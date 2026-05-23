@@ -1,9 +1,30 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 
-// ─── Firebase Configuration ───────────────────────────────────────────────────
+// ─── EmailJS Config ───────────────────────────────────────────────────────────
+const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
+const EMAILJS_TEMPLATE_ID = "6zmmd33";
+const EMAILJS_PUBLIC_KEY  = "qnGBgZu7xNKnavJb7";
+
+async function sendEmailJS(subject, message, fromName) {
+  try {
+    await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: { subject, message, name: fromName || "MokLog CheckTest", email: "moklog@moked.com.br" }
+      })
+    });
+    return true;
+  } catch(e) { console.error("EmailJS error:", e); return false; }
+}
+
+// ─── Firebase ─────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
   authDomain: "moklog-checktest.firebaseapp.com",
@@ -12,42 +33,85 @@ const firebaseConfig = {
   messagingSenderId: "390165325023",
   appId: "1:390165325023:web:3147cd333503916b0d756a"
 };
-
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
-// ─── Firebase Storage Functions ───────────────────────────────────────────────
 async function saveToFirebase(projectId, history) {
-  try {
-    await setDoc(doc(db, "projects", projectId), { history, updatedAt: new Date().toISOString() });
-  } catch(e) { console.error("Firebase save error:", e); }
+  try { await setDoc(doc(db,"projects",projectId),{history,updatedAt:new Date().toISOString()}); }
+  catch(e){ console.error("Firebase save:",e); }
 }
-
 async function loadAllFromFirebase() {
-  try {
-    const snap = await getDocs(collection(db, "projects"));
-    const data = {};
-    snap.forEach(d => { data[d.id] = d.data(); });
-    return data;
-  } catch(e) { console.error("Firebase loadAll error:", e); return {}; }
+  try { const snap=await getDocs(collection(db,"projects")); const data={}; snap.forEach(d=>{data[d.id]=d.data();}); return data; }
+  catch(e){ return {}; }
 }
-
 async function deleteReportFromFirebase(projectId, newHistory) {
-  try {
-    await setDoc(doc(db, "projects", projectId), { history: newHistory, updatedAt: new Date().toISOString() });
-  } catch(e) { console.error("Firebase delete error:", e); }
+  try { await setDoc(doc(db,"projects",projectId),{history:newHistory,updatedAt:new Date().toISOString()}); }
+  catch(e){ console.error("Firebase delete:",e); }
 }
 
-// ─── PIN Configuration ────────────────────────────────────────────────────────
+// ─── View Links (Manutenção) ──────────────────────────────────────────────────
+function generateViewToken(projectId) {
+  return btoa(projectId + "_" + Math.random().toString(36).substring(2,10)).replace(/=/g,"");
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
 const PROJECT_PINS = {
-  P601: "16601", P602: "16602", P604: "16604", P605: "16605",
-  P606: "16606", P607: "16607", P311A: "16311", P311B: "16311", P505: "16505"
+  P601:"16601",P602:"16602",P604:"16604",P605:"16605",
+  P606:"16606",P607:"16607",P311A:"16311",P311B:"16311",P505:"16505"
 };
 const ADMIN_PIN = "872101";
 const MAX_HISTORY = 26;
-const SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+const SESSION_TIMEOUT = 10 * 60 * 1000;
+const INOP_ALERT_WEEKS = 2;
+const RECURRENCE_WARN = 2;
+const RECURRENCE_CRIT = 3;
 
-// ─── Projects ─────────────────────────────────────────────────────────────────
+// ─── Push Notifications ───────────────────────────────────────────────────────
+async function requestNotificationPermission() {
+  if(!("Notification" in window)) return false;
+  if(Notification.permission === "granted") return true;
+  const result = await Notification.requestPermission();
+  return result === "granted";
+}
+
+function sendNotification(title, body, icon="") {
+  if(Notification.permission !== "granted") return;
+  try { new Notification(title, { body, icon: "/favicon.ico" }); }
+  catch(e){}
+}
+
+function scheduleWeeklyNotifications(projectName, projectId) {
+  // Store schedule in localStorage
+  const schedules = JSON.parse(localStorage.getItem("moklog_notif_schedule")||"{}");
+  schedules[projectId] = { projectName, scheduledAt: Date.now() };
+  localStorage.setItem("moklog_notif_schedule", JSON.stringify(schedules));
+}
+
+function checkPendingNotifications(stored) {
+  if(Notification.permission !== "granted") return;
+  const now = new Date();
+  const isSunday = now.getDay() === 0;
+  if(!isSunday) return;
+  const lastCheck = localStorage.getItem("moklog_notif_lastcheck");
+  const today = now.toDateString();
+  if(lastCheck === today) return;
+  localStorage.setItem("moklog_notif_lastcheck", today);
+  const hour = now.getHours();
+  Object.values(PROJECTS).forEach(p => {
+    const hist = stored[p.id]?.history??[];
+    const lastReport = hist.slice(-1)[0];
+    const lastDate = lastReport?.meta?.date;
+    const todayStr = now.toISOString().split("T")[0];
+    const filledToday = lastDate === todayStr;
+    if(hour >= 8 && hour < 14) {
+      sendNotification("MokLog CheckTest", `${p.id} – ${p.name}: Lembrete do teste semanal de hoje!`);
+    }
+    if(hour >= 14 && !filledToday) {
+      sendNotification("MokLog CheckTest ⚠️", `${p.id} – Teste semanal ainda não registrado. Não esqueça!`);
+    }
+  });
+}
+
 const PROJECTS = {
   P601: {
     id:"P601", name:"Golgi Cajamar", short:"Cajamar",
@@ -284,12 +348,21 @@ const PROJECTS = {
   },
 };
 
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const todayStr = () => new Date().toISOString().split("T")[0];
 const fmtDate = (d) => { if(!d)return"—"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
-// Status: "ok" | "partial" | "inop"
+function getWeekLabel(dateStr) {
+  if(!dateStr) return "S?";
+  try {
+    const d=new Date(dateStr+"T12:00:00");
+    const months=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    return `S${Math.ceil(d.getDate()/7)} ${months[d.getMonth()]}`;
+  } catch { return "S?"; }
+}
+
 function buildBlank(project) {
   const st = {};
   for(const cat of project.categories){
@@ -302,78 +375,157 @@ function buildBlank(project) {
   return st;
 }
 
-function computeHealth(project, state) {
-  let total=0, ok=0, partial=0, inopList=[];
+// Build from last report — carry statuses, blank header
+function buildFromLast(project, lastState) {
+  if(!lastState) return buildBlank(project);
+  const st = {};
   for(const cat of project.categories){
-    const s=state[cat.id]; if(!s)continue;
+    if(cat.type==="single"){
+      const prev=lastState[cat.id];
+      const prevSt=prev?.status??(prev?.ok===false?"inop":"ok");
+      // carry inop/partial with since date
+      st[cat.id]={status:prevSt, note:prev?.note||"", since:prevSt!=="ok"?prev?.since||todayStr():""};
+    } else if(cat.type==="items"){
+      const prev=lastState[cat.id]??cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
+      st[cat.id]=cat.itemLabels.map((_,i)=>{
+        const p=prev[i]??{status:"ok"};
+        const pSt=p.status??(p.ok===false?"inop":"ok");
+        return {status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
+      });
+    } else if(cat.type==="count"){
+      // carry inoperatives
+      st[cat.id]={total:lastState[cat.id]?.total??cat.total, inoperative:[...(lastState[cat.id]?.inoperative??[])]};
+    } else if(cat.type==="notes") st[cat.id]={items:[]};
+    else if(cat.type==="maintenance") st[cat.id]={visits:[]};
+  }
+  return st;
+}
+
+function computeHealth(project, state) {
+  let total=0, okCount=0, partial=0, inop=0;
+  for(const cat of project.categories){
+    const s=state[cat.id]; if(!s) continue;
     if(cat.type==="single"){
       total++;
-      if(s.status==="ok"||s.ok===true) ok++;
-      else if(s.status==="partial") { ok+=0.5; partial++; }
-      else inopList.push(cat.label);
+      const st=s.status??(s.ok===false?"inop":"ok");
+      if(st==="ok") okCount++; else if(st==="partial"){okCount+=0.5;partial++;} else inop++;
     } else if(cat.type==="items"){
       total+=s.length;
-      const okN=s.filter(i=>i.status==="ok"||(i.status===undefined&&i.ok===true)).length;
-      const partN=s.filter(i=>i.status==="partial").length;
-      ok+=okN+(partN*0.5);
-      if(okN+partN<s.length)inopList.push(cat.label);
+      s.forEach(v=>{
+        const st=v.status??(v.ok===false?"inop":"ok");
+        if(st==="ok") okCount++; else if(st==="partial"){okCount+=0.5;partial++;} else inop++;
+      });
     } else if(cat.type==="count"){
       const t=s.total??cat.total; total+=t;
-      const inopN=s.inoperative?.length??0; ok+=t-inopN;
-      if(inopN>0)inopList.push(cat.label);
+      const inopN=s.inoperative?.length??0; okCount+=t-inopN; inop+=inopN;
     }
   }
-  return { total, ok:Math.round(ok), pct:calcPct(Math.round(ok),total), inopList };
+  return { total, ok:Math.round(okCount), partial, inop, pct:calcPct(Math.round(okCount),total) };
+}
+
+// ─── Recurrence Analysis ──────────────────────────────────────────────────────
+function analyzeRecurrence(project, history) {
+  // Returns map of {catId_itemIdx: {count, consecutiveWeeks}}
+  const recurrence = {};
+  history.forEach(r => {
+    for(const cat of project.categories){
+      const s=r.state[cat.id]; if(!s) continue;
+      if(cat.type==="single"){
+        const st=s.status??(s.ok===false?"inop":"ok");
+        if(st!=="ok"){
+          const key=`${cat.id}_0`;
+          recurrence[key]=(recurrence[key]||0)+1;
+        }
+      } else if(cat.type==="items"){
+        s.forEach((v,i)=>{
+          const st=v.status??(v.ok===false?"inop":"ok");
+          if(st!=="ok"){
+            const key=`${cat.id}_${i}`;
+            recurrence[key]=(recurrence[key]||0)+1;
+          }
+        });
+      } else if(cat.type==="count"){
+        if((s.inoperative?.length??0)>0){
+          const key=`${cat.id}_count`;
+          recurrence[key]=(recurrence[key]||0)+1;
+        }
+      }
+    }
+  });
+  return recurrence;
+}
+
+function getRecurrenceBadge(count) {
+  if(count>=RECURRENCE_CRIT) return {label:"CRÍTICO",color:"#dc2626",bg:"#fee2e2"};
+  if(count>=RECURRENCE_WARN) return {label:"REINCIDENTE",color:"#d97706",bg:"#fef3c7"};
+  return null;
+}
+
+// ─── Consecutive weeks inop ───────────────────────────────────────────────────
+function getConsecutiveInopWeeks(project, history, catId, itemIdx) {
+  let count = 0;
+  const reversed = [...history].reverse();
+  for(const r of reversed){
+    const s=r.state[catId]; if(!s) break;
+    let isInop = false;
+    if(typeof itemIdx === "number" && Array.isArray(s)){
+      const v=s[itemIdx]; if(!v) break;
+      const st=v.status??(v.ok===false?"inop":"ok");
+      isInop = st!=="ok";
+    } else if(catId && !Array.isArray(s)){
+      const st=s.status??(s.ok===false?"inop":"ok");
+      isInop = st!=="ok";
+    }
+    if(isInop) count++; else break;
+  }
+  return count;
 }
 
 function generateReportText(project, state, meta, photos) {
   const L=[];
-  L.push("═".repeat(50));
-  L.push(`  MOKLOG CHECKTEST – RELATÓRIO DE TESTE SEMANAL`);
-  L.push("═".repeat(50));
-  L.push(`Projeto : ${project.id} – ${project.name}`);
+  L.push("="+"=".repeat(49));
+  L.push("  MOKLOG CHECKTEST - RELATORIO DE TESTE SEMANAL");
+  L.push("="+"=".repeat(49));
+  L.push(`Projeto : ${project.id} - ${project.name}`);
   L.push(`Data    : ${fmtDate(meta.date)}`);
-  L.push(`Início  : ${meta.start||"—"}  |  Término: ${meta.end||"—"}`);
-  L.push(`Líder   : ${meta.leader||"—"}`);
-  L.push(`CCO     : ${meta.cco||"—"}`);
-  L.push(`Moked 24h: ${meta.moked||"—"}  |  Contato: ${meta.mokedContact?"✓ Realizado":"✗ Não realizado"}  ${meta.mokedTime?`às ${meta.mokedTime}`:""}`);
+  L.push(`Inicio  : ${meta.start||"--"}  |  Termino: ${meta.end||"--"}`);
+  L.push(`Lider   : ${meta.leader||"--"}`);
+  L.push(`CCO     : ${meta.cco||"--"}`);
+  L.push(`Moked 24h: ${meta.moked||"--"}  |  Contato: ${meta.mokedContact?"Realizado":"Nao realizado"}  ${meta.mokedTime?`as ${meta.mokedTime}`:""}`);
   if(meta.signature) L.push(`Assinatura: ${meta.signature}`);
-  L.push("─".repeat(50));
+  L.push("-".repeat(50));
   for(const cat of project.categories){
-    const s=state[cat.id]; if(!s)continue;
+    const s=state[cat.id]; if(!s) continue;
     if(cat.type==="maintenance"){
       const visits=s.visits??[];
       L.push(`\n${cat.label}`);
       if(!visits.length) L.push("  Sem visitas registradas na semana.");
-      visits.forEach((v,i)=>{ L.push(`  Visita ${i+1}: ${fmtDate(v.date)} | Empresa: ${v.empresa||"—"} | Técnico 01: ${v.tec1||"—"} | Técnico 02: ${v.tec2||"—"} | Serviço: ${v.servico||"—"}${v.obs?` | Obs: ${v.obs}`:""}`); });
+      visits.forEach((v,i)=>L.push(`  Visita ${i+1}: ${fmtDate(v.date)} | ${v.empresa||"--"} | Tec: ${v.tec1||"--"} | ${v.servico||"--"}`));
       continue;
     }
     if(cat.type==="notes"){
       const items=s.items??[];
       L.push(`\n${cat.label}`);
-      if(!items.length) L.push("  Sem pendências.");
-      items.forEach(it=>L.push(`  ▸ ${it.label}${it.since?` (desde ${fmtDate(it.since)})`:""} ${it.note?`– ${it.note}`:""}`));
+      if(!items.length) L.push("  Sem pendencias.");
+      items.forEach(it=>L.push(`  > ${it.label}${it.since?` (desde ${fmtDate(it.since)})`:""} ${it.note?`- ${it.note}`:""}`));
       continue;
     }
     L.push(`\n${cat.label}`);
-    const statusLabel = (st, ok) => {
-      const s2 = st ?? (ok===true?"ok":ok===false?"inop":"ok");
-      return s2==="ok"?"OK":s2==="partial"?"PARCIAL":"INOPERANTE";
-    };
-    if(cat.type==="single") L.push(`  ${statusLabel(s.status,s.ok)}${s.status!=="ok"&&s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`– ${s.note}`:""}`);
-    else if(cat.type==="items") s.forEach((v,i)=>L.push(`  ${cat.itemLabels[i]}: ${statusLabel(v.status,v.ok)}${v.status!=="ok"&&v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`– ${v.note}`:""}`));
+    const stLabel=(st,ok)=>{const s2=st??(ok===false?"inop":"ok");return s2==="ok"?"OK":s2==="partial"?"PARCIAL":"INOPERANTE";};
+    if(cat.type==="single") L.push(`  ${stLabel(s.status,s.ok)}${s.status!=="ok"&&s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`- ${s.note}`:""}`);
+    else if(cat.type==="items") s.forEach((v,i)=>L.push(`  ${cat.itemLabels[i]}: ${stLabel(v.status,v.ok)}${v.status!=="ok"&&v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`- ${v.note}`:""}`));
     else if(cat.type==="count"){
       const t=s.total??cat.total; const inop=s.inoperative??[];
       L.push(`  Total: ${t} | OK: ${t-inop.length} | Inoperantes: ${inop.length}`);
-      inop.forEach(it=>L.push(`    ▸ ${it.id||"?"}${it.since?` (desde ${fmtDate(it.since)})`:""} ${it.note?`– ${it.note}`:""}`));
+      inop.forEach(it=>L.push(`    > ${it.id||"?"}${it.since?` (desde ${fmtDate(it.since)})`:""} ${it.note?`- ${it.note}`:""}`));
     }
   }
   const h=computeHealth(project,state);
-  L.push(`\n${"═".repeat(50)}`);
-  L.push(`SAÚDE GERAL: ${h.pct}%  (${h.ok}/${h.total} unidades OK)`);
-  if(meta.obs) L.push(`Observações gerais: ${meta.obs}`);
-  if(photos?.length) L.push(`Fotos anexadas: ${photos.length} foto(s)`);
-  L.push("═".repeat(50));
+  L.push(`\n${"=".repeat(50)}`);
+  L.push(`SAUDE GERAL: ${h.pct}%  (${h.ok}/${h.total} unidades OK)`);
+  if(meta.obs) L.push(`Observacoes gerais: ${meta.obs}`);
+  if(photos?.length) L.push(`Fotos: ${photos.length} foto(s) registrada(s)`);
+  L.push("=".repeat(50));
   return L.join("\n");
 }
 
@@ -397,8 +549,7 @@ function MoklogLogo({ size = 44 }) {
       <rect width="100" height="100" rx="14" fill="url(#bgGrad)"/>
       <circle cx="50" cy="50" r="38" fill="none" stroke="url(#metalGrad)" strokeWidth="7"/>
       <circle cx="50" cy="50" r="26" fill="none" stroke="url(#redGrad)" strokeWidth="8"/>
-      <circle cx="50" cy="50" r="7" fill="#111"/>
-      <circle cx="50" cy="50" r="5" fill="#222"/>
+      <circle cx="50" cy="50" r="7" fill="#111"/><circle cx="50" cy="50" r="5" fill="#222"/>
       <rect x="47.5" y="8" width="5" height="18" rx="2" fill="url(#redGrad)"/>
       <rect x="47.5" y="74" width="5" height="18" rx="2" fill="url(#redGrad)"/>
       <rect x="8" y="47.5" width="18" height="5" rx="2" fill="url(#metalGrad)"/>
@@ -411,8 +562,7 @@ function MoklogLogo({ size = 44 }) {
 }
 
 function HealthRing({ pct, size=56 }) {
-  const r=22, circ=2*Math.PI*r;
-  const dash=circ*(pct/100);
+  const r=22, circ=2*Math.PI*r, dash=circ*(pct/100);
   const color=pct>=90?"#22c55e":pct>=70?"#f59e0b":"#ef4444";
   return(
     <svg width={size} height={size} viewBox="0 0 56 56">
@@ -425,63 +575,72 @@ function HealthRing({ pct, size=56 }) {
   );
 }
 
-// ─── Status Button Component ──────────────────────────────────────────────────
-function StatusBtns({value, onChange, size="normal"}) {
-  const st = value?.status ?? (value?.ok===false?"inop":"ok");
-  const p = size==="sm" ? {padding:"4px 8px",fontSize:11} : {padding:"6px 12px",fontSize:12};
-  return (
-    <div style={{display:"flex",gap:4,flexShrink:0}}>
-      <button onClick={()=>onChange({...value,status:"ok",note:"",since:""})}
-        style={{...S.tog,...p,...(st==="ok"?S.togOk:{})}}>✓ OK</button>
-      <button onClick={()=>onChange({...value,status:"partial"})}
-        style={{...S.tog,...p,...(st==="partial"?S.togPartial:{})}}>~ Parc.</button>
-      <button onClick={()=>onChange({...value,status:"inop"})}
-        style={{...S.tog,...p,...(st==="inop"?S.togBad:{})}}>✗ Inop.</button>
+// ─── Smart Photo Upload ───────────────────────────────────────────────────────
+function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
+  const key = itemLabel ? `${catId}_${itemLabel}` : catId;
+  const existing = photos.filter(p=>p.photoKey===key);
+  const handlePhoto = (e) => {
+    const file = e.target.files?.[0]; if(!file) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const filtered = photos.filter(p=>p.photoKey!==key);
+      setPhotos([...filtered, {photoKey:key, catId, catLabel, itemLabel, name:file.name, url:ev.target.result}]);
+    };
+    r.readAsDataURL(file);
+  };
+  const removePhoto = () => setPhotos(photos.filter(p=>p.photoKey!==key));
+  if(existing.length>0) return (
+    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 8px",background:"#020510",borderRadius:6,border:"1px solid #0f172a"}}>
+      <img src={existing[0].url} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:"1px solid #1e293b"}}/>
+      <div style={{flex:1,fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{itemLabel||catLabel}</div>
+      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}}>✕</button>
     </div>
+  );
+  return (
+    <label style={{display:"flex",alignItems:"center",gap:6,marginTop:6,cursor:"pointer",color:"#334155",fontSize:11,padding:"4px 0"}}>
+      <span style={{fontSize:14}}>📷</span>
+      <span>Foto: {itemLabel||catLabel}</span>
+      <input type="file" accept="image/*" capture="environment" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
+    </label>
   );
 }
 
 // ─── Category Components ──────────────────────────────────────────────────────
-function SingleCat({cat,value,onChange}){
-  const st = value?.status ?? (value?.ok===false?"inop":"ok");
+function SingleCat({cat, value, onChange, photos, setPhotos, recurrence}){
+  const st = value?.status??(value?.ok===false?"inop":"ok");
+  const recKey = `${cat.id}_0`;
+  const badge = recurrence ? getRecurrenceBadge(recurrence[recKey]||0) : null;
   return(
     <div style={S.catCard}>
       <div style={S.catHeader}>
-        <span style={S.catLabel}>{cat.label}</span>
-        <StatusBtns value={value} onChange={onChange}/>
+        <div style={{display:"flex",alignItems:"center",gap:6,flex:1}}>
+          <span style={S.catLabel}>{cat.label}</span>
+          {badge&&<span style={{fontSize:9,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 5px",borderRadius:8}}>{badge.label}</span>}
+        </div>
+        <div style={{display:"flex",gap:4,flexShrink:0}}>
+          <button onClick={()=>onChange({...value,status:"ok",note:"",since:""})} style={{...S.sm,...(st==="ok"?S.smOk:{})}}>OK</button>
+          <button onClick={()=>onChange({...value,status:"partial"})} style={{...S.sm,...(st==="partial"?S.smPartial:{})}}>Parc.</button>
+          <button onClick={()=>onChange({...value,status:"inop"})} style={{...S.sm,...(st==="inop"?S.smBad:{})}}>Inop.</button>
+        </div>
       </div>
       {st!=="ok"&&<div style={S.subRow}>
-        <input placeholder="Descrição do problema..." value={value.note||""} onChange={e=>onChange({...value,note:e.target.value})} style={S.inp}/>
-        <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
+        <input placeholder="Descricao do problema..." value={value.note||""} onChange={e=>onChange({...value,note:e.target.value})} style={{...S.inp,fontSize:12}}/>
+        <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
           <span style={S.lbl}>Desde:</span>
-          <input type="date" value={value.since||""} onChange={e=>onChange({...value,since:e.target.value})} style={{...S.inp,maxWidth:160}}/>
+          <input type="date" value={value.since||""} onChange={e=>onChange({...value,since:e.target.value})} style={{...S.inp,maxWidth:160,fontSize:12}}/>
         </div>
+        {setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} photos={photos} setPhotos={setPhotos}/>}
       </div>}
     </div>
   );
 }
 
-function ItemsCat({cat,values,onChange,photos,setPhotos}){
+function ItemsCat({cat, values, onChange, photos, setPhotos, recurrence}){
   const upd=(i,patch)=>{const n=[...values];n[i]={...n[i],...patch};onChange(n);};
   const okN=values.filter(v=>(v.status??"ok")==="ok").length;
   const partN=values.filter(v=>v.status==="partial").length;
   const p=calcPct(okN+(partN*0.5|0),values.length);
   const dotColor=p===100?"#22c55e":p>=50?"#f59e0b":"#ef4444";
-
-  // Photos per item
-  const catPhotos = (photos||[]).filter(ph=>ph.catId===cat.id);
-  const handlePhoto=(e)=>{
-    const file=e.target.files?.[0]; if(!file)return;
-    const r=new FileReader();
-    r.onload=ev=>{
-      // Remove existing photo for this cat, add new one
-      const filtered=(photos||[]).filter(ph=>ph.catId!==cat.id);
-      setPhotos&&setPhotos([...filtered,{catId:cat.id,catLabel:cat.label,name:file.name,url:ev.target.result}]);
-    };
-    r.readAsDataURL(file);
-  };
-  const removePhoto=()=>setPhotos&&setPhotos((photos||[]).filter(ph=>ph.catId!==cat.id));
-
   return(
     <div style={S.catCard}>
       <div style={S.catHeader}>
@@ -494,99 +653,71 @@ function ItemsCat({cat,values,onChange,photos,setPhotos}){
       <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:10}}>
         {values.map((v,i)=>{
           const st=v.status??"ok";
+          const recKey=`${cat.id}_${i}`;
+          const badge=recurrence?getRecurrenceBadge(recurrence[recKey]||0):null;
           return(
-            <div key={i} style={{...S.itemRow,flexWrap:"wrap"}}>
-              <span style={{...S.iLabel,fontSize:12}}>{cat.itemLabels[i]}</span>
-              <div style={{display:"flex",gap:4,flexShrink:0}}>
-                <button onClick={()=>upd(i,{status:"ok",note:"",since:""})} style={{...S.sm,...(st==="ok"?S.smOk:{})}}>OK</button>
-                <button onClick={()=>upd(i,{status:"partial"})} style={{...S.sm,...(st==="partial"?S.smPartial:{})}}>Parc.</button>
-                <button onClick={()=>upd(i,{status:"inop"})} style={{...S.sm,...(st==="inop"?S.smBad:{})}}>Inop.</button>
+            <div key={i}>
+              <div style={{...S.itemRow,flexWrap:"wrap"}}>
+                <div style={{display:"flex",alignItems:"center",gap:4,minWidth:80,flexShrink:0}}>
+                  <span style={{...S.iLabel,fontSize:12}}>{cat.itemLabels[i]}</span>
+                  {badge&&<span style={{fontSize:8,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 4px",borderRadius:6,whiteSpace:"nowrap"}}>{badge.label}</span>}
+                </div>
+                <div style={{display:"flex",gap:4,flexShrink:0}}>
+                  <button onClick={()=>upd(i,{status:"ok",note:"",since:""})} style={{...S.sm,...(st==="ok"?S.smOk:{})}}>OK</button>
+                  <button onClick={()=>upd(i,{status:"partial"})} style={{...S.sm,...(st==="partial"?S.smPartial:{})}}>Parc.</button>
+                  <button onClick={()=>upd(i,{status:"inop"})} style={{...S.sm,...(st==="inop"?S.smBad:{})}}>Inop.</button>
+                </div>
+                {st!=="ok"&&<>
+                  <input placeholder="Problema..." value={v.note||""} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
+                  <input type="date" value={v.since||""} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
+                </>}
               </div>
-              {st!=="ok"&&<>
-                <input placeholder="Problema..." value={v.note||""} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
-                <input type="date" value={v.since||""} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-              </>}
+              {st!=="ok"&&setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} itemLabel={cat.itemLabels[i]} photos={photos} setPhotos={setPhotos}/>}
             </div>
           );
         })}
       </div>
-      {/* Photo per topic */}
-      {setPhotos&&<div style={{marginTop:10,borderTop:"1px solid #0f172a",paddingTop:8}}>
-        {catPhotos.length>0?(
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <img src={catPhotos[0].url} alt="" style={{width:60,height:45,objectFit:"cover",borderRadius:5,border:"1px solid #1e293b"}}/>
-            <div style={{flex:1,fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{catPhotos[0].name}</div>
-            <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
-          </div>
-        ):(
-          <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",color:"#334155",fontSize:11}}>
-            <span style={{fontSize:16}}>📷</span>
-            <span>Adicionar foto deste tópico</span>
-            <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
-          </label>
-        )}
-      </div>}
     </div>
   );
 }
 
-function CountCat({cat,value,onChange,photos,setPhotos}){
+function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
   const total=value.total??cat.total;
   const inop=value.inoperative??[];
   const p=calcPct(total-inop.length,total);
   const add=()=>onChange({...value,inoperative:[...inop,{id:"",note:"",since:todayStr()}]});
   const rem=(i)=>onChange({...value,inoperative:inop.filter((_,idx)=>idx!==i)});
   const upd=(i,patch)=>onChange({...value,inoperative:inop.map((it,idx)=>idx===i?{...it,...patch}:it)});
-
-  const catPhotos=(photos||[]).filter(ph=>ph.catId===cat.id);
-  const handlePhoto=(e)=>{
-    const file=e.target.files?.[0]; if(!file)return;
-    const r=new FileReader();
-    r.onload=ev=>{
-      const filtered=(photos||[]).filter(ph=>ph.catId!==cat.id);
-      setPhotos&&setPhotos([...filtered,{catId:cat.id,catLabel:cat.label,name:file.name,url:ev.target.result}]);
-    };
-    r.readAsDataURL(file);
-  };
-  const removePhoto=()=>setPhotos&&setPhotos((photos||[]).filter(ph=>ph.catId!==cat.id));
-
+  const recKey=`${cat.id}_count`;
+  const badge=recurrence?getRecurrenceBadge(recurrence[recKey]||0):null;
   return(
     <div style={S.catCard}>
       <div style={S.catHeader}>
-        <span style={S.catLabel}>{cat.label}</span>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <span style={S.catLabel}>{cat.label}</span>
+          {badge&&<span style={{fontSize:9,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 5px",borderRadius:8}}>{badge.label}</span>}
+        </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:13,fontWeight:800,color:p===100?"#22c55e":"#ef4444"}}>{p}%</span>
           <span style={{fontSize:11,color:"#475569"}}>{total-inop.length}/{total} OK</span>
           <button onClick={()=>onChange({...value,total:total+1})} style={S.iconBtn}>+</button>
-          {total>1&&<button onClick={()=>onChange({...value,total:total-1})} style={S.iconBtn}>−</button>}
+          {total>1&&<button onClick={()=>onChange({...value,total:total-1})} style={S.iconBtn}>-</button>}
         </div>
       </div>
       <div style={{marginTop:8}}>
         {inop.map((it,i)=>(
-          <div key={i} style={{...S.itemRow,flexWrap:"wrap",gap:6,marginBottom:5}}>
-            <input placeholder="ID (ex: CF-32)" value={it.id} onChange={e=>upd(i,{id:e.target.value})} style={{...S.inp,width:105,fontSize:12}}/>
-            <input placeholder="Problema..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
-            <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
+          <div key={i}>
+            <div style={{...S.itemRow,flexWrap:"wrap",gap:6,marginBottom:5}}>
+              <input placeholder="ID (ex: CF-32)" value={it.id} onChange={e=>upd(i,{id:e.target.value})} style={{...S.inp,width:105,fontSize:12}}/>
+              <input placeholder="Problema..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
+              <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
+            </div>
+            {setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} itemLabel={it.id||`Item ${i+1}`} photos={photos} setPhotos={setPhotos}/>}
           </div>
         ))}
         <button onClick={add} style={S.addBtn}>+ Registrar inoperante</button>
       </div>
-      {setPhotos&&<div style={{marginTop:10,borderTop:"1px solid #0f172a",paddingTop:8}}>
-        {catPhotos.length>0?(
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <img src={catPhotos[0].url} alt="" style={{width:60,height:45,objectFit:"cover",borderRadius:5,border:"1px solid #1e293b"}}/>
-            <div style={{flex:1,fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{catPhotos[0].name}</div>
-            <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
-          </div>
-        ):(
-          <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",color:"#334155",fontSize:11}}>
-            <span style={{fontSize:16}}>📷</span>
-            <span>Adicionar foto deste tópico</span>
-            <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
-          </label>
-        )}
-      </div>}
     </div>
   );
 }
@@ -600,13 +731,13 @@ function NotesCat({cat,value,onChange}){
     <div style={S.catCard}>
       <div style={S.catHeader}>
         <span style={S.catLabel}>{cat.label}</span>
-        <span style={{fontSize:11,color:items.length?"#ef4444":"#22c55e",fontWeight:700}}>{items.length?`${items.length} pendência(s)`:"Sem pendências"}</span>
+        <span style={{fontSize:11,color:items.length?"#ef4444":"#22c55e",fontWeight:700}}>{items.length?`${items.length} pendencia(s)`:"Sem pendencias"}</span>
       </div>
       <div style={{marginTop:8}}>
         {items.map((it,i)=>(
           <div key={i} style={{...S.itemRow,flexWrap:"wrap",gap:6,marginBottom:5}}>
             <input placeholder="Item..." value={it.label} onChange={e=>upd(i,{label:e.target.value})} style={{...S.inp,width:140,fontSize:12}}/>
-            <input placeholder="Observação..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
+            <input placeholder="Observacao..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
             <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
             <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
           </div>
@@ -636,104 +767,101 @@ function MaintenanceCat({cat,value,onChange}){
               <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:7}}>
-              <div><label style={S.lbl}>Data da Visita</label><input type="date" value={v.date} onChange={e=>upd(i,{date:e.target.value})} style={S.inp}/></div>
-              <div><label style={S.lbl}>Empresa / Prestador</label><input placeholder="Ex: Steel..." value={v.empresa} onChange={e=>upd(i,{empresa:e.target.value})} style={S.inp}/></div>
-              <div><label style={S.lbl}>Técnico 01</label><input placeholder="Nome..." value={v.tec1} onChange={e=>upd(i,{tec1:e.target.value})} style={S.inp}/></div>
-              <div><label style={S.lbl}>Técnico 02</label><input placeholder="Nome (opcional)" value={v.tec2} onChange={e=>upd(i,{tec2:e.target.value})} style={S.inp}/></div>
+              <div><label style={S.lbl}>Data</label><input type="date" value={v.date} onChange={e=>upd(i,{date:e.target.value})} style={S.inp}/></div>
+              <div><label style={S.lbl}>Empresa</label><input placeholder="Empresa..." value={v.empresa} onChange={e=>upd(i,{empresa:e.target.value})} style={S.inp}/></div>
+              <div><label style={S.lbl}>Tecnico 01</label><input placeholder="Nome..." value={v.tec1} onChange={e=>upd(i,{tec1:e.target.value})} style={S.inp}/></div>
+              <div><label style={S.lbl}>Tecnico 02</label><input placeholder="Opcional" value={v.tec2} onChange={e=>upd(i,{tec2:e.target.value})} style={S.inp}/></div>
             </div>
-            <div style={{marginTop:7}}><label style={S.lbl}>Serviço Realizado</label><input placeholder="Descreva o serviço..." value={v.servico} onChange={e=>upd(i,{servico:e.target.value})} style={S.inp}/></div>
-            <div style={{marginTop:7}}><label style={S.lbl}>Observações</label><input placeholder="Observações adicionais..." value={v.obs} onChange={e=>upd(i,{obs:e.target.value})} style={S.inp}/></div>
+            <div style={{marginTop:7}}><label style={S.lbl}>Servico Realizado</label><input placeholder="Descreva..." value={v.servico} onChange={e=>upd(i,{servico:e.target.value})} style={S.inp}/></div>
           </div>
         ))}
-        <button onClick={add} style={{...S.addBtn,borderStyle:"solid",borderColor:"#f59e0b",color:"#f59e0b"}}>+ Registrar Visita de Manutenção</button>
+        <button onClick={add} style={{...S.addBtn,borderStyle:"solid",borderColor:"#f59e0b",color:"#f59e0b"}}>+ Registrar Visita de Manutencao</button>
       </div>
     </div>
   );
 }
 
-// ─── PIN Gate per project ─────────────────────────────────────────────────────
+// ─── PIN Gate ─────────────────────────────────────────────────────────────────
 function ProjectPinGate({project, onSuccess, onBack}) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
   const correct = PROJECT_PINS[project.id];
+  const try_ = () => { if(pin===correct) onSuccess(); else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:320,width:"100%",textAlign:"center"}}>
+      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
-        <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-        <div style={{fontSize:13,color:"#94a3b8",marginBottom:4}}>{project.id} – {project.name}</div>
+        <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+        <div style={{fontSize:13,color:"#94a3b8",marginBottom:4}}>{project.id} - {project.name}</div>
         <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Insira o PIN do projeto</div>
-        <input type="password" placeholder="PIN" maxLength={8} value={pin}
+        <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(pin===correct)onSuccess();else setErr(true);}}}
+          onKeyDown={e=>{if(e.key==="Enter") try_();}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {err&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(pin===correct)onSuccess();else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10}}>Entrar</button>
-        <button onClick={onBack} style={{...S.secBtn,width:"100%"}}>← Voltar</button>
+        <button onClick={try_} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
+        <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}}>← Voltar</button>
       </div>
     </div>
   );
 }
 
-// ─── Dashboard Screen ─────────────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({stored, onBack, onDeleteReport}) {
-  const [pin, setPin] = useState("");
-  const [auth, setAuth] = useState(false);
-  const [err, setErr] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [viewReport, setViewReport] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
-  const [selectedReports, setSelectedReports] = useState({});
-  const [sessionTime, setSessionTime] = useState(Date.now());
+  const [pin,setPin]=useState(""); const [auth,setAuth]=useState(false); const [err,setErr]=useState(false);
+  const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
+  const [sessionTime,setSessionTime]=useState(Date.now());
+  const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
 
-  // Session timeout
   useEffect(()=>{
     if(!auth) return;
-    const timer = setInterval(()=>{
-      if(Date.now() - sessionTime > SESSION_TIMEOUT){ setAuth(false); setPin(""); }
-    }, 30000);
-    return ()=>clearInterval(timer);
-  },[auth, sessionTime]);
+    const t=setInterval(()=>{if(Date.now()-sessionTime>SESSION_TIMEOUT){setAuth(false);setPin("");}},30000);
+    return ()=>clearInterval(t);
+  },[auth,sessionTime]);
 
-  const resetSession = () => setSessionTime(Date.now());
+  const resetSess=()=>setSessionTime(Date.now());
 
-  if(!auth) return (
-    <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSession}>
+  const toggleViewLink=(pid)=>{
+    const cur=viewLinks[pid];
+    const next={...viewLinks};
+    if(cur) delete next[pid]; else next[pid]=generateViewToken(pid);
+    setViewLinks(next);
+    localStorage.setItem("moklog_viewlinks",JSON.stringify(next));
+  };
+
+  if(!auth) return(
+    <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSess}>
       <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
         <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
-        <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Acesso restrito — insira o PIN</div>
+        <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);resetSession();}else setErr(true);}}}
+          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {err&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(pin===ADMIN_PIN){setAuth(true);resetSession();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
+        <button onClick={()=>{if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
         <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}}>← Voltar</button>
       </div>
     </div>
   );
 
-  // ── View single report ──
-  if(viewReport) return (
-    <div style={S.page} onClick={resetSession}>
+  // View single report
+  if(viewReport) return(
+    <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
           <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
-          <div>
+          <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{viewReport.project.id} — {getWeekLabel(viewReport.report.meta?.date)}</div>
-            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(viewReport.report.meta?.date)} • {viewReport.report.meta?.leader||"—"}</div>
+            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(viewReport.report.meta?.date)} · Lider: {viewReport.report.meta?.leader||"—"}</div>
           </div>
-          <div style={{marginLeft:"auto"}}>
-            <HealthRing pct={computeHealth(viewReport.project,viewReport.report.state).pct} size={46}/>
-          </div>
+          <HealthRing pct={computeHealth(viewReport.project,viewReport.report.state).pct} size={46}/>
         </div>
-
-        {/* Report detail */}
         {viewReport.project.categories.map(cat=>{
           const sv=viewReport.report.state[cat.id]; if(!sv) return null;
-          const h=computeHealth(viewReport.project,viewReport.report.state);
           let cp=100;
           if(cat.type==="single"){const st=sv.status??(sv.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
           else if(cat.type==="items"){const okN=sv.filter(v=>(v.status??"ok")==="ok").length;const partN=sv.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),sv.length);}
@@ -741,88 +869,89 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           const dotColor=cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444";
           return(
             <div key={cat.id} style={{background:"#060c18",border:`1px solid ${dotColor}22`,borderRadius:8,padding:"10px 12px",marginBottom:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:cp<100?8:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <span style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0}}/>
                 <span style={{fontSize:12,fontWeight:700,color:"#cbd5e1",flex:1}}>{cat.label}</span>
                 {cat.type!=="maintenance"&&cat.type!=="notes"&&<span style={{fontSize:11,fontWeight:800,color:dotColor}}>{cp}%</span>}
               </div>
-              {cp<100&&cat.type==="items"&&sv.filter(v=>(v.status??"ok")!=="ok").map((v,i)=>{
-                const allV=sv; const idx=allV.indexOf(v);
-                const st=v.status??(v.ok===false?"inop":"ok");
-                return <div key={i} style={{fontSize:11,color:st==="partial"?"#f59e0b":"#ef4444",marginLeft:16,marginTop:2}}>
-                  ↳ {cat.itemLabels[idx]}: {st==="partial"?"PARCIAL":"INOP"}{v.since?` desde ${fmtDate(v.since)}`:""}{v.note?` — ${v.note}`:""}
+              {cp<100&&cat.type==="items"&&sv.filter(v=>(v.status??"ok")!=="ok").map((v,idx)=>{
+                const i=sv.indexOf(v); const st=v.status??"ok";
+                return <div key={idx} style={{fontSize:11,color:st==="partial"?"#f59e0b":"#ef4444",marginLeft:16,marginTop:2}}>
+                  ↳ {cat.itemLabels[i]}: {st==="partial"?"PARCIAL":"INOP"}{v.since?` desde ${fmtDate(v.since)}`:""}{v.note?` — ${v.note}`:""}
                 </div>;
               })}
               {cp<100&&cat.type==="count"&&(sv.inoperative??[]).map((it,i)=>(
                 <div key={i} style={{fontSize:11,color:"#ef4444",marginLeft:16,marginTop:2}}>↳ {it.id||"?"}{it.since?` desde ${fmtDate(it.since)}`:""}{it.note?` — ${it.note}`:""}</div>
               ))}
               {cat.type==="notes"&&(sv.items??[]).map((it,i)=>(
-                <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:2}}>▸ {it.label}{it.since?` (desde ${fmtDate(it.since)})`:""}{it.note?` — ${it.note}`:""}</div>
+                <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:2}}>▸ {it.label}{it.note?` — ${it.note}`:""}</div>
               ))}
             </div>
           );
         })}
-
-        <div style={{display:"flex",gap:8,marginTop:8}}>
+        <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
           <button onClick={()=>generatePDF(viewReport.project,viewReport.report.state,viewReport.report.meta,[])}
-            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>
-            📄 Exportar PDF
-          </button>
-          <button onClick={()=>{
-            setConfirmDelete({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});
-            setViewReport(null);
-          }} style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>
-            🗑 Excluir
-          </button>
+            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
+          <button onClick={()=>{setConfirmDel({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});setViewReport(null);}}
+            style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir</button>
         </div>
       </div>
     </div>
   );
 
-  // ── Project detail ──
-  if(selectedProject){
-    const p=selectedProject;
+  // Project detail
+  if(selProject){
+    const p=selProject;
     const hist=stored[p.id]?.history??[];
-    const sel=selectedReports[p.id]??[];
+    const sel=selReports[p.id]??[];
     const toggleSel=(idx)=>{
-      const cur=selectedReports[p.id]??[];
-      const next=cur.includes(idx)?cur.filter(i=>i!==idx):[...cur,idx];
-      setSelectedReports(prev=>({...prev,[p.id]:next}));
+      const cur=selReports[p.id]??[];
+      const next=cur.includes(idx)?cur.filter(i=>i!==idx):(cur.length<6?[...cur,idx]:cur);
+      setSelReports(prev=>({...prev,[p.id]:next}));
     };
+    const recurrence=analyzeRecurrence(p,hist);
+    const viewToken=viewLinks[p.id];
+    const viewUrl=viewToken?`${window.location.origin}${window.location.pathname}?view=${p.id}_${viewToken}`:"";
 
     return(
-      <div style={S.page} onClick={resetSession}>
+      <div style={S.page} onClick={resetSess}>
         <div style={S.formWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-            <button onClick={()=>{setSelectedProject(null);setSelectedReports({});}} style={S.backBtn}>← Painel</button>
+            <button onClick={()=>{setSelProject(null);setSelReports({});}} style={S.backBtn}>← Painel</button>
             <MoklogLogo size={32}/>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
-              <div style={{fontSize:11,color:"#334155"}}>{hist.length} relatório(s) • selecione para consolidado</div>
+              <div style={{fontSize:11,color:"#334155"}}>{hist.length}/{MAX_HISTORY} relatorios</div>
             </div>
           </div>
 
-          {hist.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#334155",fontSize:14}}>
-            <div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatório salvo ainda.
-          </div>}
+          {/* View link for maintenance */}
+          <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>🔗 Link Manutencao</div>
+                <div style={{fontSize:10,color:"#64748b"}}>{viewToken?"Ativo — empresa ve pendencias":"Inativo"}</div>
+              </div>
+              <button onClick={()=>toggleViewLink(p.id)}
+                style={{...S.sm,...(viewToken?S.smBad:S.smOk),fontSize:11,padding:"5px 10px"}}>
+                {viewToken?"Desativar":"Ativar"}
+              </button>
+            </div>
+            {viewToken&&<div style={{marginTop:8}}>
+              <div style={{fontSize:9,color:"#64748b",wordBreak:"break-all",background:"#020510",padding:"5px 8px",borderRadius:5,marginBottom:5}}>{viewUrl}</div>
+              <button onClick={()=>navigator.clipboard.writeText(viewUrl)}
+                style={{...S.sm,fontSize:10,width:"100%"}}>📋 Copiar Link</button>
+            </div>}
+          </div>
 
-          {/* Consolidated button */}
           {sel.length>=2&&(
-            <button onClick={()=>generateConsolidatedPDF(p, sel.map(i=>hist[i]).sort((a,b)=>a.meta?.date?.localeCompare(b.meta?.date)))}
-              style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:10,fontSize:14}}>
+            <button onClick={()=>generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")))}
+              style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:8,fontSize:14}}>
               📊 Gerar Consolidado ({sel.length} semanas)
             </button>
           )}
-          {sel.length===1&&(
-            <div style={{background:"#0f172a",borderRadius:8,padding:"10px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:10}}>
-              Selecione mais {2-sel.length} relatório(s) para gerar o consolidado
-            </div>
-          )}
-          {sel.length===0&&hist.length>0&&(
-            <div style={{background:"#0f172a",borderRadius:8,padding:"10px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:10}}>
-              ☑ Selecione 2 a 6 relatórios para gerar o consolidado
-            </div>
-          )}
+          {sel.length===1&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:8}}>Selecione mais 1 para consolidado</div>}
+          {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:8}}>☑ Selecione 2 a 6 relatorios para consolidado</div>}
 
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {hist.slice().reverse().map((r,revIdx)=>{
@@ -833,64 +962,64 @@ function Dashboard({stored, onBack, onDeleteReport}) {
               const isSelected=sel.includes(realIdx);
               return(
                 <div key={realIdx} style={{background:"#060c18",border:`2px solid ${isSelected?color:"#0f172a"}`,borderRadius:12,padding:"12px 14px"}}>
-                  {/* Checkbox + header */}
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <button onClick={()=>{if(sel.length<6||isSelected)toggleSel(realIdx);}}
-                      style={{width:28,height:28,borderRadius:6,border:`2px solid ${isSelected?color:"#1e293b"}`,background:isSelected?color+"22":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:isSelected?color:"#334155"}}>
+                    <button onClick={()=>toggleSel(realIdx)}
+                      style={{width:30,height:30,borderRadius:6,border:`2px solid ${isSelected?color:"#1e293b"}`,background:isSelected?color+"22":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:isSelected?color:"#334155"}}>
                       {isSelected?"✓":""}
                     </button>
                     <HealthRing pct={h.pct} size={44}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{weekLabel} <span style={{fontSize:11,color:"#334155",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
-                      <div style={{fontSize:11,color:"#475569",marginTop:1}}>Líder: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
+                      <div style={{fontSize:11,color:"#475569"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
                       {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
-                      <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600,marginTop:1}}>
-                        {h.inop>0?`${h.inop} inoperante(s)`:"✔ Tudo OK"}
-                      </div>
+                      <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inop`:"✔ OK"}</div>
                     </div>
                   </div>
                   <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
                     <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
-                    <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})}
-                      style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>
-                      👁 Visualizar
-                    </button>
-                    <button onClick={()=>generatePDF(p,r.state,r.meta,[])}
-                      style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
-                      📄 PDF
-                    </button>
-                    <button onClick={()=>setConfirmDelete({projectId:p.id,idx:realIdx,date:r.meta?.date})}
-                      style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>
-                      🗑
-                    </button>
+                    <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
+                    <button onClick={()=>generatePDF(p,r.state,r.meta,[])} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
+                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+        {confirmDel&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+            <div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}>
+              <div style={{fontSize:26,marginBottom:10}}>🗑️</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div>
+              <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);setSelProject(null);}}
+                  style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button>
+                <button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ── Main dashboard ──
-  const allProjects = Object.values(PROJECTS);
-  const valid = allProjects.map(p=>{
-    const hist=stored[p.id]?.history??[];
-    if(!hist.length) return null;
-    const last=hist[hist.length-1];
-    const h=computeHealth(p,last.state);
+  // Main dashboard overview
+  const allProjects=Object.values(PROJECTS);
+  const valid=allProjects.map(p=>{
+    const hist=stored[p.id]?.history??[]; if(!hist.length) return null;
+    const last=hist[hist.length-1]; const h=computeHealth(p,last.state);
     return{...p,pct:h.pct,date:last.meta?.date,inopN:h.inop};
   }).filter(Boolean);
   const avgPct=valid.length?Math.round(valid.reduce((a,b)=>a+b.pct,0)/valid.length):null;
 
-  return (
-    <div style={S.page} onClick={resetSession}>
+  return(
+    <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-          <button onClick={onBack} style={S.backBtn}>← Início</button>
+          <button onClick={onBack} style={S.backBtn}>← Inicio</button>
           <MoklogLogo size={34}/>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:900,color:"#f1f5f9"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
@@ -898,7 +1027,6 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           </div>
           {avgPct!==null&&<HealthRing pct={avgPct} size={52}/>}
         </div>
-
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjects.map(p=>{
             const hist=stored[p.id]?.history??[];
@@ -906,22 +1034,19 @@ function Dashboard({stored, onBack, onDeleteReport}) {
             const h=last?computeHealth(p,last.state):null;
             const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";
             return(
-              <div key={p.id} onClick={()=>setSelectedProject(p)}
-                style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer",active:{opacity:.8}}}>
+              <div key={p.id} onClick={()=>setSelProject(p)}
+                style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}>
                 <div style={{display:"flex",alignItems:"center",gap:12}}>
                   {h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#334155"}}>—</div>}
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
-                    {h?(
-                      <div style={{fontSize:11,color:"#475569",marginTop:2}}>
-                        Último: {fmtDate(last.meta?.date)} · {h.inop} inop · {hist.length} relatório(s)
-                      </div>
-                    ):<div style={{fontSize:11,color:"#334155",marginTop:2}}>Sem registros</div>}
+                    {h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop · {hist.length} rel.</div>
+                      :<div style={{fontSize:11,color:"#334155",marginTop:2}}>Sem registros</div>}
                   </div>
                   <span style={{color:"#334155",fontSize:16}}>›</span>
                 </div>
                 {h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2,transition:"width .5s"}}/>
+                  <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
                 </div>}
                 {hist.length>1&&<div style={{display:"flex",gap:3,marginTop:6}}>
                   {hist.slice(-6).map((r,i)=>{
@@ -935,18 +1060,16 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           })}
         </div>
       </div>
-
-      {/* Confirm Delete Modal */}
-      {confirmDelete&&(
+      {confirmDel&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
           <div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}>
             <div style={{fontSize:26,marginBottom:10}}>🗑️</div>
-            <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatório?</div>
-            <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDelete.projectId} — {fmtDate(confirmDelete.date)}<br/>Esta ação não pode ser desfeita.</div>
+            <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{onDeleteReport(confirmDelete.projectId,confirmDelete.idx);setConfirmDelete(null);}}
+              <button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}}
                 style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button>
-              <button onClick={()=>setConfirmDelete(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
+              <button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
             </div>
           </div>
         </div>
@@ -956,124 +1079,37 @@ function Dashboard({stored, onBack, onDeleteReport}) {
 }
 
 // ─── History Screen ───────────────────────────────────────────────────────────
-function getWeekLabel(dateStr) {
-  if (!dateStr) return "S?";
-  const d = new Date(dateStr + "T12:00:00");
-  const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  return `S${Math.ceil(d.getDate()/7)} ${months[d.getMonth()]}`;
-}
-
-function generateStructuredExport(project, report, weekLabel) {
-  const { state, meta } = report;
-  const h = computeHealth(project, state);
-  const L = [];
-  L.push(`╔${"═".repeat(58)}╗`);
-  L.push(`  MOKLOG CHECKTEST – EXPORTAÇÃO ESTRUTURADA`);
-  L.push(`╚${"═".repeat(58)}╝`);
-  L.push(`Projeto  : ${project.id} – ${project.name}`);
-  L.push(`Semana   : ${weekLabel}`);
-  L.push(`Data     : ${fmtDate(meta?.date)}  |  ${meta?.start||"—"} – ${meta?.end||"—"}`);
-  L.push(`Líder    : ${meta?.leader||"—"}`);
-  L.push(`CCO      : ${meta?.cco||"—"}`);
-  L.push(`Moked 24h: ${meta?.moked||"—"}  |  Contato: ${meta?.mokedContact?"✓ Realizado":"✗ Não realizado"}${meta?.mokedTime?` às ${meta.mokedTime}`:""}`);
-  L.push(`Saúde    : ${h.pct}%  (${h.ok}/${h.total} unidades OK)`);
-  if(meta?.signature) L.push(`Assinatura: ${meta.signature}`);
-  L.push("─".repeat(60));
-  const inopItems = [];
-  for (const cat of project.categories) {
-    const s = state[cat.id]; if (!s) continue;
-    if (cat.type === "single" && (s.status==="inop"||(s.status===undefined&&s.ok===false))) {
-      inopItems.push({ label: cat.label, id: "—", since: s.since, note: s.note });
-    } else if (cat.type === "items") {
-      s.forEach((v, i) => { if (v.status==="inop"||(v.status===undefined&&v.ok===false)) inopItems.push({ label: `${cat.label} – ${cat.itemLabels[i]}`, id: cat.itemLabels[i], since: v.since, note: v.note }); });
-    } else if (cat.type === "count") {
-      (s.inoperative ?? []).forEach(it => inopItems.push({ label: cat.label, id: it.id||"?", since: it.since, note: it.note }));
-    }
-  }
-  L.push(`\nITENS INOPERANTES (${inopItems.length})`);
-  if (!inopItems.length) L.push("  ✔ Nenhum item inoperante registrado.");
-  else inopItems.forEach((it, i) => { L.push(`  ${i+1}. ${it.label}${it.id && it.id !== "—" ? ` [${it.id}]` : ""} – INOP${it.since ? ` desde ${fmtDate(it.since)}` : ""}${it.note ? ` – ${it.note}` : ""}`); });
-  if (meta?.obs) { L.push(`\nOBSERVAÇÕES GERAIS`); L.push(`  ${meta.obs}`); }
-  L.push(`\n${"═".repeat(60)}`);
-  L.push(`FIM DA EXPORTAÇÃO – ${project.id} ${weekLabel} – MokLog CheckTest`);
-  L.push("═".repeat(60));
-  return L.join("\n");
-}
-
 function HistoryScreen({project, stored, onBack}) {
-  const hist = (stored[project.id]?.history??[]).slice().reverse();
-  const [exportText, setExportText] = useState(null);
-  const [copiedIdx, setCopiedIdx] = useState(null);
-
-  const handleExport = (r, i, weekLabel) => {
-    const text = generateStructuredExport(project, r, weekLabel);
-    setExportText({ text, idx: i, weekLabel });
-  };
-
-  if (exportText) return (
-    <div style={S.page}>
-      <div style={S.formWrap}>
-        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-          <button onClick={()=>setExportText(null)} style={S.backBtn}>← Voltar</button>
-          <div>
-            <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Exportar — {project.id} {exportText.weekLabel}</div>
-            <div style={{fontSize:11,color:"#334155"}}>Copie e cole no Claude para gerar o relatório</div>
-          </div>
-        </div>
-        <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"60vh",overflowY:"auto",marginBottom:12}}>
-          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:11,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{exportText.text}</pre>
-        </div>
-        <button onClick={()=>{navigator.clipboard.writeText(exportText.text);setCopiedIdx(exportText.idx);setTimeout(()=>setCopiedIdx(null),2500);}} style={{...S.primaryBtn,width:"100%"}}>
-          {copiedIdx===exportText.idx?"✓ Copiado!":"📋 Copiar Texto"}
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
+  const hist=(stored[project.id]?.history??[]).slice().reverse();
+  return(
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:4}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
           <div>
-            <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Histórico — {project.id}</div>
-            <div style={{fontSize:11,color:"#334155"}}>{project.name} • Últimas {MAX_HISTORY} semanas (somente leitura)</div>
+            <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div>
+            <div style={{fontSize:11,color:"#334155"}}>{project.name} · somente leitura</div>
           </div>
         </div>
-        {!hist.length&&(
-          <div style={{textAlign:"center",padding:"40px 0",color:"#334155",fontSize:14}}>
-            <div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatório salvo ainda.
-          </div>
-        )}
+        {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#334155",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatorio salvo ainda.</div>}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {hist.map((r,i)=>{
             const h=computeHealth(project,r.state);
             const color=h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444";
             const weekLabel=getWeekLabel(r.meta?.date);
-            const inopCount=h.total-h.ok;
             return(
               <div key={i} style={{background:"#060c18",border:`1px solid ${color}22`,borderRadius:12,padding:"12px 14px"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <HealthRing pct={h.pct} size={46}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{weekLabel}</span>
-                      <span style={{fontSize:11,color:"#334155"}}>{fmtDate(r.meta?.date)}</span>
-                    </div>
-                    <div style={{fontSize:11,color:"#475569",marginTop:2}}>Líder: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
-                    {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b",marginTop:1}}>✍ {r.meta.signature}</div>}
-                    <div style={{fontSize:11,color:inopCount>0?"#ef4444":"#22c55e",marginTop:1,fontWeight:600}}>
-                      {inopCount>0?`${inopCount} inoperante(s)`:"✔ Tudo OK"}
-                    </div>
+                    <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{weekLabel} <span style={{fontSize:11,color:"#334155",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
+                    <div style={{fontSize:11,color:"#475569"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
+                    {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
+                    <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inoperante(s)`:"✔ Tudo OK"}</div>
                   </div>
                 </div>
                 <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
-                </div>
-                <div style={{display:"flex",gap:6,marginTop:10}}>
-                  <button onClick={()=>handleExport(r,i,weekLabel)} style={{...S.primaryBtn,flex:1,padding:"9px 10px",fontSize:12}}>
-                    📄 Exportar
-                  </button>
                 </div>
               </div>
             );
@@ -1085,43 +1121,162 @@ function HistoryScreen({project, stored, onBack}) {
 }
 
 // ─── Report Screen ────────────────────────────────────────────────────────────
-function ReportScreen({project,state,meta,photos,onBack,onHome}){
+function ReportScreen({project, state, meta, photos, onBack, onHome, onSendEmail}) {
   const [copied,setCopied]=useState(false);
+  const [emailSent,setEmailSent]=useState(false);
+  const [sending,setSending]=useState(false);
   const text=generateReportText(project,state,meta,photos);
   const subject=`[${project.id}] MokLog CheckTest – Teste Semanal – ${fmtDate(meta.date)}`;
-  const mailto=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+
+  const handleWhatsApp=()=>{
+    const msg=encodeURIComponent(`*${subject}*\n\nSaude: ${computeHealth(project,state).pct}%\nLider: ${meta.leader||"—"} · CCO: ${meta.cco||"—"}\nAssinatura: ${meta.signature||"—"}\n\n_MokLog CheckTest_`);
+    window.open(`https://wa.me/?text=${msg}`,"_blank");
+  };
+
+  const handleEmail=async()=>{
+    setSending(true);
+    const success=await sendEmailJS(subject, text, `MokLog CheckTest – ${project.id}`);
+    setSending(false);
+    if(success) setEmailSent(true);
+    else alert("Erro ao enviar. Verifique a conexao.");
+  };
+
   return(
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-          <h2 style={{color:"#f1f5f9",fontSize:16,fontWeight:800,margin:0}}>Relatório — {project.id}</h2>
+          <h2 style={{color:"#f1f5f9",fontSize:16,fontWeight:800,margin:0}}>Relatorio — {project.id}</h2>
+          <HealthRing pct={computeHealth(project,state).pct} size={44}/>
         </div>
-        {photos?.length>0&&(
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:11,color:"#475569",marginBottom:6}}>Fotos ({photos.length})</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {photos.map((p,i)=><img key={i} src={p.url} alt={p.catLabel||p.name} style={{width:64,height:48,objectFit:"cover",borderRadius:5,border:"1px solid #0f172a"}} title={p.catLabel||""}/>)}
-            </div>
+
+        {/* Success banner */}
+        <div style={{background:"#021a0d",border:"1px solid #22c55e",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>✅</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div>
+            <div style={{fontSize:11,color:"#475569"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}</div>
           </div>
-        )}
-        <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"50vh",overflowY:"auto",marginBottom:14}}>
-          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:11,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button onClick={()=>generatePDF(project,state,meta,photos)} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+
+        {/* Action buttons */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+          <button onClick={()=>generatePDF(project,state,meta,photos)}
+            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>
             📄 Exportar PDF
           </button>
-          <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1}}>
+          <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}}
+            style={{...S.primaryBtn,flex:1,fontSize:13}}>
             {copied?"✓ Copiado!":"📋 Copiar Texto"}
           </button>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}>
-          <a href={mailto} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#059669,#047857)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:"#fff"}}>
-            ✉ Enviar E-mail
-          </a>
-          <button onClick={onHome} style={{...S.secBtn,flex:1}}>🏠 Início</button>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+          <button onClick={handleEmail} disabled={sending||emailSent}
+            style={{...S.primaryBtn,flex:1,background:emailSent?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#059669,#047857)",fontSize:13,opacity:sending?0.7:1}}>
+            {sending?"⟳ Enviando...":emailSent?"✓ Email Enviado!":"✉ Enviar Email"}
+          </button>
+          <button onClick={handleWhatsApp}
+            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#16a34a,#15803d)",fontSize:13}}>
+            💬 WhatsApp
+          </button>
         </div>
+        <button onClick={onHome} style={{...S.secBtn,width:"100%",fontSize:13}}>🏠 Inicio</button>
+
+        {/* Report preview */}
+        <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"45vh",overflowY:"auto",marginTop:12}}>
+          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:10,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── View Screen (Manutenção) ─────────────────────────────────────────────────
+function ViewScreen({projectId, token, stored}) {
+  const project = PROJECTS[projectId];
+  const viewLinks = JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");
+  const validToken = viewLinks[projectId];
+
+  if(!project || !validToken || token !== validToken) {
+    return(
+      <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
+        <div style={{textAlign:"center",padding:32,color:"#334155"}}>
+          <div style={{fontSize:40,marginBottom:12}}>🔒</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div>
+          <div style={{fontSize:13,color:"#64748b"}}>Solicite um novo link ao gestor.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const hist = stored[projectId]?.history??[];
+  const last = hist.slice(-1)[0];
+  if(!last) return(
+    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center",padding:32,color:"#334155"}}>
+        <div style={{fontSize:40,marginBottom:12}}>📭</div>
+        <div style={{fontSize:16,color:"#f1f5f9"}}>Sem relatorios disponíveis ainda.</div>
+      </div>
+    </div>
+  );
+
+  const h = computeHealth(project, last.state);
+  const issues = [];
+  for(const cat of project.categories){
+    const s=last.state[cat.id]; if(!s) continue;
+    if(cat.type==="single"){
+      const st=s.status??(s.ok===false?"inop":"ok");
+      if(st!=="ok") issues.push({cat:cat.label,item:"—",status:st,since:s.since,note:s.note});
+    } else if(cat.type==="items"){
+      s.forEach((v,i)=>{
+        const st=v.status??(v.ok===false?"inop":"ok");
+        if(st!=="ok") issues.push({cat:cat.label,item:cat.itemLabels[i],status:st,since:v.since,note:v.note});
+      });
+    } else if(cat.type==="count"){
+      (s.inoperative??[]).forEach(it=>issues.push({cat:cat.label,item:it.id||"?",status:"inop",since:it.since,note:it.note}));
+    }
+  }
+
+  return(
+    <div style={S.page}>
+      <div style={S.formWrap}>
+        <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"16px",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <MoklogLogo size={40}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>MokLog CheckTest</div>
+              <div style={{fontSize:12,color:"#cc2222",fontWeight:700}}>{project.id} – {project.name}</div>
+              <div style={{fontSize:11,color:"#475569"}}>Pendencias para manutencao · {fmtDate(last.meta?.date)}</div>
+            </div>
+            <HealthRing pct={h.pct} size={52}/>
+          </div>
+        </div>
+
+        <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",gap:16,justifyContent:"space-around",textAlign:"center"}}>
+          <div><div style={{fontSize:22,fontWeight:900,color:"#22c55e"}}>{h.ok}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>OK</div></div>
+          <div><div style={{fontSize:22,fontWeight:900,color:"#f59e0b"}}>{h.partial}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>PARCIAL</div></div>
+          <div><div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{h.inop}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>INOP</div></div>
+          <div><div style={{fontSize:22,fontWeight:900,color:"#f1f5f9"}}>{h.pct}%</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>SAUDE</div></div>
+        </div>
+
+        <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Itens com Pendencia ({issues.length})</div>
+        {issues.length===0&&<div style={{textAlign:"center",padding:"20px",color:"#22c55e",fontSize:13}}>✔ Nenhuma pendencia ativa</div>}
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {issues.map((iss,i)=>(
+            <div key={i} style={{background:"#060c18",border:`1px solid ${iss.status==="partial"?"#f59e0b33":"#ef444433"}`,borderRadius:8,padding:"10px 12px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                <span style={{fontSize:9,fontWeight:700,color:iss.status==="partial"?"#f59e0b":"#ef4444",background:iss.status==="partial"?"#fef3c7":"#fee2e2",padding:"2px 6px",borderRadius:8}}>
+                  {iss.status==="partial"?"PARCIAL":"INOP"}
+                </span>
+                <span style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>{iss.cat}</span>
+              </div>
+              {iss.item&&iss.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8",marginBottom:2}}>Item: {iss.item}</div>}
+              {iss.since&&<div style={{fontSize:11,color:"#64748b"}}>Desde: {fmtDate(iss.since)}</div>}
+              {iss.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{iss.note}</div>}
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:16,fontSize:10,color:"#1e293b",textAlign:"center"}}>MokLog CheckTest © Moked Security Consulting · Somente leitura</div>
       </div>
     </div>
   );
@@ -1129,252 +1284,225 @@ function ReportScreen({project,state,meta,photos,onBack,onHome}){
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App(){
-  const [screen, setScreen] = useState("home");
-  const [project, setProject] = useState(PROJECTS.P601);
-  const [state, setState] = useState(null);
-  const [meta, setMeta] = useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
-  const [stored, setStored] = useState({});
-  const [photos, setPhotos] = useState([]);
-  const [active, setActive] = useState(null);
-  const [syncing, setSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("");
-  const [loaded, setLoaded] = useState(false);
-  const [projectAuth, setProjectAuth] = useState({}); // {P601: timestamp}
-  const [sigError, setSigError] = useState(false);
-  const [draft, setDraft] = useState(null); // rascunho salvo
-  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const [screen,setScreen]=useState("home");
+  const [project,setProject]=useState(PROJECTS.P601);
+  const [state,setState]=useState(null);
+  const [meta,setMeta]=useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
+  const [stored,setStored]=useState({});
+  const [photos,setPhotos]=useState([]);
+  const [active,setActive]=useState(null);
+  const [syncing,setSyncing]=useState(false);
+  const [syncStatus,setSyncStatus]=useState("");
+  const [loaded,setLoaded]=useState(false);
+  const [projectAuth,setProjectAuth]=useState({});
+  const [sigError,setSigError]=useState(false);
+  const [draft,setDraft]=useState(null);
+  const [showDraftPrompt,setShowDraftPrompt]=useState(false);
+  const [viewParams,setViewParams]=useState(null);
+  const [notifGranted,setNotifGranted]=useState(false);
 
-  // Session timeout check
-  const checkAuth = (pid) => {
-    const ts = projectAuth[pid];
-    if(!ts) return false;
-    return (Date.now() - ts) < SESSION_TIMEOUT;
-  };
+  // Check for view mode from URL
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const view=params.get("view");
+    if(view){
+      const [pid,token]=view.split("_");
+      if(pid&&token) setViewParams({projectId:pid,token});
+    }
+  },[]);
 
-  const grantAuth = (pid) => {
-    setProjectAuth(prev => ({...prev, [pid]: Date.now()}));
-  };
+  // Request notifications on mount
+  useEffect(()=>{
+    requestNotificationPermission().then(granted=>{
+      setNotifGranted(granted);
+    });
+  },[]);
 
   // Load data
   useEffect(()=>{
-    const localData = (() => { try{ const r=localStorage.getItem("seccheck_v4"); return r?JSON.parse(r):{}; }catch{return{};} })();
-    setStored(localData);
-    // Load draft
-    try { const d=localStorage.getItem("moklog_draft"); if(d) setDraft(JSON.parse(d)); } catch{}
-    loadAllFromFirebase().then(fbData=>{
-      if(Object.keys(fbData).length > 0){
-        setStored(fbData);
-        localStorage.setItem("seccheck_v4", JSON.stringify(fbData));
-      }
+    const local=(()=>{try{const r=localStorage.getItem("seccheck_v4");return r?JSON.parse(r):{};}catch{return{};}})();
+    setStored(local);
+    try{const d=localStorage.getItem("moklog_draft");if(d)setDraft(JSON.parse(d));}catch{}
+    loadAllFromFirebase().then(fb=>{
+      if(Object.keys(fb).length>0){setStored(fb);localStorage.setItem("seccheck_v4",JSON.stringify(fb));}
       setLoaded(true);
-    }).catch(()=>{ setLoaded(true); });
+    }).catch(()=>setLoaded(true));
   },[]);
+
+  // Check notifications after load
+  useEffect(()=>{
+    if(loaded) checkPendingNotifications(stored);
+  },[loaded]);
 
   // Real-time listener
   useEffect(()=>{
     if(!loaded) return;
-    const unsubscribers = Object.keys(PROJECTS).map(pid => {
-      return onSnapshot(doc(db,"projects",pid), (snap)=>{
+    const unsubs=Object.keys(PROJECTS).map(pid=>
+      onSnapshot(doc(db,"projects",pid),(snap)=>{
         if(snap.exists()){
           setStored(prev=>{
-            const updated = {...prev, [pid]: snap.data()};
-            localStorage.setItem("seccheck_v4", JSON.stringify(updated));
-            return updated;
+            const up={...prev,[pid]:snap.data()};
+            localStorage.setItem("seccheck_v4",JSON.stringify(up));
+            return up;
           });
         }
-      }, ()=>{});
-    });
-    return ()=>unsubscribers.forEach(u=>u());
+      },()=>{})
+    );
+    return ()=>unsubs.forEach(u=>u());
   },[loaded]);
 
-  // Auto-save draft when form is open
+  // Auto-save draft
   useEffect(()=>{
-    if(screen==="form" && state){
-      const d = {projectId:project.id, state, meta, photos, savedAt: Date.now()};
-      localStorage.setItem("moklog_draft", JSON.stringify(d));
+    if(screen==="form"&&state){
+      const d={projectId:project.id,state,meta,photos,savedAt:Date.now()};
+      localStorage.setItem("moklog_draft",JSON.stringify(d));
       setDraft(d);
     }
-  },[screen, state, meta, photos]);
+  },[screen,state,meta,photos]);
 
-  const clearDraft = () => {
-    localStorage.removeItem("moklog_draft");
-    setDraft(null);
-  };
+  const clearDraft=()=>{localStorage.removeItem("moklog_draft");setDraft(null);};
+  const checkAuth=(pid)=>{const ts=projectAuth[pid];return ts&&(Date.now()-ts)<SESSION_TIMEOUT;};
+  const grantAuth=(pid)=>setProjectAuth(prev=>({...prev,[pid]:Date.now()}));
+  const lastForProject=stored[project.id]?.history?.slice(-1)[0]??null;
+  const recurrence=analyzeRecurrence(project,stored[project.id]?.history??[]);
 
-  const lastForProject = stored[project.id]?.history?.slice(-1)[0]??null;
-
-  const saveReport = async(st, mt) => {
-    setSyncing(true); setSyncStatus("");
-    const prev = stored[project.id]?.history??[];
-    const next = [...prev, {state:st, meta:mt, savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
-    const updated = {...stored, [project.id]: {...stored[project.id], history:next, updatedAt:new Date().toISOString()}};
-    setStored(updated);
-    localStorage.setItem("seccheck_v4", JSON.stringify(updated));
+  const saveReport=async(st,mt)=>{
+    setSyncing(true);setSyncStatus("");
+    const prev=stored[project.id]?.history??[];
+    const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
+    const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
+    setStored(up);localStorage.setItem("seccheck_v4",JSON.stringify(up));
     clearDraft();
-    try{ await saveToFirebase(project.id, next); setSyncStatus("saved"); }
-    catch(e){ setSyncStatus("error"); }
-    finally{ setSyncing(false); setTimeout(()=>setSyncStatus(""),3000); }
-  };
-
-  const deleteReport = async(projectId, idx) => {
-    const prev = stored[projectId]?.history??[];
-    const next = prev.filter((_,i)=>i!==idx);
-    const updated = {...stored, [projectId]: {...stored[projectId], history:next, updatedAt:new Date().toISOString()}};
-    setStored(updated);
-    localStorage.setItem("seccheck_v4", JSON.stringify(updated));
-    try{ await deleteReportFromFirebase(projectId, next); }
-    catch(e){ console.error(e); }
-  };
-
-  const startNew = () => {
-    // Check for draft
-    if(draft && draft.projectId===project.id){
-      setShowDraftPrompt(true);
-      return;
+    try{await saveToFirebase(project.id,next);setSyncStatus("saved");}
+    catch(e){setSyncStatus("error");}
+    finally{setSyncing(false);setTimeout(()=>setSyncStatus(""),3000);}
+    // Send notification for critical items
+    const h=computeHealth(project,st);
+    const criticalItems=[];
+    for(const cat of project.categories){
+      const s=st[cat.id]; if(!s) continue;
+      if(cat.type==="items"){
+        s.forEach((v,i)=>{
+          const wks=getConsecutiveInopWeeks(project,next,cat.id,i);
+          if(wks>=INOP_ALERT_WEEKS){
+            criticalItems.push(`${cat.itemLabels[i]} (${wks}sem)`);
+          }
+        });
+      }
     }
-    // Pre-fill with last report's statuses, blank header
-    const base = lastForProject ? lastForProject.state : buildBlank(project);
+    if(criticalItems.length>0){
+      sendNotification(`${project.id} – ALERTA`,`Itens criticos: ${criticalItems.slice(0,3).join(", ")}`);
+    }
+    sendNotification(`${project.id} – Relatorio Finalizado`,`${project.name}: ${h.pct}% · Assinado por ${mt.signature||"—"}`);
+  };
+
+  const deleteReport=async(projectId,idx)=>{
+    const prev=stored[projectId]?.history??[];
+    const next=prev.filter((_,i)=>i!==idx);
+    const up={...stored,[projectId]:{...stored[projectId],history:next,updatedAt:new Date().toISOString()}};
+    setStored(up);localStorage.setItem("seccheck_v4",JSON.stringify(up));
+    try{await deleteReportFromFirebase(projectId,next);}catch(e){}
+  };
+
+  const startNew=()=>{
+    if(draft&&draft.projectId===project.id){setShowDraftPrompt(true);return;}
+    const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);
     setState(base);
     setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
-    setPhotos([]);
-    setScreen("form");
-    setActive(null);
+    setPhotos([]);setScreen("form");setActive(null);
   };
 
-  const continueDraft = () => {
-    setState(draft.state);
-    setMeta(draft.meta);
-    setPhotos(draft.photos||[]);
-    setShowDraftPrompt(false);
-    setScreen("form");
-    setActive(null);
+  const continueDraft=()=>{setState(draft.state);setMeta(draft.meta);setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);};
+  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);};
+
+  const finalize=()=>{
+    if(!meta.signature||meta.signature.trim()===""){setSigError(true);window.scrollTo(0,document.body.scrollHeight);return;}
+    setSigError(false);saveReport(state,meta);setScreen("report");
   };
 
-  const discardDraft = () => {
-    clearDraft();
-    setShowDraftPrompt(false);
-    const base = lastForProject ? lastForProject.state : buildBlank(project);
-    setState(base);
-    setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
-    setPhotos([]);
-    setScreen("form");
-    setActive(null);
-  };
+  const updateCat=useCallback((id,val)=>setState(prev=>({...prev,[id]:val})),[]);
+  const health=state?computeHealth(project,state):null;
 
-  const finalize = () => {
-    if(!meta.signature || meta.signature.trim()===""){
-      setSigError(true);
-      window.scrollTo(0,document.body.scrollHeight);
-      return;
-    }
-    setSigError(false);
-    saveReport(state, meta);
-    setScreen("report");
-  };
+  const SyncBadge=()=>syncing?(
+    <div style={{position:"fixed",bottom:16,right:16,background:"#1d4ed8",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>⟳ Sincronizando...</div>
+  ):syncStatus==="saved"?(
+    <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✓ Salvo</div>
+  ):syncStatus==="error"?(
+    <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✗ Erro — local OK</div>
+  ):null;
 
-  const updateCat = useCallback((id,val)=>setState(prev=>({...prev,[id]:val})),[]);
-  const health = state ? computeHealth(project, state) : null;
+  // ── View mode (manutenção)
+  if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
-  const SyncBadge = ()=> syncing ? (
-    <div style={{position:"fixed",bottom:16,right:16,background:"#1d4ed8",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999,boxShadow:"0 4px 12px rgba(0,0,0,.4)"}}>⟳ Sincronizando...</div>
-  ) : syncStatus==="saved" ? (
-    <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999,boxShadow:"0 4px 12px rgba(0,0,0,.4)"}}>✓ Salvo na nuvem</div>
-  ) : syncStatus==="error" ? (
-    <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999,boxShadow:"0 4px 12px rgba(0,0,0,.4)"}}>✗ Erro — dados locais OK</div>
-  ) : null;
-
-  // Draft prompt modal
-  if(showDraftPrompt) return (
+  // ── Draft prompt
+  if(showDraftPrompt) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #f59e0b",borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
         <div style={{fontSize:28,marginBottom:10}}>📝</div>
         <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Rascunho encontrado</div>
-        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>
-          Você tem um relatório em andamento de {project.id}.<br/>
-          Deseja continuar de onde parou?
-        </div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Relatorio em andamento de {project.id}. Continuar?</div>
         <div style={{display:"flex",gap:8,flexDirection:"column"}}>
-          <button onClick={continueDraft} style={{...S.primaryBtn,width:"100%"}}>↩ Continuar rascunho</button>
-          <button onClick={discardDraft} style={{...S.secBtn,width:"100%"}}>🗑 Descartar e começar novo</button>
+          <button onClick={continueDraft} style={{...S.primaryBtn,width:"100%",fontSize:14}}>↩ Continuar rascunho</button>
+          <button onClick={discardDraft} style={{...S.secBtn,width:"100%",fontSize:14}}>🗑 Descartar e comecar novo</button>
         </div>
       </div>
     </div>
   );
 
-  // Project PIN gate
-  if(screen==="pin_gate") return (
-    <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>
-  );
-
-  // ── DASHBOARD ──
+  // ── PIN gate
+  if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onDeleteReport={deleteReport}/>;
-
-  // ── HISTORY ──
   if(screen==="history") return <HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/>;
-
-  // ── REPORT ──
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} onBack={()=>setScreen("form")} onHome={()=>setScreen("home")}/>;
 
-  // ── FORM ──
-  if(screen==="form") return (
+  // ── FORM
+  if(screen==="form") return(
     <div style={S.page}>
       <SyncBadge/>
       <div style={S.formWrap}>
-        {/* Header */}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:10,borderBottom:"1px solid #060c18",marginBottom:2}}>
-          <button onClick={()=>setScreen("home")} style={S.backBtn}>← Início</button>
+          <button onClick={()=>setScreen("home")} style={S.backBtn}>← Inicio</button>
           <MoklogLogo size={32}/>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:900,color:"#f8fafc",letterSpacing:.3}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-            <div style={{fontSize:11,color:"#334155",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{project.id} – {project.name}</div>
+            <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+            <div style={{fontSize:11,color:"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}</div>
           </div>
           {health&&<HealthRing pct={health.pct} size={46}/>}
         </div>
-
-        {/* Progress */}
         {health&&<div style={{height:3,background:"#060c18",borderRadius:2,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${health.pct}%`,background:health.pct>=90?"#22c55e":health.pct>=70?"#f59e0b":"#ef4444",borderRadius:2,transition:"width .4s"}}/>
         </div>}
-
-        {/* Cabeçalho */}
         <div style={S.metaCard}>
-          <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabeçalho do Relatório</div>
+          <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabecalho do Relatorio</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
-            {[["Data","date","date"],["Início","start","time"],["Término","end","time"],["Líder VSPP","leader","text"],["CCO","cco","text"],["Operador Moked 24h","moked","text"],["Horário Contato Moked","mokedTime","time"]].map(([label,key,type])=>(
+            {[["Data","date","date"],["Inicio","start","time"],["Termino","end","time"],["Lider VSPP","leader","text"],["CCO","cco","text"],["Operador Moked 24h","moked","text"],["Horario Contato Moked","mokedTime","time"]].map(([label,key,type])=>(
               <div key={key}>
                 <label style={S.lbl}>{label}</label>
                 <input type={type} placeholder={type==="text"?"Nome...":""} value={meta[key]} onChange={e=>setMeta(m=>({...m,[key]:e.target.value}))} style={S.inp}/>
               </div>
             ))}
             <div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-              <label style={S.lbl}>Contato Moked realizado?</label>
+              <label style={S.lbl}>Contato Moked?</label>
               <div style={{display:"flex",gap:6,marginTop:3}}>
                 <button onClick={()=>setMeta(m=>({...m,mokedContact:true}))} style={{...S.sm,...(meta.mokedContact?S.smOk:{}),flex:1}}>✓ Sim</button>
-                <button onClick={()=>setMeta(m=>({...m,mokedContact:false}))} style={{...S.sm,...(!meta.mokedContact?S.smBad:{}),flex:1}}>✗ Não</button>
+                <button onClick={()=>setMeta(m=>({...m,mokedContact:false}))} style={{...S.sm,...(!meta.mokedContact?S.smBad:{}),flex:1}}>✗ Nao</button>
               </div>
             </div>
           </div>
           <div style={{marginTop:8}}>
-            <label style={S.lbl}>Observações Gerais</label>
-            <textarea placeholder="Observações adicionais..." value={meta.obs} onChange={e=>setMeta(m=>({...m,obs:e.target.value}))} style={{...S.inp,height:52,resize:"vertical",fontSize:12}}/>
+            <label style={S.lbl}>Observacoes Gerais</label>
+            <textarea placeholder="Observacoes adicionais..." value={meta.obs} onChange={e=>setMeta(m=>({...m,obs:e.target.value}))} style={{...S.inp,height:52,resize:"vertical",fontSize:12}}/>
           </div>
         </div>
 
-        {/* Categories */}
         {state&&project.categories.map(cat=>{
           const isOpen=active===cat.id;
           const sv=state[cat.id];
           let cp=100;
           if(cat.type==="single"){const st=sv?.status??(sv?.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
-          else if(cat.type==="items"){
-            const a=sv||[];
-            const okN=a.filter(v=>(v.status??"ok")==="ok").length;
-            const partN=a.filter(v=>v.status==="partial").length;
-            cp=calcPct(okN+(partN*0.5|0),a.length);
-          }
+          else if(cat.type==="items"){const a=sv||[];const okN=a.filter(v=>(v.status??"ok")==="ok").length;const partN=a.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),a.length);}
           else if(cat.type==="count"){const t=sv?.total??cat.total;cp=calcPct(t-(sv?.inoperative?.length??0),t);}
-          else if(cat.type==="notes") cp=100;
-          else if(cat.type==="maintenance") cp=100;
+          else cp=100;
           const dotColor=cat.type==="maintenance"?"#f59e0b":cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444";
           return(
             <div key={cat.id} style={{borderBottom:"1px solid #060c18"}}>
@@ -1386,9 +1514,9 @@ export default function App(){
               </button>
               {isOpen&&sv&&(
                 <div style={{paddingBottom:8}}>
-                  {cat.type==="single"&&<SingleCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)}/>}
-                  {cat.type==="items"&&<ItemsCat cat={cat} values={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos}/>}
-                  {cat.type==="count"&&<CountCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos}/>}
+                  {cat.type==="single"&&<SingleCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence}/>}
+                  {cat.type==="items"&&<ItemsCat cat={cat} values={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence}/>}
+                  {cat.type==="count"&&<CountCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence}/>}
                   {cat.type==="notes"&&<NotesCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)}/>}
                   {cat.type==="maintenance"&&<MaintenanceCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)}/>}
                 </div>
@@ -1397,27 +1525,21 @@ export default function App(){
           );
         })}
 
-        {/* Signature */}
         {state&&(
           <div style={{...S.metaCard,marginTop:8,border:sigError?"1px solid #ef4444":"1px solid #0f172a"}}>
             <div style={{fontSize:11,color:sigError?"#ef4444":"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
-              ✍️ Assinatura {sigError&&"— obrigatória para finalizar"}
+              ✍️ Assinatura {sigError&&"— obrigatoria para finalizar"}
             </div>
-            <input
-              placeholder="Digite seu nome completo para assinar..."
-              value={meta.signature||""}
+            <input placeholder="Digite seu nome completo para assinar..." value={meta.signature||""}
               onChange={e=>{setMeta(m=>({...m,signature:e.target.value}));setSigError(false);}}
-              style={{...S.inp,fontSize:13,fontWeight:600}}
-            />
-            <div style={{fontSize:10,color:"#334155",marginTop:5}}>O relatório só pode ser finalizado com assinatura.</div>
+              style={{...S.inp,fontSize:13,fontWeight:600}}/>
+            <div style={{fontSize:10,color:"#334155",marginTop:5}}>Obrigatorio para finalizar o relatorio.</div>
           </div>
         )}
-
-        {/* Actions */}
         {state&&(
           <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button onClick={finalize} style={{...S.primaryBtn,flex:2}}>✓ Finalizar e Gerar Relatório</button>
-            <button onClick={()=>setScreen("home")} style={{...S.secBtn,flex:1}}>Cancelar</button>
+            <button onClick={finalize} style={{...S.primaryBtn,flex:2,fontSize:14}}>✓ Finalizar e Gerar Relatorio</button>
+            <button onClick={()=>setScreen("home")} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
         <div style={{fontSize:10,color:"#1e293b",textAlign:"center",marginTop:4}}>💾 Rascunho salvo automaticamente</div>
@@ -1425,8 +1547,8 @@ export default function App(){
     </div>
   );
 
-  // ── HOME ──
-  return (
+  // ── HOME
+  return(
     <div style={S.page}>
       <SyncBadge/>
       <div style={S.homeWrap}>
@@ -1435,12 +1557,23 @@ export default function App(){
           <div>
             <div style={{fontSize:22,fontWeight:900,color:"#f8fafc",letterSpacing:-0.5}}>MokLog</div>
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
-            <div style={{fontSize:10,color:"#334155",marginTop:1}}>Sistema de Teste Semanal de Segurança</div>
+            <div style={{fontSize:10,color:"#334155",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
-          <button onClick={()=>setScreen("dashboard")} style={{marginLeft:"auto",background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"7px 11px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
+          <button onClick={()=>setScreen("dashboard")} style={{marginLeft:"auto",background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
         </div>
 
-        {/* Draft banner */}
+        {!notifGranted&&(
+          <div style={{background:"#0f172a",border:"1px solid #f59e0b44",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:16}}>🔔</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Ativar notificacoes</div>
+              <div style={{fontSize:11,color:"#64748b"}}>Receba lembretes semanais e alertas</div>
+            </div>
+            <button onClick={()=>requestNotificationPermission().then(g=>setNotifGranted(g))}
+              style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Ativar</button>
+          </div>
+        )}
+
         {draft&&draft.projectId===project.id&&(
           <div style={{background:"#0f172a",border:"1px solid #f59e0b55",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:16}}>📝</span>
@@ -1448,7 +1581,7 @@ export default function App(){
               <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
               <div style={{fontSize:11,color:"#64748b"}}>{project.id} — salvo automaticamente</div>
             </div>
-            <button onClick={()=>{setShowDraftPrompt(true);}} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44"}}>Continuar</button>
+            <button onClick={()=>setShowDraftPrompt(true)} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Continuar</button>
           </div>
         )}
 
@@ -1481,18 +1614,15 @@ export default function App(){
         </div>
 
         <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
-          {checkAuth(project.id) ? (
+          {checkAuth(project.id)?(
             <>
-              <button onClick={startNew} style={S.primaryBtn}>＋ Novo Relatório — {project.id}</button>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>setScreen("history")} style={{...S.secBtn,flex:1}}>📅 Histórico</button>
-              </div>
+              <button onClick={startNew} style={{...S.primaryBtn,fontSize:14}}>+ Novo Relatorio — {project.id}</button>
+              <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14}}>📅 Historico</button>
             </>
-          ) : (
-            <button onClick={()=>setScreen("pin_gate")} style={S.primaryBtn}>🔐 Acessar — {project.id}</button>
+          ):(
+            <button onClick={()=>setScreen("pin_gate")} style={{...S.primaryBtn,fontSize:14}}>🔐 Acessar — {project.id}</button>
           )}
         </div>
-
         <div style={{fontSize:10,color:"#1e293b",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
     </div>
@@ -1529,5 +1659,4 @@ const S={
   iconBtn:{background:"#020510",border:"1px solid #0f172a",color:"#475569",borderRadius:5,width:24,height:24,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0},
   addBtn:{background:"transparent",border:"1px dashed #0f172a",color:"#334155",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",marginTop:4},
   subRow:{display:"flex",flexDirection:"column",gap:6,marginTop:8,paddingTop:8,borderTop:"1px solid #0f172a"},
-  photoSection:{background:"#060c18",borderRadius:10,padding:12,border:"1px solid #0f172a",marginTop:4},
 };
