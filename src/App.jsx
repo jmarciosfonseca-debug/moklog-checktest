@@ -1147,7 +1147,55 @@ function ReportScreen({project, state, meta, photos, onBack, onHome, onSendEmail
 
   const handleEmail=async()=>{
     setSending(true);
-    const success=await sendEmailJS(subject, text, `MokLog CheckTest – ${project.id}`);
+    const h=computeHealth(project,state);
+    const issues=[];
+    for(const cat of project.categories){
+      const s=state[cat.id]; if(!s) continue;
+      if(cat.type==="single"){const st=s.status??(s.ok===false?"inop":"ok");if(st!=="ok")issues.push(`  • ${cat.label}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`- ${s.note}`:""}`);}
+      else if(cat.type==="items"){s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok")issues.push(`  • ${cat.label} / ${cat.itemLabels[i]}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`- ${v.note}`:""}`);});}
+      else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push(`  • ${cat.label} [${it.id||"?"}]${it.since?` desde ${fmtDate(it.since)}`:""} ${it.note?`- ${it.note}`:""}`));}
+    }
+    const enrichedMessage = [
+      "================================================",
+      `  MOKLOG CHECKTEST - RELATORIO DE TESTE SEMANAL`,
+      "================================================",
+      `Projeto  : ${project.id} - ${project.name}`,
+      `Data     : ${fmtDate(meta.date)}`,
+      `Periodo  : ${meta.start||"--"} as ${meta.end||"--"}`,
+      `Lider    : ${meta.leader||"--"}`,
+      `CCO      : ${meta.cco||"--"}`,
+      `Moked 24h: ${meta.moked||"--"} | Contato: ${meta.mokedContact?"Realizado":"Nao realizado"}${meta.mokedTime?` as ${meta.mokedTime}`:""}`,
+      `Assinatura: ${meta.signature||"--"}`,
+      "",
+      "------------------------------------------------",
+      "  INDICADORES DE SAUDE",
+      "------------------------------------------------",
+      `  Saude Geral : ${h.pct}%`,
+      `  Itens OK    : ${h.ok}`,
+      `  Parciais    : ${h.partial}`,
+      `  Inoperantes : ${h.inop}`,
+      "",
+      issues.length>0 ? [
+        "------------------------------------------------",
+        `  ITENS COM PROBLEMA (${issues.length})`,
+        "------------------------------------------------",
+        ...issues,
+      ].join("\n") : "  Todos os itens operando normalmente.",
+      "",
+      "------------------------------------------------",
+      "  ACESSO AO SISTEMA",
+      "------------------------------------------------",
+      `  App MokLog CheckTest:`,
+      `  https://moklog-checktest.vercel.app`,
+      "",
+      meta.obs ? `Observacoes: ${meta.obs}\n` : "",
+      "================================================",
+      `Gerado automaticamente pelo MokLog CheckTest`,
+      `Moked Consulting Security`,
+      "================================================",
+    ].join("\n");
+
+    const success=await sendEmailJS(subject, enrichedMessage, `MokLog CheckTest – ${project.id}`);
     setSending(false);
     if(success) setEmailSent(true);
     else alert("Erro ao enviar. Verifique a conexao.");
