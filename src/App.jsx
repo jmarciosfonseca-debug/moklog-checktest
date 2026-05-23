@@ -1141,7 +1141,25 @@ function ReportScreen({project, state, meta, photos, onBack, onHome, onSendEmail
   const subject=`[${project.id}] MokLog CheckTest – Teste Semanal – ${fmtDate(meta.date)}`;
 
   const handleWhatsApp=()=>{
-    const msg=encodeURIComponent(`*${subject}*\n\nSaude: ${computeHealth(project,state).pct}%\nLider: ${meta.leader||"—"} · CCO: ${meta.cco||"—"}\nAssinatura: ${meta.signature||"—"}\n\n_MokLog CheckTest_`);
+    const h=computeHealth(project,state);
+    const waIssues=[];
+    for(const cat of project.categories){
+      const s=state[cat.id]; if(!s) continue;
+      if(cat.type==="single"){const st=s.status??(s.ok===false?"inop":"ok");if(st!=="ok")waIssues.push(`• ${cat.label}: ${st==="partial"?"Parcial":"Inop"}`);}
+      else if(cat.type==="items"){s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok")waIssues.push(`• ${cat.itemLabels[i]}: ${st==="partial"?"Parcial":"Inop"}`);});}
+      else if(cat.type==="count"){const inopN=s.inoperative?.length??0;if(inopN>0)waIssues.push(`• ${cat.label}: ${inopN} inop`);}
+    }
+    const inopText=waIssues.length>0?`\n\n*Itens com problema:*\n${waIssues.slice(0,10).join("\n")}${waIssues.length>10?`\n...+${waIssues.length-10} mais`:""}`:
+      "\n\n✅ Todos os itens operando normalmente.";
+    const msg=encodeURIComponent(
+      `*[${project.id}] MokLog CheckTest – ${fmtDate(meta.date)}*\n` +
+      `📍 ${project.name}\n` +
+      `📊 Saúde: *${h.pct}%* | ✅ ${h.ok} OK | ⚠️ ${h.partial} Parcial | 🔴 ${h.inop} Inop\n` +
+      `👤 Líder: ${meta.leader||"—"} · CCO: ${meta.cco||"—"}\n` +
+      `✍️ Assinatura: ${meta.signature||"—"}` +
+      inopText +
+      `\n\n🔗 https://moklog-checktest.vercel.app\n_MokLog CheckTest © Moked Security_`
+    );
     window.open(`https://wa.me/?text=${msg}`,"_blank");
   };
 
@@ -1679,32 +1697,121 @@ export default function App(){
           </div>
         )}
 
+        {/* ── VISUAL DASHBOARD ── */}
         <div style={{width:"100%"}}>
-          <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Selecione o projeto</div>
-          <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            {Object.values(PROJECTS).map(p=>{
+          <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
+            Saúde dos Projetos
+          </div>
+
+          {/* Projects with problems FIRST */}
+          {(()=>{
+            const allP = Object.values(PROJECTS).map(p=>{
               const hist=stored[p.id]?.history??[];
               const last=hist.slice(-1)[0];
               const h=last?computeHealth(p,last.state):null;
-              const isActive=p.id===project.id;
-              const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";
-              return(
-                <button key={p.id} onClick={()=>setProject(p)} style={{...S.projCard,...(isActive?{...S.projCardActive,borderColor:color+"66"}:{})}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,flex:1}}>
-                    <div style={{width:9,height:9,borderRadius:"50%",background:isActive?color:"#1e293b",border:`1px solid ${isActive?color:"#334155"}`,flexShrink:0}}/>
-                    <div style={{textAlign:"left"}}>
-                      <div style={{fontSize:12,fontWeight:800,color:isActive?color:"#475569"}}>{p.id}</div>
-                      <div style={{fontSize:13,color:isActive?"#e2e8f0":"#334155"}}>{p.name}</div>
+              return {p,h,last,hist};
+            });
+            const withProblems = allP.filter(({h})=>h&&h.pct<90);
+            const allOk = allP.filter(({h})=>!h||h.pct>=90);
+
+            return <>
+              {/* PROBLEM PROJECTS — big cards */}
+              {withProblems.length>0&&(
+                <>
+                  <div style={{fontSize:9,color:"#ef4444",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block"}}/>
+                    Requer Atenção ({withProblems.length})
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
+                    {withProblems.map(({p,h,last,hist})=>{
+                      const isActive=p.id===project.id;
+                      const color=h.pct>=70?"#f59e0b":"#ef4444";
+                      return(
+                        <button key={p.id} onClick={()=>setProject(p)}
+                          style={{background:isActive?"#0a0f1e":"#060c18",border:`2px solid ${isActive?color:color+"55"}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",textAlign:"left",width:"100%"}}>
+                          <div style={{display:"flex",alignItems:"center",gap:12}}>
+                            <HealthRing pct={h.pct} size={52}/>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{p.id} — {p.name}</div>
+                              <div style={{fontSize:11,color:"#475569",marginTop:2}}>
+                                {h.inop>0&&<span style={{color:"#ef4444",fontWeight:700}}>{h.inop} inop · </span>}
+                                {h.partial>0&&<span style={{color:"#f59e0b",fontWeight:700}}>{h.partial} parcial · </span>}
+                                Último: {fmtDate(last?.meta?.date)}
+                              </div>
+                              {/* Mini sparkline */}
+                              {hist.length>1&&<div style={{display:"flex",gap:2,marginTop:5}}>
+                                {hist.slice(-6).map((r,i)=>{
+                                  const rh=computeHealth(p,r.state);
+                                  const rc=rh.pct>=90?"#22c55e":rh.pct>=70?"#f59e0b":"#ef4444";
+                                  return <div key={i} style={{flex:1,height:18,background:`${rc}22`,border:`1px solid ${rc}44`,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:rc,fontWeight:700}}>{rh.pct}%</div>;
+                                })}
+                              </div>}
+                            </div>
+                            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                              {isActive&&<span style={{fontSize:9,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:6}}>SELECIONADO</span>}
+                              <span style={{color:"#334155",fontSize:14}}>›</span>
+                            </div>
+                          </div>
+                          {/* Health bar */}
+                          <div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
+                            <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2,transition:"width .5s"}}/>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* OK PROJECTS — compact list */}
+              {allOk.length>0&&(
+                <>
+                  <div style={{fontSize:9,color:"#22c55e",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>
+                    Operando Normalmente ({allOk.length})
+                  </div>
+                  <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,overflow:"hidden"}}>
+                    {allOk.map(({p,h,last},idx)=>{
+                      const isActive=p.id===project.id;
+                      const color=h?"#22c55e":"#334155";
+                      return(
+                        <button key={p.id} onClick={()=>setProject(p)}
+                          style={{width:"100%",background:isActive?"#060f20":"transparent",border:"none",borderBottom:idx<allOk.length-1?"1px solid #0a0f1e":"none",padding:"10px 14px",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
+                          <div style={{flex:1}}>
+                            <span style={{fontSize:12,fontWeight:700,color:isActive?"#f1f5f9":"#cbd5e1"}}>{p.id}</span>
+                            <span style={{fontSize:12,color:isActive?"#94a3b8":"#475569",marginLeft:6}}>{p.name}</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                            {h&&<span style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{h.pct}%</span>}
+                            {!h&&<span style={{fontSize:10,color:"#334155"}}>Sem dados</span>}
+                            {last&&<span style={{fontSize:10,color:"#334155"}}>{fmtDate(last?.meta?.date)}</span>}
+                            <span style={{color:"#1e293b",fontSize:12}}>›</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Overall health summary */}
+              {allP.some(({h})=>h)&&(()=>{
+                const valid=allP.filter(({h})=>h);
+                const avg=Math.round(valid.reduce((a,{h})=>a+h.pct,0)/valid.length);
+                const totalInop=valid.reduce((a,{h})=>a+h.inop,0);
+                return(
+                  <div style={{marginTop:8,background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <div style={{fontSize:11,color:"#334155",fontWeight:700}}>Saúde Geral da Operação</div>
+                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                      {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop total</span>}
+                      <span style={{fontSize:16,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}}>{avg}%</span>
                     </div>
                   </div>
-                  {h&&<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
-                    <span style={{fontSize:12,fontWeight:700,color}}>{h.pct}%</span>
-                    <span style={{fontSize:10,color:"#334155"}}>{fmtDate(last?.meta?.date)}</span>
-                  </div>}
-                </button>
-              );
-            })}
-          </div>
+                );
+              })()}
+            </>;
+          })()}
         </div>
 
         <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8,marginTop:4}}>

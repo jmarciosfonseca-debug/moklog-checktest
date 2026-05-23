@@ -216,61 +216,75 @@ export function generateConsolidatedPDF(project, reports){
   }));
 
   const periodLabel = `${weeks[0].label} – ${weeks[weeks.length-1].label}`;
+  const lastWeek = weeks[weeks.length-1];
 
-  // Build comparison table — collect all unique issue keys
-  const allIssueKeys = new Set();
-  weeks.forEach(w => w.issues.forEach(iss => allIssueKeys.add(`${iss.cat}|${iss.item}`)));
-  
-  // Also add items that were OK in some weeks (from categories)
-  const catSummaryKeys = new Set();
-  project.categories.filter(c=>c.type!=="notes"&&c.type!=="maintenance").forEach(cat=>{
-    catSummaryKeys.add(cat.label);
-  });
-
-  // Collect all items across all weeks for comparison
+  // Build item tracking across weeks
   const allItems = new Map();
   weeks.forEach(w=>{
     for(const cat of project.categories){
       if(cat.type==="notes"||cat.type==="maintenance") continue;
       const s=w.state[cat.id]; if(!s) continue;
       if(cat.type==="single"){
-        const key=`${cat.label}|—`;
+        const key=`${cat.id}|—`;
         if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:"—",weeks:{}});
         const st=s.status??(s.ok===false?"inop":"ok");
         allItems.get(key).weeks[w.label]=st;
       } else if(cat.type==="items"){
         s.forEach((v,i)=>{
-          const key=`${cat.label}|${cat.itemLabels[i]}`;
+          const key=`${cat.id}|${cat.itemLabels[i]}`;
           if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:cat.itemLabels[i],weeks:{}});
           const st=v.status??(v.ok===false?"inop":"ok");
           allItems.get(key).weeks[w.label]=st;
         });
       } else if(cat.type==="count"){
-        const inopIds=(s.inoperative??[]).map(it=>it.id||"?");
-        const key=`${cat.label}|—`;
-        if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:`${s.total??cat.total} câmeras`,weeks:{}});
-        const inopN=s.inoperative?.length??0;
-        allItems.get(key).weeks[w.label]=inopN>0?"inop":"ok";
+        const key=`${cat.id}|—`;
+        if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:`${s.total??cat.total} unid.`,weeks:{}});
+        allItems.get(key).weeks[w.label]=(s.inoperative?.length??0)>0?"inop":"ok";
       }
     }
   });
 
-  // Filter only items that had at least one issue
   const issueItems = Array.from(allItems.values()).filter(it=>
     Object.values(it.weeks).some(st=>st!=="ok")
   );
 
-  // Active pendencies — items that are still inop/partial in last week
-  const lastWeek = weeks[weeks.length-1];
-  const activePendencies = lastWeek.issues.map((iss,i)=>({
-    ...iss,
-    priority: i<3?"CRÍTICA":i<6?"ALTA":i<9?"MÉDIA":"BAIXA"
-  }));
+  // Calculate consecutive weeks for each issue item in last week
+  const activeIssues = lastWeek.issues.map(iss=>{
+    const key = `${iss.cat}|${iss.item}`;
+    const item = allItems.get(key);
+    let consecutive = 0;
+    if(item){
+      for(let i=weeks.length-1;i>=0;i--){
+        const st=item.weeks[weeks[i].label];
+        if(st&&st!=="ok") consecutive++; else break;
+      }
+    }
+    return {...iss, consecutive, priority: consecutive>=4?"CRÍTICA":consecutive>=2?"ALTA":"MÉDIA"};
+  }).sort((a,b)=>b.consecutive-a.consecutive);
+
+  // Executive summary
+  const newIssues = lastWeek.issues.filter(iss=>{
+    const key=`${iss.cat}|${iss.item}`;
+    const item=allItems.get(key);
+    if(!item) return true;
+    const prevWeek=weeks[weeks.length-2];
+    if(!prevWeek) return true;
+    return item.weeks[prevWeek.label]==="ok"||!item.weeks[prevWeek.label];
+  });
+  const resolvedIssues = weeks.length>1 ? weeks[weeks.length-2].issues.filter(iss=>{
+    const key=`${iss.cat}|${iss.item}`;
+    const item=allItems.get(key);
+    if(!item) return false;
+    return item.weeks[lastWeek.label]==="ok";
+  }) : [];
+
+  const pctTrend = weeks.length>1 ? lastWeek.health.pct - weeks[weeks.length-2].health.pct : 0;
+  const trendText = pctTrend>0?`↑ +${pctTrend}% em relacao a semana anterior`:pctTrend<0?`↓ ${pctTrend}% em relacao a semana anterior`:"= Estavel em relacao a semana anterior";
 
   function statusCell(st){
-    if(!st) return `<td style="color:#94a3b8;text-align:center">—</td>`;
-    if(st==="ok") return `<td style="text-align:center;color:#16a34a;font-weight:700">✔ OK</td>`;
-    if(st==="partial") return `<td style="text-align:center;background:#fffbeb"><span style="color:#d97706;font-weight:700">■ PARC</span></td>`;
+    if(!st) return `<td style="text-align:center;color:#94a3b8">—</td>`;
+    if(st==="ok") return `<td style="text-align:center;color:#16a34a;font-weight:700;background:#f0fdf4">✔ OK</td>`;
+    if(st==="partial") return `<td style="text-align:center;background:#fffbeb"><span style="color:#d97706;font-weight:700">⚠ PARC</span></td>`;
     return `<td style="text-align:center;background:#fef2f2"><span style="color:#dc2626;font-weight:700">✘ INOP</span></td>`;
   }
 
@@ -279,23 +293,21 @@ export function generateConsolidatedPDF(project, reports){
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:10px}
-.page{max-width:900px;margin:0 auto}
+.page{max-width:960px;margin:0 auto}
 .header{background:${cfg.secondary};padding:20px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .logo-box{height:42px;object-fit:contain;background:white;padding:4px 8px;border-radius:5px}
 .band{height:5px;background:linear-gradient(90deg,${cfg.primary},${cfg.secondary})}
 .content{padding:20px 28px}
 .section-title{font-size:11px;font-weight:800;color:${cfg.primary};text-transform:uppercase;letter-spacing:.7px;border-left:4px solid ${cfg.primary};padding-left:8px;margin:16px 0 8px}
-.exec-box{background:${pctBg(lastWeek.health.pct)};border:1px solid ${pctColor(lastWeek.health.pct)}44;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:10px;line-height:1.7}
-.indicators{display:grid;grid-template-columns:repeat(${weeks.length},1fr);gap:8px;margin-bottom:12px}
-.indicator{border-radius:8px;padding:10px;text-align:center;border:2px solid}
+.exec-box{border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:10px;line-height:1.8;border:1px solid}
+.week-cards{display:grid;grid-template-columns:repeat(${Math.min(weeks.length,6)},1fr);gap:8px;margin-bottom:12px}
+.week-card{border-radius:8px;padding:10px;text-align:center;border:2px solid}
 .ind-val{font-size:20px;font-weight:900;line-height:1}
-.ind-lbl{font-size:8px;color:#64748b;margin-top:2px;font-weight:700}
-.ind-date{font-size:8px;color:#94a3b8;margin-top:2px}
 table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:9px}
 th{padding:6px 7px;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
 td{padding:5px 7px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
 tr:nth-child(even) td{background:#f8fafc}
-.badge{display:inline-block;padding:1px 5px;border-radius:6px;font-size:8px;font-weight:700}
+.badge{display:inline-block;padding:2px 6px;border-radius:6px;font-size:8px;font-weight:700}
 .footer{background:#1e293b;color:#94a3b8;padding:12px 28px;display:flex;justify-content:space-between;align-items:center;font-size:9px;margin-top:16px}
 @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 </style></head><body><div class="page">
@@ -307,66 +319,90 @@ tr:nth-child(even) td{background:#f8fafc}
     <img src="${cfg.logo}" class="logo-box" alt="${cfg.name}"/>
   </div>
   <div style="color:white;flex:1;text-align:center">
-    <div style="font-size:14px;font-weight:800">Relatório Consolidado</div>
+    <div style="font-size:14px;font-weight:800">Relatório Consolidado de Teste Semanal</div>
     <div style="font-size:10px;opacity:.85">${project.id} – ${project.name} | ${periodLabel}</div>
   </div>
   <div style="color:white;text-align:right;font-size:9px">
     <div style="font-size:11px;font-weight:800">${weeks.length} semanas</div>
-    <div style="opacity:.7">Gerado em ${now}</div>
+    <div style="opacity:.7">${fmtDate(weeks[0].date)} a ${fmtDate(lastWeek.date)}</div>
+    <div style="opacity:.6;font-size:8px">Gerado em ${now}</div>
   </div>
 </div>
 <div class="band"></div>
 
 <div class="content">
 
-  <div class="section-title" style="margin-top:2px">Saúde por Semana</div>
-  <div class="indicators">
+  <!-- EXECUTIVE SUMMARY -->
+  <div class="section-title" style="margin-top:2px">Resumo Executivo</div>
+  <div class="exec-box" style="background:${pctColor(lastWeek.health.pct)+'11'};border-color:${pctColor(lastWeek.health.pct)}44">
+    <strong>${project.id} – ${project.name} | ${periodLabel}</strong><br/>
+    Saúde atual: <strong style="color:${pctColor(lastWeek.health.pct)}">${lastWeek.health.pct}%</strong> (${lastWeek.health.ok}/${lastWeek.health.total} unidades OK) — ${trendText}<br/>
+    ${activeIssues.length>0?`Pendências ativas: <strong style="color:#dc2626">${activeIssues.length} item(s)</strong> com problema no último teste. `:
+      `<strong style="color:#16a34a">Quadro estável</strong> — nenhuma pendência ativa. `}
+    ${newIssues.length>0?`Novas ocorrências: ${newIssues.length}. `:""}
+    ${resolvedIssues.length>0?`Resolvidos esta semana: ${resolvedIssues.length}. `:""}
+    ${activeIssues.filter(i=>i.consecutive>=2).length>0?
+      `Atenção: ${activeIssues.filter(i=>i.consecutive>=2).map(i=>`${i.cat.split(" - ")[1]||i.cat} (${i.consecutive}ª semana)`).slice(0,3).join(", ")}.`:""}
+  </div>
+
+  <!-- HEALTH PER WEEK -->
+  <div class="section-title">Saúde por Semana</div>
+  <div class="week-cards">
     ${weeks.map(w=>`
-      <div class="indicator" style="background:${pctBg(w.health.pct)};border-color:${pctColor(w.health.pct)}">
+      <div class="week-card" style="background:${pctBg(w.health.pct)};border-color:${pctColor(w.health.pct)}">
         <div class="ind-val" style="color:${pctColor(w.health.pct)}">${w.health.pct}%</div>
-        <div class="ind-lbl">${w.label}</div>
-        <div class="ind-date">${fmtDate(w.date)}</div>
-        <div style="font-size:8px;color:#64748b;margin-top:2px">${w.health.inop} inop</div>
+        <div style="font-size:9px;font-weight:700;color:#64748b;margin-top:2px">${w.label}</div>
+        <div style="font-size:8px;color:#94a3b8">${fmtDate(w.date)}</div>
+        <div style="font-size:8px;margin-top:3px">
+          <span style="color:#16a34a">✔${w.health.ok}</span>
+          ${w.health.partial>0?`<span style="color:#d97706"> ⚠${w.health.partial}</span>`:""}
+          ${w.health.inop>0?`<span style="color:#dc2626"> ✘${w.health.inop}</span>`:""}
+        </div>
       </div>`).join("")}
   </div>
 
+  <!-- COMPARATIVE TABLE -->
   <div class="section-title">Tabela Comparativa por Dispositivo</div>
   <table>
     <thead>
       <tr style="background:${cfg.primary};color:white">
         <th>Dispositivo</th><th>Item</th>
-        ${weeks.map(w=>`<th style="text-align:center">${w.label}<br/><span style="font-weight:400;opacity:.8">${fmtDate(w.date)}</span></th>`).join("")}
+        ${weeks.map(w=>`<th style="text-align:center">${w.label}</th>`).join("")}
       </tr>
     </thead>
     <tbody>
       ${issueItems.map(it=>`
         <tr>
-          <td style="font-size:9px">${it.cat}</td>
+          <td style="font-size:9px;font-weight:600">${it.cat}</td>
           <td style="font-size:9px">${it.item}</td>
           ${weeks.map(w=>statusCell(it.weeks[w.label])).join("")}
         </tr>`).join("")}
     </tbody>
   </table>
 
-  ${activePendencies.length>0?`
-  <div class="section-title">Pendências Ativas — ${lastWeek.label} (${activePendencies.length})</div>
+  <!-- ACTIVE PENDENCIES WITH WEEKS COUNT -->
+  ${activeIssues.length>0?`
+  <div class="section-title">Pendências Ativas — ${lastWeek.label} (${activeIssues.length})</div>
   <table>
     <thead><tr style="background:#1e293b;color:white">
-      <th>#</th><th>Pendência</th><th>Status</th><th>Desde</th><th>Prioridade</th>
+      <th>#</th><th>Dispositivo</th><th>Item</th><th>Status</th><th>Semanas</th><th>Desde</th><th>Prioridade</th>
     </tr></thead>
     <tbody>
-      ${activePendencies.map((p,i)=>`
+      ${activeIssues.map((p,i)=>`
         <tr>
           <td>${i+1}</td>
-          <td>${p.cat}${p.item&&p.item!=="—"?` – ${p.item}`:""}</td>
+          <td>${p.cat}</td>
+          <td>${p.item&&p.item!=="—"?p.item:"—"}</td>
           <td><span class="badge" style="background:${p.status==="partial"?"#fef3c7":"#fee2e2"};color:${p.status==="partial"?"#d97706":"#dc2626"}">${p.status==="partial"?"PARCIAL":"INOP"}</span></td>
+          <td style="text-align:center;font-weight:700;color:${p.consecutive>=4?"#dc2626":p.consecutive>=2?"#d97706":"#64748b"}">${p.consecutive}ª sem.</td>
           <td>${fmtDate(p.since)}</td>
-          <td><span class="badge" style="background:${p.priority==="CRÍTICA"?"#fee2e2":p.priority==="ALTA"?"#fef3c7":p.priority==="MÉDIA"?"#eff6ff":"#f8fafc"};color:${p.priority==="CRÍTICA"?"#dc2626":p.priority==="ALTA"?"#d97706":p.priority==="MÉDIA"?"#2563eb":"#64748b"}">${p.priority}</span></td>
+          <td><span class="badge" style="background:${p.priority==="CRÍTICA"?"#fee2e2":p.priority==="ALTA"?"#fef3c7":"#eff6ff"};color:${p.priority==="CRÍTICA"?"#dc2626":p.priority==="ALTA"?"#d97706":"#2563eb"}">${p.priority}</span></td>
         </tr>`).join("")}
     </tbody>
   </table>`:""}
 
-  <div class="section-title">Informações por Semana</div>
+  <!-- SIGNATORIES -->
+  <div class="section-title">Responsáveis por Semana</div>
   <table>
     <thead><tr style="background:${cfg.primary};color:white">
       <th>Semana</th><th>Data</th><th>Líder</th><th>CCO</th><th>Moked 24h</th><th>Assinatura</th>
@@ -392,9 +428,17 @@ tr:nth-child(even) td{background:#f8fafc}
 </div>
 </div></body></html>`;
 
-  downloadHTML(html, `MokLog_Consolidado_${project.id}_${periodLabel.replace(/\s/g,"_")}.html`);
+  downloadHTML(html, `MokLog_Consolidado_${project.id}_${periodLabel.replace(/[\s\/]/g,"_")}.html`);
 }
 
+function getWeekLabel(dateStr){
+  if(!dateStr) return "S?";
+  try{
+    const d=new Date(dateStr+"T12:00:00");
+    const months=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    return `S${Math.ceil(d.getDate()/7)} ${months[d.getMonth()]}`;
+  }catch{return "S?";}
+}
 function getWeekLabel(dateStr){
   if(!dateStr) return "S?";
   try{
