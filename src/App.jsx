@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { generatePDF } from "./generatePDF";
+import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 
@@ -676,51 +676,227 @@ function ProjectPinGate({project, onSuccess, onBack}) {
 }
 
 // ─── Dashboard Screen ─────────────────────────────────────────────────────────
-function Dashboard({stored, onBack, onSelectProject, onDeleteReport}) {
+function Dashboard({stored, onBack, onDeleteReport}) {
   const [pin, setPin] = useState("");
   const [auth, setAuth] = useState(false);
   const [err, setErr] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(null); // {projectId, idx}
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [viewReport, setViewReport] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [selectedReports, setSelectedReports] = useState({});
+  const [sessionTime, setSessionTime] = useState(Date.now());
+
+  // Session timeout
+  useEffect(()=>{
+    if(!auth) return;
+    const timer = setInterval(()=>{
+      if(Date.now() - sessionTime > SESSION_TIMEOUT){ setAuth(false); setPin(""); }
+    }, 30000);
+    return ()=>clearInterval(timer);
+  },[auth, sessionTime]);
+
+  const resetSession = () => setSessionTime(Date.now());
 
   if(!auth) return (
-    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:320,width:"100%",textAlign:"center"}}>
+    <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSession}>
+      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
-        <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-        <div style={{fontSize:12,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
+        <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+        <div style={{fontSize:13,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
         <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Acesso restrito — insira o PIN</div>
-        <input type="password" placeholder="PIN" maxLength={8} value={pin}
+        <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN)setAuth(true);else setErr(true);}}}
-          style={{...S.inp,textAlign:"center",fontSize:20,letterSpacing:8,marginBottom:10}}/>
+          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);resetSession();}else setErr(true);}}}
+          style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {err&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(pin===ADMIN_PIN)setAuth(true);else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10}}>Entrar</button>
-        <button onClick={onBack} style={{...S.secBtn,width:"100%"}}>← Voltar</button>
+        <button onClick={()=>{if(pin===ADMIN_PIN){setAuth(true);resetSession();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
+        <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}}>← Voltar</button>
       </div>
     </div>
   );
 
+  // ── View single report ──
+  if(viewReport) return (
+    <div style={S.page} onClick={resetSession}>
+      <div style={S.formWrap}>
+        <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
+          <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
+          <div>
+            <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{viewReport.project.id} — {getWeekLabel(viewReport.report.meta?.date)}</div>
+            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(viewReport.report.meta?.date)} • {viewReport.report.meta?.leader||"—"}</div>
+          </div>
+          <div style={{marginLeft:"auto"}}>
+            <HealthRing pct={computeHealth(viewReport.project,viewReport.report.state).pct} size={46}/>
+          </div>
+        </div>
+
+        {/* Report detail */}
+        {viewReport.project.categories.map(cat=>{
+          const sv=viewReport.report.state[cat.id]; if(!sv) return null;
+          const h=computeHealth(viewReport.project,viewReport.report.state);
+          let cp=100;
+          if(cat.type==="single"){const st=sv.status??(sv.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
+          else if(cat.type==="items"){const okN=sv.filter(v=>(v.status??"ok")==="ok").length;const partN=sv.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),sv.length);}
+          else if(cat.type==="count"){const t=sv.total??cat.total;cp=calcPct(t-(sv.inoperative?.length??0),t);}
+          const dotColor=cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444";
+          return(
+            <div key={cat.id} style={{background:"#060c18",border:`1px solid ${dotColor}22`,borderRadius:8,padding:"10px 12px",marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:cp<100?8:0}}>
+                <span style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0}}/>
+                <span style={{fontSize:12,fontWeight:700,color:"#cbd5e1",flex:1}}>{cat.label}</span>
+                {cat.type!=="maintenance"&&cat.type!=="notes"&&<span style={{fontSize:11,fontWeight:800,color:dotColor}}>{cp}%</span>}
+              </div>
+              {cp<100&&cat.type==="items"&&sv.filter(v=>(v.status??"ok")!=="ok").map((v,i)=>{
+                const allV=sv; const idx=allV.indexOf(v);
+                const st=v.status??(v.ok===false?"inop":"ok");
+                return <div key={i} style={{fontSize:11,color:st==="partial"?"#f59e0b":"#ef4444",marginLeft:16,marginTop:2}}>
+                  ↳ {cat.itemLabels[idx]}: {st==="partial"?"PARCIAL":"INOP"}{v.since?` desde ${fmtDate(v.since)}`:""}{v.note?` — ${v.note}`:""}
+                </div>;
+              })}
+              {cp<100&&cat.type==="count"&&(sv.inoperative??[]).map((it,i)=>(
+                <div key={i} style={{fontSize:11,color:"#ef4444",marginLeft:16,marginTop:2}}>↳ {it.id||"?"}{it.since?` desde ${fmtDate(it.since)}`:""}{it.note?` — ${it.note}`:""}</div>
+              ))}
+              {cat.type==="notes"&&(sv.items??[]).map((it,i)=>(
+                <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:2}}>▸ {it.label}{it.since?` (desde ${fmtDate(it.since)})`:""}{it.note?` — ${it.note}`:""}</div>
+              ))}
+            </div>
+          );
+        })}
+
+        <div style={{display:"flex",gap:8,marginTop:8}}>
+          <button onClick={()=>generatePDF(viewReport.project,viewReport.report.state,viewReport.report.meta,[])}
+            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>
+            📄 Exportar PDF
+          </button>
+          <button onClick={()=>{
+            setConfirmDelete({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});
+            setViewReport(null);
+          }} style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>
+            🗑 Excluir
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Project detail ──
+  if(selectedProject){
+    const p=selectedProject;
+    const hist=stored[p.id]?.history??[];
+    const sel=selectedReports[p.id]??[];
+    const toggleSel=(idx)=>{
+      const cur=selectedReports[p.id]??[];
+      const next=cur.includes(idx)?cur.filter(i=>i!==idx):[...cur,idx];
+      setSelectedReports(prev=>({...prev,[p.id]:next}));
+    };
+
+    return(
+      <div style={S.page} onClick={resetSession}>
+        <div style={S.formWrap}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
+            <button onClick={()=>{setSelectedProject(null);setSelectedReports({});}} style={S.backBtn}>← Painel</button>
+            <MoklogLogo size={32}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
+              <div style={{fontSize:11,color:"#334155"}}>{hist.length} relatório(s) • selecione para consolidado</div>
+            </div>
+          </div>
+
+          {hist.length===0&&<div style={{textAlign:"center",padding:"40px 0",color:"#334155",fontSize:14}}>
+            <div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatório salvo ainda.
+          </div>}
+
+          {/* Consolidated button */}
+          {sel.length>=2&&(
+            <button onClick={()=>generateConsolidatedPDF(p, sel.map(i=>hist[i]).sort((a,b)=>a.meta?.date?.localeCompare(b.meta?.date)))}
+              style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:10,fontSize:14}}>
+              📊 Gerar Consolidado ({sel.length} semanas)
+            </button>
+          )}
+          {sel.length===1&&(
+            <div style={{background:"#0f172a",borderRadius:8,padding:"10px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:10}}>
+              Selecione mais {2-sel.length} relatório(s) para gerar o consolidado
+            </div>
+          )}
+          {sel.length===0&&hist.length>0&&(
+            <div style={{background:"#0f172a",borderRadius:8,padding:"10px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:10}}>
+              ☑ Selecione 2 a 6 relatórios para gerar o consolidado
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {hist.slice().reverse().map((r,revIdx)=>{
+              const realIdx=hist.length-1-revIdx;
+              const h=computeHealth(p,r.state);
+              const color=h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444";
+              const weekLabel=getWeekLabel(r.meta?.date);
+              const isSelected=sel.includes(realIdx);
+              return(
+                <div key={realIdx} style={{background:"#060c18",border:`2px solid ${isSelected?color:"#0f172a"}`,borderRadius:12,padding:"12px 14px"}}>
+                  {/* Checkbox + header */}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <button onClick={()=>{if(sel.length<6||isSelected)toggleSel(realIdx);}}
+                      style={{width:28,height:28,borderRadius:6,border:`2px solid ${isSelected?color:"#1e293b"}`,background:isSelected?color+"22":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:isSelected?color:"#334155"}}>
+                      {isSelected?"✓":""}
+                    </button>
+                    <HealthRing pct={h.pct} size={44}/>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{weekLabel} <span style={{fontSize:11,color:"#334155",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
+                      <div style={{fontSize:11,color:"#475569",marginTop:1}}>Líder: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
+                      {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
+                      <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600,marginTop:1}}>
+                        {h.inop>0?`${h.inop} inoperante(s)`:"✔ Tudo OK"}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
+                  </div>
+                  <div style={{display:"flex",gap:6,marginTop:10}}>
+                    <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})}
+                      style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>
+                      👁 Visualizar
+                    </button>
+                    <button onClick={()=>generatePDF(p,r.state,r.meta,[])}
+                      style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+                      📄 PDF
+                    </button>
+                    <button onClick={()=>setConfirmDelete({projectId:p.id,idx:realIdx,date:r.meta?.date})}
+                      style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main dashboard ──
   const allProjects = Object.values(PROJECTS);
   const valid = allProjects.map(p=>{
     const hist=stored[p.id]?.history??[];
-    if(!hist.length)return null;
+    if(!hist.length) return null;
     const last=hist[hist.length-1];
     const h=computeHealth(p,last.state);
-    return{...p,pct:h.pct,inopList:h.inopList,date:last.meta?.date,inopN:h.total-h.ok};
+    return{...p,pct:h.pct,date:last.meta?.date,inopN:h.inop};
   }).filter(Boolean);
   const avgPct=valid.length?Math.round(valid.reduce((a,b)=>a+b.pct,0)/valid.length):null;
 
   return (
-    <div style={S.page}>
+    <div style={S.page} onClick={resetSession}>
       <div style={S.formWrap}>
-        <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:4}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
           <button onClick={onBack} style={S.backBtn}>← Início</button>
           <MoklogLogo size={34}/>
-          <div>
+          <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:900,color:"#f1f5f9"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-            <div style={{fontSize:11,color:"#334155"}}>Painel Gerencial — todos os projetos</div>
+            <div style={{fontSize:11,color:"#334155"}}>Painel Gerencial — toque no projeto</div>
           </div>
-          {avgPct!==null&&<div style={{marginLeft:"auto"}}><HealthRing pct={avgPct} size={52}/></div>}
+          {avgPct!==null&&<HealthRing pct={avgPct} size={52}/>}
         </div>
 
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -730,67 +906,51 @@ function Dashboard({stored, onBack, onSelectProject, onDeleteReport}) {
             const h=last?computeHealth(p,last.state):null;
             const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";
             return(
-              <div key={p.id} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px"}}>
-                <div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>onSelectProject(p)}>
-                  {h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#334155"}}>—</div>}
+              <div key={p.id} onClick={()=>setSelectedProject(p)}
+                style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer",active:{opacity:.8}}}>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  {h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#334155"}}>—</div>}
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
                     {h?(
-                      <>
-                        <div style={{fontSize:11,color:"#475569",marginTop:2}}>Último teste: {fmtDate(last.meta?.date)} • {h.total-h.ok} inoperante(s)</div>
-                        {h.inopList.length>0&&<div style={{fontSize:10,color:"#ef4444",marginTop:2}}>{h.inopList.slice(0,3).join(", ")}{h.inopList.length>3?` +${h.inopList.length-3}`:""}</div>}
-                      </>
+                      <div style={{fontSize:11,color:"#475569",marginTop:2}}>
+                        Último: {fmtDate(last.meta?.date)} · {h.inop} inop · {hist.length} relatório(s)
+                      </div>
                     ):<div style={{fontSize:11,color:"#334155",marginTop:2}}>Sem registros</div>}
                   </div>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
+                  <span style={{color:"#334155",fontSize:16}}>›</span>
                 </div>
-                {h&&<div style={{marginTop:10,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
+                {h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2,transition:"width .5s"}}/>
                 </div>}
-                {/* Trend sparkline */}
-                {hist.length>1&&<div style={{display:"flex",gap:4,marginTop:8}}>
-                  {hist.slice(-8).map((r,i)=>{
+                {hist.length>1&&<div style={{display:"flex",gap:3,marginTop:6}}>
+                  {hist.slice(-6).map((r,i)=>{
                     const rh=computeHealth(p,r.state);
                     const rc=rh.pct>=90?"#22c55e":rh.pct>=70?"#f59e0b":"#ef4444";
-                    return <div key={i} title={`${fmtDate(r.meta?.date)}: ${rh.pct}%`} style={{flex:1,height:30,background:`${rc}22`,border:`1px solid ${rc}44`,borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:rc,fontWeight:700}}>{rh.pct}%</div>;
+                    return <div key={i} style={{flex:1,height:24,background:`${rc}22`,border:`1px solid ${rc}44`,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:rc,fontWeight:700}}>{rh.pct}%</div>;
                   })}
-                </div>}
-                {/* Delete buttons */}
-                {hist.length>0&&<div style={{marginTop:10,borderTop:"1px solid #0f172a",paddingTop:8}}>
-                  <div style={{fontSize:10,color:"#334155",marginBottom:5}}>Relatórios salvos: {hist.length} / {MAX_HISTORY}</div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                    {hist.slice().reverse().slice(0,3).map((r,i)=>{
-                      const realIdx=hist.length-1-i;
-                      return(
-                        <button key={i} onClick={()=>setConfirmDelete({projectId:p.id,idx:realIdx,date:r.meta?.date})}
-                          style={{...S.sm,color:"#ef4444",border:"1px solid #ef444433",fontSize:10}}>
-                          🗑 {fmtDate(r.meta?.date)||`#${realIdx+1}`}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>}
               </div>
             );
           })}
         </div>
+      </div>
 
-        {/* Confirm Delete Modal */}
-        {confirmDelete&&(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
-            <div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}>
-              <div style={{fontSize:24,marginBottom:10}}>🗑️</div>
-              <div style={{fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatório?</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDelete.projectId} — {fmtDate(confirmDelete.date)}<br/>Esta ação não pode ser desfeita.</div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{onDeleteReport(confirmDelete.projectId,confirmDelete.idx);setConfirmDelete(null);}}
-                  style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)"}}>Excluir</button>
-                <button onClick={()=>setConfirmDelete(null)} style={{...S.secBtn,flex:1}}>Cancelar</button>
-              </div>
+      {/* Confirm Delete Modal */}
+      {confirmDelete&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}>
+            <div style={{fontSize:26,marginBottom:10}}>🗑️</div>
+            <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatório?</div>
+            <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDelete.projectId} — {fmtDate(confirmDelete.date)}<br/>Esta ação não pode ser desfeita.</div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{onDeleteReport(confirmDelete.projectId,confirmDelete.idx);setConfirmDelete(null);}}
+                style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button>
+              <button onClick={()=>setConfirmDelete(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1147,7 +1307,7 @@ export default function App(){
   );
 
   // ── DASHBOARD ──
-  if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onSelectProject={p=>{setProject(p);setScreen("home");}} onDeleteReport={deleteReport}/>;
+  if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onDeleteReport={deleteReport}/>;
 
   // ── HISTORY ──
   if(screen==="history") return <HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/>;

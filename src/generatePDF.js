@@ -1,5 +1,4 @@
-// ─── PDF Generator for MokLog CheckTest ──────────────────────────────────────
-// src/generatePDF.js
+// ─── generatePDF.js — MokLog CheckTest v3 ────────────────────────────────────
 
 const LOGOS = {
   moked: "data:image/jpeg;base64,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",
@@ -9,18 +8,18 @@ const LOGOS = {
 };
 
 const CLIENT_CONFIG = {
-  P601: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", bg: "#f0f7f4", name: "Golgi" },
-  P602: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", bg: "#f0f7f4", name: "Golgi" },
-  P604: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", bg: "#f0f7f4", name: "Golgi" },
-  P605: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", bg: "#f0f7f4", name: "Golgi" },
-  P606: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", bg: "#f0f7f4", name: "Golgi" },
-  P607: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", bg: "#f0f7f4", name: "Golgi" },
-  P311A:{ logo: LOGOS.mega,   primary: "#e8620a", secondary: "#1a1a1a", bg: "#fff8f5", name: "Mega" },
-  P311B:{ logo: LOGOS.mega,   primary: "#e8620a", secondary: "#1a1a1a", bg: "#fff8f5", name: "Mega" },
-  P505: { logo: LOGOS.klog,   primary: "#1e3a6e", secondary: "#2d5499", bg: "#f0f4fa", name: "Klog" },
+  P601: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", name: "Golgi" },
+  P602: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", name: "Golgi" },
+  P604: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", name: "Golgi" },
+  P605: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", name: "Golgi" },
+  P606: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", name: "Golgi" },
+  P607: { logo: LOGOS.golgi,  primary: "#5fa896", secondary: "#4a8a7c", name: "Golgi" },
+  P311A:{ logo: LOGOS.mega,   primary: "#e8620a", secondary: "#1a1a1a", name: "Mega" },
+  P311B:{ logo: LOGOS.mega,   primary: "#e8620a", secondary: "#1a1a1a", name: "Mega" },
+  P505: { logo: LOGOS.klog,   primary: "#1e3a6e", secondary: "#2d5499", name: "Klog" },
 };
 
-function fmtDate(d){ if(!d)return"—"; try{ const[y,m,day]=d.split("-"); return `${day}/${m}/${y}`; }catch{return d;} }
+function fmtDate(d){ if(!d)return"—"; try{ const[y,m,day]=d.split("-"); return `${day}/${m}/${y}`; }catch{return d||"—";} }
 function calcPct(ok,total){ return total===0?100:Math.round((ok/total)*100); }
 function pctColor(p){ return p>=90?"#16a34a":p>=50?"#d97706":"#dc2626"; }
 function pctBg(p){ return p>=90?"#f0fdf4":p>=50?"#fffbeb":"#fef2f2"; }
@@ -47,11 +46,7 @@ function computeHealth(project, state){
   return { total, ok:Math.round(okCount), partial, inop, pct:calcPct(Math.round(okCount),total) };
 }
 
-export function generatePDF(project, state, meta, photos){
-  const cfg = CLIENT_CONFIG[project.id] ?? CLIENT_CONFIG.P601;
-  const h = computeHealth(project, state);
-  const now = new Date().toLocaleString("pt-BR");
-
+function getIssues(project, state){
   const issues = [];
   for(const cat of project.categories){
     const s=state[cat.id]; if(!s) continue;
@@ -67,6 +62,26 @@ export function generatePDF(project, state, meta, photos){
       (s.inoperative??[]).forEach(it=>issues.push({cat:cat.label,item:it.id||"?",status:"inop",since:it.since,note:it.note}));
     }
   }
+  return issues;
+}
+
+function downloadHTML(html, filename){
+  const blob = new Blob([html], {type:"text/html;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+}
+
+// ─── Individual PDF ───────────────────────────────────────────────────────────
+export function generatePDF(project, state, meta, photos){
+  const cfg = CLIENT_CONFIG[project.id] ?? CLIENT_CONFIG.P601;
+  const h = computeHealth(project, state);
+  const issues = getIssues(project, state);
+  const now = new Date().toLocaleString("pt-BR");
 
   const infraCat = project.categories.find(c=>c.type==="notes");
   const infraItems = infraCat ? (state[infraCat.id]?.items??[]) : [];
@@ -82,172 +97,309 @@ export function generatePDF(project, state, meta, photos){
     return { label:cat.label, pct, okN:Math.round(okN), totN };
   }).filter(Boolean);
 
-  const photosHtml = photos && photos.length>0 ? `
+  const photosHtml = photos&&photos.length>0 ? `
     <div class="section-title">Registros Fotográficos</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
-      ${photos.map(p=>`
-        <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
-          <img src="${p.url}" style="width:100%;height:110px;object-fit:cover"/>
-          <div style="padding:4px 8px;font-size:10px;color:#64748b;text-align:center">${p.catLabel||p.name}</div>
-        </div>`).join("")}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+      ${photos.map(p=>`<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden"><img src="${p.url}" style="width:100%;height:100px;object-fit:cover"/><div style="padding:3px 6px;font-size:9px;color:#64748b;text-align:center">${p.catLabel||p.name}</div></div>`).join("")}
     </div>` : "";
 
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"/>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
 <title>Relatório ${project.id} – ${fmtDate(meta.date)}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:12px}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:11px}
 .page{max-width:800px;margin:0 auto}
-.header{background:${cfg.secondary};padding:22px 32px;display:flex;align-items:center;justify-content:space-between}
-.header-logos{display:flex;align-items:center;gap:16px}
-.header-logo{height:48px;object-fit:contain;background:white;padding:5px 10px;border-radius:6px}
+.header{background:${cfg.secondary};padding:20px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo-box{height:44px;object-fit:contain;background:white;padding:5px 8px;border-radius:5px}
 .header-title{color:white;flex:1;text-align:center}
-.header-title h1{font-size:17px;font-weight:800}
-.header-title p{font-size:11px;opacity:.85;margin-top:2px}
-.header-date{color:white;text-align:right;font-size:11px}
-.color-band{height:5px;background:linear-gradient(90deg,${cfg.primary},${cfg.secondary})}
-.content{padding:22px 32px}
-.section-title{font-size:12px;font-weight:800;color:${cfg.primary};text-transform:uppercase;letter-spacing:.8px;border-left:4px solid ${cfg.primary};padding-left:10px;margin:18px 0 10px}
-.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
-.info-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px}
-.info-label{font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-.info-value{font-size:12px;color:#1e293b;font-weight:600}
-.indicators{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:8px}
-.indicator{border-radius:10px;padding:14px;text-align:center;border:2px solid}
-.indicator-value{font-size:28px;font-weight:900;line-height:1}
-.indicator-label{font-size:9px;color:#64748b;margin-top:4px;font-weight:700;text-transform:uppercase}
-.cat-table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px}
-.cat-table th{background:${cfg.primary};color:white;padding:8px 10px;text-align:left;font-size:11px;font-weight:700}
-.cat-table td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
-.cat-table tr:nth-child(even) td{background:#f8fafc}
-.pct-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
-.bar-wrap{background:#e2e8f0;border-radius:4px;height:6px;width:70px;display:inline-block;vertical-align:middle;margin-left:6px}
-.bar-fill{height:6px;border-radius:4px}
-.issues-table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px}
-.issues-table th{background:#1e293b;color:white;padding:8px 10px;text-align:left;font-size:11px;font-weight:700}
-.issues-table td{padding:6px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
-.issues-table tr:nth-child(even) td{background:#f8fafc}
-.badge-inop{background:#fee2e2;color:#dc2626;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700}
-.badge-partial{background:#fef3c7;color:#d97706;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700}
-.infra-item{padding:6px 10px;border-left:3px solid #f59e0b;margin-bottom:5px;background:#fffbeb;border-radius:0 6px 6px 0;font-size:11px}
-.footer{background:#1e293b;color:#94a3b8;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;font-size:10px;margin-top:20px}
-@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}.page{max-width:100%}}
+.header-title h1{font-size:15px;font-weight:800}
+.header-title p{font-size:10px;opacity:.85;margin-top:2px}
+.header-date{color:white;text-align:right;font-size:10px;min-width:100px}
+.band{height:5px;background:linear-gradient(90deg,${cfg.primary},${cfg.secondary})}
+.content{padding:20px 28px}
+.section-title{font-size:11px;font-weight:800;color:${cfg.primary};text-transform:uppercase;letter-spacing:.7px;border-left:4px solid ${cfg.primary};padding-left:8px;margin:16px 0 8px}
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:8px}
+.info-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px}
+.info-label{font-size:8px;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:2px}
+.info-value{font-size:11px;color:#1e293b;font-weight:600}
+.indicators{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.indicator{border-radius:8px;padding:12px;text-align:center;border:2px solid}
+.ind-val{font-size:24px;font-weight:900;line-height:1}
+.ind-lbl{font-size:8px;color:#64748b;margin-top:3px;font-weight:700;text-transform:uppercase}
+table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:10px}
+th{padding:7px 8px;text-align:left;font-size:10px;font-weight:700}
+td{padding:5px 8px;border-bottom:1px solid #f1f5f9}
+tr:nth-child(even) td{background:#f8fafc}
+.badge{display:inline-block;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:700}
+.bar-wrap{background:#e2e8f0;border-radius:3px;height:5px;width:60px;display:inline-block;vertical-align:middle;margin-left:4px}
+.bar-fill{height:5px;border-radius:3px}
+.infra-item{padding:5px 8px;border-left:3px solid #f59e0b;margin-bottom:4px;background:#fffbeb;border-radius:0 5px 5px 0;font-size:10px}
+.footer{background:#1e293b;color:#94a3b8;padding:12px 28px;display:flex;justify-content:space-between;align-items:center;font-size:9px;margin-top:16px}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 </style></head><body><div class="page">
 
 <div class="header">
-  <div class="header-logos">
-    <img src="${LOGOS.moked}" class="header-logo" alt="Moked"/>
-    <div style="width:1px;height:36px;background:rgba(255,255,255,.3)"></div>
-    <img src="${cfg.logo}" class="header-logo" alt="${cfg.name}"/>
+  <div style="display:flex;align-items:center;gap:12px">
+    <img src="${LOGOS.moked}" class="logo-box" alt="Moked"/>
+    <div style="width:1px;height:32px;background:rgba(255,255,255,.3)"></div>
+    <img src="${cfg.logo}" class="logo-box" alt="${cfg.name}"/>
   </div>
-  <div class="header-title">
-    <h1>Relatório de Teste Semanal</h1>
-    <p>${project.id} – ${project.name}</p>
-  </div>
-  <div class="header-date">
-    <div style="font-size:15px;font-weight:800">${fmtDate(meta.date)}</div>
-    <div>${meta.start||"—"} – ${meta.end||"—"}</div>
-    <div style="margin-top:3px;opacity:.7;font-size:9px">Gerado em ${now}</div>
-  </div>
+  <div class="header-title"><h1>Relatório de Teste Semanal</h1><p>${project.id} – ${project.name}</p></div>
+  <div class="header-date"><div style="font-size:13px;font-weight:800">${fmtDate(meta.date)}</div><div>${meta.start||"—"} – ${meta.end||"—"}</div><div style="margin-top:2px;opacity:.7;font-size:8px">Gerado em ${now}</div></div>
 </div>
-<div class="color-band"></div>
+<div class="band"></div>
 
 <div class="content">
-  <div class="section-title" style="margin-top:4px">Informações do Teste</div>
+  <div class="section-title" style="margin-top:2px">Informações do Teste</div>
   <div class="info-grid">
     <div class="info-card"><div class="info-label">Líder VSPP</div><div class="info-value">${meta.leader||"—"}</div></div>
     <div class="info-card"><div class="info-label">CCO</div><div class="info-value">${meta.cco||"—"}</div></div>
     <div class="info-card"><div class="info-label">Operador Moked 24h</div><div class="info-value">${meta.moked||"—"}</div></div>
-    <div class="info-card"><div class="info-label">Horário Contato Moked</div><div class="info-value">${meta.mokedTime||"—"}</div></div>
+    <div class="info-card"><div class="info-label">Horário Contato</div><div class="info-value">${meta.mokedTime||"—"}</div></div>
     <div class="info-card"><div class="info-label">Contato Realizado?</div><div class="info-value" style="color:${meta.mokedContact?"#16a34a":"#dc2626"}">${meta.mokedContact?"✓ Sim":"✗ Não"}</div></div>
     <div class="info-card"><div class="info-label">Assinatura</div><div class="info-value" style="color:${cfg.primary}">✍ ${meta.signature||"—"}</div></div>
   </div>
-  ${meta.obs?`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:4px;font-size:11px"><strong>Observações:</strong> ${meta.obs}</div>`:""}
+  ${meta.obs?`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:10px"><strong>Obs:</strong> ${meta.obs}</div>`:""}
 
   <div class="section-title">Indicadores de Saúde</div>
   <div class="indicators">
-    <div class="indicator" style="background:${pctBg(h.pct)};border-color:${pctColor(h.pct)}">
-      <div class="indicator-value" style="color:${pctColor(h.pct)}">${h.pct}%</div>
-      <div class="indicator-label">Saúde Geral</div>
-    </div>
-    <div class="indicator" style="background:#f0fdf4;border-color:#16a34a">
-      <div class="indicator-value" style="color:#16a34a">${h.ok}</div>
-      <div class="indicator-label">Itens OK</div>
-    </div>
-    <div class="indicator" style="background:#fffbeb;border-color:#d97706">
-      <div class="indicator-value" style="color:#d97706">${h.partial}</div>
-      <div class="indicator-label">Parciais</div>
-    </div>
-    <div class="indicator" style="background:#fef2f2;border-color:#dc2626">
-      <div class="indicator-value" style="color:#dc2626">${h.inop}</div>
-      <div class="indicator-label">Inoperantes</div>
-    </div>
+    <div class="indicator" style="background:${pctBg(h.pct)};border-color:${pctColor(h.pct)}"><div class="ind-val" style="color:${pctColor(h.pct)}">${h.pct}%</div><div class="ind-lbl">Saúde Geral</div></div>
+    <div class="indicator" style="background:#f0fdf4;border-color:#16a34a"><div class="ind-val" style="color:#16a34a">${h.ok}</div><div class="ind-lbl">OK</div></div>
+    <div class="indicator" style="background:#fffbeb;border-color:#d97706"><div class="ind-val" style="color:#d97706">${h.partial}</div><div class="ind-lbl">Parciais</div></div>
+    <div class="indicator" style="background:#fef2f2;border-color:#dc2626"><div class="ind-val" style="color:#dc2626">${h.inop}</div><div class="ind-lbl">Inoperantes</div></div>
   </div>
 
   <div class="section-title">Status por Dispositivo</div>
-  <table class="cat-table">
-    <thead><tr><th>Dispositivo</th><th>OK / Total</th><th>Indicador</th></tr></thead>
-    <tbody>
-      ${catRows.map(r=>`
-        <tr>
-          <td>${r.label}</td>
-          <td style="color:${pctColor(r.pct)};font-weight:600">${r.okN}/${r.totN}</td>
-          <td>
-            <span class="pct-badge" style="background:${pctBg(r.pct)};color:${pctColor(r.pct)}">${r.pct}%</span>
-            <span class="bar-wrap"><span class="bar-fill" style="width:${r.pct}%;background:${pctColor(r.pct)}"></span></span>
-          </td>
-        </tr>`).join("")}
-    </tbody>
-  </table>
+  <table><thead><tr style="background:${cfg.primary};color:white"><th>Dispositivo</th><th>OK/Total</th><th>Indicador</th></tr></thead><tbody>
+    ${catRows.map(r=>`<tr><td>${r.label}</td><td style="color:${pctColor(r.pct)};font-weight:600">${r.okN}/${r.totN}</td><td><span class="badge" style="background:${pctBg(r.pct)};color:${pctColor(r.pct)}">${r.pct}%</span><span class="bar-wrap"><span class="bar-fill" style="width:${r.pct}%;background:${pctColor(r.pct)}"></span></span></td></tr>`).join("")}
+  </tbody></table>
 
   ${issues.length>0?`
-  <div class="section-title">Itens Inoperantes / Parciais (${issues.length})</div>
-  <table class="issues-table">
-    <thead><tr><th>Dispositivo</th><th>Item</th><th>Status</th><th>Desde</th><th>Descrição</th></tr></thead>
-    <tbody>
-      ${issues.map(iss=>`
-        <tr>
-          <td>${iss.cat}</td>
-          <td>${iss.item}</td>
-          <td><span class="${iss.status==="partial"?"badge-partial":"badge-inop"}">${iss.status==="partial"?"PARCIAL":"INOP"}</span></td>
-          <td>${fmtDate(iss.since)}</td>
-          <td>${iss.note||"—"}</td>
-        </tr>`).join("")}
-    </tbody>
-  </table>`:""}
+  <div class="section-title">Itens com Problema (${issues.length})</div>
+  <table><thead><tr style="background:#1e293b;color:white"><th>Dispositivo</th><th>Item</th><th>Status</th><th>Desde</th><th>Descrição</th></tr></thead><tbody>
+    ${issues.map(iss=>`<tr><td>${iss.cat}</td><td>${iss.item}</td><td><span class="badge" style="background:${iss.status==="partial"?"#fef3c7":"#fee2e2"};color:${iss.status==="partial"?"#d97706":"#dc2626"}">${iss.status==="partial"?"PARCIAL":"INOP"}</span></td><td>${fmtDate(iss.since)}</td><td>${iss.note||"—"}</td></tr>`).join("")}
+  </tbody></table>`:""}
 
   ${infraItems.length>0?`
   <div class="section-title">Infraestrutura / Pendências (${infraItems.length})</div>
-  ${infraItems.map(it=>`
-    <div class="infra-item"><strong>${it.label}</strong>${it.since?` <span style="color:#94a3b8;font-size:10px">(desde ${fmtDate(it.since)})</span>`:""}${it.note?` — ${it.note}`:""}</div>`).join("")}`:""}
+  ${infraItems.map(it=>`<div class="infra-item"><strong>${it.label}</strong>${it.since?` <span style="color:#94a3b8;font-size:9px">(desde ${fmtDate(it.since)})</span>`:""}${it.note?` — ${it.note}`:""}</div>`).join("")}`:""}
 
   ${maintVisits.length>0?`
   <div class="section-title">Visitas de Manutenção (${maintVisits.length})</div>
-  ${maintVisits.map((v,i)=>`
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 13px;margin-bottom:7px;font-size:11px">
-      <strong>Visita ${i+1}</strong> — ${fmtDate(v.date)} | ${v.empresa||"—"} | Téc: ${v.tec1||"—"}${v.tec2?` / ${v.tec2}`:""}${v.servico?` | ${v.servico}`:""}
-    </div>`).join("")}`:""}
+  ${maintVisits.map((v,i)=>`<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:10px"><strong>Visita ${i+1}</strong> — ${fmtDate(v.date)} | ${v.empresa||"—"} | Téc: ${v.tec1||"—"}${v.tec2?` / ${v.tec2}`:""}${v.servico?` | ${v.servico}`:""}</div>`).join("")}`:""}
 
   ${photosHtml}
 </div>
 
 <div class="footer">
-  <div>
-    <div style="color:white;font-weight:700;font-size:11px">✍ ${meta.signature||"—"}</div>
-    <div>MokLog CheckTest © Moked Security Consulting</div>
-  </div>
-  <div style="text-align:right">
-    <div style="color:white;font-weight:700">${project.id} – ${project.name}</div>
-    <div>Gerado em ${now}</div>
-  </div>
+  <div><div style="color:white;font-weight:700;font-size:10px">✍ ${meta.signature||"—"}</div><div>MokLog CheckTest © Moked Security Consulting</div></div>
+  <div style="text-align:right"><div style="color:white;font-weight:700">${project.id} – ${project.name}</div><div>Gerado em ${now}</div></div>
 </div>
-
 </div></body></html>`;
 
-  const win = window.open("", "_blank");
-  if(!win){ alert("Permita pop-ups para gerar o PDF"); return; }
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => { setTimeout(()=>win.print(), 600); };
+  downloadHTML(html, `MokLog_${project.id}_${meta.date||"relatorio"}.html`);
+}
+
+// ─── Consolidated PDF ─────────────────────────────────────────────────────────
+export function generateConsolidatedPDF(project, reports){
+  const cfg = CLIENT_CONFIG[project.id] ?? CLIENT_CONFIG.P601;
+  const now = new Date().toLocaleString("pt-BR");
+  if(!reports||reports.length===0) return;
+
+  const weeks = reports.map(r=>({
+    label: getWeekLabel(r.meta?.date),
+    date: r.meta?.date,
+    meta: r.meta,
+    state: r.state,
+    health: computeHealth(project, r.state),
+    issues: getIssues(project, r.state),
+  }));
+
+  const periodLabel = `${weeks[0].label} – ${weeks[weeks.length-1].label}`;
+
+  // Build comparison table — collect all unique issue keys
+  const allIssueKeys = new Set();
+  weeks.forEach(w => w.issues.forEach(iss => allIssueKeys.add(`${iss.cat}|${iss.item}`)));
+  
+  // Also add items that were OK in some weeks (from categories)
+  const catSummaryKeys = new Set();
+  project.categories.filter(c=>c.type!=="notes"&&c.type!=="maintenance").forEach(cat=>{
+    catSummaryKeys.add(cat.label);
+  });
+
+  // Collect all items across all weeks for comparison
+  const allItems = new Map();
+  weeks.forEach(w=>{
+    for(const cat of project.categories){
+      if(cat.type==="notes"||cat.type==="maintenance") continue;
+      const s=w.state[cat.id]; if(!s) continue;
+      if(cat.type==="single"){
+        const key=`${cat.label}|—`;
+        if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:"—",weeks:{}});
+        const st=s.status??(s.ok===false?"inop":"ok");
+        allItems.get(key).weeks[w.label]=st;
+      } else if(cat.type==="items"){
+        s.forEach((v,i)=>{
+          const key=`${cat.label}|${cat.itemLabels[i]}`;
+          if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:cat.itemLabels[i],weeks:{}});
+          const st=v.status??(v.ok===false?"inop":"ok");
+          allItems.get(key).weeks[w.label]=st;
+        });
+      } else if(cat.type==="count"){
+        const inopIds=(s.inoperative??[]).map(it=>it.id||"?");
+        const key=`${cat.label}|—`;
+        if(!allItems.has(key)) allItems.set(key,{cat:cat.label,item:`${s.total??cat.total} câmeras`,weeks:{}});
+        const inopN=s.inoperative?.length??0;
+        allItems.get(key).weeks[w.label]=inopN>0?"inop":"ok";
+      }
+    }
+  });
+
+  // Filter only items that had at least one issue
+  const issueItems = Array.from(allItems.values()).filter(it=>
+    Object.values(it.weeks).some(st=>st!=="ok")
+  );
+
+  // Active pendencies — items that are still inop/partial in last week
+  const lastWeek = weeks[weeks.length-1];
+  const activePendencies = lastWeek.issues.map((iss,i)=>({
+    ...iss,
+    priority: i<3?"CRÍTICA":i<6?"ALTA":i<9?"MÉDIA":"BAIXA"
+  }));
+
+  function statusCell(st){
+    if(!st) return `<td style="color:#94a3b8;text-align:center">—</td>`;
+    if(st==="ok") return `<td style="text-align:center;color:#16a34a;font-weight:700">✔ OK</td>`;
+    if(st==="partial") return `<td style="text-align:center;background:#fffbeb"><span style="color:#d97706;font-weight:700">■ PARC</span></td>`;
+    return `<td style="text-align:center;background:#fef2f2"><span style="color:#dc2626;font-weight:700">✘ INOP</span></td>`;
+  }
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<title>Consolidado ${project.id} – ${periodLabel}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:10px}
+.page{max-width:900px;margin:0 auto}
+.header{background:${cfg.secondary};padding:20px 28px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo-box{height:42px;object-fit:contain;background:white;padding:4px 8px;border-radius:5px}
+.band{height:5px;background:linear-gradient(90deg,${cfg.primary},${cfg.secondary})}
+.content{padding:20px 28px}
+.section-title{font-size:11px;font-weight:800;color:${cfg.primary};text-transform:uppercase;letter-spacing:.7px;border-left:4px solid ${cfg.primary};padding-left:8px;margin:16px 0 8px}
+.exec-box{background:${pctBg(lastWeek.health.pct)};border:1px solid ${pctColor(lastWeek.health.pct)}44;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:10px;line-height:1.7}
+.indicators{display:grid;grid-template-columns:repeat(${weeks.length},1fr);gap:8px;margin-bottom:12px}
+.indicator{border-radius:8px;padding:10px;text-align:center;border:2px solid}
+.ind-val{font-size:20px;font-weight:900;line-height:1}
+.ind-lbl{font-size:8px;color:#64748b;margin-top:2px;font-weight:700}
+.ind-date{font-size:8px;color:#94a3b8;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:9px}
+th{padding:6px 7px;text-align:left;font-size:9px;font-weight:700;white-space:nowrap}
+td{padding:5px 7px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:nth-child(even) td{background:#f8fafc}
+.badge{display:inline-block;padding:1px 5px;border-radius:6px;font-size:8px;font-weight:700}
+.footer{background:#1e293b;color:#94a3b8;padding:12px 28px;display:flex;justify-content:space-between;align-items:center;font-size:9px;margin-top:16px}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style></head><body><div class="page">
+
+<div class="header">
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="${LOGOS.moked}" class="logo-box" alt="Moked"/>
+    <div style="width:1px;height:30px;background:rgba(255,255,255,.3)"></div>
+    <img src="${cfg.logo}" class="logo-box" alt="${cfg.name}"/>
+  </div>
+  <div style="color:white;flex:1;text-align:center">
+    <div style="font-size:14px;font-weight:800">Relatório Consolidado</div>
+    <div style="font-size:10px;opacity:.85">${project.id} – ${project.name} | ${periodLabel}</div>
+  </div>
+  <div style="color:white;text-align:right;font-size:9px">
+    <div style="font-size:11px;font-weight:800">${weeks.length} semanas</div>
+    <div style="opacity:.7">Gerado em ${now}</div>
+  </div>
+</div>
+<div class="band"></div>
+
+<div class="content">
+
+  <div class="section-title" style="margin-top:2px">Saúde por Semana</div>
+  <div class="indicators">
+    ${weeks.map(w=>`
+      <div class="indicator" style="background:${pctBg(w.health.pct)};border-color:${pctColor(w.health.pct)}">
+        <div class="ind-val" style="color:${pctColor(w.health.pct)}">${w.health.pct}%</div>
+        <div class="ind-lbl">${w.label}</div>
+        <div class="ind-date">${fmtDate(w.date)}</div>
+        <div style="font-size:8px;color:#64748b;margin-top:2px">${w.health.inop} inop</div>
+      </div>`).join("")}
+  </div>
+
+  <div class="section-title">Tabela Comparativa por Dispositivo</div>
+  <table>
+    <thead>
+      <tr style="background:${cfg.primary};color:white">
+        <th>Dispositivo</th><th>Item</th>
+        ${weeks.map(w=>`<th style="text-align:center">${w.label}<br/><span style="font-weight:400;opacity:.8">${fmtDate(w.date)}</span></th>`).join("")}
+      </tr>
+    </thead>
+    <tbody>
+      ${issueItems.map(it=>`
+        <tr>
+          <td style="font-size:9px">${it.cat}</td>
+          <td style="font-size:9px">${it.item}</td>
+          ${weeks.map(w=>statusCell(it.weeks[w.label])).join("")}
+        </tr>`).join("")}
+    </tbody>
+  </table>
+
+  ${activePendencies.length>0?`
+  <div class="section-title">Pendências Ativas — ${lastWeek.label} (${activePendencies.length})</div>
+  <table>
+    <thead><tr style="background:#1e293b;color:white">
+      <th>#</th><th>Pendência</th><th>Status</th><th>Desde</th><th>Prioridade</th>
+    </tr></thead>
+    <tbody>
+      ${activePendencies.map((p,i)=>`
+        <tr>
+          <td>${i+1}</td>
+          <td>${p.cat}${p.item&&p.item!=="—"?` – ${p.item}`:""}</td>
+          <td><span class="badge" style="background:${p.status==="partial"?"#fef3c7":"#fee2e2"};color:${p.status==="partial"?"#d97706":"#dc2626"}">${p.status==="partial"?"PARCIAL":"INOP"}</span></td>
+          <td>${fmtDate(p.since)}</td>
+          <td><span class="badge" style="background:${p.priority==="CRÍTICA"?"#fee2e2":p.priority==="ALTA"?"#fef3c7":p.priority==="MÉDIA"?"#eff6ff":"#f8fafc"};color:${p.priority==="CRÍTICA"?"#dc2626":p.priority==="ALTA"?"#d97706":p.priority==="MÉDIA"?"#2563eb":"#64748b"}">${p.priority}</span></td>
+        </tr>`).join("")}
+    </tbody>
+  </table>`:""}
+
+  <div class="section-title">Informações por Semana</div>
+  <table>
+    <thead><tr style="background:${cfg.primary};color:white">
+      <th>Semana</th><th>Data</th><th>Líder</th><th>CCO</th><th>Moked 24h</th><th>Assinatura</th>
+    </tr></thead>
+    <tbody>
+      ${weeks.map(w=>`
+        <tr>
+          <td style="font-weight:700">${w.label}</td>
+          <td>${fmtDate(w.date)}</td>
+          <td>${w.meta?.leader||"—"}</td>
+          <td>${w.meta?.cco||"—"}</td>
+          <td>${w.meta?.moked||"—"}</td>
+          <td>${w.meta?.signature||"—"}</td>
+        </tr>`).join("")}
+    </tbody>
+  </table>
+
+</div>
+
+<div class="footer">
+  <div><div style="color:white;font-weight:700;font-size:10px">Moked Security Consulting</div><div>MokLog CheckTest © ${new Date().getFullYear()}</div></div>
+  <div style="text-align:right"><div style="color:white;font-weight:700">${project.id} – ${periodLabel}</div><div>Gerado em ${now}</div></div>
+</div>
+</div></body></html>`;
+
+  downloadHTML(html, `MokLog_Consolidado_${project.id}_${periodLabel.replace(/\s/g,"_")}.html`);
+}
+
+function getWeekLabel(dateStr){
+  if(!dateStr) return "S?";
+  try{
+    const d=new Date(dateStr+"T12:00:00");
+    const months=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    return `S${Math.ceil(d.getDate()/7)} ${months[d.getMonth()]}`;
+  }catch{return "S?";}
 }
