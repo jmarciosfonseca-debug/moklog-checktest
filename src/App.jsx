@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { generatePDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot, deleteDoc } from "firebase/firestore";
 
@@ -948,9 +949,14 @@ function ReportScreen({project,state,meta,photos,onBack,onHome}){
           <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:11,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1}}>
-            {copied?"✓ Copiado!":"📋 Copiar"}
+          <button onClick={()=>generatePDF(project,state,meta,photos)} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>
+            📄 Exportar PDF
           </button>
+          <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1}}>
+            {copied?"✓ Copiado!":"📋 Copiar Texto"}
+          </button>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}>
           <a href={mailto} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#059669,#047857)",textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"center",gap:6,color:"#fff"}}>
             ✉ Enviar E-mail
           </a>
