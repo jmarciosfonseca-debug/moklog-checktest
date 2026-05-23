@@ -1929,7 +1929,7 @@ export default function App(){
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
             <div style={{fontSize:10,color:"#334155",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
-          <div style={{marginLeft:"auto",display:"flex",gap:6"}}>
+          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
           </div>
