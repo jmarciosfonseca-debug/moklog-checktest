@@ -439,11 +439,4 @@ function getWeekLabel(dateStr){
     return `S${Math.ceil(d.getDate()/7)} ${months[d.getMonth()]}`;
   }catch{return "S?";}
 }
-function getWeekLabel(dateStr){
-  if(!dateStr) return "S?";
-  try{
-    const d=new Date(dateStr+"T12:00:00");
-    const months=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-    return `S${Math.ceil(d.getDate()/7)} ${months[d.getMonth()]}`;
-  }catch{return "S?";}
-}
+
