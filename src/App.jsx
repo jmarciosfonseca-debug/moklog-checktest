@@ -51,7 +51,7 @@ async function deleteReportFromFirebase(projectId, newHistory) {
 
 // ─── View Links (Manutenção) ──────────────────────────────────────────────────
 function generateViewToken(projectId) {
-  return btoa(projectId + "_" + Math.random().toString(36).substring(2,10)).replace(/=/g,"");
+  return Math.random().toString(36).substring(2,10) + Math.random().toString(36).substring(2,10);
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -88,7 +88,8 @@ function scheduleWeeklyNotifications(projectName, projectId) {
 }
 
 function checkPendingNotifications(stored) {
-  if(Notification.permission !== "granted") return;
+  try {
+  if(!("Notification" in window)||Notification.permission !== "granted") return;
   const now = new Date();
   const isSunday = now.getDay() === 0;
   if(!isSunday) return;
@@ -110,6 +111,7 @@ function checkPendingNotifications(stored) {
       sendNotification("MokLog CheckTest ⚠️", `${p.id} – Teste semanal ainda não registrado. Não esqueça!`);
     }
   });
+  } catch(e){ console.log("Notif check error:",e); }
 }
 
 const PROJECTS = {
@@ -580,13 +582,23 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
   const key = itemLabel ? `${catId}_${itemLabel}` : catId;
   const existing = photos.filter(p=>p.photoKey===key);
   const handlePhoto = (e) => {
-    const file = e.target.files?.[0]; if(!file) return;
-    const r = new FileReader();
-    r.onload = ev => {
-      const filtered = photos.filter(p=>p.photoKey!==key);
-      setPhotos([...filtered, {photoKey:key, catId, catLabel, itemLabel, name:file.name, url:ev.target.result}]);
-    };
-    r.readAsDataURL(file);
+    try {
+      const file = e.target.files?.[0]; if(!file) return;
+      // Check file size - limit to 5MB to avoid crash
+      if(file.size > 5 * 1024 * 1024) {
+        alert("Foto muito grande. Use uma imagem menor que 5MB.");
+        return;
+      }
+      const r = new FileReader();
+      r.onerror = () => console.error("Error reading file");
+      r.onload = ev => {
+        try {
+          const filtered = photos.filter(p=>p.photoKey!==key);
+          setPhotos([...filtered, {photoKey:key, catId, catLabel, itemLabel, name:file.name, url:ev.target.result}]);
+        } catch(err) { console.error("Photo save error:", err); }
+      };
+      r.readAsDataURL(file);
+    } catch(err) { console.error("Photo handle error:", err); }
   };
   const removePhoto = () => setPhotos(photos.filter(p=>p.photoKey!==key));
   if(existing.length>0) return (
@@ -599,8 +611,8 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
   return (
     <label style={{display:"flex",alignItems:"center",gap:6,marginTop:6,cursor:"pointer",color:"#334155",fontSize:11,padding:"4px 0"}}>
       <span style={{fontSize:14}}>📷</span>
-      <span>Foto: {itemLabel||catLabel}</span>
-      <input type="file" accept="image/*" capture="environment" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
+      <span>Foto: {itemLabel||catLabel} (câmera ou galeria)</span>
+      <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
     </label>
   );
 }
@@ -1197,7 +1209,7 @@ function ViewScreen({projectId, token, stored}) {
   const viewLinks = JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");
   const validToken = viewLinks[projectId];
 
-  if(!project || !validToken || token !== validToken) {
+  if(!project || !validToken || (token !== validToken && token !== (projectId+"_"+validToken))) {
     return(
       <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
         <div style={{textAlign:"center",padding:32,color:"#334155"}}>
@@ -1283,12 +1295,33 @@ function ViewScreen({projectId, token, stored}) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function ErrorBoundaryFallback() {
+  return (
+    <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>
+      <div style={{textAlign:"center",padding:24,maxWidth:320}}>
+        <div style={{fontSize:40,marginBottom:12}}>🔄</div>
+        <div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Atualize a pagina</div>
+        <div style={{fontSize:13,color:"#64748b",marginBottom:16}}>Toque para recarregar o app</div>
+        <button onClick={()=>window.location.reload()} style={{background:"#1d4ed8",color:"#fff",border:"none",borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+          Recarregar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const [screen,setScreen]=useState("home");
   const [project,setProject]=useState(PROJECTS.P601);
   const [state,setState]=useState(null);
   const [meta,setMeta]=useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
   const [stored,setStored]=useState({});
+  const [crashed,setCrashed]=useState(false);
+  
+  useEffect(()=>{
+    window.onerror=()=>{ setCrashed(true); return true; };
+    return ()=>{ window.onerror=null; };
+  },[]);
   const [photos,setPhotos]=useState([]);
   const [active,setActive]=useState(null);
   const [syncing,setSyncing]=useState(false);
@@ -1306,8 +1339,12 @@ export default function App(){
     const params=new URLSearchParams(window.location.search);
     const view=params.get("view");
     if(view){
-      const [pid,token]=view.split("_");
-      if(pid&&token) setViewParams({projectId:pid,token});
+      const firstUnderscore=view.indexOf("_");
+      if(firstUnderscore>0){
+        const pid=view.substring(0,firstUnderscore);
+        const token=view.substring(firstUnderscore+1);
+        if(pid&&token) setViewParams({projectId:pid,token});
+      }
     }
   },[]);
 
@@ -1354,9 +1391,18 @@ export default function App(){
   // Auto-save draft
   useEffect(()=>{
     if(screen==="form"&&state){
-      const d={projectId:project.id,state,meta,photos,savedAt:Date.now()};
-      localStorage.setItem("moklog_draft",JSON.stringify(d));
-      setDraft(d);
+      try {
+        // Save without photos to localStorage (photos can be too large)
+        const d={projectId:project.id,state,meta,photoCount:photos.length,savedAt:Date.now()};
+        localStorage.setItem("moklog_draft",JSON.stringify(d));
+        setDraft({...d,photos});
+      } catch(err) {
+        // If storage full, save without state details
+        try {
+          const d={projectId:project.id,savedAt:Date.now()};
+          localStorage.setItem("moklog_draft",JSON.stringify(d));
+        } catch(e) {}
+      }
     }
   },[screen,state,meta,photos]);
 
