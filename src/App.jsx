@@ -5,7 +5,7 @@ import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "fire
 
 // ─── EmailJS Config ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
-const EMAILJS_TEMPLATE_ID = "6zmmd33";
+const EMAILJS_TEMPLATE_ID = "template_dhncs7j";
 const EMAILJS_PUBLIC_KEY  = "qnGBgZu7xNKnavJb7";
 
 async function sendEmailJS(subject, message, fromName) {
