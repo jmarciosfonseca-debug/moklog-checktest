@@ -352,6 +352,68 @@ const PROJECTS = {
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function daysSince(dateStr) {
+  if(!dateStr) return null;
+  try {
+    const d = new Date(dateStr + "T12:00:00");
+    const now = new Date();
+    return Math.floor((now - d) / (1000 * 60 * 60 * 24));
+  } catch { return null; }
+}
+
+function getProjectScore(project, history) {
+  if(!history || history.length === 0) return null;
+  const last6 = history.slice(-6);
+  const avg = Math.round(last6.reduce((a, r) => a + computeHealth(project, r.state).pct, 0) / last6.length);
+  const consistency = last6.every(r => computeHealth(project, r.state).pct >= 90);
+  if(avg >= 95 && consistency) return {grade:"A", color:"#22c55e", label:"Excelente"};
+  if(avg >= 88) return {grade:"B", color:"#3b82f6", label:"Bom"};
+  if(avg >= 75) return {grade:"C", color:"#f59e0b", label:"Regular"};
+  return {grade:"D", color:"#ef4444", label:"Crítico"};
+}
+
+function isLastSundayOfMonth() {
+  const now = new Date();
+  if(now.getDay() !== 0) return false;
+  const nextSunday = new Date(now);
+  nextSunday.setDate(now.getDate() + 7);
+  return nextSunday.getMonth() !== now.getMonth();
+}
+
+function getAllPendencies(stored) {
+  const result = [];
+  Object.values(PROJECTS).forEach(project => {
+    const hist = stored[project.id]?.history ?? [];
+    if(!hist.length) return;
+    const last = hist[hist.length - 1];
+    for(const cat of project.categories) {
+      const s = last.state[cat.id]; if(!s) continue;
+      if(cat.type === "single") {
+        const st = s.status ?? (s.ok === false ? "inop" : "ok");
+        if(st !== "ok") {
+          const days = daysSince(s.since);
+          result.push({project, cat: cat.label, item: "—", status: st, since: s.since, days, note: s.note});
+        }
+      } else if(cat.type === "items") {
+        s.forEach((v, i) => {
+          const st = v.status ?? (v.ok === false ? "inop" : "ok");
+          if(st !== "ok") {
+            const days = daysSince(v.since);
+            result.push({project, cat: cat.label, item: cat.itemLabels[i], status: st, since: v.since, days, note: v.note});
+          }
+        });
+      } else if(cat.type === "count") {
+        (s.inoperative ?? []).forEach(it => {
+          const days = daysSince(it.since);
+          result.push({project, cat: cat.label, item: it.id||"?", status:"inop", since: it.since, days, note: it.note});
+        });
+      }
+    }
+  });
+  return result.sort((a,b) => (b.days||0) - (a.days||0));
+}
+
+
 const todayStr = () => new Date().toISOString().split("T")[0];
 const fmtDate = (d) => { if(!d)return"—"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
@@ -818,10 +880,42 @@ function ProjectPinGate({project, onSuccess, onBack}) {
   );
 }
 
+// ─── MiniChart ───────────────────────────────────────────────────────────────
+function MiniChart({data, width=200, height=60}) {
+  if(!data || data.length < 2) return null;
+  const min = Math.min(...data) - 5;
+  const max = Math.max(...data) + 5;
+  const range = max - min || 1;
+  const pts = data.map((v, i) => {
+    const x = (i / (data.length-1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return `${x},${y}`;
+  }).join(" ");
+  const last = data[data.length-1];
+  const color = last >= 90 ? "#22c55e" : last >= 70 ? "#f59e0b" : "#ef4444";
+  return(
+    <svg width={width} height={height} style={{overflow:"visible"}}>
+      <defs>
+        <linearGradient id={`grad_${data.length}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      {data.map((v,i)=>{
+        const x=(i/(data.length-1))*width;
+        const y=height-((v-min)/range)*height;
+        return <circle key={i} cx={x} cy={y} r="3" fill={color}/>;
+      })}
+    </svg>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 function Dashboard({stored, onBack, onDeleteReport}) {
   const [pin,setPin]=useState(""); const [auth,setAuth]=useState(false); const [err,setErr]=useState(false);
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
+  const [pendScreen,setPendScreen]=useState(false);
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
   const [sessionTime,setSessionTime]=useState(Date.now());
   const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
@@ -859,6 +953,8 @@ function Dashboard({stored, onBack, onDeleteReport}) {
       </div>
     </div>
   );
+
+  if(pendScreen) return <PendenciesScreen stored={stored} onBack={()=>setPendScreen(false)}/>;
 
   // View single report
   if(viewReport) return(
@@ -1039,6 +1135,23 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           </div>
           {avgPct!==null&&<HealthRing pct={avgPct} size={52}/>}
         </div>
+
+        {/* Quick stats bar */}
+        {(()=>{
+          const allPend=getAllPendencies(stored);
+          const critDays=allPend.filter(p=>p.days&&p.days>=30);
+          return allPend.length>0?(
+            <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}
+              onClick={()=>setPendScreen(true)}>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div>
+                {critDays.length>0&&<div style={{fontSize:10,color:"#f59e0b",marginTop:2}}>{critDays.length} item(s) com +30 dias sem resolução</div>}
+              </div>
+              <span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver todas →</span>
+            </div>
+          ):null;
+        })()}
+
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjects.map(p=>{
             const hist=stored[p.id]?.history??[];
@@ -1051,9 +1164,15 @@ function Dashboard({stored, onBack, onDeleteReport}) {
                 <div style={{display:"flex",alignItems:"center",gap:12}}>
                   {h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#334155"}}>—</div>}
                   <div style={{flex:1}}>
-                    <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
+                      <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
+                      {(()=>{const sc=getProjectScore(p,hist);return sc?<span style={{fontSize:10,fontWeight:900,color:sc.color,background:sc.color+"22",padding:"1px 6px",borderRadius:6}}>{sc.grade}</span>:null;})()}
+                    </div>
                     {h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop · {hist.length} rel.</div>
                       :<div style={{fontSize:11,color:"#334155",marginTop:2}}>Sem registros</div>}
+                    {hist.length>=2&&<div style={{marginTop:6}}>
+                      <MiniChart data={hist.slice(-8).map(r=>computeHealth(p,r.state).pct)} width={160} height={32}/>
+                    </div>}
                   </div>
                   <span style={{color:"#334155",fontSize:16}}>›</span>
                 </div>
@@ -1086,6 +1205,100 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Pendencies Screen ───────────────────────────────────────────────────────
+function PendenciesScreen({stored, onBack}) {
+  const [filter, setFilter] = useState("all"); // all | critical | partial
+  const all = getAllPendencies(stored);
+  const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
+  
+  const critCount = all.filter(p => p.status === "inop").length;
+  const partCount = all.filter(p => p.status === "partial").length;
+  
+  return(
+    <div style={S.page}>
+      <div style={S.formWrap}>
+        <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
+          <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Pendências Globais</div>
+            <div style={{fontSize:11,color:"#334155"}}>Todos os projetos · {all.length} itens</div>
+          </div>
+        </div>
+
+        {/* Summary cards */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
+          <div style={{background:"#060c18",border:"1px solid #ef444433",borderRadius:10,padding:"10px",textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{critCount}</div>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700}}>INOP</div>
+          </div>
+          <div style={{background:"#060c18",border:"1px solid #f59e0b33",borderRadius:10,padding:"10px",textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:900,color:"#f59e0b"}}>{partCount}</div>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700}}>PARCIAL</div>
+          </div>
+          <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:10,padding:"10px",textAlign:"center"}}>
+            <div style={{fontSize:22,fontWeight:900,color:"#94a3b8"}}>{all.length}</div>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700}}>TOTAL</div>
+          </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div style={{display:"flex",gap:6,marginBottom:10}}>
+          {[["all","Todos",all.length],["critical","Inop",critCount],["partial","Parcial",partCount]].map(([key,label,count])=>(
+            <button key={key} onClick={()=>setFilter(key)}
+              style={{...S.sm,flex:1,padding:"7px",fontSize:11,...(filter===key?{background:"#1d4ed8",border:"1px solid #1d4ed8",color:"white"}:{})}}>
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+
+        {/* Pendencies list */}
+        {filtered.length===0&&(
+          <div style={{textAlign:"center",padding:"30px 0",color:"#22c55e",fontSize:14}}>
+            <div style={{fontSize:28,marginBottom:8}}>✅</div>
+            Nenhuma pendência encontrada!
+          </div>
+        )}
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {filtered.map((p,i)=>{
+            const color = p.status==="inop" ? "#ef4444" : "#f59e0b";
+            const urgency = p.days && p.days >= 30 ? "🔴" : p.days && p.days >= 14 ? "🟡" : "⚪";
+            return(
+              <div key={i} style={{background:"#060c18",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 12px"}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                  <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{urgency}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                      <span style={{fontSize:10,fontWeight:700,color:"#f1f5f9",background:"#0f172a",padding:"2px 6px",borderRadius:5}}>{p.project.id}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:color,background:color+"22",padding:"2px 6px",borderRadius:5}}>
+                        {p.status==="inop"?"INOP":"PARCIAL"}
+                      </span>
+                      {p.days!==null&&<span style={{fontSize:10,color:p.days>=30?"#ef4444":p.days>=14?"#f59e0b":"#64748b",fontWeight:700}}>
+                        há {p.days} dia{p.days!==1?"s":""}
+                      </span>}
+                    </div>
+                    <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",marginBottom:2}}>{p.cat}</div>
+                    {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
+                    {p.note&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
+                    <div style={{fontSize:10,color:"#334155",marginTop:3}}>Desde: {fmtDate(p.since)||"—"} · {p.project.name}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {all.length>0&&(
+          <div style={{marginTop:8,background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px"}}>
+            <div style={{fontSize:11,color:"#475569",textAlign:"center"}}>
+              {all.filter(p=>p.days&&p.days>=30).length} item(s) com mais de 30 dias · {all.filter(p=>p.days&&p.days>=14&&p.days<30).length} entre 14-30 dias
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1395,6 +1608,7 @@ export default function App(){
   const [loaded,setLoaded]=useState(false);
   const [projectAuth,setProjectAuth]=useState({});
   const [sigError,setSigError]=useState(false);
+  const [showMonthlyPrompt,setShowMonthlyPrompt]=useState(false);
   const [draft,setDraft]=useState(null);
   const [showDraftPrompt,setShowDraftPrompt]=useState(false);
   const [viewParams,setViewParams]=useState(null);
@@ -1547,6 +1761,49 @@ export default function App(){
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   // ── Draft prompt
+  // Monthly consolidado prompt
+  if(showMonthlyPrompt) return(
+    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
+      <div style={{background:"#060c18",border:"1px solid #7c3aed",borderRadius:16,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
+        <div style={{fontSize:28,marginBottom:10}}>📊</div>
+        <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Último teste do mês!</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>
+          Este é o último domingo do mês.<br/>
+          Deseja gerar o consolidado mensal após finalizar?
+        </div>
+        <div style={{display:"flex",gap:8,flexDirection:"column"}}>
+          <button onClick={()=>{
+            setShowMonthlyPrompt(false);
+            if(!meta.signature||meta.signature.trim()===""){setSigError(true);return;}
+            saveReport(state,meta);
+            setScreen("report");
+            // Auto-select all this month's reports for consolidado
+            setTimeout(()=>{
+              const hist=stored[project.id]?.history??[];
+              const now=new Date();
+              const monthReports=hist.map((r,i)=>({r,i})).filter(({r})=>{
+                if(!r.meta?.date) return false;
+                const d=new Date(r.meta.date+"T12:00:00");
+                return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+              });
+              if(monthReports.length>=2){
+                generateConsolidatedPDF(project, monthReports.map(({r})=>r));
+              }
+            },1500);
+          }} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:14}}>
+            ✓ Finalizar + Gerar Consolidado
+          </button>
+          <button onClick={()=>{
+            setShowMonthlyPrompt(false);
+            if(!meta.signature||meta.signature.trim()===""){setSigError(true);return;}
+            saveReport(state,meta);setScreen("report");
+          }} style={{...S.secBtn,width:"100%",fontSize:14}}>Só finalizar</button>
+          <button onClick={()=>setShowMonthlyPrompt(false)} style={{...S.secBtn,width:"100%",fontSize:13,color:"#334155"}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if(showDraftPrompt) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #f59e0b",borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
@@ -1562,6 +1819,7 @@ export default function App(){
   );
 
   // ── PIN gate
+  if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
   if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onDeleteReport={deleteReport}/>;
   if(screen==="history") return <HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/>;
@@ -1671,7 +1929,10 @@ export default function App(){
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
             <div style={{fontSize:10,color:"#334155",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
-          <button onClick={()=>setScreen("dashboard")} style={{marginLeft:"auto",background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
+          <div style={{marginLeft:"auto",display:"flex",gap:6"}}>
+            <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
+            <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
+          </div>
         </div>
 
         {!notifGranted&&(
@@ -1732,7 +1993,10 @@ export default function App(){
                           <div style={{display:"flex",alignItems:"center",gap:12}}>
                             <HealthRing pct={h.pct} size={52}/>
                             <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{p.id} — {p.name}</div>
+                              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                                <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{p.id} — {p.name}</div>
+                                {(()=>{const sc=getProjectScore(p,hist);return sc?<span style={{fontSize:10,fontWeight:900,color:sc.color,background:sc.color+"22",padding:"1px 6px",borderRadius:6}}>{sc.grade}</span>:null;})()}
+                              </div>
                               <div style={{fontSize:11,color:"#475569",marginTop:2}}>
                                 {h.inop>0&&<span style={{color:"#ef4444",fontWeight:700}}>{h.inop} inop · </span>}
                                 {h.partial>0&&<span style={{color:"#f59e0b",fontWeight:700}}>{h.partial} parcial · </span>}
