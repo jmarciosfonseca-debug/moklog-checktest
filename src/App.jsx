@@ -1090,6 +1090,9 @@ function ViewScreen({projectId, token, stored}) {
 function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBack }) {
   const [subScreen, setSubScreen] = useState(null); // null | "colaboradores"
   const [selProject, setSelProject] = useState(null);
+  const [pinAuth, setPinAuth] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinErr, setPinErr] = useState(false);
 
   const bg   = dark ? "#04080f" : "#f1f5f9";
   const cardBg = dark ? "#060c18" : "#ffffff";
@@ -1100,15 +1103,48 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBac
   const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
   const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
 
-  const allProjects = Object.values(PROJECTS);
+  const JATINOX_LIST = [
+    { id:"P260A", name:"Jatinox Unidade A" },
+    { id:"P260B", name:"Jatinox Unidade B" },
+    { id:"P260C", name:"Jatinox Unidade C" },
+  ];
+  const allProjects = [...Object.values(PROJECTS), ...JATINOX_LIST];
 
   // ── Sub: lista de colaboradores por projeto
   if(subScreen==="colaboradores" && selProject) {
     return (
       <EquipeReadOnly project={selProject} dark={dark} stored={stored}
-        onBack={()=>{ setSelProject(null); setSubScreen(null); }}
+        onBack={()=>{ setSelProject(null); }}
         onToggleTheme={onToggleTheme}
         onOpenFull={()=>onEquipe(selProject)}/>
+    );
+  }
+
+  // PIN gate para colaboradores
+  if(subScreen==="colaboradores" && !pinAuth) {
+    return (
+      <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+        <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
+          <div style={{ fontSize:32, marginBottom:8 }}>🔐</div>
+          <div style={{ fontSize:16, fontWeight:800, color:txt, marginBottom:4 }}>Área Restrita</div>
+          <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial para ver os colaboradores</div>
+          <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
+            onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
+            onKeyDown={e=>{ if(e.key==="Enter"){ if(pinInput==="872101"){setPinAuth(true);}else setPinErr(true); } }}
+            style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
+          {pinErr && <div style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>{ setSubScreen(null); setPinInput(""); setPinErr(false); }}
+              style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+              ← Voltar
+            </button>
+            <button onClick={()=>{ if(pinInput==="872101"){setPinAuth(true);}else setPinErr(true); }}
+              style={{ flex:1, background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              Entrar
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -1167,7 +1203,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBac
 
         <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
           {/* Card Colaboradores */}
-          <button onClick={()=>setSubScreen("colaboradores")}
+          <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
             style={{ background:cardBg, border:`2px solid ${dark?"#0ea5e933":"#bae6fd"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
             <div style={{ width:56, height:56, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e933":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
               <span style={{ fontSize:26 }}>👥</span>
