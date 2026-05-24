@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -254,7 +255,8 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
   const S = getStyles(dark);
   const handleFoto = (e) => {
     const file = e.target.files?.[0]; if(!file) return;
-    if(file.size > 3*1024*1024) { alert("Foto muito grande. Max 3MB"); return; }
+    // Sem limite rígido — upload vai para Firebase Storage
+    if(file.size > 20*1024*1024) { alert("Foto muito grande. Use uma imagem menor que 20MB."); return; }
     const r = new FileReader();
     r.onload = ev => setF("foto", ev.target.result);
     r.readAsDataURL(file);
@@ -353,9 +355,18 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
             </div>
           </div>
 
+          {form.foto&&form.foto.startsWith("data:")&&(
+            <div style={{background:"#001a2e",border:"1px solid #0ea5e922",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:12}}>📷</span>
+              <span style={{fontSize:11,color:"#0ea5e9"}}>Foto selecionada — será enviada ao salvar</span>
+            </div>
+          )}
           <button onClick={onSave} disabled={saving} style={{ ...S.btn, opacity:saving?0.7:1 }}>
-            {saving?"⟳ Salvando...":"✓ Salvar Colaborador"}
+            {saving?"⟳ Enviando foto e salvando...":"✓ Salvar Colaborador"}
           </button>
+          <div style={{fontSize:10,color:"#334155",textAlign:"center"}}>
+            Foto opcional · Sem foto também é permitido
+          </div>
         </div>
       </div>
     </div>
@@ -520,11 +531,26 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   const saveColab = async () => {
     if(!form.nome.trim()) { alert("Informe o nome"); return; }
-    if(!adminAuth) return; // só admin cadastra
+    if(!liderAuth) { alert("Acesso negado"); return; }
+    // Se tem foto em base64 grande, faz upload para Storage primeiro
+    let fotoFinal = form.foto || "";
+    if(fotoFinal && fotoFinal.startsWith("data:")) {
+      try {
+        const storage = getStorage();
+        const storageRef = ref(storage, `equipes/${project.id}/${form.id}_foto`);
+        await uploadString(storageRef, fotoFinal, "data_url");
+        fotoFinal = await getDownloadURL(storageRef);
+      } catch(e) {
+        console.error("Erro upload foto:", e);
+        // Se falhar upload, salva sem foto
+        fotoFinal = "";
+      }
+    }
+    const formFinal = { ...form, foto: fotoFinal };
     const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
     const newColabs = isNew
-      ? [...equipeData.colaboradores, form]
-      : equipeData.colaboradores.map(c=>c.id===form.id?form:c);
+      ? [...equipeData.colaboradores, formFinal]
+      : equipeData.colaboradores.map(c=>c.id===form.id?formFinal:c);
     await save({...equipeData, colaboradores:newColabs});
     setScreen("list"); setForm(null);
   };
