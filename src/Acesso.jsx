@@ -212,7 +212,7 @@ export default function AcessoApp({onBack}) {
 
   const saveForm = async () => {
     if(!form.motorista.trim()) { alert("Informe o nome do motorista"); return; }
-    if(form.fotos.length < MAX_FOTOS) { alert(`Adicione pelo menos ${MAX_FOTOS} fotos`); return; }
+    // fotos opcionais
     setSaving(true);
     const reg = {...form, savedAt: new Date().toISOString()};
     const newList = [reg, ...registros].sort((a,b)=>(b.data||"").localeCompare(a.data||""));
@@ -319,7 +319,7 @@ export default function AcessoApp({onBack}) {
           </div>
         </div>
 
-        <div style={{...S.card,border:`1px solid ${form.fotos.length>=MAX_FOTOS?"#22c55e44":"#0f172a"}`}}>
+        <div style={{...S.card,border:"1px solid #0f172a"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <div style={{fontSize:11,color:"#cc2222",fontWeight:800,textTransform:"uppercase",letterSpacing:.8}}>Fotos</div>
             <span style={{fontSize:13,fontWeight:700,color:form.fotos.length>=MAX_FOTOS?"#22c55e":"#f59e0b"}}>{form.fotos.length}/{MAX_FOTOS}</span>
@@ -344,7 +344,7 @@ export default function AcessoApp({onBack}) {
               <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
             </label>
           )}
-          {form.fotos.length<MAX_FOTOS&&<div style={{fontSize:10,color:"#f59e0b",marginTop:6,textAlign:"center"}}>⚠ Obrigatorio {MAX_FOTOS} fotos para salvar</div>}
+          <div style={{fontSize:10,color:"#64748b",marginTop:6,textAlign:"center"}}>Fotos opcionais — camera ou galeria</div>
         </div>
 
         <div style={S.card}>

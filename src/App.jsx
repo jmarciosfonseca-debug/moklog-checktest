@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import RondaApp from "./Ronda";
 import AcessoApp from "./Acesso";
+import EquipeApp from "./Equipe";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
@@ -1121,9 +1121,89 @@ function Dashboard({stored, onBack, onDeleteReport}) {
   const valid=allProjects.map(p=>{
     const hist=stored[p.id]?.history??[]; if(!hist.length) return null;
     const last=hist[hist.length-1]; const h=computeHealth(p,last.state);
-    return{...p,pct:h.pct,date:last.meta?.date,inopN:h.inop};
+    return{...p,pct:h.pct,date:last.meta?.date,inopN:h.inop,hist};
   }).filter(Boolean);
   const avgPct=valid.length?Math.round(valid.reduce((a,b)=>a+b.pct,0)/valid.length):null;
+
+  // Executive analysis
+  const worstProject = valid.length ? [...valid].sort((a,b)=>a.pct-b.pct)[0] : null;
+  const totalInopAll = valid.reduce((a,b)=>a+b.inopN,0);
+  const prevAvgPct = valid.length ? Math.round(valid.map(p=>{
+    const hist=stored[p.id]?.history??[];
+    if(hist.length<2) return p.pct;
+    return computeHealth(PROJECTS[p.id],hist[hist.length-2].state).pct;
+  }).reduce((a,b)=>a+b,0)/valid.length) : null;
+  const trend = avgPct!==null&&prevAvgPct!==null ? avgPct-prevAvgPct : 0;
+
+  // Projects without test > 8 days
+  const noTestRecent = allProjects.filter(p=>{
+    const hist=stored[p.id]?.history??[];
+    if(!hist.length) return true;
+    const last=hist[hist.length-1];
+    if(!last.meta?.date) return false;
+    const days=(Date.now()-new Date(last.meta.date+"T12:00:00").getTime())/(1000*60*60*24);
+    return days>8;
+  });
+
+  // Top 5 most problematic items across all projects
+  const itemProblems = {};
+  allProjects.forEach(p=>{
+    const hist=stored[p.id]?.history??[];
+    hist.forEach(r=>{
+      for(const cat of p.categories){
+        const s=r.state[cat.id]; if(!s) continue;
+        if(cat.type==="single"){
+          const st=s.status??(s.ok===false?"inop":"ok");
+          if(st!=="ok"){
+            const key=`${cat.label}`;
+            if(!itemProblems[key]) itemProblems[key]={label:cat.label,count:0,projects:new Set()};
+            itemProblems[key].count++;
+            itemProblems[key].projects.add(p.id);
+          }
+        } else if(cat.type==="items"){
+          s.forEach((v,i)=>{
+            const st=v.status??(v.ok===false?"inop":"ok");
+            if(st!=="ok"){
+              const key=`${cat.label}/${cat.itemLabels[i]}`;
+              if(!itemProblems[key]) itemProblems[key]={label:`${cat.label} — ${cat.itemLabels[i]}`,count:0,projects:new Set()};
+              itemProblems[key].count++;
+              itemProblems[key].projects.add(p.id);
+            }
+          });
+        }
+      }
+    });
+  });
+  const top5Items = Object.values(itemProblems).sort((a,b)=>b.count-a.count).slice(0,5);
+
+  // Critical alerts: inop >= 2 weeks
+  const criticalAlerts = [];
+  allProjects.forEach(p=>{
+    const hist=stored[p.id]?.history??[];
+    if(!hist.length) return;
+    for(const cat of p.categories){
+      if(cat.type==="items"){
+        const lastState=hist[hist.length-1].state[cat.id];
+        if(!lastState) continue;
+        lastState.forEach((v,i)=>{
+          const st=v.status??(v.ok===false?"inop":"ok");
+          if(st!=="ok"){
+            const wks=getConsecutiveInopWeeks(p,hist,cat.id,i);
+            if(wks>=2) criticalAlerts.push({project:p.id,label:`${cat.label} — ${cat.itemLabels[i]}`,weeks:wks,status:st});
+          }
+        });
+      } else if(cat.type==="single"){
+        const lastState=hist[hist.length-1].state[cat.id];
+        if(!lastState) continue;
+        const st=lastState.status??(lastState.ok===false?"inop":"ok");
+        if(st!=="ok"){
+          const wks=getConsecutiveInopWeeks(p,hist,cat.id,null);
+          if(wks>=2) criticalAlerts.push({project:p.id,label:cat.label,weeks:wks,status:st});
+        }
+      }
+    }
+  });
+  criticalAlerts.sort((a,b)=>b.weeks-a.weeks);
 
   return(
     <div style={S.page} onClick={resetSess}>
@@ -1133,10 +1213,144 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           <MoklogLogo size={34}/>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:900,color:"#f1f5f9"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-            <div style={{fontSize:11,color:"#334155"}}>Painel Gerencial — toque no projeto</div>
+            <div style={{fontSize:11,color:"#334155"}}>Painel Gerencial</div>
           </div>
           {avgPct!==null&&<HealthRing pct={avgPct} size={52}/>}
         </div>
+
+        {/* ── EXECUTIVE DASHBOARD ── */}
+        {avgPct!==null&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+
+            {/* Saúde geral */}
+            <div style={{background:"#060c18",border:`1px solid ${avgPct>=90?"#22c55e33":avgPct>=70?"#f59e0b33":"#ef444433"}`,borderRadius:12,padding:"14px 16px"}}>
+              <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Visão Executiva</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:26,fontWeight:900,color:avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}}>{avgPct}%</div>
+                  <div style={{fontSize:9,color:"#64748b",fontWeight:700}}>SAÚDE GERAL</div>
+                  <div style={{fontSize:10,color:trend>0?"#22c55e":trend<0?"#ef4444":"#64748b",fontWeight:700,marginTop:2}}>
+                    {trend>0?`↑ +${trend}%`:trend<0?`↓ ${trend}%`:"= Estável"}
+                  </div>
+                </div>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:26,fontWeight:900,color:totalInopAll>0?"#ef4444":"#22c55e"}}>{totalInopAll}</div>
+                  <div style={{fontSize:9,color:"#64748b",fontWeight:700}}>INOP TOTAL</div>
+                  <div style={{fontSize:10,color:"#475569",marginTop:2}}>{valid.length} projetos</div>
+                </div>
+                <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div>
+                  <div style={{fontSize:9,color:"#64748b",fontWeight:700}}>ALERTAS</div>
+                  <div style={{fontSize:10,color:"#475569",marginTop:2}}>{noTestRecent.length} sem teste</div>
+                </div>
+              </div>
+              {/* Trend bar */}
+              <div style={{height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${avgPct}%`,background:avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444",borderRadius:2}}/>
+              </div>
+            </div>
+
+            {/* Projeto com maior deficiência */}
+            {worstProject&&worstProject.pct<90&&(
+              <div style={{background:"#1a0202",border:"2px solid #ef444455",borderRadius:12,padding:"12px 16px"}}>
+                <div style={{fontSize:10,color:"#ef4444",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>🚨 Maior Deficiência</div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  <HealthRing pct={worstProject.pct} size={50}/>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{worstProject.id} — {worstProject.name}</div>
+                    <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>{worstProject.inopN} inoperante(s) · {(()=>{
+                      const hist=stored[worstProject.id]?.history??[];
+                      let wks=0;
+                      for(let i=hist.length-1;i>=0;i--){
+                        if(computeHealth(PROJECTS[worstProject.id],hist[i].state).pct<90) wks++; else break;
+                      }
+                      return wks>1?`${wks} sem. consecutivas abaixo de 90%`:"Esta semana";
+                    })()}</div>
+                    <div style={{fontSize:10,color:"#475569"}}>Último teste: {worstProject.date?worstProject.date.split("-").reverse().join("/"):"—"}</div>
+                  </div>
+                  <button onClick={()=>setSelProject(PROJECTS[worstProject.id])}
+                    style={{background:"#ef444422",border:"1px solid #ef444444",color:"#ef4444",borderRadius:8,padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>
+                    Ver →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Critical alerts */}
+            {criticalAlerts.length>0&&(
+              <div style={{background:"#060c18",border:"1px solid #ef444422",borderRadius:12,padding:"12px 16px"}}>
+                <div style={{fontSize:10,color:"#ef4444",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🔴 Alertas Críticos ({criticalAlerts.length})</div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  {criticalAlerts.slice(0,5).map((a,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:"#020510",borderRadius:7,padding:"7px 10px"}}>
+                      <span style={{fontSize:9,fontWeight:700,color:a.weeks>=4?"#ef4444":"#f59e0b",background:a.weeks>=4?"#1a0202":"#1a1000",padding:"2px 6px",borderRadius:5,flexShrink:0}}>{a.weeks}ª sem.</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:11,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.label}</div>
+                        <div style={{fontSize:10,color:"#475569"}}>{a.project}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {criticalAlerts.length>5&&<div style={{fontSize:10,color:"#475569",textAlign:"center"}}>+{criticalAlerts.length-5} mais alertas</div>}
+                </div>
+              </div>
+            )}
+
+            {/* Projects without recent test */}
+            {noTestRecent.length>0&&(
+              <div style={{background:"#060c18",border:"1px solid #f59e0b33",borderRadius:12,padding:"12px 16px"}}>
+                <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⏰ Sem Teste Recente (+8 dias)</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {noTestRecent.map(p=>(
+                    <span key={p.id} style={{fontSize:11,color:"#f59e0b",background:"#0a0800",border:"1px solid #f59e0b33",padding:"3px 8px",borderRadius:6,fontWeight:700}}>{p.id}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top 5 problem items */}
+            {top5Items.length>0&&(
+              <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"12px 16px"}}>
+                <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📊 Top 5 Dispositivos Problemáticos</div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  {top5Items.map((item,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,background:"#020510",borderRadius:7,padding:"7px 10px"}}>
+                      <span style={{fontSize:11,fontWeight:900,color:i===0?"#ef4444":i===1?"#f59e0b":"#64748b",width:16,flexShrink:0}}>#{i+1}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:11,color:"#f1f5f9",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.label}</div>
+                        <div style={{fontSize:9,color:"#475569"}}>{[...item.projects].join(", ")}</div>
+                      </div>
+                      <span style={{fontSize:11,fontWeight:700,color:"#ef4444",flexShrink:0}}>{item.count}x</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ranking */}
+            <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"12px 16px"}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🏆 Ranking de Projetos</div>
+              {[...valid].sort((a,b)=>a.pct-b.pct).map((p,i)=>{
+                const sc=getProjectScore(PROJECTS[p.id],stored[p.id]?.history??[]);
+                return(
+                  <div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:"1px solid #0a0f1e"}}>
+                    <span style={{fontSize:11,color:"#334155",width:18,flexShrink:0}}>#{i+1}</span>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                        <span style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>{p.id}</span>
+                        {sc&&<span style={{fontSize:9,fontWeight:900,color:sc.color,background:sc.color+"22",padding:"1px 4px",borderRadius:4}}>{sc.grade}</span>}
+                      </div>
+                      <div style={{height:3,background:"#0f172a",borderRadius:1,marginTop:3,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${p.pct}%`,background:p.pct>=90?"#22c55e":p.pct>=70?"#f59e0b":"#ef4444",borderRadius:1}}/>
+                      </div>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:p.pct>=90?"#22c55e":p.pct>=70?"#f59e0b":"#ef4444",flexShrink:0}}>{p.pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+        )}
 
         {/* Quick stats bar */}
         {(()=>{
@@ -1593,8 +1807,10 @@ function ErrorBoundaryFallback() {
 
 export default function App(){
   const [screen,setScreen]=useState("home");
-  const [showRonda,setShowRonda]=useState(false);
   const [showAcesso,setShowAcesso]=useState(false);
+  const [showEquipe,setShowEquipe]=useState(false);
+  const [equipeProject,setEquipeProject]=useState(null);
+  const [homeGroup,setHomeGroup]=useState(null); // null | "golgi" | "mega" | "klog" | "outros"
   const [project,setProject]=useState(PROJECTS.P601);
   const [state,setState]=useState(null);
   const [meta,setMeta]=useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
@@ -1762,8 +1978,8 @@ export default function App(){
   ):null;
 
   // ── View mode (manutenção)
-  if(showRonda) return <RondaApp onBack={()=>setShowRonda(false)}/>;
   if(showAcesso) return <AcessoApp onBack={()=>setShowAcesso(false)}/>;
+  if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   // ── Draft prompt
@@ -1923,7 +2139,98 @@ export default function App(){
     </div>
   );
 
-  // ── HOME
+  // ── HOME — Group subscreen
+  if(homeGroup) {
+    const groupProjects = {
+      golgi: ["P601","P602","P604","P605","P606","P607"],
+      mega:  ["P311A","P311B"],
+      klog:  ["P505"],
+      outros:["P260A"]
+    }[homeGroup] || [];
+    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog",outros:"Outros Projetos"};
+    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a",outros:"#7c3aed"};
+    const color = groupColors[homeGroup];
+    return (
+      <div style={S.page}>
+        <SyncBadge/>
+        <div style={S.homeWrap}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
+            <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:900,color:"#f8fafc"}}>{groupNames[homeGroup]}</div>
+              <div style={{fontSize:11,color:"#334155"}}>{groupProjects.join(" · ")}</div>
+            </div>
+          </div>
+
+          {draft&&groupProjects.includes(draft.projectId)&&(
+            <div style={{background:"#0f172a",border:"1px solid #f59e0b55",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>📝</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
+                <div style={{fontSize:11,color:"#64748b"}}>{draft.projectId} — salvo automaticamente</div>
+              </div>
+              <button onClick={()=>{setProject(PROJECTS[draft.projectId]);setShowDraftPrompt(true);}} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Continuar</button>
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {groupProjects.map(pid => {
+              const p = PROJECTS[pid]; if(!p) return null;
+              const hist = stored[p.id]?.history??[];
+              const last = hist.slice(-1)[0];
+              const h = last?computeHealth(p,last.state):null;
+              const pcolor = h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";
+              const score = getProjectScore(p,hist);
+              const isActive = p.id===project.id;
+              return(
+                <div key={pid} style={{background:isActive?"#060f20":"#060c18",border:`2px solid ${isActive?color+"66":"#0f172a"}`,borderRadius:14,padding:"14px 16px",cursor:"pointer"}}
+                  onClick={()=>setProject(p)}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    {h?<HealthRing pct={h.pct} size={50}/>:
+                      <div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#334155"}}>—</div>}
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id}</div>
+                        <div style={{fontSize:12,color:"#64748b"}}>— {p.name}</div>
+                        {score&&<span style={{fontSize:9,fontWeight:900,color:score.color,background:score.color+"22",padding:"1px 5px",borderRadius:5}}>{score.grade}</span>}
+                      </div>
+                      {h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>
+                        {h.inop>0&&<span style={{color:"#ef4444",fontWeight:700}}>{h.inop} inop · </span>}
+                        Último: {fmtDate(last?.meta?.date)}
+                      </div>:<div style={{fontSize:11,color:"#334155",marginTop:2}}>Sem registros ainda</div>}
+                    </div>
+                    {isActive&&<span style={{fontSize:9,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
+                  </div>
+                  {h&&<div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${h.pct}%`,background:pcolor,borderRadius:2}}/>
+                  </div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {project&&groupProjects.includes(project.id)&&(
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+              {checkAuth(project.id)?(
+                <>
+                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:14}}>+ Novo Relatório — {project.id}</button>
+                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14}}>📅 Histórico</button>
+                  <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:14,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe — {project.id}</button>
+                </>
+              ):(
+                <>
+                  <button onClick={()=>setScreen("pin_gate")} style={{...S.primaryBtn,fontSize:14}}>🔐 Acessar — {project.id}</button>
+                  <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:14,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe — {project.id}</button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── HOME — Main cards
   return(
     <div style={S.page}>
       <SyncBadge/>
@@ -1937,7 +2244,6 @@ export default function App(){
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
-            <button onClick={()=>setShowRonda(true)} style={{background:"#001a2e",border:"1px solid #0ea5e944",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#38bdf8",fontWeight:700}}>🗺️ Ronda</button>
             <button onClick={()=>setShowAcesso(true)} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}}>🚛 Acesso</button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
           </div>
@@ -1966,136 +2272,71 @@ export default function App(){
           </div>
         )}
 
-        {/* ── VISUAL DASHBOARD ── */}
+        {/* ── CATEGORY CARDS ── */}
         <div style={{width:"100%"}}>
-          <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
-            Saúde dos Projetos
+          <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Seleção de Projeto</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {[
+              {key:"golgi",label:"Projetos Golgi",sub:"P601 — P607",color:"#1d4ed8",ids:["P601","P602","P604","P605","P606","P607"]},
+              {key:"mega",label:"Projetos Mega",sub:"P311A, P311B",color:"#0ea5e9",ids:["P311A","P311B"]},
+              {key:"klog",label:"Projetos Klog",sub:"P505",color:"#16a34a",ids:["P505"]},
+              {key:"outros",label:"Outros Projetos",sub:"P260A",color:"#7c3aed",ids:["P260A"]},
+            ].map(grp=>{
+              const grpProjects = grp.ids.map(id=>PROJECTS[id]).filter(Boolean);
+              const healths = grpProjects.map(p=>{
+                const hist=stored[p.id]?.history??[];
+                const last=hist.slice(-1)[0];
+                return last?computeHealth(p,last.state):null;
+              }).filter(Boolean);
+              const hasProblems = healths.some(h=>h.pct<90);
+              const avgPct = healths.length?Math.round(healths.reduce((a,h)=>a+h.pct,0)/healths.length):null;
+              const totalInop = healths.reduce((a,h)=>a+h.inop,0);
+              return(
+                <button key={grp.key} onClick={()=>setHomeGroup(grp.key)}
+                  style={{background:"#060c18",border:`2px solid ${hasProblems?grp.color+"88":grp.color+"22"}`,borderRadius:16,padding:"20px 14px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative"}}>
+                  {hasProblems&&<div style={{position:"absolute",top:8,right:8,width:8,height:8,borderRadius:"50%",background:"#ef4444"}}/>}
+                  {/* Warehouse icon */}
+                  <svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 18L26 4L48 18V42H4V18Z" stroke={grp.color} strokeWidth="2.5" strokeLinejoin="round" fill={grp.color+"11"}/>
+                    <rect x="18" y="26" width="16" height="16" rx="1" stroke={grp.color} strokeWidth="2" fill={grp.color+"22"}/>
+                    <rect x="10" y="20" width="8" height="8" rx="1" stroke={grp.color} strokeWidth="1.5" fill="none"/>
+                    <rect x="34" y="20" width="8" height="8" rx="1" stroke={grp.color} strokeWidth="1.5" fill="none"/>
+                    <line x1="26" y1="26" x2="26" y2="42" stroke={grp.color} strokeWidth="1.5"/>
+                  </svg>
+                  <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9",lineHeight:1.2}}>{grp.label}</div>
+                  <div style={{fontSize:11,color:"#475569"}}>{grp.sub}</div>
+                  {avgPct!==null&&(
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
+                      <span style={{fontSize:13,fontWeight:900,color:avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}}>{avgPct}%</span>
+                      {totalInop>0&&<span style={{fontSize:10,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
+                    </div>
+                  )}
+                  {avgPct===null&&<div style={{fontSize:10,color:"#334155"}}>Sem dados</div>}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Projects with problems FIRST */}
+          {/* Overall health */}
           {(()=>{
-            const allP = Object.values(PROJECTS).map(p=>{
-              const hist=stored[p.id]?.history??[];
-              const last=hist.slice(-1)[0];
-              const h=last?computeHealth(p,last.state):null;
-              return {p,h,last,hist};
-            });
-            const withProblems = allP.filter(({h})=>h&&h.pct<90);
-            const allOk = allP.filter(({h})=>!h||h.pct>=90);
-
-            return <>
-              {/* PROBLEM PROJECTS — big cards */}
-              {withProblems.length>0&&(
-                <>
-                  <div style={{fontSize:9,color:"#ef4444",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{width:6,height:6,borderRadius:"50%",background:"#ef4444",display:"inline-block"}}/>
-                    Requer Atenção ({withProblems.length})
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:10}}>
-                    {withProblems.map(({p,h,last,hist})=>{
-                      const isActive=p.id===project.id;
-                      const color=h.pct>=70?"#f59e0b":"#ef4444";
-                      return(
-                        <button key={p.id} onClick={()=>setProject(p)}
-                          style={{background:isActive?"#0a0f1e":"#060c18",border:`2px solid ${isActive?color:color+"55"}`,borderRadius:12,padding:"12px 14px",cursor:"pointer",textAlign:"left",width:"100%"}}>
-                          <div style={{display:"flex",alignItems:"center",gap:12}}>
-                            <HealthRing pct={h.pct} size={52}/>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                                <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{p.id} — {p.name}</div>
-                                {(()=>{const sc=getProjectScore(p,hist);return sc?<span style={{fontSize:10,fontWeight:900,color:sc.color,background:sc.color+"22",padding:"1px 6px",borderRadius:6}}>{sc.grade}</span>:null;})()}
-                              </div>
-                              <div style={{fontSize:11,color:"#475569",marginTop:2}}>
-                                {h.inop>0&&<span style={{color:"#ef4444",fontWeight:700}}>{h.inop} inop · </span>}
-                                {h.partial>0&&<span style={{color:"#f59e0b",fontWeight:700}}>{h.partial} parcial · </span>}
-                                Último: {fmtDate(last?.meta?.date)}
-                              </div>
-                              {/* Mini sparkline */}
-                              {hist.length>1&&<div style={{display:"flex",gap:2,marginTop:5}}>
-                                {hist.slice(-6).map((r,i)=>{
-                                  const rh=computeHealth(p,r.state);
-                                  const rc=rh.pct>=90?"#22c55e":rh.pct>=70?"#f59e0b":"#ef4444";
-                                  return <div key={i} style={{flex:1,height:18,background:`${rc}22`,border:`1px solid ${rc}44`,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:rc,fontWeight:700}}>{rh.pct}%</div>;
-                                })}
-                              </div>}
-                            </div>
-                            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                              {isActive&&<span style={{fontSize:9,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:6}}>SELECIONADO</span>}
-                              <span style={{color:"#334155",fontSize:14}}>›</span>
-                            </div>
-                          </div>
-                          {/* Health bar */}
-                          <div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
-                            <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2,transition:"width .5s"}}/>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {/* OK PROJECTS — compact list */}
-              {allOk.length>0&&(
-                <>
-                  <div style={{fontSize:9,color:"#22c55e",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6,display:"flex",alignItems:"center",gap:4}}>
-                    <span style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>
-                    Operando Normalmente ({allOk.length})
-                  </div>
-                  <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,overflow:"hidden"}}>
-                    {allOk.map(({p,h,last},idx)=>{
-                      const isActive=p.id===project.id;
-                      const color=h?"#22c55e":"#334155";
-                      return(
-                        <button key={p.id} onClick={()=>setProject(p)}
-                          style={{width:"100%",background:isActive?"#060f20":"transparent",border:"none",borderBottom:idx<allOk.length-1?"1px solid #0a0f1e":"none",padding:"10px 14px",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:10}}>
-                          <div style={{width:8,height:8,borderRadius:"50%",background:color,flexShrink:0}}/>
-                          <div style={{flex:1}}>
-                            <span style={{fontSize:12,fontWeight:700,color:isActive?"#f1f5f9":"#cbd5e1"}}>{p.id}</span>
-                            <span style={{fontSize:12,color:isActive?"#94a3b8":"#475569",marginLeft:6}}>{p.name}</span>
-                          </div>
-                          <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                            {h&&<span style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{h.pct}%</span>}
-                            {!h&&<span style={{fontSize:10,color:"#334155"}}>Sem dados</span>}
-                            {last&&<span style={{fontSize:10,color:"#334155"}}>{fmtDate(last?.meta?.date)}</span>}
-                            <span style={{color:"#1e293b",fontSize:12}}>›</span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {/* Overall health summary */}
-              {allP.some(({h})=>h)&&(()=>{
-                const valid=allP.filter(({h})=>h);
-                const avg=Math.round(valid.reduce((a,{h})=>a+h.pct,0)/valid.length);
-                const totalInop=valid.reduce((a,{h})=>a+h.inop,0);
-                return(
-                  <div style={{marginTop:8,background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                    <div style={{fontSize:11,color:"#334155",fontWeight:700}}>Saúde Geral da Operação</div>
-                    <div style={{display:"flex",alignItems:"center",gap:12}}>
-                      {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop total</span>}
-                      <span style={{fontSize:16,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}}>{avg}%</span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </>;
+            const allP=Object.values(PROJECTS);
+            const valid=allP.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.slice(-1)[0];return last?computeHealth(p,last.state):null;}).filter(Boolean);
+            if(!valid.length) return null;
+            const avg=Math.round(valid.reduce((a,h)=>a+h.pct,0)/valid.length);
+            const totalInop=valid.reduce((a,h)=>a+h.inop,0);
+            return(
+              <div style={{marginTop:10,background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{fontSize:11,color:"#334155",fontWeight:700}}>Saúde Geral da Operação</div>
+                <div style={{display:"flex",alignItems:"center",gap:12}}>
+                  {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop</span>}
+                  <span style={{fontSize:16,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}}>{avg}%</span>
+                </div>
+              </div>
+            );
           })()}
         </div>
 
-        <div style={{width:"100%",display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
-          {checkAuth(project.id)?(
-            <>
-              <button onClick={startNew} style={{...S.primaryBtn,fontSize:14}}>+ Novo Relatorio — {project.id}</button>
-              <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14}}>📅 Historico</button>
-            </>
-          ):(
-            <button onClick={()=>setScreen("pin_gate")} style={{...S.primaryBtn,fontSize:14}}>🔐 Acessar — {project.id}</button>
-          )}
-        </div>
+
         <div style={{fontSize:10,color:"#1e293b",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
     </div>
