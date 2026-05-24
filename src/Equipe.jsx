@@ -585,8 +585,8 @@ export default function EquipeApp({ project, onBack }) {
       onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); }}/>
   );
 
-  // ── Formulário (admin only)
-  if(screen==="add"&&form&&adminAuth) return (
+  // ── Formulário: cadastro (líder ou admin) / edição (admin only)
+  if(screen==="add"&&form&&liderAuth) return (
     <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("list");setForm(null);}} saving={saving} isEdit={false} dark={dark}/>
   );
@@ -647,8 +647,8 @@ export default function EquipeApp({ project, onBack }) {
             </div>
           ) : null}
 
-          {/* Botão cadastrar — admin only */}
-          {adminAuth && (
+          {/* Botão cadastrar — líder ou admin */}
+          {liderAuth && (
             <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,"Diurno"));setScreen("add");}}
               style={{ ...S.btn, fontSize:13 }}>
               + Cadastrar Colaborador
@@ -685,7 +685,7 @@ export default function EquipeApp({ project, onBack }) {
                     <span style={{ fontSize:13, fontWeight:700, color:tc.badge }}>{turno}</span>
                     <span style={{ fontSize:10, color:"#64748b", background:"#0a0f1e", padding:"2px 8px", borderRadius:10 }}>{colabsDoTurno.length}</span>
                   </div>
-                  {adminAuth && (
+                  {liderAuth && (
                     <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,turno));setScreen("add");}}
                       style={{ ...S.btnSm, fontSize:10, color:tc.badge, border:`1px solid ${tc.badge}44`, padding:"4px 10px" }}>
                       + Adicionar
@@ -780,7 +780,7 @@ export default function EquipeApp({ project, onBack }) {
               <div style={{ fontSize:40, marginBottom:10 }}>👥</div>
               <div style={{ fontSize:14, ...S.txtPrimary, marginBottom:4 }}>Equipe vazia</div>
               <div style={{ fontSize:12, ...S.txtSecondary }}>
-                {adminAuth?"Toque em + Cadastrar Colaborador para começar":"Acesso gerencial para cadastrar colaboradores"}
+                {liderAuth?"Toque em + Cadastrar Colaborador para começar":"Acesso necessário para cadastrar colaboradores"}
               </div>
             </div>
           )}
