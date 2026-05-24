@@ -1085,11 +1085,301 @@ function ViewScreen({projectId, token, stored}) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+
+// ── Tela Registros Menu
+function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBack }) {
+  const [subScreen, setSubScreen] = useState(null); // null | "colaboradores"
+  const [selProject, setSelProject] = useState(null);
+
+  const bg   = dark ? "#04080f" : "#f1f5f9";
+  const cardBg = dark ? "#060c18" : "#ffffff";
+  const border = dark ? "#0f172a" : "#e2e8f0";
+  const txt  = dark ? "#f1f5f9" : "#0f172a";
+  const txt2 = dark ? "#475569" : "#64748b";
+  const hdrBg = dark ? "#04080f" : "#f8fafc";
+  const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
+  const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
+
+  const allProjects = Object.values(PROJECTS);
+
+  // ── Sub: lista de colaboradores por projeto
+  if(subScreen==="colaboradores" && selProject) {
+    return (
+      <EquipeReadOnly project={selProject} dark={dark} stored={stored}
+        onBack={()=>{ setSelProject(null); setSubScreen(null); }}
+        onToggleTheme={onToggleTheme}
+        onOpenFull={()=>onEquipe(selProject)}/>
+    );
+  }
+
+  if(subScreen==="colaboradores") {
+    return (
+      <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+        <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
+          <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <button onClick={()=>setSubScreen(null)} style={backBtn}>← Voltar</button>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 Colaboradores</div>
+                <div style={{ fontSize:11, color:txt2 }}>Selecione o projeto</div>
+              </div>
+              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>
+            </div>
+          </div>
+          <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
+            {allProjects.map(p => {
+              const hist = stored[p.id]?.history ?? [];
+              const colabCount = null; // equipe data not loaded here
+              return (
+                <button key={p.id} onClick={()=>{ setSelProject(p); }}
+                  style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:42, height:42, borderRadius:10, background: dark?"#0f172a":"#f1f5f9", border:`1px solid ${border}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <span style={{ fontSize:18 }}>👥</span>
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:txt }}>{p.id}</div>
+                    <div style={{ fontSize:11, color:txt2 }}>{p.name}</div>
+                  </div>
+                  <span style={{ color:txt2, fontSize:16 }}>›</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Menu principal Registros
+  return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <button onClick={onBack} style={backBtn}>← Início</button>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Registros</div>
+              <div style={{ fontSize:11, color:txt2 }}>Colaboradores e Acessos</div>
+            </div>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>
+          </div>
+        </div>
+
+        <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
+          {/* Card Colaboradores */}
+          <button onClick={()=>setSubScreen("colaboradores")}
+            style={{ background:cardBg, border:`2px solid ${dark?"#0ea5e933":"#bae6fd"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{ width:56, height:56, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e933":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <span style={{ fontSize:26 }}>👥</span>
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
+              <div style={{ fontSize:12, color:txt2, marginTop:3 }}>Ver equipes cadastradas em todos os projetos</div>
+              <div style={{ fontSize:11, color:dark?"#334155":"#94a3b8", marginTop:5 }}>
+                {allProjects.length} projeto(s) disponíveis
+              </div>
+            </div>
+            <span style={{ color:txt2, fontSize:20 }}>›</span>
+          </button>
+
+          {/* Card Acessos Jatinox */}
+          <button onClick={onAcessos}
+            style={{ background:cardBg, border:`2px solid ${dark?"#f59e0b33":"#fde68a"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{ width:56, height:56, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b33":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <span style={{ fontSize:26 }}>🚛</span>
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Acessos Jatinox</div>
+              <div style={{ fontSize:12, color:txt2, marginTop:3 }}>Registros de transportadoras — P260A</div>
+              <div style={{ fontSize:11, color:dark?"#334155":"#94a3b8", marginTop:5 }}>
+                Ver, filtrar e gerar consolidado
+              </div>
+            </div>
+            <span style={{ color:txt2, fontSize:20 }}>›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Equipe somente leitura (sem PIN, só visualização)
+function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFull }) {
+  const [equipeData, setEquipeData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const bg   = dark ? "#04080f" : "#f1f5f9";
+  const cardBg = dark ? "#060c18" : "#ffffff";
+  const border = dark ? "#0f172a" : "#e2e8f0";
+  const txt  = dark ? "#f1f5f9" : "#0f172a";
+  const txt2 = dark ? "#475569" : "#64748b";
+  const hdrBg = dark ? "#04080f" : "#f8fafc";
+  const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
+  const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
+
+  const TURNO_CONFIG = {
+    "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
+    "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
+    "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:"☀️🌙" },
+    "Diurno A":  { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
+    "Noturno A": { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
+    "Diurno B":  { bg:"#1a2a10", border:"#84cc1633", badge:"#a3e635", icon:"🌤️" },
+    "Noturno B": { bg:"#0f0a2a", border:"#a855f733", badge:"#c084fc", icon:"🌃" },
+  };
+  const TURNOS = ["Diurno","Noturno","Folguista","Diurno A","Noturno A","Diurno B","Noturno B"];
+
+  useEffect(()=>{
+    const load = async () => {
+      try {
+        const { initializeApp, getApps } = await import("firebase/app");
+        const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+        const firebaseConfig = {
+          apiKey:"AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
+          authDomain:"moklog-checktest.firebaseapp.com",
+          projectId:"moklog-checktest",
+          storageBucket:"moklog-checktest.firebasestorage.app",
+          messagingSenderId:"390165325023",
+          appId:"1:390165325023:web:3147cd333503916b0d756a"
+        };
+        const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+        const db = getFirestore(fbApp);
+        const snap = await getDoc(doc(db,"equipes",project.id));
+        if(snap.exists()) { setEquipeData(snap.data()); setLoading(false); return; }
+      } catch(e){}
+      try {
+        const local = localStorage.getItem(`equipe_${project.id}`);
+        if(local) { setEquipeData(JSON.parse(local)); setLoading(false); return; }
+      } catch(e){}
+      setEquipeData({ colaboradores:[], desligados:[] });
+      setLoading(false);
+    };
+    load();
+  },[project.id]);
+
+  if(loading) return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:28, marginBottom:8 }}>👥</div>
+        <div style={{ fontSize:13, color:txt2 }}>Carregando equipe...</div>
+      </div>
+    </div>
+  );
+
+  const ativos = (equipeData?.colaboradores||[]).filter(c=>c.status==="ativo");
+  const turnos = TURNOS.filter(t=>ativos.some(c=>c.turno===t));
+
+  const fmtDate = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
+
+  return (
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif", paddingBottom:60 }}>
+      <div style={{ width:"100%", maxWidth:480 }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <button onClick={onBack} style={backBtn}>← Voltar</button>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 {project.id}</div>
+              <div style={{ fontSize:11, color:txt2 }}>{project.name} · {ativos.length} ativo(s)</div>
+            </div>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>
+          </div>
+        </div>
+
+        <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+
+          {/* Resumo turnos */}
+          {turnos.length > 0 && (
+            <div style={{ display:"grid", gridTemplateColumns:`repeat(${Math.min(turnos.length,3)},1fr)`, gap:8 }}>
+              {turnos.map(t=>{
+                const tc = TURNO_CONFIG[t] || TURNO_CONFIG["Diurno"];
+                const count = ativos.filter(c=>c.turno===t).length;
+                return (
+                  <div key={t} style={{ background:tc.bg, border:`1px solid ${tc.border}`, borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
+                    <div style={{ fontSize:16, marginBottom:2 }}>{tc.icon}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:tc.badge }}>{t}</div>
+                    <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{count}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Colaboradores por turno */}
+          {ativos.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"40px 0" }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>👥</div>
+              <div style={{ fontSize:14, color:txt }}>Equipe vazia</div>
+              <div style={{ fontSize:12, color:txt2, marginTop:4 }}>Nenhum colaborador cadastrado</div>
+            </div>
+          ) : (
+            <>
+              {turnos.map(turno=>{
+                const tc = TURNO_CONFIG[turno] || TURNO_CONFIG["Diurno"];
+                const cols = ativos.filter(c=>c.turno===turno);
+                if(!cols.length) return null;
+                return (
+                  <div key={turno} style={{ borderRadius:12, overflow:"hidden", border:`1px solid ${tc.border}` }}>
+                    <div style={{ background:tc.bg, padding:"10px 14px", display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{ fontSize:15 }}>{tc.icon}</span>
+                      <span style={{ fontSize:13, fontWeight:700, color:tc.badge }}>{turno}</span>
+                      <span style={{ fontSize:10, color:txt2, background: dark?"#0a0f1e":"#f1f5f9", padding:"2px 8px", borderRadius:10 }}>{cols.length}</span>
+                    </div>
+                    <div style={{ background: dark?"#04080f":"#f8fafc", padding:"8px" }}>
+                      {cols.map(c=>{
+                        const faltas = (c.historico||[]).filter(h=>h.tipo==="Falta").length;
+                        const fts    = (c.historico||[]).filter(h=>h.tipo==="FT").length;
+                        const mds    = (c.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
+                        return (
+                          <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", marginBottom:6, border:`1px solid ${tc.border}` }}>
+                            <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${tc.badge}44`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                              {c.foto ? <img src={c.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
+                            </div>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:13, fontWeight:700, color:txt, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
+                              <div style={{ fontSize:11, color:txt2 }}>{c.cargo}</div>
+                              <div style={{ display:"flex", gap:5, marginTop:3, flexWrap:"wrap" }}>
+                                {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background: dark?"#001a2e":"#e0f2fe", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
+                                {c.telefone && <span style={{ fontSize:9, color:txt2 }}>📱 {c.telefone}</span>}
+                                {c.dataContratacao && <span style={{ fontSize:9, color:txt2 }}>📅 {fmtDate(c.dataContratacao)}</span>}
+                              </div>
+                            </div>
+                            <div style={{ flexShrink:0, textAlign:"right" }}>
+                              {faltas>0 && <div style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{faltas}F</div>}
+                              {fts>0    && <div style={{ fontSize:9, color:"#f59e0b", fontWeight:700 }}>{fts}FT</div>}
+                              {mds>0    && <div style={{ fontSize:9, color:"#a855f7", fontWeight:700 }}>{mds}MD</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+              {/* Sem turno */}
+              {ativos.filter(c=>!TURNOS.includes(c.turno)).map(c=>(
+                <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", border:`1px solid ${border}` }}>
+                  <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    {c.foto ? <img src={c.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:txt }}>{c.nome}</div>
+                    <div style={{ fontSize:11, color:txt2 }}>{c.cargo}</div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const [screen,setScreen]=useState("home");
   const [showAcesso,setShowAcesso]=useState(false);
   const [acessoScreen,setAcessoScreen]=useState("menu");
   const [dark,setDark]=useState(true);
+  const [showRegistros,setShowRegistros]=useState(false);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -1246,6 +1536,7 @@ export default function App(){
 
   if(showAcesso) return <AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/>;
   if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
+  if(showRegistros) return <RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onBack={()=>setShowRegistros(false)}/>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
@@ -1537,7 +1828,7 @@ export default function App(){
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
-            <button onClick={()=>{setAcessoScreen("list");setShowAcesso(true);}} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}}>📋 Registros</button>
+            <button onClick={()=>setShowRegistros(true)} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}}>📋 Registros</button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
             <button onClick={()=>setDark(!dark)} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:14,color:"#94a3b8"}}>{dark?"☀️":"🌙"}</button>
           </div>
