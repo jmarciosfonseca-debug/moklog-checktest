@@ -1089,6 +1089,7 @@ export default function App(){
   const [screen,setScreen]=useState("home");
   const [showAcesso,setShowAcesso]=useState(false);
   const [acessoScreen,setAcessoScreen]=useState("menu");
+  const [dark,setDark]=useState(true);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -1243,8 +1244,8 @@ export default function App(){
     <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✗ Erro — local OK</div>
   ):null;
 
-  if(showAcesso) return <AcessoApp initialScreen={acessoScreen} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/>;
-  if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
+  if(showAcesso) return <AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/>;
+  if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
@@ -1286,7 +1287,7 @@ export default function App(){
 
   // ── FORM
   if(screen==="form") return(
-    <div style={S.page}>
+    <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
       <SyncBadge/>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:10,borderBottom:"1px solid #060c18",marginBottom:2}}>
@@ -1378,13 +1379,13 @@ export default function App(){
 
   // ── HOME — Jatinox subscreen
   if(homeGroup==="jatinox") return(
-    <div style={S.page}>
+    <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
       <SyncBadge/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
           <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:16,fontWeight:900,color:"#f8fafc"}}>🏭 Jatinox</div>
+            <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>🏭 Jatinox</div>
             <div style={{fontSize:11,color:"#334155"}}>P260A · P260B · P260C</div>
           </div>
         </div>
@@ -1443,13 +1444,13 @@ export default function App(){
     const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a"};
     const color = groupColors[homeGroup];
     return (
-      <div style={S.page}>
+      <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
         <SyncBadge/>
         <div style={S.homeWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
             <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:16,fontWeight:900,color:"#f8fafc"}}>{groupNames[homeGroup]}</div>
+              <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{groupNames[homeGroup]}</div>
               <div style={{fontSize:11,color:"#334155"}}>{groupProjects.join(" · ")}</div>
             </div>
           </div>
@@ -1524,7 +1525,7 @@ export default function App(){
 
   // ── HOME — Main cards
   return(
-    <div style={S.page}>
+    <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
       <SyncBadge/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
@@ -1538,6 +1539,7 @@ export default function App(){
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
             <button onClick={()=>{setAcessoScreen("list");setShowAcesso(true);}} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}}>📋 Registros</button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
+            <button onClick={()=>setDark(!dark)} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:14,color:"#94a3b8"}}>{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
