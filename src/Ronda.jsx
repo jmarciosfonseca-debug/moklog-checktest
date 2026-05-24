@@ -108,16 +108,26 @@ function RondaMap({project, trail, currentPos, height=220}) {
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
-    if(typeof window === "undefined") return;
+    // Check if already loaded
     if(window.L) { setMapLoaded(true); return; }
+    // Check if script already in DOM
+    if(document.querySelector('script[src*="leaflet"]')) {
+      const check = setInterval(()=>{ if(window.L){ setMapLoaded(true); clearInterval(check); } }, 100);
+      return () => clearInterval(check);
+    }
+    // Load CSS first
+    if(!document.querySelector('link[href*="leaflet"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+    // Load JS
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => setMapLoaded(true);
+    script.onerror = () => console.error("Leaflet load failed");
     document.head.appendChild(script);
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    document.head.appendChild(link);
   }, []);
 
   // Reset map when trail clears (new ronda started)
@@ -228,6 +238,20 @@ function StaticMap({project, trail, height=160}) {
 }
 
 // ─── MAIN RONDA APP ───────────────────────────────────────────────────────────
+// Pre-load Leaflet when module loads
+function preloadLeaflet() {
+  if(typeof window === "undefined" || window.L) return;
+  if(document.querySelector('script[src*="leaflet"]')) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+  document.head.appendChild(link);
+  const script = document.createElement("script");
+  script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  document.head.appendChild(script);
+}
+preloadLeaflet();
+
 export default function RondaApp({onBack}) {
   const [screen, setScreen] = useState("home");
   const [project, setProject] = useState(null);
@@ -253,6 +277,44 @@ export default function RondaApp({onBack}) {
   const watchId = useRef(null);
   const timerRef = useRef(null);
   const nextTimerRef = useRef(null);
+  const wakeLockRef = useRef(null);
+  const [wakeLockActive, setWakeLockActive] = useState(false);
+
+  // ── Wake Lock — mantém tela ligada durante ronda ──────────────────────────
+  const requestWakeLock = async () => {
+    try {
+      if("wakeLock" in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+        setWakeLockActive(true);
+        wakeLockRef.current.addEventListener("release", () => {
+          setWakeLockActive(false);
+        });
+      }
+    } catch(e) {
+      console.log("Wake Lock nao disponivel:", e);
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    try {
+      if(wakeLockRef.current) {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        setWakeLockActive(false);
+      }
+    } catch(e) {}
+  };
+
+  // Re-acquire wake lock if page becomes visible again
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if(document.visibilityState === "visible" && rondaActive && !wakeLockRef.current) {
+        await requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [rondaActive]);
 
   // Load saved rondas
   useEffect(() => {
@@ -269,31 +331,64 @@ export default function RondaApp({onBack}) {
   }, [project]);
 
   // GPS tracking
-  const startGPS = useCallback(() => {
-    if(!navigator.geolocation) { setGpsError("GPS nao disponivel neste dispositivo"); return; }
-    setGpsError(null);
-    watchId.current = navigator.geolocation.watchPosition(
+  const gpsIntervalRef = useRef(null);
+
+  const capturePosition = useCallback(() => {
+    if(!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
         setCurrentPos(p);
+        setGpsError(null);
         setTrail(prev => {
           if(prev.length > 0) {
             const last = prev[prev.length-1];
             const dist = calcDistance([last, p]);
-            if(dist < 5) return prev; // ignore if less than 5m
+            if(dist < 3) return prev; // ignore if less than 3m
           }
           return [...prev, p];
         });
       },
-      (err) => setGpsError(`Erro GPS: ${err.message}`),
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+      (err) => { console.log("GPS capture error:", err.message); },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 8000 }
     );
   }, []);
+
+  const startGPS = useCallback(() => {
+    if(!navigator.geolocation) { setGpsError("GPS nao disponivel neste dispositivo"); return; }
+    setGpsError(null);
+
+    // Primary: watchPosition for continuous tracking
+    watchId.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
+        setCurrentPos(p);
+        setGpsError(null);
+        setTrail(prev => {
+          if(prev.length > 0) {
+            const last = prev[prev.length-1];
+            const dist = calcDistance([last, p]);
+            if(dist < 3) return prev;
+          }
+          return [...prev, p];
+        });
+      },
+      (err) => setGpsError(`GPS: ${err.message} — tentando novamente...`),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    );
+
+    // Backup: poll every 5 seconds in case watchPosition pauses
+    gpsIntervalRef.current = setInterval(capturePosition, 5000);
+  }, [capturePosition]);
 
   const stopGPS = useCallback(() => {
     if(watchId.current !== null) {
       navigator.geolocation.clearWatch(watchId.current);
       watchId.current = null;
+    }
+    if(gpsIntervalRef.current) {
+      clearInterval(gpsIntervalRef.current);
+      gpsIntervalRef.current = null;
     }
   }, []);
 
@@ -329,6 +424,7 @@ export default function RondaApp({onBack}) {
     setPhotos([]);
     setRondaActive(true);
     startGPS();
+    requestWakeLock(); // mantém tela ligada
     setScreen("active");
     // Schedule next ronda notification
     clearTimeout(nextTimerRef.current);
@@ -342,6 +438,7 @@ export default function RondaApp({onBack}) {
   const finishRonda = () => {
     stopGPS();
     clearInterval(timerRef.current);
+    releaseWakeLock(); // libera tela
     const dist = calcDistance(trail);
     const finished = {
       ...currentRonda,
@@ -376,7 +473,7 @@ export default function RondaApp({onBack}) {
   };
 
   // Cleanup on unmount
-  useEffect(() => () => { stopGPS(); clearInterval(timerRef.current); clearTimeout(nextTimerRef.current); }, []);
+  useEffect(() => () => { stopGPS(); clearInterval(timerRef.current); clearInterval(gpsIntervalRef.current); clearTimeout(nextTimerRef.current); releaseWakeLock(); }, []);
 
   const distKm = (calcDistance(trail)/1000).toFixed(2);
   const todayRondas = rondas.filter(r => {
@@ -491,6 +588,12 @@ export default function RondaApp({onBack}) {
             <span style={{fontSize:11,color:"#334155"}}>Data</span>
             <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{new Date().toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"})}</span>
           </div>
+          <div style={{background:"#001a2e",border:"1px solid #0ea5e922",borderRadius:8,padding:"8px 12px",marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:14}}>💡</span>
+            <div style={{fontSize:11,color:"#64748b"}}>
+              A tela ficará <span style={{color:"#38bdf8",fontWeight:700}}>ligada automaticamente</span> durante toda a ronda para garantir o rastreamento GPS contínuo.
+            </div>
+          </div>
           <button onClick={startRonda} style={S.btn}>🗺️ Iniciar Ronda GPS</button>
         </div>
 
@@ -530,6 +633,15 @@ export default function RondaApp({onBack}) {
           </div>
         </div>
 
+        {/* Wake Lock status */}
+        <div style={{display:"flex",gap:6,marginBottom:4}}>
+          <div style={{flex:1,background:wakeLockActive?"#021a0d":"#1a0a00",border:`1px solid ${wakeLockActive?"#22c55e44":"#f59e0b44"}`,borderRadius:8,padding:"7px 10px",display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:wakeLockActive?"#22c55e":"#f59e0b",flexShrink:0}}/>
+            <span style={{fontSize:10,color:wakeLockActive?"#22c55e":"#f59e0b",fontWeight:700}}>
+              {wakeLockActive?"TELA BLOQUEADA — GPS CONTÍNUO":"TELA PODE APAGAR — GPS PODE PAUSAR"}
+            </span>
+          </div>
+        </div>
         {gpsError && <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#ef4444"}}>{gpsError}</div>}
 
         {/* Map */}
@@ -545,9 +657,12 @@ export default function RondaApp({onBack}) {
             <div style={{fontSize:20,fontWeight:900,color:"#f1f5f9"}}>{fmtDuration(elapsed)}</div>
             <div style={{fontSize:9,color:"#64748b",fontWeight:700}}>DURAÇÃO</div>
           </div>
-          <div style={{...S.card,textAlign:"center"}}>
-            <div style={{fontSize:20,fontWeight:900,color:"#22c55e"}}>{trail.length}</div>
+          <div style={{...S.card,textAlign:"center",border:"1px solid #22c55e22"}}>
+            <div style={{fontSize:20,fontWeight:900,color:trail.length>5?"#22c55e":trail.length>1?"#f59e0b":"#ef4444"}}>{trail.length}</div>
             <div style={{fontSize:9,color:"#64748b",fontWeight:700}}>PONTOS GPS</div>
+            <div style={{fontSize:8,color:trail.length>5?"#22c55e":trail.length>1?"#f59e0b":"#ef4444",marginTop:1}}>
+              {trail.length>5?"bom":trail.length>1?"aguardando":"iniciando"}
+            </div>
           </div>
         </div>
 
