@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import RondaApp from "./Ronda";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
@@ -1591,6 +1592,7 @@ function ErrorBoundaryFallback() {
 
 export default function App(){
   const [screen,setScreen]=useState("home");
+  const [showRonda,setShowRonda]=useState(false);
   const [project,setProject]=useState(PROJECTS.P601);
   const [state,setState]=useState(null);
   const [meta,setMeta]=useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
@@ -1758,6 +1760,7 @@ export default function App(){
   ):null;
 
   // ── View mode (manutenção)
+  if(showRonda) return <RondaApp onBack={()=>setShowRonda(false)}/>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   // ── Draft prompt
@@ -1931,6 +1934,7 @@ export default function App(){
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
+            <button onClick={()=>setShowRonda(true)} style={{background:"#001a2e",border:"1px solid #0ea5e944",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#38bdf8",fontWeight:700}}>🗺️ Ronda</button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
           </div>
         </div>
