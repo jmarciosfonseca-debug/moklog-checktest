@@ -74,6 +74,13 @@ async function saveRondaFirebase(projectId, ronda) {
   } catch(e) { console.error("Ronda save error:", e); }
 }
 
+async function deleteRondaFirebase(rondaId) {
+  try {
+    const { deleteDoc } = await import("firebase/firestore");
+    await deleteDoc(doc(db, "rondas", rondaId));
+  } catch(e) { console.error("Delete error:", e); }
+}
+
 async function loadRondasFirebase(projectId) {
   try {
     const snap = await getDocs(collection(db, "rondas"));
@@ -238,6 +245,102 @@ function StaticMap({project, trail, height=160}) {
 }
 
 // ─── MAIN RONDA APP ───────────────────────────────────────────────────────────
+function generateRondasPDF(project, rondas) {
+  if(!rondas.length) return;
+  const sorted = [...rondas].sort((a,b)=>a.startTime-b.startTime);
+  const now = new Date().toLocaleString("pt-BR");
+  const totalKm = rondas.reduce((a,r)=>(a+(r.distanceM||0)),0);
+  const totalDur = rondas.reduce((a,r)=>(a+(r.endTime&&r.startTime?(r.endTime-r.startTime):0)),0);
+  const avgMin = rondas.length ? Math.round(totalDur/rondas.length/60000) : 0;
+  const periodo = `${new Date(sorted[0].startTime).toLocaleDateString("pt-BR")} a ${new Date(sorted[sorted.length-1].startTime).toLocaleDateString("pt-BR")}`;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+<title>Relatorio Rondas — ${project.id} — ${periodo}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:10px}
+.page{max-width:900px;margin:0 auto}
+.header{background:#04080f;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.band{height:4px;background:linear-gradient(90deg,#0ea5e9,#0369a1)}
+.content{padding:18px 24px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
+.kpi-val{font-size:20px;font-weight:700;color:#0369a1;line-height:1}
+.kpi-lbl{font-size:8px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
+.stitle{font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.7px;border-left:3px solid #0ea5e9;padding-left:8px;margin:14px 0 8px}
+table{width:100%;border-collapse:collapse;font-size:9px}
+th{background:#04080f;color:white;padding:7px 8px;text-align:left;font-weight:700}
+td{padding:6px 8px;border-bottom:1px solid #f1f5f9}
+tr:nth-child(even) td{background:#f8fafc}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:8px;font-weight:700}
+.footer{background:#04080f;color:#64748b;padding:10px 24px;display:flex;justify-content:space-between;font-size:9px;margin-top:16px}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style></head><body><div class="page">
+<div class="header">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="width:36px;height:36px;background:#001a2e;border:2px solid #0ea5e9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">🗺️</div>
+    <div>
+      <div style="font-size:15px;font-weight:700;color:white">MokLog Ronda</div>
+      <div style="font-size:10px;color:#64748b">${project.id} — ${project.name}</div>
+    </div>
+  </div>
+  <div style="text-align:right;color:#64748b;font-size:9px">
+    <div style="color:white;font-weight:700">${rondas.length} ronda(s) · ${periodo}</div>
+    <div>Gerado em ${now}</div>
+  </div>
+</div>
+<div class="band"></div>
+<div class="content">
+  <div class="stitle" style="margin-top:2px">Resumo</div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-val">${rondas.length}</div><div class="kpi-lbl">Total Rondas</div></div>
+    <div class="kpi"><div class="kpi-val">${(totalKm/1000).toFixed(1)}</div><div class="kpi-lbl">KM Total</div></div>
+    <div class="kpi"><div class="kpi-val">${avgMin}min</div><div class="kpi-lbl">Duracao Media</div></div>
+    <div class="kpi"><div class="kpi-val">${new Set(rondas.map(r=>r.vigilante)).size}</div><div class="kpi-lbl">Vigilantes</div></div>
+  </div>
+  <div class="stitle">Registro Detalhado</div>
+  <table><thead><tr>
+    <th>#</th><th>Data</th><th>Vigilante</th><th>Turno</th>
+    <th>Inicio</th><th>Termino</th><th>Duracao</th><th>KM</th><th>Pontos GPS</th>
+  </tr></thead><tbody>
+  ${sorted.map((r,i)=>{
+    const dur = r.endTime&&r.startTime ? r.endTime-r.startTime : 0;
+    const durMin = Math.floor(dur/60000);
+    const durSec = Math.floor((dur%60000)/1000);
+    const km = (r.distanceM/1000).toFixed(2);
+    const dt = new Date(r.startTime);
+    const dtStr = dt.toLocaleDateString("pt-BR");
+    const startT = dt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    const endT = r.endTime ? new Date(r.endTime).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "--";
+    return `<tr>
+      <td style="color:#64748b">${i+1}</td>
+      <td>${dtStr}</td>
+      <td style="font-weight:600">${r.vigilante||"--"}</td>
+      <td>${r.turno||"--"}</td>
+      <td>${startT}</td>
+      <td>${endT}</td>
+      <td><span class="badge" style="background:#dbeafe;color:#1e40af">${durMin}m ${String(durSec).padStart(2,"0")}s</span></td>
+      <td><span class="badge" style="background:#dcfce7;color:#15803d">${km} km</span></td>
+      <td style="text-align:center;color:#64748b">${r.trail?.length||0}</td>
+    </tr>`;
+  }).join("")}
+  </tbody></table>
+</div>
+<div class="footer">
+  <div><span style="color:white;font-weight:700">MokLog Ronda</span> · Moked Consulting Security</div>
+  <div>${project.id} — ${period} · ${now}</div>
+</div>
+</div></body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url;
+  a.download=`MokLog_Ronda_${project.id}_${periodo.replace(/[\/\s]/g,"_")}.html`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
 // Pre-load Leaflet when module loads
 function preloadLeaflet() {
   if(typeof window === "undefined" || window.L) return;
@@ -273,6 +376,8 @@ export default function RondaApp({onBack}) {
   const [rondas, setRondas] = useState([]);
   const [viewRonda, setViewRonda] = useState(null);
   const [gpsError, setGpsError] = useState(null);
+  const [selectedRondas, setSelectedRondas] = useState([]);
+  const [confirmDel, setConfirmDel] = useState(null);
 
   const watchId = useRef(null);
   const timerRef = useRef(null);
@@ -598,24 +703,87 @@ export default function RondaApp({onBack}) {
         </div>
 
         {/* History */}
-        {todayRondas.length > 0 && (
+        {rondas.length > 0 && (
           <div>
-            <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>Rondas de Hoje</div>
-            {todayRondas.map((r,i) => (
-              <div key={r.id} onClick={()=>{setViewRonda(r);setScreen("detail");}}
-                style={{...S.card,cursor:"pointer",border:"1px solid #0ea5e922",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>Ronda {todayRondas.length - i}</div>
-                  <div style={{fontSize:11,color:"#475569"}}>{fmtTime(r.startTime)} – {r.endTime?fmtTime(r.endTime):"Em andamento"}</div>
-                  <div style={{fontSize:11,color:"#64748b"}}>{r.vigilante} · {r.turno}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>{(r.distanceM/1000).toFixed(2)} km</div>
-                  <div style={{fontSize:10,color:"#334155"}}>{fmtDuration(r.endTime-r.startTime)}</div>
-                </div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+              <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>
+                Histórico ({rondas.length})
               </div>
-            ))}
+              {selectedRondas.length > 0 && (
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={()=>generateRondasPDF(project, rondas.filter(r=>selectedRondas.includes(r.id)))}
+                    style={{...S.btn,width:"auto",padding:"6px 12px",fontSize:11}}>
+                    📄 PDF ({selectedRondas.length})
+                  </button>
+                  <button onClick={()=>setSelectedRondas([])}
+                    style={{...S.btnSec,width:"auto",padding:"6px 10px",fontSize:11}}>✕</button>
+                </div>
+              )}
+            </div>
+
+            {selectedRondas.length===0&&rondas.length>1&&(
+              <div style={{fontSize:10,color:"#64748b",marginBottom:6,textAlign:"center"}}>
+                Toque para selecionar · Selecione 1+ para PDF ou excluir
+              </div>
+            )}
+
+            {rondas.map((r,i) => {
+              const isSel = selectedRondas.includes(r.id);
+              return(
+                <div key={r.id} style={{...S.card,marginBottom:6,border:`2px solid ${isSel?"#0ea5e9":"#0f172a"}`}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <button onClick={()=>setSelectedRondas(prev=>prev.includes(r.id)?prev.filter(x=>x!==r.id):[...prev,r.id])}
+                      style={{width:26,height:26,borderRadius:5,border:`2px solid ${isSel?"#0ea5e9":"#1e293b"}`,background:isSel?"#0ea5e922":"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:isSel?"#0ea5e9":"#334155",flexShrink:0}}>
+                      {isSel?"✓":""}
+                    </button>
+                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>{setViewRonda(r);setScreen("detail");}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>
+                        Ronda {rondas.length - i}
+                        <span style={{fontSize:10,color:"#334155",fontWeight:400,marginLeft:6}}>
+                          {new Date(r.startTime).toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                      <div style={{fontSize:11,color:"#475569"}}>{fmtTime(r.startTime)} – {r.endTime?fmtTime(r.endTime):"Em andamento"}</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>{r.vigilante} · {r.turno}</div>
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>{(r.distanceM/1000).toFixed(2)} km</div>
+                      <div style={{fontSize:10,color:"#334155"}}>{fmtDuration(r.endTime-r.startTime)}</div>
+                      <button onClick={()=>setConfirmDel(r)}
+                        style={{background:"transparent",border:"none",color:"#ef444466",fontSize:12,cursor:"pointer",marginTop:2,padding:"2px 4px"}}>
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Confirm delete modal */}
+        {confirmDel&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+            <div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:300,width:"100%",textAlign:"center"}}>
+              <div style={{fontSize:26,marginBottom:10}}>🗑️</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir ronda?</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:16}}>
+                {confirmDel.vigilante} · {new Date(confirmDel.startTime).toLocaleDateString("pt-BR")} · {fmtTime(confirmDel.startTime)}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={async()=>{
+                  setRondas(prev=>prev.filter(r=>r.id!==confirmDel.id));
+                  setSelectedRondas(prev=>prev.filter(id=>id!==confirmDel.id));
+                  try {
+                    const local = JSON.parse(localStorage.getItem(`rondas_${project.id}`)||"[]");
+                    localStorage.setItem(`rondas_${project.id}`,JSON.stringify(local.filter(r=>r.id!==confirmDel.id)));
+                  } catch(e){}
+                  await deleteRondaFirebase(confirmDel.id);
+                  setConfirmDel(null);
+                }} style={{...S.btnDanger,flex:1,fontSize:13}}>Excluir</button>
+                <button onClick={()=>setConfirmDel(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+              </div>
+            </div>
           </div>
         )}
       </div>
