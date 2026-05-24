@@ -22,12 +22,19 @@ function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
 }
-function fmtDateTime(iso) {
-  if(!iso) return "--";
+
+function calcDuracao(entrada, saida) {
+  if(!entrada || !saida) return null;
   try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-  } catch { return iso; }
+    const [eh,em] = entrada.split(":").map(Number);
+    const [sh,sm] = saida.split(":").map(Number);
+    let mins = (sh*60+sm) - (eh*60+em);
+    if(mins < 0) mins += 24*60;
+    if(mins <= 0) return null;
+    const h = Math.floor(mins/60);
+    const m = mins%60;
+    return h>0 ? `${h}h${m>0?` ${m}min`:""}` : `${m}min`;
+  } catch { return null; }
 }
 
 async function loadRegistros(projectId) {
@@ -47,80 +54,122 @@ async function saveRegistros(projectId, registros) {
   try { localStorage.setItem(`acesso_${projectId}`, JSON.stringify(registros)); } catch(e){}
 }
 
-function calcDuracao(entrada, saida) {
-  if(!entrada || !saida) return null;
-  try {
-    const [eh,em] = entrada.split(":").map(Number);
-    const [sh,sm] = saida.split(":").map(Number);
-    let mins = (sh*60+sm) - (eh*60+em);
-    if(mins < 0) mins += 24*60;
-    if(mins <= 0) return null;
-    const h = Math.floor(mins/60);
-    const m = mins%60;
-    return h>0 ? `${h}h${m>0?` ${m}min`:""}` : `${m}min`;
-  } catch { return null; }
+// ── Gerar PDF de um único registro
+function gerarPDFRegistro(r, projectId) {
+  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Registro Acesso ${projectId}</title>
+<style>
+  body{font-family:'Segoe UI',sans-serif;margin:0;padding:24px;background:#f1f5f9;color:#1e293b}
+  .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:20px}
+  .header h1{margin:0 0 4px;font-size:18px}
+  .header p{margin:0;font-size:11px;opacity:.7}
+  .card{background:#fff;border-radius:10px;padding:16px 20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .card h2{margin:0 0 12px;font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.5px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field label{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px}
+  .field span{font-size:14px;font-weight:600;color:#0f172a}
+  .dur{background:#e0f2fe;border-radius:8px;padding:10px 14px;text-align:center;color:#0369a1;font-weight:700;font-size:15px}
+  .footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:16px}
+  @media print{body{padding:10px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🚛 Registro de Acesso — ${projectId}</h1>
+  <p>Emitido em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</p>
+</div>
+<div class="card">
+  <h2>📦 Dados da Carga</h2>
+  <div class="grid">
+    <div class="field"><label>Data</label><span>${fmtDate(r.data)}</span></div>
+    <div class="field"><label>Placa do Veículo</label><span>${r.placa||"--"}</span></div>
+    <div class="field"><label>Transportadora</label><span>${r.transportadora||"--"}</span></div>
+    <div class="field"><label>Motorista</label><span>${r.motorista||"--"}</span></div>
+  </div>
+</div>
+<div class="card">
+  <h2>⏱️ Horários</h2>
+  <div class="grid">
+    <div class="field"><label>Estacionou (Ext.)</label><span>${r.estacionou||"--"}</span></div>
+    <div class="field"><label>Chamado CCO</label><span>${r.chamado||"--"}</span></div>
+    <div class="field"><label>Entrada Pátio</label><span>${r.entradaPatio||"--"}</span></div>
+    <div class="field"><label>Saída Pátio</label><span>${r.saidaPatio||"--"}</span></div>
+  </div>
+  ${dur?`<div class="dur" style="margin-top:12px">⏳ Tempo no pátio: ${dur}</div>`:""}
+</div>
+<div class="footer">MokLog CheckTest © Moked Consulting Security · Controle de Acesso ${projectId}</div>
+</body>
+</html>`;
+  const blob = new Blob([html], {type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `acesso_${projectId}_${r.data||todayStr()}_${r.placa||"reg"}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function generateConsolidadoHTML(registros, projectId) {
-  const sorted = [...registros].sort((a,b)=>a.data.localeCompare(b.data));
+// ── Gerar PDF consolidado de múltiplos registros
+function gerarPDFConsolidado(lista, projectId) {
+  const sorted = [...lista].sort((a,b)=>a.data.localeCompare(b.data));
   const rows = sorted.map((r,i) => {
     const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
-    return `
-      <tr style="background:${i%2===0?"#f8fafc":"#ffffff"}">
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${fmtDate(r.data)}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.transportadora||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.placa||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.motorista||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.estacionou||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.chamado||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.entradaPatio||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px">${r.saidaPatio||"--"}</td>
-        <td style="padding:8px 12px;border:1px solid #e2e8f0;font-size:13px;color:${dur?"#0369a1":"#94a3b8"}">${dur||"--"}</td>
-      </tr>`;
+    return `<tr style="background:${i%2===0?"#f8fafc":"#ffffff"}">
+      <td>${fmtDate(r.data)}</td>
+      <td>${r.transportadora||"--"}</td>
+      <td>${r.placa||"--"}</td>
+      <td>${r.motorista||"--"}</td>
+      <td>${r.estacionou||"--"}</td>
+      <td>${r.chamado||"--"}</td>
+      <td>${r.entradaPatio||"--"}</td>
+      <td>${r.saidaPatio||"--"}</td>
+      <td style="color:${dur?"#0369a1":"#94a3b8"};font-weight:${dur?"700":"400"}">${dur||"--"}</td>
+    </tr>`;
   }).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Relatório Acesso — ${projectId}</title>
+<title>Consolidado Acesso ${projectId}</title>
 <style>
   body{font-family:'Segoe UI',sans-serif;margin:0;padding:20px;background:#f1f5f9}
-  .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:24px 28px;border-radius:12px;margin-bottom:20px}
-  .header h1{margin:0 0 4px;font-size:20px}
-  .header p{margin:0;font-size:12px;opacity:.7}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
-  .kpi{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-  .kpi-val{font-size:26px;font-weight:900;color:#1d4ed8}
-  .kpi-lbl{font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-  th{background:#1e293b;color:#fff;padding:10px 12px;text-align:left;font-size:12px;font-weight:700}
-  .footer{text-align:center;margin-top:16px;font-size:11px;color:#94a3b8}
-  @media print{body{padding:10px}.header{border-radius:0}}
+  .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
+  .header h1{margin:0 0 4px;font-size:18px}
+  .header p{margin:0;font-size:11px;opacity:.7}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .kpi{background:#fff;border-radius:10px;padding:12px 14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .kpi-val{font-size:24px;font-weight:900;color:#1d4ed8}
+  .kpi-lbl{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:2px}
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);font-size:12px}
+  th{background:#1e293b;color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;color:#1e293b}
+  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8}
+  @media print{body{padding:8px}}
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>🚛 Relatório de Acesso — ${projectId}</h1>
+  <h1>🚛 Consolidado de Acessos — ${projectId}</h1>
   <p>Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})} · ${sorted.length} registro(s)</p>
 </div>
 <div class="kpis">
-  <div class="kpi"><div class="kpi-val">${sorted.length}</div><div class="kpi-lbl">Total de Registros</div></div>
+  <div class="kpi"><div class="kpi-val">${sorted.length}</div><div class="kpi-lbl">Total</div></div>
   <div class="kpi"><div class="kpi-val">${new Set(sorted.map(r=>r.transportadora).filter(Boolean)).size}</div><div class="kpi-lbl">Transportadoras</div></div>
-  <div class="kpi"><div class="kpi-val">${sorted.filter(r=>r.saidaPatio).length}</div><div class="kpi-lbl">Saídas Registradas</div></div>
-  <div class="kpi"><div class="kpi-val">${sorted.filter(r=>r.entradaPatio&&!r.saidaPatio).length}</div><div class="kpi-lbl">No Pátio Agora</div></div>
+  <div class="kpi"><div class="kpi-val">${sorted.filter(r=>r.saidaPatio).length}</div><div class="kpi-lbl">Saídas OK</div></div>
+  <div class="kpi"><div class="kpi-val">${sorted.filter(r=>r.entradaPatio&&!r.saidaPatio).length}</div><div class="kpi-lbl">No Pátio</div></div>
 </div>
 <table>
   <thead>
-    <tr>
-      <th>Data</th><th>Transportadora</th><th>Placa</th><th>Motorista</th>
-      <th>Estacionou</th><th>Chamado</th><th>Entrada Pátio</th><th>Saída Pátio</th><th>Duração</th>
-    </tr>
+    <tr><th>Data</th><th>Transportadora</th><th>Placa</th><th>Motorista</th><th>Estacionou</th><th>Chamado</th><th>Entrada</th><th>Saída</th><th>Duração</th></tr>
   </thead>
   <tbody>${rows}</tbody>
 </table>
-<div class="footer">MokLog CheckTest © Moked Consulting Security · Controle de Acesso ${projectId}</div>
+<div class="footer">MokLog CheckTest © Moked Consulting Security</div>
 </body>
 </html>`;
 
@@ -128,30 +177,134 @@ function generateConsolidadoHTML(registros, projectId) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `acesso_${projectId}_${todayStr()}.html`;
+  a.download = `consolidado_acesso_${projectId}_${todayStr()}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
+// ── WhatsApp do registro
+function enviarWhatsApp(r, projectId) {
+  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const msg = encodeURIComponent(
+    `*🚛 Registro de Acesso — ${projectId}*\n` +
+    `📅 Data: ${fmtDate(r.data)}\n` +
+    `🏢 Transportadora: ${r.transportadora||"--"}\n` +
+    `🚗 Placa: ${r.placa||"--"}\n` +
+    `👤 Motorista: ${r.motorista||"--"}\n\n` +
+    `*⏱️ Horários:*\n` +
+    `Estacionou: ${r.estacionou||"--"}\n` +
+    `Chamado CCO: ${r.chamado||"--"}\n` +
+    `Entrada Pátio: ${r.entradaPatio||"--"}\n` +
+    `Saída Pátio: ${r.saidaPatio||"--"}\n` +
+    (dur?`⏳ Tempo no pátio: ${dur}\n`:"")+
+    `\n_MokLog CheckTest © Moked Security_`
+  );
+  window.open(`https://wa.me/?text=${msg}`, "_blank");
+}
+
 const S = {
   page:    { minHeight:"100vh", background:"#04080f", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
-  wrap:    { width:"100%", maxWidth:480, padding:"0", display:"flex", flexDirection:"column" },
+  wrap:    { width:"100%", maxWidth:520, padding:"0", display:"flex", flexDirection:"column" },
   card:    { background:"#060c18", border:"1px solid #0f172a", borderRadius:12, padding:"16px" },
-  btn:     { background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"14px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+  btn:     { background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+  btnBlue: { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+  btnPurple:{ background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
   btnSec:  { background:"#060c18", color:"#64748b", border:"1px solid #0f172a", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
   btnSm:   { background:"#020510", border:"1px solid #0f172a", color:"#64748b", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-  backBtn: { background:"transparent", border:"1px solid #0f172a", color:"#334155", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
+  backBtn: { background:"transparent", border:"1px solid #0f172a", color:"#94a3b8", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
   inp:     { width:"100%", background:"#020510", border:"1px solid #0f172a", borderRadius:7, color:"#e2e8f0", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
   lbl:     { display:"block", fontSize:10, color:"#475569", fontWeight:700, marginBottom:5, textTransform:"uppercase", letterSpacing:.5 },
 };
 
+// ── Tela VER registro individual
+function ViewRegistro({ r, onBack, onExcluir }) {
+  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const noPatioAgora = r.entradaPatio && !r.saidaPatio;
+
+  return (
+    <div style={S.page}>
+      <div style={S.wrap}>
+        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:15, fontWeight:800, color:"#f59e0b" }}>🚛 Registro — P260A</div>
+              <div style={{ fontSize:11, color:"#475569" }}>{fmtDate(r.data)}</div>
+            </div>
+            {noPatioAgora && (
+              <span style={{ fontSize:10, color:"#f59e0b", background:"#1a1000", border:"1px solid #f59e0b33", padding:"3px 8px", borderRadius:5, fontWeight:700 }}>NO PÁTIO</span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Dados da carga */}
+          <div style={S.card}>
+            <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>📦 Dados da Carga</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {[
+                ["Data",          fmtDate(r.data)],
+                ["Placa",         r.placa||"--"],
+                ["Transportadora",r.transportadora||"--"],
+                ["Motorista",     r.motorista||"--"],
+              ].map(([label,val])=>(
+                <div key={label}>
+                  <div style={S.lbl}>{label}</div>
+                  <div style={{ fontSize:14, color:"#f1f5f9", fontWeight:600 }}>{val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Horários */}
+          <div style={S.card}>
+            <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>⏱️ Horários</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              {[
+                ["Estacionou (Ext.)", r.estacionou||"--"],
+                ["Chamado CCO",       r.chamado||"--"],
+                ["Entrada Pátio",     r.entradaPatio||"--"],
+                ["Saída Pátio",       r.saidaPatio||"--"],
+              ].map(([label,val])=>(
+                <div key={label}>
+                  <div style={S.lbl}>{label}</div>
+                  <div style={{ fontSize:14, color: label.includes("Entrada")?"#22c55e":label.includes("Saída")?"#ef4444":"#f1f5f9", fontWeight:700 }}>{val}</div>
+                </div>
+              ))}
+            </div>
+            {dur && (
+              <div style={{ marginTop:12, background:"#001a2e", border:"1px solid #0ea5e922", borderRadius:8, padding:"10px 14px", textAlign:"center" }}>
+                <span style={{ fontSize:15, color:"#0ea5e9", fontWeight:800 }}>⏳ Tempo no pátio: {dur}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Ações */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <button onClick={()=>gerarPDFRegistro(r,"P260A")}
+              style={{ ...S.btnPurple, fontSize:13 }}>📄 PDF</button>
+            <button onClick={()=>enviarWhatsApp(r,"P260A")}
+              style={{ ...S.btn, fontSize:13 }}>💬 WhatsApp</button>
+          </div>
+
+          <button onClick={()=>{ if(window.confirm("Excluir este registro?")) onExcluir(r.id); }}
+            style={{ ...S.btnSec, color:"#ef4444", borderColor:"#ef444433", fontSize:13 }}>
+            🗑 Excluir Registro
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AcessoApp({ onBack, initialScreen }) {
   const projectId = "P260A";
-  const [screen, setScreen] = useState(initialScreen || "menu"); // menu | form | list
+  const [screen, setScreen] = useState(initialScreen || "menu");
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selIds, setSelIds] = useState([]);
+  const [viewReg, setViewReg] = useState(null);
 
   const emptyForm = () => ({
     id: Date.now().toString() + Math.random().toString(36).substring(2,6),
@@ -178,29 +331,28 @@ export default function AcessoApp({ onBack, initialScreen }) {
     setRegistros(newList);
     await saveRegistros(projectId, newList);
     setSaving(false);
+    // Envia WhatsApp
+    enviarWhatsApp(novoRegistro, projectId);
     setForm(emptyForm());
-    alert("✅ Registro transmitido ao CCO!");
     setScreen("menu");
   };
 
   const excluirRegistro = async (id) => {
-    if(!window.confirm("Excluir este registro?")) return;
     const newList = registros.filter(r=>r.id!==id);
     setRegistros(newList);
     await saveRegistros(projectId, newList);
-    setSelIds(prev=>prev.filter(sid=>sid!==id));
+    setSelIds(prev=>prev.filter(s=>s!==id));
+    if(viewReg?.id===id) { setViewReg(null); setScreen("list"); }
   };
 
-  const toggleSel = (id) => {
-    setSelIds(prev => prev.includes(id) ? prev.filter(s=>s!==id) : [...prev,id]);
-  };
+  const toggleSel = (id) => setSelIds(prev=>prev.includes(id)?prev.filter(s=>s!==id):[...prev,id]);
+  const selecionarTodos = () => setSelIds(registros.map(r=>r.id));
+  const limparSel = () => setSelIds([]);
 
   const gerarConsolidado = () => {
-    const selecionados = selIds.length > 0
-      ? registros.filter(r=>selIds.includes(r.id))
-      : registros;
-    if(selecionados.length===0) { alert("Nenhum registro para gerar relatório"); return; }
-    generateConsolidadoHTML(selecionados, projectId);
+    const lista = selIds.length>0 ? registros.filter(r=>selIds.includes(r.id)) : registros;
+    if(!lista.length) { alert("Nenhum registro para gerar"); return; }
+    gerarPDFConsolidado(lista, projectId);
   };
 
   if(loading) return (
@@ -212,12 +364,18 @@ export default function AcessoApp({ onBack, initialScreen }) {
     </div>
   );
 
+  // ── VER registro individual
+  if(screen==="view"&&viewReg) return (
+    <ViewRegistro r={viewReg}
+      onBack={()=>{ setViewReg(null); setScreen("list"); }}
+      onExcluir={excluirRegistro}/>
+  );
+
   // ── MENU
   if(screen==="menu") return (
     <div style={S.page}>
       <div style={S.wrap}>
-        {/* Header */}
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"16px 16px 12px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={S.backBtn}>← Menu Jatinox</button>
             <div style={{ flex:1 }}>
@@ -227,29 +385,24 @@ export default function AcessoApp({ onBack, initialScreen }) {
           </div>
         </div>
 
-        <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
-          {/* KPI rápido */}
+        <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <div style={{ ...S.card, textAlign:"center" }}>
               <div style={{ fontSize:28, fontWeight:900, color:"#f59e0b" }}>{registros.length}</div>
-              <div style={{ fontSize:10, color:"#64748b", fontWeight:700 }}>REGISTROS TOTAIS</div>
+              <div style={{ fontSize:10, color:"#64748b", fontWeight:700 }}>TOTAL REGISTROS</div>
             </div>
             <div style={{ ...S.card, textAlign:"center" }}>
-              <div style={{ fontSize:28, fontWeight:900, color:"#22c55e" }}>
-                {registros.filter(r=>r.data===todayStr()).length}
-              </div>
+              <div style={{ fontSize:28, fontWeight:900, color:"#22c55e" }}>{registros.filter(r=>r.data===todayStr()).length}</div>
               <div style={{ fontSize:10, color:"#64748b", fontWeight:700 }}>HOJE</div>
             </div>
           </div>
 
-          {/* Ações */}
-          <button onClick={()=>{ setForm(emptyForm()); setScreen("form"); }}
-            style={{ ...S.btn, fontSize:14 }}>
+          <button onClick={()=>{ setForm(emptyForm()); setScreen("form"); }} style={S.btn}>
             🚛 Novo Registro de Acesso
           </button>
 
           <button onClick={()=>{ setSelIds([]); setScreen("list"); }}
-            style={{ ...S.btnSec, fontSize:13, color:"#0ea5e9", borderColor:"#0ea5e922" }}>
+            style={{ ...S.btnSec, color:"#0ea5e9", borderColor:"#0ea5e922", fontSize:13 }}>
             📋 Ver Registros ({registros.length})
           </button>
         </div>
@@ -257,12 +410,11 @@ export default function AcessoApp({ onBack, initialScreen }) {
     </div>
   );
 
-  // ── FORMULÁRIO NOVO REGISTRO
+  // ── FORMULÁRIO
   if(screen==="form") return (
     <div style={S.page}>
       <div style={S.wrap}>
-        {/* Header */}
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"16px 16px 12px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={()=>setScreen("menu")} style={S.backBtn}>← Voltar</button>
             <div style={{ flex:1 }}>
@@ -272,8 +424,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
           </div>
         </div>
 
-        <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
-          {/* Dados da carga */}
+        <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
           <div style={S.card}>
             <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>📦 Dados da Carga</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
@@ -296,99 +447,105 @@ export default function AcessoApp({ onBack, initialScreen }) {
             </div>
           </div>
 
-          {/* Horários */}
           <div style={S.card}>
             <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>⏱️ Horários</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               {[
-                ["Estacionou (Ext.)", "estacionou"],
-                ["Chamado CCO",       "chamado"],
-                ["Entrada Pátio",     "entradaPatio"],
-                ["Saída Pátio",       "saidaPatio"],
-              ].map(([label, key])=>(
+                ["Estacionou (Ext.)","estacionou"],
+                ["Chamado CCO",      "chamado"],
+                ["Entrada Pátio",    "entradaPatio"],
+                ["Saída Pátio",      "saidaPatio"],
+              ].map(([label,key])=>(
                 <div key={key}>
                   <label style={S.lbl}>{label}</label>
                   <div style={{ display:"flex", gap:5 }}>
                     <input type="time" value={form[key]} onChange={e=>setF(key,e.target.value)} style={{ ...S.inp, flex:1 }}/>
-                    <button onClick={()=>setF(key, nowTime())}
-                      style={{ ...S.btnSm, padding:"8px", fontSize:14, flexShrink:0 }}>⏱</button>
+                    <button onClick={()=>setF(key,nowTime())} style={{ ...S.btnSm, padding:"8px 10px", fontSize:14, flexShrink:0 }}>⏱</button>
                   </div>
                 </div>
               ))}
             </div>
             {form.entradaPatio && form.saidaPatio && (
-              <div style={{ marginTop:10, background:"#001a2e", border:"1px solid #0ea5e922", borderRadius:8, padding:"8px 12px", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:12 }}>⏳</span>
+              <div style={{ marginTop:10, background:"#001a2e", border:"1px solid #0ea5e922", borderRadius:8, padding:"8px 12px" }}>
                 <span style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}>
-                  Duração no pátio: {calcDuracao(form.entradaPatio, form.saidaPatio) || "--"}
+                  ⏳ Duração: {calcDuracao(form.entradaPatio, form.saidaPatio)||"--"}
                 </span>
               </div>
             )}
           </div>
 
-          <button onClick={transmitir} disabled={saving}
-            style={{ ...S.btn, opacity:saving?0.7:1 }}>
-            {saving ? "⟳ Transmitindo..." : "💾 Transmitir Registro ao CCO"}
+          <button onClick={transmitir} disabled={saving} style={{ ...S.btn, opacity:saving?0.7:1 }}>
+            {saving?"⟳ Transmitindo...":"💾 Salvar e Enviar WhatsApp"}
           </button>
+          <div style={{ fontSize:10, color:"#334155", textAlign:"center" }}>
+            Salva o registro e abre WhatsApp com o resumo
+          </div>
         </div>
       </div>
     </div>
   );
 
-  // ── LISTA DE REGISTROS
+  // ── LISTA
   if(screen==="list") {
     const regHoje = registros.filter(r=>r.data===todayStr());
     const regAnt  = registros.filter(r=>r.data!==todayStr());
+    const todosSel = registros.length>0 && selIds.length===registros.length;
 
     return (
       <div style={S.page}>
         <div style={S.wrap}>
-          {/* Header */}
-          <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"16px 16px 12px" }}>
+          <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <button onClick={()=>{ setSelIds([]); setScreen("menu"); }} style={S.backBtn}>← Voltar</button>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:800, color:"#f1f5f9" }}>📋 Registros — P260A</div>
-                <div style={{ fontSize:11, color:"#475569" }}>{registros.length} registro(s) · {selIds.length>0?`${selIds.length} selecionado(s)`:"selecione para consolidado"}</div>
+                <div style={{ fontSize:11, color:"#475569" }}>
+                  {registros.length} registro(s) {selIds.length>0?`· ${selIds.length} selecionado(s)`:""}
+                </div>
               </div>
             </div>
           </div>
 
           <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
 
-            {/* Botões de ação */}
-            <div style={{ display:"flex", gap:8 }}>
-              <button onClick={gerarConsolidado}
-                style={{ ...S.btn, flex:1, fontSize:13, background:"linear-gradient(135deg,#7c3aed,#6d28d9)" }}>
-                📊 {selIds.length>0?`Consolidado (${selIds.length})`:"Consolidado Geral"}
-              </button>
-              {selIds.length>0 && (
-                <button onClick={()=>setSelIds([])} style={{ ...S.btnSm, padding:"10px 14px", fontSize:12, color:"#64748b" }}>
-                  Limpar
+            {/* Ações consolidado */}
+            {registros.length > 0 && (
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                <button onClick={todosSel?limparSel:selecionarTodos}
+                  style={{ ...S.btnSm, padding:"8px 14px", fontSize:12, color:"#0ea5e9", border:"1px solid #0ea5e944", flex:1 }}>
+                  {todosSel?"✓ Desmarcar todos":"☐ Selecionar todos"}
                 </button>
-              )}
-            </div>
+                <button onClick={gerarConsolidado}
+                  style={{ ...S.btnPurple, flex:2, fontSize:13, padding:"9px 14px" }}>
+                  📊 {selIds.length>0?`PDF Consolidado (${selIds.length})`:"PDF Consolidado Geral"}
+                </button>
+              </div>
+            )}
 
-            {registros.length === 0 && (
+            {registros.length===0 && (
               <div style={{ textAlign:"center", padding:"40px 0", color:"#334155" }}>
                 <div style={{ fontSize:32, marginBottom:10 }}>📭</div>
                 <div style={{ fontSize:13 }}>Nenhum registro ainda</div>
               </div>
             )}
 
-            {/* Hoje */}
-            {regHoje.length > 0 && (
+            {regHoje.length>0 && (
               <>
                 <div style={{ fontSize:10, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8 }}>Hoje</div>
-                {regHoje.map(r => <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel} onExcluir={excluirRegistro}/>)}
+                {regHoje.map(r=>(
+                  <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel}
+                    onVer={()=>{ setViewReg(r); setScreen("view"); }}/>
+                ))}
               </>
             )}
 
-            {/* Anteriores */}
-            {regAnt.length > 0 && (
+            {regAnt.length>0 && (
               <>
                 <div style={{ fontSize:10, color:"#475569", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginTop:4 }}>Anteriores</div>
-                {regAnt.map(r => <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel} onExcluir={excluirRegistro}/>)}
+                {regAnt.map(r=>(
+                  <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel}
+                    onVer={()=>{ setViewReg(r); setScreen("view"); }}/>
+                ))}
               </>
             )}
           </div>
@@ -400,7 +557,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
   return null;
 }
 
-function RegistroCard({ r, selIds, toggleSel, onExcluir }) {
+function RegistroCard({ r, selIds, toggleSel, onVer }) {
   const isSelected = selIds.includes(r.id);
   const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
   const noPatioAgora = r.entradaPatio && !r.saidaPatio;
@@ -409,24 +566,23 @@ function RegistroCard({ r, selIds, toggleSel, onExcluir }) {
     <div style={{
       background:"#060c18",
       border:`2px solid ${isSelected?"#7c3aed66":noPatioAgora?"#f59e0b33":"#0f172a"}`,
-      borderRadius:12, padding:"12px 14px",
-      cursor:"pointer"
-    }}
-      onClick={()=>toggleSel(r.id)}>
+      borderRadius:12, padding:"12px 14px"
+    }}>
       <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
         {/* Checkbox */}
-        <div style={{ width:22, height:22, borderRadius:6, border:`2px solid ${isSelected?"#7c3aed":"#1e293b"}`, background:isSelected?"#7c3aed22":"transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", marginTop:2 }}>
+        <div onClick={()=>toggleSel(r.id)} style={{ width:22, height:22, borderRadius:6, border:`2px solid ${isSelected?"#7c3aed":"#1e293b"}`, background:isSelected?"#7c3aed22":"transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", marginTop:2, cursor:"pointer" }}>
           {isSelected && <span style={{ fontSize:12, color:"#a78bfa" }}>✓</span>}
         </div>
 
-        <div style={{ flex:1, minWidth:0 }}>
+        {/* Info */}
+        <div style={{ flex:1, minWidth:0 }} onClick={()=>toggleSel(r.id)} >
           <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:4 }}>
-            <span style={{ fontSize:13, fontWeight:800, color:"#f1f5f9" }}>{r.transportadora||"Transportadora"}</span>
+            <span style={{ fontSize:13, fontWeight:800, color:"#f1f5f9" }}>{r.transportadora||"Sem transportadora"}</span>
             {r.placa && <span style={{ fontSize:11, color:"#0ea5e9", background:"#001a2e", padding:"2px 8px", borderRadius:5, fontWeight:700 }}>{r.placa}</span>}
             {noPatioAgora && <span style={{ fontSize:9, color:"#f59e0b", background:"#1a1000", padding:"2px 6px", borderRadius:4, fontWeight:700 }}>NO PÁTIO</span>}
           </div>
           {r.motorista && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>👤 {r.motorista}</div>}
-          <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             <span style={{ fontSize:10, color:"#475569" }}>📅 {fmtDate(r.data)}</span>
             {r.entradaPatio && <span style={{ fontSize:10, color:"#22c55e" }}>↓ {r.entradaPatio}</span>}
             {r.saidaPatio   && <span style={{ fontSize:10, color:"#ef4444" }}>↑ {r.saidaPatio}</span>}
@@ -434,10 +590,10 @@ function RegistroCard({ r, selIds, toggleSel, onExcluir }) {
           </div>
         </div>
 
-        {/* Excluir */}
-        <button onClick={e=>{e.stopPropagation();onExcluir(r.id);}}
-          style={{ background:"transparent", border:"none", color:"#ef444444", fontSize:16, cursor:"pointer", padding:"2px 6px", flexShrink:0 }}>
-          ✕
+        {/* Botão VER */}
+        <button onClick={onVer}
+          style={{ background:"#0f172a", border:"1px solid #1e293b", color:"#94a3b8", borderRadius:7, padding:"6px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 }}>
+          👁 Ver
         </button>
       </div>
     </div>
