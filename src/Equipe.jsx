@@ -483,7 +483,7 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
 }
 
 // ── App principal
-export default function EquipeApp({ project, onBack }) {
+export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme }) {
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
   const [screen, setScreen] = useState("pin"); // pin | list | add | edit | view | addHist
   const [authLevel, setAuthLevel] = useState(null); // null | "lider" | "admin"
@@ -493,7 +493,9 @@ export default function EquipeApp({ project, onBack }) {
   const [showDesligados, setShowDesligados] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [dark, setDark] = useState(true);
+  const [darkLocal, setDarkLocal] = useState(true);
+  const dark = darkProp !== undefined ? darkProp : darkLocal;
+  const toggleDark = onToggleTheme || (()=>setDarkLocal(!darkLocal));
 
   const S = getStyles(dark);
   const adminAuth = authLevel === "admin";
@@ -629,7 +631,7 @@ export default function EquipeApp({ project, onBack }) {
           onBack={onBack}
           saving={saving}
           dark={dark}
-          onToggleTheme={()=>setDark(!dark)}
+          onToggleTheme={toggleDark}
         />
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>

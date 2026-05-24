@@ -202,29 +202,16 @@ function enviarWhatsApp(r, projectId) {
   window.open(`https://wa.me/?text=${msg}`, "_blank");
 }
 
-const S = {
-  page:    { minHeight:"100vh", background:"#04080f", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
-  wrap:    { width:"100%", maxWidth:520, padding:"0", display:"flex", flexDirection:"column" },
-  card:    { background:"#060c18", border:"1px solid #0f172a", borderRadius:12, padding:"16px" },
-  btn:     { background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-  btnBlue: { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-  btnPurple:{ background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-  btnSec:  { background:"#060c18", color:"#64748b", border:"1px solid #0f172a", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
-  btnSm:   { background:"#020510", border:"1px solid #0f172a", color:"#64748b", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-  backBtn: { background:"transparent", border:"1px solid #0f172a", color:"#94a3b8", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
-  inp:     { width:"100%", background:"#020510", border:"1px solid #0f172a", borderRadius:7, color:"#e2e8f0", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
-  lbl:     { display:"block", fontSize:10, color:"#475569", fontWeight:700, marginBottom:5, textTransform:"uppercase", letterSpacing:.5 },
-};
 
 // ── Tela VER registro individual
-function ViewRegistro({ r, onBack, onExcluir }) {
+function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
   const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
   const noPatioAgora = r.entradaPatio && !r.saidaPatio;
 
   return (
     <div style={S.page}>
       <div style={S.wrap}>
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{ flex:1 }}>
@@ -297,8 +284,27 @@ function ViewRegistro({ r, onBack, onExcluir }) {
   );
 }
 
-export default function AcessoApp({ onBack, initialScreen }) {
+export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onToggleTheme }) {
   const projectId = "P260A";
+  const [darkLocal, setDarkLocal] = useState(true);
+  const dark = darkProp !== undefined ? darkProp : darkLocal;
+  const toggleDark = onToggleTheme || (()=>setDarkLocal(!darkLocal));
+  const S = {
+    page:    { minHeight:"100vh", background:dark?"#04080f":"#f1f5f9", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
+    wrap:    { width:"100%", maxWidth:520, padding:"0", display:"flex", flexDirection:"column" },
+    card:    { background:dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"16px" },
+    btn:     { background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+    btnBlue: { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+    btnPurple:{ background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
+    inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color:dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
+    lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:5, textTransform:"uppercase", letterSpacing:.5 },
+    headerBg:{ background:dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
+    txtPrimary: { color:dark?"#f1f5f9":"#0f172a" },
+    txtSec:  { color:dark?"#475569":"#64748b" },
+  };
   const [screen, setScreen] = useState(initialScreen || "menu");
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -366,7 +372,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
 
   // ── VER registro individual
   if(screen==="view"&&viewReg) return (
-    <ViewRegistro r={viewReg}
+    <ViewRegistro r={viewReg} dark={dark} S={S}
       onBack={()=>{ setViewReg(null); setScreen("list"); }}
       onExcluir={excluirRegistro}/>
   );
@@ -375,13 +381,14 @@ export default function AcessoApp({ onBack, initialScreen }) {
   if(screen==="menu") return (
     <div style={S.page}>
       <div style={S.wrap}>
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={S.backBtn}>← Menu Jatinox</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:"#f1f5f9" }}>🚛 Acesso — P260A</div>
+              <div style={{ fontSize:15, fontWeight:800, color:dark?"#f1f5f9":"#0f172a" }}>🚛 Acesso — P260A</div>
               <div style={{ fontSize:11, color:"#475569" }}>Controle de Transportadoras</div>
             </div>
+            <button onClick={toggleDark} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:dark?"#94a3b8":"#475569"}}>{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
@@ -414,7 +421,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
   if(screen==="form") return (
     <div style={S.page}>
       <div style={S.wrap}>
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={()=>setScreen("menu")} style={S.backBtn}>← Voltar</button>
             <div style={{ flex:1 }}>
@@ -494,7 +501,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
     return (
       <div style={S.page}>
         <div style={S.wrap}>
-          <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"14px 16px" }}>
+          <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"14px 16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <button onClick={()=>{ setSelIds([]); setScreen("menu"); }} style={S.backBtn}>← Voltar</button>
               <div style={{ flex:1 }}>
@@ -533,7 +540,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
               <>
                 <div style={{ fontSize:10, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8 }}>Hoje</div>
                 {regHoje.map(r=>(
-                  <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel}
+                  <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel} dark={dark}
                     onVer={()=>{ setViewReg(r); setScreen("view"); }}/>
                 ))}
               </>
@@ -543,7 +550,7 @@ export default function AcessoApp({ onBack, initialScreen }) {
               <>
                 <div style={{ fontSize:10, color:"#475569", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginTop:4 }}>Anteriores</div>
                 {regAnt.map(r=>(
-                  <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel}
+                  <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel} dark={dark}
                     onVer={()=>{ setViewReg(r); setScreen("view"); }}/>
                 ))}
               </>
@@ -557,15 +564,15 @@ export default function AcessoApp({ onBack, initialScreen }) {
   return null;
 }
 
-function RegistroCard({ r, selIds, toggleSel, onVer }) {
+function RegistroCard({ r, selIds, toggleSel, onVer, dark }) {
   const isSelected = selIds.includes(r.id);
   const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
   const noPatioAgora = r.entradaPatio && !r.saidaPatio;
 
   return (
     <div style={{
-      background:"#060c18",
-      border:`2px solid ${isSelected?"#7c3aed66":noPatioAgora?"#f59e0b33":"#0f172a"}`,
+      background:dark?"#060c18":"#ffffff",
+      border:`2px solid ${isSelected?"#7c3aed66":noPatioAgora?"#f59e0b33":dark?"#0f172a":"#e2e8f0"}`,
       borderRadius:12, padding:"12px 14px"
     }}>
       <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
