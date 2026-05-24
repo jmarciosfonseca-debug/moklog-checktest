@@ -5,6 +5,7 @@ import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 
+// ─── EmailJS Config ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
 const EMAILJS_TEMPLATE_ID = "template_dhncs7j";
 const EMAILJS_PUBLIC_KEY  = "qnGBgZu7xNKnavJb7";
@@ -25,6 +26,7 @@ async function sendEmailJS(subject, message, fromName) {
   } catch(e) { console.error("EmailJS error:", e); return false; }
 }
 
+// ─── Firebase Config Integrada ────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
   authDomain: "moklog-checktest.firebaseapp.com",
@@ -36,6 +38,16 @@ const firebaseConfig = {
 const firebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(firebaseApp);
 
+async function saveToFirebase(projectId, history) {
+  try { await setDoc(doc(db,"projects",projectId),{history,updatedAt:new Date().toISOString()}); }
+  catch(e){ console.error("Firebase save:",e); }
+}
+async function loadAllFromFirebase() {
+  try { const snap=await getDocs(collection(db,"projects")); const data={}; snap.forEach(d=>{data[d.id]=d.data();}); return data; }
+  catch(e){ return {}; }
+}
+
+// ─── Configurações de Segurança e Constantes ──────────────────────────────────
 const PROJECT_PINS = {
   P601:"16601", P602:"16602", P604:"16604", P605:"16605",
   P606:"16606", P607:"16607", P311A:"16311", P311B:"16311", P505:"16505",
@@ -185,13 +197,29 @@ export default function App(){
   const [projectAuth,setProjectAuth]=useState({});
   const [sigError,setSigError]=useState(false);
 
-  useEffect(()=>{
+  useEffect(()=> {
     try{const r=localStorage.getItem("seccheck_v4"); if(r) setStored(JSON.parse(r));}catch(e){}
     loadAllFromFirebase().then(fb=>{
       if(Object.keys(fb).length>0){setStored(fb); localStorage.setItem("seccheck_v4",JSON.stringify(fb));}
       setLoaded(true);
     }).catch(()=>setLoaded(true));
   },[]);
+
+  useEffect(()=>{
+    if(!loaded) return;
+    const unsubs=Object.keys(PROJECTS).map(pid=>
+      onSnapshot(doc(db,"projects",pid),(snap)=>{
+        if(snap.exists()){
+          setStored(prev=>{
+            const up={...prev,[pid]:snap.data()};
+            localStorage.setItem("seccheck_v4",JSON.stringify(up));
+            return up;
+          });
+        }
+      })
+    );
+    return ()=>unsubs.forEach(u=>u());
+  },[loaded]);
 
   const grantAuth=(pid)=>setProjectAuth(prev=>({...prev,[pid]:Date.now()}));
   const checkAuth=(pid)=>{const ts=projectAuth[pid]; return ts&&(Date.now()-ts)<SESSION_TIMEOUT;};
@@ -224,6 +252,7 @@ export default function App(){
       <div style={{maxWidth:"480px",margin:"0 auto",display:"flex",flexDirection:"column",gap:15}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1E293B",paddingBottom:15}}>
           <div><h1 style={{fontSize:"20px",fontWeight:"900",margin:0}}>MokLog <span style={{color:"#CC2222"}}>CheckTest</span></h1><p style={{fontSize:"12px",color:"#64748B",margin:"2px 0 0"}}>Moked Consulting Security · v2.0</p></div>
+          <button onClick={()=>{ setProject({id:ADMIN_PIN}); setScreen("pin_gate"); }} style={{padding:"8px 14px",background:"#1E293B",color:"#94A3B8",border:"1px solid #334155",borderRadius:6,fontSize:12,fontWeight:"bold",cursor:"pointer"}}>📊 Painel Master</button>
         </div>
         {!homeGroup ? (
           <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
@@ -241,8 +270,8 @@ export default function App(){
                   <h4>{p.name}</h4>
                   <div style={{display:"flex",gap:8}}>
                     {p.grupo !== "Jatinox" && <button onClick={()=>{ setProject(p); if(checkAuth(p.id)){ setScreen("form"); } else setScreen("pin_gate"); }} style={{flex:1,padding:"8px",background:"#CC2222",color:"#FFF",border:"none",borderRadius:4,cursor:"pointer"}}>📋 CheckTest</button>}
-                    {p.escopo === "AcessoEquipe" && <button onClick={()=>{ setProject(p); setScreen("pin_gate"); }} style={{flex:1,padding:"8px",background:"#F59E0B",color:"#FFF",border:"none",borderRadius:4,cursor:"pointer"}}>🚛 Acesso GH</button>}
-                    {(p.grupo === "Jatinox" || p.id === "P601" || p.id === "P604" || p.id === "P311A") && <button onClick={() => { setProject(p); setScreen("pin_gate"); }} style={{flex:1,padding:"8px",background:"#2563EB",color:"#FFF",border:"none",borderRadius:4,cursor:"pointer"}}>👥 Escala Equipe</button>}
+                    {p.escopo === "AcessoEquipe" && <button onClick={()=>{ setProject(p); if(checkAuth(p.id)){ setScreen("acesso_app"); } else setScreen("pin_gate"); }} style={{flex:1,padding:"8px",background:"#F59E0B",color:"#FFF",border:"none",borderRadius:4,cursor:"pointer"}}>🚛 Acesso GH</button>}
+                    {(p.grupo === "Jatinox" || p.id === "P601" || p.id === "P604" || p.id === "P311A") && <button onClick={() => { setProject(p); if(checkAuth(p.id)){ setScreen("equipe_app"); } else setScreen("pin_gate"); }} style={{flex:1,padding:"8px",background:"#2563EB",color:"#FFF",border:"none",borderRadius:4,cursor:"pointer"}}>👥 Escala Equipe</button>}
                   </div>
                 </div>
               ))}
