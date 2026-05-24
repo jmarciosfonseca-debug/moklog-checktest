@@ -16,7 +16,13 @@ const db = getFirestore(fbApp);
 const ADMIN_PIN = "872101";
 const MAX_DESLIGADOS = 50;
 
-// ── Cargos por projeto
+// PINs de acesso por projeto (líder pode cadastrar + adicionar histórico)
+const PROJECT_PINS = {
+  P601:"16601", P602:"16602", P604:"16604", P605:"16605",
+  P606:"16606", P607:"16607", P311A:"16311", P311B:"16311",
+  P505:"16505", P260A:"162601", P260B:"162602", P260C:"162603"
+};
+
 const CARGOS_PROJETO = {
   P601:  ["VSPP Líder","VSPP Apoio","Vig CCO","CDA","Recepção"],
   P602:  ["VSPP Líder","VSPP Apoio","Vig CCO","CDA","Recepção"],
@@ -32,16 +38,13 @@ const CARGOS_PROJETO = {
   P607:  ["Vigilante Ronda","Vigilante Apoio","AGP","AGP CCO"],
 };
 
-// ── Turnos disponíveis
-const TURNOS = ["Diurno A","Noturno A","Diurno B","Noturno B"];
-const ESCALAS = ["12x36","4x2","5x2","6x1","24x48"];
+const TURNOS = ["Diurno","Noturno","Folguista"];
+const ESCALAS = ["12x36","4x2","5x2","6x1"];
 
-// ── Cores dos turnos
-const TURNO_COLOR = {
-  "Diurno A":  { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
-  "Noturno A": { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
-  "Diurno B":  { bg:"#1a2a10", border:"#84cc1633", badge:"#a3e635", icon:"🌤️" },
-  "Noturno B": { bg:"#0f0a2a", border:"#a855f733", badge:"#c084fc", icon:"🌃" },
+const TURNO_CONFIG = {
+  "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
+  "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
+  "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:"☀️🌙" },
 };
 
 function todayStr() { return new Date().toISOString().split("T")[0]; }
@@ -74,43 +77,51 @@ function emptyColab(cargo, projectId, turno) {
     nome:"", telefone:"",
     dataContratacao:"", ultimaReciclagem:"",
     foto:"", escala:"12x36",
-    turno: turno || "Diurno A",
+    turno: turno || "Diurno",
     status:"ativo",
     historico:[],
     criadoEm: new Date().toISOString()
   };
 }
 
-// ── Styles
-const S = {
-  page:   { minHeight:"100vh", background:"#04080f", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
-  wrap:   { width:"100%", maxWidth:480, padding:"0 0 40px", display:"flex", flexDirection:"column", gap:0 },
-  card:   { background:"#060c18", border:"1px solid #0f172a", borderRadius:12, padding:"14px 16px" },
-  btn:    { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6 },
-  btnSec: { background:"#060c18", color:"#64748b", border:"1px solid #0f172a", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
-  btnSm:  { background:"#020510", border:"1px solid #0f172a", color:"#64748b", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-  backBtn:{ background:"transparent", border:"1px solid #0f172a", color:"#334155", borderRadius:7, padding:"6px 10px", fontSize:11, cursor:"pointer", flexShrink:0 },
-  inp:    { width:"100%", background:"#020510", border:"1px solid #0f172a", borderRadius:7, color:"#e2e8f0", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
-  lbl:    { display:"block", fontSize:10, color:"#334155", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
-};
+// ── Styles (dark padrão)
+function getStyles(dark) {
+  return {
+    page:    { minHeight:"100vh", background: dark?"#04080f":"#f1f5f9", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
+    wrap:    { width:"100%", maxWidth:480, padding:"0 0 40px", display:"flex", flexDirection:"column", gap:0 },
+    card:    { background: dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"14px 16px" },
+    btn:     { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6 },
+    btnSec:  { background: dark?"#060c18":"#f8fafc", color: dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background: dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color: dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color: dark?"#334155":"#64748b", borderRadius:7, padding:"6px 10px", fontSize:11, cursor:"pointer", flexShrink:0 },
+    inp:     { width:"100%", background: dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color: dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
+    lbl:     { display:"block", fontSize:10, color: dark?"#334155":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    headerBg:{ background: dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
+    txtPrimary:  { color: dark?"#f1f5f9":"#0f172a" },
+    txtSecondary:{ color: dark?"#475569":"#64748b" },
+  };
+}
 
-// ── Cabeçalho fixo do módulo
-function Header({ title, sub, onBack, saving }) {
+function Header({ title, sub, onBack, saving, dark, onToggleTheme }) {
+  const S = getStyles(dark);
   return (
-    <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"16px 16px 12px" }}>
+    <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"16px 16px 12px" }}>
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
         <button onClick={onBack} style={S.backBtn}>← Início</button>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:15, fontWeight:800, color:"#f1f5f9" }}>👥 {title}</div>
-          <div style={{ fontSize:11, color:"#475569" }}>{sub}</div>
+          <div style={{ fontSize:15, fontWeight:800, ...S.txtPrimary }}>👥 {title}</div>
+          <div style={{ fontSize:11, ...S.txtSecondary }}>{sub}</div>
         </div>
-        {saving && <div style={{ fontSize:10, color:"#0ea5e9", fontWeight:700 }}>⟳ salvando</div>}
+        {saving && <div style={{ fontSize:10, color:"#0ea5e9", fontWeight:700 }}>⟳</div>}
+        <button onClick={onToggleTheme}
+          style={{ background:"transparent", border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color: dark?"#94a3b8":"#475569" }}>
+          {dark?"☀️":"🌙"}
+        </button>
       </div>
     </div>
   );
 }
 
-// ── Componente: Foto avatar
 function Avatar({ foto, size=52, border="#1e293b" }) {
   return (
     <div style={{ width:size, height:size, borderRadius:size/4, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background:"#0f172a", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -123,18 +134,19 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 }
 
 // ── Tela de ficha completa
-function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist }) {
+function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, dark }) {
+  const S = getStyles(dark);
   const hist = [...(colab.historico||[])].reverse();
   const faltas = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
   const fts    = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
   const mds    = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
-  const tc = TURNO_COLOR[colab.turno] || TURNO_COLOR["Diurno A"];
+  const tc = TURNO_CONFIG[colab.turno] || TURNO_CONFIG["Diurno"];
+  const canAddHist = adminAuth || liderAuth;
 
   return (
     <div style={S.page}>
       <div style={S.wrap}>
-        {/* Hero */}
-        <div style={{ background:`linear-gradient(160deg, #0c1220 0%, ${tc.bg} 100%)`, borderBottom:`1px solid ${tc.border}`, padding:"20px 16px 18px" }}>
+        <div style={{ background:`linear-gradient(160deg,${dark?"#0c1220":"#f8fafc"} 0%,${tc.bg} 100%)`, borderBottom:`1px solid ${tc.border}`, padding:"20px 16px 18px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             {adminAuth && (
@@ -146,12 +158,12 @@ function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, 
           <div style={{ display:"flex", gap:16, alignItems:"flex-start" }}>
             <Avatar foto={colab.foto} size={78} border={tc.badge+"66"}/>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:18, fontWeight:800, color:"#f1f5f9", lineHeight:1.2 }}>{colab.nome || "—"}</div>
+              <div style={{ fontSize:18, fontWeight:800, ...S.txtPrimary, lineHeight:1.2 }}>{colab.nome || "—"}</div>
               <div style={{ fontSize:12, color:"#94a3b8", marginTop:3 }}>{colab.cargo}</div>
               {colab.telefone && <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>📱 {colab.telefone}</div>}
               <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:tc.badge, background:tc.bg, border:`1px solid ${tc.border}`, padding:"3px 9px", borderRadius:6 }}>
-                  {TURNO_COLOR[colab.turno]?.icon || "⏰"} {colab.turno}
+                  {TURNO_CONFIG[colab.turno]?.icon || "⏰"} {colab.turno}
                 </span>
                 {colab.escala && <span style={{ fontSize:10, fontWeight:700, color:"#0ea5e9", background:"#001a2e", border:"1px solid #0ea5e922", padding:"3px 9px", borderRadius:6 }}>{colab.escala}</span>}
                 <span style={{ fontSize:10, fontWeight:700, color:colab.status==="ativo"?"#22c55e":"#ef4444", background:colab.status==="ativo"?"#021a0d":"#1a0202", border:`1px solid ${colab.status==="ativo"?"#22c55e33":"#ef444433"}`, padding:"3px 9px", borderRadius:6 }}>
@@ -165,9 +177,9 @@ function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, 
         {/* Contadores */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:1, background:"#0a0f1e" }}>
           {[
-            { label:"Faltas",   val:faltas, color:"#ef4444", bg:"#1a0202" },
-            { label:"FT",       val:fts,    color:"#f59e0b", bg:"#1a1000" },
-            { label:"Med. Disc",val:mds,    color:"#a855f7", bg:"#120a2e" },
+            { label:"Faltas",    val:faltas, color:"#ef4444", bg:"#1a0202" },
+            { label:"FT",        val:fts,    color:"#f59e0b", bg:"#1a1000" },
+            { label:"Med. Disc", val:mds,    color:"#a855f7", bg:"#120a2e" },
           ].map(({ label, val, color, bg }) => (
             <div key={label} style={{ background:bg, padding:"12px 8px", textAlign:"center" }}>
               <div style={{ fontSize:22, fontWeight:900, color }}>{val}</div>
@@ -181,7 +193,7 @@ function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, 
           <div style={{ ...S.card, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <div>
               <div style={S.lbl}>Contratação no Posto</div>
-              <div style={{ fontSize:13, color:"#f1f5f9", fontWeight:600 }}>{fmtDate(colab.dataContratacao)}</div>
+              <div style={{ fontSize:13, ...S.txtPrimary, fontWeight:600 }}>{fmtDate(colab.dataContratacao)}</div>
             </div>
             <div>
               <div style={S.lbl}>Última Reciclagem</div>
@@ -190,12 +202,14 @@ function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, 
           </div>
 
           {/* Histórico */}
-          <div style={{ ...S.card }}>
+          <div style={S.card}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f1f5f9" }}>Histórico <span style={{ fontSize:11, color:"#64748b" }}>({(colab.historico||[]).length})</span></div>
-              <button onClick={onAddHist} style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", background:"#001a2e", padding:"7px 14px", fontSize:12 }}>
-                + Adicionar
-              </button>
+              <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>Histórico <span style={{ fontSize:11, color:"#64748b" }}>({(colab.historico||[]).length})</span></div>
+              {canAddHist && (
+                <button onClick={onAddHist} style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", background:"#001a2e", padding:"7px 14px", fontSize:12 }}>
+                  + Adicionar
+                </button>
+              )}
             </div>
             {hist.length === 0 && (
               <div style={{ textAlign:"center", padding:"20px 0", color:"#334155", fontSize:12 }}>Nenhum registro ainda</div>
@@ -222,7 +236,7 @@ function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, 
             </div>
           </div>
 
-          {/* Desligar */}
+          {/* Desligar — admin only */}
           {adminAuth && colab.status==="ativo" && (
             <button onClick={()=>{ if(window.confirm(`Desligar ${colab.nome}?`)) onDesligar(colab); }}
               style={{ ...S.btnSec, color:"#ef4444", borderColor:"#ef444433", fontSize:13 }}>
@@ -235,8 +249,9 @@ function FichaScreen({ colab, adminAuth, onBack, onEdit, onAddHist, onDesligar, 
   );
 }
 
-// ── Tela de formulário (add/edit) — admin only
-function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit }) {
+// ── Formulário (admin only — cadastrar/editar)
+function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark }) {
+  const S = getStyles(dark);
   const handleFoto = (e) => {
     const file = e.target.files?.[0]; if(!file) return;
     if(file.size > 3*1024*1024) { alert("Foto muito grande. Max 3MB"); return; }
@@ -248,12 +263,12 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit }) {
   return (
     <div style={S.page}>
       <div style={S.wrap}>
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"16px 16px 12px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"16px 16px 12px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onCancel} style={S.backBtn}>← Cancelar</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:"#f1f5f9" }}>{isEdit?"Editar Colaborador":"Novo Colaborador"}</div>
-              <div style={{ fontSize:11, color:"#475569" }}>{form.cargo} · {form.projectId}</div>
+              <div style={{ fontSize:14, fontWeight:800, ...S.txtPrimary }}>{isEdit?"Editar Colaborador":"Novo Colaborador"}</div>
+              <div style={{ fontSize:11, ...S.txtSecondary }}>{form.cargo} · {form.projectId}</div>
             </div>
           </div>
         </div>
@@ -262,8 +277,11 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit }) {
           {/* Foto */}
           <div style={{ ...S.card, display:"flex", gap:14, alignItems:"center" }}>
             <label style={{ cursor:"pointer", flexShrink:0 }}>
-              <div style={{ width:82, height:82, borderRadius:14, overflow:"hidden", border:`2px dashed ${form.foto?"#0ea5e9":"#1e293b"}`, background:"#020510", display:"flex", alignItems:"center", justifyContent:"center", position:"relative" }}>
-                {form.foto ? <img src={form.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <div style={{ textAlign:"center" }}><div style={{ fontSize:26 }}>📷</div><div style={{ fontSize:8, color:"#475569", marginTop:2 }}>FOTO</div></div>}
+              <div style={{ width:82, height:82, borderRadius:14, overflow:"hidden", border:`2px dashed ${form.foto?"#0ea5e9":"#1e293b"}`, background:"#020510", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {form.foto
+                  ? <img src={form.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+                  : <div style={{ textAlign:"center" }}><div style={{ fontSize:26 }}>📷</div><div style={{ fontSize:8, color:"#475569", marginTop:2 }}>FOTO</div></div>
+                }
               </div>
               <input type="file" accept="image/*" style={{ position:"absolute", opacity:0, width:0, height:0 }} onChange={handleFoto}/>
             </label>
@@ -273,7 +291,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit }) {
             </div>
           </div>
 
-          {/* Dados básicos */}
+          {/* Dados */}
           <div style={{ ...S.card, display:"flex", flexDirection:"column", gap:10 }}>
             <div>
               <label style={S.lbl}>Nome Completo *</label>
@@ -292,18 +310,18 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit }) {
           </div>
 
           {/* Turno e Escala */}
-          <div style={{ ...S.card }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#f1f5f9", marginBottom:10 }}>Turno e Escala</div>
+          <div style={S.card}>
+            <div style={{ fontSize:12, fontWeight:700, ...S.txtPrimary, marginBottom:10 }}>Turno e Escala</div>
             <div style={{ marginBottom:10 }}>
               <label style={S.lbl}>Turno</label>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
                 {TURNOS.map(t => {
-                  const tc = TURNO_COLOR[t];
+                  const tc = TURNO_CONFIG[t];
                   const isSel = form.turno===t;
                   return (
                     <button key={t} onClick={()=>setF("turno",t)}
-                      style={{ background:isSel?tc.bg:"#020510", border:`2px solid ${isSel?tc.badge+"66":"#0f172a"}`, borderRadius:8, padding:"10px 8px", cursor:"pointer", textAlign:"center" }}>
-                      <div style={{ fontSize:16, marginBottom:2 }}>{tc.icon}</div>
+                      style={{ background:isSel?tc.bg:"#020510", border:`2px solid ${isSel?tc.badge+"66":"#0f172a"}`, borderRadius:8, padding:"12px 6px", cursor:"pointer", textAlign:"center" }}>
+                      <div style={{ fontSize:18, marginBottom:3 }}>{tc.icon}</div>
                       <div style={{ fontSize:11, fontWeight:700, color:isSel?tc.badge:"#475569" }}>{t}</div>
                     </button>
                   );
@@ -344,29 +362,29 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit }) {
   );
 }
 
-// ── Tela de adicionar histórico
-function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel }) {
+// ── Tela adicionar histórico (líder ou admin)
+function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dark }) {
+  const S = getStyles(dark);
   const hColor = histForm.tipo==="Falta"?"#ef4444":histForm.tipo==="FT"?"#f59e0b":"#a855f7";
   return (
     <div style={S.page}>
       <div style={S.wrap}>
-        <div style={{ position:"sticky", top:0, zIndex:10, background:"#04080f", borderBottom:"1px solid #0a0f1e", padding:"16px 16px 12px" }}>
+        <div style={{ position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"16px 16px 12px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onCancel} style={S.backBtn}>← Cancelar</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:"#f1f5f9" }}>Adicionar Registro</div>
-              <div style={{ fontSize:11, color:"#475569" }}>{colabNome}</div>
+              <div style={{ fontSize:14, fontWeight:800, ...S.txtPrimary }}>Adicionar Registro</div>
+              <div style={{ fontSize:11, ...S.txtSecondary }}>{colabNome}</div>
             </div>
           </div>
         </div>
-
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
-          <div style={{ ...S.card }}>
-            <div style={{ fontSize:12, fontWeight:700, color:"#f1f5f9", marginBottom:12 }}>Tipo de Registro</div>
+          <div style={S.card}>
+            <div style={{ fontSize:12, fontWeight:700, ...S.txtPrimary, marginBottom:12 }}>Tipo de Registro</div>
             <div style={{ display:"flex", gap:8, marginBottom:14 }}>
               {["Falta","FT","Medida Disciplinar"].map(tipo=>{
-                const c = tipo==="Falta"?"#ef4444":tipo==="FT"?"#f59e0b":"#a855f7";
-                const bg= tipo==="Falta"?"#1a0202":tipo==="FT"?"#1a1000":"#120a2e";
+                const c  = tipo==="Falta"?"#ef4444":tipo==="FT"?"#f59e0b":"#a855f7";
+                const bg = tipo==="Falta"?"#1a0202":tipo==="FT"?"#1a1000":"#120a2e";
                 const isSel = histForm.tipo===tipo;
                 return (
                   <button key={tipo} onClick={()=>setHistForm(h=>({...h,tipo,detalhe:""}))}
@@ -393,8 +411,13 @@ function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel }) {
                 </div>
               </div>
             )}
+            {histForm.tipo==="FT" && (
+              <div style={{ marginTop:10 }}>
+                <label style={S.lbl}>Observação (opcional)</label>
+                <input value={histForm.detalhe||""} onChange={e=>setHistForm(h=>({...h,detalhe:e.target.value}))} placeholder="Ex: Banco de horas, folga compensatória..." style={S.inp}/>
+              </div>
+            )}
           </div>
-
           <button onClick={onSave} style={{ ...S.btn, background:`linear-gradient(135deg,${hColor},${hColor}cc)` }}>
             ✓ Adicionar Registro
           </button>
@@ -404,23 +427,78 @@ function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel }) {
   );
 }
 
-// ── Tela principal (lista por turnos)
+// ── Tela de PIN (entrada)
+function PinScreen({ project, onSuccess, onBack, dark }) {
+  const S = getStyles(dark);
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState(false);
+  const [mode, setMode] = useState(null); // "lider" | "admin"
+
+  const tryPin = (inputPin) => {
+    if(inputPin === ADMIN_PIN) { onSuccess("admin"); return; }
+    if(inputPin === PROJECT_PINS[project.id]) { onSuccess("lider"); return; }
+    setErr(true);
+  };
+
+  return (
+    <div style={{ ...S.page, alignItems:"center", justifyContent:"center" }}>
+      <div style={{ background: dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
+        <div style={{ fontSize:32, marginBottom:8 }}>👥</div>
+        <div style={{ fontSize:16, fontWeight:800, ...S.txtPrimary, marginBottom:4 }}>Equipe — {project.id}</div>
+        <div style={{ fontSize:12, ...S.txtSecondary, marginBottom:20 }}>{project.name}</div>
+
+        {!mode && (
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            <button onClick={()=>setMode("lider")}
+              style={{ ...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13 }}>
+              👷 Acesso Líder
+            </button>
+            <button onClick={()=>setMode("admin")}
+              style={{ ...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33" }}>
+              🔐 Acesso Gerencial
+            </button>
+            <button onClick={onBack} style={{ ...S.btnSec, fontSize:13, marginTop:4 }}>← Voltar</button>
+          </div>
+        )}
+
+        {mode && (
+          <>
+            <div style={{ fontSize:12, ...S.txtSecondary, marginBottom:12 }}>
+              {mode==="lider"?"PIN do projeto":"PIN gerencial"}
+            </div>
+            <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
+              onChange={e=>{ setPin(e.target.value); setErr(false); }}
+              onKeyDown={e=>{ if(e.key==="Enter") tryPin(pin); }}
+              style={{ ...S.inp, textAlign:"center", fontSize:22, letterSpacing:10, marginBottom:8 }}/>
+            {err && <div style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={()=>{ setMode(null); setPin(""); setErr(false); }} style={{ ...S.btnSec, flex:1, fontSize:13 }}>← Voltar</button>
+              <button onClick={()=>tryPin(pin)} style={{ ...S.btn, flex:1, fontSize:13 }}>Entrar</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── App principal
 export default function EquipeApp({ project, onBack }) {
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
-  const [screen, setScreen] = useState("list");
+  const [screen, setScreen] = useState("pin"); // pin | list | add | edit | view | addHist
+  const [authLevel, setAuthLevel] = useState(null); // null | "lider" | "admin"
   const [selColab, setSelColab] = useState(null);
   const [form, setForm] = useState(null);
   const [histForm, setHistForm] = useState({ tipo:"Falta", data:todayStr(), detalhe:"" });
-  const [adminAuth, setAdminAuth] = useState(false);
-  const [adminPin, setAdminPin] = useState("");
-  const [adminErr, setAdminErr] = useState(false);
-  const [showAdminInput, setShowAdminInput] = useState(false);
   const [showDesligados, setShowDesligados] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [dark, setDark] = useState(true);
 
+  const S = getStyles(dark);
+  const adminAuth = authLevel === "admin";
+  const liderAuth = authLevel === "lider" || authLevel === "admin";
   const cargos = CARGOS_PROJETO[project.id] || ["Colaborador"];
-  const hasCaoGuarda = !!project.hasCaoGuarda;
 
   useEffect(() => {
     loadEquipe(project.id).then(data => {
@@ -440,6 +518,7 @@ export default function EquipeApp({ project, onBack }) {
 
   const saveColab = async () => {
     if(!form.nome.trim()) { alert("Informe o nome"); return; }
+    if(!adminAuth) return; // só admin cadastra
     const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
     const newColabs = isNew
       ? [...equipeData.colaboradores, form]
@@ -492,29 +571,52 @@ export default function EquipeApp({ project, onBack }) {
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>👥</div><div style={{fontSize:13,color:"#64748b"}}>Carregando equipe...</div></div>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:30,marginBottom:10}}>👥</div>
+        <div style={{fontSize:13,color:"#64748b"}}>Carregando equipe...</div>
+      </div>
     </div>
   );
 
-  // ── Telas secundárias
-  if(screen==="add"&&form&&adminAuth) return <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab} onCancel={()=>{setScreen("list");setForm(null);}} saving={saving} isEdit={false}/>;
-  if(screen==="edit"&&form&&adminAuth) return <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab} onCancel={()=>{setScreen("view");setForm(null);}} saving={saving} isEdit={true}/>;
-  if(screen==="addHist"&&selColab) return <AddHistScreen colabNome={selColab.nome} histForm={histForm} setHistForm={setHistForm} onSave={addHistorico} onCancel={()=>setScreen("view")}/>;
+  // ── PIN
+  if(screen==="pin") return (
+    <PinScreen project={project} dark={dark}
+      onBack={onBack}
+      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); }}/>
+  );
+
+  // ── Formulário (admin only)
+  if(screen==="add"&&form&&adminAuth) return (
+    <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
+      onCancel={()=>{setScreen("list");setForm(null);}} saving={saving} isEdit={false} dark={dark}/>
+  );
+  if(screen==="edit"&&form&&adminAuth) return (
+    <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
+      onCancel={()=>{setScreen("view");setForm(null);}} saving={saving} isEdit={true} dark={dark}/>
+  );
+
+  // ── Adicionar histórico (líder ou admin)
+  if(screen==="addHist"&&selColab) return (
+    <AddHistScreen colabNome={selColab.nome} histForm={histForm} setHistForm={setHistForm}
+      onSave={addHistorico} onCancel={()=>setScreen("view")} dark={dark}/>
+  );
+
+  // ── Ficha
   if(screen==="view"&&selColab) {
     const colab = equipeData.colaboradores.find(c=>c.id===selColab.id) || selColab;
-    return <FichaScreen colab={colab} adminAuth={adminAuth}
-      onBack={()=>{setScreen("list");setSelColab(null);}}
-      onEdit={()=>{setForm({...colab});setScreen("edit");}}
-      onAddHist={()=>setScreen("addHist")}
-      onDesligar={desligarColab}
-      onRemoveHist={removeHist}/>;
+    return (
+      <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}
+        onBack={()=>{setScreen("list");setSelColab(null);}}
+        onEdit={()=>{setForm({...colab});setScreen("edit");}}
+        onAddHist={()=>setScreen("addHist")}
+        onDesligar={desligarColab}
+        onRemoveHist={removeHist}/>
+    );
   }
 
-  // ── Lista principal agrupada por turno
+  // ── Lista principal
   const ativos = equipeData.colaboradores.filter(c=>c.status==="ativo");
   const desligados = equipeData.desligados || [];
-
-  // Agrupa por turno
   const turnosComEquipe = TURNOS.filter(t => ativos.some(c=>c.turno===t));
   const semTurno = ativos.filter(c=>!TURNOS.includes(c.turno));
 
@@ -526,54 +628,44 @@ export default function EquipeApp({ project, onBack }) {
           sub={`${project.id} · ${project.name} · ${ativos.length} ativo(s)`}
           onBack={onBack}
           saving={saving}
+          dark={dark}
+          onToggleTheme={()=>setDark(!dark)}
         />
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
-          {/* Acesso gerencial */}
-          {!adminAuth ? (
-            <div style={{ ...S.card }}>
-              {!showAdminInput ? (
-                <button onClick={()=>setShowAdminInput(true)} style={{ ...S.btnSec, fontSize:12, color:"#f59e0b", borderColor:"#f59e0b33" }}>
-                  🔐 Acesso Gerencial
-                </button>
-              ) : (
-                <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                  <input type="password" inputMode="numeric" placeholder="PIN gerencial" maxLength={8} value={adminPin}
-                    onChange={e=>{setAdminPin(e.target.value);setAdminErr(false);}}
-                    onKeyDown={e=>{if(e.key==="Enter"){if(adminPin===ADMIN_PIN){setAdminAuth(true);setShowAdminInput(false);}else setAdminErr(true);}}}
-                    style={{ ...S.inp, flex:1, fontSize:16, letterSpacing:8, textAlign:"center" }}/>
-                  <button onClick={()=>{if(adminPin===ADMIN_PIN){setAdminAuth(true);setShowAdminInput(false);}else setAdminErr(true);}}
-                    style={{ ...S.btn, width:"auto", padding:"10px 16px", fontSize:13 }}>OK</button>
-                </div>
-              )}
-              {adminErr && <div style={{ fontSize:11, color:"#ef4444", marginTop:6, textAlign:"center" }}>PIN incorreto</div>}
-            </div>
-          ) : (
+
+          {/* Barra de auth */}
+          {adminAuth ? (
             <div style={{ background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>🔓 Modo Gerencial Ativo</div>
-              <button onClick={()=>{setAdminAuth(false);setAdminPin("");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
+              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
             </div>
-          )}
+          ) : liderAuth ? (
+            <div style={{ background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}>👷 Acesso Líder — Pode adicionar registros</div>
+              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
+            </div>
+          ) : null}
 
           {/* Botão cadastrar — admin only */}
           {adminAuth && (
-            <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,"Diurno A"));setScreen("add");}}
+            <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,"Diurno"));setScreen("add");}}
               style={{ ...S.btn, fontSize:13 }}>
               + Cadastrar Colaborador
             </button>
           )}
 
-          {/* Resumo visual por turno */}
+          {/* Resumo por turno */}
           {turnosComEquipe.length > 0 && (
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:6 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6 }}>
               {turnosComEquipe.map(t=>{
-                const tc = TURNO_COLOR[t];
+                const tc = TURNO_CONFIG[t];
                 const count = ativos.filter(c=>c.turno===t).length;
                 return (
                   <div key={t} style={{ background:tc.bg, border:`1px solid ${tc.border}`, borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
                     <div style={{ fontSize:18, marginBottom:3 }}>{tc.icon}</div>
                     <div style={{ fontSize:12, fontWeight:700, color:tc.badge }}>{t}</div>
-                    <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{count} colaborador{count!==1?"es":""}</div>
+                    <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{count}</div>
                   </div>
                 );
               })}
@@ -582,12 +674,11 @@ export default function EquipeApp({ project, onBack }) {
 
           {/* Cards por turno */}
           {TURNOS.map(turno=>{
-            const tc = TURNO_COLOR[turno];
+            const tc = TURNO_CONFIG[turno];
             const colabsDoTurno = ativos.filter(c=>c.turno===turno);
             if(colabsDoTurno.length===0 && !adminAuth) return null;
             return (
               <div key={turno} style={{ borderRadius:12, overflow:"hidden", border:`1px solid ${tc.border}` }}>
-                {/* Header do turno */}
                 <div style={{ background:tc.bg, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                     <span style={{ fontSize:16 }}>{tc.icon}</span>
@@ -601,11 +692,10 @@ export default function EquipeApp({ project, onBack }) {
                     </button>
                   )}
                 </div>
-                {/* Colaboradores */}
-                <div style={{ background:"#04080f", padding:"8px" }}>
+                <div style={{ background: dark?"#04080f":"#f8fafc", padding:"8px" }}>
                   {colabsDoTurno.length===0 && (
                     <div style={{ textAlign:"center", padding:"14px 0", fontSize:11, color:"#334155" }}>
-                      {adminAuth ? "Nenhum cadastrado — toque em + Adicionar" : "Nenhum cadastrado"}
+                      {adminAuth?"Nenhum cadastrado — toque em + Adicionar":"Nenhum cadastrado"}
                     </div>
                   )}
                   <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
@@ -615,11 +705,11 @@ export default function EquipeApp({ project, onBack }) {
                       const mds    = (c.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
                       return (
                         <div key={c.id} onClick={()=>{setSelColab(c);setScreen("view");}}
-                          style={{ display:"flex", alignItems:"center", gap:10, background:"#060c18", borderRadius:10, padding:"10px 12px", cursor:"pointer", border:`1px solid ${tc.border}` }}>
+                          style={{ display:"flex", alignItems:"center", gap:10, background: dark?"#060c18":"#ffffff", borderRadius:10, padding:"10px 12px", cursor:"pointer", border:`1px solid ${tc.border}` }}>
                           <Avatar foto={c.foto} size={46} border={tc.badge+"44"}/>
                           <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:13, fontWeight:700, color:"#f1f5f9", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
-                            <div style={{ fontSize:11, color:"#64748b", marginTop:1 }}>{c.cargo}</div>
+                            <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
+                            <div style={{ fontSize:11, ...S.txtSecondary, marginTop:1 }}>{c.cargo}</div>
                             <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
                               {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background:"#001a2e", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
                               {c.telefone && <span style={{ fontSize:9, color:"#475569", padding:"1px 5px" }}>📱 {c.telefone}</span>}
@@ -640,17 +730,17 @@ export default function EquipeApp({ project, onBack }) {
             );
           })}
 
-          {/* Colaboradores sem turno definido */}
+          {/* Sem turno */}
           {semTurno.length > 0 && (
-            <div style={{ ...S.card }}>
-              <div style={{ fontSize:12, fontWeight:700, color:"#64748b", marginBottom:8 }}>Sem turno definido ({semTurno.length})</div>
+            <div style={S.card}>
+              <div style={{ fontSize:12, fontWeight:700, color:"#64748b", marginBottom:8 }}>Sem turno ({semTurno.length})</div>
               {semTurno.map(c=>(
                 <div key={c.id} onClick={()=>{setSelColab(c);setScreen("view");}}
                   style={{ display:"flex", alignItems:"center", gap:10, background:"#020510", borderRadius:8, padding:"10px 12px", cursor:"pointer", marginBottom:6, border:"1px solid #0a0f1e" }}>
                   <Avatar foto={c.foto} size={42}/>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#f1f5f9" }}>{c.nome}</div>
-                    <div style={{ fontSize:11, color:"#64748b" }}>{c.cargo}</div>
+                    <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>{c.nome}</div>
+                    <div style={{ fontSize:11, ...S.txtSecondary }}>{c.cargo}</div>
                   </div>
                   <span style={{ color:"#334155", fontSize:14 }}>›</span>
                 </div>
@@ -660,7 +750,7 @@ export default function EquipeApp({ project, onBack }) {
 
           {/* Desligados */}
           {desligados.length > 0 && (
-            <div style={{ ...S.card }}>
+            <div style={S.card}>
               <button onClick={()=>setShowDesligados(!showDesligados)}
                 style={{ width:"100%", background:"transparent", border:"none", display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", padding:0 }}>
                 <span style={{ fontSize:12, fontWeight:700, color:"#ef4444" }}>🔴 Desligados ({desligados.length})</span>
@@ -688,13 +778,15 @@ export default function EquipeApp({ project, onBack }) {
           {ativos.length === 0 && (
             <div style={{ textAlign:"center", padding:"40px 0" }}>
               <div style={{ fontSize:40, marginBottom:10 }}>👥</div>
-              <div style={{ fontSize:14, color:"#f1f5f9", marginBottom:4 }}>Equipe vazia</div>
-              <div style={{ fontSize:12, color:"#475569" }}>{adminAuth?"Toque em + Cadastrar Colaborador para começar":"Acesso gerencial para cadastrar colaboradores"}</div>
+              <div style={{ fontSize:14, ...S.txtPrimary, marginBottom:4 }}>Equipe vazia</div>
+              <div style={{ fontSize:12, ...S.txtSecondary }}>
+                {adminAuth?"Toque em + Cadastrar Colaborador para começar":"Acesso gerencial para cadastrar colaboradores"}
+              </div>
             </div>
           )}
 
           <div style={{ fontSize:10, color:"#1e293b", textAlign:"center", marginTop:4 }}>
-            Líder: adicionar registros · Gerencial: cadastrar, editar, desligar
+            Líder: adicionar FT/Falta/Medida · Gerencial: cadastrar, editar, desligar
           </div>
         </div>
       </div>
