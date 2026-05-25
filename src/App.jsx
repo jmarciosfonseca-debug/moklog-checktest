@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import AcessoApp from "./Acesso";
 import EquipeApp from "./Equipe";
+import AcessoCCO from "./AcessoCCO";
+import EmpresaInfo from "./EmpresaInfo";
+import Equipamentos from "./Equipamentos";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
@@ -1553,6 +1556,12 @@ export default function App(){
   const [acessoScreen,setAcessoScreen]=useState("menu");
   const [dark,setDark]=useState(true);
   const [showRegistros,setShowRegistros]=useState(false);
+  const [showAcessoCCO,setShowAcessoCCO]=useState(false);
+  const [acessoCCOProject,setAcessoCCOProject]=useState(null);
+  const [showEmpresaInfo,setShowEmpresaInfo]=useState(false);
+  const [empresaInfoProject,setEmpresaInfoProject]=useState(null);
+  const [showEquipamentos,setShowEquipamentos]=useState(false);
+  const [equipamentosProject,setEquipamentosProject]=useState(null);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -1710,6 +1719,9 @@ export default function App(){
   if(showAcesso) return <AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/>;
   if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
   if(showRegistros) return <RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onBack={()=>setShowRegistros(false)}/>;
+  if(showAcessoCCO&&acessoCCOProject) return <AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}}/>;
+  if(showEmpresaInfo&&empresaInfoProject) return <EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/>;
+  if(showEquipamentos&&equipamentosProject) return <Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
@@ -1878,7 +1890,7 @@ export default function App(){
                     {jp.hasAcesso&&(
                       <button onClick={()=>setShowAcesso(true)}
                         style={{...S.primaryBtn,fontSize:13,background:"linear-gradient(135deg,#92400e,#78350f)"}}>
-                        🚛 Módulo Acesso — Transportadoras
+                        🚛 Acesso Transportadoras
                       </button>
                     )}
                     {jp.hasEquipe&&(
@@ -1887,6 +1899,14 @@ export default function App(){
                         👥 Equipe — {jp.id}
                       </button>
                     )}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setShowAcessoCCO(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
+                      <button onClick={()=>{setEquipamentosProject({id:jp.id,name:jp.name});setShowEquipamentos(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
+                      <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1970,14 +1990,24 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
               {checkAuth(project.id)?(
                 <>
-                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:14}}>+ Novo Relatório — {project.id}</button>
-                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14}}>📅 Histórico</button>
-                  <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:14,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe — {project.id}</button>
+                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:13}}>📋 Novo Relatório — {project.id}</button>
+                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico</button>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe</button>
+                    <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
+                    <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
+                    <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
+                  </div>
                 </>
               ):(
                 <>
                   <button onClick={()=>setScreen("pin_gate")} style={{...S.primaryBtn,fontSize:14}}>🔐 Acessar — {project.id}</button>
-                  <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:14,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe — {project.id}</button>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe</button>
+                    <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
+                    <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
+                    <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
+                  </div>
                 </>
               )}
             </div>
