@@ -701,16 +701,34 @@ function Dashboard({stored, onBack, onDeleteReport}) {
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
   const [sessionTime,setSessionTime]=useState(Date.now());
   const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
+  // Load viewLinks from Firebase on mount to keep links permanent
+  useEffect(()=>{
+    const loadVL = async () => {
+      try {
+        const { getDoc:gd, doc:dc } = await import("firebase/firestore");
+        const snap = await gd(dc(db,"config","viewlinks"));
+        if(snap.exists()) {
+          const data = snap.data();
+          setViewLinks(prev => ({...data,...prev})); // merge, prefer local
+          localStorage.setItem("moklog_viewlinks", JSON.stringify({...data}));
+        }
+      } catch(e){}
+    };
+    loadVL();
+  },[]);
   useEffect(()=>{
     if(!auth) return;
     const t=setInterval(()=>{if(Date.now()-sessionTime>SESSION_TIMEOUT){setAuth(false);setPin("");}},30000);
     return ()=>clearInterval(t);
   },[auth,sessionTime]);
   const resetSess=()=>setSessionTime(Date.now());
-  const toggleViewLink=(pid)=>{
+  const toggleViewLink=async(pid)=>{
     const cur=viewLinks[pid]; const next={...viewLinks};
     if(cur) delete next[pid]; else next[pid]=generateViewToken(pid);
-    setViewLinks(next); localStorage.setItem("moklog_viewlinks",JSON.stringify(next));
+    setViewLinks(next);
+    localStorage.setItem("moklog_viewlinks",JSON.stringify(next));
+    // Save to Firebase so link is permanent across devices
+    try { await setDoc(doc(db,"config","viewlinks"), next); } catch(e){}
   };
   if(!auth) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSess}>
@@ -1127,9 +1145,36 @@ function ReportScreen({project, state, meta, photos, onBack, onHome}) {
 
 function ViewScreen({projectId, token, stored}) {
   const project = PROJECTS[projectId];
-  const viewLinks = JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");
-  const validToken = viewLinks[projectId];
-  if(!project || !validToken || (token !== validToken && token !== (projectId+"_"+validToken))) {
+  const [validToken, setValidToken] = useState(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(()=>{
+    const checkToken = async () => {
+      // Check localStorage first
+      try {
+        const local = JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");
+        if(local[projectId]) { setValidToken(local[projectId]); setChecking(false); return; }
+      } catch(e){}
+      // Then check Firebase
+      try {
+        const snap = await getDoc(doc(db,"config","viewlinks"));
+        if(snap.exists()) {
+          const data = snap.data();
+          localStorage.setItem("moklog_viewlinks", JSON.stringify(data));
+          setValidToken(data[projectId] || null);
+        }
+      } catch(e){}
+      setChecking(false);
+    };
+    checkToken();
+  },[projectId]);
+
+  if(checking) return (
+    <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{fontSize:13,color:"#64748b"}}>Verificando acesso...</div>
+    </div>
+  );
+  if(!project || !validToken || (token !== validToken && token !== (projectId+"_"+validToken) && token !== validToken.split("_").pop())) {
     return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#334155"}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#64748b"}}>Solicite um novo link ao gestor.</div></div></div>);
   }
   const hist = stored[projectId]?.history??[];
