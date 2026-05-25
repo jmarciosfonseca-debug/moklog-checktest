@@ -31,7 +31,7 @@ const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
 const ADMIN_PIN = "872101";
-const MAX_DESLIGADOS = 50;
+// Sem limite para desligados — ficam todos para consulta
 
 // PINs de acesso por projeto (líder pode cadastrar + adicionar histórico)
 const PROJECT_PINS = {
@@ -56,6 +56,14 @@ const CARGOS_PROJETO = {
 };
 
 const TURNOS = ["Diurno","Noturno","Folguista"];
+const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento"];
+const HIST_COLORS = {
+  "Falta":             { color:"#ef4444", bg:"#1a0202", badge:"#fee2e2" },
+  "FT":                { color:"#f59e0b", bg:"#1a1000", badge:"#fef3c7" },
+  "Medida Disciplinar":{ color:"#a855f7", bg:"#120a2e", badge:"#f3e8ff" },
+  "Férias":            { color:"#0ea5e9", bg:"#001a2e", badge:"#e0f2fe" },
+  "Treinamento":       { color:"#22c55e", bg:"#021a0d", badge:"#dcfce7" },
+};
 const ESCALAS = ["12x36","4x2","5x2","6x1"];
 
 const TURNO_CONFIG = {
@@ -138,11 +146,13 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
   const semTurno = colaboradores.filter(c=>!turnos.includes(c.turno));
 
   const renderColab = (c) => {
-    const faltas = (c.historico||[]).filter(h=>h.tipo==="Falta").length;
-    const fts    = (c.historico||[]).filter(h=>h.tipo==="FT").length;
-    const mds    = (c.historico||[]).filter(h=>h.tipo==="Medida Disciplinar");
-    const adv    = mds.filter(m=>m.detalhe==="Advertência").length;
-    const susp   = mds.filter(m=>m.detalhe==="Suspensão").length;
+    const faltas  = (c.historico||[]).filter(h=>h.tipo==="Falta").length;
+    const fts     = (c.historico||[]).filter(h=>h.tipo==="FT").length;
+    const mds     = (c.historico||[]).filter(h=>h.tipo==="Medida Disciplinar");
+    const adv     = mds.filter(m=>m.detalhe==="Advertência").length;
+    const susp    = mds.filter(m=>m.detalhe==="Suspensão").length;
+    const ferias  = (c.historico||[]).filter(h=>h.tipo==="Férias").length;
+    const treinos = (c.historico||[]).filter(h=>h.tipo==="Treinamento").length;
     const hist   = (c.historico||[]).slice().reverse();
     const fotoHtml = c.foto
       ? `<img src="${c.foto}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;"/>`
@@ -170,6 +180,8 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
               ${fts>0?`<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#d97706;">${fts}</div><div style="font-size:8px;color:#d97706;font-weight:700;">FT</div></div>`:""}
               ${adv>0?`<div style="background:#f3e8ff;border:1px solid #d8b4fe;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#7c3aed;">${adv}</div><div style="font-size:8px;color:#7c3aed;font-weight:700;">ADV</div></div>`:""}
               ${susp>0?`<div style="background:#ffe4e6;border:1px solid #fda4af;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#be123c;">${susp}</div><div style="font-size:8px;color:#be123c;font-weight:700;">SUSP</div></div>`:""}
+              ${ferias>0?`<div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#0369a1;">${ferias}</div><div style="font-size:8px;color:#0369a1;font-weight:700;">FÉRIAS</div></div>`:""}
+              ${treinos>0?`<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#15803d;">${treinos}</div><div style="font-size:8px;color:#15803d;font-weight:700;">TREIN.</div></div>`:""}
             </div>
           </div>
         </div>
@@ -177,8 +189,16 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
         <div style="margin-top:10px;border-top:1px solid #f1f5f9;padding-top:8px;">
           <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:5px;">Histórico</div>
           ${hist.slice(0,5).map(h=>{
-            const hColor = h.tipo==="Falta"?"#dc2626":h.tipo==="FT"?"#d97706":"#7c3aed";
-            const hBg    = h.tipo==="Falta"?"#fee2e2":h.tipo==="FT"?"#fef3c7":"#f3e8ff";
+            const PDF_HIST_COLORS = {
+              "Falta":{"c":"#dc2626","b":"#fee2e2"},
+              "FT":{"c":"#d97706","b":"#fef3c7"},
+              "Medida Disciplinar":{"c":"#7c3aed","b":"#f3e8ff"},
+              "Férias":{"c":"#0369a1","b":"#e0f2fe"},
+              "Treinamento":{"c":"#15803d","b":"#dcfce7"},
+            };
+            const hColors = PDF_HIST_COLORS[h.tipo] || PDF_HIST_COLORS["Medida Disciplinar"];
+            const hColor = hColors.c;
+            const hBg    = hColors.b;
             return `<div style="display:inline-flex;align-items:center;gap:5px;background:${hBg};border-radius:5px;padding:3px 8px;margin:2px;font-size:10px;">
               <span style="font-weight:700;color:${hColor}">${h.tipo}</span>
               <span style="color:#64748b">${fmtD(h.data)}</span>
@@ -332,10 +352,12 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 // ── Tela de ficha completa
 function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, dark }) {
   const S = getStyles(dark);
-  const hist = [...(colab.historico||[])].reverse();
-  const faltas = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
-  const fts    = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
-  const mds    = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
+  const hist    = [...(colab.historico||[])].reverse();
+  const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
+  const fts     = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
+  const mds     = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
+  const ferias  = (colab.historico||[]).filter(h=>h.tipo==="Férias").length;
+  const treinos = (colab.historico||[]).filter(h=>h.tipo==="Treinamento").length;
   const tc = TURNO_CONFIG[colab.turno] || TURNO_CONFIG["Diurno"];
   const canAddHist = adminAuth || liderAuth;
 
@@ -371,15 +393,17 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
         </div>
 
         {/* Contadores */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:1, background:"#0a0f1e" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:1, background:"#0a0f1e" }}>
           {[
-            { label:"Faltas",    val:faltas, color:"#ef4444", bg:"#1a0202" },
-            { label:"FT",        val:fts,    color:"#f59e0b", bg:"#1a1000" },
-            { label:"Med. Disc", val:mds,    color:"#a855f7", bg:"#120a2e" },
+            { label:"Faltas",    val:faltas,    color:"#ef4444", bg:"#1a0202" },
+            { label:"FT",        val:fts,       color:"#f59e0b", bg:"#1a1000" },
+            { label:"Med. Disc", val:mds,       color:"#a855f7", bg:"#120a2e" },
+            { label:"Férias",    val:ferias,    color:"#0ea5e9", bg:"#001a2e" },
+            { label:"Treinam.",  val:treinos,   color:"#22c55e", bg:"#021a0d" },
           ].map(({ label, val, color, bg }) => (
-            <div key={label} style={{ background:bg, padding:"12px 8px", textAlign:"center" }}>
-              <div style={{ fontSize:22, fontWeight:900, color }}>{val}</div>
-              <div style={{ fontSize:9, color:"#64748b", fontWeight:700, textTransform:"uppercase" }}>{label}</div>
+            <div key={label} style={{ background:bg, padding:"10px 4px", textAlign:"center" }}>
+              <div style={{ fontSize:18, fontWeight:900, color }}>{val}</div>
+              <div style={{ fontSize:8, color:"#64748b", fontWeight:700, textTransform:"uppercase" }}>{label}</div>
             </div>
           ))}
         </div>
@@ -412,8 +436,9 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
             )}
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
               {hist.map(h => {
-                const hColor = h.tipo==="Falta"?"#ef4444":h.tipo==="FT"?"#f59e0b":"#a855f7";
-                const hBg    = h.tipo==="Falta"?"#1a0202":h.tipo==="FT"?"#1a1000":"#120a2e";
+                const hc = HIST_COLORS[h.tipo] || HIST_COLORS["Medida Disciplinar"];
+                const hColor = hc.color;
+                const hBg    = hc.bg;
                 return (
                   <div key={h.id} style={{ display:"flex", alignItems:"center", gap:10, background:hBg, borderRadius:8, padding:"9px 12px", border:`1px solid ${hColor}22` }}>
                     <span style={{ fontSize:9, fontWeight:700, color:hColor, background:hColor+"22", padding:"2px 7px", borderRadius:5, flexShrink:0, textTransform:"uppercase" }}>
@@ -434,10 +459,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
 
           {/* Desligar — admin only */}
           {adminAuth && colab.status==="ativo" && (
-            <button onClick={()=>{ if(window.confirm(`Desligar ${colab.nome}?`)) onDesligar(colab); }}
-              style={{ ...S.btnSec, color:"#ef4444", borderColor:"#ef444433", fontSize:13 }}>
-              🔴 Desligar Colaborador
-            </button>
+            <DesligarModal colab={colab} onDesligar={onDesligar} S={S} dark={dark}/>
           )}
         </div>
       </div>
@@ -574,7 +596,8 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
 // ── Tela adicionar histórico (líder ou admin)
 function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dark }) {
   const S = getStyles(dark);
-  const hColor = histForm.tipo==="Falta"?"#ef4444":histForm.tipo==="FT"?"#f59e0b":"#a855f7";
+  const hc = HIST_COLORS[histForm.tipo] || HIST_COLORS["Medida Disciplinar"];
+
   return (
     <div style={S.page}>
       <div style={S.wrap}>
@@ -590,23 +613,40 @@ function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dar
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
           <div style={S.card}>
             <div style={{ fontSize:12, fontWeight:700, ...S.txtPrimary, marginBottom:12 }}>Tipo de Registro</div>
-            <div style={{ display:"flex", gap:8, marginBottom:14 }}>
+            {/* Row 1: Falta, FT, Medida */}
+            <div style={{ display:"flex", gap:6, marginBottom:6 }}>
               {["Falta","FT","Medida Disciplinar"].map(tipo=>{
-                const c  = tipo==="Falta"?"#ef4444":tipo==="FT"?"#f59e0b":"#a855f7";
-                const bg = tipo==="Falta"?"#1a0202":tipo==="FT"?"#1a1000":"#120a2e";
+                const tc = HIST_COLORS[tipo];
                 const isSel = histForm.tipo===tipo;
                 return (
                   <button key={tipo} onClick={()=>setHistForm(h=>({...h,tipo,detalhe:""}))}
-                    style={{ flex:1, background:isSel?bg:"#020510", border:`2px solid ${isSel?c+"66":"#0f172a"}`, borderRadius:8, padding:"10px 4px", cursor:"pointer", textAlign:"center" }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:isSel?c:"#475569", lineHeight:1.3 }}>{tipo}</div>
+                    style={{ flex:1, background:isSel?tc.bg:"#020510", border:`2px solid ${isSel?tc.color+"66":"#0f172a"}`, borderRadius:8, padding:"10px 4px", cursor:"pointer", textAlign:"center" }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:isSel?tc.color:"#475569", lineHeight:1.3 }}>{tipo}</div>
                   </button>
                 );
               })}
             </div>
+            {/* Row 2: Férias, Treinamento */}
+            <div style={{ display:"flex", gap:6, marginBottom:14 }}>
+              {["Férias","Treinamento"].map(tipo=>{
+                const tc = HIST_COLORS[tipo];
+                const isSel = histForm.tipo===tipo;
+                return (
+                  <button key={tipo} onClick={()=>setHistForm(h=>({...h,tipo,detalhe:""}))}
+                    style={{ flex:1, background:isSel?tc.bg:"#020510", border:`2px solid ${isSel?tc.color+"66":"#0f172a"}`, borderRadius:8, padding:"10px 4px", cursor:"pointer", textAlign:"center" }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:isSel?tc.color:"#475569", lineHeight:1.3 }}>{tipo}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Data */}
             <div style={{ marginBottom:10 }}>
-              <label style={S.lbl}>Data do Registro</label>
+              <label style={S.lbl}>{histForm.tipo==="Férias"?"Data de Início":"Data do Registro"}</label>
               <input type="date" value={histForm.data} onChange={e=>setHistForm(h=>({...h,data:e.target.value}))} style={S.inp}/>
             </div>
+
+            {/* Campos específicos por tipo */}
             {histForm.tipo==="Medida Disciplinar" && (
               <div>
                 <label style={S.lbl}>Tipo de Medida</label>
@@ -626,11 +666,73 @@ function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dar
                 <input value={histForm.detalhe||""} onChange={e=>setHistForm(h=>({...h,detalhe:e.target.value}))} placeholder="Ex: Banco de horas, folga compensatória..." style={S.inp}/>
               </div>
             )}
+            {histForm.tipo==="Férias" && (
+              <div style={{ marginTop:10 }}>
+                <label style={S.lbl}>Data de Retorno</label>
+                <input type="date" value={histForm.detalhe||""} onChange={e=>setHistForm(h=>({...h,detalhe:e.target.value}))} style={S.inp}/>
+              </div>
+            )}
+            {histForm.tipo==="Treinamento" && (
+              <div style={{ marginTop:10 }}>
+                <label style={S.lbl}>Descrição do Treinamento</label>
+                <input value={histForm.detalhe||""} onChange={e=>setHistForm(h=>({...h,detalhe:e.target.value}))} placeholder="Ex: Treinamento de segurança, NR35..." style={S.inp}/>
+              </div>
+            )}
           </div>
-          <button onClick={onSave} style={{ ...S.btn, background:`linear-gradient(135deg,${hColor},${hColor}cc)` }}>
+          <button onClick={onSave} style={{ ...S.btn, background:`linear-gradient(135deg,${hc.color},${hc.color}cc)` }}>
             ✓ Adicionar Registro
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── Modal desligamento com motivo, tipo e data
+function DesligarModal({ colab, onDesligar, S, dark }) {
+  const [open, setOpen] = useState(false);
+  const [tipo, setTipo] = useState("Demissão");
+  const [motivo, setMotivo] = useState("");
+  const [data, setData] = useState(todayStr());
+
+  if(!open) return (
+    <button onClick={()=>setOpen(true)}
+      style={{ ...S.btnSec, color:"#ef4444", borderColor:"#ef444433", fontSize:13 }}>
+      🔴 Desligar Colaborador
+    </button>
+  );
+
+  return (
+    <div style={{ background:"#1a0202", border:"1px solid #ef444444", borderRadius:12, padding:"16px" }}>
+      <div style={{ fontSize:13, fontWeight:700, color:"#ef4444", marginBottom:12 }}>🔴 Desligar — {colab.nome}</div>
+      <div style={{ marginBottom:10 }}>
+        <div style={S.lbl}>Tipo de Desligamento</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+          {["Demissão","Pedido de Demissão","Abandono de Emprego","Outros"].map(t=>(
+            <button key={t} onClick={()=>setTipo(t)}
+              style={{ background:tipo===t?"#2a0202":"#020510", border:`1px solid ${tipo===t?"#ef4444":"#0f172a"}`, color:tipo===t?"#ef4444":"#475569", borderRadius:7, padding:"8px 6px", fontSize:11, cursor:"pointer", fontWeight:tipo===t?700:400, textAlign:"center" }}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ marginBottom:10 }}>
+        <div style={S.lbl}>Data do Desligamento</div>
+        <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
+      </div>
+      <div style={{ marginBottom:12 }}>
+        <div style={S.lbl}>Motivo (opcional)</div>
+        <input value={motivo} onChange={e=>setMotivo(e.target.value)}
+          placeholder="Descreva o motivo..." style={S.inp}/>
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={()=>setOpen(false)}
+          style={{ ...S.btnSec, flex:1, fontSize:13 }}>Cancelar</button>
+        <button onClick={()=>{ onDesligar(colab, motivo, tipo, data); }}
+          style={{ flex:1, background:"linear-gradient(135deg,#b91c1c,#991b1b)", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+          ✓ Confirmar
+        </button>
       </div>
     </div>
   );
@@ -801,11 +903,17 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setSelColab(newColabs.find(c=>c.id===colabId));
   };
 
-  const desligarColab = async (colab) => {
+  const desligarColab = async (colab, motivo, tipoDeslig, dataDeslig) => {
     if(!adminAuth) return;
-    const desligado = {...colab, status:"desligado", desligadoEm:todayStr()};
+    const desligado = {
+      ...colab,
+      status:"desligado",
+      desligadoEm: dataDeslig || todayStr(),
+      motivoDesligamento: motivo || "",
+      tipoDesligamento: tipoDeslig || "Demissão"
+    };
     const newColabs = equipeData.colaboradores.filter(c=>c.id!==colab.id);
-    const newDesligados = [desligado, ...(equipeData.desligados||[])].slice(0, MAX_DESLIGADOS);
+    const newDesligados = [desligado, ...(equipeData.desligados||[])];
     await save({...equipeData, colaboradores:newColabs, desligados:newDesligados});
     setScreen("list"); setSelColab(null);
   };
@@ -1053,15 +1161,22 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
               {showDesligados && (
                 <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
                   {desligados.map(c=>(
-                    <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:"#1a0202", borderRadius:8, padding:"10px 12px", border:"1px solid #ef444422" }}>
-                      <Avatar foto={c.foto} size={40} border="#ef444444"/>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:12, fontWeight:700, color:"#94a3b8" }}>{c.nome}</div>
-                        <div style={{ fontSize:10, color:"#475569" }}>{c.cargo}{c.desligadoEm?` · Deslig: ${fmtDate(c.desligadoEm)}`:""}</div>
+                    <div key={c.id} style={{ background:"#1a0202", borderRadius:10, padding:"10px 12px", border:"1px solid #ef444422", marginBottom:6 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        <Avatar foto={c.foto} size={40} border="#ef444444"/>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:12, fontWeight:700, color:"#94a3b8" }}>{c.nome}</div>
+                          <div style={{ fontSize:10, color:"#475569" }}>{c.cargo}</div>
+                          <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap" }}>
+                            {c.tipoDesligamento&&<span style={{ fontSize:9, color:"#ef4444", background:"#2a0202", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.tipoDesligamento}</span>}
+                            {c.desligadoEm&&<span style={{ fontSize:9, color:"#64748b" }}>📅 {fmtDate(c.desligadoEm)}</span>}
+                          </div>
+                          {c.motivoDesligamento&&<div style={{ fontSize:10, color:"#64748b", marginTop:2, fontStyle:"italic" }}>{c.motivoDesligamento}</div>}
+                        </div>
+                        {adminAuth && (
+                          <button onClick={()=>reativarColab(c)} style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10 }}>Reativar</button>
+                        )}
                       </div>
-                      {adminAuth && (
-                        <button onClick={()=>reativarColab(c)} style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10 }}>Reativar</button>
-                      )}
                     </div>
                   ))}
                 </div>

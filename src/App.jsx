@@ -1250,18 +1250,25 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBac
           <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
             {allProjects.map(p => {
               const hist = stored[p.id]?.history ?? [];
-              const colabCount = null; // equipe data not loaded here
+              let colabCount = null;
+              try {
+                const local = localStorage.getItem(`equipe_${p.id}`);
+                if(local) { const d=JSON.parse(local); colabCount=(d.colaboradores||[]).filter(c=>c.status==="ativo").length; }
+              } catch(e){}
               return (
                 <button key={p.id} onClick={()=>{ setSelProject(p); }}
-                  style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:12 }}>
+                  style={{ background:cardBg, border:`1px solid ${colabCount>0?"#0ea5e944":border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:12 }}>
                   <div style={{ width:42, height:42, borderRadius:10, background: dark?"#0f172a":"#f1f5f9", border:`1px solid ${border}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                     <span style={{ fontSize:18 }}>👥</span>
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:800, color:txt }}>{p.id}</div>
-                    <div style={{ fontSize:11, color:txt2 }}>{p.name}</div>
+                    <div style={{ fontSize:11, color:txt2 }}>{p.name||""}</div>
                   </div>
-                  <span style={{ color:txt2, fontSize:16 }}>›</span>
+                  {colabCount!==null && colabCount>0
+                    ? <span style={{ fontSize:11, fontWeight:700, color:"#0ea5e9", background:"#001a2e", padding:"3px 10px", borderRadius:8, flexShrink:0 }}>{colabCount} ativo(s)</span>
+                    : <span style={{ color:txt2, fontSize:16 }}>›</span>
+                  }
                 </button>
               );
             })}
