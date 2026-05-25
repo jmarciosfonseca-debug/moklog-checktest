@@ -951,13 +951,92 @@ function PendenciesScreen({stored, onBack}) {
 }
 
 function HistoryScreen({project, stored, onBack}) {
+  const [viewReport, setViewReport] = useState(null);
   const hist=(stored[project.id]?.history??[]).slice().reverse();
+
+  // ── Tela de visualização do relatório (somente leitura, sem PDF/excluir)
+  if(viewReport) return(
+    <div style={S.page}>
+      <div style={S.formWrap}>
+        <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
+          <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(viewReport.meta?.date)}</div>
+            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(viewReport.meta?.date)} · somente leitura</div>
+          </div>
+          <HealthRing pct={computeHealth(project,viewReport.state).pct} size={46}/>
+        </div>
+        {/* Cabeçalho completo */}
+        <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+          <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📋 Cabeçalho</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {[
+              ["Data",        fmtDate(viewReport.meta?.date)],
+              ["Início",      viewReport.meta?.start||"—"],
+              ["Término",     viewReport.meta?.end||"—"],
+              ["Líder VSPP",  viewReport.meta?.leader||"—"],
+              ["CCO",         viewReport.meta?.cco||"—"],
+              ["Moked 24h",   viewReport.meta?.moked||"—"],
+              ["Assinatura",  viewReport.meta?.signature||"—"],
+            ].map(([label,val])=>(
+              <div key={label}>
+                <div style={{fontSize:9,color:"#475569",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>{label}</div>
+                <div style={{fontSize:12,color:"#f1f5f9",fontWeight:600}}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Itens do relatório */}
+        {project.categories.map(cat=>{
+          const sv=viewReport.state[cat.id]; if(!sv) return null;
+          let cp=100;
+          if(cat.type==="single"){const st=sv.status??(sv.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
+          else if(cat.type==="items"){const okN=sv.filter(v=>(v.status??"ok")==="ok").length;const partN=sv.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),sv.length);}
+          else if(cat.type==="count"){const t=sv.total??cat.total;cp=calcPct(t-(sv.inoperative?.length??0),t);}
+          const dotColor=cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444";
+          return(
+            <div key={cat.id} style={{background:"#060c18",border:`1px solid ${dotColor}22`,borderRadius:8,padding:"10px 12px",marginBottom:6}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{width:8,height:8,borderRadius:"50%",background:dotColor,flexShrink:0}}/>
+                <span style={{fontSize:12,fontWeight:700,color:"#cbd5e1",flex:1}}>{cat.label}</span>
+                {cat.type!=="maintenance"&&cat.type!=="notes"&&<span style={{fontSize:11,fontWeight:800,color:dotColor}}>{cp}%</span>}
+              </div>
+              {cp<100&&cat.type==="items"&&sv.filter(v=>(v.status??"ok")!=="ok").map((v,idx)=>{
+                const i=sv.indexOf(v);const st=v.status??"ok";
+                return<div key={idx} style={{fontSize:11,color:st==="partial"?"#f59e0b":"#ef4444",marginLeft:16,marginTop:3}}>
+                  ↳ {cat.itemLabels[i]}: {st==="partial"?"PARCIAL":"INOP"}{v.since?` desde ${fmtDate(v.since)}`:""}{v.note?` — ${v.note}`:""}
+                </div>;
+              })}
+              {cp<100&&cat.type==="count"&&(sv.inoperative??[]).map((it,i)=>(
+                <div key={i} style={{fontSize:11,color:"#ef4444",marginLeft:16,marginTop:3}}>↳ {it.id||"?"}{it.since?` desde ${fmtDate(it.since)}`:""}{it.note?` — ${it.note}`:""}</div>
+              ))}
+              {cat.type==="notes"&&(sv.items??[]).map((it,i)=>(
+                <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:3}}>▸ {it.label}{it.note?` — ${it.note}`:""}</div>
+              ))}
+              {cat.type==="maintenance"&&(sv.visits??[]).map((v,i)=>(
+                <div key={i} style={{fontSize:11,color:"#64748b",marginLeft:16,marginTop:3}}>🔧 {fmtDate(v.date)} · {v.empresa||"—"} · {v.tec1||"—"}</div>
+              ))}
+            </div>
+          );
+        })}
+        {viewReport.meta?.obs&&(
+          <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:8,padding:"10px 14px",marginTop:4}}>
+            <div style={{fontSize:10,color:"#475569",fontWeight:700,marginBottom:4}}>OBSERVAÇÕES</div>
+            <div style={{fontSize:12,color:"#94a3b8"}}>{viewReport.meta.obs}</div>
+          </div>
+        )}
+        <div style={{fontSize:10,color:"#334155",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
+      </div>
+    </div>
+  );
+
+  // ── Lista de relatórios
   return(
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:4}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-          <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#334155"}}>{project.name} · somente leitura</div></div>
+          <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#334155"}}>{project.name} · {hist.length} relatório(s)</div></div>
         </div>
         {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#334155",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatorio salvo ainda.</div>}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -977,6 +1056,12 @@ function HistoryScreen({project, stored, onBack}) {
                 </div>
                 <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
+                </div>
+                <div style={{marginTop:10}}>
+                  <button onClick={()=>setViewReport(r)}
+                    style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px"}}>
+                    👁 Ver Relatório Completo
+                  </button>
                 </div>
               </div>
             );
