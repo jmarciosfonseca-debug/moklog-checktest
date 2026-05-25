@@ -1,0 +1,725 @@
+import { useState, useEffect } from "react";
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
+  authDomain: "moklog-checktest.firebaseapp.com",
+  projectId: "moklog-checktest",
+  storageBucket: "moklog-checktest.firebasestorage.app",
+  messagingSenderId: "390165325023",
+  appId: "1:390165325023:web:3147cd333503916b0d756a"
+};
+const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+const ADMIN_PIN = "872101";
+const PROJECT_PINS = {
+  P601:"16601",P602:"16602",P604:"16604",P605:"16605",
+  P606:"16606",P607:"16607",P311A:"16311",P311B:"16311",
+  P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
+};
+
+// Projetos com Pânico ZTRAX
+const TEM_ZTRAX = ["P311A","P311B"];
+
+const STATUS_CONFIG = {
+  ok:      { label:"OK",         color:"#22c55e", bg:"#021a0d", border:"#22c55e33" },
+  parcial: { label:"Parcial",    color:"#f59e0b", bg:"#1a1000", border:"#f59e0b33" },
+  inop:    { label:"Inoperante", color:"#ef4444", bg:"#1a0202", border:"#ef444433" },
+  baixo:   { label:"Baixo",      color:"#f59e0b", bg:"#1a1000", border:"#f59e0b33" },
+  critico: { label:"Crítico",    color:"#ef4444", bg:"#1a0202", border:"#ef444433" },
+};
+
+function todayStr() { return new Date().toISOString().split("T")[0]; }
+function fmtDate(d) {
+  if(!d) return "--";
+  try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
+}
+function daysSince(d) {
+  if(!d) return 0;
+  try { return Math.floor((Date.now()-new Date(d+"T12:00:00").getTime())/86400000); } catch { return 0; }
+}
+
+async function loadEquip(projectId) {
+  try {
+    const snap = await getDoc(doc(db,"equipamentos",projectId));
+    if(snap.exists()) {
+      const data = snap.data();
+      try { localStorage.setItem(`equipamentos_${projectId}`, JSON.stringify(data)); } catch(e){}
+      return data;
+    }
+  } catch(e){}
+  try {
+    const local = localStorage.getItem(`equipamentos_${projectId}`);
+    if(local) return JSON.parse(local);
+  } catch(e){}
+  return { smartphones:[], radiosHT:[], armamento:[], municao:[], placas:[], lanternas:[], moto:null, ztrax:[] };
+}
+
+async function saveEquip(projectId, data) {
+  try { await setDoc(doc(db,"equipamentos",projectId), data); } catch(e){ console.error(e); }
+  try { localStorage.setItem(`equipamentos_${projectId}`, JSON.stringify(data)); } catch(e){}
+}
+
+function getStyles(dark) {
+  return {
+    page:    { minHeight:"100vh", background:dark?"#04080f":"#f1f5f9", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
+    wrap:    { width:"100%", maxWidth:480, display:"flex", flexDirection:"column" },
+    card:    { background:dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"14px 16px" },
+    btn:     { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
+    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
+    inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color:dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
+    lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    hdrBg:   { background:dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
+    txt:     { color:dark?"#f1f5f9":"#0f172a" },
+    txt2:    { color:dark?"#475569":"#64748b" },
+  };
+}
+
+// ── Status Badge
+function StatusBadge({ status }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.ok;
+  return (
+    <span style={{ fontSize:10, fontWeight:700, color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}`, padding:"2px 8px", borderRadius:5 }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+// ── Dias em aberto badge
+function DiasAberto({ dataProblem }) {
+  if(!dataProblem) return null;
+  const dias = daysSince(dataProblem);
+  const color = dias >= 7 ? "#ef4444" : dias >= 3 ? "#f59e0b" : "#64748b";
+  return (
+    <span style={{ fontSize:9, fontWeight:700, color, background:color+"22", padding:"2px 6px", borderRadius:4 }}>
+      {dias}d em aberto
+    </span>
+  );
+}
+
+// ── Status Selector + Justificativa
+function StatusSelector({ value, onChange, tipos, dark }) {
+  const S = getStyles(dark);
+  const [showJust, setShowJust] = useState(false);
+  const [just, setJust] = useState("");
+  const [data, setData] = useState(todayStr());
+
+  const tiposList = tipos || ["ok","parcial","inop"];
+
+  const handleSelect = (status) => {
+    if(status === "ok") {
+      onChange({ status, justificativa:"", dataProblem:"" });
+    } else {
+      setShowJust(true);
+    }
+    onChange({ status });
+  };
+
+  const confirmJust = (status) => {
+    onChange({ status, justificativa:just, dataProblem:data });
+    setShowJust(false);
+    setJust("");
+  };
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+        {tiposList.map(s => {
+          const cfg = STATUS_CONFIG[s];
+          const isSel = value?.status === s;
+          return (
+            <button key={s} onClick={()=>handleSelect(s)}
+              style={{ background:isSel?cfg.bg:"transparent", border:`2px solid ${isSel?cfg.color:dark?"#0f172a":"#e2e8f0"}`, color:isSel?cfg.color:dark?"#475569":"#94a3b8", borderRadius:7, padding:"6px 12px", fontSize:11, cursor:"pointer", fontWeight:isSel?700:400 }}>
+              {cfg.label}
+            </button>
+          );
+        })}
+      </div>
+      {showJust && (
+        <div style={{ background:dark?"#1a0202":"#fff5f5", border:"1px solid #ef444433", borderRadius:8, padding:"10px 12px", marginTop:8 }}>
+          <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginBottom:8 }}>⚠️ Justificativa obrigatória</div>
+          <div style={{ marginBottom:8 }}>
+            <label style={S.lbl}>Data da ocorrência</label>
+            <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
+          </div>
+          <div style={{ marginBottom:8 }}>
+            <label style={S.lbl}>Justificativa</label>
+            <textarea value={just} onChange={e=>setJust(e.target.value)} placeholder="Descreva o problema..." style={{...S.inp,height:60,resize:"vertical",fontSize:12}}/>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={()=>setShowJust(false)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
+            <button onClick={()=>confirmJust(value?.status)}
+              style={{...S.btn,flex:1,fontSize:12,background:"linear-gradient(135deg,#ef4444,#dc2626)"}}>
+              ✓ Confirmar e Enviar WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Item Card genérico
+function ItemCard({ item, icon, title, children, onRemove, adminAuth, dark, problema }) {
+  const S = getStyles(dark);
+  const [open, setOpen] = useState(false);
+  const hasProblema = item.status && item.status !== "ok";
+
+  return (
+    <div style={{ background:dark?"#060c18":"#ffffff", border:`2px solid ${hasProblema?(STATUS_CONFIG[item.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, overflow:"hidden", marginBottom:6 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }} onClick={()=>setOpen(!open)}>
+        <span style={{ fontSize:20, flexShrink:0 }}>{icon}</span>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:13, fontWeight:700, ...S.txt }}>{title}</div>
+          <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap", alignItems:"center" }}>
+            <StatusBadge status={item.status||"ok"}/>
+            {hasProblema && <DiasAberto dataProblem={item.dataProblem}/>}
+          </div>
+        </div>
+        <span style={{ color:dark?"#334155":"#94a3b8", fontSize:12 }}>{open?"▲":"▼"}</span>
+      </div>
+      {open && (
+        <div style={{ padding:"0 12px 12px", borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}` }}>
+          <div style={{ paddingTop:10 }}>{children}</div>
+          {hasProblema && item.justificativa && (
+            <div style={{ background:dark?"#1a0202":"#fff5f5", border:"1px solid #ef444433", borderRadius:8, padding:"8px 12px", marginTop:8 }}>
+              <div style={{ fontSize:10, color:"#ef4444", fontWeight:700, marginBottom:3 }}>⚠️ {fmtDate(item.dataProblem)}</div>
+              <div style={{ fontSize:11, ...S.txt }}>{item.justificativa}</div>
+            </div>
+          )}
+          {adminAuth && onRemove && (
+            <button onClick={()=>{ if(window.confirm("Excluir este item?")) onRemove(); }}
+              style={{ ...S.btnSm, color:"#ef4444", border:"1px solid #ef444433", fontSize:10, marginTop:8 }}>
+              🗑 Excluir Item
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Enviar WhatsApp
+function enviarWhatsApp(project, tipo, nome, status, justificativa, data) {
+  const statusLabel = STATUS_CONFIG[status]?.label || status;
+  const icon = status==="inop"?"🔴":"⚠️";
+  const msg = encodeURIComponent(
+    `${icon} *[${project.id}] Equipamento com problema*\n` +
+    `📍 ${project.name}\n` +
+    `🛡️ ${tipo}: ${nome} — *${statusLabel.toUpperCase()}*\n` +
+    `📝 ${justificativa}\n` +
+    `📅 ${fmtDate(data)}\n` +
+    `⏳ Aguardando resolução\n\n` +
+    `_MokLog CheckTest © Moked Security_`
+  );
+  window.open(`https://wa.me/?text=${msg}`, "_blank");
+}
+
+// ── PIN Gate
+function PinGate({ project, onSuccess, onBack, dark }) {
+  const S = getStyles(dark);
+  const [mode, setMode] = useState(null);
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState(false);
+
+  const tryPin = () => {
+    if(pin===ADMIN_PIN){ onSuccess("admin"); return; }
+    if(pin===PROJECT_PINS[project.id]){ onSuccess("lider"); return; }
+    setErr(true);
+  };
+
+  return (
+    <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
+      <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
+        <div style={{fontSize:32, marginBottom:8}}>🛡️</div>
+        <div style={{fontSize:16, fontWeight:800, ...S.txt, marginBottom:4}}>Equipamentos</div>
+        <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project.id} · {project.name}</div>
+        {!mode ? (
+          <div style={{display:"flex", flexDirection:"column", gap:8}}>
+            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}>👷 Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={onBack} style={{...S.btnSec, fontSize:13, marginTop:4}}>← Voltar</button>
+          </div>
+        ) : (
+          <>
+            <div style={{fontSize:12,...S.txt2,marginBottom:12}}>{mode==="lider"?"PIN do projeto":"PIN gerencial"}</div>
+            <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
+              onChange={e=>{setPin(e.target.value);setErr(false);}}
+              onKeyDown={e=>{if(e.key==="Enter") tryPin();}}
+              style={{...S.inp, textAlign:"center", fontSize:22, letterSpacing:10, marginBottom:8}}/>
+            {err && <div style={{fontSize:12, color:"#ef4444", marginBottom:8}}>PIN incorreto</div>}
+            <div style={{display:"flex", gap:8}}>
+              <button onClick={()=>{setMode(null);setPin("");setErr(false);}} style={{...S.btnSec,flex:1,fontSize:13}}>← Voltar</button>
+              <button onClick={tryPin} style={{...S.btn,flex:1,fontSize:13}}>Entrar</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Formulário de novo item genérico
+function NovoItemForm({ tipo, project, onSave, onCancel, dark }) {
+  const S = getStyles(dark);
+  const [f, setF] = useState({
+    id: Date.now().toString()+Math.random().toString(36).substring(2,5),
+    status:"ok", justificativa:"", dataProblem:"", historico:[],
+    // Campos específicos
+    identificacao:"", modelo:"", marca:"",
+    calibre:".38", nSerie:"", qtd:1,
+    validade:"", placa:"", km:"", proximaRevisao:"",
+    bateria:"ok", carregador:"ok",
+  });
+  const upd = (k,v) => setF(p=>({...p,[k]:v}));
+
+  const renderFields = () => {
+    switch(tipo) {
+      case "smartphones": return (
+        <>
+          <div><label style={S.lbl}>Identificação (ex: Smartphone 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Smartphone 01" style={S.inp}/></div>
+          <div><label style={S.lbl}>Modelo</label><input value={f.modelo} onChange={e=>upd("modelo",e.target.value)} placeholder="Ex: Samsung A15..." style={S.inp}/></div>
+        </>
+      );
+      case "radiosHT": return (
+        <>
+          <div><label style={S.lbl}>Identificação (ex: Rádio 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Rádio 01" style={S.inp}/></div>
+          <div><label style={S.lbl}>Marca</label><input value={f.marca} onChange={e=>upd("marca",e.target.value)} placeholder="Ex: Motorola..." style={S.inp}/></div>
+          <div><label style={S.lbl}>Modelo</label><input value={f.modelo} onChange={e=>upd("modelo",e.target.value)} placeholder="Ex: DEP550..." style={S.inp}/></div>
+          <div><label style={S.lbl}>Quantidade</label><input type="number" min="1" value={f.qtd} onChange={e=>upd("qtd",parseInt(e.target.value)||1)} style={S.inp}/></div>
+        </>
+      );
+      case "armamento": return (
+        <>
+          <div><label style={S.lbl}>Identificação (ex: Arma 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Arma 01" style={S.inp}/></div>
+          <div>
+            <label style={S.lbl}>Calibre</label>
+            <div style={{display:"flex",gap:6}}>
+              {[".38",".380","Outro"].map(c=>(
+                <button key={c} onClick={()=>upd("calibre",c)}
+                  style={{...S.btnSm,flex:1,padding:"8px",color:f.calibre===c?"#0ea5e9":dark?"#475569":"#94a3b8",border:`1px solid ${f.calibre===c?"#0ea5e944":dark?"#0f172a":"#e2e8f0"}`,background:f.calibre===c?dark?"#001a2e":"#e0f2fe":"transparent"}}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div><label style={S.lbl}>Nº de Série *</label><input value={f.nSerie} onChange={e=>upd("nSerie",e.target.value)} placeholder="Número de série..." style={S.inp}/></div>
+        </>
+      );
+      case "municao": return (
+        <>
+          <div><label style={S.lbl}>Tipo / Calibre</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Ex: .38 / .380..." style={S.inp}/></div>
+          <div><label style={S.lbl}>Quantidade inicial</label><input type="number" min="0" value={f.qtd} onChange={e=>upd("qtd",parseInt(e.target.value)||0)} style={S.inp}/></div>
+        </>
+      );
+      case "placas": return (
+        <>
+          <div><label style={S.lbl}>Identificação (ex: Colete 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Colete 01" style={S.inp}/></div>
+          <div><label style={S.lbl}>Nº de Série *</label><input value={f.nSerie} onChange={e=>upd("nSerie",e.target.value)} placeholder="Número de série..." style={S.inp}/></div>
+          <div><label style={S.lbl}>Validade</label><input type="date" value={f.validade} onChange={e=>upd("validade",e.target.value)} style={S.inp}/></div>
+        </>
+      );
+      case "lanternas": return (
+        <div><label style={S.lbl}>Identificação (ex: Lanterna 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Lanterna 01" style={S.inp}/></div>
+      );
+      case "ztrax": return (
+        <div><label style={S.lbl}>Identificação (ex: ZTRAX 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="ZTRAX 01" style={S.inp}/></div>
+      );
+      default: return null;
+    }
+  };
+
+  return (
+    <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
+      <div style={{fontSize:13,fontWeight:700,...S.txt,marginBottom:4}}>+ Novo Item</div>
+      {renderFields()}
+      <div style={{display:"flex",gap:8,marginTop:4}}>
+        <button onClick={onCancel} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+        <button onClick={()=>{ if(!f.identificacao.trim()){ alert("Informe a identificação"); return; } onSave(f); }}
+          style={{...S.btn,flex:1,fontSize:13}}>✓ Adicionar</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Seção genérica de itens
+function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, dark, extraStatusTipos }) {
+  const S = getStyles(dark);
+  const [showForm, setShowForm] = useState(false);
+
+  const updateItem = (id, patch) => {
+    const updated = items.map(it=> it.id===id ? {...it,...patch} : it);
+    onUpdate(updated);
+    // WhatsApp se problema
+    if(patch.status && patch.status !== "ok" && patch.justificativa) {
+      const item = items.find(it=>it.id===id);
+      enviarWhatsApp(project, titulo, item?.identificacao||tipo, patch.status, patch.justificativa, patch.dataProblem);
+    }
+  };
+
+  const removeItem = (id) => onUpdate(items.filter(it=>it.id!==id));
+  const addItem = (item) => { onUpdate([...items, item]); setShowForm(false); };
+
+  const problemCount = items.filter(it=>it.status&&it.status!=="ok").length;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>{icon}</span>
+          <span style={{fontSize:13,fontWeight:700,...S.txt}}>{titulo}</span>
+          <span style={{fontSize:10,...S.txt2,background:dark?"#0f172a":"#f1f5f9",padding:"2px 8px",borderRadius:8}}>{items.length}</span>
+          {problemCount>0 && <span style={{fontSize:9,color:"#ef4444",fontWeight:700,background:"#1a0202",padding:"2px 6px",borderRadius:4}}>{problemCount} problema(s)</span>}
+        </div>
+        <button onClick={()=>setShowForm(true)} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"4px 10px"}}>+ Adicionar</button>
+      </div>
+
+      {showForm && <NovoItemForm tipo={tipo} project={project} dark={dark} onSave={addItem} onCancel={()=>setShowForm(false)}/>}
+
+      {items.length===0 && !showForm && (
+        <div style={{...S.card,textAlign:"center",padding:"14px",fontSize:12,...S.txt2}}>
+          Nenhum item cadastrado — toque em + Adicionar
+        </div>
+      )}
+
+      {items.map(item => (
+        <ItemCard key={item.id} item={item} icon={icon} title={item.identificacao||(item.tipo||tipo)}
+          onRemove={adminAuth?()=>removeItem(item.id):null} adminAuth={adminAuth} dark={dark}>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {/* Campos específicos somente leitura */}
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {item.modelo && <span style={{fontSize:10,...S.txt2}}>📱 {item.modelo}</span>}
+              {item.marca  && <span style={{fontSize:10,...S.txt2}}>🏷 {item.marca}</span>}
+              {item.calibre && <span style={{fontSize:10,...S.txt2}}>🔫 {item.calibre}</span>}
+              {item.nSerie && <span style={{fontSize:10,...S.txt2}}>🔢 {item.nSerie}</span>}
+              {item.validade && <span style={{fontSize:10,color:new Date(item.validade)<new Date()?"#ef4444":"#22c55e"}}>📅 Val: {fmtDate(item.validade)}</span>}
+              {item.qtd!==undefined && tipo==="municao" && <span style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>{item.qtd} unidades</span>}
+              {item.qtd!==undefined && tipo==="radiosHT" && <span style={{fontSize:10,...S.txt2}}>Qtd: {item.qtd}</span>}
+            </div>
+
+            {/* Status Bateria e Carregador para Rádio HT */}
+            {tipo==="radiosHT" && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {[["Bateria","bateria"],["Carregador","carregador"]].map(([label,key])=>(
+                  <div key={key}>
+                    <div style={S.lbl}>{label}</div>
+                    <StatusSelector value={{status:item[key]||"ok"}}
+                      onChange={(val)=>updateItem(item.id,{[key]:val.status,...(val.justificativa?{[`just_${key}`]:val.justificativa}:{})})}
+                      tipos={["ok","parcial","inop"]} dark={dark}/>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Munição — botão menos */}
+            {tipo==="municao" && (
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={S.lbl}>Quantidade atual</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <button onClick={()=>{
+                    const newQtd = Math.max(0,(item.qtd||0)-1);
+                    // Abrir justificativa
+                    const just = window.prompt("Justificativa para redução de munição:");
+                    if(just===null) return;
+                    updateItem(item.id,{qtd:newQtd,status:newQtd===0?"inop":newQtd<5?"critico":"ok",justificativa:just,dataProblem:todayStr()});
+                  }} style={{background:"#1a0202",border:"1px solid #ef444433",color:"#ef4444",borderRadius:6,width:28,height:28,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>−</button>
+                  <span style={{fontSize:16,fontWeight:700,...S.txt,minWidth:30,textAlign:"center"}}>{item.qtd||0}</span>
+                  <button onClick={()=>updateItem(item.id,{qtd:(item.qtd||0)+1})}
+                    style={{background:"#021a0d",border:"1px solid #22c55e33",color:"#22c55e",borderRadius:6,width:28,height:28,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900}}>+</button>
+                </div>
+              </div>
+            )}
+
+            {/* Armamento — manutenção */}
+            {tipo==="armamento" && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div>
+                  <label style={S.lbl}>Última manutenção</label>
+                  <input type="date" value={item.dataManutencao||""} onChange={e=>updateItem(item.id,{dataManutencao:e.target.value})} style={S.inp}/>
+                </div>
+                <div>
+                  <label style={S.lbl}>Armeiro</label>
+                  <input value={item.armeiro||""} onChange={e=>updateItem(item.id,{armeiro:e.target.value})} placeholder="Nome do armeiro..." style={S.inp}/>
+                </div>
+              </div>
+            )}
+
+            {/* Status geral */}
+            {tipo!=="municao" && (
+              <div>
+                <div style={S.lbl}>Status {tipo==="radiosHT"?"Geral":""}</div>
+                <StatusSelector
+                  value={{status:item.status||"ok"}}
+                  onChange={(val)=>{
+                    updateItem(item.id,{status:val.status,...(val.justificativa?{justificativa:val.justificativa,dataProblem:val.dataProblem}:{justificativa:"",dataProblem:""})});
+                    if(val.status!=="ok" && val.justificativa) {
+                      enviarWhatsApp(project,titulo,item.identificacao,val.status,val.justificativa,val.dataProblem);
+                    }
+                  }}
+                  tipos={extraStatusTipos||["ok","parcial","inop"]} dark={dark}/>
+              </div>
+            )}
+
+            {/* Gerencial resolve */}
+            {adminAuth && item.status && item.status!=="ok" && (
+              <button onClick={()=>updateItem(item.id,{status:"ok",justificativa:"",dataProblem:""})}
+                style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"6px 14px"}}>
+                ✓ Marcar como Resolvido
+              </button>
+            )}
+          </div>
+        </ItemCard>
+      ))}
+    </div>
+  );
+}
+
+// ── Motocicleta (1 por projeto)
+function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
+  const S = getStyles(dark);
+  const [editing, setEditing] = useState(false);
+  const [showHist, setShowHist] = useState(false);
+  const [novaManut, setNovaManut] = useState({ data:todayStr(), km:"", desc:"" });
+  const [form, setForm] = useState(moto || { placa:"", km:"", proximaRevisao:"", status:"ok", historico:[] });
+
+  const save = (updated) => { onUpdate(updated); setEditing(false); };
+
+  const addManut = () => {
+    if(!novaManut.desc.trim()) { alert("Informe a descrição"); return; }
+    const updated = {...form, historico:[{id:Date.now().toString(),...novaManut},...(form.historico||[])]};
+    setForm(updated); onUpdate(updated);
+    setNovaManut({data:todayStr(),km:"",desc:""});
+    setShowHist(false);
+  };
+
+  const hasProblema = form.status && form.status!=="ok";
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:18}}>🏍️</span>
+          <span style={{fontSize:13,fontWeight:700,...S.txt}}>Motocicleta</span>
+          {hasProblema && <DiasAberto dataProblem={form.dataProblem}/>}
+        </div>
+        {adminAuth && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}>✏️ Editar</button>}
+      </div>
+
+      <div style={{...S.card,border:`2px solid ${hasProblema?(STATUS_CONFIG[form.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`}}>
+        {editing ? (
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <div><label style={S.lbl}>Placa</label><input value={form.placa} onChange={e=>setForm(f=>({...f,placa:e.target.value}))} placeholder="ABC-1234" style={S.inp}/></div>
+              <div><label style={S.lbl}>KM Atual</label><input type="number" value={form.km} onChange={e=>setForm(f=>({...f,km:e.target.value}))} placeholder="0" style={S.inp}/></div>
+            </div>
+            <div><label style={S.lbl}>Próxima Revisão</label><input value={form.proximaRevisao} onChange={e=>setForm(f=>({...f,proximaRevisao:e.target.value}))} placeholder="KM ou Data..." style={S.inp}/></div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setEditing(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+              <button onClick={()=>save(form)} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {!form.placa ? (
+              <div style={{textAlign:"center",padding:"10px 0",fontSize:12,...S.txt2}}>Motocicleta não cadastrada{adminAuth?" — toque em ✏️ Editar":""}</div>
+            ) : (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                {[["Placa",form.placa],["KM Atual",form.km?`${form.km} km`:"--"],["Próxima Revisão",form.proximaRevisao||"--"]].map(([label,val])=>(
+                  <div key={label}><div style={S.lbl}>{label}</div><div style={{fontSize:13,fontWeight:600,...S.txt}}>{val}</div></div>
+                ))}
+              </div>
+            )}
+
+            {form.placa && (
+              <>
+                <div style={S.lbl}>Status</div>
+                <StatusSelector
+                  value={{status:form.status||"ok"}}
+                  onChange={(val)=>{
+                    const updated = {...form,status:val.status,...(val.justificativa?{justificativa:val.justificativa,dataProblem:val.dataProblem}:{justificativa:"",dataProblem:""})};
+                    setForm(updated); onUpdate(updated);
+                    if(val.status!=="ok"&&val.justificativa) enviarWhatsApp(project,"Motocicleta",form.placa,val.status,val.justificativa,val.dataProblem);
+                  }}
+                  tipos={["ok","parcial","inop"]} dark={dark}/>
+
+                {hasProblema && form.justificativa && (
+                  <div style={{background:dark?"#1a0202":"#fff5f5",border:"1px solid #ef444433",borderRadius:8,padding:"8px 12px",marginTop:8}}>
+                    <div style={{fontSize:10,color:"#ef4444",fontWeight:700,marginBottom:3}}>⚠️ {fmtDate(form.dataProblem)}</div>
+                    <div style={{fontSize:11,...S.txt}}>{form.justificativa}</div>
+                  </div>
+                )}
+
+                {adminAuth && hasProblema && (
+                  <button onClick={()=>{ const u={...form,status:"ok",justificativa:"",dataProblem:""}; setForm(u); onUpdate(u); }}
+                    style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"6px 14px",marginTop:8}}>
+                    ✓ Marcar como Resolvido
+                  </button>
+                )}
+
+                {/* Histórico manutenção */}
+                <div style={{marginTop:12,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,paddingTop:10}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <div style={{fontSize:11,fontWeight:700,...S.txt}}>🔧 Histórico Manutenção ({(form.historico||[]).length})</div>
+                    <button onClick={()=>setShowHist(!showHist)} style={{...S.btnSm,fontSize:10,color:"#f59e0b",border:"1px solid #f59e0b44"}}>+ Registrar</button>
+                  </div>
+                  {showHist && (
+                    <div style={{background:dark?"#020510":"#f8fafc",borderRadius:8,padding:"10px",marginBottom:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                        <div><label style={S.lbl}>Data</label><input type="date" value={novaManut.data} onChange={e=>setNovaManut(m=>({...m,data:e.target.value}))} style={S.inp}/></div>
+                        <div><label style={S.lbl}>KM</label><input type="number" value={novaManut.km} onChange={e=>setNovaManut(m=>({...m,km:e.target.value}))} placeholder="KM..." style={S.inp}/></div>
+                      </div>
+                      <div style={{marginBottom:8}}><label style={S.lbl}>Descrição</label><textarea value={novaManut.desc} onChange={e=>setNovaManut(m=>({...m,desc:e.target.value}))} placeholder="O que foi feito..." style={{...S.inp,height:50,resize:"vertical",fontSize:12}}/></div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>setShowHist(false)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
+                        <button onClick={addManut} style={{...S.btn,flex:1,fontSize:12}}>✓ Adicionar</button>
+                      </div>
+                    </div>
+                  )}
+                  {(form.historico||[]).map(h=>(
+                    <div key={h.id} style={{background:dark?"#020510":"#f8fafc",borderRadius:7,padding:"8px 10px",marginBottom:5,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+                      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:3}}>
+                        <span style={{fontSize:10,color:"#f59e0b",fontWeight:700}}>{fmtDate(h.data)}</span>
+                        {h.km && <span style={{fontSize:10,...S.txt2}}>🏍️ {h.km} km</span>}
+                      </div>
+                      <div style={{fontSize:11,...S.txt}}>{h.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── App principal
+export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
+  const S = getStyles(dark);
+  const [authLevel, setAuthLevel] = useState(null);
+  const [screen, setScreen] = useState("pin");
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const adminAuth = authLevel==="admin";
+
+  useEffect(()=>{
+    loadEquip(project.id).then(d=>{ setData(d||{smartphones:[],radiosHT:[],armamento:[],municao:[],placas:[],lanternas:[],moto:null,ztrax:[]}); setLoading(false); });
+  },[project.id]);
+
+  const saveSection = async (section, val) => {
+    setSaving(true);
+    const updated = {...data,[section]:val};
+    setData(updated);
+    await saveEquip(project.id, updated);
+    setSaving(false);
+  };
+
+  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("main");}}/>;
+
+  if(loading) return (
+    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🛡️</div><div style={{fontSize:13,...S.txt2}}>Carregando equipamentos...</div></div>
+    </div>
+  );
+
+  // KPIs
+  const allItems = [
+    ...(data.smartphones||[]), ...(data.radiosHT||[]),
+    ...(data.armamento||[]),   ...(data.municao||[]),
+    ...(data.placas||[]),      ...(data.lanternas||[]),
+    ...(data.ztrax||[]),
+    ...(data.moto?[data.moto]:[])
+  ];
+  const totalProblemas = allItems.filter(it=>it.status&&it.status!=="ok").length;
+  const inop = allItems.filter(it=>it.status==="inop"||it.status==="critico").length;
+  const parcial = allItems.filter(it=>it.status==="parcial"||it.status==="baixo").length;
+
+  return (
+    <div style={S.page}>
+      <div style={S.wrap}>
+        <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🛡️ Equipamentos</div>
+              <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
+            </div>
+            {saving && <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700}}>⟳</div>}
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+          </div>
+        </div>
+
+        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:14}}>
+          {/* KPIs */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+            {[
+              {label:"INOP/CRÍTICO",val:inop,color:"#ef4444"},
+              {label:"PARCIAL",val:parcial,color:"#f59e0b"},
+              {label:"TOTAL ITENS",val:allItems.length,color:"#0ea5e9"},
+            ].map(({label,val,color})=>(
+              <div key={label} style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
+                <div style={{fontSize:22,fontWeight:900,color}}>{val}</div>
+                <div style={{fontSize:8,...S.txt2,fontWeight:700}}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Badge acesso */}
+          {adminAuth ? (
+            <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:12,color:"#22c55e",fontWeight:700}}>🔓 Gerencial — pode editar e resolver</div>
+              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm,color:"#64748b",fontSize:10}}>Sair</button>
+            </div>
+          ) : (
+            <div style={{background:"#001a2e",border:"1px solid #0ea5e933",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{fontSize:12,color:"#0ea5e9",fontWeight:700}}>👷 Líder — pode cadastrar e atualizar status</div>
+              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm,color:"#64748b",fontSize:10}}>Sair</button>
+            </div>
+          )}
+
+          {/* Seções */}
+          <SecaoItens titulo="Smartphones" icon="📱" tipo="smartphones"
+            items={data.smartphones||[]} project={project}
+            onUpdate={v=>saveSection("smartphones",v)} adminAuth={adminAuth} dark={dark}/>
+
+          <SecaoItens titulo="Rádios HT" icon="📻" tipo="radiosHT"
+            items={data.radiosHT||[]} project={project}
+            onUpdate={v=>saveSection("radiosHT",v)} adminAuth={adminAuth} dark={dark}/>
+
+          <SecaoItens titulo="Armamento" icon="🔫" tipo="armamento"
+            items={data.armamento||[]} project={project}
+            onUpdate={v=>saveSection("armamento",v)} adminAuth={adminAuth} dark={dark}/>
+
+          <SecaoItens titulo="Munição" icon="💊" tipo="municao"
+            items={data.municao||[]} project={project}
+            onUpdate={v=>saveSection("municao",v)} adminAuth={adminAuth} dark={dark}
+            extraStatusTipos={["ok","baixo","critico"]}/>
+
+          <SecaoItens titulo="Placas Balísticas" icon="🦺" tipo="placas"
+            items={data.placas||[]} project={project}
+            onUpdate={v=>saveSection("placas",v)} adminAuth={adminAuth} dark={dark}/>
+
+          <SecaoItens titulo="Lanternas" icon="🔦" tipo="lanternas"
+            items={data.lanternas||[]} project={project}
+            onUpdate={v=>saveSection("lanternas",v)} adminAuth={adminAuth} dark={dark}/>
+
+          {TEM_ZTRAX.includes(project.id) && (
+            <SecaoItens titulo="Pânico ZTRAX" icon="🚨" tipo="ztrax"
+              items={data.ztrax||[]} project={project}
+              onUpdate={v=>saveSection("ztrax",v)} adminAuth={adminAuth} dark={dark}/>
+          )}
+
+          <SecMoto moto={data.moto} project={project}
+            onUpdate={v=>saveSection("moto",v)} adminAuth={adminAuth} dark={dark}/>
+        </div>
+      </div>
+    </div>
+  );
+}
