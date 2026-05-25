@@ -79,10 +79,17 @@ function fmtDate(d) {
 }
 
 async function loadEquipe(projectId) {
+  // Always try Firebase first (source of truth)
   try {
     const snap = await getDoc(doc(db,"equipes",projectId));
-    if(snap.exists()) return snap.data();
-  } catch(e){}
+    if(snap.exists()) {
+      const data = snap.data();
+      // Sync to localStorage as cache
+      try { localStorage.setItem(`equipe_${projectId}`, JSON.stringify(data)); } catch(e){}
+      return data;
+    }
+  } catch(e){ console.warn("Firebase load failed, using localStorage:", e); }
+  // Fallback to localStorage
   try {
     const local = localStorage.getItem(`equipe_${projectId}`);
     if(local) return JSON.parse(local);
@@ -91,8 +98,18 @@ async function loadEquipe(projectId) {
 }
 
 async function saveEquipe(projectId, data) {
-  try { await setDoc(doc(db,"equipes",projectId), data); } catch(e){ console.error(e); }
-  try { localStorage.setItem(`equipe_${projectId}`, JSON.stringify(data)); } catch(e){}
+  // Save to Firebase (primary)
+  try {
+    await setDoc(doc(db,"equipes",projectId), data);
+  } catch(e){
+    console.error("Firebase save error:", e);
+  }
+  // Always sync localStorage too
+  try {
+    localStorage.setItem(`equipe_${projectId}`, JSON.stringify(data));
+  } catch(e){
+    console.warn("localStorage save failed:", e);
+  }
 }
 
 function emptyColab(cargo, projectId, turno) {
@@ -920,9 +937,15 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   const reativarColab = async (colab) => {
     if(!adminAuth) return;
-    const reativado = {...colab, status:"ativo", desligadoEm:null};
+    const reativado = {...colab, status:"ativo", desligadoEm:null, motivoDesligamento:undefined, tipoDesligamento:undefined};
     const newDesligados = (equipeData.desligados||[]).filter(c=>c.id!==colab.id);
     await save({...equipeData, colaboradores:[...equipeData.colaboradores, reativado], desligados:newDesligados});
+  };
+
+  const excluirDesligado = async (colab) => {
+    if(!adminAuth) return;
+    const newDesligados = (equipeData.desligados||[]).filter(c=>c.id!==colab.id);
+    await save({...equipeData, desligados:newDesligados});
   };
 
   if(loading) return (
@@ -1174,7 +1197,21 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                           {c.motivoDesligamento&&<div style={{ fontSize:10, color:"#64748b", marginTop:2, fontStyle:"italic" }}>{c.motivoDesligamento}</div>}
                         </div>
                         {adminAuth && (
-                          <button onClick={()=>reativarColab(c)} style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10 }}>Reativar</button>
+                          <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
+                            <button onClick={()=>reativarColab(c)}
+                              style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px" }}>
+                              ↑ Reativar
+                            </button>
+                            <button onClick={()=>{
+                              if(window.confirm(`Excluir permanentemente ${c.nome}?
+
+Esta ação não pode ser desfeita.`))
+                                excluirDesligado(c);
+                            }}
+                              style={{ ...S.btnSm, color:"#ef4444", border:"1px solid #ef444433", fontSize:10, padding:"4px 10px" }}>
+                              🗑 Excluir
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
