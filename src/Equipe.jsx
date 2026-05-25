@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
-import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
+// Firebase Storage removido - usando compressão local
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -255,10 +255,13 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
   const S = getStyles(dark);
   const handleFoto = (e) => {
     const file = e.target.files?.[0]; if(!file) return;
-    // Sem limite rígido — upload vai para Firebase Storage
     if(file.size > 20*1024*1024) { alert("Foto muito grande. Use uma imagem menor que 20MB."); return; }
     const r = new FileReader();
-    r.onload = ev => setF("foto", ev.target.result);
+    r.onload = ev => {
+      // Mostra preview imediato (compressão acontece no save)
+      setF("foto", ev.target.result);
+    };
+    r.onerror = () => alert("Erro ao ler foto.");
     r.readAsDataURL(file);
   };
 
@@ -362,7 +365,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
             </div>
           )}
           <button onClick={onSave} disabled={saving} style={{ ...S.btn, opacity:saving?0.7:1 }}>
-            {saving?"⟳ Enviando foto e salvando...":"✓ Salvar Colaborador"}
+            {saving?"⟳ Salvando...":"✓ Salvar Colaborador"}
           </button>
           <div style={{fontSize:10,color:"#334155",textAlign:"center"}}>
             Foto opcional · Sem foto também é permitido
@@ -532,27 +535,47 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const saveColab = async () => {
     if(!form.nome.trim()) { alert("Informe o nome"); return; }
     if(!liderAuth) { alert("Acesso negado"); return; }
-    // Se tem foto em base64 grande, faz upload para Storage primeiro
-    let fotoFinal = form.foto || "";
-    if(fotoFinal && fotoFinal.startsWith("data:")) {
-      try {
-        const storage = getStorage();
-        const storageRef = ref(storage, `equipes/${project.id}/${form.id}_foto`);
-        await uploadString(storageRef, fotoFinal, "data_url");
-        fotoFinal = await getDownloadURL(storageRef);
-      } catch(e) {
-        console.error("Erro upload foto:", e);
-        // Se falhar upload, salva sem foto
-        fotoFinal = "";
+    setSaving(true);
+    try {
+      // Comprime foto para max 400px e qualidade 0.7 antes de salvar
+      let fotoFinal = "";
+      if(form.foto && form.foto.startsWith("data:")) {
+        fotoFinal = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX = 400;
+            let w = img.width, h = img.height;
+            if(w > h && w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
+            else if(h > w && h > MAX) { w = Math.round(w*MAX/h); h = MAX; }
+            else if(w > MAX) { w = MAX; h = MAX; }
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", 0.7));
+          };
+          img.onerror = () => resolve("");
+          img.src = form.foto;
+        });
       }
+      const formFinal = { ...form, foto: fotoFinal };
+      // Remove campos undefined para não quebrar Firestore
+      Object.keys(formFinal).forEach(k => { if(formFinal[k]===undefined) formFinal[k]=""; });
+      const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
+      const newColabs = isNew
+        ? [...equipeData.colaboradores, formFinal]
+        : equipeData.colaboradores.map(c=>c.id===form.id?formFinal:c);
+      const newData = {...equipeData, colaboradores:newColabs};
+      setEquipeData(newData);
+      await saveEquipe(project.id, newData);
+      setSaving(false);
+      setScreen("list");
+      setForm(null);
+    } catch(err) {
+      console.error("Erro ao salvar colaborador:", err);
+      setSaving(false);
+      alert("Erro ao salvar. Tente novamente ou salve sem foto.");
     }
-    const formFinal = { ...form, foto: fotoFinal };
-    const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
-    const newColabs = isNew
-      ? [...equipeData.colaboradores, formFinal]
-      : equipeData.colaboradores.map(c=>c.id===form.id?formFinal:c);
-    await save({...equipeData, colaboradores:newColabs});
-    setScreen("list"); setForm(null);
   };
 
   const addHistorico = async () => {
