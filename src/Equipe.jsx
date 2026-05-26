@@ -1176,7 +1176,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
           )}
 
           {/* Cards por turno */}
-          {TURNOS.map(turno=>{
+          {getTurnos(project.id).map(turno=>{
             const tc = TURNO_CONFIG[turno];
             const colabsDoTurno = ativos.filter(c=>c.turno===turno);
             if(colabsDoTurno.length===0 && !adminAuth) return null;
