@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import AcessoApp from "./Acesso";
 import EquipeApp from "./Equipe";
 import AcessoCCO from "./AcessoCCO";
@@ -6,6 +6,48 @@ import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos from "./Equipamentos";
 import Visita from "./Visita";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
+
+// ── Escudo de proteção global contra crashes
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError:false, error:null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError:true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("MokLog ErrorBoundary caught:", error, info);
+  }
+  render() {
+    if(this.state.hasError) {
+      const dark = true;
+      return (
+        <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",padding:24}}>
+          <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:16,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Algo deu errado</div>
+            <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>
+              {this.props.moduleName ? `Módulo: ${this.props.moduleName}` : "Erro inesperado"}
+            </div>
+            <div style={{fontSize:11,color:"#64748b",marginBottom:20,background:"#0f0202",borderRadius:8,padding:"8px 12px",textAlign:"left",wordBreak:"break-word"}}>
+              {this.state.error?.message || "Erro desconhecido"}
+            </div>
+            <button onClick={()=>this.setState({hasError:false,error:null})}
+              style={{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%",marginBottom:8}}>
+              🔄 Tentar novamente
+            </button>
+            <button onClick={()=>window.location.reload()}
+              style={{background:"transparent",color:"#64748b",border:"1px solid #1e293b",borderRadius:10,padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
+              ↩ Recarregar app
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 
@@ -1859,13 +1901,13 @@ export default function App(){
     <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✗ Erro — local OK</div>
   ):null;
 
-  if(showAcesso) return <AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/>;
-  if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
-  if(showRegistros) return <RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/>;
-  if(showAcessoCCO&&acessoCCOProject) return <AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}}/>;
-  if(showEmpresaInfo&&empresaInfoProject) return <EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/>;
-  if(showEquipamentos&&equipamentosProject) return <Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/>;
-  if(showVisita&&visitaProject) return <Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/>;
+  if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
+  if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/></ErrorBoundary>;
+  if(showRegistros) return <ErrorBoundary moduleName="Registros"><RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/></ErrorBoundary>;
+  if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}}/></ErrorBoundary>;
+  if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/></ErrorBoundary>;
+  if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/></ErrorBoundary>;
+  if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/></ErrorBoundary>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
