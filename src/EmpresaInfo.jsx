@@ -25,6 +25,11 @@ function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
 }
+function daysSince(d) {
+  if(!d) return null;
+  try { return Math.floor((Date.now()-new Date(d+"T12:00:00").getTime())/86400000); } catch { return null; }
+}
+const VISITA_ALERTA_DIAS = 15;
 
 async function loadInfo(projectId) {
   try {
@@ -67,6 +72,104 @@ function getStyles(dark) {
     txt2:    { color:dark?"#475569":"#64748b" },
     addBtn:  { background:"transparent", border:`1px dashed ${dark?"#1e293b":"#cbd5e1"}`, color:dark?"#475569":"#64748b", borderRadius:8, padding:"8px 14px", fontSize:12, cursor:"pointer", width:"100%", marginTop:6 },
   };
+}
+
+
+// ── Gerar PDF de informações da empresa
+function gerarPDFEmpresa(project, info, dark) {
+  const seg = info?.seguranca || {};
+  const manut = info?.manutencao || {};
+  const adm = info?.adm || [];
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const fmtD = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
+
+  const visitasSeg = (seg.visitas||[]).slice(0,10).map(v=>`
+    <tr>
+      <td>${fmtD(v.data)}</td>
+      <td>${v.resumo||"--"}</td>
+    </tr>`).join("");
+
+  const visitasManut = (manut.visitas||[]).slice(0,10).map(v=>`
+    <tr>
+      <td>${fmtD(v.data)}</td>
+      <td>${v.tecnico||"--"}</td>
+      <td>${v.resumo||"--"}</td>
+    </tr>`).join("");
+
+  const admRows = adm.filter(m=>m.nome).map(m=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#f8fafc;border-radius:8px;margin-bottom:6px;">
+      <div>👔</div>
+      <div><div style="font-weight:700;color:#0f172a">${m.nome}</div><div style="font-size:12px;color:#64748b">${m.cargo||"—"}</div></div>
+    </div>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>Informações — ${project.id}</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;margin:0}
+  .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
+  .card h2{margin:0 0 12px;font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
+  td{padding:7px 10px;border-bottom:1px solid #f1f5f9}
+  tr:nth-child(even) td{background:#f8fafc}
+  .alert{background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;color:#dc2626;font-size:12px;margin-bottom:10px}
+  .ok{background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:8px 12px;color:#15803d;font-size:12px;margin-bottom:10px}
+  .footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:16px}
+  @media print{body{padding:8px}@page{margin:12mm}}
+</style>
+</head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:16px">
+  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <div>
+    <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Moked Consulting Security</div>
+    <div style="font-size:20px;font-weight:900">Informações do Projeto</div>
+    <div style="font-size:13px;opacity:.8">${project.id} — ${project.name||""}</div>
+  </div>
+  <div style="font-size:11px;opacity:.7">Emitido em ${hoje}</div>
+</div>
+
+<div class="card">
+  <h2>🏢 Empresa de Segurança</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div><div style="font-size:10px;color:#94a3b8;font-weight:700">EMPRESA</div><div style="font-weight:700">${seg.nome||"—"}</div></div>
+    <div><div style="font-size:10px;color:#94a3b8;font-weight:700">GERENTE</div><div style="font-weight:700">${seg.gerente||"—"}</div></div>
+    <div><div style="font-size:10px;color:#94a3b8;font-weight:700">SUPERVISOR</div><div style="font-weight:700">${seg.supervisor||"—"}</div></div>
+  </div>
+  ${(()=>{
+    const visitas=seg.visitas||[];
+    const ultima=visitas[0];
+    const dias=ultima?Math.floor((Date.now()-new Date(ultima.data+"T12:00:00").getTime())/86400000):null;
+    if(!ultima) return '<div class="alert">⚠️ Nenhuma visita registrada</div>';
+    if(dias>=15) return `<div class="alert">🔴 Visita em atraso — ${dias} dias sem visita do supervisor</div>`;
+    return `<div class="ok">✅ Última visita há ${dias} dia(s) — dentro do prazo</div>`;
+  })()}
+  ${visitasSeg ? `<table><thead><tr><th>Data</th><th>Resumo</th></tr></thead><tbody>${visitasSeg}</tbody></table>` : "<div style='font-size:12px;color:#94a3b8'>Nenhuma visita registrada</div>"}
+</div>
+
+<div class="card">
+  <h2>🔧 Empresa de Manutenção</h2>
+  <div style="margin-bottom:10px"><div style="font-size:10px;color:#94a3b8;font-weight:700">EMPRESA</div><div style="font-weight:700">${manut.nome||"—"}</div></div>
+  ${visitasManut ? `<table><thead><tr><th>Data</th><th>Técnico</th><th>Resumo</th></tr></thead><tbody>${visitasManut}</tbody></table>` : "<div style='font-size:12px;color:#94a3b8'>Nenhuma visita registrada</div>"}
+</div>
+
+<div class="card">
+  <h2>👔 ADM</h2>
+  ${admRows || "<div style='font-size:12px;color:#94a3b8'>Nenhum membro cadastrado</div>"}
+</div>
+
+<div class="footer">MokLog CheckTest © Moked Consulting Security · ${project.id} · ${hoje}</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`info_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+  a.click(); URL.revokeObjectURL(url);
 }
 
 // ── PIN Gate
@@ -181,6 +284,34 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
 
       {/* Histórico Visitas */}
       <div style={{...S.card}}>
+        {/* Contador dias desde última visita supervisor */}
+        {(()=>{
+          const visitas = data.visitas||[];
+          const ultima = visitas.length ? visitas[0] : null;
+          const dias = ultima ? daysSince(ultima.data) : null;
+          const atrasado = dias !== null && dias >= VISITA_ALERTA_DIAS;
+          const semVisita = !ultima;
+          if(atrasado || semVisita) return (
+            <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:16}}>🔴</span>
+              <div>
+                <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>
+                  {semVisita?"Nenhuma visita registrada":`Visita em atraso — ${dias} dias sem visita`}
+                </div>
+                <div style={{fontSize:10,color:"#64748b"}}>Frequência esperada: a cada {VISITA_ALERTA_DIAS} dias</div>
+              </div>
+            </div>
+          );
+          return (
+            <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:8,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:16}}>✅</span>
+              <div>
+                <div style={{fontSize:11,color:"#22c55e",fontWeight:700}}>Última visita há {dias} dia(s)</div>
+                <div style={{fontSize:10,color:"#64748b"}}>Próxima em até {VISITA_ALERTA_DIAS-dias} dia(s)</div>
+              </div>
+            </div>
+          );
+        })()}
         <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
           <div style={{fontSize:12, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:11, ...S.txt2}}>({(data.visitas||[]).length})</span></div>
           <button onClick={()=>setShowAddVisita(!showAddVisita)}
@@ -278,6 +409,23 @@ function SecManutencao({ data, onSave, adminAuth, dark }) {
 
       {/* Histórico */}
       <div style={S.card}>
+        {/* Contador dias desde última visita manutenção */}
+        {(()=>{
+          const visitas = data.visitas||[];
+          const ultima = visitas.length ? visitas[0] : null;
+          const dias = ultima ? daysSince(ultima.data) : null;
+          if(!ultima) return (
+            <div style={{background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+              <div style={{fontSize:11,...S.txt2}}>Nenhuma visita registrada ainda</div>
+            </div>
+          );
+          return (
+            <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+              <div style={{fontSize:11,color:"#22c55e",fontWeight:700}}>🔧 Última visita há {dias} dia(s)</div>
+              <div style={{fontSize:10,color:"#64748b"}}>{fmtDate(ultima.data)}{ultima.tecnico?` · ${ultima.tecnico}`:""}</div>
+            </div>
+          );
+        })()}
         <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
           <div style={{fontSize:12, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:11, ...S.txt2}}>({(data.visitas||[]).length})</span></div>
           <button onClick={()=>setShowAdd(!showAdd)} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:10}}>+ Visita</button>
@@ -447,7 +595,10 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme }) {
           {adminAuth ? (
             <div style={{background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"8px 14px", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
               <div style={{fontSize:12, color:"#22c55e", fontWeight:700}}>🔓 Modo Gerencial — pode editar tudo</div>
-              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>gerarPDFEmpresa(project,info,dark)} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:10}}>📄 PDF</button>
+                <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
+              </div>
             </div>
           ) : (
             <div style={{background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"8px 14px", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
