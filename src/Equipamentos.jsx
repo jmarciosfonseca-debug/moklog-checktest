@@ -576,7 +576,7 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
             )}
 
             {/* Gerencial resolve */}
-            {adminAuth && item.status && item.status!=="ok" && (
+            {item.status && item.status!=="ok" && (
               <button onClick={()=>updateItem(item.id,{status:"ok",justificativa:"",dataProblem:""})}
                 style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"6px 14px"}}>
                 ✓ Marcar como Resolvido
@@ -590,7 +590,7 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
 }
 
 // ── Motocicleta (1 por projeto)
-function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
+function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
   const [showHist, setShowHist] = useState(false);
@@ -617,7 +617,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
           <span style={{fontSize:13,fontWeight:700,...S.txt}}>Motocicleta</span>
           {hasProblema && <DiasAberto dataProblem={form.dataProblem}/>}
         </div>
-        {adminAuth && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}>✏️ Editar</button>}
+        {liderAuth && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}>✏️ Editar</button>}
       </div>
 
       <div style={{...S.card,border:`2px solid ${hasProblema?(STATUS_CONFIG[form.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`}}>
@@ -639,7 +639,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
         ) : (
           <>
             {!form.placa ? (
-              <div style={{textAlign:"center",padding:"10px 0",fontSize:12,...S.txt2}}>Motocicleta não cadastrada{adminAuth?" — toque em ✏️ Editar":""}</div>
+              <div style={{textAlign:"center",padding:"10px 0",fontSize:12,...S.txt2}}>Motocicleta não cadastrada{liderAuth?" — toque em ✏️ Editar":""}</div>
             ) : (
               <>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
@@ -682,7 +682,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
                   </div>
                 )}
 
-                {adminAuth && hasProblema && (
+                {liderAuth && hasProblema && (
                   <button onClick={()=>{ const u={...form,status:"ok",justificativa:"",dataProblem:""}; setForm(u); onUpdate(u); }}
                     style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"6px 14px",marginTop:8}}>
                     ✓ Marcar como Resolvido
@@ -737,6 +737,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
   const [saving, setSaving] = useState(false);
 
   const adminAuth = authLevel==="admin";
+  const liderAuth = authLevel==="lider" || authLevel==="admin";
 
   useEffect(()=>{
     loadEquip(project.id).then(d=>{ setData(d||{smartphones:[],radiosHT:[],armamento:[],municao:[],placas:[],lanternas:[],moto:null,ztrax:[]}); setLoading(false); });
@@ -855,7 +856,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
           )}
 
           <SecMoto moto={data.moto} project={project}
-            onUpdate={v=>saveSection("moto",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("moto",v)} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}/>
         </div>
       </div>
     </div>
