@@ -108,13 +108,47 @@ async function saveEquipe(projectId, data) {
   try {
     await setDoc(doc(db,"equipes",projectId), data);
   } catch(e){
-    console.error("Firebase save error:", e);
+    console.warn("Firebase save failed, trying without photos:", e.message);
+    // If document too large, strip base64 photos and save URLs only
+    try {
+      const stripped = {
+        ...data,
+        colaboradores: (data.colaboradores||[]).map(c=>({
+          ...c,
+          foto: c.foto && c.foto.startsWith("http") ? c.foto : "" // keep URLs, strip base64
+        })),
+        desligados: (data.desligados||[]).map(c=>({
+          ...c,
+          foto: c.foto && c.foto.startsWith("http") ? c.foto : ""
+        }))
+      };
+      await setDoc(doc(db,"equipes",projectId), stripped);
+      console.log("Saved without photos to Firebase");
+    } catch(e2){
+      console.error("Firebase save failed completely:", e2);
+    }
   }
-  // Always sync localStorage too
+  // Always sync localStorage too (with size check)
   try {
-    localStorage.setItem(`equipe_${projectId}`, JSON.stringify(data));
+    const json = JSON.stringify(data);
+    if(json.length < 4*1024*1024) { // 4MB safety limit
+      localStorage.setItem(`equipe_${projectId}`, json);
+    } else {
+      // Strip photos for localStorage too
+      const stripped = {
+        ...data,
+        colaboradores: (data.colaboradores||[]).map(c=>({...c, foto: c.foto?.startsWith("http")?c.foto:""})),
+        desligados: (data.desligados||[]).map(c=>({...c, foto: c.foto?.startsWith("http")?c.foto:""}))
+      };
+      localStorage.setItem(`equipe_${projectId}`, JSON.stringify(stripped));
+    }
   } catch(e){
-    console.warn("localStorage save failed:", e);
+    // QuotaExceededError - clear old data and try again
+    try {
+      localStorage.removeItem(`equipe_${projectId}`);
+      const minimal = {...data, colaboradores:(data.colaboradores||[]).map(c=>({...c,foto:""}))};
+      localStorage.setItem(`equipe_${projectId}`, JSON.stringify(minimal));
+    } catch(e2){ console.warn("localStorage completely full:", e2); }
   }
 }
 
@@ -925,16 +959,26 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         fotoFinal = await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
-            const MAX = 400;
+            // Compress agressively: max 300px, 60% quality
+            const MAX = 300;
             let w = img.width, h = img.height;
             if(w > h && w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
-            else if(h > w && h > MAX) { w = Math.round(w*MAX/h); h = MAX; }
-            else if(w > MAX) { w = MAX; h = MAX; }
+            else if(h >= w && h > MAX) { w = Math.round(w*MAX/h); h = MAX; }
             const canvas = document.createElement("canvas");
             canvas.width = w; canvas.height = h;
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL("image/jpeg", 0.7));
+            const compressed = canvas.toDataURL("image/jpeg", 0.6);
+            // Safety check: if still > 80KB, compress more
+            if(compressed.length > 80*1024) {
+              const canvas2 = document.createElement("canvas");
+              const s = Math.min(w,h,200);
+              canvas2.width = s; canvas2.height = s;
+              canvas2.getContext("2d").drawImage(img,0,0,s,s);
+              resolve(canvas2.toDataURL("image/jpeg", 0.5));
+            } else {
+              resolve(compressed);
+            }
           };
           img.onerror = () => resolve("");
           img.src = form.foto;
@@ -959,7 +1003,25 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     } catch(err) {
       console.error("Erro ao salvar colaborador:", err);
       setSaving(false);
-      alert("Erro ao salvar. Tente novamente ou salve sem foto.");
+      // Try saving without photo as fallback
+      try {
+        const formSemFoto = { ...form, foto: "" };
+        Object.keys(formSemFoto).forEach(k => { if(formSemFoto[k]===undefined) formSemFoto[k]=""; });
+        const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
+        const newColabs = isNew
+          ? [...equipeData.colaboradores, formSemFoto]
+          : equipeData.colaboradores.map(c=>c.id===form.id?formSemFoto:c);
+        const newData = {...equipeData, colaboradores:newColabs};
+        setEquipeData(newData);
+        await saveEquipe(project.id, newData);
+        setSaving(false);
+        setScreen("list");
+        setForm(null);
+        alert("Salvo sem foto (limite de armazenamento atingido).");
+      } catch(err2) {
+        console.error("Fallback save also failed:", err2);
+        alert("Erro ao salvar. Verifique sua conexão e tente novamente.");
+      }
     }
   };
 
