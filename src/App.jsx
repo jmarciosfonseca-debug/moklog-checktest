@@ -1219,13 +1219,114 @@ function ViewScreen({projectId, token, stored}) {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
+
+// ── Listagem de equipamentos de todos os projetos (Registros)
+function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
+  const bg=dark?"#04080f":"#f1f5f9";
+  const cardBg=dark?"#060c18":"#ffffff";
+  const border=dark?"#0f172a":"#e2e8f0";
+  const txt=dark?"#f1f5f9":"#0f172a";
+  const txt2=dark?"#475569":"#64748b";
+  const hdrBg=dark?"#04080f":"#f8fafc";
+  const hdrBorder=dark?"#0a0f1e":"#e2e8f0";
+  const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
+
+  const allProjects = [
+    ...Object.values(PROJECTS),
+    {id:"P260A",name:"Jatinox Unidade A"},{id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
+  ];
+
+  const [equipData, setEquipData] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(()=>{
+    const loadAll = async () => {
+      const results = {};
+      for(const p of allProjects) {
+        try {
+          const local = localStorage.getItem(`equipamentos_${p.id}`);
+          if(local) results[p.id] = JSON.parse(local);
+        } catch(e){}
+      }
+      setEquipData(results);
+      setLoading(false);
+    };
+    loadAll();
+  },[]);
+
+  const countProblemas = (data) => {
+    if(!data) return {inop:0,parcial:0,total:0};
+    const all = [...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])];
+    return {
+      inop:   all.filter(i=>i.status==="inop"||i.status==="critico").length,
+      parcial:all.filter(i=>i.status==="parcial"||i.status==="baixo").length,
+      total:  all.length,
+    };
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:60}}>
+      <div style={{width:"100%",maxWidth:480}}>
+        <div style={{position:"sticky",top:0,zIndex:10,background:hdrBg,borderBottom:`1px solid ${hdrBorder}`,padding:"14px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={onBack} style={backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:800,color:txt}}>🛡️ Equipamentos</div>
+              <div style={{fontSize:11,color:txt2}}>Todos os projetos</div>
+            </div>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}}>{dark?"☀️":"🌙"}</button>
+          </div>
+        </div>
+
+        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:8}}>
+          {loading ? (
+            <div style={{textAlign:"center",padding:"40px 0",color:txt2}}>Carregando...</div>
+          ) : (
+            allProjects.map(p => {
+              const d = equipData[p.id];
+              const {inop,parcial,total} = countProblemas(d);
+              const hasProb = inop>0||parcial>0;
+              return (
+                <button key={p.id} onClick={()=>onOpenEquip(p)}
+                  style={{background:cardBg,border:`2px solid ${hasProb?inop>0?"#ef444444":"#f59e0b44":border}`,borderRadius:12,padding:"14px 16px",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
+                  <div style={{width:44,height:44,borderRadius:10,background:hasProb?inop>0?"#1a0202":"#1a1000":"#021a0d",border:`1px solid ${hasProb?inop>0?"#ef444433":"#f59e0b33":"#22c55e33"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:20}}>
+                    🛡️
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:800,color:txt}}>{p.id}</div>
+                    <div style={{fontSize:11,color:txt2}}>{p.name}</div>
+                    {total>0?(
+                      <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                        <span style={{fontSize:9,fontWeight:700,color:"#0ea5e9",background:"#001a2e",padding:"1px 6px",borderRadius:4}}>{total} itens</span>
+                        {inop>0&&<span style={{fontSize:9,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"1px 6px",borderRadius:4}}>🔴 {inop} inop</span>}
+                        {parcial>0&&<span style={{fontSize:9,fontWeight:700,color:"#f59e0b",background:"#1a1000",padding:"1px 6px",borderRadius:4}}>⚠️ {parcial} parcial</span>}
+                        {!hasProb&&<span style={{fontSize:9,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}>✅ OK</span>}
+                      </div>
+                    ):(
+                      <div style={{fontSize:10,color:txt2,marginTop:3}}>Sem itens cadastrados</div>
+                    )}
+                  </div>
+                  <span style={{color:txt2,fontSize:16}}>›</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Tela Registros Menu
-function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBack }) {
-  const [subScreen, setSubScreen] = useState(null); // null | "colaboradores"
+function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEquipamentos, onBack }) {
+  const [subScreen, setSubScreen] = useState(null); // null | "colaboradores" | "equipamentos"
   const [selProject, setSelProject] = useState(null);
   const [pinAuth, setPinAuth] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState(false);
+  const [equipPinAuth, setEquipPinAuth] = useState(false);
+  const [equipPinInput, setEquipPinInput] = useState("");
+  const [equipPinErr, setEquipPinErr] = useState(false);
 
   const bg   = dark ? "#04080f" : "#f1f5f9";
   const cardBg = dark ? "#060c18" : "#ffffff";
@@ -1251,6 +1352,45 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBac
         onToggleTheme={onToggleTheme}
         onOpenFull={()=>onEquipe(selProject)}/>
     );
+  }
+
+  // Equipamentos PIN gate
+  if(subScreen==="equipamentos" && !equipPinAuth) {
+    const bg=dark?"#04080f":"#f1f5f9";
+    const cardBg=dark?"#060c18":"#ffffff";
+    const border=dark?"#0f172a":"#e2e8f0";
+    const txt=dark?"#f1f5f9":"#0f172a";
+    const txt2=dark?"#475569":"#64748b";
+    return (
+      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
+          <div style={{fontSize:32,marginBottom:8}}>🛡️</div>
+          <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Equipamentos</div>
+          <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial para ver todos os projetos</div>
+          <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
+            onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
+            onKeyDown={e=>{if(e.key==="Enter"){if(equipPinInput==="872101"){setEquipPinAuth(true);}else setEquipPinErr(true);}}}
+            style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
+          {equipPinErr && <div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{setSubScreen(null);setEquipPinInput("");setEquipPinErr(false);}}
+              style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              ← Voltar
+            </button>
+            <button onClick={()=>{if(equipPinInput==="872101"){setEquipPinAuth(true);}else setEquipPinErr(true);}}
+              style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+              Entrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if(subScreen==="equipamentos" && equipPinAuth) {
+    return <EquipamentosListagem dark={dark} stored={stored} onToggleTheme={onToggleTheme}
+      onBack={()=>{setSubScreen(null);setEquipPinAuth(false);setEquipPinInput("");}}
+      onOpenEquip={onEquipamentos}/>;
   }
 
   // PIN gate para colaboradores
@@ -1358,17 +1498,17 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onBac
             <span style={{ color:txt2, fontSize:20 }}>›</span>
           </button>
 
-          {/* Card Acessos Jatinox */}
-          <button onClick={onAcessos}
+          {/* Card Equipamentos */}
+          <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
             style={{ background:cardBg, border:`2px solid ${dark?"#f59e0b33":"#fde68a"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
             <div style={{ width:56, height:56, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b33":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span style={{ fontSize:26 }}>🚛</span>
+              <span style={{ fontSize:26 }}>🛡️</span>
             </div>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Acessos Jatinox</div>
-              <div style={{ fontSize:12, color:txt2, marginTop:3 }}>Registros de transportadoras — P260A</div>
+              <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
+              <div style={{ fontSize:12, color:txt2, marginTop:3 }}>Inventário de equipamentos por projeto</div>
               <div style={{ fontSize:11, color:dark?"#334155":"#94a3b8", marginTop:5 }}>
-                Ver, filtrar e gerar consolidado
+                Ver status, problemas e gerar PDF
               </div>
             </div>
             <span style={{ color:txt2, fontSize:20 }}>›</span>
@@ -1718,7 +1858,7 @@ export default function App(){
 
   if(showAcesso) return <AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/>;
   if(showEquipe&&equipeProject) return <EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/>;
-  if(showRegistros) return <RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onBack={()=>setShowRegistros(false)}/>;
+  if(showRegistros) return <RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/>;
   if(showAcessoCCO&&acessoCCOProject) return <AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}}/>;
   if(showEmpresaInfo&&empresaInfoProject) return <EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/>;
   if(showEquipamentos&&equipamentosProject) return <Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/>;
@@ -1900,10 +2040,12 @@ export default function App(){
                       </button>
                     )}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setShowAcessoCCO(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
+                      {["P260A"].includes(jp.id)&&(
+                        <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setShowAcessoCCO(true);}}
+                          style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
+                      )}
                       <button onClick={()=>{setEquipamentosProject({id:jp.id,name:jp.name});setShowEquipamentos(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
+                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:["P260A"].includes(jp.id)?"auto":"1/-1"}}>🛡️ Equipamentos</button>
                       <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
                     </div>
