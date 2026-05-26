@@ -29,18 +29,19 @@ function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
 }
-function fmtDateTime(iso) {
-  if(!iso) return "--";
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-  } catch { return iso; }
+function daysSince(d) {
+  if(!d) return null;
+  try { return Math.floor((Date.now()-new Date(d+"T12:00:00").getTime())/86400000); } catch { return null; }
 }
 
 async function loadAcessos(projectId) {
   try {
     const snap = await getDoc(doc(db,"acesso_cco",projectId));
-    if(snap.exists()) return snap.data().registros || [];
+    if(snap.exists()) {
+      const data = snap.data();
+      try { localStorage.setItem(`acesso_cco_${projectId}`, JSON.stringify(data.registros||[])); } catch(e){}
+      return data.registros || [];
+    }
   } catch(e){}
   try {
     const local = localStorage.getItem(`acesso_cco_${projectId}`);
@@ -50,8 +51,12 @@ async function loadAcessos(projectId) {
 }
 
 async function saveAcessos(projectId, registros) {
-  try { await setDoc(doc(db,"acesso_cco",projectId),{registros,updatedAt:new Date().toISOString()}); } catch(e){}
-  try { localStorage.setItem(`acesso_cco_${projectId}`, JSON.stringify(registros)); } catch(e){}
+  try {
+    await setDoc(doc(db,"acesso_cco",projectId),{registros,updatedAt:new Date().toISOString()});
+  } catch(e){ console.error("Firebase save error:",e); }
+  try {
+    localStorage.setItem(`acesso_cco_${projectId}`, JSON.stringify(registros));
+  } catch(e){ console.warn("localStorage save failed:",e); }
 }
 
 function getStyles(dark) {
@@ -79,8 +84,8 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   const [err, setErr] = useState(false);
 
   const tryPin = () => {
-    if(pin === ADMIN_PIN) { onSuccess("admin"); return; }
-    if(pin === PROJECT_PINS[project.id]) { onSuccess("lider"); return; }
+    if(pin===ADMIN_PIN){ onSuccess("admin"); return; }
+    if(pin===PROJECT_PINS[project.id]){ onSuccess("lider"); return; }
     setErr(true);
   };
 
@@ -89,7 +94,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
       <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
         <div style={{fontSize:32, marginBottom:8}}>🚪</div>
         <div style={{fontSize:16, fontWeight:800, ...S.txt, marginBottom:4}}>Acesso CCO</div>
-        <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project.id} · {project.name}</div>
+        <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project?.id||""} · {project?.name||""}</div>
         {!mode ? (
           <div style={{display:"flex", flexDirection:"column", gap:8}}>
             <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}>
@@ -102,9 +107,11 @@ function PinGate({ project, onSuccess, onBack, dark }) {
           </div>
         ) : (
           <>
-            <div style={{fontSize:12, ...S.txt2, marginBottom:12}}>{mode==="lider"?"PIN do projeto":"PIN gerencial"}</div>
-            <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
-              onChange={e=>{setPin(e.target.value);setErr(false);}}
+            <div style={{fontSize:12, ...S.txt2, marginBottom:12}}>
+              {mode==="lider"?"PIN do projeto":"PIN gerencial"}
+            </div>
+            <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8}
+              value={pin} onChange={e=>{setPin(e.target.value);setErr(false);}}
               onKeyDown={e=>{if(e.key==="Enter") tryPin();}}
               style={{...S.inp, textAlign:"center", fontSize:22, letterSpacing:10, marginBottom:8}}/>
             {err && <div style={{fontSize:12, color:"#ef4444", marginBottom:8}}>PIN incorreto</div>}
@@ -119,119 +126,32 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   );
 }
 
-// ── View registro completo
-function ViewRegistro({ r, onBack, onExcluir, adminAuth, dark }) {
-  const S = getStyles(dark);
-  const emAberto = !r.horaSaida;
-  const dur = (() => {
-    if(!r.horaEntrada || !r.horaSaida) return null;
-    try {
-      const [eh,em] = r.horaEntrada.split(":").map(Number);
-      const [sh,sm] = r.horaSaida.split(":").map(Number);
-      let mins = (sh*60+sm)-(eh*60+em);
-      if(mins<0) mins+=24*60;
-      const h=Math.floor(mins/60), m=mins%60;
-      return h>0?`${h}h${m>0?` ${m}min`:""}` : `${m}min`;
-    } catch { return null; }
-  })();
-
-  return (
-    <div style={S.page}>
-      <div style={S.wrap}>
-        <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-            <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 Registro CCO</div>
-              <div style={{fontSize:11,...S.txt2}}>{fmtDate(r.data)}</div>
-            </div>
-            {emAberto && <span style={{fontSize:10,color:"#f59e0b",background:"#1a1000",border:"1px solid #f59e0b33",padding:"3px 8px",borderRadius:5,fontWeight:700}}>EM ABERTO</span>}
-          </div>
-        </div>
-        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          {/* Foto */}
-          {r.foto && (
-            <div style={{...S.card,display:"flex",justifyContent:"center"}}>
-              <img src={r.foto} alt="" style={{width:120,height:120,objectFit:"cover",borderRadius:12,border:`2px solid ${dark?"#1e293b":"#e2e8f0"}`}}/>
-            </div>
-          )}
-          {/* Dados */}
-          <div style={S.card}>
-            <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>👤 Identificação</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              {[["Nome",r.nome||"--"],["Empresa",r.empresa||"--"],["Data",fmtDate(r.data)],["Hora Entrada",r.horaEntrada||"--"],["Hora Saída",r.horaSaida||"--"],["Duração",dur||"--"]].map(([label,val])=>(
-                <div key={label}>
-                  <div style={S.lbl}>{label}</div>
-                  <div style={{fontSize:13,fontWeight:600,...S.txt}}>{val}</div>
-                </div>
-              ))}
-            </div>
-            {r.obs && <div style={{marginTop:10}}>
-              <div style={S.lbl}>Observação</div>
-              <div style={{fontSize:12,...S.txt2}}>{r.obs}</div>
-            </div>}
-          </div>
-          {adminAuth && (
-            <button onClick={()=>{if(window.confirm("Excluir este registro?")) onExcluir(r.id);}}
-              style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>
-              🗑 Excluir Registro
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
-  const S = getStyles(dark);
+  const S = getStyles(dark||true);
   const [authLevel, setAuthLevel] = useState(null);
   const [screen, setScreen] = useState("pin");
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [viewReg, setViewReg] = useState(null);
 
-  const adminAuth = authLevel === "admin";
+  const adminAuth = authLevel==="admin";
 
   const emptyForm = () => ({
-    id: Date.now().toString() + Math.random().toString(36).substring(2,6),
+    id: Date.now().toString()+Math.random().toString(36).substring(2,6),
     data: todayStr(),
-    nome:"", empresa:"", foto:"",
-    horaEntrada: nowTime(), horaSaida:"", obs:"",
+    nome:"",
+    empresa:"",
+    horaEntrada: nowTime(),
+    obs:"",
     registradoEm: new Date().toISOString()
   });
   const [form, setForm] = useState(emptyForm());
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
 
   useEffect(()=>{
+    if(!project?.id) return;
     loadAcessos(project.id).then(r=>{ setRegistros(r||[]); setLoading(false); });
-  },[project.id]);
-
-  const handleFoto = (e) => {
-    const file = e.target.files?.[0]; if(!file) return;
-    if(file.size > 10*1024*1024) { alert("Foto muito grande. Max 10MB."); return; }
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      // Compress
-      const compressed = await new Promise(resolve => {
-        const img = new Image();
-        img.onload = () => {
-          const MAX = 400; let w=img.width, h=img.height;
-          if(w>h&&w>MAX){h=Math.round(h*MAX/w);w=MAX;}
-          else if(h>=w&&h>MAX){w=Math.round(w*MAX/h);h=MAX;}
-          const canvas=document.createElement("canvas");
-          canvas.width=w;canvas.height=h;
-          canvas.getContext("2d").drawImage(img,0,0,w,h);
-          resolve(canvas.toDataURL("image/jpeg",0.7));
-        };
-        img.onerror=()=>resolve(ev.target.result);
-        img.src=ev.target.result;
-      });
-      setF("foto", compressed);
-    };
-    reader.readAsDataURL(file);
-  };
+  },[project?.id]);
 
   const salvar = async () => {
     if(!form.nome.trim()) { alert("Informe o nome"); return; }
@@ -243,7 +163,10 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
       await saveAcessos(project.id, newList);
       setForm(emptyForm());
       setScreen("list");
-    } catch(e) { alert("Erro ao salvar"); }
+    } catch(e) {
+      console.error("Erro ao salvar:",e);
+      alert("Erro ao salvar. Verifique sua conexão.");
+    }
     setSaving(false);
   };
 
@@ -251,28 +174,20 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
     const newList = registros.filter(r=>r.id!==id);
     setRegistros(newList);
     await saveAcessos(project.id, newList);
-    if(viewReg?.id===id) { setViewReg(null); setScreen("list"); }
   };
 
   if(screen==="pin") return (
-    <PinGate project={project} dark={dark}
-      onBack={onBack}
+    <PinGate project={project||{}} dark={dark||true} onBack={onBack}
       onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); }}/>
   );
 
   if(loading) return (
-    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
+    <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:30,marginBottom:10}}>🚪</div>
-        <div style={{fontSize:13,...S.txt2}}>Carregando registros...</div>
+        <div style={{fontSize:30, marginBottom:10}}>🚪</div>
+        <div style={{fontSize:13, ...S.txt2}}>Carregando registros...</div>
       </div>
     </div>
-  );
-
-  if(screen==="view"&&viewReg) return (
-    <ViewRegistro r={viewReg} dark={dark} adminAuth={adminAuth}
-      onBack={()=>{setViewReg(null);setScreen("list");}}
-      onExcluir={excluir}/>
   );
 
   // ── FORMULÁRIO
@@ -284,63 +199,50 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
             <button onClick={()=>setScreen("list")} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 Novo Acesso CCO</div>
-              <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
+              <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {project?.name||""}</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>
+              {dark?"☀️":"🌙"}
+            </button>
           </div>
         </div>
-        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
-          {/* Foto */}
-          <div style={{...S.card,display:"flex",gap:14,alignItems:"center"}}>
-            <label style={{cursor:"pointer",flexShrink:0}}>
-              <div style={{width:80,height:80,borderRadius:12,overflow:"hidden",border:`2px dashed ${form.foto?"#0ea5e9":dark?"#1e293b":"#cbd5e1"}`,background:dark?"#020510":"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {form.foto
-                  ? <img src={form.foto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  : <div style={{textAlign:"center"}}><div style={{fontSize:24}}>📷</div><div style={{fontSize:8,...S.txt2,marginTop:2}}>FOTO</div></div>
-                }
-              </div>
-              <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handleFoto}/>
-            </label>
-            <div>
-              <div style={{fontSize:13,fontWeight:700,color:form.foto?"#0ea5e9":dark?"#475569":"#94a3b8"}}>{form.foto?"✓ Foto adicionada":"Foto (opcional)"}</div>
-              <div style={{fontSize:11,...S.txt2,marginTop:2}}>Toque para escolher</div>
-            </div>
-          </div>
 
-          {/* Dados */}
+        <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+          {/* Identificação */}
           <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>👤 Identificação</div>
+            <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>
+              👤 Identificação
+            </div>
             <div>
               <label style={S.lbl}>Nome *</label>
-              <input value={form.nome} onChange={e=>setF("nome",e.target.value)} placeholder="Nome completo..." style={S.inp}/>
+              <input value={form.nome} onChange={e=>setF("nome",e.target.value)}
+                placeholder="Nome completo..." style={S.inp}/>
             </div>
             <div>
-              <label style={S.lbl}>Empresa</label>
-              <input value={form.empresa} onChange={e=>setF("empresa",e.target.value)} placeholder="Empresa / Setor..." style={S.inp}/>
+              <label style={S.lbl}>Empresa / Setor</label>
+              <input value={form.empresa} onChange={e=>setF("empresa",e.target.value)}
+                placeholder="Empresa ou setor..." style={S.inp}/>
             </div>
           </div>
 
-          {/* Horários */}
+          {/* Data e Hora Entrada */}
           <div style={S.card}>
-            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>⏱️ Horários</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>
+              ⏱️ Data e Hora de Acesso
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <div>
                 <label style={S.lbl}>Data</label>
                 <input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/>
               </div>
-              <div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
-                <label style={S.lbl}>Hora Entrada</label>
+              <div>
+                <label style={S.lbl}>Hora de Entrada</label>
                 <div style={{display:"flex",gap:5}}>
-                  <input type="time" value={form.horaEntrada} onChange={e=>setF("horaEntrada",e.target.value)} style={{...S.inp,flex:1}}/>
-                  <button onClick={()=>setF("horaEntrada",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+                  <input type="time" value={form.horaEntrada}
+                    onChange={e=>setF("horaEntrada",e.target.value)} style={{...S.inp,flex:1}}/>
+                  <button onClick={()=>setF("horaEntrada",nowTime())}
+                    style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
                 </div>
-              </div>
-            </div>
-            <div>
-              <label style={S.lbl}>Hora Saída (preencher ao sair)</label>
-              <div style={{display:"flex",gap:5}}>
-                <input type="time" value={form.horaSaida} onChange={e=>setF("horaSaida",e.target.value)} style={{...S.inp,flex:1}}/>
-                <button onClick={()=>setF("horaSaida",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
               </div>
             </div>
           </div>
@@ -348,10 +250,13 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
           {/* Observação */}
           <div style={S.card}>
             <label style={S.lbl}>Observação (opcional)</label>
-            <textarea value={form.obs} onChange={e=>setF("obs",e.target.value)} placeholder="Motivo da visita, observações..." style={{...S.inp,height:60,resize:"vertical",fontSize:12}}/>
+            <textarea value={form.obs} onChange={e=>setF("obs",e.target.value)}
+              placeholder="Motivo da visita, observações..."
+              style={{...S.inp,height:60,resize:"vertical",fontSize:12}}/>
           </div>
 
-          <button onClick={salvar} disabled={saving} style={{...S.btn,opacity:saving?0.7:1}}>
+          <button onClick={salvar} disabled={saving}
+            style={{...S.btn, opacity:saving?0.7:1}}>
             {saving?"⟳ Salvando...":"✓ Registrar Acesso"}
           </button>
         </div>
@@ -363,6 +268,10 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
   const hoje = registros.filter(r=>r.data===todayStr());
   const anteriores = registros.filter(r=>r.data!==todayStr());
 
+  // Último acesso
+  const ultimoAcesso = registros.length > 0 ? registros[0] : null;
+  const diasUltimo = ultimoAcesso ? daysSince(ultimoAcesso.data) : null;
+
   return (
     <div style={S.page}>
       <div style={S.wrap}>
@@ -371,26 +280,41 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 Acesso CCO</div>
-              <div style={{fontSize:11,...S.txt2}}>{project.id} · {registros.length} registro(s)</div>
+              <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {registros.length} registro(s)</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>
+              {dark?"☀️":"🌙"}
+            </button>
           </div>
         </div>
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+
           {/* KPIs */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            {[
-              {label:"TOTAL",val:registros.length,color:"#0ea5e9"},
-              {label:"HOJE",val:hoje.length,color:"#22c55e"},
-              {label:"EM ABERTO",val:registros.filter(r=>!r.horaSaida).length,color:"#f59e0b"},
-            ].map(({label,val,color})=>(
-              <div key={label} style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
-                <div style={{fontSize:22,fontWeight:900,color}}>{val}</div>
-                <div style={{fontSize:9,...S.txt2,fontWeight:700}}>{label}</div>
-              </div>
-            ))}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
+              <div style={{fontSize:22,fontWeight:900,color:"#0ea5e9"}}>{registros.length}</div>
+              <div style={{fontSize:9,...S.txt2,fontWeight:700}}>TOTAL</div>
+            </div>
+            <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
+              <div style={{fontSize:22,fontWeight:900,color:"#22c55e"}}>{hoje.length}</div>
+              <div style={{fontSize:9,...S.txt2,fontWeight:700}}>HOJE</div>
+            </div>
           </div>
+
+          {/* Último acesso */}
+          {ultimoAcesso && (
+            <div style={{background:diasUltimo===0?dark?"#021a0d":"#dcfce7":diasUltimo&&diasUltimo>7?dark?"#1a0202":"#fee2e2":dark?"#060c18":"#ffffff",border:`1px solid ${diasUltimo===0?"#22c55e33":diasUltimo&&diasUltimo>7?"#ef444433":dark?"#0f172a":"#e2e8f0"}`,borderRadius:10,padding:"10px 14px"}}>
+              <div style={{fontSize:10,color:diasUltimo===0?"#22c55e":diasUltimo&&diasUltimo>7?"#ef4444":"#0ea5e9",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>
+                📅 Último Acesso
+              </div>
+              <div style={{fontSize:13,fontWeight:700,...S.txt}}>{ultimoAcesso.nome}</div>
+              <div style={{fontSize:11,...S.txt2}}>{ultimoAcesso.empresa&&`${ultimoAcesso.empresa} · `}{fmtDate(ultimoAcesso.data)} às {ultimoAcesso.horaEntrada}</div>
+              <div style={{fontSize:11,color:diasUltimo===0?"#22c55e":diasUltimo&&diasUltimo>7?"#ef4444":"#64748b",fontWeight:700,marginTop:3}}>
+                {diasUltimo===0?"Hoje":diasUltimo===1?"Ontem":`Há ${diasUltimo} dias`}
+              </div>
+            </div>
+          )}
 
           <button onClick={()=>{setForm(emptyForm());setScreen("form");}} style={S.btn}>
             + Registrar Acesso ao CCO
@@ -406,14 +330,14 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
           {hoje.length>0 && (
             <>
               <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
-              {hoje.map(r=><RegistroCard key={r.id} r={r} dark={dark} S={S} onVer={()=>{setViewReg(r);setScreen("view");}}/>)}
+              {hoje.map(r=><RegistroCard key={r.id} r={r} dark={dark||true} S={S} adminAuth={adminAuth} onExcluir={()=>{if(window.confirm("Excluir?")) excluir(r.id);}}/>)}
             </>
           )}
 
           {anteriores.length>0 && (
             <>
               <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
-              {anteriores.map(r=><RegistroCard key={r.id} r={r} dark={dark} S={S} onVer={()=>{setViewReg(r);setScreen("view");}}/>)}
+              {anteriores.map(r=><RegistroCard key={r.id} r={r} dark={dark||true} S={S} adminAuth={adminAuth} onExcluir={()=>{if(window.confirm("Excluir?")) excluir(r.id);}}/>)}
             </>
           )}
         </div>
@@ -422,27 +346,43 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
   );
 }
 
-function RegistroCard({ r, dark, S, onVer }) {
-  const emAberto = !r.horaSaida;
+function RegistroCard({ r, dark, S, adminAuth, onExcluir }) {
+  const [open, setOpen] = useState(false);
+  const dias = daysSince(r.data);
+
   return (
-    <div style={{...S.card,border:`1px solid ${emAberto?"#f59e0b33":dark?"#0f172a":"#e2e8f0"}`}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        {r.foto
-          ? <img src={r.foto} alt="" style={{width:44,height:44,objectFit:"cover",borderRadius:8,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,flexShrink:0}}/>
-          : <div style={{width:44,height:44,borderRadius:8,background:dark?"#0f172a":"#f1f5f9",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:20}}>👤</div>
-        }
+    <div style={{...S.card,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}} onClick={()=>setOpen(!open)}>
+        <div style={{width:40,height:40,borderRadius:10,background:dark?"#0f172a":"#f1f5f9",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
+          👤
+        </div>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:700,...S.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome}</div>
+          <div style={{fontSize:13,fontWeight:700,...S.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {r.nome}
+          </div>
           {r.empresa&&<div style={{fontSize:11,...S.txt2}}>{r.empresa}</div>}
           <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
             <span style={{fontSize:10,...S.txt2}}>📅 {fmtDate(r.data)}</span>
-            {r.horaEntrada&&<span style={{fontSize:10,color:"#22c55e"}}>↓ {r.horaEntrada}</span>}
-            {r.horaSaida&&<span style={{fontSize:10,color:"#ef4444"}}>↑ {r.horaSaida}</span>}
-            {emAberto&&<span style={{fontSize:9,color:"#f59e0b",fontWeight:700}}>EM ABERTO</span>}
+            {r.horaEntrada&&<span style={{fontSize:10,color:"#22c55e"}}>⏱ {r.horaEntrada}</span>}
+            <span style={{fontSize:10,color:dias===0?"#22c55e":dias&&dias>7?"#ef4444":"#64748b",fontWeight:700}}>
+              {dias===0?"Hoje":dias===1?"Ontem":`${dias}d atrás`}
+            </span>
           </div>
         </div>
-        <button onClick={onVer} style={{...S.btnSm,padding:"6px 12px",fontSize:12,flexShrink:0}}>👁 Ver</button>
+        <span style={{...S.txt2,fontSize:12}}>{open?"▲":"▼"}</span>
       </div>
+
+      {open && (
+        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`}}>
+          {r.obs&&<div style={{fontSize:12,...S.txt,marginBottom:8,lineHeight:1.5}}>{r.obs}</div>}
+          {adminAuth && (
+            <button onClick={onExcluir}
+              style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11}}>
+              🗑 Excluir
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
