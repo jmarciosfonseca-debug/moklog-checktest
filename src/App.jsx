@@ -4,6 +4,7 @@ import EquipeApp from "./Equipe";
 import AcessoCCO from "./AcessoCCO";
 import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos from "./Equipamentos";
+import Visita from "./Visita";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
@@ -1702,6 +1703,8 @@ export default function App(){
   const [empresaInfoProject,setEmpresaInfoProject]=useState(null);
   const [showEquipamentos,setShowEquipamentos]=useState(false);
   const [equipamentosProject,setEquipamentosProject]=useState(null);
+  const [showVisita,setShowVisita]=useState(false);
+  const [visitaProject,setVisitaProject]=useState(null);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -1862,6 +1865,7 @@ export default function App(){
   if(showAcessoCCO&&acessoCCOProject) return <AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}}/>;
   if(showEmpresaInfo&&empresaInfoProject) return <EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/>;
   if(showEquipamentos&&equipamentosProject) return <Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/>;
+  if(showVisita&&visitaProject) return <Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
@@ -2048,6 +2052,8 @@ export default function App(){
                         style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:["P260A"].includes(jp.id)?"auto":"1/-1"}}>🛡️ Equipamentos</button>
                       <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
+                      <button onClick={()=>{setVisitaProject({id:jp.id,name:jp.name});setShowVisita(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     </div>
                   </div>
                 )}
@@ -2139,6 +2145,7 @@ export default function App(){
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
+                    <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                   </div>
                 </>
               ):(
@@ -2149,6 +2156,7 @@ export default function App(){
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
+                    <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                   </div>
                 </>
               )}
