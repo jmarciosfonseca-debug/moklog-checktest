@@ -55,7 +55,13 @@ const CARGOS_PROJETO = {
   P607:  ["Vigilante Ronda","Vigilante Apoio","AGP","AGP CCO"],
 };
 
+// Turnos por projeto — P601-P607 e P311A/B só Diurno/Noturno (12x36)
+const TURNOS_SEM_FOLGUISTA = ["P601","P602","P604","P605","P606","P607","P311A","P311B"];
 const TURNOS = ["Diurno","Noturno","Folguista"];
+function getTurnos(projectId) {
+  if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno"];
+  return ["Diurno","Noturno","Folguista"];
+}
 const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento"];
 const HIST_COLORS = {
   "Falta":             { color:"#ef4444", bg:"#1a0202", badge:"#fee2e2" },
@@ -113,6 +119,7 @@ async function saveEquipe(projectId, data) {
 }
 
 function emptyColab(cargo, projectId, turno) {
+  turno = turno || "Diurno";
   return {
     id: Date.now().toString() + Math.random().toString(36).substring(2,6),
     cargo, projectId,
@@ -513,6 +520,28 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
         </div>
 
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Banner afastamento indeterminado */}
+          {colab.afastamentoAberto && (()=>{
+            const entry=(colab.historico||[]).find(h=>h.id===colab.afastamentoAberto&&h.emAberto);
+            if(!entry) return null;
+            const dias=Math.floor((Date.now()-new Date(entry.data+"T12:00:00").getTime())/86400000);
+            return(
+              <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                <div>
+                  <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>🚨 Afastamento Indeterminado</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>Desde {fmtDate(entry.data)} · {dias} dia(s) em aberto</div>
+                </div>
+                {adminAuth&&(
+                  <button onClick={()=>{
+                    const newHist=(colab.historico||[]).map(h=>h.id===entry.id?{...h,emAberto:false,dataRetorno:todayStr()}:h);
+                    onDesligar({...colab,historico:newHist,afastamentoAberto:null},"Retorno","Retorno",todayStr());
+                  }} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
+                    ✓ Encerrar
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           {/* Foto */}
           <div style={{ ...S.card, display:"flex", gap:14, alignItems:"center" }}>
             <label style={{ cursor:"pointer", flexShrink:0 }}>
@@ -554,7 +583,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
             <div style={{ marginBottom:10 }}>
               <label style={S.lbl}>Turno</label>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6 }}>
-                {TURNOS.map(t => {
+                {getTurnos(form.projectId||"P601").map(t => {
                   const tc = TURNO_CONFIG[t];
                   const isSel = form.turno===t;
                   return (
@@ -657,11 +686,48 @@ function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dar
               })}
             </div>
 
-            {/* Data */}
-            <div style={{ marginBottom:10 }}>
-              <label style={S.lbl}>{histForm.tipo==="Férias"?"Data de Início":"Data do Registro"}</label>
-              <input type="date" value={histForm.data} onChange={e=>setHistForm(h=>({...h,data:e.target.value}))} style={S.inp}/>
-            </div>
+            {/* Data — Falta tem lógica especial */}
+            {histForm.tipo==="Falta" ? (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
+                <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginBottom:4 }}>Tipo de Falta</div>
+                <div style={{ display:"flex", gap:6 }}>
+                  {["1 dia","Período","Indeterminado"].map(t=>{
+                    const isSel = (histForm.subtipo||"1 dia")===t;
+                    return (
+                      <button key={t} onClick={()=>setHistForm(h=>({...h,subtipo:t,dataFim:"",indeterminado:t==="Indeterminado"}))}
+                        style={{ flex:1, background:isSel?"#1a0202":"transparent", border:`2px solid ${isSel?"#ef4444":"#0f172a"}`, color:isSel?"#ef4444":"#475569", borderRadius:7, padding:"8px 4px", fontSize:10, cursor:"pointer", fontWeight:isSel?700:400 }}>
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div>
+                  <label style={S.lbl}>{histForm.subtipo==="Indeterminado"?"Data de Início":histForm.subtipo==="Período"?"Data Início":"Data da Falta"}</label>
+                  <input type="date" value={histForm.data} onChange={e=>setHistForm(h=>({...h,data:e.target.value}))} style={S.inp}/>
+                </div>
+                {histForm.subtipo==="Período" && (
+                  <div>
+                    <label style={S.lbl}>Data Fim</label>
+                    <input type="date" value={histForm.dataFim||""} onChange={e=>setHistForm(h=>({...h,dataFim:e.target.value}))} style={S.inp}/>
+                    {histForm.data && histForm.dataFim && histForm.dataFim >= histForm.data && (
+                      <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginTop:4 }}>
+                        {Math.round((new Date(histForm.dataFim)-new Date(histForm.data))/86400000)+1} dias
+                      </div>
+                    )}
+                  </div>
+                )}
+                {histForm.subtipo==="Indeterminado" && (
+                  <div style={{ background:"#1a0202", border:"1px solid #ef444433", borderRadius:8, padding:"8px 12px" }}>
+                    <div style={{ fontSize:11, color:"#ef4444" }}>⚠️ Afastamento indeterminado — ficará em aberto até encerramento</div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ marginBottom:10 }}>
+                <label style={S.lbl}>{histForm.tipo==="Férias"?"Data de Início":"Data do Registro"}</label>
+                <input type="date" value={histForm.data} onChange={e=>setHistForm(h=>({...h,data:e.target.value}))} style={S.inp}/>
+              </div>
+            )}
 
             {/* Campos específicos por tipo */}
             {histForm.tipo==="Medida Disciplinar" && (
@@ -877,6 +943,9 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       const formFinal = { ...form, foto: fotoFinal };
       // Remove campos undefined para não quebrar Firestore
       Object.keys(formFinal).forEach(k => { if(formFinal[k]===undefined) formFinal[k]=""; });
+      // Limpa campos de Falta que não existem em outros tipos
+      if(formFinal.subtipo===undefined) formFinal.subtipo="";
+      if(formFinal.dataFim===undefined) formFinal.dataFim="";
       const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
       const newColabs = isNew
         ? [...equipeData.colaboradores, formFinal]
@@ -897,10 +966,25 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const addHistorico = async () => {
     if(!histForm.data) { alert("Informe a data"); return; }
     if(histForm.tipo==="Medida Disciplinar" && !histForm.detalhe) { alert("Especifique o tipo de medida"); return; }
-    const item = { ...histForm, id:Date.now().toString(), registradoEm:new Date().toISOString() };
+    if(histForm.tipo==="Falta" && histForm.subtipo==="Período" && !histForm.dataFim) { alert("Informe a data fim"); return; }
+    // Enrich falta entry
+    let extra = {};
+    if(histForm.tipo==="Falta") {
+      if(histForm.subtipo==="Período" && histForm.dataFim) {
+        const dias = Math.round((new Date(histForm.dataFim)-new Date(histForm.data))/86400000)+1;
+        extra = { diasFalta:dias, label:`${dias} dia(s) — ${fmtDate(histForm.data)} a ${fmtDate(histForm.dataFim)}` };
+      } else if(histForm.subtipo==="Indeterminado") {
+        extra = { indeterminado:true, emAberto:true, label:`Afastamento indeterminado desde ${fmtDate(histForm.data)}` };
+      } else {
+        extra = { diasFalta:1, subtipo:"1 dia", label:fmtDate(histForm.data) };
+      }
+    }
+    const item = { ...histForm, ...extra, id:Date.now().toString(), registradoEm:new Date().toISOString() };
     const newColabs = equipeData.colaboradores.map(c=>{
       if(c.id!==selColab.id) return c;
-      return {...c, historico:[...(c.historico||[]), item]};
+      const newHist = [item, ...(c.historico||[])];
+      const afastamentoAberto = (histForm.tipo==="Falta"&&histForm.subtipo==="Indeterminado") ? item.id : (c.afastamentoAberto||null);
+      return {...c, historico:newHist, afastamentoAberto};
     });
     const updated = {...equipeData, colaboradores:newColabs};
     await save(updated);
@@ -996,7 +1080,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   // ── Lista principal
   const ativos = equipeData.colaboradores.filter(c=>c.status==="ativo");
   const desligados = equipeData.desligados || [];
-  const turnosComEquipe = TURNOS.filter(t => ativos.some(c=>c.turno===t));
+  const turnosComEquipe = getTurnos(project.id).filter(t => ativos.some(c=>c.turno===t));
   const semTurno = ativos.filter(c=>!TURNOS.includes(c.turno));
 
   return (
@@ -1032,7 +1116,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                     style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"4px 10px" }}>
                     ☐ Todos ({ativos.length})
                   </button>
-                  {["Diurno","Noturno","Folguista"].map(t=>{
+                  {getTurnos(project.id).map(t=>{
                     const cols=ativos.filter(c=>c.turno===t);
                     if(!cols.length) return null;
                     return(
