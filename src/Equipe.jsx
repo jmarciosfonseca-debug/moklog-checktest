@@ -163,11 +163,11 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
     <rect x="74" y="47.5" width="18" height="5" rx="2" fill="url(#metal2)"/>
   </svg>`;
 
-  // Group by turno
-  const turnos = ["Diurno","Noturno","Folguista"];
+  // Group by turno - detect from collaborators (don't force Folguista)
+  const turnosPresentes = ["Diurno","Noturno","Folguista"].filter(t=>colaboradores.some(c=>c.turno===t));
   const byTurno = {};
-  turnos.forEach(t => { byTurno[t] = colaboradores.filter(c=>c.turno===t); });
-  const semTurno = colaboradores.filter(c=>!turnos.includes(c.turno));
+  turnosPresentes.forEach(t => { byTurno[t] = colaboradores.filter(c=>c.turno===t); });
+  const semTurno = colaboradores.filter(c=>!["Diurno","Noturno","Folguista"].includes(c.turno));
 
   const renderColab = (c) => {
     const faltas  = (c.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -235,7 +235,7 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
       </div>`;
   };
 
-  const turnoSections = turnos.map(t => {
+  const turnoSections = turnosPresentes.map(t => {
     const cols = byTurno[t];
     if(!cols || cols.length===0) return "";
     const tc = TURNO_COLORS[t];
@@ -1081,7 +1081,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const ativos = equipeData.colaboradores.filter(c=>c.status==="ativo");
   const desligados = equipeData.desligados || [];
   const turnosComEquipe = getTurnos(project.id).filter(t => ativos.some(c=>c.turno===t));
-  const semTurno = ativos.filter(c=>!TURNOS.includes(c.turno));
+  const semTurno = ativos.filter(c=>!getTurnos(project.id).includes(c.turno));
 
   return (
     <div style={S.page}>
@@ -1160,7 +1160,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
           {/* Resumo por turno */}
           {turnosComEquipe.length > 0 && (
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:6 }}>
+            <div style={{ display:"grid", gridTemplateColumns:`repeat(${turnosComEquipe.length},1fr)`, gap:6 }}>
               {turnosComEquipe.map(t=>{
                 const tc = TURNO_CONFIG[t];
                 const count = ativos.filter(c=>c.turno===t).length;
