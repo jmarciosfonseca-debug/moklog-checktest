@@ -20,8 +20,9 @@ const PROJECT_PINS = {
   P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
 };
 
-// Projetos com Pânico ZTRAX
-const TEM_ZTRAX = ["P311A","P311B"];
+// Projetos com equipamentos especiais
+const TEM_ZTRAX    = ["P311A","P311B"];
+const TEM_BODYCAM  = ["P311A","P311B"];
 
 const STATUS_CONFIG = {
   ok:      { label:"OK",         color:"#22c55e", bg:"#021a0d", border:"#22c55e33" },
@@ -54,7 +55,7 @@ async function loadEquip(projectId) {
     const local = localStorage.getItem(`equipamentos_${projectId}`);
     if(local) return JSON.parse(local);
   } catch(e){}
-  return { smartphones:[], radiosHT:[], armamento:[], municao:[], placas:[], lanternas:[], moto:null, ztrax:[] };
+  return { smartphones:[], radiosHT:[], armamento:[], municao:[], placas:[], lanternas:[], moto:null, ztrax:[], bodycam:[] };
 }
 
 async function saveEquip(projectId, data) {
@@ -219,6 +220,113 @@ function enviarWhatsApp(project, tipo, nome, status, justificativa, data) {
   window.open(`https://wa.me/?text=${msg}`, "_blank");
 }
 
+
+// ── Gerar PDF completo de equipamentos por projeto
+function gerarPDFEquipamentos(project, data, segLogos) {
+  const seg = segLogos || {};
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const fmtD = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
+  const statusLabel = (s) => ({ ok:"OK", parcial:"Parcial", inop:"Inoperante", baixo:"Baixo", critico:"Crítico" }[s] || "OK");
+  const statusColor = (s) => ({ ok:"#15803d", parcial:"#d97706", inop:"#dc2626", baixo:"#d97706", critico:"#dc2626" }[s] || "#15803d");
+  const statusBg    = (s) => ({ ok:"#dcfce7", parcial:"#fef3c7", inop:"#fee2e2", baixo:"#fef3c7", critico:"#fee2e2" }[s] || "#dcfce7");
+
+  const itemRow = (item, extra="") => {
+    const hasProb = item.status && item.status !== "ok";
+    const dias = hasProb && item.dataProblem ? Math.floor((Date.now()-new Date(item.dataProblem+"T12:00:00").getTime())/86400000) : 0;
+    return `<tr style="background:${hasProb?"#fff5f5":"#fff"}">
+      <td>${item.identificacao||"--"}</td>
+      ${extra}
+      <td><span style="background:${statusBg(item.status||"ok")};color:${statusColor(item.status||"ok")};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${statusLabel(item.status||"ok")}</span></td>
+      <td>${hasProb?`<span style="color:#dc2626;font-weight:700">${dias}d em aberto</span>${item.justificativa?`<br><span style="font-size:10px;color:#64748b">${item.justificativa}</span>`:""}` : "—"}</td>
+    </tr>`;
+  };
+
+  const section = (titulo, icon, headers, rows) => {
+    if(!rows.length) return "";
+    const hasProb = rows.some(r=>r.status&&r.status!=="ok");
+    return `<div class="card">
+      <h2>${icon} ${titulo} <span style="font-size:12px;font-weight:400;color:#64748b">(${rows.length} item${rows.length>1?"s":""})</span>
+        ${hasProb?`<span style="background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:8px">⚠️ COM PROBLEMA</span>`:""}
+      </h2>
+      <table><thead><tr>${["Identificação",...headers,"Status","Observação"].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(r=>itemRow(r,headers.map(h=>{
+        if(h==="Modelo") return `<td>${r.modelo||"--"}</td>`;
+        if(h==="Marca") return `<td>${r.marca||"--"}</td>`;
+        if(h==="Calibre") return `<td>${r.calibre||"--"}</td>`;
+        if(h==="Nº Série") return `<td>${r.nSerie||"--"}</td>`;
+        if(h==="Validade") return `<td style="color:${r.validade&&new Date(r.validade)<new Date()?"#dc2626":"#15803d"}">${fmtD(r.validade)}</td>`;
+        if(h==="Quantidade") return `<td><strong>${r.qtd||0}</strong></td>`;
+        if(h==="Armeiro") return `<td>${r.armeiro||"--"}</td>`;
+        if(h==="Últ. Manutenção") return `<td>${fmtD(r.dataManutencao)}</td>`;
+        return `<td>--</td>`;
+      }).join(""))).join("")}</tbody></table>
+    </div>`;
+  };
+
+  const moto = data.moto;
+  const motoSection = moto && moto.placa ? `<div class="card">
+    <h2>🏍️ Motocicleta</h2>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
+      ${[["Placa",moto.placa],["Modelo",moto.modelo||"--"],["Ano",moto.ano||"--"],["KM Atual",moto.km?`${moto.km} km`:"--"],["KM Manutenção",moto.kmManutencao?`${moto.kmManutencao} km`:"--"],["Próx. Revisão",moto.proximaRevisao?fmtD(moto.proximaRevisao):"--"]].map(([l,v])=>`
+        <div><div style="font-size:10px;color:#94a3b8;font-weight:700">${l}</div><div style="font-weight:700;color:${l==="KM Atual"&&moto.kmManutencao&&Number(moto.km)>=Number(moto.kmManutencao)?"#dc2626":"#0f172a"}">${v}</div></div>`).join("")}
+    </div>
+    ${moto.km&&moto.kmManutencao&&Number(moto.km)>=Number(moto.kmManutencao)?'<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;color:#dc2626;font-size:12px;font-weight:700">🔴 KM de manutenção atingido!</div>':""}
+    ${(moto.historico||[]).length>0?`<div style="margin-top:10px"><strong style="font-size:12px">Histórico manutenção:</strong><table style="margin-top:6px"><thead><tr><th>Data</th><th>KM</th><th>Descrição</th></tr></thead><tbody>${(moto.historico||[]).slice(0,5).map(h=>`<tr><td>${fmtD(h.data)}</td><td>${h.km||"--"} km</td><td>${h.desc||"--"}</td></tr>`).join("")}</tbody></table></div>`:""}
+  </div>` : "";
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Equipamentos — ${project.id}</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;margin:0}
+  .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .kpi{background:#fff;border-radius:10px;padding:12px;text-align:center;border:1px solid #e2e8f0}
+  .kpi-val{font-size:24px;font-weight:900}
+  .kpi-lbl{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:2px}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
+  .card h2{margin:0 0 12px;font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#1e293b;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+  td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  .footer{text-align:center;font-size:10px;color:#94a3b8;margin-top:16px}
+  @media print{body{padding:8px}@page{margin:12mm}}
+</style></head><body>
+<div style="text-align:center;margin-bottom:16px">
+  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <div>
+    <div style="font-size:11px;opacity:.7;text-transform:uppercase">Moked Consulting Security</div>
+    <div style="font-size:20px;font-weight:900">Inventário de Equipamentos</div>
+    <div style="font-size:13px;opacity:.8">${project.id} — ${project.name||""}</div>
+  </div>
+  ${seg.logo?`<img src="${seg.logo}" style="height:52px;max-width:120px;object-fit:contain" alt="${seg.empresa||""}"/>`:""}
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val" style="color:#ef4444">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].filter(i=>i.status==="inop"||i.status==="critico").length}</div><div class="kpi-lbl">Inop/Crítico</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#d97706">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].filter(i=>i.status==="parcial"||i.status==="baixo").length}</div><div class="kpi-lbl">Parcial</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#15803d">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].filter(i=>!i.status||i.status==="ok").length}</div><div class="kpi-lbl">OK</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].length}</div><div class="kpi-lbl">Total</div></div>
+</div>
+${section("Smartphones","📱",[],[...data.smartphones||[]])}
+${section("Rádios HT","📻",["Marca"],  [...data.radiosHT||[]])}
+${section("Armamento","🔫",["Calibre","Nº Série","Armeiro","Últ. Manutenção"],[...data.armamento||[]])}
+${section("Munição","💊",["Quantidade"],[...data.municao||[]])}
+${section("Placas Balísticas","🦺",["Nº Série","Validade"],[...data.placas||[]])}
+${section("Lanternas","🔦",[],[...data.lanternas||[]])}
+${(data.ztrax||[]).length?section("Pânico ZTRAX","🚨",[],[...data.ztrax]):""}
+${(data.bodycam||[]).length?section("Bodycam","📹",[],[...data.bodycam]):""}
+${motoSection}
+<div class="footer">MokLog CheckTest © Moked Consulting Security · ${project.id} · Emitido em ${hoje}</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`equipamentos_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
 // ── PIN Gate
 function PinGate({ project, onSuccess, onBack, dark }) {
   const S = getStyles(dark);
@@ -328,6 +436,9 @@ function NovoItemForm({ tipo, project, onSave, onCancel, dark }) {
       );
       case "ztrax": return (
         <div><label style={S.lbl}>Identificação (ex: ZTRAX 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="ZTRAX 01" style={S.inp}/></div>
+      );
+      case "bodycam": return (
+        <div><label style={S.lbl}>Identificação (ex: Bodycam 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Bodycam 01" style={S.inp}/></div>
       );
       default: return null;
     }
@@ -514,9 +625,12 @@ function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               <div><label style={S.lbl}>Placa</label><input value={form.placa} onChange={e=>setForm(f=>({...f,placa:e.target.value}))} placeholder="ABC-1234" style={S.inp}/></div>
+              <div><label style={S.lbl}>Modelo</label><input value={form.modelo||""} onChange={e=>setForm(f=>({...f,modelo:e.target.value}))} placeholder="Ex: Honda CG 160..." style={S.inp}/></div>
+              <div><label style={S.lbl}>Ano</label><input type="number" value={form.ano||""} onChange={e=>setForm(f=>({...f,ano:e.target.value}))} placeholder="Ex: 2022" style={S.inp}/></div>
               <div><label style={S.lbl}>KM Atual</label><input type="number" value={form.km} onChange={e=>setForm(f=>({...f,km:e.target.value}))} placeholder="0" style={S.inp}/></div>
             </div>
-            <div><label style={S.lbl}>Próxima Revisão</label><input value={form.proximaRevisao} onChange={e=>setForm(f=>({...f,proximaRevisao:e.target.value}))} placeholder="KM ou Data..." style={S.inp}/></div>
+            <div><label style={S.lbl}>KM para próxima manutenção</label><input type="number" value={form.kmManutencao||""} onChange={e=>setForm(f=>({...f,kmManutencao:e.target.value}))} placeholder="Ex: 5000" style={S.inp}/></div>
+            <div><label style={S.lbl}>Próxima Revisão (Data)</label><input type="date" value={form.proximaRevisao||""} onChange={e=>setForm(f=>({...f,proximaRevisao:e.target.value}))} style={S.inp}/></div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditing(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
               <button onClick={()=>save(form)} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
@@ -527,11 +641,26 @@ function SecMoto({ moto, project, onUpdate, adminAuth, dark }) {
             {!form.placa ? (
               <div style={{textAlign:"center",padding:"10px 0",fontSize:12,...S.txt2}}>Motocicleta não cadastrada{adminAuth?" — toque em ✏️ Editar":""}</div>
             ) : (
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-                {[["Placa",form.placa],["KM Atual",form.km?`${form.km} km`:"--"],["Próxima Revisão",form.proximaRevisao||"--"]].map(([label,val])=>(
-                  <div key={label}><div style={S.lbl}>{label}</div><div style={{fontSize:13,fontWeight:600,...S.txt}}>{val}</div></div>
-                ))}
-              </div>
+              <>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                  {[
+                    ["Placa",      form.placa],
+                    ["Modelo",     form.modelo||"--"],
+                    ["Ano",        form.ano||"--"],
+                    ["KM Atual",   form.km?`${form.km} km`:"--"],
+                    ["KM Manutenção", form.kmManutencao?`${form.kmManutencao} km`:"--"],
+                    ["Próx. Revisão", form.proximaRevisao?fmtDate(form.proximaRevisao):"--"],
+                  ].map(([label,val])=>(
+                    <div key={label}><div style={S.lbl}>{label}</div><div style={{fontSize:12,fontWeight:600,...S.txt}}>{val}</div></div>
+                  ))}
+                </div>
+                {form.km && form.kmManutencao && Number(form.km) >= Number(form.kmManutencao) && (
+                  <div style={{background:"#1a0202",border:"1px solid #ef444433",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+                    <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 KM de manutenção atingido!</div>
+                    <div style={{fontSize:10,color:"#94a3b8"}}>KM atual ({form.km}) ≥ KM manutenção ({form.kmManutencao})</div>
+                  </div>
+                )}
+              </>
             )}
 
             {form.placa && (
@@ -634,7 +763,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
     ...(data.smartphones||[]), ...(data.radiosHT||[]),
     ...(data.armamento||[]),   ...(data.municao||[]),
     ...(data.placas||[]),      ...(data.lanternas||[]),
-    ...(data.ztrax||[]),
+    ...(data.ztrax||[]),       ...(data.bodycam||[]),
     ...(data.moto?[data.moto]:[])
   ];
   const totalProblemas = allItems.filter(it=>it.status&&it.status!=="ok").length;
@@ -675,7 +804,10 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
           {adminAuth ? (
             <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div style={{fontSize:12,color:"#22c55e",fontWeight:700}}>🔓 Gerencial — pode editar e resolver</div>
-              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm,color:"#64748b",fontSize:10}}>Sair</button>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>gerarPDFEquipamentos(project,data)} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}>📄 PDF</button>
+                <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm,color:"#64748b",fontSize:10}}>Sair</button>
+              </div>
             </div>
           ) : (
             <div style={{background:"#001a2e",border:"1px solid #0ea5e933",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -714,6 +846,12 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
             <SecaoItens titulo="Pânico ZTRAX" icon="🚨" tipo="ztrax"
               items={data.ztrax||[]} project={project}
               onUpdate={v=>saveSection("ztrax",v)} adminAuth={adminAuth} dark={dark}/>
+          )}
+
+          {TEM_BODYCAM.includes(project.id) && (
+            <SecaoItens titulo="Bodycam" icon="📹" tipo="bodycam"
+              items={data.bodycam||[]} project={project}
+              onUpdate={v=>saveSection("bodycam",v)} adminAuth={adminAuth} dark={dark}/>
           )}
 
           <SecMoto moto={data.moto} project={project}
