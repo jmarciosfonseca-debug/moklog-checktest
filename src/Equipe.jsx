@@ -467,6 +467,31 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
         </div>
 
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Banner afastamento indeterminado */}
+          {colab.afastamentoAberto && (()=>{
+            const entry=(colab.historico||[]).find(h=>h.id===colab.afastamentoAberto&&h.emAberto);
+            if(!entry) return null;
+            const dias=Math.floor((Date.now()-new Date(entry.data+"T12:00:00").getTime())/86400000);
+            return(
+              <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:4}}>
+                <div>
+                  <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>🚨 Afastamento Indeterminado</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>Desde {fmtDate(entry.data)} · {dias} dia(s) em aberto</div>
+                </div>
+                {adminAuth&&(
+                  <button onClick={()=>{
+                    const newHist=(colab.historico||[]).map(h=>h.id===entry.id?{...h,emAberto:false,dataRetorno:todayStr()}:h);
+                    const newColab={...colab,historico:newHist,afastamentoAberto:null};
+                    const newColabs=equipeData.colaboradores.map(c=>c.id===colab.id?newColab:c);
+                    setSelColab(newColab);
+                    save({...equipeData,colaboradores:newColabs});
+                  }} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
+                    ✓ Encerrar
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           {/* Datas */}
           <div style={{ ...S.card, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <div>
@@ -554,28 +579,6 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
         </div>
 
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
-          {/* Banner afastamento indeterminado */}
-          {colab.afastamentoAberto && (()=>{
-            const entry=(colab.historico||[]).find(h=>h.id===colab.afastamentoAberto&&h.emAberto);
-            if(!entry) return null;
-            const dias=Math.floor((Date.now()-new Date(entry.data+"T12:00:00").getTime())/86400000);
-            return(
-              <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-                <div>
-                  <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>🚨 Afastamento Indeterminado</div>
-                  <div style={{fontSize:11,color:"#94a3b8"}}>Desde {fmtDate(entry.data)} · {dias} dia(s) em aberto</div>
-                </div>
-                {adminAuth&&(
-                  <button onClick={()=>{
-                    const newHist=(colab.historico||[]).map(h=>h.id===entry.id?{...h,emAberto:false,dataRetorno:todayStr()}:h);
-                    onDesligar({...colab,historico:newHist,afastamentoAberto:null},"Retorno","Retorno",todayStr());
-                  }} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
-                    ✓ Encerrar
-                  </button>
-                )}
-              </div>
-            );
-          })()}
           {/* Foto */}
           <div style={{ ...S.card, display:"flex", gap:14, alignItems:"center" }}>
             <label style={{ cursor:"pointer", flexShrink:0 }}>
