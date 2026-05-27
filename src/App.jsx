@@ -7,33 +7,109 @@ import Equipamentos from "./Equipamentos";
 import Visita from "./Visita";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 
+// ── Hook de conectividade
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+  React.useEffect(() => {
+    const handleOnline  = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online",  handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online",  handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+  return isOnline;
+}
+
+// ── Firebase save com retry automático (até 3 tentativas)
+async function safeFirebaseSave(saveFn, maxRetries = 3) {
+  let lastError;
+  for(let attempt = 1; attempt <= maxRetries; attempt++) {
+    if(!navigator.onLine) {
+      // Wait up to 8s for reconnection
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 8000);
+        window.addEventListener("online", () => { clearTimeout(timeout); resolve(); }, { once: true });
+      });
+    }
+    try {
+      await saveFn();
+      return { ok: true };
+    } catch(e) {
+      lastError = e;
+      console.warn(`Firebase save attempt ${attempt}/${maxRetries} failed:`, e.message);
+      if(attempt < maxRetries) await new Promise(r => setTimeout(r, 1500 * attempt));
+    }
+  }
+  return { ok: false, error: lastError };
+}
+
 // ── Escudo de proteção global contra crashes
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError:false, error:null };
+    this.state = { hasError:false, error:null, errorInfo:null };
   }
   static getDerivedStateFromError(error) {
     return { hasError:true, error };
   }
   componentDidCatch(error, info) {
-    console.error("MokLog ErrorBoundary caught:", error, info);
+    // Log with module context
+    console.error(`[MokLog ErrorBoundary] Módulo: ${this.props.moduleName||"desconhecido"}`, error, info);
+    this.setState({ errorInfo: info });
+    // Try to save error to localStorage for debugging
+    try {
+      const log = JSON.parse(localStorage.getItem("moklog_errors")||"[]");
+      log.unshift({ ts: new Date().toISOString(), module: this.props.moduleName||"?", msg: error?.message||"?", stack: error?.stack?.slice(0,300)||"?" });
+      localStorage.setItem("moklog_errors", JSON.stringify(log.slice(0,10))); // keep last 10
+    } catch(e){}
   }
   render() {
     if(this.state.hasError) {
-      const dark = true;
+      // inline = true means this boundary wraps a small block, not full screen
+      const isInline = this.props.inline;
+      const moduleName = this.props.moduleName || "módulo";
+      const errMsg = this.state.error?.message || "Erro desconhecido";
+      // Is it a null/undefined property access? Give friendlier message
+      const isNullErr = errMsg.includes("Cannot read") || errMsg.includes("null") || errMsg.includes("undefined");
+      const friendlyMsg = isNullErr
+        ? "Dado incompleto ou corrompido no banco de dados."
+        : errMsg;
+
+      if(isInline) {
+        // Inline boundary: shows a small warning card, doesn't take full screen
+        return (
+          <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",margin:"4px 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>⚠️</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>Erro em: {moduleName}</div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{friendlyMsg}</div>
+              </div>
+              <button onClick={()=>this.setState({hasError:false,error:null,errorInfo:null})}
+                style={{background:"#1d4ed8",color:"#fff",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
+                🔄 Tentar
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Full-screen boundary
       return (
         <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",padding:24}}>
-          <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:16,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center"}}>
+          <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",textAlign:"center"}}>
             <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
             <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Algo deu errado</div>
             <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>
-              {this.props.moduleName ? `Módulo: ${this.props.moduleName}` : "Erro inesperado"}
+              Módulo: <strong style={{color:"#f59e0b"}}>{moduleName}</strong>
             </div>
             <div style={{fontSize:11,color:"#64748b",marginBottom:20,background:"#0f0202",borderRadius:8,padding:"8px 12px",textAlign:"left",wordBreak:"break-word"}}>
-              {this.state.error?.message || "Erro desconhecido"}
+              {friendlyMsg}
             </div>
-            <button onClick={()=>this.setState({hasError:false,error:null})}
+            <button onClick={()=>this.setState({hasError:false,error:null,errorInfo:null})}
               style={{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%",marginBottom:8}}>
               🔄 Tentar novamente
             </button>
@@ -41,12 +117,25 @@ class ErrorBoundary extends React.Component {
               style={{background:"transparent",color:"#64748b",border:"1px solid #1e293b",borderRadius:10,padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
               ↩ Recarregar app
             </button>
+            <div style={{fontSize:10,color:"#334155",marginTop:12}}>
+              Os dados salvos localmente estão protegidos.
+            </div>
           </div>
         </div>
       );
     }
-    return this.props.children;
+    // Null-safe render: wrap children in try-catch via React error boundary
+    return this.props.children || null;
   }
+}
+
+// ── Inline ErrorBoundary helper — para proteger blocos menores
+function SafeBlock({ name, children }) {
+  return (
+    <ErrorBoundary moduleName={name} inline={true}>
+      {children}
+    </ErrorBoundary>
+  );
 }
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
@@ -85,8 +174,11 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
 async function saveToFirebase(projectId, history) {
-  try { await setDoc(doc(db,"projects",projectId),{history,updatedAt:new Date().toISOString()}); }
-  catch(e){ console.error("Firebase save:",e); }
+  const result = await safeFirebaseSave(async () => {
+    await setDoc(doc(db,"projects",projectId),{history,updatedAt:new Date().toISOString()});
+  });
+  if(!result.ok) console.error("Firebase save failed after retries:", result.error);
+  return result;
 }
 async function loadAllFromFirebase() {
   try { const snap=await getDocs(collection(db,"projects")); const data={}; snap.forEach(d=>{data[d.id]=d.data();}); return data; }
@@ -103,9 +195,9 @@ function generateViewToken(projectId) {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const PROJECT_PINS = {
-  P601:"16601",P602:"16602",P604:"16604",P605:"16605",
-  P606:"16606",P607:"16607",P311A:"16311",P311B:"16311",P505:"16505",
-  P260A:"1626001", P260B:"1626002", P260C:"1626003"
+  P601:"16601", P602:"16602", P604:"16604", P605:"16605",
+  P606:"16606", P607:"16607", P311A:"16311", P311B:"16311", P505:"16505",
+  P260A:"162601", P260B:"162602", P260C:"162603"
 };
 
 // ─── Jatinox ──────────────────────────────────────────────────────────────────
@@ -488,14 +580,56 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
   const handlePhoto = (e) => {
     try {
       const file = e.target.files?.[0]; if(!file) return;
-      if(file.size > 5 * 1024 * 1024) { alert("Foto muito grande. Use uma imagem menor que 5MB."); return; }
+      if(file.size > 10 * 1024 * 1024) { alert("Foto muito grande. Use uma imagem menor que 10MB."); return; }
       const r = new FileReader();
-      r.onerror = () => console.error("Error reading file");
+      r.onerror = () => {
+        console.error("Error reading file");
+        alert("Não foi possível ler a foto. Tente novamente.");
+      };
       r.onload = ev => {
         try {
-          const filtered = photos.filter(p=>p.photoKey!==key);
-          setPhotos([...filtered, {photoKey:key, catId, catLabel, itemLabel, name:file.name, url:ev.target.result}]);
-        } catch(err) { console.error("Photo save error:", err); }
+          // Compress via Canvas: 300px / 60% quality
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const MAX = 300;
+              let w = img.width, h = img.height;
+              if(w > h && w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
+              else if(h >= w && h > MAX) { w = Math.round(w*MAX/h); h = MAX; }
+              const canvas = document.createElement("canvas");
+              canvas.width = w; canvas.height = h;
+              const ctx = canvas.getContext("2d");
+              if(!ctx) throw new Error("Canvas context unavailable");
+              ctx.drawImage(img, 0, 0, w, h);
+              let compressed = canvas.toDataURL("image/jpeg", 0.6);
+              // Safety: if still > 100KB, compress harder
+              if(compressed.length > 100*1024) {
+                canvas.width = Math.min(w, 200);
+                canvas.height = Math.min(h, 200);
+                canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                compressed = canvas.toDataURL("image/jpeg", 0.45);
+              }
+              // Final size guard: if > 150KB, discard and warn
+              if(compressed.length > 150*1024) {
+                alert("Foto muito pesada mesmo após compressão. Relatório será salvo sem ela.");
+                return;
+              }
+              const filtered = photos.filter(p=>p.photoKey!==key);
+              setPhotos([...filtered, {photoKey:key, catId, catLabel, itemLabel, name:file.name, url:compressed}]);
+            } catch(compressErr) {
+              console.error("Compression error:", compressErr);
+              // Fallback: save without photo, don't crash
+              alert("Erro ao processar foto. Relatório será salvo sem ela.");
+            }
+          };
+          img.onerror = () => {
+            alert("Não foi possível carregar a foto. Relatório será salvo sem ela.");
+          };
+          img.src = ev.target.result;
+        } catch(err) {
+          console.error("Photo save error:", err);
+          alert("Erro inesperado na foto. Prosseguindo sem ela.");
+        }
       };
       r.readAsDataURL(file);
     } catch(err) { console.error("Photo handle error:", err); }
@@ -1735,6 +1869,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
 
 export default function App(){
   const [screen,setScreen]=useState("home");
+  const isOnline = useOnlineStatus();
   const [showAcesso,setShowAcesso]=useState(false);
   const [acessoScreen,setAcessoScreen]=useState("menu");
   const [dark,setDark]=useState(true);
@@ -1843,13 +1978,35 @@ export default function App(){
 
   const saveReport=async(st,mt)=>{
     setSyncing(true);setSyncStatus("");
+    // Validate state is not corrupted before saving
+    if(!st || typeof st !== "object") {
+      setSyncing(false);
+      alert("Erro: dados do relatório inválidos. Tente novamente.");
+      return;
+    }
     const prev=stored[project.id]?.history??[];
     const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
     const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
-    setStored(up);localStorage.setItem("seccheck_v4",JSON.stringify(up));
+    // Always save to localStorage first (offline-safe)
+    try {
+      setStored(up);
+      localStorage.setItem("seccheck_v4",JSON.stringify(up));
+    } catch(localErr) {
+      console.error("localStorage save failed:", localErr);
+    }
     clearDraft();
-    try{await saveToFirebase(project.id,next);setSyncStatus("saved");}
-    catch(e){setSyncStatus("error");}
+    // Then try Firebase with retry
+    if(!navigator.onLine) {
+      setSyncStatus("offline");
+      setSyncing(false);
+      setTimeout(()=>setSyncStatus(""),4000);
+      return; // Data already saved locally
+    }
+    try{
+      const result = await saveToFirebase(project.id,next);
+      setSyncStatus(result?.ok===false ? "error" : "saved");
+    }
+    catch(e){ setSyncStatus("error"); }
     finally{setSyncing(false);setTimeout(()=>setSyncStatus(""),3000);}
     const h=computeHealth(project,st);
     const criticalItems=[];
@@ -1898,7 +2055,9 @@ export default function App(){
   ):syncStatus==="saved"?(
     <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✓ Salvo</div>
   ):syncStatus==="error"?(
-    <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✗ Erro — local OK</div>
+    <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✗ Erro — salvo localmente</div>
+  ):syncStatus==="offline"?(
+    <div style={{position:"fixed",bottom:16,right:16,background:"#92400e",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>📡 Offline — salvo no dispositivo</div>
   ):null;
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
@@ -1944,7 +2103,7 @@ export default function App(){
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
   if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onDeleteReport={deleteReport}/>;
-  if(screen==="history") return <HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/>;
+  if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} onBack={()=>setScreen("form")} onHome={()=>setScreen("home")}/>;
 
   // ── FORM
@@ -2086,12 +2245,12 @@ export default function App(){
                       </button>
                     )}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      {["P260A"].includes(jp.id)&&(
+                      {jp.id==="P260A"&&(
                         <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setShowAcessoCCO(true);}}
                           style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
                       )}
                       <button onClick={()=>{setEquipamentosProject({id:jp.id,name:jp.name});setShowEquipamentos(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:["P260A"].includes(jp.id)?"auto":"1/-1"}}>🛡️ Equipamentos</button>
+                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:jp.id==="P260A"?"auto":"1/-1"}}>🛡️ Equipamentos</button>
                       <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
                       <button onClick={()=>{setVisitaProject({id:jp.id,name:jp.name});setShowVisita(true);}}
@@ -2212,6 +2371,13 @@ export default function App(){
   // ── HOME — Main cards
   return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
+      {/* Offline banner */}
+      {!isOnline && (
+        <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#92400e",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <span style={{fontSize:14}}>📡</span>
+          <span style={{fontSize:12,color:"#fef3c7",fontWeight:700}}>Sem conexão — dados salvos localmente, aguardando reconexão...</span>
+        </div>
+      )}
       <SyncBadge/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
