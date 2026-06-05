@@ -57,10 +57,10 @@ const CARGOS_PROJETO = {
 
 // Turnos por projeto — P601-P607 e P311A/B só Diurno/Noturno (12x36)
 const TURNOS_SEM_FOLGUISTA = ["P601","P602","P604","P605","P606","P607","P311A","P311B"];
-const TURNOS = ["Diurno","Noturno","Folguista"];
+const TURNOS = ["Diurno","Noturno","Folguista","Perista"];
 function getTurnos(projectId) {
-  if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno"];
-  return ["Diurno","Noturno","Folguista"];
+  if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno","Perista"];
+  return ["Diurno","Noturno","Folguista","Perista"];
 }
 const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento"];
 const HIST_COLORS = {
@@ -76,6 +76,7 @@ const TURNO_CONFIG = {
   "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
   "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
   "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:"☀️🌙" },
+  "Perista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:"🔄" },
 };
 
 function todayStr() { return new Date().toISOString().split("T")[0]; }
@@ -168,6 +169,90 @@ function emptyColab(cargo, projectId, turno) {
 }
 
 // ── Styles (dark padrão)
+
+
+// ── Tela de edição de item do histórico
+function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
+  const S = getStyles(dark);
+  const hc = HIST_COLORS[item.tipo] || HIST_COLORS["Medida Disciplinar"];
+  const [data, setData] = useState(item.data || "");
+  const [detalhe, setDetalhe] = useState(item.detalhe || "");
+  const [label, setLabel] = useState(item.label || "");
+
+  const canEdit = !isLider || !item.editadoPor; // lider só pode editar 1x
+
+  if(!canEdit) return (
+    <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
+      <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
+        <div style={{fontSize:32, marginBottom:8}}>🔒</div>
+        <div style={{fontSize:14, fontWeight:700, ...S.txt, marginBottom:8}}>Edição não permitida</div>
+        <div style={{fontSize:12, ...S.txt2, marginBottom:16}}>Este registro já foi editado. Apenas o gerencial pode editar novamente.</div>
+        <button onClick={onCancel} style={{...S.btnSec, fontSize:13}}>← Voltar</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={S.page}>
+      <div style={S.wrap}>
+        <div style={{position:"sticky", top:0, zIndex:10, ...S.headerBg, padding:"14px 16px"}}>
+          <div style={{display:"flex", alignItems:"center", gap:10}}>
+            <button onClick={onCancel} style={S.backBtn}>← Cancelar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14, fontWeight:800, ...S.txtPrimary}}>✏️ Editar Registro</div>
+              <div style={{fontSize:11, ...S.txtSecondary}}>
+                {item.tipo}
+                {isLider && <span style={{color:"#f59e0b"}}> · Edição única</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{padding:"14px 16px", display:"flex", flexDirection:"column", gap:10}}>
+          <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
+            <div>
+              <label style={S.lbl}>Data</label>
+              <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
+            </div>
+            {item.tipo==="Medida Disciplinar" && (
+              <div>
+                <label style={S.lbl}>Tipo de Medida</label>
+                <div style={{display:"flex", gap:8}}>
+                  {["Advertência","Suspensão"].map(d=>(
+                    <button key={d} onClick={()=>setDetalhe(d)}
+                      style={{...S.btnSm, flex:1, padding:"10px 8px", color:detalhe===d?"#a855f7":"#475569", border:`1px solid ${detalhe===d?"#a855f744":"#0f172a"}`, background:detalhe===d?"#120a2e":"#020510", fontSize:12}}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(item.tipo==="FT"||item.tipo==="Treinamento") && (
+              <div>
+                <label style={S.lbl}>Observação</label>
+                <input value={detalhe} onChange={e=>setDetalhe(e.target.value)} placeholder="Observação..." style={S.inp}/>
+              </div>
+            )}
+            {item.tipo==="Férias" && (
+              <div>
+                <label style={S.lbl}>Data de Retorno</label>
+                <input type="date" value={detalhe} onChange={e=>setDetalhe(e.target.value)} style={S.inp}/>
+              </div>
+            )}
+          </div>
+          {isLider && (
+            <div style={{background:"#1a1000", border:"1px solid #f59e0b33", borderRadius:8, padding:"8px 12px"}}>
+              <div style={{fontSize:11, color:"#f59e0b"}}>⚠️ Após salvar, este registro não poderá ser editado novamente pelo líder.</div>
+            </div>
+          )}
+          <button onClick={()=>onSave({data, detalhe, label})}
+            style={{...S.btn, background:`linear-gradient(135deg,${hc.color},${hc.color}cc)`}}>
+            ✓ Salvar Edição
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Gerar PDF de Mapa de Equipe
 function gerarMapaEquipePDF(project, colaboradores, titulo) {
@@ -408,7 +493,7 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 }
 
 // ── Tela de ficha completa
-function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, dark }) {
+function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -523,17 +608,33 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
                 const hColor = hc.color;
                 const hBg    = hc.bg;
                 return (
-                  <div key={h.id} style={{ display:"flex", alignItems:"center", gap:10, background:hBg, borderRadius:8, padding:"9px 12px", border:`1px solid ${hColor}22` }}>
-                    <span style={{ fontSize:9, fontWeight:700, color:hColor, background:hColor+"22", padding:"2px 7px", borderRadius:5, flexShrink:0, textTransform:"uppercase" }}>
+                  <div key={h.id} style={{ display:"flex", alignItems:"flex-start", gap:10, background:hBg, borderRadius:8, padding:"9px 12px", border:`1px solid ${h.editadoPor?"#f59e0b44":hColor+"22"}` }}>
+                    <span style={{ fontSize:9, fontWeight:700, color:hColor, background:hColor+"22", padding:"2px 7px", borderRadius:5, flexShrink:0, textTransform:"uppercase", marginTop:2 }}>
                       {h.tipo}
                     </span>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:12, color:"#f1f5f9", fontWeight:600 }}>{fmtDate(h.data)}</div>
+                      {h.label && <div style={{ fontSize:10, color:"#94a3b8" }}>{h.label}</div>}
                       {h.detalhe && <div style={{ fontSize:10, color:"#64748b" }}>{h.detalhe}</div>}
+                      {h.editadoPor && (
+                        <div style={{ fontSize:9, color:"#f59e0b", marginTop:2 }}>
+                          ✏️ Editado {h.editadoPor==="lider"?"pelo líder":"pelo gerencial"} · {fmtDate(h.editadoEm?.split("T")[0])}
+                        </div>
+                      )}
                     </div>
-                    {adminAuth && (
-                      <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}>✕</button>
-                    )}
+                    <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+                      {/* Líder: editar UMA vez se ainda não foi editado */}
+                      {liderAuth && !adminAuth && !h.editadoPor && (
+                        <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
+                      )}
+                      {/* Gerencial: editar sempre + excluir */}
+                      {adminAuth && (
+                        <>
+                          <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
+                          <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}>✕</button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -858,6 +959,276 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
   );
 }
 
+
+// ── Projeção de Férias
+function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, ferias, dark, onToggleTheme }) {
+  const S = getStyles(dark);
+
+  // ferias = array of { colabId, dataInicio, dataRetorno(auto), cobertura, ordem }
+  const [lista, setLista] = useState(() => {
+    // Merge colaboradores with existing ferias data
+    return colaboradores.map(c => {
+      const existing = (ferias||[]).find(f=>f.colabId===c.id);
+      return {
+        colabId: c.id,
+        nome: c.nome,
+        cargo: c.cargo,
+        turno: c.turno,
+        foto: c.foto||"",
+        dataContratacao: c.dataContratacao||"",
+        dataInicio: existing?.dataInicio||"",
+        dataRetorno: existing?.dataRetorno||"",
+        cobertura: existing?.cobertura||"",
+        ordem: existing?.ordem ?? colaboradores.indexOf(c),
+      };
+    }).sort((a,b)=>a.ordem-b.ordem);
+  });
+
+  const [editId, setEditId] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  function calcRetorno(inicio) {
+    if(!inicio) return "";
+    try {
+      const d = new Date(inicio+"T12:00:00");
+      d.setDate(d.getDate()+30);
+      return d.toISOString().split("T")[0];
+    } catch { return ""; }
+  }
+
+  function calcPeriodoAquisitivo(dataContratacao) {
+    if(!dataContratacao) return null;
+    try {
+      const contrat = new Date(dataContratacao+"T12:00:00");
+      const hoje = new Date();
+      const meses = (hoje.getFullYear()-contrat.getFullYear())*12 + (hoje.getMonth()-contrat.getMonth());
+      const completo = meses >= 12;
+      return { meses, completo };
+    } catch { return null; }
+  }
+
+  function fmtD(d) {
+    if(!d) return "--";
+    try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
+  }
+
+  function alertaFerias(item) {
+    if(!item.dataInicio) return null;
+    const hoje = new Date();
+    const inicio = new Date(item.dataInicio+"T12:00:00");
+    const diff = Math.floor((inicio-hoje)/86400000);
+    if(diff < 0) return null; // já começou
+    if(diff <= 2) return { tipo:"urgente", msg:`⚠️ Férias em ${diff===0?"hoje":diff===1?"amanhã":diff+" dias"}!` };
+    if(diff <= 7) return { tipo:"aviso", msg:`📅 Férias em ${diff} dias` };
+    return null;
+  }
+
+  const updateItem = (colabId, fields) => {
+    setLista(prev => prev.map(item => {
+      if(item.colabId !== colabId) return item;
+      const updated = {...item, ...fields};
+      if(fields.dataInicio !== undefined) {
+        updated.dataRetorno = calcRetorno(fields.dataInicio);
+      }
+      return updated;
+    }));
+  };
+
+  const moveUp = (idx) => {
+    if(idx===0) return;
+    const newList = [...lista];
+    [newList[idx-1], newList[idx]] = [newList[idx], newList[idx-1]];
+    newList.forEach((item,i) => item.ordem=i);
+    setLista(newList);
+  };
+
+  const moveDown = (idx) => {
+    if(idx===lista.length-1) return;
+    const newList = [...lista];
+    [newList[idx], newList[idx+1]] = [newList[idx+1], newList[idx]];
+    newList.forEach((item,i) => item.ordem=i);
+    setLista(newList);
+  };
+
+  const salvar = async () => {
+    setSaving(true);
+    await onSave(lista);
+    setSaving(false);
+    setEditId(null);
+  };
+
+  // PDF Projeção
+  const gerarPDF = () => {
+    const hoje = new Date().toLocaleDateString("pt-BR");
+    const rows = lista.map(item => {
+      const pa = calcPeriodoAquisitivo(item.dataContratacao);
+      const alerta = alertaFerias(item);
+      return `<tr>
+        <td><strong>${item.nome}</strong><br><span style="font-size:11px;color:#64748b">${item.cargo}</span></td>
+        <td>${item.dataInicio?fmtD(item.dataInicio):"—"}</td>
+        <td>${item.dataRetorno?fmtD(item.dataRetorno):"—"}</td>
+        <td>${item.cobertura||"—"}</td>
+        <td>${pa?`${pa.meses}m ${pa.completo?"✅":"⏳"}`:"—"}</td>
+        <td style="color:${alerta?.tipo==="urgente"?"#dc2626":"#d97706"}">${alerta?.msg||"—"}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+    <title>Projeção Férias ${project.id}</title>
+    <style>body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;color:#1e293b}
+    .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:20px;border-radius:12px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left}
+    td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+    @media print{@page{margin:12mm}}</style></head>
+    <body>
+    <div class="no-print" style="margin-bottom:12px"><button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / PDF</button></div>
+    <div class="header"><h1 style="margin:0 0 4px;font-size:18px">🏖️ Projeção de Férias</h1>
+    <p style="margin:0;font-size:12px;opacity:.8">${project.id} — ${project.name||""} · Gerado em ${hoje}</p></div>
+    <table><thead><tr><th>Colaborador</th><th>Início</th><th>Retorno</th><th>Cobertura</th><th>Período Aq.</th><th>Alerta</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div style="margin-top:14px;font-size:10px;color:#94a3b8;text-align:center">MokLog CheckTest © Moked Consulting Security · ${project.id}</div>
+    </body></html>`;
+
+    const blob = new Blob([html],{type:"text/html"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download=`ferias_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={S.page}>
+      <div style={S.wrap}>
+        <div style={{position:"sticky",top:0,zIndex:10,...S.headerBg,padding:"14px 16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:800,...S.txtPrimary}}>🏖️ Projeção de Férias</div>
+              <div style={{fontSize:11,...S.txtSecondary}}>{project.id} · {lista.length} colaborador(es)</div>
+            </div>
+            <button onClick={gerarPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}>📄 PDF</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:13,...S.txtSecondary}}>{dark?"☀️":"🌙"}</button>
+          </div>
+        </div>
+
+        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:8}}>
+          {lista.map((item,idx) => {
+            const pa = calcPeriodoAquisitivo(item.dataContratacao);
+            const alerta = alertaFerias(item);
+            const tc = TURNO_CONFIG[item.turno] || TURNO_CONFIG["Diurno"];
+            const isEditing = editId===item.colabId;
+
+            return (
+              <div key={item.colabId} style={{...S.card, border:`2px solid ${alerta?.tipo==="urgente"?"#ef444444":alerta?"#f59e0b33":dark?"#0f172a":"#e2e8f0"}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  {/* Foto */}
+                  <div style={{width:44,height:44,borderRadius:10,overflow:"hidden",border:`2px solid ${tc.badge}44`,flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    {item.foto?<img src={item.foto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20}}>👤</span>}
+                  </div>
+                  {/* Info */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:700,...S.txtPrimary,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.nome}</div>
+                    <div style={{fontSize:11,...S.txtSecondary}}>{item.cargo}</div>
+                    <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap",alignItems:"center"}}>
+                      <span style={{fontSize:9,color:tc.badge,background:tc.bg,padding:"1px 6px",borderRadius:4,fontWeight:700}}>{tc.icon} {item.turno}</span>
+                      {pa && <span style={{fontSize:9,color:pa.completo?"#22c55e":"#f59e0b",fontWeight:700}}>{pa.completo?"✅ Aquisitivo OK":`⏳ ${pa.meses}m/12`}</span>}
+                    </div>
+                  </div>
+                  {/* Reorder buttons — admin only */}
+                  {adminAuth && (
+                    <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+                      <button onClick={()=>moveUp(idx)} disabled={idx===0}
+                        style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:idx===0?dark?"#1e293b":"#e2e8f0":dark?"#64748b":"#94a3b8",borderRadius:4,width:24,height:22,cursor:idx===0?"not-allowed":"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>↑</button>
+                      <button onClick={()=>moveDown(idx)} disabled={idx===lista.length-1}
+                        style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:idx===lista.length-1?dark?"#1e293b":"#e2e8f0":dark?"#64748b":"#94a3b8",borderRadius:4,width:24,height:22,cursor:idx===lista.length-1?"not-allowed":"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
+                    </div>
+                  )}
+                  {/* Edit toggle — admin only */}
+                  {adminAuth && (
+                    <button onClick={()=>setEditId(isEditing?null:item.colabId)}
+                      style={{...S.btnSm,color:isEditing?"#ef4444":"#0ea5e9",border:`1px solid ${isEditing?"#ef444433":"#0ea5e944"}`,fontSize:10,flexShrink:0}}>
+                      {isEditing?"✕":"✏️"}
+                    </button>
+                  )}
+                </div>
+
+                {/* Férias info */}
+                {!isEditing && (
+                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`}}>
+                    {item.dataInicio ? (
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div>
+                          <div style={{fontSize:9,...S.txtSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Início</div>
+                          <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>{fmtD(item.dataInicio)}</div>
+                        </div>
+                        <div>
+                          <div style={{fontSize:9,...S.txtSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Retorno (30d)</div>
+                          <div style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>{fmtD(item.dataRetorno)}</div>
+                        </div>
+                        <div style={{gridColumn:"1/-1"}}>
+                          <div style={{fontSize:9,...S.txtSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Cobertura</div>
+                          <div style={{fontSize:12,...S.txtPrimary}}>{item.cobertura||<span style={{color:dark?"#334155":"#94a3b8"}}>Não definida ⚠️</span>}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{fontSize:11,...S.txtSecondary}}>
+                        {adminAuth?"Toque em ✏️ para agendar férias":"Sem férias agendadas"}
+                      </div>
+                    )}
+                    {alerta && (
+                      <div style={{marginTop:8,background:alerta.tipo==="urgente"?dark?"#1a0202":"#fee2e2":dark?"#1a1000":"#fef3c7",border:`1px solid ${alerta.tipo==="urgente"?"#ef444433":"#f59e0b33"}`,borderRadius:6,padding:"5px 10px",fontSize:11,color:alerta.tipo==="urgente"?"#ef4444":"#d97706",fontWeight:700}}>
+                        {alerta.msg}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit form */}
+                {isEditing && adminAuth && (
+                  <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,display:"flex",flexDirection:"column",gap:8}}>
+                    <div>
+                      <label style={S.lbl}>Data de Início das Férias</label>
+                      <input type="date" value={item.dataInicio}
+                        onChange={e=>updateItem(item.colabId,{dataInicio:e.target.value})}
+                        style={S.inp}/>
+                    </div>
+                    <div>
+                      <label style={S.lbl}>Data de Retorno (automático — 30 dias)</label>
+                      <input type="date" value={item.dataRetorno} readOnly
+                        style={{...S.inp, opacity:0.6, cursor:"not-allowed"}}/>
+                    </div>
+                    <div>
+                      <label style={S.lbl}>Cobertura (nome ou "Perista")</label>
+                      <input value={item.cobertura}
+                        onChange={e=>updateItem(item.colabId,{cobertura:e.target.value})}
+                        placeholder="Nome do coberturista ou Perista..."
+                        style={S.inp}/>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+                      <button onClick={salvar} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>
+                        {saving?"⟳ Salvando...":"✓ Salvar"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {adminAuth && (
+            <button onClick={salvar} disabled={saving}
+              style={{...S.btnGreen||S.btn, background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
+              {saving?"⟳ Salvando ordem...":"💾 Salvar Ordem e Dados"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Tela de PIN (entrada)
 function PinScreen({ project, onSuccess, onBack, dark }) {
   const S = getStyles(dark);
@@ -924,6 +1295,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [showDesligados, setShowDesligados] = useState(false);
   const [selPDF, setSelPDF] = useState([]); // ids selecionados para PDF
   const [modoSel, setModoSel] = useState(false); // modo seleção PDF
+  const [editHistItem, setEditHistItem] = useState(null); // item do histórico em edição
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [darkLocal, setDarkLocal] = useState(true);
@@ -1069,6 +1441,30 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setSelColab(newColabs.find(c=>c.id===colabId));
   };
 
+  const saveEditHist = async (colabId, histId, updatedFields, isLider) => {
+    const newColabs = equipeData.colaboradores.map(c => {
+      if(c.id !== colabId) return c;
+      const newHist = (c.historico||[]).map(h => {
+        if(h.id !== histId) return h;
+        return {
+          ...h,
+          ...updatedFields,
+          editadoPor: isLider ? "lider" : "gerencial",
+          editadoEm: new Date().toISOString(),
+        };
+      });
+      return {...c, historico: newHist};
+    });
+    const newData = {...equipeData, colaboradores: newColabs};
+    setEquipeData(newData);
+    // Update selColab if it's the one being edited
+    const updated = newColabs.find(c=>c.id===colabId);
+    if(updated) setSelColab(updated);
+    await saveEquipe(project.id, newData);
+    setEditHistItem(null);
+    setScreen("view");
+  };
+
   const desligarColab = async (colab, motivo, tipoDeslig, dataDeslig) => {
     if(!adminAuth) return;
     const desligado = {
@@ -1118,6 +1514,29 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("list");setForm(null);}} saving={saving} isEdit={false} dark={dark}/>
   );
+  if(screen==="editHist"&&editHistItem) return (
+    <EditHistScreen
+      item={editHistItem}
+      isLider={!adminAuth}
+      onSave={(updatedFields)=>saveEditHist(selColab.id, editHistItem.id, updatedFields, !adminAuth)}
+      onCancel={()=>{setEditHistItem(null);setScreen("view");}}
+      dark={dark}/>
+  );
+  if(screen==="ferias") return (
+    <ProjecaoFerias
+      project={project}
+      colaboradores={(equipeData.colaboradores||[]).filter(c=>c.status==="ativo")}
+      adminAuth={adminAuth}
+      onBack={()=>setScreen("list")}
+      onSave={async(ferias)=>{
+        const newData = {...equipeData, ferias};
+        setEquipeData(newData);
+        await saveEquipe(project.id, newData);
+      }}
+      ferias={equipeData.ferias||[]}
+      dark={dark}
+      onToggleTheme={toggleDark}/>
+  );
   if(screen==="edit"&&form&&adminAuth) return (
     <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("view");setForm(null);}} saving={saving} isEdit={true} dark={dark}/>
@@ -1137,6 +1556,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
+        onEditHist={(colabId, item)=>{setEditHistItem(item);setScreen("editHist");}}
         onDesligar={desligarColab}
         onRemoveHist={removeHist}/>
     );
@@ -1171,6 +1591,10 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                   <button onClick={()=>{ setModoSel(!modoSel); setSelPDF([]); }}
                     style={{ ...S.btnSm, color: modoSel?"#f59e0b":"#22c55e", border:`1px solid ${modoSel?"#f59e0b44":"#22c55e44"}`, fontSize:10, padding:"4px 10px" }}>
                     {modoSel?"✕ Cancelar":"📄 Exportar PDF"}
+                  </button>
+                  <button onClick={()=>setScreen("ferias")}
+                    style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
+                    🏖️ Férias
                   </button>
                   <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
                 </div>
