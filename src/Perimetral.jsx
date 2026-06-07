@@ -86,8 +86,8 @@ function emptyTeste() {
   };
 }
 
-// ── Gerador de PDF
-function gerarPDFTeste(teste) {
+// ── Gerador de PDF com gráfico e análise (padrão TDS P505)
+function gerarPDFTeste(teste, allTestes) {
   const zonaRows = ZONAS.map(z=>{
     const zd = teste.zonas[z]||{status:"ok",obs:""};
     const cfg = STATUS_CFG[zd.status]||STATUS_CFG.ok;
@@ -141,7 +141,60 @@ function gerarPDFTeste(teste) {
   <div class="footer">MokLog CheckTest © Moked Consulting Security · P505 · ${fmtDate(teste.data)}</div>
   </body></html>`;
 
-  const blob = new Blob([html],{type:"text/html"});
+  // Historical analysis — calculate fail rate per zone from all tests
+  const historico = (allTestes||[]).filter(t=>t.turno===teste.turno).slice(0,20);
+  const zoneStats = ZONAS.map(z=>{
+    const total = historico.length;
+    if(total===0) return {zona:z, total:0, falhas:0, pct:0, criticidade:"--"};
+    const falhas = historico.filter(t=>(t.zonas[z]?.status||"ok")!=="ok").length;
+    const pct = Math.round((falhas/total)*100);
+    const crit = pct>=60?"ALTA":pct>=30?"MÉDIA":"BAIXA";
+    return {zona:z, total, falhas, pct, crit};
+  });
+
+  // Chart bars
+  const chartBars = zoneStats.map(zs=>{
+    const color = zs.pct>=60?"#dc2626":zs.pct>=30?"#d97706":"#15803d";
+    const barW = Math.max(zs.pct,2);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <span style="font-size:11px;font-weight:700;width:55px;flex-shrink:0">${zs.zona}</span>
+      <div style="flex:1;background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden">
+        <div style="width:${barW}%;background:${color};height:100%;border-radius:3px;transition:.3s"></div>
+      </div>
+      <span style="font-size:11px;font-weight:700;color:${color};width:35px;text-align:right">${zs.pct}%</span>
+      <span style="font-size:9px;color:#64748b;width:45px">${zs.crit}</span>
+    </div>`;
+  }).join("");
+
+  // Zone stats table
+  const statsRows = zoneStats.map(zs=>`
+    <tr style="background:${zs.pct>=60?"#fff8f8":zs.pct>=30?"#fffef8":"#f8fffe"}">
+      <td>${zs.zona}</td>
+      <td style="text-align:center">${zs.total}</td>
+      <td style="text-align:center">${zs.total-zs.falhas}</td>
+      <td style="text-align:center">${zs.falhas}</td>
+      <td style="text-align:center;font-weight:700;color:${zs.pct>=60?"#dc2626":zs.pct>=30?"#d97706":"#15803d"}">${zs.pct}%</td>
+      <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${zs.pct>=60?"#fee2e2":zs.pct>=30?"#fef3c7":"#dcfce7"};color:${zs.pct>=60?"#dc2626":zs.pct>=30?"#d97706":"#15803d"}">${zs.crit}</span></td>
+    </tr>`).join("");
+
+  const htmlFull = html.replace('</body></html>', `
+  ${historico.length>1?`
+  <div class="card">
+    <h2>📊 Taxa de Falha por Zona — ${historico.length} teste(s) ${teste.turno}</h2>
+    <div style="margin-bottom:16px">
+      <div style="display:flex;gap:14px;margin-bottom:10px;font-size:10px">
+        <span style="color:#15803d;font-weight:700">■ BAIXA (&lt;30%)</span>
+        <span style="color:#d97706;font-weight:700">■ MÉDIA (30–59%)</span>
+        <span style="color:#dc2626;font-weight:700">■ ALTA (≥60%)</span>
+      </div>
+      ${chartBars}
+    </div>
+    <table><thead><tr><th>Zona</th><th>Total Testes</th><th>OK</th><th>Falhas</th><th>Taxa Falha</th><th>Criticidade</th></tr></thead>
+    <tbody>${statsRows}</tbody></table>
+  </div>`:""}
+</body></html>`);
+
+  const blob = new Blob([htmlFull],{type:"text/html"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href=url;
@@ -248,7 +301,7 @@ export default function Perimetral({ onBack, dark, onToggleTheme }) {
                 <div style={{fontSize:15,fontWeight:800,...S.txt}}>🔒 {viewTeste.turno}</div>
                 <div style={{fontSize:11,...S.txt2}}>{fmtDate(viewTeste.data)} às {viewTeste.hora}</div>
               </div>
-              <button onClick={()=>gerarPDFTeste(viewTeste)} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:11}}>📄 PDF</button>
+              <button onClick={()=>gerarPDFTeste(viewTeste,testes)} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:11}}>📄 PDF</button>
             </div>
           </div>
           <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
