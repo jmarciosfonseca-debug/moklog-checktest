@@ -107,17 +107,21 @@ function getWeekLabel(dateStr) {
     const d = new Date(dateStr+"T12:00:00");
     const months = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
                     "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    const month = months[d.getMonth()];
+    const year = d.getFullYear();
+    const monthIdx = d.getMonth();
     const day = d.getDate();
-    // Correct week calculation - no duplicate S4
-    const daysInMonth = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    // Find first Sunday of the month
+    let firstSun = new Date(year, monthIdx, 1);
+    while(firstSun.getDay() !== 0) firstSun.setDate(firstSun.getDate()+1);
+    const firstSunDay = firstSun.getDate();
+    const diff = day - firstSunDay;
     let week;
-    if(day <= 7) week = "S1";
-    else if(day <= 14) week = "S2";
-    else if(day <= 21) week = "S3";
-    else if(day <= 28) week = "S4";
-    else week = "S5";
-    return `${week} ${month}`;
+    if(diff < 0) {
+      week = 1;
+    } else {
+      week = Math.min(Math.floor(diff/7) + 1, 5);
+    }
+    return "S"+week+" "+months[monthIdx];
   } catch { return ""; }
 }
 
@@ -191,8 +195,9 @@ function buildHeader(theme, project, meta, weekLabel) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
           <div style="display:flex;align-items:center;gap:8px">
-            <img src="${theme.mokedLogo}" style="height:36px;object-fit:contain" alt="Moked"/>
-            <img src="${theme.empresaLogo}" style="height:36px;object-fit:contain;background:rgba(255,255,255,.1);border-radius:6px;padding:3px 6px" alt="${theme.empresaNome}"/>
+            <img src="${theme.mokedLogo}" style="height:52px;max-width:120px;object-fit:contain" alt="Moked"/>
+            <div style="width:1px;background:rgba(255,255,255,.2);height:40px;flex-shrink:0"></div>
+            <img src="${theme.empresaLogo}" style="height:52px;max-width:140px;object-fit:contain;background:rgba(255,255,255,.12);border-radius:8px;padding:4px 10px" alt="${theme.empresaNome}"/>
           </div>
           <div style="text-align:right;font-size:10px;color:rgba(255,255,255,.6)">
             <div>Gerado em ${new Date().toLocaleDateString("pt-BR")}</div>
@@ -235,13 +240,14 @@ export function generatePDF(project, state, meta, photos) {
     totalOK+=okCount; totalInop+=total-okCount;
     if(s.status==="partial") totalParcial++;
     const pct=total>0?Math.round((okCount/total)*100):100;
-    const bColor=pct===100?theme.barOk:pct>=50?"#d97706":"#dc2626";
+    const bColor=pct===100?theme.barOk:pct>=80?"#d97706":pct>=50?"#f59e0b":"#dc2626";
+    const textColor=pct===100?"#15803d":pct>=80?"#d97706":pct>=50?"#d97706":"#dc2626";
     deviceRows+=`<tr>
       <td>${cat.label}</td>
-      <td style="text-align:center;font-weight:600;color:${bColor}">${okCount}/${total}</td>
+      <td style="text-align:center;font-weight:600;color:${textColor}">${okCount}/${total}</td>
       <td><div class="bar-wrap">
-        <div class="bar-track"><div style="width:${pct}%;background:${bColor};height:6px;border-radius:3px"></div></div>
-        <span style="font-size:10px;font-weight:700;color:${bColor};width:32px">${pct}%</span>
+        <div class="bar-track" style="background:#f1f5f9;height:8px"><div style="width:${pct}%;background:${bColor};height:8px;border-radius:3px"></div></div>
+        <span style="font-size:10px;font-weight:700;color:${textColor};min-width:34px;text-align:right">${pct}%</span>
       </div></td>
     </tr>`;
   }
@@ -276,6 +282,14 @@ ${buildHeader(theme,project,meta,weekLabel)}
   <div class="kpi"><div class="kpi-val" style="color:#15803d">${totalOK}</div><div class="kpi-lbl">OK</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#d97706">${totalParcial}</div><div class="kpi-lbl">Parciais</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#dc2626">${totalInop}</div><div class="kpi-lbl">Inoperantes</div></div>
+</div>
+
+<div class="section" style="background:#f8fafc;border-left:3px solid ${theme.headerBg}">
+  <p style="font-size:12px;color:#475569;line-height:1.7;margin:0">
+    Os testes descritos neste relatório são realizados <strong>semanalmente pelas equipes de segurança</strong> do projeto, 
+    sob supervisão da Moked Consulting Security. Cada item é verificado individualmente e seu status registrado em tempo real 
+    pelo líder responsável. O relatório é gerado automaticamente pelo sistema MokLog CheckTest.
+  </p>
 </div>
 
 <div class="section">
@@ -445,8 +459,9 @@ table td,table th{font-size:11px}
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
       <div style="display:flex;align-items:center;gap:8px">
-        <img src="${theme.mokedLogo}" style="height:36px;object-fit:contain" alt="Moked"/>
-        <img src="${theme.empresaLogo}" style="height:36px;object-fit:contain;background:rgba(255,255,255,.1);border-radius:6px;padding:3px 6px" alt="${theme.empresaNome}"/>
+        <img src="${theme.mokedLogo}" style="height:52px;max-width:120px;object-fit:contain" alt="Moked"/>
+        <div style="width:1px;background:rgba(255,255,255,.2);height:40px;flex-shrink:0"></div>
+        <img src="${theme.empresaLogo}" style="height:52px;max-width:140px;object-fit:contain;background:rgba(255,255,255,.12);border-radius:8px;padding:4px 10px" alt="${theme.empresaNome}"/>
       </div>
       <div style="text-align:right;font-size:10px;color:rgba(255,255,255,.6)">
         <div>Emissão: ${hoje}</div>
