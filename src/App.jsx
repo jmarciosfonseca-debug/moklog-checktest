@@ -5,6 +5,8 @@ import AcessoCCO from "./AcessoCCO";
 import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos from "./Equipamentos";
 import Visita from "./Visita";
+import Perimetral from "./Perimetral";
+import Intervalos from "./Intervalos";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 
 // ── Hook de conectividade
@@ -1882,6 +1884,9 @@ export default function App(){
   const [equipamentosProject,setEquipamentosProject]=useState(null);
   const [showVisita,setShowVisita]=useState(false);
   const [visitaProject,setVisitaProject]=useState(null);
+  const [showPerimetral,setShowPerimetral]=useState(false);
+  const [showIntervalos,setShowIntervalos]=useState(false);
+  const [intervalosProject,setIntervalosProject]=useState(null);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -2067,6 +2072,8 @@ export default function App(){
   if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/></ErrorBoundary>;
   if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/></ErrorBoundary>;
   if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/></ErrorBoundary>;
+  if(showPerimetral) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowPerimetral(false)}/></ErrorBoundary>;
+  if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
@@ -2347,6 +2354,8 @@ export default function App(){
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
+                    {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
+                    <button onClick={()=>{setIntervalosProject(project);setShowIntervalos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>⏱️ Intervalos</button>
                   </div>
                 </>
               ):(
@@ -2358,6 +2367,8 @@ export default function App(){
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
+                    {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
+                    <button onClick={()=>{setIntervalosProject(project);setShowIntervalos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>⏱️ Intervalos</button>
                   </div>
                 </>
               )}
