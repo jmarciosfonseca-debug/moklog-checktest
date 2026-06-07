@@ -371,26 +371,24 @@ const todayStr = () => new Date().toISOString().split("T")[0];
 const fmtDate = (d) => { if(!d)return"—"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
-function try {
+function getWeekLabel(dateStr) {
+  if(!dateStr) return "S?";
+  try {
     const d = new Date(dateStr+"T12:00:00");
     const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
     const year = d.getFullYear();
     const monthIdx = d.getMonth();
     const day = d.getDate();
-    // Find first Sunday of the month
     let firstSun = new Date(year, monthIdx, 1);
     while(firstSun.getDay() !== 0) firstSun.setDate(firstSun.getDate()+1);
     const firstSunDay = firstSun.getDate();
-    // Days since first Sunday (negative if before)
     const diff = day - firstSunDay;
     let week;
-    if(diff < 0) {
-      week = 1; // before first Sunday = still S1
-    } else {
-      week = Math.min(Math.floor(diff/7) + 1, 5);
-    }
+    if(diff < 0) { week = 1; }
+    else { week = Math.min(Math.floor(diff/7) + 1, 5); }
     return "S"+week+" "+months[monthIdx];
   } catch { return "S?"; }
+}
 
 function buildBlank(project) {
   const st = {};
