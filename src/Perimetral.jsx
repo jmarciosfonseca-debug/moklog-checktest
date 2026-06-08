@@ -100,12 +100,12 @@ function getStyles(dark) {
 // ── Mapa SVG overlay sobre foto aérea
 function MapaPerimetral({ zonas, size="normal" }) {
   const isSmall = size==="small";
-  const h = isSmall ? 160 : 260;
+  const h = isSmall ? 160 : 280;
   return (
     <div style={{position:"relative",width:"100%",borderRadius:10,overflow:"hidden",border:"1px solid #1e293b"}}>
       <img src={`data:image/jpeg;base64,${MAPA_B64}`} alt="Mapa Perimetral P505"
-        style={{width:"100%",height:h,objectFit:"cover",display:"block",filter:"brightness(0.85)"}}/>
-      {/* SVG overlay with zone markers */}
+        style={{width:"100%",height:h,objectFit:"cover",display:"block",filter:"brightness(0.88)"}}/>
+      {/* SVG overlay — small dot markers, non-intrusive */}
       <svg style={{position:"absolute",top:0,left:0,width:"100%",height:"100%"}} viewBox="0 0 100 100" preserveAspectRatio="none">
         {ZONAS.map(zona=>{
           const pos = ZONA_POS[zona];
@@ -114,9 +114,13 @@ function MapaPerimetral({ zonas, size="normal" }) {
           const cfg = STATUS_CFG[st];
           return (
             <g key={zona}>
-              <circle cx={pos.x} cy={pos.y} r="3.5" fill={cfg.dot} fillOpacity="0.9" stroke="#000" strokeWidth="0.5"/>
-              <text x={pos.x} y={pos.y-4.5} textAnchor="middle"
-                style={{fontSize:"3.2px",fontWeight:"bold",fill:"#fff",textShadow:"0 0 2px #000"}}>
+              {/* Outer glow ring */}
+              <circle cx={pos.x} cy={pos.y} r="2.8" fill={cfg.dot} fillOpacity="0.25" stroke="none"/>
+              {/* Main dot */}
+              <circle cx={pos.x} cy={pos.y} r="1.6" fill={cfg.dot} fillOpacity="0.95" stroke="#fff" strokeWidth="0.4"/>
+              {/* Zone label — small, tight */}
+              <text x={pos.x} y={pos.y-2.6} textAnchor="middle"
+                style={{fontSize:"2.4px",fontWeight:"bold",fill:"#fff",paintOrder:"stroke",stroke:"#000",strokeWidth:"0.5px",strokeLinejoin:"round"}}>
                 {zona.replace("Zona ","Z")}
               </text>
             </g>
@@ -158,8 +162,13 @@ function gerarPDFTeste(teste, allTestes) {
     if(!pos) return "";
     const st = teste.zonas[zona]?.status||"ok";
     const cfg = STATUS_CFG[st];
-    return `<circle cx="${pos.x}%" cy="${pos.y}%" r="12" fill="${cfg.dot}" fill-opacity="0.85" stroke="white" stroke-width="1.5"/>
-    <text x="${pos.x}%" y="${pos.y}%" text-anchor="middle" dy="1" style="font-size:8px;font-weight:bold;fill:white">${zona.replace("Zona ","Z")}</text>`;
+    const label = zona.replace("Zona ","Z");
+    return `<g>
+      <circle cx="${pos.x}%" cy="${pos.y}%" r="3%" fill="${cfg.dot}" fill-opacity="0.2"/>
+      <circle cx="${pos.x}%" cy="${pos.y}%" r="1.4%" fill="${cfg.dot}" fill-opacity="0.95" stroke="white" stroke-width="0.5%"/>
+      <text x="${pos.x}%" y="calc(${pos.y}% - 2%)" text-anchor="middle"
+        style="font-size:2.2%;font-weight:700;fill:white;paint-order:stroke;stroke:#000;stroke-width:0.6%;stroke-linejoin:round">${label}</text>
+    </g>`;
   }).join("");
 
   // Historical analysis
@@ -329,11 +338,16 @@ function gerarPDFConsolidado(testes, periodo) {
   const lastTeste = sorted[0];
   const svgMarkers = lastTeste ? ZONAS.map(zona=>{
     const pos = ZONA_POS[zona]; if(!pos) return "";
-    // Use aggregate: if >30% fail rate = problem color
+    // Use aggregate fail rate to color
     const zs = zoneStats.find(z=>z.zona===zona);
     const dotColor = !zs||zs.pct===0?"#22c55e":zs.pct>=60?"#ef4444":zs.pct>=30?"#f59e0b":"#22c55e";
-    return `<circle cx="${pos.x}%" cy="${pos.y}%" r="12" fill="${dotColor}" fill-opacity="0.85" stroke="white" stroke-width="1.5"/>
-    <text x="${pos.x}%" y="${pos.y}%" text-anchor="middle" dy="1" style="font-size:8px;font-weight:bold;fill:white">${zona.replace("Zona ","Z")}</text>`;
+    const label = zona.replace("Zona ","Z");
+    return `<g>
+      <circle cx="${pos.x}%" cy="${pos.y}%" r="3%" fill="${dotColor}" fill-opacity="0.22" stroke="none"/>
+      <circle cx="${pos.x}%" cy="${pos.y}%" r="1.4%" fill="${dotColor}" fill-opacity="0.95" stroke="white" stroke-width="0.5%"/>
+      <text x="${pos.x}%" y="calc(${pos.y}% - 2%)" text-anchor="middle"
+        style="font-size:2.2%;font-weight:700;fill:white;paint-order:stroke;stroke:#000;stroke-width:0.6%;stroke-linejoin:round">${label}</text>
+    </g>`;
   }).join("") : "";
 
   // Test table rows (compact — line per test)
@@ -511,6 +525,8 @@ export default function Perimetral({ onBack, dark, onToggleTheme }) {
   const [filtroTurno, setFiltroTurno] = useState("Todos");
   const [filtroPeriodo, setFiltroPeriodo] = useState("7");
   const [showConsolidado, setShowConsolidado] = useState(false);
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selecionados, setSelecionados] = useState([]);
 
   const adminAuth = authLevel==="admin";
 
@@ -848,12 +864,39 @@ export default function Perimetral({ onBack, dark, onToggleTheme }) {
               </div>
 
               {/* PDF Consolidado */}
-              <button onClick={()=>{
-                const periodo = filtroPeriodo==="all"?"Período completo":`Últimos ${filtroPeriodo} dias`;
-                gerarPDFConsolidado(testesFiltrados, periodo);
-              }} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:12,padding:"8px 12px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                📄 PDF Consolidado ({testesFiltrados.length} teste{testesFiltrados.length!==1?"s":""})
-              </button>
+              {/* Modo seleção */}
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                <button onClick={()=>{
+                  if(modoSelecao){
+                    if(selecionados.length>0){
+                      const periodo = `${selecionados.length} teste(s) selecionado(s)`;
+                      const testsSelected = testesFiltrados.filter(t=>selecionados.includes(t.id));
+                      gerarPDFConsolidado(testsSelected, periodo);
+                    }
+                    setModoSelecao(false); setSelecionados([]);
+                  } else {
+                    setModoSelecao(true);
+                  }
+                }} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:12,padding:"8px 12px",display:"flex",alignItems:"center",gap:6,flex:1,justifyContent:"center"}}>
+                  {modoSelecao
+                    ? selecionados.length>0
+                      ? `📄 Gerar PDF (${selecionados.length} selecionado${selecionados.length!==1?"s":""})`
+                      : "📄 Selecione ao menos 1"
+                    : `☐ Selecionar para PDF Consolidado`}
+                </button>
+                {modoSelecao && (
+                  <button onClick={()=>{setModoSelecao(false);setSelecionados([]);}}
+                    style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11,padding:"8px 10px"}}>✕</button>
+                )}
+              </div>
+              {modoSelecao && (
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <button onClick={()=>setSelecionados(testesFiltrados.map(t=>t.id))}
+                    style={{...S.btnSm,fontSize:10,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>✓ Selecionar todos</button>
+                  <button onClick={()=>setSelecionados([])}
+                    style={{...S.btnSm,fontSize:10,color:"#64748b",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>✕ Limpar</button>
+                </div>
+              )}
 
               {/* Arquivo agrupado por data */}
               <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>
@@ -872,13 +915,27 @@ export default function Perimetral({ onBack, dark, onToggleTheme }) {
                     {testsDodia.map(t=>{
                       const probs = ZONAS.filter(z=>(t.zonas[z]?.status||"ok")!=="ok").length;
                       return (
-                        <div key={t.id} style={{...S.card,marginBottom:6,cursor:"pointer",border:`1px solid ${probs>0?"#ef444433":dark?"#0f172a":"#e2e8f0"}`}}
-                          onClick={()=>{setViewTeste(t);setScreen("view");}}>
+                        <div key={t.id} style={{...S.card,marginBottom:6,border:`2px solid ${modoSelecao&&selecionados.includes(t.id)?"#a855f7":probs>0?"#ef444433":dark?"#0f172a":"#e2e8f0"}`}}>
                           <div style={{display:"flex",alignItems:"center",gap:10}}>
-                            <div style={{width:36,height:36,borderRadius:9,background:t.turno==="Diurno"?dark?"#1a2e1a":"#dcfce7":dark?"#0a0a2e":"#e0e7ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
+                            {/* Checkbox em modo seleção */}
+                            {modoSelecao && (
+                              <button onClick={()=>setSelecionados(prev=>
+                                prev.includes(t.id)?prev.filter(x=>x!==t.id):[...prev,t.id]
+                              )} style={{width:26,height:26,borderRadius:6,border:`2px solid ${selecionados.includes(t.id)?"#a855f7":dark?"#334155":"#cbd5e1"}`,background:selecionados.includes(t.id)?"#a855f7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:14,color:"#fff"}}>
+                                {selecionados.includes(t.id)?"✓":""}
+                              </button>
+                            )}
+                            <div style={{width:36,height:36,borderRadius:9,background:t.turno==="Diurno"?dark?"#1a2e1a":"#dcfce7":dark?"#0a0a2e":"#e0e7ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18,cursor:"pointer"}}
+                              onClick={()=>{if(!modoSelecao){setViewTeste(t);setScreen("view");}}}>
                               {t.turno==="Diurno"?"☀️":"🌙"}
                             </div>
-                            <div style={{flex:1}}>
+                            <div style={{flex:1,cursor:"pointer"}} onClick={()=>{
+                              if(modoSelecao){
+                                setSelecionados(prev=>prev.includes(t.id)?prev.filter(x=>x!==t.id):[...prev,t.id]);
+                              } else {
+                                setViewTeste(t);setScreen("view");
+                              }
+                            }}>
                               <div style={{fontSize:12,fontWeight:700,...S.txt}}>{t.turno} · {t.hora}</div>
                               <div style={{fontSize:10,...S.txt2}}>{t.quemFez||"—"}</div>
                             </div>
@@ -886,7 +943,7 @@ export default function Perimetral({ onBack, dark, onToggleTheme }) {
                               ?<span style={{fontSize:10,color:"#ef4444",fontWeight:700,background:"#1a0202",padding:"2px 8px",borderRadius:5}}>{probs} prob.</span>
                               :<span style={{fontSize:10,color:"#22c55e",fontWeight:700,background:"#021a0d",padding:"2px 8px",borderRadius:5}}>✅ OK</span>
                             }
-                            <span style={{...S.txt2,fontSize:14}}>›</span>
+                            {!modoSelecao&&<span style={{...S.txt2,fontSize:14}}>›</span>}
                           </div>
                         </div>
                       );
