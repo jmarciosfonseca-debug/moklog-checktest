@@ -147,8 +147,23 @@ function calcHealthPct(project, state) {
 }
 
 function stLabel(st) { return !st||st==="ok"?"OK":st==="partial"?"PARCIAL":"INOPERANTE"; }
+// Status colors ALWAYS fixed — never use theme color for status
 function stColor(st) { return !st||st==="ok"?"#15803d":st==="partial"?"#d97706":"#dc2626"; }
 function stBg(st)    { return !st||st==="ok"?"#dcfce7":st==="partial"?"#fef3c7":"#fee2e2"; }
+// Bar color by percentage — always fixed
+function barColor(pct) {
+  if(pct===100) return "#15803d"; // green
+  if(pct>0)    return "#d97706"; // yellow
+  return "#dc2626";               // red
+}
+function barTextColor(pct) {
+  if(pct===100) return "#15803d";
+  if(pct>0)    return "#d97706";
+  return "#dc2626";
+}
+// Critical threshold: > 30 days
+const CRITICAL_DAYS = 30;
+function isCritical(diasAberto) { return diasAberto !== null && diasAberto > CRITICAL_DAYS; }
 
 // ── Shared CSS
 function getCSS(theme) {
@@ -218,7 +233,7 @@ export function generatePDF(project, state, meta, photos) {
   const theme = getTheme(project.id);
   const weekLabel = getWeekLabel(meta.date);
   const healthPct = calcHealthPct(project, state);
-  const barColor = healthPct>=90?theme.barOk:healthPct>=70?"#d97706":"#dc2626";
+  const healthBarColor = healthPct===100?"#15803d":healthPct>0?"#d97706":"#dc2626";
 
   let totalOK=0, totalParcial=0, totalInop=0;
   const problemItems = [];
@@ -243,8 +258,8 @@ export function generatePDF(project, state, meta, photos) {
     totalOK+=okCount; totalInop+=total-okCount;
     if(s.status==="partial") totalParcial++;
     const pct=total>0?Math.round((okCount/total)*100):100;
-    const bColor=pct===100?theme.barOk:pct>=80?"#d97706":pct>=50?"#f59e0b":"#dc2626";
-    const textColor=pct===100?"#15803d":pct>=80?"#d97706":pct>=50?"#d97706":"#dc2626";
+    const bColor = barColor(pct);
+    const textColor = barTextColor(pct);
     const hasProb = okCount < total;
     // Collect problem dates for this category
     let probDates = [];
@@ -280,36 +295,38 @@ export function generatePDF(project, state, meta, photos) {
     const key = p.cat + "|" + p.item;
     seenItems.set(key, p);
   });
-  const uniqueProblems = [...seenItems.values()];
-
-  const problemRows = uniqueProblems.map(p=>{
-    const diasAberto = p.since
+  // Enrich with dias em aberto
+  const uniqueProblems = [...seenItems.values()].map(p => {
+    const dias = p.since
       ? Math.floor((Date.now()-new Date(p.since+"T12:00:00").getTime())/86400000)
       : null;
-    const isUrgent = diasAberto !== null && diasAberto > 14;
+    return {...p, dias};
+  });
+
+  const problemRows = uniqueProblems.map(p=>{
+    const diasAberto = p.dias;
+    const isUrgent = isCritical(diasAberto);
     return `
     <tr style="background:${isUrgent?"#fff5f5":"#fff8f8"};border-left:4px solid ${stColor(p.status)}">
-      <td style="padding:11px 12px">
+      <td style="padding:10px 12px">
         <div style="font-weight:700;font-size:13px;color:#0f172a">${p.cat}</div>
         <div style="font-size:12px;color:#475569;margin-top:2px">${p.item}</div>
       </td>
-      <td style="padding:11px 12px;white-space:nowrap;vertical-align:top">
+      <td style="padding:10px 12px;white-space:nowrap;vertical-align:top;text-align:center">
         <span class="badge" style="background:${stBg(p.status)};color:${stColor(p.status)}">${stLabel(p.status)}</span>
       </td>
-      <td style="padding:11px 12px;vertical-align:top">
-        <div style="font-size:12px;color:#94a3b8;font-weight:600;margin-bottom:2px">
-          ${p.since
-            ? `Desde ${fmtDate(p.since)}`
-            : "Data não registrada"}
+      <td style="padding:10px 12px;vertical-align:top">
+        <div style="font-size:12px;color:#64748b;margin-bottom:3px">
+          ${p.since ? `${fmtDate(p.since)}` : `<span style="color:#94a3b8;font-style:italic">s/ data</span>`}
         </div>
-        <div style="font-size:13px;font-weight:700;color:${isUrgent?"#dc2626":"#d97706"}">
-          ${diasAberto!==null?`${diasAberto} dia${diasAberto!==1?"s":""} em aberto`:"—"}
+        <div style="font-size:13px;font-weight:800;color:${isUrgent?"#dc2626":diasAberto!==null?"#d97706":"#94a3b8"}">
+          ${diasAberto!==null?`${diasAberto}d em aberto`:"—"}
         </div>
       </td>
-      <td style="padding:11px 12px;font-size:13px;color:#1e293b;vertical-align:top;max-width:260px">
+      <td style="padding:10px 12px;font-size:13px;color:#1e293b;vertical-align:top">
         ${p.note&&p.note!=="--"
           ? `<span style="font-weight:500">${p.note}</span>`
-          : `<span style="color:#94a3b8;font-style:italic">Sem descrição registrada</span>`}
+          : `<span style="color:#94a3b8;font-style:italic">Sem descrição</span>`}
       </td>
     </tr>`;
   }).join("");
@@ -333,18 +350,14 @@ export function generatePDF(project, state, meta, photos) {
 ${buildHeader(theme,project,meta,weekLabel)}
 
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-val" style="color:${barColor}">${healthPct}%</div><div class="kpi-lbl">Saúde Geral</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${healthBarColor}">${healthPct}%</div><div class="kpi-lbl">Saúde Geral</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#15803d">${totalOK}</div><div class="kpi-lbl">OK</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#d97706">${totalParcial}</div><div class="kpi-lbl">Parciais</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#dc2626">${totalInop}</div><div class="kpi-lbl">Inoperantes</div></div>
 </div>
 
-<div class="section" style="background:#f8fafc;border-left:3px solid ${theme.headerBg}">
-  <p style="font-size:12px;color:#475569;line-height:1.7;margin:0">
-    Os testes descritos neste relatório são realizados <strong>semanalmente pelas equipes de segurança</strong> do projeto, 
-    sob supervisão da Moked Consulting Security. Cada item é verificado individualmente e seu status registrado em tempo real 
-    pelo líder responsável. O relatório é gerado automaticamente pelo sistema MokLog CheckTest.
-  </p>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:13px 18px;margin-bottom:14px;font-size:12px;color:#475569;line-height:1.75">
+  Os testes deste relatório são realizados <strong style="color:#1e293b">semanalmente pelas equipes de segurança</strong> do projeto, sob supervisão da Moked Consulting Security. Cada item é verificado individualmente e seu status registrado em tempo real pelo líder responsável. Relatório gerado pelo sistema MokLog CheckTest. <strong style="color:#1e293b">Regra de status: 0% = Inoperante, 1–99% = Parcial, 100% = OK.</strong>
 </div>
 
 <div class="section">
@@ -379,16 +392,50 @@ ${buildHeader(theme,project,meta,weekLabel)}
   </table>
 </div>
 
-${problemItems.length?`
+${uniqueProblems.length>0?`
+<!-- PRIORIDADE CRÍTICA -->
+${(()=>{
+  const criticos = uniqueProblems.filter(p=>p.dias!==null&&p.dias>CRITICAL_DAYS);
+  if(!criticos.length) return "";
+  const critRows = criticos.map(p=>`
+    <tr style="background:#fff0f0;border-left:4px solid #dc2626">
+      <td style="padding:10px 12px;font-weight:700;color:#0f172a">${p.cat}<br><span style="font-size:12px;color:#475569;font-weight:500">${p.item}</span></td>
+      <td style="padding:10px 12px;text-align:center;white-space:nowrap">
+        <span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:800;padding:3px 10px;border-radius:5px">CRÍTICO</span>
+      </td>
+      <td style="padding:10px 12px;font-size:13px;font-weight:800;color:#dc2626;text-align:center">${p.dias}d</td>
+      <td style="padding:10px 12px;font-size:13px;color:#1e293b;font-weight:500">
+        ${p.note&&p.note!=="--"?p.note:"<span style='color:#94a3b8;font-style:italic'>Sem descrição</span>"}
+      </td>
+    </tr>`).join("");
+  return `<div class="section" style="border:2px solid #dc2626">
+    <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">
+      🔴 PRIORIDADE CRÍTICA — ITENS COM MAIS DE ${CRITICAL_DAYS} DIAS EM ABERTO
+      <span style="font-weight:400;font-size:10px;margin-left:8px">${criticos.length} item(s) exigem ação imediata</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:35%">Dispositivo / Item</th>
+        <th style="width:90px;text-align:center">Status</th>
+        <th style="width:80px;text-align:center">Dias</th>
+        <th>Descrição do Problema</th>
+      </tr></thead>
+      <tbody>${critRows}</tbody>
+    </table>
+  </div>`;
+})()}
+<!-- TODOS OS ITENS COM PROBLEMA -->
 <div class="section">
-  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">⚠️ Itens com Problema — ${uniqueProblems.length} item(s) | Total de dias em aberto registrado abaixo</div>
+  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">
+    ⚠️ Itens com Problema — ${uniqueProblems.length} item(s)
+  </div>
   <table>
     <thead><tr>
-  <th style="width:35%">Dispositivo / Item</th>
-  <th style="width:90px;text-align:center">Status</th>
-  <th style="width:170px">Desde / Dias em aberto</th>
-  <th>Descrição do Problema</th>
-</tr></thead>
+      <th style="width:35%">Dispositivo / Item</th>
+      <th style="width:90px;text-align:center">Status</th>
+      <th style="width:170px">Desde / Dias em aberto</th>
+      <th>Descrição do Problema</th>
+    </tr></thead>
     <tbody>${problemRows}</tbody>
   </table>
 </div>`:""}
@@ -399,10 +446,12 @@ ${pendencias.length?`
   ${pendRows}
 </div>`:""}
 
-<div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · ${theme.empresaNome}</div>
-  <div style="font-weight:600;margin-top:2px">José Fonseca · jose.fonseca@moked.com.br</div>
-  <div>${project.id} — ${project.name||""} · ${fmtDate(meta.date)} · ${weekLabel}</div>
+<div style="margin-top:16px;padding-top:12px;border-top:2px solid #e2e8f0">
+  <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64748b;font-weight:500">
+    <div>MokLog CheckTest © Moked Consulting Security · ${theme.empresaNome}</div>
+    <div style="text-align:center">${project.id} — ${project.name||""} · ${fmtDate(meta.date)} · ${weekLabel}</div>
+    <div style="text-align:right">pág. 1</div>
+  </div>
 </div>
 </body></html>`;
 
