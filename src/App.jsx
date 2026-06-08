@@ -2191,6 +2191,11 @@ export default function App(){
         {health&&<div style={{height:3,background:"#060c18",borderRadius:2,overflow:"hidden",marginBottom:8}}>
           <div style={{height:"100%",width:`${health.pct}%`,background:health.pct>=90?"#22c55e":health.pct>=70?"#f59e0b":"#ef4444",borderRadius:2,transition:"width .4s"}}/>
         </div>}
+        {health&&<div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:10,color:"#22c55e",background:"#021a0d",padding:"2px 8px",borderRadius:4,fontWeight:700}}>✅ {health.ok} OK</span>
+          {health.partial>0&&<span style={{fontSize:10,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}>⚠️ {health.partial} Parcial</span>}
+          {health.inop>0&&<span style={{fontSize:10,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}>🔴 {health.inop} Inop</span>}
+        </div>}
         <div style={S.metaCard}>
           <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabecalho do Relatorio</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
