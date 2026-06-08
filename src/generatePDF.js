@@ -251,12 +251,23 @@ export function generatePDF(project, state, meta, photos) {
       total=s.length; okCount=s.filter(v=>!v.status||v.status==="ok").length;
       s.forEach((v,i)=>{ if(v.status&&v.status!=="ok") problemItems.push({cat:cat.label,item:cat.itemLabels?.[i]||`Item ${i+1}`,status:v.status,since:v.since,note:v.note}); });
     } else if(cat.type==="count") {
-      total=s.total??cat.total??0; const inop=s.inoper??0; okCount=total-inop;
+      total=s.total??cat.total??0; const inop=(s.inoperative?.length??s.inoper??0); okCount=total-inop;
       if(inop>0) problemItems.push({cat:cat.label,item:`${inop} inoperante(s)`,status:"inop",since:s.since,note:s.note});
     }
 
-    totalOK+=okCount; totalInop+=total-okCount;
-    if(s.status==="partial") totalParcial++;
+    // Count parciais correctly for all types
+    let catParcial = 0;
+    if(cat.type==="single") {
+      if(s.status==="partial") catParcial = 1;
+    } else if(cat.type==="items"&&Array.isArray(s)) {
+      catParcial = s.filter(v=>v.status==="partial").length;
+    } else if(cat.type==="count") {
+      // count type: partial items tracked individually
+      catParcial = (s.inoperative||[]).filter(it=>it.status==="partial").length;
+    }
+    totalOK += okCount;
+    totalParcial += catParcial;
+    totalInop += (total - okCount - catParcial);
     const pct=total>0?Math.round((okCount/total)*100):100;
     const bColor = barColor(pct);
     const textColor = barTextColor(pct);
