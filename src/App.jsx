@@ -1924,6 +1924,7 @@ export default function App(){
   const [loaded,setLoaded]=useState(false);
   const [projectAuth,setProjectAuth]=useState({});
   const [sigError,setSigError]=useState(false);
+  const [showConfirmModal,setShowConfirmModal]=useState(false);
   const [showMonthlyPrompt,setShowMonthlyPrompt]=useState(false);
   const [draft,setDraft]=useState(null);
   const [showDraftPrompt,setShowDraftPrompt]=useState(false);
@@ -2062,9 +2063,32 @@ export default function App(){
   const continueDraft=()=>{setState(draft.state);setMeta(draft.meta);setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);};
   const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);};
 
+  // Required fields validation
+  const missingFields = () => {
+    const missing = [];
+    if(!meta.date) missing.push("Data");
+    if(!meta.start||!meta.end) missing.push("Horário de início e término");
+    if(!meta.signature||meta.signature.trim()==="") missing.push("Assinatura do líder");
+    return missing;
+  };
+  const canFinalize = missingFields().length === 0;
+
   const finalize=()=>{
-    if(!meta.signature||meta.signature.trim()===""){setSigError(true);window.scrollTo(0,document.body.scrollHeight);return;}
-    setSigError(false);saveReport(state,meta);setScreen("report");
+    const missing = missingFields();
+    if(missing.length>0){
+      setSigError(true);
+      window.scrollTo(0,document.body.scrollHeight);
+      return;
+    }
+    setSigError(false);
+    // Show confirmation popup
+    setShowConfirmModal(true);
+  };
+
+  const confirmAndSend=()=>{
+    setShowConfirmModal(false);
+    saveReport(state,meta);
+    setScreen("report");
   };
 
   const updateCat=useCallback((id,val)=>setState(prev=>({...prev,[id]:val})),[]);
@@ -2131,6 +2155,28 @@ export default function App(){
   // ── FORM
   if(screen==="form") return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
+      {/* ── Popup de confirmação antes de enviar */}
+      {showConfirmModal && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:dark?"#060c18":"#fff",border:"2px solid #f59e0b66",borderRadius:16,padding:"26px 22px",maxWidth:360,width:"100%"}}>
+            <div style={{fontSize:28,textAlign:"center",marginBottom:10}}>⚠️</div>
+            <div style={{fontSize:15,fontWeight:800,color:dark?"#f1f5f9":"#1e293b",textAlign:"center",marginBottom:10}}>Atenção Líder!</div>
+            <div style={{fontSize:13,color:dark?"#94a3b8":"#475569",lineHeight:1.65,marginBottom:20,textAlign:"center"}}>
+              Por favor, revise todo o relatório antes de enviar. Verifique se os textos explicativos estão corretos e se você inseriu a <strong style={{color:dark?"#f1f5f9":"#1e293b"}}>data inicial de todas as ocorrências</strong> e dispositivos inoperantes/parciais.
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={()=>setShowConfirmModal(false)}
+                style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:dark?"#94a3b8":"#64748b",borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                ← Voltar e Revisar
+              </button>
+              <button onClick={confirmAndSend}
+                style={{flex:1,background:"linear-gradient(135deg,#16a34a,#15803d)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                ✓ Confirmar e Enviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <SyncBadge/>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:10,borderBottom:"1px solid #060c18",marginBottom:2}}>
@@ -2211,7 +2257,19 @@ export default function App(){
         )}
         {state&&(
           <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap"}}>
-            <button onClick={finalize} style={{...S.primaryBtn,flex:2,fontSize:14}}>✓ Finalizar e Gerar Relatorio</button>
+            {/* Validation warning */}
+            {!canFinalize && (
+              <div style={{width:"100%",background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",marginBottom:4}}>
+                <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginBottom:4}}>⚠️ Campos obrigatórios não preenchidos:</div>
+                {missingFields().map(f=>(
+                  <div key={f} style={{fontSize:11,color:"#fca5a5"}}>• {f}</div>
+                ))}
+              </div>
+            )}
+            <button onClick={finalize} disabled={!canFinalize}
+              style={{...S.primaryBtn,flex:2,fontSize:14,opacity:canFinalize?1:0.45,cursor:canFinalize?"pointer":"not-allowed"}}>
+              ✓ Finalizar e Gerar Relatório
+            </button>
             <button onClick={()=>setScreen("home")} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
