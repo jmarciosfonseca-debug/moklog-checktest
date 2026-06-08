@@ -154,53 +154,56 @@ function stBg(st)    { return !st||st==="ok"?"#dcfce7":st==="partial"?"#fef3c7":
 function getCSS(theme) {
   return `
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:20px}
-    .header{background:${theme.headerBg};padding:0;border-radius:12px;margin-bottom:14px;overflow:hidden}
-    .header-top{padding:18px 22px;display:flex;align-items:flex-start;justify-content:space-between}
-    .header-accent{height:4px;background:${theme.accent};opacity:.6}
-    .section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px}
-    .section-title{font-size:10px;font-weight:700;color:${theme.primary};text-transform:uppercase;letter-spacing:.8px;border-left:3px solid ${theme.headerBg};padding-left:8px;margin-bottom:10px}
-    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;margin-bottom:12px}
-    .kpi{background:#fff;padding:12px;text-align:center}
-    .kpi-val{font-size:26px;font-weight:700;line-height:1}
-    .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-    table{width:100%;border-collapse:collapse;font-size:12px}
-    th{background:${theme.headerBg};color:${theme.headerText};padding:8px 10px;text-align:left;font-size:10px;font-weight:600}
-    td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
+    .header{background:${theme.headerBg};padding:0;border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.18)}
+    .header-top{padding:22px 26px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+    .header-accent{height:5px;background:rgba(255,255,255,0.25)}
+    .section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+    .section-title{font-size:11px;font-weight:800;color:${theme.primary};text-transform:uppercase;letter-spacing:1px;border-left:4px solid ${theme.headerBg};padding-left:10px;margin-bottom:14px}
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+    .kpi{background:#fff;padding:16px 12px;text-align:center}
+    .kpi-val{font-size:32px;font-weight:800;line-height:1;letter-spacing:-1px}
+    .kpi-lbl{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:4px;letter-spacing:.5px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:${theme.headerBg};color:${theme.headerText};padding:10px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.5px}
+    td{padding:10px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:#1e293b;font-size:13px}
     tr:nth-child(even) td{background:#f8fafc}
-    .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
-    .bar-wrap{display:flex;align-items:center;gap:6px}
-    .bar-track{flex:1;background:#f1f5f9;border-radius:3px;height:6px;overflow:hidden;min-width:60px}
-    .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-    .info-item label{font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;display:block;margin-bottom:2px}
-    .info-item span{font-size:13px;font-weight:600;color:#1e293b}
-    .pending{background:#fff8f0;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:5px;border-radius:0 6px 6px 0}
-    .confirm-box{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px}
-    .draft-badge{background:#f1f5f9;border:1px solid #e2e8f0;padding:3px 12px;border-radius:20px;font-size:11px;color:#64748b}
-    .footer{text-align:center;margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8}
-    @media print{body{padding:8px;background:#fff}@page{margin:12mm}.no-print{display:none!important}}
+    .badge{display:inline-block;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:800;letter-spacing:.3px}
+    .bar-wrap{display:flex;align-items:center;gap:8px}
+    .bar-track{flex:1;background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;min-width:80px}
+    .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .info-item label{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px;letter-spacing:.5px}
+    .info-item span{font-size:14px;font-weight:700;color:#0f172a}
+    .pending{background:#fff8f0;border-left:4px solid #f59e0b;padding:10px 14px;margin-bottom:6px;border-radius:0 8px 8px 0}
+    .footer{text-align:center;margin-top:16px;padding-top:14px;border-top:2px solid #e2e8f0;font-size:11px;color:#64748b;font-weight:500}
+    @media print{body{padding:10px;background:#fff}@page{margin:14mm}.no-print{display:none!important}}
   `;
 }
 
 // ── Cabeçalho HTML
 function buildHeader(theme, project, meta, weekLabel) {
+  const hoje = new Date().toLocaleDateString("pt-BR");
   return `
     <div class="header">
       <div class="header-top">
-        <div>
-          <p style="font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-          <h1 style="font-size:19px;font-weight:700;color:#fff;margin-bottom:4px">Relatório de Teste Semanal</h1>
-          <p style="font-size:12px;color:rgba(255,255,255,.8)">${project.id} — ${project.name||""}</p>
-          <p style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px">${fmtDate(meta.date)} · ${weekLabel} · ${meta.start||"--"}–${meta.end||"--"}</p>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <img src="${theme.mokedLogo}" style="height:52px;max-width:120px;object-fit:contain" alt="Moked"/>
-            <div style="width:1px;background:rgba(255,255,255,.2);height:40px;flex-shrink:0"></div>
-            <img src="${theme.empresaLogo}" style="height:52px;max-width:140px;object-fit:contain;background:rgba(255,255,255,.12);border-radius:8px;padding:4px 10px" alt="${theme.empresaNome}"/>
+        <div style="flex:1">
+          <p style="font-size:10px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:600">Moked Consulting Security</p>
+          <h1 style="font-size:24px;font-weight:900;color:#fff;margin-bottom:6px;letter-spacing:-0.5px">Relatório de Teste Semanal</h1>
+          <p style="font-size:14px;color:rgba(255,255,255,.9);font-weight:600;margin-bottom:3px">${project.id} — ${project.name||""}</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+            <span style="font-size:12px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px">📅 ${fmtDate(meta.date)}</span>
+            <span style="font-size:12px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px">📆 ${weekLabel}</span>
+            ${meta.start?`<span style="font-size:12px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px">⏱ ${meta.start}–${meta.end||"--"}</span>`:""}
           </div>
-          <div style="text-align:right;font-size:10px;color:rgba(255,255,255,.6)">
-            <div>Gerado em ${new Date().toLocaleDateString("pt-BR")}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <img src="${theme.mokedLogo}" style="height:56px;max-width:130px;object-fit:contain;filter:brightness(1.1)" alt="Moked"/>
+            <div style="width:1px;background:rgba(255,255,255,.25);height:44px;flex-shrink:0"></div>
+            <img src="${theme.empresaLogo}" style="height:56px;max-width:150px;object-fit:contain;background:rgba(255,255,255,.14);border-radius:10px;padding:5px 12px" alt="${theme.empresaNome}"/>
+          </div>
+          <div style="text-align:right;font-size:11px;color:rgba(255,255,255,.6)">
+            <div style="font-weight:600">Gerado em ${hoje}</div>
             <div>José Fonseca · jose.fonseca@moked.com.br</div>
           </div>
         </div>
@@ -242,39 +245,74 @@ export function generatePDF(project, state, meta, photos) {
     const pct=total>0?Math.round((okCount/total)*100):100;
     const bColor=pct===100?theme.barOk:pct>=80?"#d97706":pct>=50?"#f59e0b":"#dc2626";
     const textColor=pct===100?"#15803d":pct>=80?"#d97706":pct>=50?"#d97706":"#dc2626";
-    deviceRows+=`<tr>
-      <td>${cat.label}</td>
-      <td style="text-align:center;font-weight:600;color:${textColor}">${okCount}/${total}</td>
-      <td><div class="bar-wrap">
-        <div class="bar-track" style="background:#f1f5f9;height:8px"><div style="width:${pct}%;background:${bColor};height:8px;border-radius:3px"></div></div>
-        <span style="font-size:10px;font-weight:700;color:${textColor};min-width:34px;text-align:right">${pct}%</span>
-      </div></td>
+    const hasProb = okCount < total;
+    // Collect problem dates for this category
+    let probDates = [];
+    let diasAberto = null;
+    if(cat.type==="items"&&Array.isArray(s)){
+      s.forEach(v=>{ if(v.status&&v.status!=="ok"&&v.since) probDates.push(v.since); });
+    } else if(cat.type==="single"&&s.since&&s.status&&s.status!=="ok"){
+      probDates.push(s.since);
+    }
+    if(probDates.length>0){
+      const oldest = probDates.sort()[0];
+      const days = Math.floor((Date.now()-new Date(oldest+"T12:00:00").getTime())/86400000);
+      diasAberto = days;
+    }
+    deviceRows+=`<tr style="${hasProb?"background:#fff8f8;":""}">
+      <td style="font-weight:${hasProb?"700":"500"}">${cat.label}</td>
+      <td style="text-align:center;font-weight:700;color:${textColor};white-space:nowrap">${okCount}/${total}</td>
+      <td>
+        <div class="bar-wrap">
+          <div class="bar-track"><div style="width:${pct}%;background:${bColor};height:8px;border-radius:4px"></div></div>
+          <span style="font-size:12px;font-weight:800;color:${textColor};min-width:38px;text-align:right">${pct}%</span>
+        </div>
+      </td>
+      <td style="text-align:center;font-size:11px;color:${diasAberto!==null?"#dc2626":"#94a3b8"};font-weight:${diasAberto!==null?"700":"400"}">
+        ${diasAberto!==null?`${diasAberto}d em aberto`:"—"}
+      </td>
     </tr>`;
   }
 
-  // Deduplicate: if same item appears multiple times, keep only the most recent note
+  // Deduplicate: keep only last note per item
   const seenItems = new Map();
   problemItems.forEach(p => {
     const key = p.cat + "|" + p.item;
-    // Keep last occurrence (most recent note wins)
     seenItems.set(key, p);
   });
   const uniqueProblems = [...seenItems.values()];
 
-  const problemRows = uniqueProblems.map(p=>`
-    <tr style="background:#fff8f8;border-left:3px solid ${stColor(p.status)}">
-      <td style="padding:8px 10px">
-        <div style="font-weight:600;font-size:12px;color:#1e293b">${p.cat}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:1px">${p.item}</div>
+  const problemRows = uniqueProblems.map(p=>{
+    const diasAberto = p.since
+      ? Math.floor((Date.now()-new Date(p.since+"T12:00:00").getTime())/86400000)
+      : null;
+    const isUrgent = diasAberto !== null && diasAberto > 14;
+    return `
+    <tr style="background:${isUrgent?"#fff5f5":"#fff8f8"};border-left:4px solid ${stColor(p.status)}">
+      <td style="padding:11px 12px">
+        <div style="font-weight:700;font-size:13px;color:#0f172a">${p.cat}</div>
+        <div style="font-size:12px;color:#475569;margin-top:2px">${p.item}</div>
       </td>
-      <td style="padding:8px 10px;white-space:nowrap">
+      <td style="padding:11px 12px;white-space:nowrap;vertical-align:top">
         <span class="badge" style="background:${stBg(p.status)};color:${stColor(p.status)}">${stLabel(p.status)}</span>
-        ${p.since?`<div style="font-size:10px;color:#94a3b8;margin-top:3px">Desde ${fmtDate(p.since)}</div>`:""}
       </td>
-      <td style="padding:8px 10px;font-size:12px;color:#334155;font-style:${p.note&&p.note!=="--"?"normal":"italic"}">
-        ${p.note&&p.note!=="--"?p.note:"<span style='color:#94a3b8'>Sem descrição</span>"}
+      <td style="padding:11px 12px;vertical-align:top">
+        <div style="font-size:12px;color:#94a3b8;font-weight:600;margin-bottom:2px">
+          ${p.since
+            ? `Desde ${fmtDate(p.since)}`
+            : "Data não registrada"}
+        </div>
+        <div style="font-size:13px;font-weight:700;color:${isUrgent?"#dc2626":"#d97706"}">
+          ${diasAberto!==null?`${diasAberto} dia${diasAberto!==1?"s":""} em aberto`:"—"}
+        </div>
       </td>
-    </tr>`).join("");
+      <td style="padding:11px 12px;font-size:13px;color:#1e293b;vertical-align:top;max-width:260px">
+        ${p.note&&p.note!=="--"
+          ? `<span style="font-weight:500">${p.note}</span>`
+          : `<span style="color:#94a3b8;font-style:italic">Sem descrição registrada</span>`}
+      </td>
+    </tr>`;
+  }).join("");
 
   const notesCat = (project.categories||[]).find(c=>c.type==="notes");
   const pendencias = notesCat?((state[notesCat.id]?.items)||[]):[];
@@ -314,27 +352,43 @@ ${buildHeader(theme,project,meta,weekLabel)}
   <div class="info-grid">
     <div class="info-item"><label>Líder VSPP</label><span>${meta.leader||"--"}</span></div>
     <div class="info-item"><label>CCO</label><span>${meta.cco||"--"}</span></div>
-    <div class="info-item"><label>Moked 24h</label><span>${meta.moked||"--"}</span></div>
-    <div class="info-item"><label>Horário</label><span>${meta.start||"--"} – ${meta.end||"--"}</span></div>
-    <div class="info-item"><label>Contato</label><span style="color:${meta.mokedContact?"#15803d":"#dc2626"}">${meta.mokedContact?"✓ Realizado":"✗ Não realizado"}</span></div>
-    <div class="info-item"><label>Horário Contato</label><span>${meta.mokedTime||"--"}</span></div>
+    <div class="info-item"><label>Operador Moked 24h</label><span>${meta.moked||"--"}</span></div>
+    <div class="info-item"><label>Horário do Teste</label><span>${meta.start||"--"} – ${meta.end||"--"}</span></div>
+    <div class="info-item"><label>Contato Moked</label><span style="color:${meta.mokedContact?"#15803d":"#dc2626"};font-size:15px">${meta.mokedContact?"✓ Realizado":"✗ Não realizado"}</span></div>
+    <div class="info-item"><label>Horário do Contato</label><span>${meta.mokedTime||"--"}</span></div>
   </div>
-  ${meta.signature?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9"><label style="font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">Assinatura</label><div style="font-size:14px;font-weight:600;color:#1e293b">✍ ${meta.signature}</div></div>`:""}
+  ${meta.signature?`
+  <div style="margin-top:14px;padding-top:12px;border-top:2px solid #f1f5f9;display:flex;align-items:center;gap:12px">
+    <div>
+      <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Assinatura do Líder</div>
+      <div style="font-size:16px;font-weight:700;color:#0f172a">✍ ${meta.signature}</div>
+    </div>
+  </div>`:""}
 </div>
 
 <div class="section">
-  <div class="section-title">Status por Dispositivo — Lista Completa</div>
+  <div class="section-title">Status por Dispositivo — Lista Completa (${(project.categories||[]).filter(c=>c.type!=="notes"&&c.type!=="maintenance").length} categorias)</div>
   <table>
-    <thead><tr><th>Dispositivo</th><th style="text-align:center">OK/Total</th><th>Indicador</th></tr></thead>
+    <thead><tr>
+  <th>Dispositivo</th>
+  <th style="text-align:center;width:80px">OK/Total</th>
+  <th style="width:200px">Indicador</th>
+  <th style="text-align:center;width:120px">Em Aberto</th>
+</tr></thead>
     <tbody>${deviceRows||"<tr><td colspan='3' style='color:#94a3b8;text-align:center;padding:12px'>Sem itens cadastrados</td></tr>"}</tbody>
   </table>
 </div>
 
 ${problemItems.length?`
 <div class="section">
-  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">Itens com Problema (${problemItems.length})</div>
+  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">⚠️ Itens com Problema — ${uniqueProblems.length} item(s) | Total de dias em aberto registrado abaixo</div>
   <table>
-    <thead><tr><th style="width:40%">Dispositivo / Item</th><th style="width:20%">Status</th><th>Descrição (último registro)</th></tr></thead>
+    <thead><tr>
+  <th style="width:35%">Dispositivo / Item</th>
+  <th style="width:90px;text-align:center">Status</th>
+  <th style="width:170px">Desde / Dias em aberto</th>
+  <th>Descrição do Problema</th>
+</tr></thead>
     <tbody>${problemRows}</tbody>
   </table>
 </div>`:""}
