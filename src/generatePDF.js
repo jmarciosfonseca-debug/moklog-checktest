@@ -252,12 +252,29 @@ export function generatePDF(project, state, meta, photos) {
     </tr>`;
   }
 
-  const problemRows = problemItems.map(p=>`<tr style="background:#fff8f8">
-    <td>${p.cat}</td><td>${p.item}</td>
-    <td><span class="badge" style="background:${stBg(p.status)};color:${stColor(p.status)}">${stLabel(p.status)}</span></td>
-    <td style="font-size:11px;color:#64748b">${p.since?fmtDate(p.since):"--"}</td>
-    <td style="font-size:11px;color:#64748b">${p.note||"--"}</td>
-  </tr>`).join("");
+  // Deduplicate: if same item appears multiple times, keep only the most recent note
+  const seenItems = new Map();
+  problemItems.forEach(p => {
+    const key = p.cat + "|" + p.item;
+    // Keep last occurrence (most recent note wins)
+    seenItems.set(key, p);
+  });
+  const uniqueProblems = [...seenItems.values()];
+
+  const problemRows = uniqueProblems.map(p=>`
+    <tr style="background:#fff8f8;border-left:3px solid ${stColor(p.status)}">
+      <td style="padding:8px 10px">
+        <div style="font-weight:600;font-size:12px;color:#1e293b">${p.cat}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:1px">${p.item}</div>
+      </td>
+      <td style="padding:8px 10px;white-space:nowrap">
+        <span class="badge" style="background:${stBg(p.status)};color:${stColor(p.status)}">${stLabel(p.status)}</span>
+        ${p.since?`<div style="font-size:10px;color:#94a3b8;margin-top:3px">Desde ${fmtDate(p.since)}</div>`:""}
+      </td>
+      <td style="padding:8px 10px;font-size:12px;color:#334155;font-style:${p.note&&p.note!=="--"?"normal":"italic"}">
+        ${p.note&&p.note!=="--"?p.note:"<span style='color:#94a3b8'>Sem descrição</span>"}
+      </td>
+    </tr>`).join("");
 
   const notesCat = (project.categories||[]).find(c=>c.type==="notes");
   const pendencias = notesCat?((state[notesCat.id]?.items)||[]):[];
@@ -317,7 +334,7 @@ ${problemItems.length?`
 <div class="section">
   <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">Itens com Problema (${problemItems.length})</div>
   <table>
-    <thead><tr><th>Dispositivo</th><th>Item</th><th>Status</th><th>Desde</th><th>Descrição</th></tr></thead>
+    <thead><tr><th style="width:40%">Dispositivo / Item</th><th style="width:20%">Status</th><th>Descrição (último registro)</th></tr></thead>
     <tbody>${problemRows}</tbody>
   </table>
 </div>`:""}
