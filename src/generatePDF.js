@@ -164,6 +164,7 @@ function barTextColor(pct) {
 // Critical threshold: > 30 days
 const CRITICAL_DAYS = 150;  // Critério 1: > 150 dias em aberto
 const VOLUME_THRESHOLD = 8;  // Critério 2: > 8 subitens com falha no mesmo sistema
+const COMPACT_THRESHOLD = 10;  // > 10 itens com falha no mesmo sistema → tabela compacta interna
 function isCritical(diasAberto) { return diasAberto !== null && diasAberto > CRITICAL_DAYS; }
 
 // ── Shared CSS
@@ -252,8 +253,12 @@ export function generatePDF(project, state, meta, photos) {
       total=s.length; okCount=s.filter(v=>!v.status||v.status==="ok").length;
       s.forEach((v,i)=>{ if(v.status&&v.status!=="ok") problemItems.push({cat:cat.label,item:cat.itemLabels?.[i]||`Item ${i+1}`,status:v.status,since:v.since,note:v.note}); });
     } else if(cat.type==="count") {
-      total=s.total??cat.total??0; const inop=(s.inoperative?.length??s.inoper??0); okCount=total-inop;
-      if(inop>0) problemItems.push({cat:cat.label,item:`${inop} inoperante(s)`,status:"inop",since:s.since,note:s.note});
+      const inopArr=Array.isArray(s.inoperative)?s.inoperative:[];
+      total=s.total??cat.total??0; okCount=total-inopArr.length;
+      inopArr.forEach(it=>{
+        const itLabel=it.id||it.label||it.name||"Item";
+        problemItems.push({cat:cat.label,item:itLabel,status:it.status||"inop",since:it.since||null,note:it.note||it.descricao||"",_count:true});
+      });
     }
 
     // Count parciais correctly for all types
@@ -315,32 +320,75 @@ export function generatePDF(project, state, meta, photos) {
     return {...p, dias};
   });
 
-  const problemRows = uniqueProblems.map(p=>{
-    const diasAberto = p.dias;
-    const isUrgent = isCritical(diasAberto);
-    return `
-    <tr style="background:${isUrgent?"#fff5f5":"#fff8f8"};border-left:4px solid ${stColor(p.status)}">
-      <td style="padding:10px 12px">
-        <div style="font-weight:700;font-size:13px;color:#0f172a">${p.cat}</div>
-        <div style="font-size:12px;color:#475569;margin-top:2px">${p.item}</div>
-      </td>
-      <td style="padding:10px 12px;white-space:nowrap;vertical-align:top;text-align:center">
-        <span class="badge" style="background:${stBg(p.status)};color:${stColor(p.status)}">${stLabel(p.status)}</span>
-      </td>
-      <td style="padding:10px 12px;vertical-align:top">
-        <div style="font-size:12px;color:#64748b;margin-bottom:3px">
-          ${p.since ? `${fmtDate(p.since)}` : `<span style="color:#94a3b8;font-style:italic">s/ data</span>`}
+  // Agrupa por sistema (cat). Sistemas com > COMPACT_THRESHOLD itens → tabela compacta interna.
+  const grupos = new Map();
+  uniqueProblems.forEach(p => {
+    if(!grupos.has(p.cat)) grupos.set(p.cat, []);
+    grupos.get(p.cat).push(p);
+  });
+
+  const diasColor = (d, urgent) => urgent ? "#dc2626" : d!==null ? "#d97706" : "#94a3b8";
+
+  const problemRows = [...grupos.entries()].map(([cat, itens]) => {
+    // CASO COMPACTO: muitos itens no mesmo sistema → bloco único com mini-tabela
+    if(itens.length > COMPACT_THRESHOLD) {
+      const inner = itens.map(p=>{
+        const urgent = isCritical(p.dias);
+        return `<tr style="border-top:0.5px solid #f5c4b3">
+          <td style="padding:4px 12px;font-weight:700;color:#0f172a;white-space:nowrap">${p.item}</td>
+          <td style="padding:4px 8px;text-align:center;font-weight:700;color:${stColor(p.status)}">${p.status==="partial"?"PARC":"INOP"}</td>
+          <td style="padding:4px 8px;color:#64748b;white-space:nowrap">${p.since?fmtDate(p.since):`<span style="color:#94a3b8;font-style:italic">s/ data</span>`}</td>
+          <td style="padding:4px 8px;text-align:center;font-weight:800;color:${diasColor(p.dias,urgent)};white-space:nowrap">${p.dias!==null?`${p.dias}d`:"—"}</td>
+          <td style="padding:4px 12px;color:#1e293b">${p.note&&p.note!=="--"?p.note:`<span style="color:#94a3b8;font-style:italic">Sem descrição</span>`}</td>
+        </tr>`;
+      }).join("");
+      return `<tr><td colspan="4" style="padding:0">
+        <div style="border:1px solid #f0997b;border-radius:8px;overflow:hidden;margin:6px 0">
+          <div style="background:#faece7;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0997b">
+            <span style="font-weight:800;font-size:13px;color:#0f172a">${cat}</span>
+            <span style="background:#fee2e2;color:#dc2626;font-size:10px;font-weight:800;padding:3px 8px;border-radius:8px">${itens.length} ITENS COM FALHA</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="background:#fbf3ef;color:#712b13">
+              <th style="text-align:left;padding:5px 12px;font-weight:700">Item</th>
+              <th style="text-align:center;padding:5px 8px;font-weight:700">Status</th>
+              <th style="text-align:left;padding:5px 8px;font-weight:700">Desde</th>
+              <th style="text-align:center;padding:5px 8px;font-weight:700">Dias</th>
+              <th style="text-align:left;padding:5px 12px;font-weight:700">Descrição</th>
+            </tr></thead>
+            <tbody>${inner}</tbody>
+          </table>
         </div>
-        <div style="font-size:13px;font-weight:800;color:${isUrgent?"#dc2626":diasAberto!==null?"#d97706":"#94a3b8"}">
-          ${diasAberto!==null?`${diasAberto}d em aberto`:"—"}
-        </div>
-      </td>
-      <td style="padding:10px 12px;font-size:13px;color:#1e293b;vertical-align:top">
-        ${p.note&&p.note!=="--"
-          ? `<span style="font-weight:500">${p.note}</span>`
-          : `<span style="color:#94a3b8;font-style:italic">Sem descrição</span>`}
-      </td>
-    </tr>`;
+      </td></tr>`;
+    }
+    // CASO DETALHADO: poucos itens → linhas grandes (formato original)
+    return itens.map(p=>{
+      const diasAberto = p.dias;
+      const isUrgent = isCritical(diasAberto);
+      return `
+      <tr style="background:${isUrgent?"#fff5f5":"#fff8f8"};border-left:4px solid ${stColor(p.status)}">
+        <td style="padding:10px 12px">
+          <div style="font-weight:700;font-size:13px;color:#0f172a">${p.cat}</div>
+          <div style="font-size:12px;color:#475569;margin-top:2px">${p.item}</div>
+        </td>
+        <td style="padding:10px 12px;white-space:nowrap;vertical-align:top;text-align:center">
+          <span class="badge" style="background:${stBg(p.status)};color:${stColor(p.status)}">${stLabel(p.status)}</span>
+        </td>
+        <td style="padding:10px 12px;vertical-align:top">
+          <div style="font-size:12px;color:#64748b;margin-bottom:3px">
+            ${p.since ? `${fmtDate(p.since)}` : `<span style="color:#94a3b8;font-style:italic">s/ data</span>`}
+          </div>
+          <div style="font-size:13px;font-weight:800;color:${isUrgent?"#dc2626":diasAberto!==null?"#d97706":"#94a3b8"}">
+            ${diasAberto!==null?`${diasAberto}d em aberto`:"—"}
+          </div>
+        </td>
+        <td style="padding:10px 12px;font-size:13px;color:#1e293b;vertical-align:top">
+          ${p.note&&p.note!=="--"
+            ? `<span style="font-weight:500">${p.note}</span>`
+            : `<span style="color:#94a3b8;font-style:italic">Sem descrição</span>`}
+        </td>
+      </tr>`;
+    }).join("");
   }).join("");
 
   const notesCat = (project.categories||[]).find(c=>c.type==="notes");
