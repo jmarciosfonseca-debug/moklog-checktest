@@ -981,7 +981,12 @@ function Dashboard({stored, onBack, onDeleteReport}) {
           );
         })}
         <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
-          <button onClick={()=>generatePDF(viewReport.project,viewReport.report.state,viewReport.report.meta,[])}
+          <button onClick={()=>generatePDF(
+              viewReport.project||viewReport,
+              viewReport.report?.state||viewReport.state,
+              viewReport.report?.meta||viewReport.meta,
+              []
+            )}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
           <button onClick={()=>{setConfirmDel({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});setViewReport(null);}}
             style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir</button>
@@ -1268,7 +1273,7 @@ function HistoryScreen({project, stored, onBack}) {
                   <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
                 </div>
                 <div style={{marginTop:10}}>
-                  <button onClick={()=>setViewReport(r)}
+                  <button onClick={()=>setViewReport({project,report:r,idx:i})}
                     style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px"}}>
                     👁 Ver Relatório Completo
                   </button>
