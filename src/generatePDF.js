@@ -162,7 +162,8 @@ function barTextColor(pct) {
   return "#dc2626";
 }
 // Critical threshold: > 30 days
-const CRITICAL_DAYS = 30;
+const CRITICAL_DAYS = 150;  // Critério 1: > 150 dias em aberto
+const VOLUME_THRESHOLD = 8;  // Critério 2: > 8 subitens com falha no mesmo sistema
 function isCritical(diasAberto) { return diasAberto !== null && diasAberto > CRITICAL_DAYS; }
 
 // ── Shared CSS
@@ -404,35 +405,78 @@ ${buildHeader(theme,project,meta,weekLabel)}
 </div>
 
 ${uniqueProblems.length>0?`
-<!-- PRIORIDADE CRÍTICA -->
+<!-- PRIORIDADE CRÍTICA — Critério 1 (>150d) + Critério 2 (>8 falhas no sistema) -->
 ${(()=>{
-  const criticos = uniqueProblems.filter(p=>p.dias!==null&&p.dias>CRITICAL_DAYS);
-  if(!criticos.length) return "";
-  const critRows = criticos.map(p=>`
-    <tr style="background:#fff0f0;border-left:4px solid #dc2626">
-      <td style="padding:10px 12px;font-weight:700;color:#0f172a">${p.cat}<br><span style="font-size:12px;color:#475569;font-weight:500">${p.item}</span></td>
+  // ── CRITÉRIO 1: Temporal — pendência > 150 dias
+  const criticos150 = uniqueProblems.filter(p => p.dias !== null && p.dias > CRITICAL_DAYS);
+
+  // ── CRITÉRIO 2: Degradação sistêmica — > 8 subitens com falha no mesmo sistema
+  const falhasPorCat = {};
+  uniqueProblems.forEach(p => {
+    if(!falhasPorCat[p.cat]) falhasPorCat[p.cat] = [];
+    falhasPorCat[p.cat].push(p);
+  });
+  const sistemasColapsados = Object.entries(falhasPorCat)
+    .filter(([cat, items]) => items.length > VOLUME_THRESHOLD)
+    .map(([cat, items]) => ({cat, count: items.length, items}));
+
+  if(!criticos150.length && !sistemasColapsados.length) return "";
+
+  // ── Alertas de volume (Critério 2)
+  const alertasVolume = sistemasColapsados.map(s => `
+    <div style="background:#1a0202;border:1px solid #ef444466;border-radius:8px;padding:12px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px">
+      <div style="font-size:22px;flex-shrink:0;margin-top:2px">⚠️</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:800;color:#ef4444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">
+          ALERTA DE DEGRADAÇÃO SISTÊMICA
+        </div>
+        <div style="font-size:13px;color:#0f172a;line-height:1.65;background:#fff;padding:9px 12px;border-radius:6px">
+          O ecossistema de <strong>${s.cat}</strong> apresenta <strong style="color:#dc2626">${s.count} subitens com falha</strong>.
+          Risco elevado de perda de cobertura e vulnerabilidade crítica na planta.
+        </div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+          ${s.items.map(it=>`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:${it.status==="inop"?"#fee2e2":"#fef3c7"};color:${it.status==="inop"?"#dc2626":"#d97706"};font-weight:700">${it.item}</span>`).join("")}
+        </div>
+      </div>
+    </div>`).join("");
+
+  // ── Linhas temporais (Critério 1)
+  const critRows = criticos150.map(p=>`
+    <tr style="background:#fff5f5;border-left:4px solid #dc2626">
+      <td style="padding:10px 12px;font-weight:700;color:#0f172a">
+        ${p.cat}<br><span style="font-size:12px;color:#475569;font-weight:500">${p.item}</span>
+      </td>
       <td style="padding:10px 12px;text-align:center;white-space:nowrap">
         <span style="background:#fee2e2;color:#dc2626;font-size:11px;font-weight:800;padding:3px 10px;border-radius:5px">CRÍTICO</span>
       </td>
-      <td style="padding:10px 12px;font-size:13px;font-weight:800;color:#dc2626;text-align:center">${p.dias}d</td>
+      <td style="padding:10px 12px;font-size:14px;font-weight:800;color:#dc2626;text-align:center">${p.dias}d</td>
       <td style="padding:10px 12px;font-size:13px;color:#1e293b;font-weight:500">
         ${p.note&&p.note!=="--"?p.note:"<span style='color:#94a3b8;font-style:italic'>Sem descrição</span>"}
       </td>
     </tr>`).join("");
+
   return `<div class="section" style="border:2px solid #dc2626">
     <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">
-      🔴 PRIORIDADE CRÍTICA — ITENS COM MAIS DE ${CRITICAL_DAYS} DIAS EM ABERTO
-      <span style="font-weight:400;font-size:10px;margin-left:8px">${criticos.length} item(s) exigem ação imediata</span>
+      🔴 PRIORIDADE CRÍTICA — ESTADO PREOCUPANTE
+      <span style="font-weight:400;font-size:10px;margin-left:8px;color:#64748b">
+        ${[
+          criticos150.length>0?`${criticos150.length} item(s) > ${CRITICAL_DAYS} dias`:"",
+          sistemasColapsados.length>0?`${sistemasColapsados.length} sistema(s) com degradação volumétrica`:""
+        ].filter(Boolean).join(" · ")}
+      </span>
     </div>
+    ${alertasVolume}
+    ${criticos150.length>0?`
+    ${sistemasColapsados.length>0?`<div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 8px;padding-top:10px;border-top:1px solid #fee2e2">Pendências Acima de ${CRITICAL_DAYS} Dias</div>`:""}
     <table>
       <thead><tr>
         <th style="width:35%">Dispositivo / Item</th>
-        <th style="width:90px;text-align:center">Status</th>
+        <th style="width:100px;text-align:center">Status</th>
         <th style="width:80px;text-align:center">Dias</th>
         <th>Descrição do Problema</th>
       </tr></thead>
       <tbody>${critRows}</tbody>
-    </table>
+    </table>`:""}
   </div>`;
 })()}
 <!-- TODOS OS ITENS COM PROBLEMA -->
