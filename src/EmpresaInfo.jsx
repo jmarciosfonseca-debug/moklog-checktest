@@ -86,6 +86,7 @@ function gerarPDFEmpresa(project, info, dark) {
   const visitasSeg = (seg.visitas||[]).slice(0,10).map(v=>`
     <tr>
       <td>${fmtD(v.data)}</td>
+      <td>${v.turno||"--"}</td>
       <td>${v.resumo||"--"}</td>
     </tr>`).join("");
 
@@ -148,7 +149,7 @@ function gerarPDFEmpresa(project, info, dark) {
     if(dias>=15) return `<div class="alert">🔴 Visita em atraso — ${dias} dias sem visita do supervisor</div>`;
     return `<div class="ok">✅ Última visita há ${dias} dia(s) — dentro do prazo</div>`;
   })()}
-  ${visitasSeg ? `<table><thead><tr><th>Data</th><th>Resumo</th></tr></thead><tbody>${visitasSeg}</tbody></table>` : "<div style='font-size:12px;color:#94a3b8'>Nenhuma visita registrada</div>"}
+  ${visitasSeg ? `<table><thead><tr><th>Data</th><th>Turno</th><th>Resumo</th></tr></thead><tbody>${visitasSeg}</tbody></table>` : "<div style='font-size:12px;color:#94a3b8'>Nenhuma visita registrada</div>"}
 </div>
 
 <div class="card">
@@ -226,7 +227,8 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({...data});
   const [showAddVisita, setShowAddVisita] = useState(false);
-  const [novaVisita, setNovaVisita] = useState({ data:todayStr(), resumo:"" });
+  const [novaVisita, setNovaVisita] = useState({ data:todayStr(), turno:"", resumo:"" });
+  const [filtroTurno, setFiltroTurno] = useState("todos");
 
   const saveEdit = () => {
     onSave(form);
@@ -234,11 +236,12 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
   };
 
   const addVisita = () => {
+    if(!novaVisita.turno) { alert("Selecione o turno (Diurno ou Noturno)"); return; }
     if(!novaVisita.resumo.trim()) { alert("Informe o resumo da visita"); return; }
     const updated = { ...form, visitas: [{ id:Date.now().toString(), ...novaVisita }, ...(form.visitas||[])] };
     setForm(updated);
     onSave(updated);
-    setNovaVisita({ data:todayStr(), resumo:"" });
+    setNovaVisita({ data:todayStr(), turno:"", resumo:"" });
     setShowAddVisita(false);
   };
 
@@ -318,12 +321,38 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
             style={{...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10}}>+ Visita</button>
         </div>
 
+        <div style={{display:"flex", gap:6, marginBottom:10}}>
+          {[["todos","Geral"],["Diurno","☀️ Diurno"],["Noturno","🌙 Noturno"]].map(([key,label])=>(
+            <button key={key} onClick={()=>setFiltroTurno(key)}
+              style={{flex:1, padding:"6px", borderRadius:6, fontSize:11, fontWeight:700, cursor:"pointer",
+                border:`1px solid ${filtroTurno===key?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}`,
+                background:filtroTurno===key?"#0ea5e922":(dark?"#020510":"#fff"),
+                color:filtroTurno===key?"#0ea5e9":(dark?"#64748b":"#94a3b8")}}>
+              {label}
+            </button>
+          ))}
+        </div>
+
         {showAddVisita && (
           <div style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", marginBottom:10, border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8}}>
               <div>
                 <label style={S.lbl}>Data</label>
                 <input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={S.inp}/>
+              </div>
+            </div>
+            <div style={{marginBottom:8}}>
+              <label style={S.lbl}>Turno</label>
+              <div style={{display:"flex", gap:8}}>
+                {[["Diurno","☀️"],["Noturno","🌙"]].map(([t,icon])=>(
+                  <button key={t} onClick={()=>setNovaVisita(v=>({...v,turno:t}))}
+                    style={{flex:1, padding:"10px", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer",
+                      border:`1px solid ${novaVisita.turno===t?(t==="Diurno"?"#f59e0b":"#6366f1"):(dark?"#0f172a":"#e2e8f0")}`,
+                      background:novaVisita.turno===t?(t==="Diurno"?"#f59e0b22":"#6366f122"):(dark?"#020510":"#fff"),
+                      color:novaVisita.turno===t?(t==="Diurno"?"#f59e0b":"#818cf8"):(dark?"#64748b":"#94a3b8")}}>
+                    {icon} {t}
+                  </button>
+                ))}
               </div>
             </div>
             <div style={{marginBottom:8}}>
@@ -342,10 +371,19 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
         )}
 
         <div style={{display:"flex", flexDirection:"column", gap:6}}>
-          {(data.visitas||[]).map(v=>(
+          {(data.visitas||[]).filter(v=>filtroTurno==="todos"||v.turno===filtroTurno).map(v=>(
             <div key={v.id} style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4}}>
-                <span style={{fontSize:11, color:"#0ea5e9", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
+                <div style={{display:"flex", alignItems:"center", gap:8}}>
+                  <span style={{fontSize:11, color:"#0ea5e9", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
+                  {v.turno && (
+                    <span style={{fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:5,
+                      background:v.turno==="Diurno"?"#f59e0b22":"#6366f122",
+                      color:v.turno==="Diurno"?"#f59e0b":"#818cf8"}}>
+                      {v.turno==="Diurno"?"☀️":"🌙"} {v.turno}
+                    </span>
+                  )}
+                </div>
                 {adminAuth && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
               </div>
               <div style={{fontSize:12, ...S.txt}}>{v.resumo}</div>
