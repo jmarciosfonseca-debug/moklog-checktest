@@ -69,6 +69,17 @@ async function saveIntervalos(projectId, registros) {
   try { localStorage.setItem(`intervalos_${projectId}`, JSON.stringify(registros)); } catch(e){}
 }
 
+async function loadEquipe(projectId) {
+  try {
+    const snap = await getDoc(doc(db,"equipes",projectId));
+    if(snap.exists()) {
+      const cols = snap.data().colaboradores||[];
+      return cols.filter(c=>c.status!=="desligado"&&c.nome&&c.nome.trim());
+    }
+  } catch(e){}
+  return [];
+}
+
 function getStyles(dark) {
   return {
     page:    { minHeight:"100vh", background:dark?"#04080f":"#f1f5f9", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
@@ -93,9 +104,9 @@ function emptyRegistro() {
     data: todayStr(),
     turno: "Diurno",
     intervalos: {
-      cafe1:    { saida:"", retorno:"" },
-      refeicao: { saida:"", retorno:"" },
-      cafe2:    { saida:"", retorno:"" },
+      cafe1:    { saida:"", retorno:"", colaboradores:[] },
+      refeicao: { saida:"", retorno:"", colaboradores:[] },
+      cafe2:    { saida:"", retorno:"", colaboradores:[] },
     },
     criadoEm: new Date().toISOString(),
   };
@@ -140,15 +151,49 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
   const [viewReg, setViewReg] = useState(null);
+  const [equipe, setEquipe] = useState([]);
   const adminAuth = authLevel==="admin";
 
   useEffect(()=>{
     if(!project?.id) return;
     loadIntervalos(project.id).then(r=>{ setRegistros(r||[]); setLoading(false); });
+    loadEquipe(project.id).then(setEquipe);
   },[project?.id]);
 
   const setIntervalo = (tipo, campo, val) => {
     setForm(f=>({...f, intervalos:{...f.intervalos,[tipo]:{...f.intervalos[tipo],[campo]:val}}}));
+  };
+
+  const addColab = (tipo, colab) => {
+    setForm(f=>{
+      const iv = f.intervalos[tipo]||{};
+      const lista = iv.colaboradores||[];
+      if(lista.some(c=>c.id===colab.id)) return f;
+      return {...f, intervalos:{...f.intervalos,[tipo]:{...iv, colaboradores:[...lista,{id:colab.id,nome:colab.nome,saida:"",retorno:""}]}}};
+    });
+  };
+
+  const addColabManual = (tipo, nome) => {
+    if(!nome||!nome.trim()) return;
+    setForm(f=>{
+      const iv = f.intervalos[tipo]||{};
+      const lista = iv.colaboradores||[];
+      return {...f, intervalos:{...f.intervalos,[tipo]:{...iv, colaboradores:[...lista,{id:"m"+Date.now(),nome:nome.trim(),saida:"",retorno:""}]}}};
+    });
+  };
+
+  const removeColab = (tipo, id) => {
+    setForm(f=>{
+      const iv = f.intervalos[tipo]||{};
+      return {...f, intervalos:{...f.intervalos,[tipo]:{...iv, colaboradores:(iv.colaboradores||[]).filter(c=>c.id!==id)}}};
+    });
+  };
+
+  const setColabTime = (tipo, id, campo, val) => {
+    setForm(f=>{
+      const iv = f.intervalos[tipo]||{};
+      return {...f, intervalos:{...f.intervalos,[tipo]:{...iv, colaboradores:(iv.colaboradores||[]).map(c=>c.id===id?{...c,[campo]:val}:c)}}};
+    });
   };
 
   const salvar = async () => {
@@ -196,19 +241,39 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
           <div style={S.card}>
             {TIPOS_INTERVALO.map((t,i)=>{
               const iv = viewReg.intervalos[t.key]||{};
+              const lista = iv.colaboradores||[];
               const dur = calcDuracao(iv.saida, iv.retorno);
               return (
-                <div key={t.key} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:i<2?`1px solid ${dark?"#0f172a":"#f1f5f9"}`:"none"}}>
-                  <span style={{fontSize:22,flexShrink:0}}>{t.icon}</span>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:12,fontWeight:700,...S.txt}}>{t.label} {i===0?"(1º)":i===2?"(2º)":""}</div>
-                    <div style={{display:"flex",gap:10,marginTop:3}}>
-                      {iv.saida&&<span style={{fontSize:11,color:"#ef4444"}}>Saída: {iv.saida}</span>}
-                      {iv.retorno&&<span style={{fontSize:11,color:"#22c55e"}}>Retorno: {iv.retorno}</span>}
+                <div key={t.key} style={{padding:"10px 0",borderBottom:i<2?`1px solid ${dark?"#0f172a":"#f1f5f9"}`:"none"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <span style={{fontSize:22,flexShrink:0}}>{t.icon}</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:12,fontWeight:700,...S.txt}}>{t.label} {i===0?"(1º)":i===2?"(2º)":""}</div>
+                      {lista.length===0 && (
+                        <div style={{display:"flex",gap:10,marginTop:3}}>
+                          {iv.saida&&<span style={{fontSize:11,color:"#ef4444"}}>Saída: {iv.saida}</span>}
+                          {iv.retorno&&<span style={{fontSize:11,color:"#22c55e"}}>Retorno: {iv.retorno}</span>}
+                          {!iv.saida&&<span style={{fontSize:10,...S.txt2}}>—</span>}
+                        </div>
+                      )}
                     </div>
+                    {lista.length===0&&dur&&<span style={{fontSize:12,fontWeight:700,color:t.cor,background:t.cor+"22",padding:"3px 10px",borderRadius:8,flexShrink:0}}>{dur}</span>}
                   </div>
-                  {dur&&<span style={{fontSize:12,fontWeight:700,color:t.cor,background:t.cor+"22",padding:"3px 10px",borderRadius:8,flexShrink:0}}>{dur}</span>}
-                  {!iv.saida&&<span style={{fontSize:10,...S.txt2}}>—</span>}
+                  {lista.length>0 && (
+                    <div style={{marginTop:6,marginLeft:34,display:"flex",flexDirection:"column",gap:4}}>
+                      {lista.map(c=>{
+                        const cd=calcDuracao(c.saida,c.retorno);
+                        return (
+                          <div key={c.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:11}}>
+                            <span style={{...S.txt,fontWeight:600,minWidth:90}}>👤 {c.nome}</span>
+                            {c.saida&&<span style={{color:"#ef4444"}}>↑ {c.saida}</span>}
+                            {c.retorno&&<span style={{color:"#22c55e"}}>↓ {c.retorno}</span>}
+                            {cd&&<span style={{fontWeight:700,color:t.cor}}>{cd}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -256,29 +321,65 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
           {/* 3 Intervalos */}
           {TIPOS_INTERVALO.map((tipo,i)=>{
             const iv = form.intervalos[tipo.key]||{};
-            const dur = calcDuracao(iv.saida, iv.retorno);
+            const lista = iv.colaboradores||[];
+            const jaAdd = new Set(lista.map(c=>c.id));
+            const disponiveis = equipe.filter(c=>!jaAdd.has(c.id));
             return (
               <div key={tipo.key} style={S.card}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
                   <span style={{fontSize:20}}>{tipo.icon}</span>
                   <div style={{fontSize:13,fontWeight:700,...S.txt}}>{i+1}º Intervalo — {tipo.label}</div>
-                  {dur&&<span style={{fontSize:12,fontWeight:700,color:tipo.cor,background:tipo.cor+"22",padding:"2px 10px",borderRadius:8,marginLeft:"auto"}}>{dur}</span>}
+                  {lista.length>0&&<span style={{fontSize:11,fontWeight:700,color:tipo.cor,background:tipo.cor+"22",padding:"2px 10px",borderRadius:8,marginLeft:"auto"}}>{lista.length} colaborador(es)</span>}
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  <div>
-                    <label style={S.lbl}>Saída</label>
-                    <div style={{display:"flex",gap:5}}>
-                      <input type="time" value={iv.saida||""} onChange={e=>setIntervalo(tipo.key,"saida",e.target.value)} style={{...S.inp,flex:1}}/>
-                      <button onClick={()=>setIntervalo(tipo.key,"saida",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+
+                {/* Lista de colaboradores adicionados */}
+                {lista.map(c=>{
+                  const dur=calcDuracao(c.saida,c.retorno);
+                  return (
+                    <div key={c.id} style={{background:dark?"#020510":"#f8fafc",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"8px 10px",marginBottom:6}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                        <span style={{fontSize:13,fontWeight:600,...S.txt,flex:1}}>👤 {c.nome}</span>
+                        {dur&&<span style={{fontSize:11,fontWeight:700,color:tipo.cor}}>{dur}</span>}
+                        <button onClick={()=>removeColab(tipo.key,c.id)} style={{background:"transparent",border:"none",color:"#ef444488",fontSize:15,cursor:"pointer",padding:"0 4px"}}>✕</button>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div>
+                          <label style={{...S.lbl,fontSize:9}}>Saída</label>
+                          <div style={{display:"flex",gap:4}}>
+                            <input type="time" value={c.saida||""} onChange={e=>setColabTime(tipo.key,c.id,"saida",e.target.value)} style={{...S.inp,flex:1,fontSize:12,padding:"7px 8px"}}/>
+                            <button onClick={()=>setColabTime(tipo.key,c.id,"saida",nowTime())} style={{...S.btnSm,padding:"6px 8px",fontSize:12,flexShrink:0}}>⏱</button>
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{...S.lbl,fontSize:9}}>Retorno</label>
+                          <div style={{display:"flex",gap:4}}>
+                            <input type="time" value={c.retorno||""} onChange={e=>setColabTime(tipo.key,c.id,"retorno",e.target.value)} style={{...S.inp,flex:1,fontSize:12,padding:"7px 8px"}}/>
+                            <button onClick={()=>setColabTime(tipo.key,c.id,"retorno",nowTime())} style={{...S.btnSm,padding:"6px 8px",fontSize:12,flexShrink:0}}>⏱</button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label style={S.lbl}>Retorno</label>
-                    <div style={{display:"flex",gap:5}}>
-                      <input type="time" value={iv.retorno||""} onChange={e=>setIntervalo(tipo.key,"retorno",e.target.value)} style={{...S.inp,flex:1}}/>
-                      <button onClick={()=>setIntervalo(tipo.key,"retorno",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+                  );
+                })}
+
+                {/* Adicionar colaborador */}
+                <div style={{marginTop:lista.length>0?8:0}}>
+                  <label style={S.lbl}>+ Adicionar colaborador</label>
+                  {disponiveis.length>0 ? (
+                    <select value="" onChange={e=>{const c=equipe.find(x=>x.id===e.target.value);if(c)addColab(tipo.key,c);e.target.value="";}}
+                      style={{...S.inp,cursor:"pointer"}}>
+                      <option value="">Selecione um colaborador...</option>
+                      {disponiveis.map(c=>(
+                        <option key={c.id} value={c.id}>{c.nome} — {c.turno||"—"}{c.cargo?` · ${c.cargo}`:""}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{fontSize:11,...S.txt2,padding:"6px 0"}}>
+                      {equipe.length===0?"Nenhum colaborador cadastrado na equipe deste projeto.":"Todos os colaboradores já foram adicionados."}
                     </div>
-                  </div>
+                  )}
+                  <button onClick={()=>{const nome=prompt("Nome do colaborador (não cadastrado na equipe):");if(nome)addColabManual(tipo.key,nome);}}
+                    style={{...S.btnSm,marginTop:6,width:"100%",padding:"7px"}}>+ Outro (digitar nome)</button>
                 </div>
               </div>
             );
@@ -352,6 +453,7 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
 }
 
 function RegistroCard({ r, dark, S, onVer }) {
+  const totalColabs = TIPOS_INTERVALO.reduce((acc,t)=>acc+((r.intervalos[t.key]?.colaboradores||[]).length),0);
   const duracoes = TIPOS_INTERVALO.map(t=>{
     const iv = r.intervalos[t.key]||{};
     return calcDuracao(iv.saida, iv.retorno);
@@ -366,16 +468,22 @@ function RegistroCard({ r, dark, S, onVer }) {
         <div style={{flex:1}}>
           <div style={{fontSize:13,fontWeight:700,...S.txt}}>{r.turno} · {fmtDate(r.data)}</div>
           <div style={{display:"flex",gap:6,marginTop:3,flexWrap:"wrap"}}>
-            {TIPOS_INTERVALO.map((t,i)=>{
-              const iv = r.intervalos[t.key]||{};
-              const dur = calcDuracao(iv.saida,iv.retorno);
-              return dur?(
-                <span key={t.key} style={{fontSize:10,color:t.cor,background:t.cor+"22",padding:"1px 7px",borderRadius:5,fontWeight:700}}>
-                  {t.icon} {dur}
-                </span>
-              ):null;
-            })}
-            {duracoes.length===0&&<span style={{fontSize:10,...S.txt2}}>Sem horários registrados</span>}
+            {totalColabs>0 ? (
+              <span style={{fontSize:10,color:"#0ea5e9",background:"#0ea5e922",padding:"1px 7px",borderRadius:5,fontWeight:700}}>👤 {totalColabs} colaborador(es)</span>
+            ) : (
+              <>
+                {TIPOS_INTERVALO.map((t)=>{
+                  const iv = r.intervalos[t.key]||{};
+                  const dur = calcDuracao(iv.saida,iv.retorno);
+                  return dur?(
+                    <span key={t.key} style={{fontSize:10,color:t.cor,background:t.cor+"22",padding:"1px 7px",borderRadius:5,fontWeight:700}}>
+                      {t.icon} {dur}
+                    </span>
+                  ):null;
+                })}
+                {duracoes.length===0&&<span style={{fontSize:10,...S.txt2}}>Sem horários registrados</span>}
+              </>
+            )}
           </div>
         </div>
         <span style={{...S.txt2,fontSize:16}}>›</span>
