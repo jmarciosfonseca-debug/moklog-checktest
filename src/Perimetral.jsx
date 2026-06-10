@@ -381,10 +381,11 @@ function gerarPDFConsolidado(testes, periodo) {
   table{width:100%;border-collapse:collapse;font-size:11px}
   th{background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
   td{padding:5px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-  .map-wrap{position:relative;width:100%;border-radius:8px;overflow:hidden}
-  .map-wrap img{width:100%;display:block;filter:brightness(.82)}
-  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  @media print{body{padding:8px}@page{margin:10mm;size:A4 landscape}.no-print{display:none}}
+  .map-wrap{position:relative;width:100%;max-width:520px;margin:0 auto;border-radius:8px;overflow:hidden}
+  .map-wrap img{width:100%;height:240px;object-fit:cover;display:block;filter:brightness(.82)}
+  .grid-2{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:start}
+  .footer{text-align:center;margin-top:10px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
+  @media print{body{padding:6px}@page{margin:8mm;size:A4 landscape}.no-print{display:none}.section{margin-bottom:8px;padding:10px 12px}.kpis{margin-bottom:8px}}
 </style></head>
 <body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
@@ -411,32 +412,34 @@ function gerarPDFConsolidado(testes, periodo) {
   <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${sorted.length}</div><div class="kpi-lbl">Testes</div></div>
 </div>
 
-<!-- MAPA COM STATUS AGREGADO -->
-<div class="section">
-  <div class="section-title">Mapa Perimetral — Zonas com Maior Taxa de Falha</div>
-  <div class="map-wrap">
-    <img src="data:image/jpeg;base64,${MAPA_B64}" alt="Mapa P505"/>
-    <svg style="position:absolute;top:0;left:0;width:100%;height:100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-      ${svgMarkers}
-    </svg>
-    <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.65);border-radius:5px;padding:4px 8px;display:flex;gap:10px">
-      <span style="font-size:9px;color:#22c55e;font-weight:700">● &lt;30% falha</span>
-      <span style="font-size:9px;color:#f59e0b;font-weight:700">● 30–59%</span>
-      <span style="font-size:9px;color:#ef4444;font-weight:700">● ≥60% falha</span>
+<!-- MAPA + GRÁFICO LADO A LADO -->
+<div class="grid-2">
+  <div class="section" style="margin-bottom:0">
+    <div class="section-title">Mapa Perimetral — Zonas com Maior Taxa de Falha</div>
+    <div class="map-wrap">
+      <img src="data:image/jpeg;base64,${MAPA_B64}" alt="Mapa P505"/>
+      <svg style="position:absolute;top:0;left:0;width:100%;height:100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+        ${svgMarkers}
+      </svg>
+      <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.65);border-radius:5px;padding:4px 8px;display:flex;gap:10px">
+        <span style="font-size:9px;color:#22c55e;font-weight:700">● &lt;30% falha</span>
+        <span style="font-size:9px;color:#f59e0b;font-weight:700">● 30–59%</span>
+        <span style="font-size:9px;color:#ef4444;font-weight:700">● ≥60% falha</span>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- GRÁFICO DE BARRAS POR ZONA -->
-<div class="section">
-  <div class="section-title">Taxa de Falha por Zona</div>
-  <div style="margin-bottom:8px;display:flex;gap:14px;font-size:9px">
-    <span style="color:#15803d;font-weight:700">■ BAIXA (&lt;30%)</span>
-    <span style="color:#d97706;font-weight:700">■ MÉDIA (30–59%)</span>
-    <span style="color:#dc2626;font-weight:700">■ ALTA (≥60%)</span>
+  <div class="section" style="margin-bottom:0">
+    <div class="section-title">Taxa de Falha por Zona</div>
+    <div style="margin-bottom:8px;display:flex;gap:14px;font-size:9px">
+      <span style="color:#15803d;font-weight:700">■ BAIXA (&lt;30%)</span>
+      <span style="color:#d97706;font-weight:700">■ MÉDIA (30–59%)</span>
+      <span style="color:#dc2626;font-weight:700">■ ALTA (≥60%)</span>
+    </div>
+    ${chartRows}
   </div>
-  ${chartRows}
 </div>
+<div style="height:12px"></div>
 
 <!-- TABELA COMPLETA DE TESTES -->
 <div class="section">
