@@ -7,6 +7,7 @@ import Equipamentos from "./Equipamentos";
 import Visita from "./Visita";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
+import CCO from "./CCO";
 import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
 
 // ── Hook de conectividade
@@ -461,13 +462,7 @@ function analyzeRecurrence(project, history) {
           if(st!=="ok"){ const key=`${cat.id}_${i}`; recurrence[key]=(recurrence[key]||0)+1; }
         });
       } else if(cat.type==="count"){
-        const inopArr=s.inoperative??[];
-        if(inopArr.length>0){ const aggKey=`${cat.id}_count`; recurrence[aggKey]=(recurrence[aggKey]||0)+1; }
-        // Track each camera/device individually by its ID so recurrence reflects the actual item
-        inopArr.forEach(it=>{
-          const itemId=(it.id||"").trim();
-          if(itemId){ const key=`${cat.id}_id_${itemId}`; recurrence[key]=(recurrence[key]||0)+1; }
-        });
+        if((s.inoperative?.length??0)>0){ const key=`${cat.id}_count`; recurrence[key]=(recurrence[key]||0)+1; }
       }
     }
   });
@@ -768,24 +763,17 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
         </div>
       </div>
       <div style={{marginTop:8}}>
-        {inop.map((it,i)=>{
-          const itemId=(it.id||"").trim();
-          const itemBadge=recurrence&&itemId?getRecurrenceBadge(recurrence[`${cat.id}_id_${itemId}`]||0):null;
-          return(
+        {inop.map((it,i)=>(
           <div key={i}>
             <div style={{...S.itemRow,flexWrap:"wrap",gap:6,marginBottom:5}}>
-              <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
-                <input placeholder="ID (ex: CF-32)" value={it.id} onChange={e=>upd(i,{id:e.target.value})} style={{...S.inp,width:105,fontSize:12}}/>
-                {itemBadge&&<span style={{fontSize:8,fontWeight:700,color:itemBadge.color,background:itemBadge.bg,padding:"1px 4px",borderRadius:6,whiteSpace:"nowrap"}}>{itemBadge.label}</span>}
-              </div>
+              <input placeholder="ID (ex: CF-32)" value={it.id} onChange={e=>upd(i,{id:e.target.value})} style={{...S.inp,width:105,fontSize:12}}/>
               <input placeholder="Problema..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
               <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
               <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
             </div>
             {setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} itemLabel={it.id||`Item ${i+1}`} photos={photos} setPhotos={setPhotos}/>}
           </div>
-          );
-        })}
+        ))}
         <button onClick={add} style={S.addBtn}>+ Registrar inoperante</button>
       </div>
     </div>
@@ -899,7 +887,7 @@ function MiniChart({data, width=200, height=60}) {
   );
 }
 
-function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
+function Dashboard({stored, onBack, onDeleteReport}) {
   const [pin,setPin]=useState(""); const [auth,setAuth]=useState(false); const [err,setErr]=useState(false);
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
   const [pendScreen,setPendScreen]=useState(false);
@@ -1001,8 +989,6 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
               []
             )}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
-          {onEditReport&&<button onClick={()=>onEditReport(viewReport.project,viewReport.report,viewReport.idx)}
-            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}>✏️ Editar</button>}
           <button onClick={()=>{setConfirmDel({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});setViewReport(null);}}
             style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir</button>
         </div>
@@ -1901,7 +1887,6 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
 
 export default function App(){
   const [screen,setScreen]=useState("home");
-  const [editingIdx,setEditingIdx]=useState(null); // index in history being edited (gerencial), null = creating new
   const isOnline = useOnlineStatus();
   const [showAcesso,setShowAcesso]=useState(false);
   const [acessoScreen,setAcessoScreen]=useState("menu");
@@ -1918,6 +1903,8 @@ export default function App(){
   const [showPerimetral,setShowPerimetral]=useState(false);
   const [showIntervalos,setShowIntervalos]=useState(false);
   const [intervalosProject,setIntervalosProject]=useState(null);
+  const [showCCO,setShowCCO]=useState(false);
+  const [ccoProject,setCcoProject]=useState(null);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -1993,7 +1980,7 @@ export default function App(){
   },[loaded]);
 
   useEffect(()=>{
-    if(screen==="form"&&state&&editingIdx===null){
+    if(screen==="form"&&state){
       try {
         const d={projectId:project.id,state,meta,photoCount:photos.length,savedAt:Date.now()};
         localStorage.setItem("moklog_draft",JSON.stringify(d));
@@ -2005,7 +1992,7 @@ export default function App(){
         } catch(e) {}
       }
     }
-  },[screen,state,meta,photos,editingIdx]);
+  },[screen,state,meta,photos]);
 
   const clearDraft=()=>{localStorage.removeItem("moklog_draft");setDraft(null);};
   const checkAuth=(pid)=>{const ts=projectAuth[pid];return ts&&(Date.now()-ts)<SESSION_TIMEOUT;};
@@ -2019,15 +2006,6 @@ export default function App(){
     if(!st || typeof st !== "object") {
       setSyncing(false);
       alert("Erro: dados do relatório inválidos. Tente novamente.");
-      return;
-    }
-    // ── Modo edição gerencial: sobrescreve o relatório existente no mesmo índice
-    if(editingIdx!==null){
-      const result=await editReport(project.id,editingIdx,st,mt);
-      setSyncStatus(result?.offline?"offline":result?.ok===false?"error":"saved");
-      setSyncing(false);
-      setTimeout(()=>setSyncStatus(""),3000);
-      setEditingIdx(null);
       return;
     }
     const prev=stored[project.id]?.history??[];
@@ -2077,38 +2055,6 @@ export default function App(){
     try{await deleteReportFromFirebase(projectId,next);}catch(e){}
   };
 
-  // Edição gerencial: sobrescreve o relatório no mesmo índice (sem duplicar, sem criar novo)
-  const editReport=async(projectId,idx,newState,newMeta)=>{
-    const prev=stored[projectId]?.history??[];
-    if(idx<0||idx>=prev.length) return {ok:false};
-    const original=prev[idx];
-    const updatedReport={
-      ...original,
-      state:newState,
-      meta:newMeta,
-      savedAt:original.savedAt||new Date().toISOString(), // preserva a data original
-      editedAt:new Date().toISOString(),                   // marca quando foi editado
-    };
-    const next=prev.map((r,i)=>i===idx?updatedReport:r);
-    const up={...stored,[projectId]:{...stored[projectId],history:next,updatedAt:new Date().toISOString()}};
-    setStored(up);
-    try{localStorage.setItem("seccheck_v4",JSON.stringify(up));}catch(e){}
-    if(!navigator.onLine) return {ok:true,offline:true};
-    const result=await saveToFirebase(projectId,next);
-    return result;
-  };
-
-  // Abre o formulário completo já preenchido com um relatório salvo (modo edição gerencial)
-  const startEditReport=(proj,report,idx)=>{
-    setProject(proj);
-    setState(JSON.parse(JSON.stringify(report.state))); // cópia profunda para não mutar o original
-    setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:"",...report.meta});
-    setPhotos([]);
-    setEditingIdx(idx);
-    setActive(null);
-    setScreen("form");
-  };
-
   const startNew=()=>{
     if(draft&&draft.projectId===project.id){setShowDraftPrompt(true);return;}
     const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);
@@ -2125,13 +2071,6 @@ export default function App(){
     const missing = [];
     if(!meta.date) missing.push("Data");
     if(!meta.start||!meta.end) missing.push("Horário de início e término");
-    if(!meta.leader||meta.leader.trim()==="") missing.push("Nome do líder VSPP");
-    if(!meta.cco||meta.cco.trim()==="") missing.push("Nome da Central (CCO)");
-    // Conditional: if Moked contact was made, time and operator name are required
-    if(meta.mokedContact){
-      if(!meta.mokedTime||meta.mokedTime.trim()==="") missing.push("Horário do contato com a Central Moked");
-      if(!meta.moked||meta.moked.trim()==="") missing.push("Nome do operador Moked 24h");
-    }
     if(!meta.signature||meta.signature.trim()==="") missing.push("Assinatura do líder");
     return missing;
   };
@@ -2177,6 +2116,7 @@ export default function App(){
   if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/></ErrorBoundary>;
   if(showPerimetral) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowPerimetral(false)}/></ErrorBoundary>;
   if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
+  if(showCCO&&ccoProject) return <ErrorBoundary moduleName="CCO"><CCO project={ccoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowCCO(false);setCcoProject(null);}}/></ErrorBoundary>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
@@ -2212,7 +2152,7 @@ export default function App(){
 
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
   if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>;
-  if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
+  if(screen==="dashboard") return <Dashboard stored={stored} onBack={()=>setScreen("home")} onDeleteReport={deleteReport}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} onBack={()=>setScreen("form")} onHome={()=>setScreen("home")}/>;
 
@@ -2243,21 +2183,12 @@ export default function App(){
       )}
       <SyncBadge/>
       <div style={S.formWrap}>
-        {editingIdx!==null&&(
-          <div style={{background:"#001a2e",border:"1px solid #0ea5e966",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:16}}>✏️</span>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>Modo edição gerencial</div>
-              <div style={{fontSize:11,color:"#64748b"}}>Você está editando um relatório já salvo. Ao confirmar, ele será sobrescrito (sem duplicar).</div>
-            </div>
-          </div>
-        )}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:10,borderBottom:"1px solid #060c18",marginBottom:2}}>
-          <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={S.backBtn}>← {editingIdx!==null?"Cancelar":"Inicio"}</button>
+          <button onClick={()=>setScreen("home")} style={S.backBtn}>← Inicio</button>
           <MoklogLogo size={32}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-            <div style={{fontSize:11,color:"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}{editingIdx!==null?" · editando":""}</div>
+            <div style={{fontSize:11,color:"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}</div>
           </div>
           {health&&<HealthRing pct={health.pct} size={46}/>}
         </div>
@@ -2346,12 +2277,12 @@ export default function App(){
             )}
             <button onClick={finalize} disabled={!canFinalize}
               style={{...S.primaryBtn,flex:2,fontSize:14,opacity:canFinalize?1:0.45,cursor:canFinalize?"pointer":"not-allowed"}}>
-              {editingIdx!==null?"✓ Salvar Alterações":"✓ Finalizar e Gerar Relatório"}
+              ✓ Finalizar e Gerar Relatório
             </button>
-            <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
+            <button onClick={()=>setScreen("home")} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
-        <div style={{fontSize:10,color:"#1e293b",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
+        <div style={{fontSize:10,color:"#1e293b",textAlign:"center",marginTop:4}}>💾 Rascunho salvo automaticamente</div>
       </div>
     </div>
   );
@@ -2413,6 +2344,8 @@ export default function App(){
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
                       <button onClick={()=>{setVisitaProject({id:jp.id,name:jp.name});setShowVisita(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
+                      <button onClick={()=>{setCcoProject({id:jp.id,name:jp.name});setShowCCO(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                     </div>
                   </div>
                 )}
@@ -2507,6 +2440,7 @@ export default function App(){
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     <button onClick={()=>{setIntervalosProject(project);setShowIntervalos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>⏱️ Intervalos</button>
+                    <button onClick={()=>{setCcoProject(project);setShowCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                   </div>
                 </>
               ):(
@@ -2520,6 +2454,7 @@ export default function App(){
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     <button onClick={()=>{setIntervalosProject(project);setShowIntervalos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>⏱️ Intervalos</button>
+                    <button onClick={()=>{setCcoProject(project);setShowCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                   </div>
                 </>
               )}
