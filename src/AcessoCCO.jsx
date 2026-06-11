@@ -20,6 +20,31 @@ const PROJECT_PINS = {
   P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
 };
 
+// ── Coleções por tema. "acesso" mantém a coleção LEGADA acesso_cco (retrocompatível).
+const COLLECTIONS = {
+  acesso:     "acesso_cco",
+  intervalo:  "cco_intervalo",
+  supervisao: "cco_supervisao",
+  manutencao: "cco_manutencao",
+};
+
+const TEMAS = [
+  { key:"acesso",     label:"Acesso",     icon:"🚪", color:"#0ea5e9" },
+  { key:"intervalo",  label:"Intervalo",  icon:"⏱️", color:"#22c55e" },
+  { key:"supervisao", label:"Supervisão", icon:"👁️", color:"#a855f7" },
+  { key:"manutencao", label:"Manutenção", icon:"🛠️", color:"#f59e0b" },
+];
+
+const STATUS_MANUT = [
+  { key:"concluida", label:"Concluída", color:"#22c55e", bg:"#021a0d", icon:"✅" },
+  { key:"parcial",   label:"Parcial",   color:"#f59e0b", bg:"#1a1000", icon:"⚠️" },
+  { key:"pendente",  label:"Pendente",  color:"#ef4444", bg:"#1a0202", icon:"⏳" },
+];
+const TURNOS = [
+  { key:"diurno",  label:"Diurno",  color:"#f59e0b", bg:"#1a1000", icon:"☀️" },
+  { key:"noturno", label:"Noturno", color:"#818cf8", bg:"#0a0a2e", icon:"🌙" },
+];
+
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 function nowTime() {
   const n = new Date();
@@ -34,29 +59,42 @@ function daysSince(d) {
   try { return Math.floor((Date.now()-new Date(d+"T12:00:00").getTime())/86400000); } catch { return null; }
 }
 
-async function loadAcessos(projectId) {
+// ── Firebase load/save por tema (registros guardados em array `registros`)
+async function loadTema(tema, projectId) {
+  const col = COLLECTIONS[tema];
   try {
-    const snap = await getDoc(doc(db,"acesso_cco",projectId));
+    const snap = await getDoc(doc(db,col,projectId));
     if(snap.exists()) {
       const data = snap.data();
-      try { localStorage.setItem(`acesso_cco_${projectId}`, JSON.stringify(data.registros||[])); } catch(e){}
+      try { localStorage.setItem(`${col}_${projectId}`, JSON.stringify(data.registros||[])); } catch(e){}
       return data.registros || [];
     }
   } catch(e){}
   try {
-    const local = localStorage.getItem(`acesso_cco_${projectId}`);
+    const local = localStorage.getItem(`${col}_${projectId}`);
     if(local) return JSON.parse(local);
   } catch(e){}
   return [];
 }
+async function saveTema(tema, projectId, registros) {
+  const col = COLLECTIONS[tema];
+  try { await setDoc(doc(db,col,projectId),{registros,updatedAt:new Date().toISOString()}); }
+  catch(e){ console.error("Firebase save error:",e); }
+  try { localStorage.setItem(`${col}_${projectId}`, JSON.stringify(registros)); }
+  catch(e){ console.warn("localStorage save failed:",e); }
+}
 
-async function saveAcessos(projectId, registros) {
-  try {
-    await setDoc(doc(db,"acesso_cco",projectId),{registros,updatedAt:new Date().toISOString()});
-  } catch(e){ console.error("Firebase save error:",e); }
-  try {
-    localStorage.setItem(`acesso_cco_${projectId}`, JSON.stringify(registros));
-  } catch(e){ console.warn("localStorage save failed:",e); }
+// ── Rascunho por tema + projeto
+function draftKey(tema, projectId) { return `cco_draft_${tema}_${projectId}`; }
+function loadDraft(tema, projectId) {
+  try { const d = localStorage.getItem(draftKey(tema,projectId)); if(d) return JSON.parse(d); } catch(e){}
+  return null;
+}
+function saveDraft(tema, projectId, form) {
+  try { localStorage.setItem(draftKey(tema,projectId), JSON.stringify({form,savedAt:Date.now()})); } catch(e){}
+}
+function clearDraft(tema, projectId) {
+  try { localStorage.removeItem(draftKey(tema,projectId)); } catch(e){}
 }
 
 function getStyles(dark) {
@@ -76,19 +114,19 @@ function getStyles(dark) {
   };
 }
 
-// ── PIN Gate
+// ════════════════════════════════════════════════════════════════════════
+// PIN GATE
+// ════════════════════════════════════════════════════════════════════════
 function PinGate({ project, onSuccess, onBack, dark }) {
   const S = getStyles(dark);
   const [mode, setMode] = useState(null);
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
-
   const tryPin = () => {
     if(pin===ADMIN_PIN){ onSuccess("admin"); return; }
     if(pin===PROJECT_PINS[project.id]){ onSuccess("lider"); return; }
     setErr(true);
   };
-
   return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
@@ -97,19 +135,13 @@ function PinGate({ project, onSuccess, onBack, dark }) {
         <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project?.id||""} · {project?.name||""}</div>
         {!mode ? (
           <div style={{display:"flex", flexDirection:"column", gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}>
-              🚪 Acesso CCO / Líder
-            </button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}>
-              🔐 Acesso Gerencial
-            </button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}>🚪 Acesso CCO / Vig CCO</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec, fontSize:13, marginTop:4}}>← Voltar</button>
           </div>
         ) : (
           <>
-            <div style={{fontSize:12, ...S.txt2, marginBottom:12}}>
-              {mode==="lider"?"PIN do projeto":"PIN gerencial"}
-            </div>
+            <div style={{fontSize:12, ...S.txt2, marginBottom:12}}>{mode==="lider"?"PIN do projeto":"PIN gerencial"}</div>
             <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8}
               value={pin} onChange={e=>{setPin(e.target.value);setErr(false);}}
               onKeyDown={e=>{if(e.key==="Enter") tryPin();}}
@@ -126,54 +158,378 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   );
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// PDF POR TEMA
+// ════════════════════════════════════════════════════════════════════════
+function statusLabel(key){ const s=STATUS_MANUT.find(x=>x.key===key); return s?s.label:key||"--"; }
+function turnoLabel(key){ const t=TURNOS.find(x=>x.key===key); return t?t.label:key||"--"; }
+
+function gerarPDFTema(tema, project, registros) {
+  const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const ativos = registros.filter(r=>!r.arquivado);
+  const arquivados = registros.filter(r=>r.arquivado);
+
+  // Cabeçalho de tabela e linhas por tema
+  let head = "", rowsAtivos = "", rowsArq = "";
+  const rowFn = {
+    acesso: (r)=>`<tr><td><strong>${r.nome||"--"}</strong></td><td>${r.empresa||"--"}</td><td>${fmtDate(r.data)}</td><td>${r.horaEntrada||"--"}</td><td>${r.obs||"--"}</td></tr>`,
+    intervalo: (r)=>`<tr><td><strong>${r.nome||"--"}</strong><br><span style="font-size:10px;color:#64748b">${r.cargo||""}</span></td><td>${turnoLabel(r.turno)}</td><td>${fmtDate(r.data)}</td><td>${r.saida||"--"}</td><td>${r.retorno||"--"}</td><td>${r.obs||"--"}</td></tr>`,
+    supervisao: (r)=>`<tr><td><strong>${r.supervisor||"--"}</strong></td><td>${turnoLabel(r.turno)}</td><td>${fmtDate(r.data)}</td><td>${r.hora||"--"}</td><td>${r.resumo||"--"}</td><td>${r.obs||"--"}</td></tr>`,
+    manutencao: (r)=>`<tr><td><strong>${r.empresa||"--"}</strong></td><td>${r.tecnico||"--"}</td><td>${r.sistema||"--"}</td><td>${turnoLabel(r.turno)}</td><td>${statusLabel(r.status)}</td><td>${fmtDate(r.data)}</td><td>${r.servico||"--"}</td></tr>`,
+  };
+  const heads = {
+    acesso: "<tr><th>Nome</th><th>Empresa/Setor</th><th>Data</th><th>Entrada</th><th>Observação</th></tr>",
+    intervalo: "<tr><th>Colaborador</th><th>Turno</th><th>Data</th><th>Saída</th><th>Retorno</th><th>Obs.</th></tr>",
+    supervisao: "<tr><th>Supervisor</th><th>Turno</th><th>Data</th><th>Hora</th><th>Resumo</th><th>Obs.</th></tr>",
+    manutencao: "<tr><th>Empresa</th><th>Técnico</th><th>Sistema</th><th>Turno</th><th>Status</th><th>Data</th><th>Serviço</th></tr>",
+  };
+  head = heads[tema];
+  rowsAtivos = ativos.map(rowFn[tema]).join("");
+  rowsArq = arquivados.map(rowFn[tema]).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>${temaInfo.label} — ${project.id} ${hoje}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b}
+  .header{background:linear-gradient(135deg,#0c2340,#081626);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+  .header h1{font-size:18px;margin-bottom:4px}
+  .header p{font-size:11px;opacity:.75}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafc}
+  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}
+  .kpi{display:flex;gap:10px;margin-bottom:14px}
+  .kpibox{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+  .kpibox .n{font-size:22px;font-weight:800;color:#0c2340}
+  .kpibox .l{font-size:10px;color:#64748b;font-weight:700}
+  @media print{body{padding:8px}@page{margin:12mm}.no-print{display:none}}
+</style></head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:16px">
+  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <div>
+    <h1>${temaInfo.icon} ${temaInfo.label} — CCO</h1>
+    <p>${project.id} — ${project.name||""}</p>
+    <p>Relatório gerado em ${hoje}</p>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.75">
+    <div>Moked Consulting Security</div>
+    <div>MokLog CheckTest</div>
+  </div>
+</div>
+<div class="kpi">
+  <div class="kpibox"><div class="n">${registros.length}</div><div class="l">TOTAL</div></div>
+  <div class="kpibox"><div class="n">${ativos.length}</div><div class="l">ATIVOS</div></div>
+  <div class="kpibox"><div class="n">${arquivados.length}</div><div class="l">ARQUIVADOS</div></div>
+</div>
+${rowsAtivos ? `<div class="card"><h2>Registros Ativos</h2><table><thead>${head}</thead><tbody>${rowsAtivos}</tbody></table></div>` : `<div class="card"><h2>Registros Ativos</h2><div style="font-size:12px;color:#94a3b8">Nenhum registro ativo.</div></div>`}
+${rowsArq ? `<div class="card"><h2>Arquivados (mantidos para histórico)</h2><table><thead>${head}</thead><tbody>${rowsArq}</tbody></table></div>` : ""}
+<div class="footer">
+  <div>MokLog CheckTest © Moked Consulting Security</div>
+  <div>${temaInfo.label} · ${project.id} · ${hoje}</div>
+</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`cco_${tema}_${project.id}_${todayStr()}.html`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// COMPONENTES COMPARTILHADOS
+// ════════════════════════════════════════════════════════════════════════
+function PillGroup({ options, value, onChange, dark }) {
+  return (
+    <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+      {options.map(o=>{
+        const sel = value===o.key;
+        return (
+          <button key={o.key} onClick={()=>onChange(o.key)}
+            style={{flex:1, minWidth:90, background:sel?o.bg:"transparent",
+              border:`1px solid ${sel?o.color+"66":dark?"#0f172a":"#e2e8f0"}`,
+              color:sel?o.color:dark?"#475569":"#94a3b8",
+              borderRadius:8, padding:"9px 8px", fontSize:12, cursor:"pointer",
+              fontWeight:sel?700:500}}>
+            {o.icon} {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function KPI({ S, val, label, color }) {
+  return (
+    <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
+      <div style={{fontSize:22,fontWeight:900,color}}>{val}</div>
+      <div style={{fontSize:9,...S.txt2,fontWeight:700}}>{label}</div>
+    </div>
+  );
+}
+
+// Cartão genérico de registro com expandir + arquivar/desarquivar + excluir
+function RegistroCard({ tema, r, dark, S, adminAuth, onArquivar, onDesarquivar, onExcluir }) {
+  const [open, setOpen] = useState(false);
+  const dias = daysSince(r.data);
+  const st = tema==="manutencao" ? (STATUS_MANUT.find(s=>s.key===r.status)||STATUS_MANUT[0]) : null;
+  const tn = (tema==="manutencao"||tema==="intervalo"||tema==="supervisao") ? (TURNOS.find(t=>t.key===r.turno)||TURNOS[0]) : null;
+  const temaInfo = TEMAS.find(t=>t.key===tema)||TEMAS[0];
+
+  // título e subtítulo por tema
+  const titulo = {
+    acesso: r.nome, intervalo: r.nome, supervisao: r.supervisor, manutencao: r.empresa,
+  }[tema] || "—";
+  const sub = {
+    acesso: r.empresa, intervalo: r.cargo, supervisao: "", manutencao: r.sistema,
+  }[tema] || "";
+  const icon = { acesso:"👤", intervalo:"👤", supervisao:"👁️", manutencao:"🛠️" }[tema] || "•";
+  const borderC = st ? st.color+"33" : (dark?"#0f172a":"#e2e8f0");
+
+  return (
+    <div style={{...S.card,border:`1px solid ${borderC}`,opacity:r.arquivado?0.7:1}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}} onClick={()=>setOpen(!open)}>
+        <div style={{width:40,height:40,borderRadius:10,background:st?st.bg:(dark?"#0f172a":"#f1f5f9"),border:`1px solid ${borderC}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
+          {st?st.icon:icon}
+        </div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:700,...S.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {titulo}{r.arquivado&&<span style={{fontSize:9,color:"#64748b",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}>📦 Arquivado</span>}
+          </div>
+          {sub&&<div style={{fontSize:11,...S.txt2}}>{sub}</div>}
+          <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,...S.txt2}}>📅 {fmtDate(r.data)}</span>
+            {tema==="acesso"&&r.horaEntrada&&<span style={{fontSize:10,color:"#22c55e"}}>⏱ {r.horaEntrada}</span>}
+            {tema==="intervalo"&&r.saida&&<span style={{fontSize:10,color:"#f59e0b"}}>↗ {r.saida}</span>}
+            {tema==="intervalo"&&r.retorno&&<span style={{fontSize:10,color:"#22c55e"}}>↘ {r.retorno}</span>}
+            {tema==="supervisao"&&r.hora&&<span style={{fontSize:10,color:"#22c55e"}}>⏱ {r.hora}</span>}
+            {tn&&<span style={{fontSize:10,color:tn.color,fontWeight:700}}>{tn.icon} {tn.label}</span>}
+            {st&&<span style={{fontSize:10,color:st.color,fontWeight:700}}>{st.label}</span>}
+            {tema==="acesso"&&dias!==null&&<span style={{fontSize:10,color:dias===0?"#22c55e":dias>7?"#ef4444":"#64748b",fontWeight:700}}>{dias===0?"Hoje":dias===1?"Ontem":`${dias}d atrás`}</span>}
+          </div>
+        </div>
+        <span style={{...S.txt2,fontSize:12}}>{open?"▲":"▼"}</span>
+      </div>
+      {open && (
+        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`}}>
+          {tema==="manutencao"&&r.tecnico&&<div style={{fontSize:12,...S.txt,marginBottom:4}}><strong>Técnico:</strong> {r.tecnico}</div>}
+          {tema==="manutencao"&&r.servico&&<div style={{fontSize:12,...S.txt,marginBottom:6,lineHeight:1.5}}><strong>Serviço:</strong> {r.servico}</div>}
+          {tema==="supervisao"&&r.resumo&&<div style={{fontSize:12,...S.txt,marginBottom:6,lineHeight:1.5}}><strong>Resumo:</strong> {r.resumo}</div>}
+          {r.obs&&<div style={{fontSize:12,...S.txt2,marginBottom:8,lineHeight:1.5}}>{r.obs}</div>}
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {!r.arquivado
+              ? <button onClick={onArquivar} style={{...S.btnSm,color:"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`}}>📦 Arquivar</button>
+              : <button onClick={onDesarquivar} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>↩ Desarquivar</button>}
+            {adminAuth && <button onClick={onExcluir} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433"}}>🗑 Excluir</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// FORMULÁRIOS POR TEMA
+// ════════════════════════════════════════════════════════════════════════
+function emptyForm(tema) {
+  const base = { id: Date.now().toString()+Math.random().toString(36).substring(2,6), data: todayStr(), arquivado:false, obs:"", registradoEm:new Date().toISOString() };
+  if(tema==="acesso")     return { ...base, nome:"", empresa:"", horaEntrada:nowTime() };
+  if(tema==="intervalo")  return { ...base, nome:"", cargo:"", turno:"diurno", saida:nowTime(), retorno:"" };
+  if(tema==="supervisao") return { ...base, supervisor:"", turno:"diurno", hora:nowTime(), resumo:"" };
+  if(tema==="manutencao") return { ...base, empresa:"", tecnico:"", sistema:"", turno:"diurno", status:"concluida", servico:"" };
+  return base;
+}
+
+function TemaForm({ tema, form, setF, S, dark }) {
+  const c = TEMAS.find(t=>t.key===tema).color;
+  if(tema==="acesso") return (
+    <>
+      <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>👤 Identificação</div>
+        <div><label style={S.lbl}>Nome *</label><input value={form.nome} onChange={e=>setF("nome",e.target.value)} placeholder="Nome completo..." style={S.inp}/></div>
+        <div><label style={S.lbl}>Empresa / Setor</label><input value={form.empresa} onChange={e=>setF("empresa",e.target.value)} placeholder="Empresa ou setor..." style={S.inp}/></div>
+      </div>
+      <div style={S.card}>
+        <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>⏱️ Data e Hora</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Hora de Entrada</label>
+            <div style={{display:"flex",gap:5}}>
+              <input type="time" value={form.horaEntrada} onChange={e=>setF("horaEntrada",e.target.value)} style={{...S.inp,flex:1}}/>
+              <button onClick={()=>setF("horaEntrada",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+  if(tema==="intervalo") return (
+    <>
+      <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>👤 Colaborador</div>
+        <div><label style={S.lbl}>Nome *</label><input value={form.nome} onChange={e=>setF("nome",e.target.value)} placeholder="Nome completo..." style={S.inp}/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={S.lbl}>Cargo</label><input value={form.cargo} onChange={e=>setF("cargo",e.target.value)} placeholder="Cargo..." style={S.inp}/></div>
+          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+        </div>
+      </div>
+      <div style={S.card}><label style={S.lbl}>Turno</label><PillGroup options={TURNOS} value={form.turno} onChange={v=>setF("turno",v)} dark={dark}/></div>
+      <div style={S.card}>
+        <div style={{fontSize:11,color:"#22c55e",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>⏱️ Horários</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={S.lbl}>Saída</label>
+            <div style={{display:"flex",gap:5}}>
+              <input type="time" value={form.saida} onChange={e=>setF("saida",e.target.value)} style={{...S.inp,flex:1}}/>
+              <button onClick={()=>setF("saida",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+            </div>
+          </div>
+          <div><label style={S.lbl}>Retorno</label>
+            <div style={{display:"flex",gap:5}}>
+              <input type="time" value={form.retorno} onChange={e=>setF("retorno",e.target.value)} style={{...S.inp,flex:1}}/>
+              <button onClick={()=>setF("retorno",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+  if(tema==="supervisao") return (
+    <>
+      <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>👤 Supervisor</div>
+        <div><label style={S.lbl}>Nome do Supervisor *</label><input value={form.supervisor} onChange={e=>setF("supervisor",e.target.value)} placeholder="Nome completo..." style={S.inp}/></div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Hora</label>
+            <div style={{display:"flex",gap:5}}>
+              <input type="time" value={form.hora} onChange={e=>setF("hora",e.target.value)} style={{...S.inp,flex:1}}/>
+              <button onClick={()=>setF("hora",nowTime())} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={S.card}><label style={S.lbl}>Turno</label><PillGroup options={TURNOS} value={form.turno} onChange={v=>setF("turno",v)} dark={dark}/></div>
+      <div style={S.card}>
+        <label style={{...S.lbl,marginBottom:8}}>Resumo da Visita *</label>
+        <textarea value={form.resumo} onChange={e=>setF("resumo",e.target.value)} placeholder="O que foi verificado / alinhado..." style={{...S.inp,height:80,resize:"vertical",fontSize:12}}/>
+      </div>
+    </>
+  );
+  if(tema==="manutencao") return (
+    <>
+      <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
+        <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>🏢 Dados da Visita</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Empresa *</label><input value={form.empresa} onChange={e=>setF("empresa",e.target.value)} placeholder="Empresa..." style={S.inp}/></div>
+        </div>
+        <div><label style={S.lbl}>Técnico(s)</label><input value={form.tecnico} onChange={e=>setF("tecnico",e.target.value)} placeholder="Nome do(s) técnico(s)..." style={S.inp}/></div>
+        <div><label style={S.lbl}>Sistema</label><input value={form.sistema} onChange={e=>setF("sistema",e.target.value)} placeholder="Ex: CFTV, alarme, cancela..." style={S.inp}/></div>
+      </div>
+      <div style={S.card}><label style={S.lbl}>Turno</label><PillGroup options={TURNOS} value={form.turno} onChange={v=>setF("turno",v)} dark={dark}/></div>
+      <div style={S.card}>
+        <label style={{...S.lbl,marginBottom:8}}>Serviço Realizado *</label>
+        <textarea value={form.servico} onChange={e=>setF("servico",e.target.value)} placeholder="Descreva o serviço executado..." style={{...S.inp,height:70,resize:"vertical",fontSize:12}}/>
+      </div>
+      <div style={S.card}><label style={{...S.lbl,marginBottom:8}}>Status</label><PillGroup options={STATUS_MANUT} value={form.status} onChange={v=>setF("status",v)} dark={dark}/></div>
+    </>
+  );
+  return null;
+}
+
+function validarForm(tema, form) {
+  if(tema==="acesso")     { if(!form.nome.trim()) return "Informe o nome"; }
+  if(tema==="intervalo")  { if(!form.nome.trim()) return "Informe o nome do colaborador"; }
+  if(tema==="supervisao") { if(!form.supervisor.trim()) return "Informe o supervisor"; if(!form.resumo.trim()) return "Descreva o resumo"; }
+  if(tema==="manutencao") { if(!form.empresa.trim()) return "Informe a empresa"; if(!form.servico.trim()) return "Descreva o serviço"; }
+  return null;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MÓDULO PRINCIPAL
+// ════════════════════════════════════════════════════════════════════════
 export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
   const S = getStyles(dark||true);
   const [authLevel, setAuthLevel] = useState(null);
-  const [screen, setScreen] = useState("pin");
-  const [registros, setRegistros] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [tema, setTema] = useState("acesso");
+  const [screen, setScreen] = useState("pin"); // pin | list | form
+  const [showArquivados, setShowArquivados] = useState(false);
+
+  // registros de TODOS os temas (carregados sob demanda ao trocar de aba)
+  const [dados, setDados] = useState({ acesso:[], intervalo:[], supervisao:[], manutencao:[] });
+  const [loadingTema, setLoadingTema] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
-  const adminAuth = authLevel==="admin";
-
-  const emptyForm = () => ({
-    id: Date.now().toString()+Math.random().toString(36).substring(2,6),
-    data: todayStr(),
-    nome:"",
-    empresa:"",
-    horaEntrada: nowTime(),
-    obs:"",
-    registradoEm: new Date().toISOString()
-  });
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState(emptyForm("acesso"));
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
 
+  const adminAuth = authLevel==="admin";
+  const registros = dados[tema] || [];
+  const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
+
+  // Carrega o tema atual ao entrar / trocar de aba
   useEffect(()=>{
-    if(!project?.id) return;
-    loadAcessos(project.id).then(r=>{ setRegistros(r||[]); setLoading(false); });
-  },[project?.id]);
+    if(!project?.id || screen==="pin") return;
+    setLoadingTema(true);
+    loadTema(tema, project.id).then(r=>{
+      setDados(prev=>({...prev,[tema]:r||[]}));
+      setLoadingTema(false);
+    });
+    setHasDraft(!!loadDraft(tema, project.id));
+    setShowArquivados(false);
+  },[tema, project?.id, screen==="pin"]);
+
+  // Autosave do rascunho enquanto preenche
+  useEffect(()=>{
+    if(screen==="form" && project?.id) {
+      saveDraft(tema, project.id, form);
+      setHasDraft(true);
+    }
+  },[form, screen, project?.id, tema]);
+
+  const setRegistros = (novaLista) => setDados(prev=>({...prev,[tema]:novaLista}));
+
+  const novoLimpo = () => { clearDraft(tema, project.id); setHasDraft(false); setForm(emptyForm(tema)); setScreen("form"); };
+  const continuarRascunho = () => { const d=loadDraft(tema,project.id); setForm(d?.form||emptyForm(tema)); setScreen("form"); };
+  const salvarRascunho = () => { saveDraft(tema, project.id, form); setHasDraft(true); setScreen("list"); };
 
   const salvar = async () => {
-    if(!form.nome.trim()) { alert("Informe o nome"); return; }
+    const erro = validarForm(tema, form);
+    if(erro) { alert(erro); return; }
     setSaving(true);
     try {
-      const novo = {...form, registradoEm: new Date().toISOString()};
+      const novo = {...form, arquivado:false, registradoEm:new Date().toISOString()};
       const newList = [novo, ...registros];
       setRegistros(newList);
-      await saveAcessos(project.id, newList);
-      setForm(emptyForm());
+      await saveTema(tema, project.id, newList);
+      clearDraft(tema, project.id);
+      setHasDraft(false);
+      setForm(emptyForm(tema));
       setScreen("list");
-    } catch(e) {
-      console.error("Erro ao salvar:",e);
-      alert("Erro ao salvar. Verifique sua conexão.");
-    }
+    } catch(e) { console.error(e); alert("Erro ao salvar. Verifique sua conexão."); }
     setSaving(false);
   };
 
+  const arquivar = async (id) => {
+    const newList = registros.map(r=>r.id===id?{...r,arquivado:true,arquivadoEm:new Date().toISOString()}:r);
+    setRegistros(newList); await saveTema(tema, project.id, newList);
+  };
+  const desarquivar = async (id) => {
+    const newList = registros.map(r=>r.id===id?{...r,arquivado:false}:r);
+    setRegistros(newList); await saveTema(tema, project.id, newList);
+  };
   const excluir = async (id) => {
     const newList = registros.filter(r=>r.id!==id);
-    setRegistros(newList);
-    await saveAcessos(project.id, newList);
+    setRegistros(newList); await saveTema(tema, project.id, newList);
   };
 
   if(screen==="pin") return (
@@ -181,12 +537,21 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
       onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); }}/>
   );
 
-  if(loading) return (
-    <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:30, marginBottom:10}}>🚪</div>
-        <div style={{fontSize:13, ...S.txt2}}>Carregando registros...</div>
-      </div>
+  // Barra de abas (temas)
+  const TabBar = () => (
+    <div style={{display:"flex",gap:5,padding:"0 16px 10px",overflowX:"auto"}}>
+      {TEMAS.map(t=>{
+        const sel = tema===t.key;
+        return (
+          <button key={t.key} onClick={()=>{setTema(t.key);setScreen("list");}}
+            style={{flex:"1 0 auto",background:sel?t.color+"22":"transparent",
+              border:`1px solid ${sel?t.color+"66":dark?"#0f172a":"#e2e8f0"}`,
+              color:sel?t.color:dark?"#475569":"#94a3b8",
+              borderRadius:9,padding:"8px 10px",fontSize:12,cursor:"pointer",fontWeight:sel?700:500,whiteSpace:"nowrap"}}>
+            {t.icon} {t.label}
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -198,191 +563,109 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={()=>setScreen("list")} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 Novo Acesso CCO</div>
+              <div style={{fontSize:15,fontWeight:800,...S.txt}}>{temaInfo.icon} Novo — {temaInfo.label}</div>
               <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {project?.name||""}</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>
-              {dark?"☀️":"🌙"}
-            </button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
           </div>
         </div>
-
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
-          {/* Identificação */}
-          <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:4}}>
-              👤 Identificação
-            </div>
-            <div>
-              <label style={S.lbl}>Nome *</label>
-              <input value={form.nome} onChange={e=>setF("nome",e.target.value)}
-                placeholder="Nome completo..." style={S.inp}/>
-            </div>
-            <div>
-              <label style={S.lbl}>Empresa / Setor</label>
-              <input value={form.empresa} onChange={e=>setF("empresa",e.target.value)}
-                placeholder="Empresa ou setor..." style={S.inp}/>
-            </div>
-          </div>
-
-          {/* Data e Hora Entrada */}
-          <div style={S.card}>
-            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>
-              ⏱️ Data e Hora de Acesso
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-              <div>
-                <label style={S.lbl}>Data</label>
-                <input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/>
-              </div>
-              <div>
-                <label style={S.lbl}>Hora de Entrada</label>
-                <div style={{display:"flex",gap:5}}>
-                  <input type="time" value={form.horaEntrada}
-                    onChange={e=>setF("horaEntrada",e.target.value)} style={{...S.inp,flex:1}}/>
-                  <button onClick={()=>setF("horaEntrada",nowTime())}
-                    style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Observação */}
+          <TemaForm tema={tema} form={form} setF={setF} S={S} dark={dark}/>
           <div style={S.card}>
             <label style={S.lbl}>Observação (opcional)</label>
-            <textarea value={form.obs} onChange={e=>setF("obs",e.target.value)}
-              placeholder="Motivo da visita, observações..."
-              style={{...S.inp,height:60,resize:"vertical",fontSize:12}}/>
+            <textarea value={form.obs} onChange={e=>setF("obs",e.target.value)} placeholder="Observações..." style={{...S.inp,height:50,resize:"vertical",fontSize:12}}/>
           </div>
-
-          <button onClick={salvar} disabled={saving}
-            style={{...S.btn, opacity:saving?0.7:1}}>
-            {saving?"⟳ Salvando...":"✓ Registrar Acesso"}
-          </button>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={salvarRascunho} style={{...S.btnSec,flex:1,color:"#f59e0b",borderColor:"#f59e0b33"}}>💾 Salvar Rascunho</button>
+            <button onClick={salvar} disabled={saving} style={{...S.btn,flex:1,opacity:saving?0.7:1}}>{saving?"⟳ Salvando...":"✓ Registrar"}</button>
+          </div>
         </div>
       </div>
     </div>
   );
 
   // ── LISTA
-  const hoje = registros.filter(r=>r.data===todayStr());
-  const anteriores = registros.filter(r=>r.data!==todayStr());
-
-  // Último acesso
-  const ultimoAcesso = registros.length > 0 ? registros[0] : null;
-  const diasUltimo = ultimoAcesso ? daysSince(ultimoAcesso.data) : null;
+  const ativos = registros.filter(r=>!r.arquivado);
+  const arquivados = registros.filter(r=>r.arquivado);
+  const visiveis = showArquivados ? arquivados : ativos;
+  const hoje = visiveis.filter(r=>r.data===todayStr());
+  const anteriores = visiveis.filter(r=>r.data!==todayStr());
 
   return (
     <div style={S.page}>
       <div style={S.wrap}>
-        <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px 0"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 Acesso CCO</div>
-              <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {registros.length} registro(s)</div>
+              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 CCO / Vig CCO</div>
+              <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {project?.name||""}</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>
-              {dark?"☀️":"🌙"}
-            </button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
           </div>
+          <TabBar/>
         </div>
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
-
-          {/* KPIs */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-            <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
-              <div style={{fontSize:22,fontWeight:900,color:"#0ea5e9"}}>{registros.length}</div>
-              <div style={{fontSize:9,...S.txt2,fontWeight:700}}>TOTAL</div>
-            </div>
-            <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
-              <div style={{fontSize:22,fontWeight:900,color:"#22c55e"}}>{hoje.length}</div>
-              <div style={{fontSize:9,...S.txt2,fontWeight:700}}>HOJE</div>
-            </div>
-          </div>
-
-          {/* Último acesso */}
-          {ultimoAcesso && (
-            <div style={{background:diasUltimo===0?dark?"#021a0d":"#dcfce7":diasUltimo&&diasUltimo>7?dark?"#1a0202":"#fee2e2":dark?"#060c18":"#ffffff",border:`1px solid ${diasUltimo===0?"#22c55e33":diasUltimo&&diasUltimo>7?"#ef444433":dark?"#0f172a":"#e2e8f0"}`,borderRadius:10,padding:"10px 14px"}}>
-              <div style={{fontSize:10,color:diasUltimo===0?"#22c55e":diasUltimo&&diasUltimo>7?"#ef4444":"#0ea5e9",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>
-                📅 Último Acesso
-              </div>
-              <div style={{fontSize:13,fontWeight:700,...S.txt}}>{ultimoAcesso.nome}</div>
-              <div style={{fontSize:11,...S.txt2}}>{ultimoAcesso.empresa&&`${ultimoAcesso.empresa} · `}{fmtDate(ultimoAcesso.data)} às {ultimoAcesso.horaEntrada}</div>
-              <div style={{fontSize:11,color:diasUltimo===0?"#22c55e":diasUltimo&&diasUltimo>7?"#ef4444":"#64748b",fontWeight:700,marginTop:3}}>
-                {diasUltimo===0?"Hoje":diasUltimo===1?"Ontem":`Há ${diasUltimo} dias`}
-              </div>
-            </div>
-          )}
-
-          <button onClick={()=>{setForm(emptyForm());setScreen("form");}} style={S.btn}>
-            + Registrar Acesso ao CCO
-          </button>
-
-          {registros.length===0 && (
+          {loadingTema ? (
             <div style={{textAlign:"center",padding:"40px 0"}}>
-              <div style={{fontSize:32,marginBottom:10}}>🚪</div>
-              <div style={{fontSize:13,...S.txt}}>Nenhum registro ainda</div>
+              <div style={{fontSize:28,marginBottom:8}}>{temaInfo.icon}</div>
+              <div style={{fontSize:13,...S.txt2}}>Carregando {temaInfo.label.toLowerCase()}...</div>
             </div>
-          )}
-
-          {hoje.length>0 && (
+          ) : (
             <>
-              <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
-              {hoje.map(r=><RegistroCard key={r.id} r={r} dark={dark||true} S={S} adminAuth={adminAuth} onExcluir={()=>{if(window.confirm("Excluir?")) excluir(r.id);}}/>)}
-            </>
-          )}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                <KPI S={S} val={registros.length} label="TOTAL" color={temaInfo.color}/>
+                <KPI S={S} val={ativos.length} label="ATIVOS" color="#22c55e"/>
+                <KPI S={S} val={arquivados.length} label="ARQUIVADOS" color="#64748b"/>
+              </div>
 
-          {anteriores.length>0 && (
-            <>
-              <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
-              {anteriores.map(r=><RegistroCard key={r.id} r={r} dark={dark||true} S={S} adminAuth={adminAuth} onExcluir={()=>{if(window.confirm("Excluir?")) excluir(r.id);}}/>)}
+              {hasDraft && (
+                <div style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b55",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{fontSize:16}}>📝</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho salvo</div>
+                    <div style={{fontSize:11,...S.txt2}}>Continue de onde parou</div>
+                  </div>
+                  <button onClick={continuarRascunho} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44"}}>Continuar</button>
+                </div>
+              )}
+
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={novoLimpo} style={{...S.btn,flex:2}}>+ Registrar {temaInfo.label}</button>
+                <button onClick={()=>gerarPDFTema(tema, project, registros)} disabled={registros.length===0}
+                  style={{...S.btnSec,flex:1,color:"#a855f7",borderColor:"#a855f733",opacity:registros.length===0?0.5:1}}>📄 PDF</button>
+              </div>
+
+              {/* Toggle ativos / arquivados */}
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>setShowArquivados(false)} style={{...S.btnSm,flex:1,padding:"7px",...(!showArquivados?{background:temaInfo.color+"22",border:`1px solid ${temaInfo.color}66`,color:temaInfo.color}:{})}}>Ativos ({ativos.length})</button>
+                <button onClick={()=>setShowArquivados(true)} style={{...S.btnSm,flex:1,padding:"7px",...(showArquivados?{background:"#64748b22",border:"1px solid #64748b66",color:"#94a3b8"}:{})}}>📦 Arquivados ({arquivados.length})</button>
+              </div>
+
+              {visiveis.length===0 && (
+                <div style={{textAlign:"center",padding:"36px 0"}}>
+                  <div style={{fontSize:30,marginBottom:8}}>{showArquivados?"📦":temaInfo.icon}</div>
+                  <div style={{fontSize:13,...S.txt}}>{showArquivados?"Nenhum registro arquivado":`Nenhum registro de ${temaInfo.label.toLowerCase()}`}</div>
+                </div>
+              )}
+
+              {hoje.length>0 && (<>
+                <div style={{fontSize:10,color:temaInfo.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
+                {hoje.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
+                  onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
+                  onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
+              </>)}
+              {anteriores.length>0 && (<>
+                <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
+                {anteriores.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
+                  onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
+                  onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
+              </>)}
             </>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function RegistroCard({ r, dark, S, adminAuth, onExcluir }) {
-  const [open, setOpen] = useState(false);
-  const dias = daysSince(r.data);
-
-  return (
-    <div style={{...S.card,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}} onClick={()=>setOpen(!open)}>
-        <div style={{width:40,height:40,borderRadius:10,background:dark?"#0f172a":"#f1f5f9",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>
-          👤
-        </div>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:13,fontWeight:700,...S.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {r.nome}
-          </div>
-          {r.empresa&&<div style={{fontSize:11,...S.txt2}}>{r.empresa}</div>}
-          <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,...S.txt2}}>📅 {fmtDate(r.data)}</span>
-            {r.horaEntrada&&<span style={{fontSize:10,color:"#22c55e"}}>⏱ {r.horaEntrada}</span>}
-            <span style={{fontSize:10,color:dias===0?"#22c55e":dias&&dias>7?"#ef4444":"#64748b",fontWeight:700}}>
-              {dias===0?"Hoje":dias===1?"Ontem":`${dias}d atrás`}
-            </span>
-          </div>
-        </div>
-        <span style={{...S.txt2,fontSize:12}}>{open?"▲":"▼"}</span>
-      </div>
-
-      {open && (
-        <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`}}>
-          {r.obs&&<div style={{fontSize:12,...S.txt,marginBottom:8,lineHeight:1.5}}>{r.obs}</div>}
-          {adminAuth && (
-            <button onClick={onExcluir}
-              style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11}}>
-              🗑 Excluir
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
