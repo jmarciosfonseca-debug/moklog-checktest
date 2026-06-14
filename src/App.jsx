@@ -2428,8 +2428,7 @@ export default function App(){
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
                       <button onClick={()=>{setVisitaProject({id:jp.id,name:jp.name});setShowVisita(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
-                      <button onClick={()=>{setCcoProject({id:jp.id,name:jp.name});setShowCCO(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
+
                     </div>
                   </div>
                 )}
@@ -2523,7 +2522,6 @@ export default function App(){
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
-                    <button onClick={()=>{setCcoProject(project);setShowCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                   </div>
                 </>
               ):(
@@ -2536,7 +2534,6 @@ export default function App(){
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
-                    <button onClick={()=>{setCcoProject(project);setShowCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                   </div>
                 </>
               )}
