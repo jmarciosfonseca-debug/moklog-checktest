@@ -2523,7 +2523,6 @@ export default function App(){
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
-                    <button onClick={()=>{setIntervalosProject(project);setShowIntervalos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>⏱️ Intervalos</button>
                     <button onClick={()=>{setCcoProject(project);setShowCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                   </div>
                 </>
@@ -2537,7 +2536,6 @@ export default function App(){
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
-                    <button onClick={()=>{setIntervalosProject(project);setShowIntervalos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>⏱️ Intervalos</button>
                     <button onClick={()=>{setCcoProject(project);setShowCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#0369a1",borderColor:"#0369a122",gridColumn:"1/-1"}}>🏢 CCO (Manutenção · Intervalo · Supervisão)</button>
                   </div>
                 </>
