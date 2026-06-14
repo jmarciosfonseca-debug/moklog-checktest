@@ -1187,29 +1187,47 @@ function HistoryScreen({project, stored, onBack}) {
   const hist=(stored[project.id]?.history??[]).slice().reverse();
 
   // ── Tela de visualização do relatório (somente leitura, sem PDF/excluir)
-  if(viewReport) return(
+  if(viewReport) return((()=>{
+    // normaliza: HistoryScreen passa {project, report, idx}
+    const rep = viewReport.report || viewReport;
+    const repMeta = rep.meta || {};
+    const repState = rep.state || {};
+    // resumo dos últimos testes (quem fez) — puxa do histórico
+    const ultimos = hist.slice(0,4).map(r=>({ wk:getWeekLabel(r.meta?.date), data:fmtDate(r.meta?.date), leader:r.meta?.leader||"—", cco:r.meta?.cco||"—", sig:r.meta?.signature||"" }));
+    return(
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
           <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(viewReport.meta?.date)}</div>
-            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(viewReport.meta?.date)} · somente leitura</div>
+            <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
+            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(repMeta.date)} · somente leitura</div>
           </div>
-          <HealthRing pct={computeHealth(project,viewReport.state).pct} size={46}/>
+          <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
+        </div>
+        {/* Resumo: quem fez os últimos testes */}
+        <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
+          <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📂 Últimos testes</div>
+          {ultimos.map((u,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:i<ultimos.length-1?"1px solid #0a0f1e":"none"}}>
+              <span style={{fontSize:11,fontWeight:800,color:"#cbd5e1",minWidth:54}}>{u.wk}</span>
+              <span style={{fontSize:10,color:"#475569",minWidth:74}}>{u.data}</span>
+              <span style={{fontSize:11,color:"#94a3b8",flex:1}}>Líder: {u.leader} · CCO: {u.cco}</span>
+            </div>
+          ))}
         </div>
         {/* Cabeçalho completo */}
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
           <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📋 Cabeçalho</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             {[
-              ["Data",        fmtDate(viewReport.meta?.date)],
-              ["Início",      viewReport.meta?.start||"—"],
-              ["Término",     viewReport.meta?.end||"—"],
-              ["Líder VSPP",  viewReport.meta?.leader||"—"],
-              ["CCO",         viewReport.meta?.cco||"—"],
-              ["Moked 24h",   viewReport.meta?.moked||"—"],
-              ["Assinatura",  viewReport.meta?.signature||"—"],
+              ["Data",        fmtDate(repMeta.date)],
+              ["Início",      repMeta.start||"—"],
+              ["Término",     repMeta.end||"—"],
+              ["Líder VSPP",  repMeta.leader||"—"],
+              ["CCO",         repMeta.cco||"—"],
+              ["Moked 24h",   repMeta.moked||"—"],
+              ["Assinatura",  repMeta.signature||"—"],
             ].map(([label,val])=>(
               <div key={label}>
                 <div style={{fontSize:9,color:"#475569",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>{label}</div>
@@ -1220,7 +1238,7 @@ function HistoryScreen({project, stored, onBack}) {
         </div>
         {/* Itens do relatório */}
         {project.categories.map(cat=>{
-          const sv=viewReport.state?.[cat.id]; if(!sv) return null;
+          const sv=repState[cat.id]; if(!sv) return null;
           const itemLabels=Array.isArray(cat.itemLabels)?cat.itemLabels:[];
           let cp=100;
           if(cat.type==="single"){const st=sv.status??(sv.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
@@ -1252,16 +1270,17 @@ function HistoryScreen({project, stored, onBack}) {
             </div>
           );
         })}
-        {viewReport.meta?.obs&&(
+        {repMeta.obs&&(
           <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:8,padding:"10px 14px",marginTop:4}}>
             <div style={{fontSize:10,color:"#475569",fontWeight:700,marginBottom:4}}>OBSERVAÇÕES</div>
-            <div style={{fontSize:12,color:"#94a3b8"}}>{viewReport.meta.obs}</div>
+            <div style={{fontSize:12,color:"#94a3b8"}}>{repMeta.obs}</div>
           </div>
         )}
         <div style={{fontSize:10,color:"#334155",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
       </div>
     </div>
-  );
+    );
+  })());
 
   // ── Lista de relatórios
   return(
