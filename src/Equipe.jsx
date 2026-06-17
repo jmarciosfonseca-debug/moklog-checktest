@@ -1635,7 +1635,13 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
           ) : liderAuth ? (
             <div style={{ background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}>👷 Acesso Líder — Pode adicionar registros</div>
-              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
+              <div style={{ display:"flex", gap:6 }}>
+                <button onClick={()=>setScreen("ferias")}
+                  style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
+                  🏖️ Férias
+                </button>
+                <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
+              </div>
             </div>
           ) : null}
 
