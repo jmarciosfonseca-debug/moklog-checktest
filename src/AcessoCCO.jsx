@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import RondaVirtual from "./RondaVirtual"; // ◀ NOVO — aba de ronda virtual CFTV
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -26,12 +27,14 @@ const COLLECTIONS = {
   intervalo:  "cco_intervalo",
   supervisao: "cco_supervisao",
   manutencao: "cco_manutencao",
+  ronda:      "cco_ronda",        // ◀ NOVO — coleção própria, não toca as legadas
 };
 
 const TEMAS = [
   { key:"acesso",     label:"Acesso",     icon:"🚪", color:"#0ea5e9" },
   { key:"intervalo",  label:"Intervalo",  icon:"⏱️", color:"#22c55e" },
   { key:"supervisao", label:"Supervisão", icon:"👁️", color:"#a855f7" },
+  { key:"ronda",      label:"Ronda Virtual", icon:"🎥", color:"#818cf8" }, // ◀ NOVO
   { key:"manutencao", label:"Manutenção", icon:"🛠️", color:"#f59e0b" },
 ];
 
@@ -625,10 +628,12 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
   const adminAuth = authLevel==="admin";
   const registros = dados[tema] || [];
   const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
+  const isRonda = tema==="ronda"; // ◀ NOVO — a aba ronda tem fluxo próprio (não usa o CRUD genérico)
 
   // Carrega o tema atual ao entrar / trocar de aba
   useEffect(()=>{
     if(!project?.id || screen==="pin") return;
+    if(isRonda){ setLoadingTema(false); setShowArquivados(false); return; } // ◀ ronda gerencia o próprio load
     setLoadingTema(true);
     loadTema(tema, project.id).then(r=>{
       setDados(prev=>({...prev,[tema]:r||[]}));
@@ -643,7 +648,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
 
   // Autosave do rascunho enquanto preenche
   useEffect(()=>{
-    if(screen==="form" && project?.id) {
+    if(screen==="form" && project?.id && !isRonda) {
       saveDraft(tema, project.id, form);
       setHasDraft(true);
     }
@@ -716,8 +721,8 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
     </div>
   );
 
-  // ── FORMULÁRIO
-  if(screen==="form") return (
+  // ── FORMULÁRIO (não se aplica à aba ronda)
+  if(screen==="form" && !isRonda) return (
     <div style={S.page}>
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
@@ -768,7 +773,12 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
         </div>
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          {loadingTema ? (
+          {/* ◀ NOVO: aba ronda renderiza o componente próprio */}
+          {isRonda ? (
+            <RondaVirtual
+              project={project} dark={dark||true} S={S} adminAuth={adminAuth}
+              loadEquipe={loadEquipe} db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
+          ) : loadingTema ? (
             <div style={{textAlign:"center",padding:"40px 0"}}>
               <div style={{fontSize:28,marginBottom:8}}>{temaInfo.icon}</div>
               <div style={{fontSize:13,...S.txt2}}>Carregando {temaInfo.label.toLowerCase()}...</div>
