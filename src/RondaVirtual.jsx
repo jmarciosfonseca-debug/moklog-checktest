@@ -29,18 +29,36 @@ export const RONDA_TURNOS = {
   diurno:  { key:"diurno",  label:"Diurno",  icon:"☀️", color:"#f59e0b", bg:"#1a1000", obs:"Apenas finais de semana e feriados" },
 };
 
+// Projetos com grade ESPECIAL no noturno (30min após as 23h até 05:30).
+// Todos os demais projetos fazem ronda de 1 em 1 hora o tempo todo (18:00→05:00).
+const PROJETOS_GRADE_ESPECIAL = ["P311A", "P311B"];
+function temGradeEspecial(projectId){ return PROJETOS_GRADE_ESPECIAL.includes(projectId); }
+
 // offsetMin = minutos desde o horário de início do turno (18:00 noturno / 06:00 diurno)
-function buildSlots(tipo) {
+// projectId define a cadência noturna: especial = 30min após 23h; demais = 1h até 05:00.
+function buildSlots(tipo, projectId) {
   const slots = [];
+  const especial = temGradeEspecial(projectId);
   if (tipo === "noturno") {
     for (let h = 18; h <= 22; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-18)*60 });
-    let off = (23-18)*60, cur = 23*60, fim = (24+5)*60+30; // 05:30 do dia seguinte
-    while (cur <= fim) {
-      const hh = Math.floor((cur%1440)/60), mm = cur%60;
-      slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
-      cur += 30; off += 30;
+    if (especial) {
+      // 23:00 → 05:30 a cada 30min (apenas P311A / P311B)
+      let off = (23-18)*60, cur = 23*60, fim = (24+5)*60+30; // 05:30 do dia seguinte
+      while (cur <= fim) {
+        const hh = Math.floor((cur%1440)/60), mm = cur%60;
+        slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
+        cur += 30; off += 30;
+      }
+    } else {
+      // 23:00 → 05:00 a cada 1h (demais projetos)
+      let off = (23-18)*60, cur = 23*60, fim = (24+5)*60; // 05:00 do dia seguinte
+      while (cur <= fim) {
+        const hh = Math.floor((cur%1440)/60), mm = cur%60;
+        slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
+        cur += 60; off += 60;
+      }
     }
-  } else { // diurno: 06:00 → 17:00 de 1h (janela final 17:30)
+  } else { // diurno: 06:00 → 17:00 de 1h (igual para todos os projetos)
     for (let h = 6; h <= 17; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-6)*60 });
   }
   return slots;
@@ -205,8 +223,10 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           <div style={{fontSize:11,...S.txt2,marginBottom:10,background:dark?"#020510":"#f8fafc",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"8px 10px"}}>
             <strong style={{color:RONDA_TURNOS[novoTipo].color}}>{RONDA_TURNOS[novoTipo].icon} {RONDA_TURNOS[novoTipo].label}</strong> · {RONDA_TURNOS[novoTipo].obs}
             <br/>{novoTipo==="noturno"
-              ? "18h→22h a cada 1h · 23h→05:30 a cada 30min"
-              : "06h→17h a cada 1h (janela final 17:30)"}
+              ? (temGradeEspecial(project.id)
+                  ? "18h→22h a cada 1h · 23h→05:30 a cada 30min"
+                  : "18h→05h a cada 1 hora")
+              : "06h→17h a cada 1 hora"}
           </div>
           <label style={S.lbl}>Plantonista *</label>
           <select value={novoPlant} onChange={e=>setNovoPlant(e.target.value)} style={{...S.inp,marginBottom:10}}>
@@ -232,7 +252,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       )}
 
       {visiveis.map(t=>(
-        <TurnoCard key={t.id} turno={t} dark={dark} S={S} adminAuth={adminAuth} tick={tick}
+        <TurnoCard key={t.id} turno={t} projectId={project.id} dark={dark} S={S} adminAuth={adminAuth} tick={tick}
           onUpd={updTurno} onArquivar={()=>arquivarTurno(t.id)} onDesarquivar={()=>desarquivarTurno(t.id)}
           onExcluir={()=>{ if(window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
           onPDF={()=>gerarPDFRonda(project, t)}/>
@@ -254,10 +274,10 @@ function KpiBox({ S, val, label, color }) {
 // ════════════════════════════════════════════════════════════════════════
 // CARTÃO DE UM TURNO — lista os slots e gerencia início/fim/justificativa
 // ════════════════════════════════════════════════════════════════════════
-function TurnoCard({ turno, dark, S, adminAuth, tick, onUpd, onArquivar, onDesarquivar, onExcluir, onPDF }) {
+function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquivar, onDesarquivar, onExcluir, onPDF }) {
   const [open, setOpen] = useState(!turno.arquivado);
   const tinfo = RONDA_TURNOS[turno.tipo] || RONDA_TURNOS.noturno;
-  const slots = useMemo(()=>buildSlots(turno.tipo),[turno.tipo]);
+  const slots = useMemo(()=>buildSlots(turno.tipo, projectId),[turno.tipo, projectId]);
   const agoraMin = minutosDesdeInicio(turno.tipo, turno.dataInicio); // recalculado a cada render (tick)
   void tick;
 
@@ -420,7 +440,7 @@ function SlotRow({ linha, dark, S, disabled, onIniciar, onFecharSem, onFecharCom
 // ════════════════════════════════════════════════════════════════════════
 export function gerarPDFRonda(project, turno) {
   const tinfo = RONDA_TURNOS[turno.tipo] || RONDA_TURNOS.noturno;
-  const slots = buildSlots(turno.tipo);
+  const slots = buildSlots(turno.tipo, project.id);
   const hoje = new Date().toLocaleDateString("pt-BR");
 
   const rows = slots.map((s,i)=>{
