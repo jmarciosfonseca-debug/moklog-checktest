@@ -34,6 +34,55 @@ export const RONDA_TURNOS = {
 const PROJETOS_GRADE_ESPECIAL = ["P311A", "P311B"];
 function temGradeEspecial(projectId){ return PROJETOS_GRADE_ESPECIAL.includes(projectId); }
 
+// ── Calendário: o turno DIURNO só pode ser aberto em sábados, domingos e
+// feriados (federais + estaduais conforme a UF do projeto). O NOTURNO abre
+// todo dia. Feriados móveis (Carnaval, Sexta-feira Santa, Corpus Christi)
+// são calculados automaticamente a partir da Páscoa, sem manutenção manual.
+const PROJETO_UF = {
+  P260A:"SP", P260B:"SP", P260C:"SP", P505:"SP",
+  P601:"SP", P602:"SP", P604:"SP", P605:"SP",
+  P606:"RJ", P607:"DF", P311A:"PR", P311B:"SC",
+};
+// Feriados nacionais fixos (MM-DD). 20/11 (Consciência Negra) é nacional desde 2024.
+const FERIADOS_NACIONAIS = ["01-01","04-21","05-01","09-07","10-12","11-02","11-15","11-20","12-25"];
+// Feriados estaduais fixos (MM-DD) por UF.
+const FERIADOS_ESTADUAIS = {
+  SP: ["07-09"],            // Revolução Constitucionalista
+  RJ: ["04-23"],            // São Jorge (Consciência Negra já é nacional)
+  DF: ["11-30"],            // Dia do Evangélico (Fundação de Brasília = 21/04, já nacional)
+  PR: [],
+  SC: [],
+};
+function _pascoa(ano){
+  const a=ano%19,b=Math.floor(ano/100),c=ano%100,d=Math.floor(b/4),e=b%4,
+    f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,
+    i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+    mes=Math.floor((h+l-7*m+114)/31),dia=((h+l-7*m+114)%31)+1;
+  return { mes, dia };
+}
+function _mmdd(dt){ return `${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`; }
+function _feriadosMoveis(ano){
+  const p=_pascoa(ano);
+  const base=new Date(ano,p.mes-1,p.dia);
+  const off=(n)=>{ const d=new Date(base); d.setDate(d.getDate()+n); return _mmdd(d); };
+  return [off(-47), off(-2), off(60)]; // Carnaval (terça), Sexta-feira Santa, Corpus Christi
+}
+function ehFeriado(dataISO, uf){
+  const [Y,M,D]=dataISO.split("-").map(Number);
+  const md=`${String(M).padStart(2,"0")}-${String(D).padStart(2,"0")}`;
+  const lista=[...FERIADOS_NACIONAIS, ...(FERIADOS_ESTADUAIS[uf]||[]), ..._feriadosMoveis(Y)];
+  return lista.includes(md);
+}
+function ehFimDeSemana(dataISO){
+  const [Y,M,D]=dataISO.split("-").map(Number);
+  const w=new Date(Y,M-1,D).getDay();
+  return w===0||w===6;
+}
+// Regra de abertura do turno diurno: fim de semana OU feriado do estado do projeto.
+function podeAbrirDiurno(dataISO, projectId){
+  return ehFimDeSemana(dataISO) || ehFeriado(dataISO, PROJETO_UF[projectId]||"SP");
+}
+
 // offsetMin = minutos desde o horário de início do turno (18:00 noturno / 06:00 diurno)
 // projectId define a cadência noturna: especial = 30min após 23h; demais = 1h até 05:00.
 function buildSlots(tipo, projectId) {
@@ -158,6 +207,11 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   };
 
   const abrirTurno = async () => {
+    // Trava de calendário: diurno só abre em sábado, domingo ou feriado do estado.
+    if(novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id)){
+      alert("O turno diurno só pode ser aberto em sábados, domingos e feriados.\nHoje não é um dia válido para ronda diurna neste projeto. O turno noturno está disponível todos os dias.");
+      return;
+    }
     if(!novoPlant){ alert("Selecione o plantonista de plantão."); return; }
     const col = equipe.find(c=>String(c.id)===String(novoPlant));
     if(!col){ alert("Plantonista inválido."); return; }
@@ -234,7 +288,19 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
             {equipe.map(c=>(<option key={c.id} value={c.id}>{c.nome}{c.cargo?` — ${c.cargo}`:""}{c.turno?` · ${c.turno}`:""}</option>))}
           </select>
           {equipe.length===0 && <div style={{fontSize:11,color:"#ef4444",marginBottom:8}}>Nenhum colaborador em equipes/{"{projeto}"}. Cadastre a equipe primeiro.</div>}
-          <button onClick={abrirTurno} disabled={abrindo} style={{...S.btn,opacity:abrindo?0.7:1}}>{abrindo?"⟳ Abrindo...":"▶ Abrir turno de ronda"}</button>
+          {novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id) && (
+            <div style={{fontSize:11,color:"#f59e0b",marginBottom:8,background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:7,padding:"7px 9px"}}>
+              📅 Turno diurno indisponível hoje. Só abre em sábados, domingos e feriados. O turno noturno está disponível todos os dias.
+            </div>
+          )}
+          {(()=>{ const bloqueado = novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id);
+            return (
+              <button onClick={abrirTurno} disabled={abrindo||bloqueado}
+                style={{...S.btn,opacity:(abrindo||bloqueado)?0.5:1,cursor:bloqueado?"not-allowed":"pointer"}}>
+                {abrindo?"⟳ Abrindo...":"▶ Abrir turno de ronda"}
+              </button>
+            );
+          })()}
         </div>
       )}
 
@@ -290,8 +356,22 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquiv
   });
   const feitas = linhas.filter(l=>l.st==="feita"||l.st==="feita_atrasada").length;
   const naoexec = linhas.filter(l=>l.st==="naoexec"||l.st==="bloqueado").length;
-  const pendJust = linhas.filter(l=>l.st==="bloqueado" || (l.reg && l.reg.naoExec && !l.reg.justificativa)).length
-                 + linhas.filter(l=>l.st==="feita_atrasada" && !(l.reg&&l.reg.justificativa)).length;
+  // Rondas NÃO REALIZADAS sem justificativa preenchida (estas TRAVAM o arquivamento).
+  const naoRealizadasSemJust = linhas.filter(l=>
+    (l.st==="bloqueado" || l.st==="naoexec") && !(l.reg && (l.reg.justificativa||"").trim())
+  ).length;
+  // Indicador geral (não-execução sem justificativa + atrasos sem justificativa) — só visual.
+  const pendJust = naoRealizadasSemJust
+                 + linhas.filter(l=>l.st==="feita_atrasada" && !(l.reg&&(l.reg.justificativa||"").trim())).length;
+
+  // Conclui/arquiva o turno SOMENTE se todas as rondas não realizadas estiverem justificadas.
+  const tentarArquivar = () => {
+    if(naoRealizadasSemJust>0){
+      alert(`Favor justificar as rondas não realizadas.\n\nHá ${naoRealizadasSemJust} ronda(s) não executada(s) sem justificativa. Preencha o motivo antes de concluir e arquivar o turno.`);
+      return;
+    }
+    onArquivar();
+  };
 
   // Ações sobre um slot
   const setRonda = (offset, patch) => onUpd(turno.id, t=>{
@@ -348,10 +428,16 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquiv
               onNaoExec={()=>marcarNaoExec(l)} onJust={(v)=>setJustificativa(l,v)} onObs={(v)=>setObs(l,v)}/>
           ))}
 
+          {!turno.arquivado && naoRealizadasSemJust>0 && (
+            <div style={{fontSize:11,color:"#ef4444",marginTop:6,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444444",borderRadius:7,padding:"7px 9px"}}>
+              ⚠ {naoRealizadasSemJust} ronda(s) não realizada(s) sem justificativa. Justifique todas para poder concluir e arquivar o turno.
+            </div>
+          )}
+
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
             <button onClick={onPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f733"}}>📄 PDF</button>
             {!turno.arquivado
-              ? <button onClick={onArquivar} style={{...S.btnSm,color:"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`}}>📦 Concluir e arquivar</button>
+              ? <button onClick={tentarArquivar} style={{...S.btnSm,color:naoRealizadasSemJust>0?"#94a3b8":"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,opacity:naoRealizadasSemJust>0?0.6:1}}>📦 Concluir e arquivar</button>
               : <button onClick={onDesarquivar} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>↩ Desarquivar</button>}
             {adminAuth && <button onClick={onExcluir} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433"}}>🗑 Excluir</button>}
           </div>
