@@ -415,8 +415,10 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
   );
 }
 
-// ── Seção Empresa de Manutenção  (INALTERADA)
-function SecManutencao({ data, onSave, adminAuth, dark }) {
+// ── Seção Empresa de Manutenção
+// PROPS: + ccoMode (bool) — quando true, o histórico é somente-leitura e o
+//          lançamento é redirecionado à aba CCO → Manutenção (fonte única).
+function SecManutencao({ data, onSave, adminAuth, dark, ccoMode }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({...data});
@@ -467,6 +469,13 @@ function SecManutencao({ data, onSave, adminAuth, dark }) {
 
       {/* Histórico */}
       <div style={S.card}>
+        {/* Aviso de fonte única quando o projeto tem aba CCO */}
+        {ccoMode && (
+          <div style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>ℹ️ Manutenção agora fica no CCO</div>
+            <div style={{fontSize:10,...S.txt2,marginTop:2}}>Para registrar uma nova visita de manutenção, use a aba <strong>🚪 CCO → 🛠️ Manutenção</strong>. O histórico abaixo é mantido para consulta.</div>
+          </div>
+        )}
         {/* Contador dias desde última visita manutenção */}
         {(()=>{
           const visitas = data.visitas||[];
@@ -486,10 +495,12 @@ function SecManutencao({ data, onSave, adminAuth, dark }) {
         })()}
         <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
           <div style={{fontSize:12, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:11, ...S.txt2}}>({(data.visitas||[]).length})</span></div>
-          <button onClick={()=>setShowAdd(!showAdd)} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:10}}>+ Visita</button>
+          {!ccoMode && (
+            <button onClick={()=>setShowAdd(!showAdd)} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:10}}>+ Visita</button>
+          )}
         </div>
 
-        {showAdd && (
+        {!ccoMode && showAdd && (
           <div style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", marginBottom:10, border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8}}>
               <div>
@@ -524,7 +535,7 @@ function SecManutencao({ data, onSave, adminAuth, dark }) {
                   <span style={{fontSize:11, color:"#f59e0b", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
                   {v.tecnico && <span style={{fontSize:10, ...S.txt2}}>🔧 {v.tecnico}</span>}
                 </div>
-                {adminAuth && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
+                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
               </div>
               <div style={{fontSize:12, ...S.txt}}>{v.resumo}</div>
             </div>
@@ -679,7 +690,8 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme }) {
             data={info?.manutencao || {nome:"",visitas:[]}}
             onSave={(d)=>saveSection("manutencao",d)}
             adminAuth={adminAuth}
-            dark={dark}/>
+            dark={dark}
+            ccoMode={ccoMode}/>
 
           {/* ADM */}
           <SecADM

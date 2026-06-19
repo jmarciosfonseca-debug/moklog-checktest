@@ -48,7 +48,8 @@ const PROJETOS_COM_CCO = [
 ];
 
 const COL_ORIGEM = "empresa_info";
-const COL_DESTINO = "cco_supervisao";
+const COL_DESTINO = "cco_supervisao";       // destino das visitas de SEGURANÇA
+const COL_DESTINO_MANUT = "cco_manutencao"; // destino das visitas de MANUTENÇÃO
 
 function fmtDate(d){ if(!d) return "--"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 
@@ -71,33 +72,65 @@ function migrarVisita(v, supervisorCabecalho){
   };
 }
 
+// Converte uma visita de MANUTENÇÃO -> registro da aba CCO Manutenção.
+function migrarManutencao(v, empresaCabecalho){
+  return {
+    id: "mig_" + (v.id || (Date.now().toString()+Math.random().toString(36).slice(2,6))),
+    data: v.data || "",
+    arquivado: false,
+    empresa: empresaCabecalho || "",
+    tecnico: v.tecnico || "",
+    sistema: "",
+    turno: "diurno",      // origem não tem turno na manutenção
+    status: "concluida",  // origem não tem status
+    servico: v.resumo || "",
+    obs: "",
+    origem: "empresa_info",
+    migradoEm: new Date().toISOString(),
+    registradoEm: v.data ? (v.data+"T12:00:00.000Z") : new Date().toISOString(),
+  };
+}
+
 async function lerOrigem(pid){
   try { const s = await getDoc(doc(db,COL_ORIGEM,pid)); if(s.exists()) return s.data(); } catch(e){}
   try { const l = localStorage.getItem(`${COL_ORIGEM}_${pid}`); if(l) return JSON.parse(l); } catch(e){}
   return null;
 }
-async function lerDestino(pid){
-  try { const s = await getDoc(doc(db,COL_DESTINO,pid)); if(s.exists()) return s.data().registros||[]; } catch(e){}
-  try { const l = localStorage.getItem(`${COL_DESTINO}_${pid}`); if(l) return JSON.parse(l); } catch(e){}
+async function lerDestino(pid, col){
+  try { const s = await getDoc(doc(db,col,pid)); if(s.exists()) return s.data().registros||[]; } catch(e){}
+  try { const l = localStorage.getItem(`${col}_${pid}`); if(l) return JSON.parse(l); } catch(e){}
   return [];
 }
-async function gravarDestino(pid, registros){
-  try { await setDoc(doc(db,COL_DESTINO,pid),{ registros, updatedAt:new Date().toISOString() }); }
+async function gravarDestino(pid, registros, col){
+  try { await setDoc(doc(db,col,pid),{ registros, updatedAt:new Date().toISOString() }); }
   catch(e){ console.error("Migração — erro ao gravar destino:",e); throw e; }
-  try { localStorage.setItem(`${COL_DESTINO}_${pid}`, JSON.stringify(registros)); } catch(e){}
+  try { localStorage.setItem(`${col}_${pid}`, JSON.stringify(registros)); } catch(e){}
 }
 
-// Calcula o preview de um projeto sem gravar nada.
+// Calcula o preview de um projeto sem gravar nada (supervisão + manutenção).
 async function analisar(pid){
   const origem = await lerOrigem(pid);
+  // SEGURANÇA
   const visitas = origem?.seguranca?.visitas || [];
   const supervisor = origem?.seguranca?.supervisor || "";
-  const destino = await lerDestino(pid);
+  const destino = await lerDestino(pid, COL_DESTINO);
   const idsDestino = new Set(destino.map(r=>r.id));
   const convertidas = visitas.map(v=>migrarVisita(v, supervisor));
   const novas = convertidas.filter(c=>!idsDestino.has(c.id));
-  const jaMigradas = convertidas.length - novas.length;
-  return { pid, totalOrigem:visitas.length, novas, jaMigradas, supervisor, destinoAtual:destino.length };
+  // MANUTENÇÃO
+  const visitasM = origem?.manutencao?.visitas || [];
+  const empresaM = origem?.manutencao?.nome || "";
+  const destinoM = await lerDestino(pid, COL_DESTINO_MANUT);
+  const idsDestinoM = new Set(destinoM.map(r=>r.id));
+  const convertidasM = visitasM.map(v=>migrarManutencao(v, empresaM));
+  const novasM = convertidasM.filter(c=>!idsDestinoM.has(c.id));
+  return {
+    pid,
+    // supervisão
+    totalOrigem:visitas.length, novas, jaMigradas: convertidas.length - novas.length, supervisor, destinoAtual:destino.length,
+    // manutenção
+    totalOrigemM:visitasM.length, novasM, jaMigradasM: convertidasM.length - novasM.length, empresaM, destinoAtualM:destinoM.length,
+  };
 }
 
 export default function MigracaoVisitas({ dark=true, onBack }){
@@ -130,24 +163,27 @@ export default function MigracaoVisitas({ dark=true, onBack }){
 
   useEffect(()=>{ if(auth) carregarPreviews(); },[auth]);
 
-  const executarMigracao = async (pid) => {
+  const executarMigracao = async (pid, tipo) => {
     setConfirm(null);
-    setMigrando(pid);
+    const chave = pid+"_"+tipo;
+    setMigrando(chave);
     try {
       const prev = previews[pid];
-      if(!prev || !prev.novas.length){ setMigrando(null); return; }
-      const destinoAtual = await lerDestino(pid);
+      const col = tipo==="manut" ? COL_DESTINO_MANUT : COL_DESTINO;
+      const novos = tipo==="manut" ? (prev?.novasM||[]) : (prev?.novas||[]);
+      if(!novos.length){ setMigrando(null); return; }
+      const destinoAtual = await lerDestino(pid, col);
       const idsDestino = new Set(destinoAtual.map(r=>r.id));
-      const adicionar = prev.novas.filter(n=>!idsDestino.has(n.id)); // dupla checagem
+      const adicionar = novos.filter(n=>!idsDestino.has(n.id)); // dupla checagem
       const novaLista = [...adicionar, ...destinoAtual];
-      await gravarDestino(pid, novaLista);
-      setResultado(r=>({...r,[pid]:"ok"}));
-      // recarrega o preview desse projeto (agora deve mostrar 0 novas)
+      await gravarDestino(pid, novaLista, col);
+      setResultado(r=>({...r,[chave]:"ok"}));
+      // recarrega o preview desse projeto (agora deve mostrar 0 novas no tipo migrado)
       const novoPrev = await analisar(pid);
       setPreviews(p=>({...p,[pid]:novoPrev}));
     } catch(e){
       console.error(e);
-      setResultado(r=>({...r,[pid]:"erro"}));
+      setResultado(r=>({...r,[chave]:"erro"}));
     }
     setMigrando(null);
   };
@@ -199,8 +235,6 @@ export default function MigracaoVisitas({ dark=true, onBack }){
           ) : (
             PROJETOS_COM_CCO.map(p=>{
               const prev = previews[p.id];
-              const res = resultado[p.id];
-              const isMig = migrando===p.id;
               if(!prev) return null;
               if(prev.erro) return (
                 <div key={p.id} style={{background:cardBg,border:"1px solid #ef444433",borderRadius:12,padding:"12px 14px"}}>
@@ -208,38 +242,56 @@ export default function MigracaoVisitas({ dark=true, onBack }){
                   <div style={{fontSize:11,color:"#ef4444"}}>Erro ao ler dados deste projeto.</div>
                 </div>
               );
-              const nNovas = prev.novas.length;
-              return (
-                <div key={p.id} style={{background:cardBg,border:`1px solid ${nNovas>0?"#0ea5e944":border}`,borderRadius:12,padding:"12px 14px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:txt}}>{p.id} — {p.name}</div>
-                      <div style={{fontSize:11,color:txt2,marginTop:2}}>
-                        {prev.totalOrigem} visita(s) na origem · {prev.jaMigradas} já no CCO · <strong style={{color:nNovas>0?"#0ea5e9":"#22c55e"}}>{nNovas} a migrar</strong>
-                      </div>
-                      {prev.supervisor && <div style={{fontSize:10,color:txt2,marginTop:2}}>Supervisor (cabeçalho): {prev.supervisor}</div>}
-                    </div>
-                    {res==="ok" && <span style={{fontSize:11,color:"#22c55e",fontWeight:700,flexShrink:0}}>✓ migrado</span>}
-                    {res==="erro" && <span style={{fontSize:11,color:"#ef4444",fontWeight:700,flexShrink:0}}>✗ erro</span>}
-                    {nNovas>0 && !isMig && (
-                      <button onClick={()=>setConfirm(p.id)} style={{...btn,padding:"8px 14px",fontSize:12,flexShrink:0}}>Migrar {nNovas}</button>
-                    )}
-                    {isMig && <span style={{fontSize:12,color:"#0ea5e9",fontWeight:700,flexShrink:0}}>⟳ migrando...</span>}
-                    {nNovas===0 && res!=="erro" && <span style={{fontSize:11,color:"#22c55e",fontWeight:700,flexShrink:0}}>✓ em dia</span>}
-                  </div>
 
-                  {/* Preview das visitas a migrar */}
-                  {nNovas>0 && (
-                    <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${border}`,display:"flex",flexDirection:"column",gap:5}}>
-                      {prev.novas.slice(0,5).map(n=>(
-                        <div key={n.id} style={{fontSize:11,color:txt2}}>
-                          <span style={{color:n.turno==="noturno"?"#818cf8":"#f59e0b",fontWeight:700}}>{n.turno==="noturno"?"🌙":"☀️"}</span>{" "}
-                          {fmtDate(n.data)} — {n.resumo ? (n.resumo.length>70?n.resumo.slice(0,70)+"…":n.resumo) : "(sem resumo)"}
+              // Linha de um tipo (supervisão ou manutenção)
+              const Linha = ({ tipo, titulo, total, jaMig, novos, extra }) => {
+                const n = novos.length;
+                const chave = p.id+"_"+tipo;
+                const res = resultado[chave];
+                const isMig = migrando===chave;
+                const corTipo = tipo==="manut" ? "#f59e0b" : "#0ea5e9";
+                return (
+                  <div style={{marginTop:8,paddingTop:8,borderTop:`1px solid ${border}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:700,color:corTipo}}>{titulo}</div>
+                        <div style={{fontSize:11,color:txt2,marginTop:2}}>
+                          {total} na origem · {jaMig} já no CCO · <strong style={{color:n>0?corTipo:"#22c55e"}}>{n} a migrar</strong>
                         </div>
-                      ))}
-                      {nNovas>5 && <div style={{fontSize:11,color:txt2}}>…e mais {nNovas-5} visita(s).</div>}
+                        {extra}
+                      </div>
+                      {res==="ok" && <span style={{fontSize:11,color:"#22c55e",fontWeight:700,flexShrink:0}}>✓ migrado</span>}
+                      {res==="erro" && <span style={{fontSize:11,color:"#ef4444",fontWeight:700,flexShrink:0}}>✗ erro</span>}
+                      {n>0 && !isMig && (
+                        <button onClick={()=>setConfirm({pid:p.id,tipo})} style={{...btn,padding:"8px 14px",fontSize:12,flexShrink:0,background:tipo==="manut"?"linear-gradient(135deg,#b45309,#92400e)":"linear-gradient(135deg,#1d4ed8,#1e40af)"}}>Migrar {n}</button>
+                      )}
+                      {isMig && <span style={{fontSize:12,color:corTipo,fontWeight:700,flexShrink:0}}>⟳ migrando...</span>}
+                      {n===0 && res!=="erro" && <span style={{fontSize:11,color:"#22c55e",fontWeight:700,flexShrink:0}}>✓ em dia</span>}
                     </div>
-                  )}
+                    {n>0 && (
+                      <div style={{marginTop:6,display:"flex",flexDirection:"column",gap:4}}>
+                        {novos.slice(0,4).map(it=>(
+                          <div key={it.id} style={{fontSize:11,color:txt2}}>
+                            {tipo==="manut"
+                              ? <>🔧 {fmtDate(it.data)} — {it.servico ? (it.servico.length>70?it.servico.slice(0,70)+"…":it.servico) : "(sem descrição)"}</>
+                              : <><span style={{color:it.turno==="noturno"?"#818cf8":"#f59e0b",fontWeight:700}}>{it.turno==="noturno"?"🌙":"☀️"}</span> {fmtDate(it.data)} — {it.resumo ? (it.resumo.length>70?it.resumo.slice(0,70)+"…":it.resumo) : "(sem resumo)"}</>}
+                          </div>
+                        ))}
+                        {n>4 && <div style={{fontSize:11,color:txt2}}>…e mais {n-4}.</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              };
+
+              const algoAMigrar = prev.novas.length>0 || prev.novasM.length>0;
+              return (
+                <div key={p.id} style={{background:cardBg,border:`1px solid ${algoAMigrar?"#0ea5e944":border}`,borderRadius:12,padding:"12px 14px"}}>
+                  <div style={{fontSize:13,fontWeight:700,color:txt}}>{p.id} — {p.name}</div>
+                  <Linha tipo="seg" titulo="👁️ Supervisão → CCO" total={prev.totalOrigem} jaMig={prev.jaMigradas} novos={prev.novas}
+                    extra={prev.supervisor ? <div style={{fontSize:10,color:txt2,marginTop:2}}>Supervisor (cabeçalho): {prev.supervisor}</div> : null}/>
+                  <Linha tipo="manut" titulo="🛠️ Manutenção → CCO" total={prev.totalOrigemM} jaMig={prev.jaMigradasM} novos={prev.novasM}
+                    extra={prev.empresaM ? <div style={{fontSize:10,color:txt2,marginTop:2}}>Empresa (cabeçalho): {prev.empresaM}</div> : null}/>
                 </div>
               );
             })
@@ -248,18 +300,21 @@ export default function MigracaoVisitas({ dark=true, onBack }){
 
         {/* Modal de confirmação */}
         {confirm && (()=>{
-          const prev = previews[confirm];
+          const prev = previews[confirm.pid];
+          const ehManut = confirm.tipo==="manut";
+          const qtd = ehManut ? (prev?.novasM.length||0) : (prev?.novas.length||0);
+          const destinoLabel = ehManut ? "CCO Manutenção" : "CCO Supervisão";
           return (
             <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
-              <div style={{background:cardBg,border:"1px solid #0ea5e9",borderRadius:14,padding:"24px 20px",maxWidth:340,width:"100%",textAlign:"center"}}>
-                <div style={{fontSize:28,marginBottom:10}}>🔄</div>
-                <div style={{fontSize:15,fontWeight:700,color:txt,marginBottom:6}}>Migrar {prev?.novas.length} visita(s)?</div>
+              <div style={{background:cardBg,border:`1px solid ${ehManut?"#f59e0b":"#0ea5e9"}`,borderRadius:14,padding:"24px 20px",maxWidth:340,width:"100%",textAlign:"center"}}>
+                <div style={{fontSize:28,marginBottom:10}}>{ehManut?"🛠️":"👁️"}</div>
+                <div style={{fontSize:15,fontWeight:700,color:txt,marginBottom:6}}>Migrar {qtd} visita(s)?</div>
                 <div style={{fontSize:12,color:txt2,marginBottom:18}}>
-                  {confirm} — copia para o CCO Supervisão. As visitas continuam em Empresas também. Esta ação não apaga nada.
+                  {confirm.pid} — copia para o {destinoLabel}. As visitas continuam em Empresas também. Esta ação não apaga nada.
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>setConfirm(null)} style={{...btnSec,flex:1}}>Cancelar</button>
-                  <button onClick={()=>executarMigracao(confirm)} style={{...btn,flex:1}}>✓ Migrar</button>
+                  <button onClick={()=>executarMigracao(confirm.pid, confirm.tipo)} style={{...btn,flex:1,background:ehManut?"linear-gradient(135deg,#b45309,#92400e)":"linear-gradient(135deg,#1d4ed8,#1e40af)"}}>✓ Migrar</button>
                 </div>
               </div>
             </div>
@@ -271,4 +326,4 @@ export default function MigracaoVisitas({ dark=true, onBack }){
 }
 
 // utilitários puros para teste
-export const _internal = { migrarVisita };
+export const _internal = { migrarVisita, migrarManutencao };
