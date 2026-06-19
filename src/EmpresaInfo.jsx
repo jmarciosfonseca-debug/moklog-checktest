@@ -20,6 +20,13 @@ const PROJECT_PINS = {
   P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
 };
 
+// ── Projetos COM aba CCO. Nestes, as visitas de SEGURANÇA são registradas
+// na aba CCO → Supervisão (fonte única). Aqui o histórico fica somente-leitura
+// e o lançamento é redirecionado ao CCO. P260B/P260C NÃO têm CCO: para eles,
+// o histórico de visitas continua funcionando normalmente nesta tela.
+const PROJETOS_COM_CCO = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505","P260A"];
+function temCCO(pid){ return PROJETOS_COM_CCO.includes(pid); }
+
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 function fmtDate(d) {
   if(!d) return "--";
@@ -222,7 +229,9 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 }
 
 // ── Seção Empresa de Segurança
-function SecSeguranca({ data, onSave, adminAuth, dark }) {
+// PROPS: + ccoMode (bool) — quando true, o histórico de visitas é somente-leitura
+//          e o lançamento é redirecionado à aba CCO → Supervisão (fonte única).
+function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({...data});
@@ -287,6 +296,13 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
 
       {/* Histórico Visitas */}
       <div style={{...S.card}}>
+        {/* Aviso de fonte única quando o projeto tem aba CCO */}
+        {ccoMode && (
+          <div style={{background:dark?"#001a2e":"#e0f2fe",border:"1px solid #0ea5e933",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+            <div style={{fontSize:11,color:dark?"#7dd3fc":"#0369a1",fontWeight:700}}>ℹ️ Visitas de supervisão agora ficam no CCO</div>
+            <div style={{fontSize:10,...S.txt2,marginTop:2}}>Para registrar uma nova visita do supervisor, use a aba <strong>🚪 CCO → 👁️ Supervisão</strong>. O histórico abaixo é mantido para consulta.</div>
+          </div>
+        )}
         {/* Contador dias desde última visita supervisor */}
         {(()=>{
           const visitas = data.visitas||[];
@@ -317,8 +333,11 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
         })()}
         <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
           <div style={{fontSize:12, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:11, ...S.txt2}}>({(data.visitas||[]).length})</span></div>
-          <button onClick={()=>setShowAddVisita(!showAddVisita)}
-            style={{...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10}}>+ Visita</button>
+          {/* Em projetos com CCO, o lançamento é feito no CCO. Sem botão +Visita aqui. */}
+          {!ccoMode && (
+            <button onClick={()=>setShowAddVisita(!showAddVisita)}
+              style={{...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10}}>+ Visita</button>
+          )}
         </div>
 
         <div style={{display:"flex", gap:6, marginBottom:10}}>
@@ -333,7 +352,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
           ))}
         </div>
 
-        {showAddVisita && (
+        {!ccoMode && showAddVisita && (
           <div style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", marginBottom:10, border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8}}>
               <div>
@@ -384,7 +403,8 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
                     </span>
                   )}
                 </div>
-                {adminAuth && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
+                {/* Remoção de visita só fora do modo CCO (no CCO, gerencie pela aba Supervisão) */}
+                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
               </div>
               <div style={{fontSize:12, ...S.txt}}>{v.resumo}</div>
             </div>
@@ -395,7 +415,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark }) {
   );
 }
 
-// ── Seção Empresa de Manutenção
+// ── Seção Empresa de Manutenção  (INALTERADA)
 function SecManutencao({ data, onSave, adminAuth, dark }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
@@ -515,7 +535,7 @@ function SecManutencao({ data, onSave, adminAuth, dark }) {
   );
 }
 
-// ── Seção ADM
+// ── Seção ADM  (INALTERADA)
 function SecADM({ data, onSave, adminAuth, dark }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
@@ -585,6 +605,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme }) {
   const [saving, setSaving] = useState(false);
 
   const adminAuth = authLevel === "admin";
+  const ccoMode = temCCO(project.id); // projetos com CCO: visitas de supervisão ficam no CCO
 
   useEffect(()=>{
     loadInfo(project.id).then(d=>{ setInfo(d); setLoading(false); });
@@ -650,7 +671,8 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme }) {
             data={info?.seguranca || {nome:"",gerente:"",supervisor:"",visitas:[]}}
             onSave={(d)=>saveSection("seguranca",d)}
             adminAuth={adminAuth}
-            dark={dark}/>
+            dark={dark}
+            ccoMode={ccoMode}/>
 
           {/* Empresa Manutenção */}
           <SecManutencao
