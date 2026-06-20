@@ -120,7 +120,7 @@ class ErrorBoundary extends React.Component {
               style={{background:"transparent",color:"#64748b",border:"1px solid #1e293b",borderRadius:10,padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
               ↩ Recarregar app
             </button>
-            <div style={{fontSize:10,color:"#334155",marginTop:12}}>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:12}}>
               Os dados salvos localmente estão protegidos.
             </div>
           </div>
@@ -663,7 +663,7 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
     </div>
   );
   return (
-    <label style={{display:"flex",alignItems:"center",gap:6,marginTop:6,cursor:"pointer",color:"#334155",fontSize:11,padding:"4px 0"}}>
+    <label style={{display:"flex",alignItems:"center",gap:6,marginTop:6,cursor:"pointer",color:"#94a3b8",fontSize:11,padding:"4px 0"}}>
       <span style={{fontSize:14}}>📷</span>
       <span>Foto: {itemLabel||catLabel} (câmera ou galeria)</span>
       <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
@@ -962,7 +962,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
           <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{viewReport.project.id} — {getWeekLabel(viewReport.report.meta?.date)}</div>
-            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(viewReport.report.meta?.date)} · Lider: {viewReport.report.meta?.leader||"—"}</div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(viewReport.report.meta?.date)} · Lider: {viewReport.report.meta?.leader||"—"}</div>
           </div>
           <HealthRing pct={computeHealth(viewReport.project,viewReport.report.state).pct} size={46}/>
         </div>
@@ -1024,7 +1024,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
             <MoklogLogo size={32}/>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
-              <div style={{fontSize:11,color:"#334155"}}>{hist.length}/{MAX_HISTORY} relatorios</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>{hist.length}/{MAX_HISTORY} relatorios</div>
             </div>
           </div>
           <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",marginBottom:8}}>
@@ -1056,12 +1056,12 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
                 <div key={realIdx} style={{background:"#060c18",border:`2px solid ${isSelected?color:"#0f172a"}`,borderRadius:12,padding:"12px 14px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <button onClick={()=>toggleSel(realIdx)}
-                      style={{width:30,height:30,borderRadius:6,border:`2px solid ${isSelected?color:"#1e293b"}`,background:isSelected?color+"22":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:isSelected?color:"#334155"}}>
+                      style={{width:30,height:30,borderRadius:6,border:`2px solid ${isSelected?color:"#94a3b8"}`,background:isSelected?color+"22":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:isSelected?color:"#94a3b8"}}>
                       {isSelected?"✓":""}
                     </button>
                     <HealthRing pct={h.pct} size={44}/>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#334155",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
+                      <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
                       <div style={{fontSize:11,color:"#475569"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
                       {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
                       <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inop`:"✔ OK"}</div>
@@ -1109,7 +1109,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
           <button onClick={onBack} style={S.backBtn}>← Inicio</button>
           <MoklogLogo size={34}/>
-          <div style={{flex:1}}><div style={{fontSize:14,fontWeight:900,color:"#f1f5f9"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div><div style={{fontSize:11,color:"#334155"}}>Painel Gerencial</div></div>
+          <div style={{flex:1}}><div style={{fontSize:14,fontWeight:900,color:"#f1f5f9"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div><div style={{fontSize:11,color:"#94a3b8"}}>Painel Gerencial</div></div>
           {avgPct!==null&&<HealthRing pct={avgPct} size={52}/>}
         </div>
         {avgPct!==null&&<div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"14px 16px",marginBottom:8}}>
@@ -1121,7 +1121,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#334155"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#334155"}}>Sem registros</div>}</div><span style={{color:"#334155",fontSize:16}}>›</span></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
+          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><span style={{color:"#94a3b8",fontSize:16}}>›</span></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
         </div>
       </div>
       {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
@@ -1140,7 +1140,7 @@ function PendenciesScreen({stored, onBack}) {
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-          <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Pendências Globais</div><div style={{fontSize:11,color:"#334155"}}>Todos os projetos · {all.length} itens</div></div>
+          <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Pendências Globais</div><div style={{fontSize:11,color:"#94a3b8"}}>Todos os projetos · {all.length} itens</div></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
           <div style={{background:"#060c18",border:"1px solid #ef444433",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{critCount}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>INOP</div></div>
@@ -1170,7 +1170,7 @@ function PendenciesScreen({stored, onBack}) {
                     <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",marginBottom:2}}>{p.cat}</div>
                     {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
                     {p.note&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
-                    <div style={{fontSize:10,color:"#334155",marginTop:3}}>Desde: {fmtDate(p.since)||"—"} · {p.project.name}</div>
+                    <div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"} · {p.project.name}</div>
                   </div>
                 </div>
               </div>
@@ -1201,7 +1201,7 @@ function HistoryScreen({project, stored, onBack}) {
           <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
-            <div style={{fontSize:11,color:"#334155"}}>{fmtDate(repMeta.date)} · somente leitura</div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)} · somente leitura</div>
           </div>
           <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
         </div>
@@ -1276,7 +1276,7 @@ function HistoryScreen({project, stored, onBack}) {
             <div style={{fontSize:12,color:"#94a3b8"}}>{repMeta.obs}</div>
           </div>
         )}
-        <div style={{fontSize:10,color:"#334155",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
+        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
       </div>
     </div>
     );
@@ -1288,9 +1288,9 @@ function HistoryScreen({project, stored, onBack}) {
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:4}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-          <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#334155"}}>{project.name} · {hist.length} relatório(s)</div></div>
+          <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#94a3b8"}}>{project.name} · {hist.length} relatório(s)</div></div>
         </div>
-        {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#334155",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatorio salvo ainda.</div>}
+        {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#94a3b8",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatorio salvo ainda.</div>}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {hist.map((r,i)=>{
             const h=computeHealth(project,r.state);
@@ -1300,7 +1300,7 @@ function HistoryScreen({project, stored, onBack}) {
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <HealthRing pct={h.pct} size={46}/>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#334155",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
+                    <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
                     <div style={{fontSize:11,color:"#475569"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
                     {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
                     <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inoperante(s)`:"✔ Tudo OK"}</div>
@@ -1370,7 +1370,7 @@ function ReportScreen({project, state, meta, photos, onBack, onHome}) {
         </div>
         <button onClick={onHome} style={{...S.secBtn,width:"100%",fontSize:13}}>🏠 Inicio</button>
         <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"45vh",overflowY:"auto",marginTop:12}}>
-          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:10,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
+          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:10,whiteSpace:"pre-wrap",color:"#94a3b8",lineHeight:1.7}}>{text}</pre>
         </div>
       </div>
     </div>
@@ -1409,11 +1409,11 @@ function ViewScreen({projectId, token, stored}) {
     </div>
   );
   if(!project || !validToken || (token !== validToken && token !== (projectId+"_"+validToken) && token !== validToken.split("_").pop())) {
-    return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#334155"}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#64748b"}}>Solicite um novo link ao gestor.</div></div></div>);
+    return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#64748b"}}>Solicite um novo link ao gestor.</div></div></div>);
   }
   const hist = stored[projectId]?.history??[];
   const last = hist.slice(-1)[0];
-  if(!last) return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#334155"}}><div style={{fontSize:40,marginBottom:12}}>📭</div><div style={{fontSize:16,color:"#f1f5f9"}}>Sem relatorios disponíveis ainda.</div></div></div>);
+  if(!last) return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>📭</div><div style={{fontSize:16,color:"#f1f5f9"}}>Sem relatorios disponíveis ainda.</div></div></div>);
   const h = computeHealth(project, last.state);
   const issues = [];
   for(const cat of project.categories){const s=last.state[cat.id];if(!s)continue;if(cat.type==="single"){const st=s.status??(s.ok===false?"inop":"ok");if(st!=="ok")issues.push({cat:cat.label,item:"—",status:st,since:s.since,note:s.note});}else if(cat.type==="items"){s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok")issues.push({cat:cat.label,item:cat.itemLabels[i],status:st,since:v.since,note:v.note});});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push({cat:cat.label,item:it.id||"?",status:"inop",since:it.since,note:it.note}));}}
@@ -1442,7 +1442,7 @@ function ViewScreen({projectId, token, stored}) {
             </div>
           ))}
         </div>
-        <div style={{marginTop:16,fontSize:10,color:"#1e293b",textAlign:"center"}}>MokLog CheckTest © Moked Security Consulting · Somente leitura</div>
+        <div style={{marginTop:16,fontSize:10,color:"#94a3b8",textAlign:"center"}}>MokLog CheckTest © Moked Security Consulting · Somente leitura</div>
       </div>
     </div>
   );
@@ -2205,7 +2205,7 @@ export default function App(){
             ✓ Finalizar + Gerar Consolidado
           </button>
           <button onClick={()=>{setShowMonthlyPrompt(false);if(!meta.signature||meta.signature.trim()===""){setSigError(true);return;}saveReport(state,meta);setScreen("report");}} style={{...S.secBtn,width:"100%",fontSize:14}}>Só finalizar</button>
-          <button onClick={()=>setShowMonthlyPrompt(false)} style={{...S.secBtn,width:"100%",fontSize:13,color:"#334155"}}>Cancelar</button>
+          <button onClick={()=>setShowMonthlyPrompt(false)} style={{...S.secBtn,width:"100%",fontSize:13,color:"#94a3b8"}}>Cancelar</button>
         </div>
       </div>
     </div>
@@ -2272,7 +2272,7 @@ export default function App(){
           <MoklogLogo size={32}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
-            <div style={{fontSize:11,color:"#334155",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}{editingIdx!==null?" · editando":""}</div>
+            <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}{editingIdx!==null?" · editando":""}</div>
           </div>
           {health&&<HealthRing pct={health.pct} size={46}/>}
         </div>
@@ -2322,7 +2322,7 @@ export default function App(){
                 <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:dotColor}}/>
                 <span style={{fontSize:12,fontWeight:600,color:"#cbd5e1",textAlign:"left",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cat.label}</span>
                 {cat.type!=="maintenance"&&cat.type!=="notes"&&<span style={{fontSize:11,color:cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444",fontWeight:800,flexShrink:0}}>{cp}%</span>}
-                <span style={{color:"#1e293b",fontSize:10,flexShrink:0,marginLeft:4}}>{isOpen?"▲":"▼"}</span>
+                <span style={{color:"#94a3b8",fontSize:10,flexShrink:0,marginLeft:4}}>{isOpen?"▲":"▼"}</span>
               </button>
               {isOpen&&sv&&(
                 <div style={{paddingBottom:8}}>
@@ -2345,7 +2345,7 @@ export default function App(){
             <input placeholder="Digite seu nome completo para assinar..." value={meta.signature||""}
               onChange={e=>{setMeta(m=>({...m,signature:e.target.value}));setSigError(false);}}
               style={{...S.inp,fontSize:13,fontWeight:600}}/>
-            <div style={{fontSize:10,color:"#334155",marginTop:5}}>Obrigatorio para finalizar o relatorio.</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:5}}>Obrigatorio para finalizar o relatorio.</div>
           </div>
         )}
         {state&&(
@@ -2366,7 +2366,7 @@ export default function App(){
             <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
-        <div style={{fontSize:10,color:"#1e293b",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
+        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
       </div>
     </div>
   );
@@ -2380,7 +2380,7 @@ export default function App(){
           <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>🏭 Jatinox</div>
-            <div style={{fontSize:11,color:"#334155"}}>P260A · P260B · P260C</div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>P260A · P260B · P260C</div>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2401,7 +2401,7 @@ export default function App(){
                       {jp.hasCaoGuarda&&<span style={{fontSize:9,color:"#22c55e",background:"#021a0d",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #22c55e22"}}>🐕 CÃO GUARDA</span>}
                     </div>
                   </div>
-                  <div style={{color:"#334155",fontSize:18,flexShrink:0}}>{isSel?"▲":"▼"}</div>
+                  <div style={{color:"#94a3b8",fontSize:18,flexShrink:0}}>{isSel?"▲":"▼"}</div>
                 </div>
                 {isSel&&(
                   <div style={{padding:"12px 16px 16px",display:"flex",flexDirection:"column",gap:8,borderTop:"1px solid #0f172a"}}>
@@ -2458,7 +2458,7 @@ export default function App(){
             <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{groupNames[homeGroup]}</div>
-              <div style={{fontSize:11,color:"#334155"}}>{groupProjects.join(" · ")}</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.join(" · ")}</div>
             </div>
           </div>
 
@@ -2487,7 +2487,7 @@ export default function App(){
                   onClick={()=>setProject(p)}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
                     {h?<HealthRing pct={h.pct} size={50}/>:
-                      <div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#334155"}}>—</div>}
+                      <div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
                         <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id}</div>
@@ -2497,7 +2497,7 @@ export default function App(){
                       {h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>
                         {h.inop>0&&<span style={{color:"#ef4444",fontWeight:700}}>{h.inop} inop · </span>}
                         Último: {fmtDate(last?.meta?.date)}
-                      </div>:<div style={{fontSize:11,color:"#334155",marginTop:2}}>Sem registros ainda</div>}
+                      </div>:<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Sem registros ainda</div>}
                     </div>
                     {isActive&&<span style={{fontSize:9,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
                   </div>
@@ -2561,7 +2561,7 @@ export default function App(){
           <div>
             <div style={{fontSize:22,fontWeight:900,color:"#f8fafc",letterSpacing:-0.5}}>MokLog</div>
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
-            <div style={{fontSize:10,color:"#334155",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
+            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
@@ -2595,7 +2595,7 @@ export default function App(){
         )}
 
         <div style={{width:"100%"}}>
-          <div style={{fontSize:10,color:"#334155",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Seleção de Projeto</div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Seleção de Projeto</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
               {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"]},
@@ -2627,7 +2627,7 @@ export default function App(){
                       {totalInop>0&&<span style={{fontSize:10,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
                     </div>
                   )}
-                  {avgPct===null&&<div style={{fontSize:10,color:"#334155"}}>Sem dados</div>}
+                  {avgPct===null&&<div style={{fontSize:10,color:"#94a3b8"}}>Sem dados</div>}
                 </button>
               );
             })}
@@ -2641,7 +2641,7 @@ export default function App(){
             const totalInop=valid.reduce((a,h)=>a+h.inop,0);
             return(
               <div style={{marginTop:10,background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:11,color:"#334155",fontWeight:700}}>Saúde Geral da Operação</div>
+                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>Saúde Geral da Operação</div>
                 <div style={{display:"flex",alignItems:"center",gap:12}}>
                   {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop</span>}
                   <span style={{fontSize:16,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}}>{avg}%</span>
@@ -2651,7 +2651,7 @@ export default function App(){
           })()}
         </div>
 
-        <div style={{fontSize:10,color:"#1e293b",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
+        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
     </div>
   );
@@ -2664,26 +2664,26 @@ const S={
   formWrap:{width:"100%",maxWidth:720,padding:"16px 12px 40px",display:"flex",flexDirection:"column",gap:8},
   primaryBtn:{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 4px 20px rgba(29,78,216,.3)"},
   secBtn:{background:"#060c18",color:"#64748b",border:"1px solid #0f172a",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5},
-  backBtn:{background:"transparent",border:"1px solid #0f172a",color:"#334155",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"},
+  backBtn:{background:"transparent",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"},
   projCard:{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#060c18",border:"1px solid #0a0f1e",borderRadius:10,padding:"10px 13px",cursor:"pointer",width:"100%",textAlign:"left"},
   metaCard:{background:"#060c18",borderRadius:11,padding:"12px 14px",border:"1px solid #0f172a"},
-  lbl:{display:"block",fontSize:10,color:"#334155",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:.5},
+  lbl:{display:"block",fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:.5},
   inp:{width:"100%",background:"#020510",border:"1px solid #0f172a",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:12,boxSizing:"border-box",outline:"none"},
   accordion:{width:"100%",background:"transparent",border:"none",display:"flex",alignItems:"center",gap:8,padding:"12px 4px",cursor:"pointer"},
   catCard:{background:"#060c18",borderRadius:9,padding:"11px 13px",margin:"0 0 4px"},
   catHeader:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:5},
   catLabel:{fontSize:12,fontWeight:700,color:"#94a3b8"},
   itemRow:{display:"flex",alignItems:"center",gap:6},
-  iLabel:{fontSize:11,color:"#334155",minWidth:80,flexShrink:0},
-  tog:{background:"#020510",border:"1px solid #0f172a",color:"#334155",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",fontWeight:600},
+  iLabel:{fontSize:11,color:"#94a3b8",minWidth:80,flexShrink:0},
+  tog:{background:"#020510",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",fontWeight:600},
   togOk:{background:"#021a0d",border:"1px solid #22c55e",color:"#22c55e"},
   togPartial:{background:"#1a130a",border:"1px solid #f59e0b",color:"#f59e0b"},
   togBad:{background:"#1a0202",border:"1px solid #ef4444",color:"#ef4444"},
-  sm:{background:"#020510",border:"1px solid #0f172a",color:"#334155",borderRadius:5,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:600},
+  sm:{background:"#020510",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:5,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:600},
   smOk:{background:"#021a0d",border:"1px solid #22c55e",color:"#22c55e"},
   smPartial:{background:"#1a130a",border:"1px solid #f59e0b",color:"#f59e0b"},
   smBad:{background:"#1a0202",border:"1px solid #ef4444",color:"#ef4444"},
   iconBtn:{background:"#020510",border:"1px solid #0f172a",color:"#475569",borderRadius:5,width:24,height:24,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0},
-  addBtn:{background:"transparent",border:"1px dashed #0f172a",color:"#334155",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",marginTop:4},
+  addBtn:{background:"transparent",border:"1px dashed #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",marginTop:4},
   subRow:{display:"flex",flexDirection:"column",gap:6,marginTop:8,paddingTop:8,borderTop:"1px solid #0f172a"},
 };
