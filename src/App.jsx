@@ -659,7 +659,7 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 8px",background:"#020510",borderRadius:6,border:"1px solid #0f172a"}}>
       <img src={existing[0].url} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:"1px solid #1e293b"}}/>
       <div style={{flex:1,fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{itemLabel||catLabel}</div>
-      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}}>✕</button>
+      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}}aria-label="Remover">✕</button>
     </div>
   );
   return (
@@ -782,7 +782,7 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
               </div>
               <input placeholder="Problema..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
               <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}aria-label="Remover">✕</button>
             </div>
             {setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} itemLabel={it.id||`Item ${i+1}`} photos={photos} setPhotos={setPhotos}/>}
           </div>
@@ -811,7 +811,7 @@ function NotesCat({cat,value,onChange}){
             <input placeholder="Item..." value={it.label} onChange={e=>upd(i,{label:e.target.value})} style={{...S.inp,width:140,fontSize:12}}/>
             <input placeholder="Observacao..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
             <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
+            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}aria-label="Remover">✕</button>
           </div>
         ))}
         <button onClick={add} style={S.addBtn}>+ Adicionar item</button>
@@ -836,7 +836,7 @@ function MaintenanceCat({cat,value,onChange}){
           <div key={i} style={{background:"#020510",borderRadius:8,padding:"10px 12px",border:"1px solid #1e293b"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Visita {i+1}</span>
-              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}>✕</button>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}aria-label="Remover">✕</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:7}}>
               <div><label style={S.lbl}>Data</label><input type="date" value={v.date} onChange={e=>upd(i,{date:e.target.value})} style={S.inp}/></div>
@@ -1073,7 +1073,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
                     <button onClick={()=>generatePDF(p,r.state,r.meta,[])} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
-                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>
+                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
               );
