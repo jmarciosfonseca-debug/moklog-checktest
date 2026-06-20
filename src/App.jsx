@@ -31,7 +31,6 @@ async function safeFirebaseSave(saveFn, maxRetries = 3) {
   let lastError;
   for(let attempt = 1; attempt <= maxRetries; attempt++) {
     if(!navigator.onLine) {
-      // Wait up to 8s for reconnection
       await new Promise(resolve => {
         const timeout = setTimeout(resolve, 8000);
         window.addEventListener("online", () => { clearTimeout(timeout); resolve(); }, { once: true });
@@ -59,30 +58,25 @@ class ErrorBoundary extends React.Component {
     return { hasError:true, error };
   }
   componentDidCatch(error, info) {
-    // Log with module context
     console.error(`[MokLog ErrorBoundary] Módulo: ${this.props.moduleName||"desconhecido"}`, error, info);
     this.setState({ errorInfo: info });
-    // Try to save error to localStorage for debugging
     try {
       const log = JSON.parse(localStorage.getItem("moklog_errors")||"[]");
       log.unshift({ ts: new Date().toISOString(), module: this.props.moduleName||"?", msg: error?.message||"?", stack: error?.stack?.slice(0,300)||"?" });
-      localStorage.setItem("moklog_errors", JSON.stringify(log.slice(0,10))); // keep last 10
+      localStorage.setItem("moklog_errors", JSON.stringify(log.slice(0,10)));
     } catch(e){}
   }
   render() {
     if(this.state.hasError) {
-      // inline = true means this boundary wraps a small block, not full screen
       const isInline = this.props.inline;
       const moduleName = this.props.moduleName || "módulo";
       const errMsg = this.state.error?.message || "Erro desconhecido";
-      // Is it a null/undefined property access? Give friendlier message
       const isNullErr = errMsg.includes("Cannot read") || errMsg.includes("null") || errMsg.includes("undefined");
       const friendlyMsg = isNullErr
         ? "Dado incompleto ou corrompido no banco de dados."
         : errMsg;
 
       if(isInline) {
-        // Inline boundary: shows a small warning card, doesn't take full screen
         return (
           <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",margin:"4px 0"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -100,7 +94,6 @@ class ErrorBoundary extends React.Component {
         );
       }
 
-      // Full-screen boundary
       return (
         <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",padding:24}}>
           <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",textAlign:"center"}}>
@@ -127,12 +120,10 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
-    // Null-safe render: wrap children in try-catch via React error boundary
     return this.props.children || null;
   }
 }
 
-// ── Inline ErrorBoundary helper — para proteger blocos menores
 function SafeBlock({ name, children }) {
   return (
     <ErrorBoundary moduleName={name} inline={true}>
@@ -143,7 +134,6 @@ function SafeBlock({ name, children }) {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 
-// ─── EmailJS Config ───────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
 const EMAILJS_TEMPLATE_ID = "template_dhncs7j";
 const EMAILJS_PUBLIC_KEY  = "qnGBgZu7xNKnavJb7";
@@ -164,7 +154,6 @@ async function sendEmailJS(subject, message, fromName) {
   } catch(e) { console.error("EmailJS error:", e); return false; }
 }
 
-// ─── Firebase ─────────────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
   authDomain: "moklog-checktest.firebaseapp.com",
@@ -196,14 +185,12 @@ function generateViewToken(projectId) {
   return Math.random().toString(36).substring(2,10) + Math.random().toString(36).substring(2,10);
 }
 
-// ─── Config ───────────────────────────────────────────────────────────────────
 const PROJECT_PINS = {
   P601:"16601", P602:"16602", P604:"16604", P605:"16605",
   P606:"16606", P607:"16607", P311A:"16311", P311B:"16311", P505:"16505",
   P260A:"162601", P260B:"162602", P260C:"162603"
 };
 
-// ─── Jatinox ──────────────────────────────────────────────────────────────────
 const JATINOX_SUBS = {
   P260A: { id:"P260A", name:"Jatinox Unidade A", hasAcesso:true,  hasEquipe:true,  hasCaoGuarda:false },
   P260B: { id:"P260B", name:"Jatinox Unidade B", hasAcesso:false, hasEquipe:true,  hasCaoGuarda:false },
@@ -217,7 +204,6 @@ const INOP_ALERT_WEEKS = 2;
 const RECURRENCE_WARN = 2;
 const RECURRENCE_CRIT = 3;
 
-// ─── Push Notifications ───────────────────────────────────────────────────────
 async function requestNotificationPermission() {
   if(!("Notification" in window)) return false;
   if(Notification.permission === "granted") return true;
@@ -303,10 +289,9 @@ const PROJECTS = {
   P607: {id:"P607",name:"Golgi Bras\u00edlia",short:"Bras\u00edlia",categories:[{id:"fire",label:"01 - Alarme de Inc\u00eandio",type:"items",itemLabels:["Painel CCO","Painel Guarita","Painel ADM"]},{id:"cftv",label:"02 - CFTV",type:"count",total:44},{id:"monitores_cco",label:"03 - Monitores CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03"]},{id:"monitor_ka",label:"04 - Monitor KeyAccess",type:"items",itemLabels:["Monitor 01"]},{id:"joystick",label:"05 - Joystick",type:"items",itemLabels:["CCO"]},{id:"nobreak",label:"06 - Nobreak",type:"items",itemLabels:["CCO"]},{id:"ac",label:"07 - Ar-Condicionado CCO",type:"items",itemLabels:["Aparelho 01"]},{id:"botoeiras",label:"08 - Botoeiras Port\u00f5es",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},{id:"perimeter",label:"09 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04"]},{id:"panic",label:"10 - P\u00e2nico M\u00f3vel",type:"items",itemLabels:["Ronda","Pista","CCO"]},{id:"totens",label:"11 - Totens",type:"items",itemLabels:["Entrada","Sa\u00edda"]},{id:"qr_leitores",label:"12 - Leitores QR Code",type:"items",itemLabels:["Torniquete 1 Entrada","Torniquete 1 Sa\u00edda","Torniquete 2 Entrada","Torniquete 2 Sa\u00edda","Eclusa Ent 1 \u2013 QR 01","Eclusa Ent 1 \u2013 QR 02","Eclusa Ent 2 \u2013 QR 01","Eclusa Ent 2 \u2013 QR 02","Eclusa Sa\u00ed 1 \u2013 QR 01","Eclusa Sa\u00ed 1 \u2013 QR 02","Eclusa Sa\u00ed 2 \u2013 QR 01","Eclusa Sa\u00ed 2 \u2013 QR 02"]},{id:"tablets",label:"13 - Tablets KeyAccess",type:"items",itemLabels:["Tablet 01","Tablet 02"]},{id:"portoes",label:"14 - Port\u00f5es",type:"items",itemLabels:["Eclusa Ent 1 \u2013 P01","Eclusa Ent 1 \u2013 P02","Eclusa Ent 2 \u2013 P01","Eclusa Ent 2 \u2013 P02","Eclusa Sa\u00ed 1 \u2013 P01","Eclusa Sa\u00ed 1 \u2013 P02","Eclusa Sa\u00ed 2 \u2013 P01","Eclusa Sa\u00ed 2 \u2013 P02"]},{id:"motores",label:"15 - Motores dos Port\u00f5es",type:"items",itemLabels:["Ent 1 \u2013 M01","Ent 1 \u2013 M02","Ent 1 \u2013 M03","Ent 2 \u2013 M01","Ent 2 \u2013 M02","Ent 2 \u2013 M03","Sa\u00ed 1 \u2013 M01","Sa\u00ed 1 \u2013 M02","Sa\u00ed 1 \u2013 M03","Sa\u00ed 1 \u2013 M04","Sa\u00ed 2 \u2013 M01","Sa\u00ed 2 \u2013 M02","Sa\u00ed 2 \u2013 M03","Sa\u00ed 2 \u2013 M04"]},{id:"sensores",label:"16 - Sensores dos Port\u00f5es",type:"items",itemLabels:["Ent 1 \u2013 S01","Ent 1 \u2013 S02","Ent 1 \u2013 S03","Ent 1 \u2013 S04","Ent 2 \u2013 S01","Ent 2 \u2013 S02","Ent 2 \u2013 S03","Ent 2 \u2013 S04","Sa\u00ed 1 \u2013 S01","Sa\u00ed 1 \u2013 S02","Sa\u00ed 1 \u2013 S03","Sa\u00ed 1 \u2013 S04","Sa\u00ed 2 \u2013 S01","Sa\u00ed 2 \u2013 S02","Sa\u00ed 2 \u2013 S03","Sa\u00ed 2 \u2013 S04"]},{id:"anti_esmag",label:"17 - Anti-esmagamento",type:"items",itemLabels:["Eclusa Ent 1 \u2013 AE 01","Eclusa Ent 1 \u2013 AE 02","Eclusa Ent 2 \u2013 AE 01","Eclusa Ent 2 \u2013 AE 02"]},{id:"guarita",label:"18 - Guarita / Recep\u00e7\u00e3o",type:"items",itemLabels:["Computador","Monitor 01","Monitor 02","Modem Internet"]},{id:"manutencao",label:"19 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"20 - Infraestrutura / Obs.",type:"notes"}]},
   P311A: {id:"P311A",name:"Mega CL Curitiba",short:"Curitiba",categories:[{id:"cftv",label:"01 - CFTV",type:"count",total:140},{id:"perimeter",label:"02 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},{id:"botoeiras",label:"03 - Botoeiras / Port\u00f5es de Acesso",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},{id:"panic",label:"04 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["L\u00edder","CCO"]},{id:"alertas",label:"05 - Recebimento de Alertas Externos",type:"items",itemLabels:["Central Moked","Central Auxiliar"]},{id:"portas_cco",label:"06 - CCO / Abertura de Portas",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},{id:"keyaccess",label:"07 - Sistema KeyAccess",type:"items",itemLabels:["Torniquete 01","Torniquete 02","Torniquete 03"]},{id:"totens",label:"08 - Totens de Autoatendimento",type:"items",itemLabels:["Entrada","Sa\u00edda"]},{id:"qr_code",label:"09 - Leitores de QR Code",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},{id:"computadores",label:"10 - Computadores / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},{id:"portoes",label:"11 - Port\u00f5es",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},{id:"cancelas",label:"12 - Cancelas de Acesso",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},{id:"dilaceradores",label:"13 - Dilaceradores",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},{id:"ac",label:"14 - Ar-Condicionado",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},{id:"intercomunicadores",label:"15 - Intercomunicadores",type:"items",itemLabels:["Portaria"]},{id:"sdai",label:"16 - SDAI (Inc\u00eandio)",type:"items",itemLabels:["Central 01","Central 02","Central 03","Central 04","Central 05"]},{id:"materiais",label:"17 - Materiais Operacionais",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},{id:"manutencao",label:"18 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"19 - Infraestrutura / Obs.",type:"notes"}]},
   P311B: {id:"P311B",name:"Mega CL Itaja\u00ed",short:"Itaja\u00ed",categories:[{id:"cftv",label:"01 - CFTV",type:"count",total:114},{id:"perimeter",label:"02 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06"]},{id:"botoeiras",label:"03 - Botoeiras do Dilacerador",type:"items",itemLabels:["Botoeira 01","Botoeira 02","Botoeira 03"]},{id:"panic",label:"04 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["CCO Fixo","Ronda M\u00f3vel","L\u00edder M\u00f3vel"]},{id:"portas_cco",label:"05 - CCO / Controle de Acesso",type:"items",itemLabels:["Porta 01 Externa \u2013 Local","Porta 01 Externa \u2013 Remota","Porta 02 Interna \u2013 Local","Porta 02 Interna \u2013 Remota"]},{id:"keyaccess",label:"06 - Sistema KeyAccess",type:"items",itemLabels:["Catraca 01","Catraca 02","Catraca 03"]},{id:"totens_cancela",label:"07 - Totens nas Cancelas",type:"items",itemLabels:["Totem Cancela 01","Totem Cancela 02","Totem Cancela 03","Totem Cancela 04","Totem Cancela 05","Totem Cancela 06"]},{id:"qr_code",label:"08 - Leitores QR Code",type:"items",itemLabels:["Cancela 01 Sup","Cancela 01 Inf","Cancela 02 Sup","Cancela 02 Inf","Cancela 04 Sup","Cancela 04 Inf","Sa\u00edda Cancela 02 Sup","Sa\u00edda Cancela 02 Inf","Sa\u00edda Cancela 03 Sup","Sa\u00edda Cancela 03 Inf","Sa\u00edda Cancela 04 Sup","Sa\u00edda Cancela 04 Inf"]},{id:"computadores",label:"09 - Computadores / CCO",type:"items",itemLabels:["Computador Principal","Computador Secund\u00e1rio","Internet"]},{id:"portoes",label:"10 - Port\u00f5es",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02","Port\u00e3o 03","Port\u00e3o 04"]},{id:"dilaceradores",label:"11 - Dilaceradores",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},{id:"ac",label:"12 - Ar-Condicionado",type:"items",itemLabels:["CCO","Sala T\u00e9cnica"]},{id:"materiais",label:"13 - Materiais Operacionais",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x2)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},{id:"sdai",label:"14 - SDAI (Inc\u00eandio)",type:"items",itemLabels:["Central Portaria","Central Casa de Bombas","Central Sala T\u00e9cnica"]},{id:"manutencao",label:"15 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"16 - Infraestrutura / Obs.",type:"notes"}]},
-  P505: {id:"P505",name:"Klog Guarulhos",short:"Guarulhos",categories:[{id:"panic",label:"01 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["Fixo CCO"]},{id:"giroflex",label:"02 - Giroflex das Eclusas",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},{id:"sdai",label:"03 - Alarme SDAI Portaria",type:"items",itemLabels:["G100","G200"]},{id:"garra",label:"04 - Garra de Tigre",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Reversiva 03","Eclusa Sa\u00edda 04"]},{id:"cftv",label:"05 - CFTV",type:"count",total:73},{id:"monitores",label:"06 - Monitores CCO e Portaria",type:"items",itemLabels:["CCO 01","CCO 02","CCO 03","Portaria 01","Portaria 02","Portaria 03"]},{id:"totens",label:"07 - Totens Visitantes / Motoristas",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},{id:"cofres",label:"08 - Cofres",type:"items",itemLabels:["CCO","Portaria"]},{id:"cancelas",label:"09 - Cancelas, Hastes e Motores",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},{id:"perimeter",label:"10 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08","Zona 09","Zona 10","Zona 11","Zona 12"]},{id:"eclusas",label:"11 - Eclusas CCO e Portaria",type:"items",itemLabels:["CCO Porta 01 Ext \u2013 Local","CCO Porta 02 Int \u2013 Local","Portaria Porta 01 Int \u2013 Local","Portaria Porta 02 Ext \u2013 Local"]},{id:"internet",label:"12 - Internet",type:"single"},{id:"facial",label:"13 - Leitores Faciais Eclusas/Cancelas",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Sa\u00edda 03 Reversiva","Eclusa Sa\u00edda 04"]},{id:"torniquetes",label:"14 - Torniquetes Leitores Faciais",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},{id:"mesa",label:"15 - Mesa Controladora CCO e Portaria",type:"items",itemLabels:["CCO","Portaria"]},{id:"ac",label:"16 - Ar-Condicionado",type:"items",itemLabels:["CCO","Portaria Aparelho 01"]},{id:"telefone",label:"17 - Telefone Fixo CCO e Portaria",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},{id:"intercomunicadores",label:"18 - Intercomunicadores",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},{id:"eletroima",label:"19 - Eletroimã / Eclusa / Portas",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},{id:"portoes",label:"20 - Portões / Anti-esmagamento",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},{id:"farois",label:"21 - Faróis das Cancelas",type:"items",itemLabels:["Cancela Eclusa 01 Ext","Cancela Eclusa 01 Int","Cancela Eclusa 02 Ext","Cancela Eclusa 02 Int","Cancela Eclusa 03 Ext","Cancela Eclusa 03 Int","Cancela Eclusa 04 Ext"]},{id:"manutencao",label:"22 - Visita de Manutenção",type:"maintenance"},{id:"infra",label:"23 - Infraestrutura / Obs.",type:"notes"}]},
+  P505: {id:"P505",name:"Klog Guarulhos",short:"Guarulhos",categories:[{id:"panic",label:"01 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["Fixo CCO"]},{id:"giroflex",label:"02 - Giroflex das Eclusas",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},{id:"sdai",label:"03 - Alarme SDAI Portaria",type:"items",itemLabels:["G100","G200"]},{id:"garra",label:"04 - Garra de Tigre",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Reversiva 03","Eclusa Sa\u00edda 04"]},{id:"cftv",label:"05 - CFTV",type:"count",total:73},{id:"monitores",label:"06 - Monitores CCO e Portaria",type:"items",itemLabels:["CCO 01","CCO 02","CCO 03","Portaria 01","Portaria 02","Portaria 03"]},{id:"totens",label:"07 - Totens Visitantes / Motoristas",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},{id:"cofres",label:"08 - Cofres",type:"items",itemLabels:["CCO","Portaria"]},{id:"cancelas",label:"09 - Cancelas, Hastes e Motores",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},{id:"perimeter",label:"10 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08","Zona 09","Zona 10","Zona 11","Zona 12"]},{id:"eclusas",label:"11 - Eclusas CCO e Portaria",type:"items",itemLabels:["CCO Porta 01 Ext \u2013 Local","CCO Porta 02 Int \u2013 Local","Portaria Porta 01 Int \u2013 Local","Portaria Porta 02 Ext \u2013 Local"]},{id:"internet",label:"12 - Internet",type:"single"},{id:"facial",label:"13 - Leitores Faciais Eclusas/Cancelas",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Sa\u00edda 03 Reversiva","Eclusa Sa\u00edda 04"]},{id:"torniquetes",label:"14 - Torniquetes Leitores Faciais",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},{id:"mesa",label:"15 - Mesa Controladora CCO e Portaria",type:"items",itemLabels:["CCO","Portaria"]},{id:"ac",label:"16 - Ar-Condicionado",type:"items",itemLabels:["CCO","Portaria Aparelho 01"]},{id:"telefone",label:"17 - Telefone Fixo CCO e Portaria",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},{id:"intercomunicadores",label:"18 - Intercomunicadores",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},{id:"eletroima",label:"19 - Eletroim\u00e3 / Eclusa / Portas",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},{id:"portoes",label:"20 - Port\u00f5es / Anti-esmagamento",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},{id:"farois",label:"21 - Far\u00f3is das Cancelas",type:"items",itemLabels:["Cancela Eclusa 01 Ext","Cancela Eclusa 01 Int","Cancela Eclusa 02 Ext","Cancela Eclusa 02 Int","Cancela Eclusa 03 Ext","Cancela Eclusa 03 Int","Cancela Eclusa 04 Ext"]},{id:"manutencao",label:"22 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"23 - Infraestrutura / Obs.",type:"notes"}]},
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function daysSince(dateStr) {
   if(!dateStr) return null;
   try {
@@ -324,7 +309,7 @@ function getProjectScore(project, history) {
   if(avg >= 95 && consistency) return {grade:"A", color:"#22c55e", label:"Excelente"};
   if(avg >= 88) return {grade:"B", color:"#3b82f6", label:"Bom"};
   if(avg >= 75) return {grade:"C", color:"#f59e0b", label:"Regular"};
-  return {grade:"D", color:"#ef4444", label:"Crítico"};
+  return {grade:"D", color:"#ef4444", label:"Cr\u00edtico"};
 }
 
 function isLastSundayOfMonth() {
@@ -347,7 +332,7 @@ function getAllPendencies(stored) {
         const st = s.status ?? (s.ok === false ? "inop" : "ok");
         if(st !== "ok") {
           const days = daysSince(s.since);
-          result.push({project, cat: cat.label, item: "—", status: st, since: s.since, days, note: s.note});
+          result.push({project, cat: cat.label, item: "\u2014", status: st, since: s.since, days, note: s.note});
         }
       } else if(cat.type === "items") {
         s.forEach((v, i) => {
@@ -369,7 +354,7 @@ function getAllPendencies(stored) {
 }
 
 const todayStr = () => new Date().toISOString().split("T")[0];
-const fmtDate = (d) => { if(!d)return"—"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
+const fmtDate = (d) => { if(!d)return"\u2014"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
 function getWeekLabel(dateStr) {
@@ -477,7 +462,7 @@ function analyzeRecurrence(project, history) {
 }
 
 function getRecurrenceBadge(count) {
-  if(count>=RECURRENCE_CRIT) return {label:"CRÍTICO",color:"#dc2626",bg:"#fee2e2"};
+  if(count>=RECURRENCE_CRIT) return {label:"CR\u00cdTICO",color:"#dc2626",bg:"#fee2e2"};
   if(count>=RECURRENCE_WARN) return {label:"REINCIDENTE",color:"#d97706",bg:"#fef3c7"};
   return null;
 }
@@ -604,11 +589,10 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
       const r = new FileReader();
       r.onerror = () => {
         console.error("Error reading file");
-        alert("Não foi possível ler a foto. Tente novamente.");
+        alert("N\u00e3o foi poss\u00edvel ler a foto. Tente novamente.");
       };
       r.onload = ev => {
         try {
-          // Compress via Canvas: 300px / 60% quality
           const img = new Image();
           img.onload = () => {
             try {
@@ -622,28 +606,25 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
               if(!ctx) throw new Error("Canvas context unavailable");
               ctx.drawImage(img, 0, 0, w, h);
               let compressed = canvas.toDataURL("image/jpeg", 0.6);
-              // Safety: if still > 100KB, compress harder
               if(compressed.length > 100*1024) {
                 canvas.width = Math.min(w, 200);
                 canvas.height = Math.min(h, 200);
                 canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
                 compressed = canvas.toDataURL("image/jpeg", 0.45);
               }
-              // Final size guard: if > 150KB, discard and warn
               if(compressed.length > 150*1024) {
-                alert("Foto muito pesada mesmo após compressão. Relatório será salvo sem ela.");
+                alert("Foto muito pesada mesmo ap\u00f3s compress\u00e3o. Relat\u00f3rio ser\u00e1 salvo sem ela.");
                 return;
               }
               const filtered = photos.filter(p=>p.photoKey!==key);
               setPhotos([...filtered, {photoKey:key, catId, catLabel, itemLabel, name:file.name, url:compressed}]);
             } catch(compressErr) {
               console.error("Compression error:", compressErr);
-              // Fallback: save without photo, don't crash
-              alert("Erro ao processar foto. Relatório será salvo sem ela.");
+              alert("Erro ao processar foto. Relat\u00f3rio ser\u00e1 salvo sem ela.");
             }
           };
           img.onerror = () => {
-            alert("Não foi possível carregar a foto. Relatório será salvo sem ela.");
+            alert("N\u00e3o foi poss\u00edvel carregar a foto. Relat\u00f3rio ser\u00e1 salvo sem ela.");
           };
           img.src = ev.target.result;
         } catch(err) {
@@ -659,7 +640,7 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 8px",background:"#020510",borderRadius:6,border:"1px solid #0f172a"}}>
       <img src={existing[0].url} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:"1px solid #1e293b"}}/>
       <div style={{flex:1,fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{itemLabel||catLabel}</div>
-      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}}aria-label="Remover">✕</button>
+      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}} aria-label="Remover">✕</button>
     </div>
   );
   return (
@@ -782,7 +763,7 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
               </div>
               <input placeholder="Problema..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
               <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}aria-label="Remover">✕</button>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover">✕</button>
             </div>
             {setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} itemLabel={it.id||`Item ${i+1}`} photos={photos} setPhotos={setPhotos}/>}
           </div>
@@ -811,7 +792,7 @@ function NotesCat({cat,value,onChange}){
             <input placeholder="Item..." value={it.label} onChange={e=>upd(i,{label:e.target.value})} style={{...S.inp,width:140,fontSize:12}}/>
             <input placeholder="Observacao..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
             <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}aria-label="Remover">✕</button>
+            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover">✕</button>
           </div>
         ))}
         <button onClick={add} style={S.addBtn}>+ Adicionar item</button>
@@ -836,7 +817,7 @@ function MaintenanceCat({cat,value,onChange}){
           <div key={i} style={{background:"#020510",borderRadius:8,padding:"10px 12px",border:"1px solid #1e293b"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Visita {i+1}</span>
-              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}}aria-label="Remover">✕</button>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover">✕</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:7}}>
               <div><label style={S.lbl}>Data</label><input type="date" value={v.date} onChange={e=>upd(i,{date:e.target.value})} style={S.inp}/></div>
@@ -869,9 +850,9 @@ function ProjectPinGate({project, onSuccess, onBack}) {
           onChange={e=>{setPin(e.target.value);setErr(false);}}
           onKeyDown={e=>{if(e.key==="Enter") try_();}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
-        {err&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+        {err&&<div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
         <button onClick={try_} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
-        <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}}>← Voltar</button>
+        <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}} aria-label="Voltar">← Voltar</button>
       </div>
     </div>
   );
@@ -908,7 +889,6 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
   const [sessionTime,setSessionTime]=useState(Date.now());
   const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
-  // Load viewLinks from Firebase on mount to keep links permanent
   useEffect(()=>{
     const loadVL = async () => {
       try {
@@ -916,7 +896,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
         const snap = await gd(dc(db,"config","viewlinks"));
         if(snap.exists()) {
           const data = snap.data();
-          setViewLinks(prev => ({...data,...prev})); // merge, prefer local
+          setViewLinks(prev => ({...data,...prev}));
           localStorage.setItem("moklog_viewlinks", JSON.stringify({...data}));
         }
       } catch(e){}
@@ -934,13 +914,13 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
     if(cur) delete next[pid]; else next[pid]=generateViewToken(pid);
     setViewLinks(next);
     localStorage.setItem("moklog_viewlinks",JSON.stringify(next));
-    // Save to Firebase so link is permanent across devices
     try { await setDoc(doc(db,"config","viewlinks"), next); } catch(e){}
   };
   if(!auth) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSess}>
       <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
+        <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Painel Gerencial</h1>
         <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
         <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Acesso restrito</div>
@@ -948,9 +928,9 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
           onChange={e=>{setPin(e.target.value);setErr(false);}}
           onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
-        {err&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+        {err&&<div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
         <button onClick={()=>{if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
-        <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}}>← Voltar</button>
+        <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}} aria-label="Voltar">← Voltar</button>
       </div>
     </div>
   );
@@ -959,7 +939,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
     <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-          <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
+          <button onClick={()=>setViewReport(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{viewReport.project.id} — {getWeekLabel(viewReport.report.meta?.date)}</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(viewReport.report.meta?.date)} · Lider: {viewReport.report.meta?.leader||"—"}</div>
@@ -1006,7 +986,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
           {onEditReport&&<button onClick={()=>onEditReport(viewReport.project,viewReport.report,viewReport.idx)}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}>✏️ Editar</button>}
           <button onClick={()=>{setConfirmDel({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});setViewReport(null);}}
-            style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir</button>
+            style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}} aria-label="Excluir relatório">🗑 Excluir</button>
         </div>
       </div>
     </div>
@@ -1020,7 +1000,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
       <div style={S.page} onClick={resetSess}>
         <div style={S.formWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-            <button onClick={()=>{setSelProject(null);setSelReports({});}} style={S.backBtn}>← Painel</button>
+            <button onClick={()=>{setSelProject(null);setSelReports({});}} style={S.backBtn} aria-label="Voltar ao Painel">← Painel</button>
             <MoklogLogo size={32}/>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>
@@ -1073,7 +1053,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
                     <button onClick={()=>generatePDF(p,r.state,r.meta,[])} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
-                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}aria-label="Excluir relatório">🗑</button>
+                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
               );
@@ -1107,7 +1087,7 @@ function Dashboard({stored, onBack, onDeleteReport, onEditReport}) {
     <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-          <button onClick={onBack} style={S.backBtn}>← Inicio</button>
+          <button onClick={onBack} style={S.backBtn} aria-label="Voltar ao Início">← Inicio</button>
           <MoklogLogo size={34}/>
           <div style={{flex:1}}><div style={{fontSize:14,fontWeight:900,color:"#f1f5f9"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div><div style={{fontSize:11,color:"#94a3b8"}}>Painel Gerencial</div></div>
           {avgPct!==null&&<HealthRing pct={avgPct} size={52}/>}
@@ -1139,8 +1119,10 @@ function PendenciesScreen({stored, onBack}) {
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-          <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-          <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Pendências Globais</div><div style={{fontSize:11,color:"#94a3b8"}}>Todos os projetos · {all.length} itens</div></div>
+          <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
+          <div style={{flex:1}}>
+            <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Pendências Globais</h1>
+            <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Pendências Globais</div><div style={{fontSize:11,color:"#94a3b8"}}>Todos os projetos · {all.length} itens</div></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
           <div style={{background:"#060c18",border:"1px solid #ef444433",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{critCount}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>INOP</div></div>
@@ -1186,26 +1168,22 @@ function HistoryScreen({project, stored, onBack}) {
   const [viewReport, setViewReport] = useState(null);
   const hist=(stored[project.id]?.history??[]).slice().reverse();
 
-  // ── Tela de visualização do relatório (somente leitura, sem PDF/excluir)
   if(viewReport) return((()=>{
-    // normaliza: HistoryScreen passa {project, report, idx}
     const rep = viewReport.report || viewReport;
     const repMeta = rep.meta || {};
     const repState = rep.state || {};
-    // resumo dos últimos testes (quem fez) — puxa do histórico
     const ultimos = hist.slice(0,4).map(r=>({ wk:getWeekLabel(r.meta?.date), data:fmtDate(r.meta?.date), leader:r.meta?.leader||"—", cco:r.meta?.cco||"—", sig:r.meta?.signature||"" }));
     return(
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
-          <button onClick={()=>setViewReport(null)} style={S.backBtn}>← Voltar</button>
+          <button onClick={()=>setViewReport(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)} · somente leitura</div>
           </div>
           <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
         </div>
-        {/* Resumo: quem fez os últimos testes */}
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
           <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📂 Últimos testes</div>
           {ultimos.map((u,i)=>(
@@ -1216,7 +1194,6 @@ function HistoryScreen({project, stored, onBack}) {
             </div>
           ))}
         </div>
-        {/* Cabeçalho completo */}
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
           <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📋 Cabeçalho</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -1236,7 +1213,6 @@ function HistoryScreen({project, stored, onBack}) {
             ))}
           </div>
         </div>
-        {/* Itens do relatório */}
         {project.categories.map(cat=>{
           const sv=repState[cat.id]; if(!sv) return null;
           const itemLabels=Array.isArray(cat.itemLabels)?cat.itemLabels:[];
@@ -1282,12 +1258,11 @@ function HistoryScreen({project, stored, onBack}) {
     );
   })());
 
-  // ── Lista de relatórios
   return(
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:4}}>
-          <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+          <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#94a3b8"}}>{project.name} · {hist.length} relatório(s)</div></div>
         </div>
         {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#94a3b8",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatorio salvo ainda.</div>}
@@ -1352,7 +1327,7 @@ function ReportScreen({project, state, meta, photos, onBack, onHome}) {
     <div style={S.page}>
       <div style={S.formWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-          <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+          <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <h2 style={{color:"#f1f5f9",fontSize:16,fontWeight:800,margin:0}}>Relatorio — {project.id}</h2>
           <HealthRing pct={computeHealth(project,state).pct} size={44}/>
         </div>
@@ -1370,7 +1345,7 @@ function ReportScreen({project, state, meta, photos, onBack, onHome}) {
         </div>
         <button onClick={onHome} style={{...S.secBtn,width:"100%",fontSize:13}}>🏠 Inicio</button>
         <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"45vh",overflowY:"auto",marginTop:12}}>
-          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:10,whiteSpace:"pre-wrap",color:"#94a3b8",lineHeight:1.7}}>{text}</pre>
+          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:10,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
         </div>
       </div>
     </div>
@@ -1384,12 +1359,10 @@ function ViewScreen({projectId, token, stored}) {
 
   useEffect(()=>{
     const checkToken = async () => {
-      // Check localStorage first
       try {
         const local = JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");
         if(local[projectId]) { setValidToken(local[projectId]); setChecking(false); return; }
       } catch(e){}
-      // Then check Firebase
       try {
         const snap = await getDoc(doc(db,"config","viewlinks"));
         if(snap.exists()) {
@@ -1451,7 +1424,6 @@ function ViewScreen({projectId, token, stored}) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 
-// ── Listagem de equipamentos de todos os projetos (Registros)
 function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const bg=dark?"#04080f":"#f1f5f9";
   const cardBg=dark?"#060c18":"#ffffff";
@@ -1500,12 +1472,12 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
       <div style={{width:"100%",maxWidth:480}}>
         <div style={{position:"sticky",top:0,zIndex:10,background:hdrBg,borderBottom:`1px solid ${hdrBorder}`,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={onBack} style={backBtn}>← Voltar</button>
+            <button onClick={onBack} style={backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,color:txt}}>🛡️ Equipamentos</div>
               <div style={{fontSize:11,color:txt2}}>Todos os projetos</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
@@ -1548,9 +1520,8 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   );
 }
 
-// ── Tela Registros Menu
 function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEquipamentos, onBack }) {
-  const [subScreen, setSubScreen] = useState(null); // null | "colaboradores" | "equipamentos"
+  const [subScreen, setSubScreen] = useState(null);
   const [selProject, setSelProject] = useState(null);
   const [pinAuth, setPinAuth] = useState(false);
   const [pinInput, setPinInput] = useState("");
@@ -1575,7 +1546,6 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   ];
   const allProjects = [...Object.values(PROJECTS), ...JATINOX_LIST];
 
-  // ── Sub: lista de colaboradores por projeto
   if(subScreen==="colaboradores" && selProject) {
     return (
       <EquipeReadOnly project={selProject} dark={dark} stored={stored}
@@ -1585,7 +1555,6 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     );
   }
 
-  // Equipamentos PIN gate
   if(subScreen==="equipamentos" && !equipPinAuth) {
     const bg=dark?"#04080f":"#f1f5f9";
     const cardBg=dark?"#060c18":"#ffffff";
@@ -1602,10 +1571,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
             onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
             onKeyDown={e=>{if(e.key==="Enter"){if(equipPinInput==="872101"){setEquipPinAuth(true);}else setEquipPinErr(true);}}}
             style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
-          {equipPinErr && <div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+          {equipPinErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{setSubScreen(null);setEquipPinInput("");setEquipPinErr(false);}}
-              style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+              style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}} aria-label="Voltar">
               ← Voltar
             </button>
             <button onClick={()=>{if(equipPinInput==="872101"){setEquipPinAuth(true);}else setEquipPinErr(true);}}
@@ -1624,7 +1593,6 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       onOpenEquip={onEquipamentos}/>;
   }
 
-  // PIN gate para colaboradores
   if(subScreen==="colaboradores" && !pinAuth) {
     return (
       <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
@@ -1636,10 +1604,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
             onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
             onKeyDown={e=>{ if(e.key==="Enter"){ if(pinInput==="872101"){setPinAuth(true);}else setPinErr(true); } }}
             style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
-          {pinErr && <div style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
+          {pinErr && <div role="alert" style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
           <div style={{ display:"flex", gap:8 }}>
             <button onClick={()=>{ setSubScreen(null); setPinInput(""); setPinErr(false); }}
-              style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }}>
+              style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }} aria-label="Voltar">
               ← Voltar
             </button>
             <button onClick={()=>{ if(pinInput==="872101"){setPinAuth(true);}else setPinErr(true); }}
@@ -1658,12 +1626,12 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
           <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <button onClick={()=>setSubScreen(null)} style={backBtn}>← Voltar</button>
+              <button onClick={()=>setSubScreen(null)} style={backBtn} aria-label="Voltar">← Voltar</button>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 Colaboradores</div>
                 <div style={{ fontSize:11, color:txt2 }}>Selecione o projeto</div>
               </div>
-              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>
+              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
             </div>
           </div>
           <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
@@ -1697,23 +1665,21 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     );
   }
 
-  // ── Menu principal Registros
   return (
     <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
       <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
         <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <button onClick={onBack} style={backBtn}>← Início</button>
+            <button onClick={onBack} style={backBtn} aria-label="Voltar ao início">← Início</button>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Registros</div>
               <div style={{ fontSize:11, color:txt2 }}>Colaboradores e Acessos</div>
             </div>
-            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
         <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
-          {/* Card Colaboradores */}
           <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
             style={{ background:cardBg, border:`2px solid ${dark?"#0ea5e933":"#bae6fd"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
             <div style={{ width:56, height:56, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e933":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -1729,7 +1695,6 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
             <span style={{ color:txt2, fontSize:20 }}>›</span>
           </button>
 
-          {/* Card Equipamentos */}
           <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
             style={{ background:cardBg, border:`2px solid ${dark?"#f59e0b33":"#fde68a"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
             <div style={{ width:56, height:56, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b33":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
@@ -1750,7 +1715,6 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   );
 }
 
-// ── Equipe somente leitura (sem PIN, só visualização)
 function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFull }) {
   const [equipeData, setEquipeData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1822,18 +1786,17 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
       <div style={{ width:"100%", maxWidth:480 }}>
         <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <button onClick={onBack} style={backBtn}>← Voltar</button>
+            <button onClick={onBack} style={backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 {project.id}</div>
               <div style={{ fontSize:11, color:txt2 }}>{project.name} · {ativos.length} ativo(s)</div>
             </div>
-            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
 
-          {/* Resumo turnos */}
           {turnos.length > 0 && (
             <div style={{ display:"grid", gridTemplateColumns:`repeat(${Math.min(turnos.length,3)},1fr)`, gap:8 }}>
               {turnos.map(t=>{
@@ -1850,7 +1813,6 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
             </div>
           )}
 
-          {/* Colaboradores por turno */}
           {ativos.length === 0 ? (
             <div style={{ textAlign:"center", padding:"40px 0" }}>
               <div style={{ fontSize:36, marginBottom:10 }}>👥</div>
@@ -1901,7 +1863,6 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
                   </div>
                 );
               })}
-              {/* Sem turno */}
               {ativos.filter(c=>!TURNOS.includes(c.turno)).map(c=>(
                 <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", border:`1px solid ${border}` }}>
                   <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -2039,7 +2000,6 @@ export default function App(){
 
   const saveReport=async(st,mt)=>{
     setSyncing(true);setSyncStatus("");
-    // Validate state is not corrupted before saving
     if(!st || typeof st !== "object") {
       setSyncing(false);
       alert("Erro: dados do relatório inválidos. Tente novamente.");
@@ -2056,7 +2016,6 @@ export default function App(){
     const prev=stored[project.id]?.history??[];
     const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
     const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
-    // Always save to localStorage first (offline-safe)
     try {
       setStored(up);
       localStorage.setItem("seccheck_v4",JSON.stringify(up));
@@ -2064,12 +2023,11 @@ export default function App(){
       console.error("localStorage save failed:", localErr);
     }
     clearDraft();
-    // Then try Firebase with retry
     if(!navigator.onLine) {
       setSyncStatus("offline");
       setSyncing(false);
       setTimeout(()=>setSyncStatus(""),4000);
-      return; // Data already saved locally
+      return;
     }
     try{
       const result = await saveToFirebase(project.id,next);
@@ -2147,6 +2105,21 @@ export default function App(){
       if(!meta.moked||meta.moked.trim()==="") missing.push("Nome do operador Moked 24h");
     }
     if(!meta.signature||meta.signature.trim()==="") missing.push("Assinatura do líder");
+    if(state){
+      const badWords=["inoperante","inop","inop.","parcial","parc.","sem motivo","problema","defeito"];
+      const isBadNote=(note)=>{const n=(note||"").trim().toLowerCase().replace(/[.,!]/g,"");return n===""||badWords.includes(n);};
+      for(const cat of project.categories){
+        const s=state[cat.id]; if(!s) continue;
+        if(cat.type==="single"){
+          const st=s.status??(s.ok===false?"inop":"ok");
+          if(st!=="ok"&&isBadNote(s.note)) missing.push(`Corrija a descrição de "${cat.label}" — não pode ser só "inoperante" ou "parcial"`);
+        } else if(cat.type==="items"){
+          s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok"&&isBadNote(v.note)) missing.push(`Corrija a descrição de "${cat.itemLabels[i]}" (${cat.label}) — não pode ser só "inoperante" ou "parcial"`);});
+        } else if(cat.type==="count"){
+          (s.inoperative??[]).forEach(it=>{if(isBadNote(it.note)) missing.push(`Corrija a descrição do item "${it.id||"sem ID"}" (${cat.label}) — não pode ser só "inoperante" ou "parcial"`);});
+        }
+      }
+    }
     return missing;
   };
   const canFinalize = missingFields().length === 0;
@@ -2159,7 +2132,6 @@ export default function App(){
       return;
     }
     setSigError(false);
-    // Show confirmation popup
     setShowConfirmModal(true);
   };
 
@@ -2234,7 +2206,6 @@ export default function App(){
   // ── FORM
   if(screen==="form") return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
-      {/* ── Popup de confirmação antes de enviar */}
       {showConfirmModal && (
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:dark?"#060c18":"#fff",border:"2px solid #f59e0b66",borderRadius:16,padding:"26px 22px",maxWidth:360,width:"100%"}}>
@@ -2268,7 +2239,7 @@ export default function App(){
           </div>
         )}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:10,borderBottom:"1px solid #060c18",marginBottom:2}}>
-          <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={S.backBtn}>← {editingIdx!==null?"Cancelar":"Inicio"}</button>
+          <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={S.backBtn} aria-label={editingIdx!==null?"Cancelar edição":"Voltar ao início"}>← {editingIdx!==null?"Cancelar":"Inicio"}</button>
           <MoklogLogo size={32}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
@@ -2342,7 +2313,8 @@ export default function App(){
             <div style={{fontSize:11,color:sigError?"#ef4444":"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
               ✍️ Assinatura {sigError&&"— obrigatoria para finalizar"}
             </div>
-            <input placeholder="Digite seu nome completo para assinar..." value={meta.signature||""}
+            <label htmlFor="campo-assinatura" style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Assinatura do líder</label>
+            <input id="campo-assinatura" placeholder="Digite seu nome completo para assinar..." value={meta.signature||""}
               onChange={e=>{setMeta(m=>({...m,signature:e.target.value}));setSigError(false);}}
               style={{...S.inp,fontSize:13,fontWeight:600}}/>
             <div style={{fontSize:10,color:"#94a3b8",marginTop:5}}>Obrigatorio para finalizar o relatorio.</div>
@@ -2350,9 +2322,8 @@ export default function App(){
         )}
         {state&&(
           <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap"}}>
-            {/* Validation warning */}
             {!canFinalize && (
-              <div style={{width:"100%",background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",marginBottom:4}}>
+              <div role="alert" style={{width:"100%",background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",marginBottom:4}}>
                 <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginBottom:4}}>⚠️ Campos obrigatórios não preenchidos:</div>
                 {missingFields().map(f=>(
                   <div key={f} style={{fontSize:11,color:"#fca5a5"}}>• {f}</div>
@@ -2377,7 +2348,7 @@ export default function App(){
       <SyncBadge/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
-          <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
+          <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>🏭 Jatinox</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>P260A · P260B · P260C</div>
@@ -2455,7 +2426,7 @@ export default function App(){
         <SyncBadge/>
         <div style={S.homeWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
-            <button onClick={()=>setHomeGroup(null)} style={S.backBtn}>← Voltar</button>
+            <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{groupNames[homeGroup]}</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.join(" · ")}</div>
@@ -2547,7 +2518,6 @@ export default function App(){
   // ── HOME — Main cards
   return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
-      {/* Offline banner */}
       {!isOnline && (
         <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#92400e",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           <span style={{fontSize:14}}>📡</span>
@@ -2558,16 +2528,17 @@ export default function App(){
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
           <MoklogLogo size={52}/>
+          <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>MokLog CheckTest</h1>
           <div>
             <div style={{fontSize:22,fontWeight:900,color:"#f8fafc",letterSpacing:-0.5}}>MokLog</div>
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
             <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 Inop</button>
-            <button onClick={()=>setShowRegistros(true)} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}}>📋 Registros</button>
-            <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}}>📊 Painel</button>
-            <button onClick={()=>setDark(!dark)} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:14,color:"#94a3b8"}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}} aria-label="Ver pendências">🔴 Inop</button>
+            <button onClick={()=>setShowRegistros(true)} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}} aria-label="Ver registros">📋 Registros</button>
+            <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}} aria-label="Abrir painel gerencial">📊 Painel</button>
+            <button onClick={()=>setDark(!dark)} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:14,color:"#94a3b8"}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
