@@ -30,7 +30,7 @@ export const RONDA_TURNOS = {
 };
 
 // Projetos com grade ESPECIAL no noturno (30min após as 23h até 05:30).
-// Todos os demais projetos fazem ronda de 1 em 1 hora o tempo todo (18:00→05:00).
+// Também são os projetos com regra ESPECIAL de diurno: só domingo (+feriado).
 const PROJETOS_GRADE_ESPECIAL = ["P311A", "P311B"];
 function temGradeEspecial(projectId){ return PROJETOS_GRADE_ESPECIAL.includes(projectId); }
 
@@ -38,6 +38,9 @@ function temGradeEspecial(projectId){ return PROJETOS_GRADE_ESPECIAL.includes(pr
 // feriados (federais + estaduais conforme a UF do projeto). O NOTURNO abre
 // todo dia. Feriados móveis (Carnaval, Sexta-feira Santa, Corpus Christi)
 // são calculados automaticamente a partir da Páscoa, sem manutenção manual.
+//
+// EXCEÇÃO P311A / P311B: como ainda há movimentação no sábado nesses dois
+// projetos, o diurno só abre no DOMINGO (ou feriado) — sábado não conta.
 const PROJETO_UF = {
   P260A:"SP", P260B:"SP", P260C:"SP", P505:"SP",
   P601:"SP", P602:"SP", P604:"SP", P605:"SP",
@@ -73,14 +76,22 @@ function ehFeriado(dataISO, uf){
   const lista=[...FERIADOS_NACIONAIS, ...(FERIADOS_ESTADUAIS[uf]||[]), ..._feriadosMoveis(Y)];
   return lista.includes(md);
 }
-function ehFimDeSemana(dataISO){
+function diaDaSemana(dataISO){
   const [Y,M,D]=dataISO.split("-").map(Number);
-  const w=new Date(Y,M-1,D).getDay();
-  return w===0||w===6;
+  return new Date(Y,M-1,D).getDay(); // 0=domingo ... 6=sábado
 }
-// Regra de abertura do turno diurno: fim de semana OU feriado do estado do projeto.
+function ehDomingo(dataISO){ return diaDaSemana(dataISO)===0; }
+function ehFimDeSemana(dataISO){ const w=diaDaSemana(dataISO); return w===0||w===6; }
+
+// Regra de abertura do turno diurno:
+//  - P311A / P311B: SOMENTE domingo OU feriado (sábado comum não abre mais).
+//  - Demais projetos: sábado, domingo OU feriado (regra original, inalterada).
 function podeAbrirDiurno(dataISO, projectId){
-  return ehFimDeSemana(dataISO) || ehFeriado(dataISO, PROJETO_UF[projectId]||"SP");
+  const feriado = ehFeriado(dataISO, PROJETO_UF[projectId]||"SP");
+  if(temGradeEspecial(projectId)){
+    return ehDomingo(dataISO) || feriado;
+  }
+  return ehFimDeSemana(dataISO) || feriado;
 }
 
 // offsetMin = minutos desde o horário de início do turno (18:00 noturno / 06:00 diurno)
@@ -207,9 +218,19 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   };
 
   const abrirTurno = async () => {
-    // Trava de calendário: diurno só abre em sábado, domingo ou feriado do estado.
+    // ── TRAVA: só pode existir UM turno ativo (não arquivado) por vez no projeto.
+    // Evita múltiplas rondas abertas simultaneamente por pessoas diferentes.
+    const turnoAbertoExistente = turnos.find(t=>!t.arquivado);
+    if(turnoAbertoExistente){
+      alert(`Já existe um turno de ronda em aberto neste projeto.\n\nPlantonista: ${turnoAbertoExistente.plantonista?.nome||"—"} · ${RONDA_TURNOS[turnoAbertoExistente.tipo]?.label||turnoAbertoExistente.tipo}\n\nConclua e arquive esse turno antes de abrir um novo.`);
+      return;
+    }
+    // Trava de calendário: diurno só abre em dia válido (regra varia por projeto).
     if(novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id)){
-      alert("O turno diurno só pode ser aberto em sábados, domingos e feriados.\nHoje não é um dia válido para ronda diurna neste projeto. O turno noturno está disponível todos os dias.");
+      const msg = temGradeEspecial(project.id)
+        ? "O turno diurno só pode ser aberto no domingo ou em feriado.\nHoje não é um dia válido para ronda diurna neste projeto. O turno noturno está disponível todos os dias."
+        : "O turno diurno só pode ser aberto em sábados, domingos e feriados.\nHoje não é um dia válido para ronda diurna neste projeto. O turno noturno está disponível todos os dias.";
+      alert(msg);
       return;
     }
     if(!novoPlant){ alert("Selecione o plantonista de plantão."); return; }
@@ -241,6 +262,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const ativos = turnos.filter(t=>!t.arquivado);
   const arquivados = turnos.filter(t=>t.arquivado);
   const visiveis = showArquivados ? arquivados : ativos;
+  const jaTemAberto = ativos.length>0;
 
   if(loading) return (
     <div style={{textAlign:"center",padding:"40px 0"}}>
@@ -260,6 +282,14 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
 
       {/* Abrir novo turno */}
       {!showArquivados && (
+        jaTemAberto ? (
+          <div style={{...S.card,border:"1px solid #f59e0b44",background:dark?"#1a1000":"#fffbeb"}}>
+            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>⚠ Já existe um turno em aberto</div>
+            <div style={{fontSize:12,...S.txt}}>
+              Conclua e arquive o turno de <strong>{ativos[0]?.plantonista?.nome||"—"}</strong> ({RONDA_TURNOS[ativos[0]?.tipo]?.label}) antes de abrir um novo turno de ronda.
+            </div>
+          </div>
+        ) : (
         <div style={S.card}>
           <div style={{fontSize:11,color:"#818cf8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>🎥 Abrir turno de ronda</div>
           <label style={S.lbl}>Turno</label>
@@ -280,7 +310,9 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
               ? (temGradeEspecial(project.id)
                   ? "18h→22h a cada 1h · 23h→05:30 a cada 30min"
                   : "18h→05h a cada 1 hora")
-              : "06h→17h a cada 1 hora"}
+              : (temGradeEspecial(project.id)
+                  ? "06h→17h a cada 1 hora · apenas domingo ou feriado"
+                  : "06h→17h a cada 1 hora")}
           </div>
           <label style={S.lbl}>Plantonista *</label>
           <select value={novoPlant} onChange={e=>setNovoPlant(e.target.value)} style={{...S.inp,marginBottom:10}}>
@@ -290,7 +322,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           {equipe.length===0 && <div style={{fontSize:11,color:"#ef4444",marginBottom:8}}>Nenhum colaborador em equipes/{"{projeto}"}. Cadastre a equipe primeiro.</div>}
           {novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id) && (
             <div style={{fontSize:11,color:"#f59e0b",marginBottom:8,background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:7,padding:"7px 9px"}}>
-              📅 Turno diurno indisponível hoje. Só abre em sábados, domingos e feriados. O turno noturno está disponível todos os dias.
+              📅 Turno diurno indisponível hoje. {temGradeEspecial(project.id)?"Só abre no domingo ou em feriado.":"Só abre em sábados, domingos e feriados."} O turno noturno está disponível todos os dias.
             </div>
           )}
           {(()=>{ const bloqueado = novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id);
@@ -302,6 +334,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
             );
           })()}
         </div>
+        )
       )}
 
       {/* Toggle ativos / arquivados */}
@@ -623,4 +656,4 @@ export function gerarPDFRonda(project, turno) {
 }
 
 // Exporta utilitários puros para teste
-export const _internal = { buildSlots, statusSlot, minutosDesdeInicio, TOLERANCIA_MIN };
+export const _internal = { buildSlots, statusSlot, minutosDesdeInicio, podeAbrirDiurno, ehDomingo, ehFimDeSemana, TOLERANCIA_MIN };
