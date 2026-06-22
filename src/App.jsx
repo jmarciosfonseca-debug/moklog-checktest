@@ -132,7 +132,7 @@ function SafeBlock({ name, children }) {
   );
 }
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
 const EMAILJS_TEMPLATE_ID = "template_dhncs7j";
@@ -1946,6 +1946,7 @@ export default function App(){
   const [notifGranted,setNotifGranted]=useState(false);
   const [pendingSync,setPendingSync]=useState(null); // {projectId, history} aguardando sincronizar com o servidor
   const savingRef = useRef(false); // trava contra duplo clique no "Confirmar e Enviar"
+  const [firestoreDown,setFirestoreDown]=useState(false); // alarme geral: banco fora do ar/bloqueado
 
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
@@ -1989,6 +1990,28 @@ export default function App(){
   },[]);
 
   useEffect(()=>{ if(loaded) checkPendingNotifications(stored); },[loaded]);
+
+  // ── Monitor de saúde do banco de dados (alarme geral)
+  // Testa periodicamente se o Firestore está acessível. Se uma regra de
+  // segurança expirar, uma cota for excedida, ou qualquer outra falha de
+  // permissão ocorrer, isso avisa na tela em vez de deixar todo mundo
+  // trabalhando sem saber que os dados não estão sendo salvos no servidor.
+  useEffect(()=>{
+    if(!loaded) return;
+    let cancelado = false;
+    const checarSaude = async () => {
+      try {
+        await getDoc(doc(db,"projects","P601"));
+        if(!cancelado) setFirestoreDown(false);
+      } catch(e) {
+        if(!cancelado) setFirestoreDown(true);
+        console.error("[MokLog] Banco de dados inacessível:", e?.message||e);
+      }
+    };
+    checarSaude();
+    const intervalo = setInterval(checarSaude, 120000); // a cada 2 minutos
+    return ()=>{ cancelado = true; clearInterval(intervalo); };
+  },[loaded]);
 
   useEffect(()=>{
     if(!loaded) return;
@@ -2298,6 +2321,15 @@ export default function App(){
         </div>
       )}
       <SyncBadge/>
+      {firestoreDown && (
+        <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:18}}>🚫</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Servidor não está respondendo</div>
+            <div style={{fontSize:11,color:"#fed7aa"}}>O que você salvar agora pode ficar só neste aparelho até a conexão voltar. Avise o suporte se isso persistir.</div>
+          </div>
+        </div>
+      )}
       <div style={S.formWrap}>
         {editingIdx!==null&&(
           <div style={{background:"#001a2e",border:"1px solid #0ea5e966",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
@@ -2592,6 +2624,12 @@ export default function App(){
         <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#92400e",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           <span style={{fontSize:14}}>📡</span>
           <span style={{fontSize:12,color:"#fef3c7",fontWeight:700}}>Sem conexão — dados salvos localmente, aguardando reconexão...</span>
+        </div>
+      )}
+      {isOnline && firestoreDown && (
+        <div role="alert" style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#7c2d12",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+          <span style={{fontSize:14}}>🚫</span>
+          <span style={{fontSize:12,color:"#fff",fontWeight:700}}>Servidor não está respondendo — o que for salvo agora pode ficar só neste aparelho. Avise o suporte técnico.</span>
         </div>
       )}
       <SyncBadge/>
