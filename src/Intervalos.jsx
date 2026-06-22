@@ -132,7 +132,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
           value={pin} onChange={e=>{setPin(e.target.value);setErr(false);}}
           onKeyDown={e=>{if(e.key==="Enter") tryPin();}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:8}}/>
-        {err&&<div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+        {err&&<div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
         <div style={{display:"flex",gap:8}}>
           <button onClick={onBack} style={{...S.btnSec,flex:1,fontSize:13}}>← Voltar</button>
           <button onClick={tryPin} style={{...S.btn,flex:1,fontSize:13}}>Entrar</button>
@@ -154,11 +154,34 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
   const [equipe, setEquipe] = useState([]);
   const adminAuth = authLevel==="admin";
 
+  // ── Rascunho automático (evita perder o preenchimento se a aba fechar,
+  // o navegador travar, ou a pessoa voltar sem querer antes de salvar).
+  const [draft, setDraft] = useState(null);
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const draftKey = project?.id ? `intervalos_draft_${project.id}` : null;
+
+  const clearDraft = () => {
+    if(draftKey) { try{ localStorage.removeItem(draftKey); }catch(e){} }
+    setDraft(null);
+  };
+
   useEffect(()=>{
     if(!project?.id) return;
     loadIntervalos(project.id).then(r=>{ setRegistros(r||[]); setLoading(false); });
     loadEquipe(project.id).then(setEquipe);
+    try {
+      const d = localStorage.getItem(`intervalos_draft_${project.id}`);
+      if(d) setDraft(JSON.parse(d));
+    } catch(e){}
   },[project?.id]);
+
+  // Salva o formulário automaticamente a cada alteração, enquanto está sendo preenchido.
+  useEffect(()=>{
+    if(screen==="form" && form && draftKey){
+      try { localStorage.setItem(draftKey, JSON.stringify(form)); } catch(e){}
+      setDraft(form);
+    }
+  },[form, screen, draftKey]);
 
   const setIntervalo = (tipo, campo, val) => {
     setForm(f=>({...f, intervalos:{...f.intervalos,[tipo]:{...f.intervalos[tipo],[campo]:val}}}));
@@ -196,13 +219,24 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
     });
   };
 
+  // ── Aviso de duplicidade: evita dois registros pro mesmo dia + turno
+  // (ex.: duas pessoas registrando o intervalo do mesmo turno sem perceber).
   const salvar = async () => {
+    const duplicado = registros.some(r => r.id!==form.id && r.data===form.data && r.turno===form.turno);
+    if(duplicado){
+      const continuar = window.confirm(
+        `Já existe um registro de intervalos para ${form.turno} em ${fmtDate(form.data)}.\n\n` +
+        `Deseja salvar mesmo assim? Isso vai criar um registro duplicado para esse turno.`
+      );
+      if(!continuar) return;
+    }
     setSaving(true);
     try {
       const novo = {...form, criadoEm:new Date().toISOString()};
       const newList = [novo,...registros];
       setRegistros(newList);
       await saveIntervalos(project.id, newList);
+      clearDraft();
       setScreen("list");
       setForm(null);
     } catch(e){ alert("Erro ao salvar"); }
@@ -216,11 +250,35 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
     if(viewReg?.id===id){ setViewReg(null); setScreen("list"); }
   };
 
+  const abrirNovoRegistro = () => {
+    if(draft){ setShowDraftPrompt(true); return; }
+    setForm(emptyRegistro());
+    setScreen("form");
+  };
+
   if(screen==="pin") return <PinGate project={project||{}} dark={dark||true} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("list");}}/>;
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>⏱️</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+    </div>
+  );
+
+  // ── PROMPT DE RASCUNHO
+  if(showDraftPrompt) return (
+    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
+      <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center",border:"1px solid #f59e0b"}}>
+        <div style={{fontSize:28,marginBottom:10}}>📝</div>
+        <div style={{fontSize:15,fontWeight:700,...S.txt,marginBottom:6}}>Rascunho encontrado</div>
+        <div style={{fontSize:12,...S.txt2,marginBottom:20}}>
+          Há um registro de intervalos em andamento ({draft?.turno||"—"} · {fmtDate(draft?.data)}). Continuar de onde parou?
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <button onClick={()=>{setForm(draft);setShowDraftPrompt(false);setScreen("form");}} style={S.btn}>↩ Continuar rascunho</button>
+          <button onClick={()=>{clearDraft();setShowDraftPrompt(false);setForm(emptyRegistro());setScreen("form");}} style={{...S.btnSec,color:"#ef4444"}}>🗑 Descartar e começar novo</button>
+          <button onClick={()=>setShowDraftPrompt(false)} style={{...S.btnSec,fontSize:12}}>Cancelar</button>
+        </div>
+      </div>
     </div>
   );
 
@@ -230,7 +288,7 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={()=>{setViewReg(null);setScreen("list");}} style={S.backBtn}>← Voltar</button>
+            <button onClick={()=>{setViewReg(null);setScreen("list");}} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>⏱️ Intervalos</div>
               <div style={{fontSize:11,...S.txt2}}>{viewReg.turno} · {fmtDate(viewReg.data)}</div>
@@ -290,15 +348,16 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={()=>{setScreen("list");setForm(null);}} style={S.backBtn}>← Voltar</button>
+            <button onClick={()=>{setScreen("list");setForm(null);}} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>⏱️ Registrar Intervalos</div>
               <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>💾 Rascunho salvo automaticamente</div>
           {/* Data e Turno */}
           <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
             <div>
@@ -317,6 +376,13 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
               </div>
             </div>
           </div>
+
+          {registros.some(r=>r.id!==form.id && r.data===form.data && r.turno===form.turno) && (
+            <div role="alert" style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b66",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:18}}>⚠️</span>
+              <div style={{fontSize:11,color:dark?"#fbbf24":"#92400e"}}>Já existe um registro para <strong>{form.turno}</strong> em <strong>{fmtDate(form.data)}</strong>. Salvar agora vai criar um registro duplicado.</div>
+            </div>
+          )}
 
           {/* 3 Intervalos */}
           {TIPOS_INTERVALO.map((tipo,i)=>{
@@ -340,21 +406,21 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
                       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
                         <span style={{fontSize:13,fontWeight:600,...S.txt,flex:1}}>👤 {c.nome}</span>
                         {dur&&<span style={{fontSize:11,fontWeight:700,color:tipo.cor}}>{dur}</span>}
-                        <button onClick={()=>removeColab(tipo.key,c.id)} style={{background:"transparent",border:"none",color:"#ef444488",fontSize:15,cursor:"pointer",padding:"0 4px"}}>✕</button>
+                        <button onClick={()=>removeColab(tipo.key,c.id)} style={{background:"transparent",border:"none",color:"#ef444488",fontSize:15,cursor:"pointer",padding:"0 4px"}} aria-label={`Remover ${c.nome}`}>✕</button>
                       </div>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                         <div>
                           <label style={{...S.lbl,fontSize:9}}>Saída</label>
                           <div style={{display:"flex",gap:4}}>
                             <input type="time" value={c.saida||""} onChange={e=>setColabTime(tipo.key,c.id,"saida",e.target.value)} style={{...S.inp,flex:1,fontSize:12,padding:"7px 8px"}}/>
-                            <button onClick={()=>setColabTime(tipo.key,c.id,"saida",nowTime())} style={{...S.btnSm,padding:"6px 8px",fontSize:12,flexShrink:0}}>⏱</button>
+                            <button onClick={()=>setColabTime(tipo.key,c.id,"saida",nowTime())} style={{...S.btnSm,padding:"6px 8px",fontSize:12,flexShrink:0}} aria-label="Usar horário atual na saída">⏱</button>
                           </div>
                         </div>
                         <div>
                           <label style={{...S.lbl,fontSize:9}}>Retorno</label>
                           <div style={{display:"flex",gap:4}}>
                             <input type="time" value={c.retorno||""} onChange={e=>setColabTime(tipo.key,c.id,"retorno",e.target.value)} style={{...S.inp,flex:1,fontSize:12,padding:"7px 8px"}}/>
-                            <button onClick={()=>setColabTime(tipo.key,c.id,"retorno",nowTime())} style={{...S.btnSm,padding:"6px 8px",fontSize:12,flexShrink:0}}>⏱</button>
+                            <button onClick={()=>setColabTime(tipo.key,c.id,"retorno",nowTime())} style={{...S.btnSm,padding:"6px 8px",fontSize:12,flexShrink:0}} aria-label="Usar horário atual no retorno">⏱</button>
                           </div>
                         </div>
                       </div>
@@ -402,16 +468,27 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <button onClick={onBack} style={S.backBtn}>← Voltar</button>
+            <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>⏱️ Intervalos</div>
               <div style={{fontSize:11,...S.txt2}}>{project.id} · {registros.length} registro(s)</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+          {draft&&(
+            <div style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b55",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>📝</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
+                <div style={{fontSize:11,...S.txt2}}>{draft.turno} · {fmtDate(draft.data)} — salvo automaticamente</div>
+              </div>
+              <button onClick={()=>{setForm(draft);setScreen("form");}} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44"}}>Continuar</button>
+            </div>
+          )}
+
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
               <div style={{fontSize:22,fontWeight:900,color:"#0ea5e9"}}>{registros.length}</div>
@@ -423,7 +500,7 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
             </div>
           </div>
 
-          <button onClick={()=>{setForm(emptyRegistro());setScreen("form");}} style={S.btn}>
+          <button onClick={abrirNovoRegistro} style={S.btn}>
             + Registrar Intervalos do Turno
           </button>
 
