@@ -467,6 +467,19 @@ function getRecurrenceBadge(count) {
   return null;
 }
 
+// Mescla histórico local com o do servidor, em vez de substituir.
+// Para cada DATA, prioriza a versão do servidor (já sincronizada); mas mantém
+// qualquer relatório que exista SÓ localmente (ainda não enviado) — nunca o descarta.
+function mergeHistory(local, server) {
+  const byDate = new Map();
+  (server||[]).forEach(r => { if(r?.meta?.date) byDate.set(r.meta.date, r); });
+  (local||[]).forEach(r => {
+    const d = r?.meta?.date;
+    if(d && !byDate.has(d)) byDate.set(d, r); // relatório local ainda não sincronizado: preserva
+  });
+  return Array.from(byDate.values()).sort((a,b)=> (a.meta?.date||"").localeCompare(b.meta?.date||""));
+}
+
 function getConsecutiveInopWeeks(project, history, catId, itemIdx) {
   let count = 0;
   const reversed = [...history].reverse();
@@ -1955,8 +1968,22 @@ export default function App(){
     const local=(()=>{try{const r=localStorage.getItem("seccheck_v4");return r?JSON.parse(r):{};}catch{return{};}})();
     setStored(local);
     try{const d=localStorage.getItem("moklog_draft");if(d)setDraft(JSON.parse(d));}catch{}
-    loadAllFromFirebase().then(fb=>{
-      if(Object.keys(fb).length>0){setStored(fb);localStorage.setItem("seccheck_v4",JSON.stringify(fb));}
+    loadAllFromFirebase().then(async fb=>{
+      if(Object.keys(fb).length>0){
+        const merged={...local};
+        const resyncs=[];
+        Object.keys(fb).forEach(pid=>{
+          const serverHist = fb[pid]?.history||[];
+          const localHist = local[pid]?.history||[];
+          const mergedHist = mergeHistory(localHist, serverHist);
+          merged[pid] = {...fb[pid], history: mergedHist};
+          if(mergedHist.length > serverHist.length){ resyncs.push({pid, history:mergedHist}); }
+        });
+        setStored(merged);
+        try{ localStorage.setItem("seccheck_v4",JSON.stringify(merged)); }catch(e){}
+        // Reenvia automaticamente ao servidor qualquer relatório que só existia neste aparelho
+        for(const r of resyncs){ try{ await saveToFirebase(r.pid, r.history); }catch(e){} }
+      }
       setLoaded(true);
     }).catch(()=>setLoaded(true));
   },[]);
@@ -1969,8 +1996,14 @@ export default function App(){
       onSnapshot(doc(db,"projects",pid),(snap)=>{
         if(snap.exists()){
           setStored(prev=>{
-            const up={...prev,[pid]:snap.data()};
-            localStorage.setItem("seccheck_v4",JSON.stringify(up));
+            const serverHist = snap.data()?.history||[];
+            const localHist = prev[pid]?.history||[];
+            const mergedHist = mergeHistory(localHist, serverHist);
+            const up={...prev,[pid]:{...snap.data(), history: mergedHist}};
+            try{ localStorage.setItem("seccheck_v4",JSON.stringify(up)); }catch(e){}
+            if(mergedHist.length > serverHist.length){
+              saveToFirebase(pid, mergedHist).catch(()=>{});
+            }
             return up;
           });
         }
