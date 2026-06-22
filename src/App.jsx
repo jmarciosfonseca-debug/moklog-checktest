@@ -1931,6 +1931,8 @@ export default function App(){
   const [showDraftPrompt,setShowDraftPrompt]=useState(false);
   const [viewParams,setViewParams]=useState(null);
   const [notifGranted,setNotifGranted]=useState(false);
+  const [pendingSync,setPendingSync]=useState(null); // {projectId, history} aguardando sincronizar com o servidor
+  const savingRef = useRef(false); // trava contra duplo clique no "Confirmar e Enviar"
 
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
@@ -2007,9 +2009,11 @@ export default function App(){
     }
     if(editingIdx!==null){
       const result=await editReport(project.id,editingIdx,st,mt);
-      setSyncStatus(result?.offline?"offline":result?.ok===false?"error":"saved");
       setSyncing(false);
-      setTimeout(()=>setSyncStatus(""),3000);
+      if(result?.ok!==false){
+        setSyncStatus("saved");
+        setTimeout(()=>setSyncStatus(""),3000);
+      }
       setEditingIdx(null);
       return;
     }
@@ -2024,17 +2028,22 @@ export default function App(){
     }
     clearDraft();
     if(!navigator.onLine) {
-      setSyncStatus("offline");
       setSyncing(false);
-      setTimeout(()=>setSyncStatus(""),4000);
+      setPendingSync({projectId:project.id, history:next});
       return;
     }
     try{
       const result = await saveToFirebase(project.id,next);
-      setSyncStatus(result?.ok===false ? "error" : "saved");
+      if(result?.ok===false){
+        setPendingSync({projectId:project.id, history:next});
+      } else {
+        setSyncStatus("saved");
+        setPendingSync(null);
+        setTimeout(()=>setSyncStatus(""),3000);
+      }
     }
-    catch(e){ setSyncStatus("error"); }
-    finally{setSyncing(false);setTimeout(()=>setSyncStatus(""),3000);}
+    catch(e){ setPendingSync({projectId:project.id, history:next}); }
+    finally{ setSyncing(false); }
     const h=computeHealth(project,st);
     const criticalItems=[];
     for(const cat of project.categories){
@@ -2067,8 +2076,9 @@ export default function App(){
     const up={...stored,[projectId]:{...stored[projectId],history:next,updatedAt:new Date().toISOString()}};
     setStored(up);
     try{localStorage.setItem("seccheck_v4",JSON.stringify(up));}catch(e){}
-    if(!navigator.onLine) return {ok:true,offline:true};
+    if(!navigator.onLine){ setPendingSync({projectId,history:next}); return {ok:true,offline:true}; }
     const result=await saveToFirebase(projectId,next);
+    if(result?.ok===false){ setPendingSync({projectId,history:next}); }
     return result;
   };
 
@@ -2136,23 +2146,50 @@ export default function App(){
   };
 
   const confirmAndSend=()=>{
+    if(savingRef.current) return;
+    savingRef.current = true;
     setShowConfirmModal(false);
-    saveReport(state,meta);
+    saveReport(state,meta).finally(()=>{ savingRef.current = false; });
     setScreen("report");
   };
 
   const updateCat=useCallback((id,val)=>setState(prev=>({...prev,[id]:val})),[]);
   const health=state?computeHealth(project,state):null;
 
-  const SyncBadge=()=>syncing?(
-    <div style={{position:"fixed",bottom:16,right:16,background:"#1d4ed8",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>⟳ Sincronizando...</div>
-  ):syncStatus==="saved"?(
-    <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✓ Salvo</div>
-  ):syncStatus==="error"?(
-    <div style={{position:"fixed",bottom:16,right:16,background:"#b91c1c",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✗ Erro — salvo localmente</div>
-  ):syncStatus==="offline"?(
-    <div style={{position:"fixed",bottom:16,right:16,background:"#92400e",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>📡 Offline — salvo no dispositivo</div>
-  ):null;
+  const retrySync = async () => {
+    if(!pendingSync) return;
+    setSyncing(true);
+    try {
+      const result = await saveToFirebase(pendingSync.projectId, pendingSync.history);
+      if(result?.ok!==false){
+        setPendingSync(null);
+        setSyncStatus("saved");
+        setTimeout(()=>setSyncStatus(""),3000);
+      }
+    } catch(e){ /* mantém pendingSync para tentar de novo depois */ }
+    finally{ setSyncing(false); }
+  };
+
+  const SyncBadge=()=>(
+    <>
+      {syncing && (
+        <div style={{position:"fixed",bottom:16,right:16,background:"#1d4ed8",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>⟳ Sincronizando...</div>
+      )}
+      {syncStatus==="saved" && (
+        <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✓ Salvo</div>
+      )}
+      {pendingSync && (
+        <div style={{position:"fixed",bottom:16,left:16,right:16,maxWidth:420,margin:"0 auto",background:"#7c2d12",color:"#fff",borderRadius:12,padding:"12px 14px",zIndex:1000,display:"flex",alignItems:"center",gap:10,boxShadow:"0 6px 24px rgba(0,0,0,.45)"}}>
+          <span style={{fontSize:20,flexShrink:0}}>⚠️</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:700}}>Relatório não sincronizado — {pendingSync.projectId}</div>
+            <div style={{fontSize:11,opacity:.85}}>Salvo só neste aparelho. Toque em "Tentar" para enviar ao servidor.</div>
+          </div>
+          <button onClick={retrySync} disabled={syncing} style={{background:"#fff",color:"#7c2d12",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:syncing?"not-allowed":"pointer",flexShrink:0,opacity:syncing?0.6:1}}>{syncing?"⟳":"Tentar"}</button>
+        </div>
+      )}
+    </>
+  );
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
   if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/></ErrorBoundary>;
