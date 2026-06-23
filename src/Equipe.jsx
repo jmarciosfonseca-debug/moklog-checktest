@@ -961,8 +961,10 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
 
 
 // ── Projeção de Férias
-function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, ferias, dark, onToggleTheme }) {
+function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, onSave, ferias, dark, onToggleTheme }) {
   const S = getStyles(dark);
+  // Líder e Gerencial podem agendar férias e reordenar a equipe — é trabalho do líder no dia a dia.
+  const podeEditar = adminAuth || liderAuth;
 
   // ferias = array of { colabId, dataInicio, dataRetorno(auto), cobertura, ordem }
   const [lista, setLista] = useState(() => {
@@ -1135,8 +1137,8 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, fer
                       {pa && <span style={{fontSize:9,color:pa.completo?"#22c55e":"#f59e0b",fontWeight:700}}>{pa.completo?"✅ Aquisitivo OK":`⏳ ${pa.meses}m/12`}</span>}
                     </div>
                   </div>
-                  {/* Reorder buttons — admin only */}
-                  {adminAuth && (
+                  {/* Reorder buttons — líder ou gerencial */}
+                  {podeEditar && (
                     <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
                       <button onClick={()=>moveUp(idx)} disabled={idx===0}
                         style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:idx===0?dark?"#1e293b":"#e2e8f0":dark?"#64748b":"#94a3b8",borderRadius:4,width:24,height:22,cursor:idx===0?"not-allowed":"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>↑</button>
@@ -1144,8 +1146,8 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, fer
                         style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:idx===lista.length-1?dark?"#1e293b":"#e2e8f0":dark?"#64748b":"#94a3b8",borderRadius:4,width:24,height:22,cursor:idx===lista.length-1?"not-allowed":"pointer",fontSize:11,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
                     </div>
                   )}
-                  {/* Edit toggle — admin only */}
-                  {adminAuth && (
+                  {/* Edit toggle — líder ou gerencial */}
+                  {podeEditar && (
                     <button onClick={()=>setEditId(isEditing?null:item.colabId)}
                       style={{...S.btnSm,color:isEditing?"#ef4444":"#0ea5e9",border:`1px solid ${isEditing?"#ef444433":"#0ea5e944"}`,fontSize:10,flexShrink:0}}>
                       {isEditing?"✕":"✏️"}
@@ -1173,7 +1175,7 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, fer
                       </div>
                     ) : (
                       <div style={{fontSize:11,...S.txtSecondary}}>
-                        {adminAuth?"Toque em ✏️ para agendar férias":"Sem férias agendadas"}
+                        {podeEditar?"Toque em ✏️ para agendar férias":"Sem férias agendadas"}
                       </div>
                     )}
                     {alerta && (
@@ -1184,8 +1186,8 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, fer
                   </div>
                 )}
 
-                {/* Edit form */}
-                {isEditing && adminAuth && (
+                {/* Edit form — líder ou gerencial */}
+                {isEditing && podeEditar && (
                   <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,display:"flex",flexDirection:"column",gap:8}}>
                     <div>
                       <label style={S.lbl}>Data de Início das Férias</label>
@@ -1217,7 +1219,7 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, onBack, onSave, fer
             );
           })}
 
-          {adminAuth && (
+          {podeEditar && (
             <button onClick={salvar} disabled={saving}
               style={{...S.btnGreen||S.btn, background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
               {saving?"⟳ Salvando ordem...":"💾 Salvar Ordem e Dados"}
@@ -1527,6 +1529,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       project={project}
       colaboradores={(equipeData.colaboradores||[]).filter(c=>c.status==="ativo")}
       adminAuth={adminAuth}
+      liderAuth={liderAuth}
       onBack={()=>setScreen("list")}
       onSave={async(ferias)=>{
         const newData = {...equipeData, ferias};
