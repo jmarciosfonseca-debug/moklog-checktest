@@ -181,6 +181,9 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [novoTipo, setNovoTipo] = useState("noturno");
   const [novoPlant, setNovoPlant] = useState("");
   const [abrindo, setAbrindo] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState(false);
+  const [listaPendente, setListaPendente] = useState(null); // última gravação que falhou, p/ retry
 
   // Relógio: recalcula status a cada 30s (e ao montar/abrir o app)
   useEffect(()=>{
@@ -213,9 +216,21 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const persist = async (lista) => {
     setTurnos(lista);
     try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(lista)); }catch(e){}
-    try{ await setDoc(doc(db,COL,project.id),{ turnos:lista, updatedAt:new Date().toISOString() }); }
-    catch(e){ console.error("Ronda save error:",e); }
+    setSalvando(true);
+    try{
+      await setDoc(doc(db,COL,project.id),{ turnos:lista, updatedAt:new Date().toISOString() });
+      setErroSalvar(false);
+      setListaPendente(null);
+    }
+    catch(e){
+      console.error("Ronda save error:",e);
+      setErroSalvar(true);
+      setListaPendente(lista); // guarda pra permitir "Tentar novamente"
+    }
+    setSalvando(false);
   };
+
+  const tentarSalvarDeNovo = () => { if(listaPendente) persist(listaPendente); };
 
   const abrirTurno = async () => {
     // ── TRAVA: só pode existir UM turno ativo (não arquivado) por vez no projeto.
@@ -236,6 +251,23 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     if(!novoPlant){ alert("Selecione o plantonista de plantão."); return; }
     const col = equipe.find(c=>String(c.id)===String(novoPlant));
     if(!col){ alert("Plantonista inválido."); return; }
+
+    // ── Confere se o turno cadastrado do plantonista bate com o tipo de ronda
+    // selecionado. Não bloqueia (trocas de plantão e extras acontecem), mas
+    // pede confirmação explícita pra evitar mistura sem querer.
+    const turnoColab = (col.turno||"").toLowerCase();
+    const ehNoturnoColab = turnoColab.includes("noturno");
+    const ehDiurnoColab = turnoColab.includes("diurno");
+    const bateTurno = (novoTipo==="diurno" && ehDiurnoColab) || (novoTipo==="noturno" && ehNoturnoColab);
+    if(turnoColab && !bateTurno){
+      const confirma = window.confirm(
+        `${col.nome} está cadastrado(a) como turno "${col.turno}".\n\n`+
+        `Você está abrindo uma ronda ${novoTipo==="diurno"?"DIURNA":"NOTURNA"}.\n\n`+
+        `Confirma que ${col.nome} está de plantão (extra ou trocado) neste turno agora?`
+      );
+      if(!confirma) return;
+    }
+
     setAbrindo(true);
     const novo = {
       id: Date.now().toString()+Math.random().toString(36).substring(2,6),
@@ -273,6 +305,21 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      {/* Aviso visível quando a gravação no servidor falha — evita a sensação
+          de "app não responde" quando, na verdade, é a rede/Firebase que falhou. */}
+      {erroSalvar && (
+        <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:18}}>🚫</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Falha ao salvar a ronda</div>
+            <div style={{fontSize:11,color:"#fed7aa"}}>O servidor não respondeu. Esta ação ainda não foi salva — toque em "Tentar" antes de continuar.</div>
+          </div>
+          <button onClick={tentarSalvarDeNovo} disabled={salvando}
+            style={{background:"#fff",color:"#7c2d12",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:salvando?"not-allowed":"pointer",flexShrink:0,opacity:salvando?0.6:1}}>
+            {salvando?"⟳":"Tentar"}
+          </button>
+        </div>
+      )}
       {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
         <KpiBox S={S} val={turnos.length} label="TURNOS" color="#818cf8"/>

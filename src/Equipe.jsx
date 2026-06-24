@@ -1196,9 +1196,10 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, 
                         style={S.inp}/>
                     </div>
                     <div>
-                      <label style={S.lbl}>Data de Retorno (automático — 30 dias)</label>
-                      <input type="date" value={item.dataRetorno} readOnly
-                        style={{...S.inp, opacity:0.6, cursor:"not-allowed"}}/>
+                      <label style={S.lbl}>Data de Retorno (sugestão automática: 30 dias — pode ajustar)</label>
+                      <input type="date" value={item.dataRetorno}
+                        onChange={e=>updateItem(item.colabId,{dataRetorno:e.target.value})}
+                        style={S.inp}/>
                     </div>
                     <div>
                       <label style={S.lbl}>Cobertura (nome ou "Perista")</label>
