@@ -55,6 +55,15 @@ const TAGS_FALHA = [
 ];
 const TAG_OUTRO = { key:"outro", label:"✏️ Editar Falha (digitar)", cor:"#818cf8" };
 
+// Suporta tanto registros antigos (impacto era uma string única) quanto os
+// novos (array, pois agora dá pra marcar Entrada e Saída ao mesmo tempo).
+function getImpactos(r){
+  if(Array.isArray(r.impacto)) return r.impacto;
+  if(r.impacto) return [r.impacto];
+  return [];
+}
+function labelImpacto(k){ return k==="entrada" ? "↘ Entrada" : "↗ Saída"; }
+
 function todayStr(){ return new Date().toISOString().split("T")[0]; }
 function nowHM(){ const n=new Date(); return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`; }
 function fmtDate(d){ if(!d) return "--"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
@@ -99,6 +108,13 @@ async function saveFalhas(projectId, registros){
   catch(e){ console.error("KeyAccess save error:",e); throw e; }
   try{ localStorage.setItem(`${COL}_${projectId}`, JSON.stringify(registros)); }catch(e){}
 }
+// Quem registra a falha do KeyAccess só pode ser Líder (Vigilante Líder /
+// VSPP Líder) ou CCO (Vigilante CCO / Porteiro CCO) — não CDA, Ronda, Apoio etc.
+function ehLiderOuCCO(cargo){
+  const c = (cargo||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  return c.includes("lider") || c.includes("cco");
+}
+
 async function loadEquipe(projectId){
   try{
     const snap = await getDoc(doc(db,"equipes",projectId));
@@ -145,7 +161,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
     setLoading(true);
     const [f, eq] = await Promise.all([loadFalhas(p.id), loadEquipe(p.id)]);
     setRegistros(f);
-    setEquipe(eq);
+    setEquipe(eq.filter(c=>ehLiderOuCCO(c.cargo)));
     setLoading(false);
     setScreen("lista");
   };
@@ -227,7 +243,9 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                     <div key={r.id} style={{...S.card,padding:"10px 12px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
                         <span style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 8px",borderRadius:6}}>{r.tipo==="outro"?"Outro":tag.label}</span>
-                        {r.impacto&&<span style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 8px",borderRadius:6}}>{r.impacto==="entrada"?"↘ Entrada":"↗ Saída"}</span>}
+                        {getImpactos(r).map(imp=>(
+                          <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 8px",borderRadius:6}}>{labelImpacto(imp)}</span>
+                        ))}
                       </div>
                       {r.tipo==="outro"&&r.tipoCustom&&<div style={{fontSize:12,...S.txt,marginBottom:3}}>{r.tipoCustom}</div>}
                       <div style={{fontSize:11,...S.txt2}}>📅 {fmtDate(r.data)} · {r.hora} · 👤 {r.registradoPor?.nome||"—"}</div>
@@ -283,7 +301,7 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
   const [tipoCustom, setTipoCustom] = useState("");
   const [data, setData] = useState(todayStr());
   const [hora, setHora] = useState(nowHM());
-  const [impacto, setImpacto] = useState("");
+  const [impactos, setImpactos] = useState([]); // array: pode ter "entrada", "saida", ou os dois
   const [obs, setObs] = useState("");
 
   const podeSalvar = registradoPor && tipo && (tipo!=="outro"||tipoCustom.trim());
@@ -296,7 +314,7 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
     onSalvo({
       id: Date.now().toString()+Math.random().toString(36).substring(2,5),
       data, hora, tipo, tipoCustom: tipo==="outro"?tipoCustom.trim():"",
-      impacto, obs: obs.trim(),
+      impacto: impactos, obs: obs.trim(),
       registradoPor: { id:registradoPor.id, nome:registradoPor.nome },
       registradoEm: new Date().toISOString(),
     });
@@ -357,14 +375,17 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
           <div style={{fontSize:10,...S.txt2}}>💡 Preenchido com a hora atual, mas pode ajustar pra registrar uma falha de outro horário.</div>
 
           <div>
-            <label style={S.lbl}>Impacto Operacional</label>
+            <label style={S.lbl}>Impacto Operacional (pode marcar os dois)</label>
             <div style={{display:"flex",gap:8}}>
-              {[["entrada","↘ Impacto na Entrada"],["saida","↗ Impacto na Saída"]].map(([k,lb])=>(
-                <button key={k} onClick={()=>setImpacto(impacto===k?"":k)}
-                  style={{flex:1,padding:"10px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:`2px solid ${impacto===k?"#0ea5e9":dark?"#0f172a":"#e2e8f0"}`,background:impacto===k?"#0ea5e922":dark?"#020510":"#fff",color:impacto===k?"#0ea5e9":dark?"#64748b":"#94a3b8"}}>
-                  {lb}
-                </button>
-              ))}
+              {[["entrada","↘ Impacto na Entrada"],["saida","↗ Impacto na Saída"]].map(([k,lb])=>{
+                const sel = impactos.includes(k);
+                return (
+                  <button key={k} onClick={()=>setImpactos(prev=> prev.includes(k) ? prev.filter(x=>x!==k) : [...prev,k])}
+                    style={{flex:1,padding:"10px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#0ea5e9":dark?"#0f172a":"#e2e8f0"}`,background:sel?"#0ea5e922":dark?"#020510":"#fff",color:sel?"#0ea5e9":dark?"#64748b":"#94a3b8"}}>
+                    {sel?"✓ ":""}{lb}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -438,7 +459,7 @@ function RelatoriosKA({ dark, S, onBack }){
   const filtrar = (lista) => lista.filter(r=>{
     if(dataIni && r.data < dataIni) return false;
     if(dataFim && r.data > dataFim) return false;
-    if(impactoFiltro && r.impacto !== impactoFiltro) return false;
+    if(impactoFiltro && !getImpactos(r).includes(impactoFiltro)) return false;
     return true;
   });
 
@@ -529,7 +550,9 @@ function RelatoriosKA({ dark, S, onBack }){
                           )}
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:3}}>
                             <span style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 7px",borderRadius:5}}>{r.tipo==="outro"?"Outro":tag.label}</span>
-                            {r.impacto&&<span style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 7px",borderRadius:5}}>{r.impacto==="entrada"?"Entrada":"Saída"}</span>}
+                            {getImpactos(r).map(imp=>(
+                              <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 7px",borderRadius:5}}>{imp==="entrada"?"Entrada":"Saída"}</span>
+                            ))}
                           </div>
                           {r.tipo==="outro"&&r.tipoCustom&&<div style={{fontSize:11,...S.txt}}>{r.tipoCustom}</div>}
                           <div style={{fontSize:10,...S.txt2}}>📅 {fmtDate(r.data)} · {r.hora} · 👤 {r.registradoPor?.nome||"—"}</div>
