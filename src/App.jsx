@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import AcessoApp from "./Acesso";
+import KeyAccessFalha from "./KeyAccessFalha";
 import EquipeApp from "./Equipe";
 import AcessoCCO from "./AcessoCCO";
 import EmpresaInfo from "./EmpresaInfo";
@@ -2256,22 +2257,7 @@ export default function App(){
   if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/></ErrorBoundary>;
   if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/></ErrorBoundary>;
   if(showPerimetral) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowPerimetral(false)}/></ErrorBoundary>;
-  if(showKeyAccess) return (
-    <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{...S.homeWrap,alignItems:"center",textAlign:"center",gap:14}}>
-        <div style={{width:64,height:64,borderRadius:16,background:dark?"#0f172a":"#fff",border:"1px solid #22c55e44",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-            <path d="M5 4v14" stroke="#22c55e" strokeWidth="2.6" strokeLinecap="round"/>
-            <path d="M9 11l3 3 6-7" stroke="#22c55e" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <div style={{position:"absolute",bottom:-5,right:-5,width:20,height:20,borderRadius:"50%",background:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#fff",border:`2px solid ${dark?"#04080f":"#f1f5f9"}`}}>!</div>
-        </div>
-        <div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>KeyAccess Falha</div>
-        <div style={{fontSize:12,color:dark?"#94a3b8":"#64748b",maxWidth:280}}>Módulo em construção. O formulário de registro de falhas e os relatórios gerenciais estão sendo finalizados.</div>
-        <button onClick={()=>setShowKeyAccess(false)} style={{...S.secBtn,maxWidth:200}}>← Voltar</button>
-      </div>
-    </div>
-  );
+  if(showKeyAccess) return <ErrorBoundary moduleName="KeyAccess Falha"><KeyAccessFalha dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowKeyAccess(false)}/></ErrorBoundary>;
   if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
   if(showCCO&&ccoProject) return <ErrorBoundary moduleName="CCO"><CCO project={ccoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowCCO(false);setCcoProject(null);}}/></ErrorBoundary>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
