@@ -52,6 +52,7 @@ const TAGS_FALHA = [
   { key:"liberacao_caminhoes",  label:"Liberação de caminhões/motoristas não sobe",          cor:"#ef4444" },
   { key:"painel_alertas",       label:"Painel de alertas offline",                           cor:"#ef4444" },
   { key:"saida_motorista",      label:"Informações de saída do motorista não sobem pra CCO", cor:"#ef4444" },
+  { key:"internet_local",       label:"Q-Access em falha por queda de Internet Local",        cor:"#f59e0b" },
 ];
 const TAG_OUTRO = { key:"outro", label:"✏️ Editar Falha (digitar)", cor:"#818cf8" };
 
@@ -62,7 +63,31 @@ function getImpactos(r){
   if(r.impacto) return [r.impacto];
   return [];
 }
-function labelImpacto(k){ return k==="entrada" ? "↘ Entrada" : "↗ Saída"; }
+function labelImpacto(k){ return k==="entrada" ? "↘ Entrada" : k==="saida" ? "↗ Saída" : "🏢 Inquilino"; }
+
+// Suporta registros antigos (tipo único) e novos (array de tipos — agora
+// dá pra marcar mais de uma falha no mesmo registro).
+function getTipos(r){
+  if(Array.isArray(r.tipos)) return r.tipos;
+  if(r.tipo) return [r.tipo];
+  return [];
+}
+// Hora de início, com fallback pro campo antigo "hora" (registros anteriores).
+function getHoraInicio(r){ return r.horaInicio || r.hora || ""; }
+
+// Calcula quanto tempo a falha ficou no ar, quando há hora de início e de retorno.
+function calcDuracaoFalha(horaInicio, horaFim){
+  if(!horaInicio||!horaFim) return null;
+  try{
+    const [h1,m1]=horaInicio.split(":").map(Number);
+    const [h2,m2]=horaFim.split(":").map(Number);
+    let mins=(h2*60+m2)-(h1*60+m1);
+    if(mins<0) mins+=24*60; // virou o dia
+    if(mins<=0) return null;
+    const h=Math.floor(mins/60), m=mins%60;
+    return h>0 ? `${h}h ${m}min` : `${m} min`;
+  }catch{ return null; }
+}
 
 function todayStr(){ return new Date().toISOString().split("T")[0]; }
 function nowHM(){ const n=new Date(); return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`; }
@@ -133,14 +158,14 @@ function getStyles(dark){
     card:    { background:dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"14px 16px" },
     btn:     { background:"linear-gradient(135deg,#dc2626,#991b1b)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
     btnGreen:{ background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
-    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
-    inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color:dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
-    lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#94a3b8":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:15, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#475569", borderRadius:6, padding:"5px 10px", fontSize:12, cursor:"pointer", fontWeight:600 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#cbd5e1":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:13, cursor:"pointer", flexShrink:0, fontWeight:600 },
+    inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`, borderRadius:7, color:dark?"#f1f5f9":"#1e293b", padding:"11px 12px", fontSize:14, boxSizing:"border-box", outline:"none" },
+    lbl:     { display:"block", fontSize:11, color:dark?"#94a3b8":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
     hdrBg:   { background:dark?"#1a0202":"#fef2f2", borderBottom:`1px solid ${dark?"#3a0a0a":"#fecaca"}` },
-    txt:     { color:dark?"#f1f5f9":"#0f172a" },
-    txt2:    { color:dark?"#94a3b8":"#64748b" },
+    txt:     { color:dark?"#ffffff":"#0f172a" },
+    txt2:    { color:dark?"#cbd5e1":"#475569" },
   };
 }
 
@@ -155,6 +180,19 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [diasPorProjeto, setDiasPorProjeto] = useState({}); // {pid: dias|null} — pra mostrar na tela de seleção
+
+  // Carrega o resumo de "dias sem falha" de todos os projetos, pra mostrar
+  // já na tela inicial de seleção, sem precisar abrir cada um.
+  useEffect(()=>{
+    (async()=>{
+      const entries = await Promise.all(PROJETOS_KA.map(async p=>{
+        const f = await loadFalhas(p.id);
+        return [p.id, calcDiasSemFalha(f)];
+      }));
+      setDiasPorProjeto(Object.fromEntries(entries));
+    })();
+  },[]);
 
   const abrirProjeto = async (p) => {
     setProject(p);
@@ -181,7 +219,9 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
           </div>
         </div>
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:8}}>
-          {PROJETOS_KA.map(p=>(
+          {PROJETOS_KA.map(p=>{
+            const dias = diasPorProjeto[p.id];
+            return (
             <button key={p.id} onClick={()=>abrirProjeto(p)}
               style={{...S.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
               <div style={{width:40,height:40,borderRadius:10,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>🚨</div>
@@ -189,9 +229,20 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                 <div style={{fontSize:14,fontWeight:800,...S.txt}}>{p.id}</div>
                 <div style={{fontSize:11,...S.txt2}}>{p.name}</div>
               </div>
+              {dias!==undefined && (
+                dias===null ? (
+                  <span style={{fontSize:10,...S.txt2,flexShrink:0}}>Sem registros</span>
+                ) : (
+                  <div style={{textAlign:"center",flexShrink:0}}>
+                    <div style={{fontSize:16,fontWeight:900,color:dias>=7?"#22c55e":dias>=2?"#f59e0b":"#ef4444"}}>{dias}</div>
+                    <div style={{fontSize:8,...S.txt2,fontWeight:700,whiteSpace:"nowrap"}}>DIAS S/ FALHA</div>
+                  </div>
+                )
+              )}
               <span style={{...S.txt2,fontSize:16}}>›</span>
             </button>
-          ))}
+            );
+          })}
           <button onClick={()=>setScreen("relatorios_pin")} style={{...S.btnSec,marginTop:10,color:"#a855f7",borderColor:"#a855f733"}}>📊 Relatórios Gerenciais</button>
         </div>
       </div>
@@ -238,17 +289,24 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
               <>
                 <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Últimos registros</div>
                 {recentes.map(r=>{
-                  const tag = TAGS_FALHA.find(t=>t.key===r.tipo) || TAG_OUTRO;
+                  const tipos = getTipos(r);
+                  const horaIni = getHoraInicio(r);
+                  const dur = calcDuracaoFalha(horaIni, r.horaFim);
                   return (
                     <div key={r.id} style={{...S.card,padding:"10px 12px"}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
-                        <span style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 8px",borderRadius:6}}>{r.tipo==="outro"?"Outro":tag.label}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                        {tipos.map(tk=>{
+                          const tag = TAGS_FALHA.find(t=>t.key===tk) || TAG_OUTRO;
+                          return <span key={tk} style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 8px",borderRadius:6}}>{tk==="outro"?"Outro":tag.label}</span>;
+                        })}
                         {getImpactos(r).map(imp=>(
                           <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 8px",borderRadius:6}}>{labelImpacto(imp)}</span>
                         ))}
                       </div>
-                      {r.tipo==="outro"&&r.tipoCustom&&<div style={{fontSize:12,...S.txt,marginBottom:3}}>{r.tipoCustom}</div>}
-                      <div style={{fontSize:11,...S.txt2}}>📅 {fmtDate(r.data)} · {r.hora} · 👤 {r.registradoPor?.nome||"—"}</div>
+                      {tipos.includes("outro")&&r.tipoCustom&&<div style={{fontSize:12,...S.txt,marginBottom:3}}>{r.tipoCustom}</div>}
+                      <div style={{fontSize:11,...S.txt2}}>
+                        📅 {fmtDate(r.data)} · ⏱ {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · 👤 {r.registradoPor?.nome||"—"}
+                      </div>
                       {r.obs&&<div style={{fontSize:11,...S.txt2,marginTop:3,fontStyle:"italic"}}>{r.obs}</div>}
                     </div>
                   );
@@ -297,24 +355,29 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
     try{ const l=localStorage.getItem(`ka_last_user_${project.id}`); if(l) return JSON.parse(l); }catch(e){}
     return null;
   });
-  const [tipo, setTipo] = useState("");
+  const [tipos, setTipos] = useState([]); // array: pode marcar mais de um tipo de falha
   const [tipoCustom, setTipoCustom] = useState("");
   const [data, setData] = useState(todayStr());
-  const [hora, setHora] = useState(nowHM());
-  const [impactos, setImpactos] = useState([]); // array: pode ter "entrada", "saida", ou os dois
+  const [horaInicio, setHoraInicio] = useState(nowHM());
+  const [horaFim, setHoraFim] = useState("");
+  const [impactos, setImpactos] = useState([]); // array: pode ter "entrada", "saida", "inquilino"
+  const [responsaveisP607, setResponsaveisP607] = useState([]); // só usado quando project.id==="P607"
   const [obs, setObs] = useState("");
 
-  const podeSalvar = registradoPor && tipo && (tipo!=="outro"||tipoCustom.trim());
+  const duracao = calcDuracaoFalha(horaInicio, horaFim);
+  const podeSalvar = registradoPor && tipos.length>0 && (!tipos.includes("outro")||tipoCustom.trim());
 
   const salvar = () => {
     if(!registradoPor){ alert("Selecione quem está registrando."); return; }
-    if(!tipo){ alert("Selecione o tipo de falha."); return; }
-    if(tipo==="outro"&&!tipoCustom.trim()){ alert("Descreva a falha."); return; }
+    if(tipos.length===0){ alert("Selecione ao menos um tipo de falha."); return; }
+    if(tipos.includes("outro")&&!tipoCustom.trim()){ alert("Descreva a falha."); return; }
     try{ localStorage.setItem(`ka_last_user_${project.id}`, JSON.stringify(registradoPor)); }catch(e){}
     onSalvo({
       id: Date.now().toString()+Math.random().toString(36).substring(2,5),
-      data, hora, tipo, tipoCustom: tipo==="outro"?tipoCustom.trim():"",
-      impacto: impactos, obs: obs.trim(),
+      data, horaInicio, horaFim, tipos, tipoCustom: tipos.includes("outro")?tipoCustom.trim():"",
+      impacto: impactos,
+      ...(project.id==="P607" ? { responsaveisP607 } : {}),
+      obs: obs.trim(),
       registradoPor: { id:registradoPor.id, nome:registradoPor.nome },
       registradoEm: new Date().toISOString(),
     });
@@ -344,21 +407,22 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
           </div>
 
           <div>
-            <label style={S.lbl}>Tipo de Falha *</label>
+            <label style={S.lbl}>Tipo de Falha * (pode marcar mais de uma)</label>
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {[...TAGS_FALHA, TAG_OUTRO].map(t=>{
-                const sel = tipo===t.key;
+                const sel = tipos.includes(t.key);
                 return (
-                  <button key={t.key} onClick={()=>setTipo(t.key)}
-                    style={{textAlign:"left",background:sel?t.cor+"22":dark?"#020510":"#fff",border:`2px solid ${sel?t.cor:dark?"#0f172a":"#e2e8f0"}`,borderRadius:9,padding:"11px 14px",cursor:"pointer",fontSize:13,fontWeight:sel?700:500,color:sel?t.cor:dark?"#cbd5e1":"#475569"}}>
+                  <button key={t.key} onClick={()=>setTipos(prev=> prev.includes(t.key) ? prev.filter(x=>x!==t.key) : [...prev,t.key])}
+                    style={{textAlign:"left",background:sel?t.cor+"22":dark?"#020510":"#fff",border:`2px solid ${sel?t.cor:dark?"#1e293b":"#e2e8f0"}`,borderRadius:9,padding:"11px 14px",cursor:"pointer",fontSize:14,fontWeight:sel?700:500,color:sel?t.cor:dark?"#e2e8f0":"#334155",display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{width:18,height:18,borderRadius:5,border:`2px solid ${sel?t.cor:dark?"#475569":"#cbd5e1"}`,background:sel?t.cor:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}>{sel?"✓":""}</span>
                     {t.label}
                   </button>
                 );
               })}
             </div>
-            {tipo==="outro"&&(
+            {tipos.includes("outro")&&(
               <textarea value={tipoCustom} onChange={e=>setTipoCustom(e.target.value)} placeholder="Descreva a falha..."
-                style={{...S.inp,height:60,resize:"vertical",fontSize:13,marginTop:8}}/>
+                style={{...S.inp,height:60,resize:"vertical",fontSize:14,marginTop:8}}/>
             )}
           </div>
 
@@ -368,20 +432,29 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
               <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
             </div>
             <div>
-              <label style={S.lbl}>Hora</label>
-              <input type="time" value={hora} onChange={e=>setHora(e.target.value)} style={S.inp}/>
+              <label style={S.lbl}>Hora de Início</label>
+              <input type="time" value={horaInicio} onChange={e=>setHoraInicio(e.target.value)} style={S.inp}/>
             </div>
           </div>
-          <div style={{fontSize:10,...S.txt2}}>💡 Preenchido com a hora atual, mas pode ajustar pra registrar uma falha de outro horário.</div>
+          <div>
+            <label style={S.lbl}>Hora de Retorno (quando voltou ao normal — opcional)</label>
+            <input type="time" value={horaFim} onChange={e=>setHoraFim(e.target.value)} style={S.inp}/>
+          </div>
+          {duracao && (
+            <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"7px 11px"}}>
+              ⏱ Tempo fora do ar: {duracao}
+            </div>
+          )}
+          <div style={{fontSize:11,...S.txt2}}>💡 Os horários vêm preenchidos com o atual, mas podem ser ajustados pra registrar uma falha retroativa (ex: ocorreu de manhã, só deu pra lançar à tarde).</div>
 
           <div>
-            <label style={S.lbl}>Impacto Operacional (pode marcar os dois)</label>
+            <label style={S.lbl}>Impacto Operacional (pode marcar mais de um)</label>
             <div style={{display:"flex",gap:8}}>
-              {[["entrada","↘ Impacto na Entrada"],["saida","↗ Impacto na Saída"]].map(([k,lb])=>{
+              {[["entrada","↘ Entrada"],["saida","↗ Saída"],["inquilino","🏢 Inquilino"]].map(([k,lb])=>{
                 const sel = impactos.includes(k);
                 return (
                   <button key={k} onClick={()=>setImpactos(prev=> prev.includes(k) ? prev.filter(x=>x!==k) : [...prev,k])}
-                    style={{flex:1,padding:"10px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#0ea5e9":dark?"#0f172a":"#e2e8f0"}`,background:sel?"#0ea5e922":dark?"#020510":"#fff",color:sel?"#0ea5e9":dark?"#64748b":"#94a3b8"}}>
+                    style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#0ea5e9":dark?"#1e293b":"#e2e8f0"}`,background:sel?"#0ea5e922":dark?"#020510":"#fff",color:sel?"#0ea5e9":dark?"#94a3b8":"#64748b"}}>
                     {sel?"✓ ":""}{lb}
                   </button>
                 );
@@ -389,10 +462,27 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
             </div>
           </div>
 
+          {project.id==="P607" && (
+            <div>
+              <label style={S.lbl}>Responsável pelo turno/ocorrência (P607)</label>
+              <div style={{display:"flex",gap:8}}>
+                {["Rondas","AGP de CCO"].map(opt=>{
+                  const sel = responsaveisP607.includes(opt);
+                  return (
+                    <button key={opt} onClick={()=>setResponsaveisP607(prev=> prev.includes(opt) ? prev.filter(x=>x!==opt) : [...prev,opt])}
+                      style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#a855f7":dark?"#1e293b":"#e2e8f0"}`,background:sel?"#a855f722":dark?"#020510":"#fff",color:sel?"#a855f7":dark?"#94a3b8":"#64748b"}}>
+                      {sel?"✓ ":""}{opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div>
             <label style={S.lbl}>Observação (opcional)</label>
             <textarea value={obs} onChange={e=>setObs(e.target.value)} placeholder="Detalhe curto, se necessário..."
-              style={{...S.inp,height:54,resize:"vertical",fontSize:13}}/>
+              style={{...S.inp,height:54,resize:"vertical",fontSize:14}}/>
           </div>
 
           <button onClick={salvar} disabled={!podeSalvar||saving} style={{...S.btn,opacity:(!podeSalvar||saving)?0.5:1,cursor:(!podeSalvar||saving)?"not-allowed":"pointer"}}>
@@ -506,7 +596,7 @@ function RelatoriosKA({ dark, S, onBack }){
             </div>
             <label style={S.lbl}>Impacto</label>
             <div style={{display:"flex",gap:6}}>
-              {[["","Todos"],["entrada","Entrada"],["saida","Saída"]].map(([k,lb])=>(
+              {[["","Todos"],["entrada","Entrada"],["saida","Saída"],["inquilino","Inquilino"]].map(([k,lb])=>(
                 <button key={k} onClick={()=>setImpactoFiltro(k)}
                   style={{flex:1,padding:"7px",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer",border:`1px solid ${impactoFiltro===k?"#0ea5e9":dark?"#0f172a":"#e2e8f0"}`,background:impactoFiltro===k?"#0ea5e922":"transparent",color:impactoFiltro===k?"#0ea5e9":dark?"#64748b":"#94a3b8"}}>
                   {lb}
@@ -518,6 +608,11 @@ function RelatoriosKA({ dark, S, onBack }){
           <button onClick={gerar} disabled={carregando} style={{...S.btnGreen,opacity:carregando?0.6:1}}>
             {carregando?"⟳ Gerando...":"📊 Gerar Relatório"}
           </button>
+
+          {gerado && (
+            <button onClick={()=>gerarPDFRelatorioKA({modo,projsSel,dadosPorProjeto,dataIni,dataFim,impactoFiltro})}
+              style={{...S.btnSec,color:"#a855f7",borderColor:"#a855f733"}}>📄 Exportar PDF</button>
+          )}
 
           {gerado && (
             <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:6}}>
@@ -542,20 +637,28 @@ function RelatoriosKA({ dark, S, onBack }){
                     </div>
                     {comIntervalos.length===0&&<div style={{fontSize:12,...S.txt2,textAlign:"center",padding:"10px 0"}}>Nenhuma falha no período selecionado.</div>}
                     {comIntervalos.map(r=>{
-                      const tag = TAGS_FALHA.find(t=>t.key===r.tipo) || TAG_OUTRO;
+                      const tiposR = getTipos(r);
+                      const horaIni = getHoraInicio(r);
+                      const dur = calcDuracaoFalha(horaIni, r.horaFim);
                       return (
                         <div key={r.id} style={{borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,padding:"8px 0"}}>
                           {r.diasDesdeAnterior!==null&&(
                             <div style={{fontSize:10,color:"#22c55e",fontWeight:700,marginBottom:4}}>✅ {r.diasDesdeAnterior} dia(s) sem falha antes deste registro</div>
                           )}
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:3}}>
-                            <span style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 7px",borderRadius:5}}>{r.tipo==="outro"?"Outro":tag.label}</span>
+                            {tiposR.map(tk=>{
+                              const tag = TAGS_FALHA.find(t=>t.key===tk) || TAG_OUTRO;
+                              return <span key={tk} style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 7px",borderRadius:5}}>{tk==="outro"?"Outro":tag.label}</span>;
+                            })}
                             {getImpactos(r).map(imp=>(
-                              <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 7px",borderRadius:5}}>{imp==="entrada"?"Entrada":"Saída"}</span>
+                              <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 7px",borderRadius:5}}>{labelImpacto(imp)}</span>
                             ))}
                           </div>
-                          {r.tipo==="outro"&&r.tipoCustom&&<div style={{fontSize:11,...S.txt}}>{r.tipoCustom}</div>}
-                          <div style={{fontSize:10,...S.txt2}}>📅 {fmtDate(r.data)} · {r.hora} · 👤 {r.registradoPor?.nome||"—"}</div>
+                          {tiposR.includes("outro")&&r.tipoCustom&&<div style={{fontSize:11,...S.txt}}>{r.tipoCustom}</div>}
+                          <div style={{fontSize:10,...S.txt2}}>
+                            📅 {fmtDate(r.data)} · ⏱ {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · 👤 {r.registradoPor?.nome||"—"}
+                          </div>
+                          {r.responsaveisP607&&r.responsaveisP607.length>0&&<div style={{fontSize:10,color:"#a855f7",fontWeight:700,marginTop:2}}>Responsável: {r.responsaveisP607.join(", ")}</div>}
                           {r.obs&&<div style={{fontSize:10,...S.txt2,fontStyle:"italic",marginTop:2}}>{r.obs}</div>}
                         </div>
                       );
@@ -571,4 +674,84 @@ function RelatoriosKA({ dark, S, onBack }){
   );
 }
 
-export const _internal = { calcDiasSemFalha, calcIntervalos, diffDias };
+// ── PDF do relatório (unitário ou consolidado)
+function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim, impactoFiltro }){
+  const filtrar = (lista) => lista.filter(r=>{
+    if(dataIni && r.data < dataIni) return false;
+    if(dataFim && r.data > dataFim) return false;
+    if(impactoFiltro && !getImpactos(r).includes(impactoFiltro)) return false;
+    return true;
+  });
+  const hoje = new Date().toLocaleDateString("pt-BR");
+
+  const blocos = projsSel.map(pid=>{
+    const proj = PROJETOS_KA.find(p=>p.id===pid);
+    const lista = filtrar(dadosPorProjeto[pid]||[]).sort((a,b)=>(a.data+getHoraInicio(a)).localeCompare(b.data+getHoraInicio(b)));
+    const comIntervalos = calcIntervalos(lista);
+    const diasAtual = calcDiasSemFalha(dadosPorProjeto[pid]||[]);
+    const rows = comIntervalos.map(r=>{
+      const tiposR = getTipos(r);
+      const tagsTxt = tiposR.map(tk=>{ const tag=TAGS_FALHA.find(t=>t.key===tk)||TAG_OUTRO; return tk==="outro"?(r.tipoCustom||"Outro"):tag.label; }).join("; ");
+      const horaIni = getHoraInicio(r);
+      const dur = calcDuracaoFalha(horaIni, r.horaFim);
+      const impTxt = getImpactos(r).map(labelImpacto).join(", ");
+      const resp = r.responsaveisP607&&r.responsaveisP607.length ? r.responsaveisP607.join(", ") : "";
+      return `<tr>
+        <td>${fmtDate(r.data)}</td>
+        <td>${horaIni}${r.horaFim?` – ${r.horaFim}`:""}${dur?` (${dur})`:""}</td>
+        <td>${tagsTxt}</td>
+        <td>${impTxt||"--"}</td>
+        <td>${r.registradoPor?.nome||"--"}</td>
+        <td style="font-size:10px">${[resp,r.obs].filter(Boolean).join(" — ")||"--"}</td>
+        <td style="color:#16a34a;font-weight:700">${r.diasDesdeAnterior!=null?r.diasDesdeAnterior+"d":"--"}</td>
+      </tr>`;
+    }).join("");
+    return `<div class="card">
+      <h2>${pid} — ${proj?.name||""}${diasAtual!=null?` · ${diasAtual} dia(s) sem falha atualmente`:""}</h2>
+      <table><thead><tr><th>Data</th><th>Horário</th><th>Tipo(s) de Falha</th><th>Impacto</th><th>Registrado por</th><th>Obs/Responsável</th><th>Dias s/ falha antes</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:#94a3b8">Nenhuma falha no período</td></tr>'}</tbody></table>
+    </div>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>KeyAccess Falha — Relatório ${hoje}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b}
+  .header{background:linear-gradient(135deg,#991b1b,#7f1d1d);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
+  .header h1{font-size:18px;margin-bottom:4px}
+  .header p{font-size:11px;opacity:.8}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
+  .card h2{font-size:13px;color:#475569;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:#1e293b;color:#fff;padding:7px 8px;text-align:left;font-size:10px}
+  td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafc}
+  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}
+  .meta{font-size:12px;margin-bottom:14px;color:#475569}
+  @media print{body{padding:8px}@page{margin:12mm}.no-print{display:none}}
+</style></head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:16px">
+  <button onclick="window.print()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <h1>🚨 KeyAccess Falha — Relatório ${modo==="unitario"?"Unitário":"Consolidado"}</h1>
+  <p>Gerado em ${hoje} · Moked Consulting Security</p>
+</div>
+<div class="meta">
+  <b>Período:</b> ${dataIni?fmtDate(dataIni):"início"} até ${dataFim?fmtDate(dataFim):"hoje"}
+  ${impactoFiltro?` · <b>Impacto:</b> ${impactoFiltro==="entrada"?"Entrada":impactoFiltro==="saida"?"Saída":"Inquilino"}`:""}
+</div>
+${blocos}
+<div class="footer">MokLog CheckTest © Moked Consulting Security · KeyAccess Falha</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`keyaccess_falha_${modo}_${hoje.replace(/\//g,"-")}.html`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+export const _internal = { calcDiasSemFalha, calcIntervalos, diffDias, calcDuracaoFalha, getTipos, getImpactos };
