@@ -383,8 +383,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
   const [horaInicio, setHoraInicio] = useState(nowHM());
   const [horaFim, setHoraFim] = useState("");
   const [impactos, setImpactos] = useState([]); // array: pode ter "entrada", "saida", "inquilino"
-  const [vigilanteRonda, setVigilanteRonda] = useState(null); // só P607: colaborador específico (Vigilante Ronda = líder do posto)
-  const [responsavelTurno, setResponsavelTurno] = useState([]); // demais projetos: "Rondas" / "AGP de CCO"
+  const [vigilanteRonda, setVigilanteRonda] = useState(null); // colaborador com cargo "Vigilante Ronda" — universal, todos os projetos
   const [obs, setObs] = useState("");
 
   const duracao = calcDuracaoFalha(horaInicio, horaFim);
@@ -399,9 +398,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
       id: Date.now().toString()+Math.random().toString(36).substring(2,5),
       data, horaInicio, horaFim, tipos, tipoCustom: tipos.includes("outro")?tipoCustom.trim():"",
       impacto: impactos,
-      ...(project.id==="P607"
-        ? { vigilanteRonda: vigilanteRonda ? {id:vigilanteRonda.id, nome:vigilanteRonda.nome} : null }
-        : { responsavelTurno }),
+      vigilanteRonda: vigilanteRonda ? {id:vigilanteRonda.id, nome:vigilanteRonda.nome} : null,
       obs: obs.trim(),
       registradoPor: { id:registradoPor.id, nome:registradoPor.nome },
       registradoEm: new Date().toISOString(),
@@ -487,35 +484,18 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
             </div>
           </div>
 
-          {project.id==="P607" ? (
-            <div>
-              <label style={S.lbl}>Vigilante Ronda responsável (atua como líder do posto no P607)</label>
-              <select value={vigilanteRonda?.id||""} onChange={e=>{const c=equipeCompleta.find(x=>String(x.id)===e.target.value);setVigilanteRonda(c?{id:c.id,nome:c.nome}:null);}} style={{...S.inp,cursor:"pointer"}}>
-                <option value="">Selecione...</option>
-                {equipeCompleta.filter(c=>(c.cargo||"").toLowerCase().includes("ronda")).map(c=>(
-                  <option key={c.id} value={c.id}>{c.nome}{c.cargo?` — ${c.cargo}`:""}</option>
-                ))}
-              </select>
-              {equipeCompleta.filter(c=>(c.cargo||"").toLowerCase().includes("ronda")).length===0&&(
-                <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>Nenhum colaborador com cargo "Vigilante Ronda" cadastrado na Equipe do P607.</div>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label style={S.lbl}>Responsável pelo turno/ocorrência</label>
-              <div style={{display:"flex",gap:8}}>
-                {["Rondas","AGP de CCO"].map(opt=>{
-                  const sel = responsavelTurno.includes(opt);
-                  return (
-                    <button key={opt} onClick={()=>setResponsavelTurno(prev=> prev.includes(opt) ? prev.filter(x=>x!==opt) : [...prev,opt])}
-                      style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#a855f7":dark?"#1e293b":"#e2e8f0"}`,background:sel?"#a855f722":dark?"#020510":"#fff",color:sel?"#a855f7":dark?"#94a3b8":"#64748b"}}>
-                      {sel?"✓ ":""}{opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <div>
+            <label style={S.lbl}>Vigilante Ronda responsável</label>
+            <select value={vigilanteRonda?.id||""} onChange={e=>{const c=equipeCompleta.find(x=>String(x.id)===e.target.value);setVigilanteRonda(c?{id:c.id,nome:c.nome}:null);}} style={{...S.inp,cursor:"pointer"}}>
+              <option value="">Selecione...</option>
+              {equipeCompleta.filter(c=>(c.cargo||"").toLowerCase().includes("ronda")).map(c=>(
+                <option key={c.id} value={c.id}>{c.nome}{c.cargo?` — ${c.cargo}`:""}</option>
+              ))}
+            </select>
+            {equipeCompleta.filter(c=>(c.cargo||"").toLowerCase().includes("ronda")).length===0&&(
+              <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>Nenhum colaborador com cargo "Vigilante Ronda" cadastrado na Equipe deste projeto.</div>
+            )}
+          </div>
 
           <div>
             <label style={S.lbl}>Observação (opcional)</label>
