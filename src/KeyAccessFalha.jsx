@@ -52,7 +52,7 @@ const TAGS_FALHA = [
   { key:"liberacao_caminhoes",  label:"Liberação de caminhões/motoristas não sobe",          cor:"#ef4444" },
   { key:"painel_alertas",       label:"Painel de alertas offline",                           cor:"#ef4444" },
   { key:"saida_motorista",      label:"Informações de saída do motorista não sobem pra CCO", cor:"#ef4444" },
-  { key:"internet_local",       label:"Q-Access em falha por queda de Internet Local",        cor:"#f59e0b" },
+  { key:"internet_local",       label:"KeyAccess em falha por queda de Internet Local",        cor:"#f59e0b" },
 ];
 const TAG_OUTRO = { key:"outro", label:"✏️ Editar Falha (digitar)", cor:"#818cf8" };
 
@@ -86,6 +86,26 @@ function calcDuracaoFalha(horaInicio, horaFim){
     if(mins<=0) return null;
     const h=Math.floor(mins/60), m=mins%60;
     return h>0 ? `${h}h ${m}min` : `${m} min`;
+  }catch{ return null; }
+}
+
+// Texto de exibição do responsável: P607 usa um colaborador específico
+// (Vigilante Ronda); os demais projetos usam o toggle Rondas/AGP de CCO.
+function getResponsavelTexto(r){
+  if(r.vigilanteRonda?.nome) return `Vigilante Ronda: ${r.vigilanteRonda.nome}`;
+  if(r.responsavelTurno?.length) return `Responsável: ${r.responsavelTurno.join(", ")}`;
+  return "";
+}
+
+// Versão numérica (em minutos) da duração — usada pra somar nos relatórios.
+function calcMinutosFalha(horaInicio, horaFim){
+  if(!horaInicio||!horaFim) return null;
+  try{
+    const [h1,m1]=horaInicio.split(":").map(Number);
+    const [h2,m2]=horaFim.split(":").map(Number);
+    let mins=(h2*60+m2)-(h1*60+m1);
+    if(mins<0) mins+=24*60;
+    return mins>0 ? mins : null;
   }catch{ return null; }
 }
 
@@ -177,6 +197,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
   const [screen, setScreen] = useState("projetos"); // projetos | form | lista | relatorios_pin | relatorios
   const [project, setProject] = useState(null);
   const [equipe, setEquipe] = useState([]);
+  const [equipeCompleta, setEquipeCompleta] = useState([]); // sem filtro de cargo — pra achar Vigilante Ronda (P607)
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -200,6 +221,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
     const [f, eq] = await Promise.all([loadFalhas(p.id), loadEquipe(p.id)]);
     setRegistros(f);
     setEquipe(eq.filter(c=>ehLiderOuCCO(c.cargo)));
+    setEquipeCompleta(eq);
     setLoading(false);
     setScreen("lista");
   };
@@ -322,7 +344,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
 
   // ── TELA: formulário de registro
   if(screen==="form"&&project) return (
-    <FormularioFalha project={project} equipe={equipe} dark={dark} S={S}
+    <FormularioFalha project={project} equipe={equipe} equipeCompleta={equipeCompleta} dark={dark} S={S}
       onVoltar={()=>setScreen("lista")}
       onSalvo={async(novo)=>{
         setSaving(true);
@@ -350,7 +372,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
 }
 
 // ── Formulário de registro de falha
-function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }){
+function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, onSalvo, saving }){
   const [registradoPor, setRegistradoPor] = useState(()=>{
     try{ const l=localStorage.getItem(`ka_last_user_${project.id}`); if(l) return JSON.parse(l); }catch(e){}
     return null;
@@ -361,7 +383,8 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
   const [horaInicio, setHoraInicio] = useState(nowHM());
   const [horaFim, setHoraFim] = useState("");
   const [impactos, setImpactos] = useState([]); // array: pode ter "entrada", "saida", "inquilino"
-  const [responsaveisP607, setResponsaveisP607] = useState([]); // só usado quando project.id==="P607"
+  const [vigilanteRonda, setVigilanteRonda] = useState(null); // só P607: colaborador específico (Vigilante Ronda = líder do posto)
+  const [responsavelTurno, setResponsavelTurno] = useState([]); // demais projetos: "Rondas" / "AGP de CCO"
   const [obs, setObs] = useState("");
 
   const duracao = calcDuracaoFalha(horaInicio, horaFim);
@@ -376,7 +399,9 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
       id: Date.now().toString()+Math.random().toString(36).substring(2,5),
       data, horaInicio, horaFim, tipos, tipoCustom: tipos.includes("outro")?tipoCustom.trim():"",
       impacto: impactos,
-      ...(project.id==="P607" ? { responsaveisP607 } : {}),
+      ...(project.id==="P607"
+        ? { vigilanteRonda: vigilanteRonda ? {id:vigilanteRonda.id, nome:vigilanteRonda.nome} : null }
+        : { responsavelTurno }),
       obs: obs.trim(),
       registradoPor: { id:registradoPor.id, nome:registradoPor.nome },
       registradoEm: new Date().toISOString(),
@@ -462,14 +487,27 @@ function FormularioFalha({ project, equipe, dark, S, onVoltar, onSalvo, saving }
             </div>
           </div>
 
-          {project.id==="P607" && (
+          {project.id==="P607" ? (
             <div>
-              <label style={S.lbl}>Responsável pelo turno/ocorrência (P607)</label>
+              <label style={S.lbl}>Vigilante Ronda responsável (atua como líder do posto no P607)</label>
+              <select value={vigilanteRonda?.id||""} onChange={e=>{const c=equipeCompleta.find(x=>String(x.id)===e.target.value);setVigilanteRonda(c?{id:c.id,nome:c.nome}:null);}} style={{...S.inp,cursor:"pointer"}}>
+                <option value="">Selecione...</option>
+                {equipeCompleta.filter(c=>(c.cargo||"").toLowerCase().includes("ronda")).map(c=>(
+                  <option key={c.id} value={c.id}>{c.nome}{c.cargo?` — ${c.cargo}`:""}</option>
+                ))}
+              </select>
+              {equipeCompleta.filter(c=>(c.cargo||"").toLowerCase().includes("ronda")).length===0&&(
+                <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>Nenhum colaborador com cargo "Vigilante Ronda" cadastrado na Equipe do P607.</div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label style={S.lbl}>Responsável pelo turno/ocorrência</label>
               <div style={{display:"flex",gap:8}}>
                 {["Rondas","AGP de CCO"].map(opt=>{
-                  const sel = responsaveisP607.includes(opt);
+                  const sel = responsavelTurno.includes(opt);
                   return (
-                    <button key={opt} onClick={()=>setResponsaveisP607(prev=> prev.includes(opt) ? prev.filter(x=>x!==opt) : [...prev,opt])}
+                    <button key={opt} onClick={()=>setResponsavelTurno(prev=> prev.includes(opt) ? prev.filter(x=>x!==opt) : [...prev,opt])}
                       style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#a855f7":dark?"#1e293b":"#e2e8f0"}`,background:sel?"#a855f722":dark?"#020510":"#fff",color:sel?"#a855f7":dark?"#94a3b8":"#64748b"}}>
                       {sel?"✓ ":""}{opt}
                     </button>
@@ -658,7 +696,7 @@ function RelatoriosKA({ dark, S, onBack }){
                           <div style={{fontSize:10,...S.txt2}}>
                             📅 {fmtDate(r.data)} · ⏱ {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · 👤 {r.registradoPor?.nome||"—"}
                           </div>
-                          {r.responsaveisP607&&r.responsaveisP607.length>0&&<div style={{fontSize:10,color:"#a855f7",fontWeight:700,marginTop:2}}>Responsável: {r.responsaveisP607.join(", ")}</div>}
+                          {getResponsavelTexto(r)&&<div style={{fontSize:10,color:"#a855f7",fontWeight:700,marginTop:2}}>{getResponsavelTexto(r)}</div>}
                           {r.obs&&<div style={{fontSize:10,...S.txt2,fontStyle:"italic",marginTop:2}}>{r.obs}</div>}
                         </div>
                       );
@@ -674,7 +712,7 @@ function RelatoriosKA({ dark, S, onBack }){
   );
 }
 
-// ── PDF do relatório (unitário ou consolidado)
+// ── PDF do relatório (modelo "Consolidado Executivo", funciona também pra unitário)
 function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim, impactoFiltro }){
   const filtrar = (lista) => lista.filter(r=>{
     if(dataIni && r.data < dataIni) return false;
@@ -683,68 +721,125 @@ function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim
     return true;
   });
   const hoje = new Date().toLocaleDateString("pt-BR");
+  const periodoIni = dataIni ? fmtDate(dataIni) : "início dos registros";
+  const periodoFim = dataFim ? fmtDate(dataFim) : hoje;
 
-  const blocos = projsSel.map(pid=>{
+  // Monta os dados de cada projeto uma única vez (lista filtrada, intervalos, minutos totais).
+  const dadosProjetos = projsSel.map(pid=>{
     const proj = PROJETOS_KA.find(p=>p.id===pid);
-    const lista = filtrar(dadosPorProjeto[pid]||[]).sort((a,b)=>(a.data+getHoraInicio(a)).localeCompare(b.data+getHoraInicio(b)));
+    const listaCompleta = dadosPorProjeto[pid]||[];
+    const lista = filtrar(listaCompleta).sort((a,b)=>(a.data+getHoraInicio(a)).localeCompare(b.data+getHoraInicio(b)));
     const comIntervalos = calcIntervalos(lista);
-    const diasAtual = calcDiasSemFalha(dadosPorProjeto[pid]||[]);
-    const rows = comIntervalos.map(r=>{
+    const minutosTotais = lista.reduce((acc,r)=> acc + (calcMinutosFalha(getHoraInicio(r), r.horaFim)||0), 0);
+    const temPendente = lista.some(r=>!r.horaFim); // sem hora de retorno = ainda em aberto
+    const diasAtual = calcDiasSemFalha(listaCompleta);
+    return { pid, proj, lista, comIntervalos, minutosTotais, temPendente, diasAtual };
+  });
+
+  // KPIs consolidados gerais
+  const totalOcorrencias = dadosProjetos.reduce((a,d)=>a+d.lista.length,0);
+  const tempoTotalImpactado = dadosProjetos.reduce((a,d)=>a+d.minutosTotais,0);
+  const parquesAfetados = dadosProjetos.filter(d=>d.lista.length>0).length;
+  const algumPendente = dadosProjetos.some(d=>d.temPendente);
+
+  // Tabela comparativa de impacto por projeto
+  const linhasComparacao = dadosProjetos.map(d=>`
+    <tr>
+      <td><strong>${d.pid}</strong></td>
+      <td>${d.proj?.name||""}</td>
+      <td style="color:${d.minutosTotais>0?"#dc2626":"#16a34a"};font-weight:700">${d.minutosTotais>0?d.minutosTotais+" minutos":"Sem impacto no período"}</td>
+    </tr>`).join("");
+
+  const corImpacto = (imp)=> imp==="entrada" ? "#3b82f6" : imp==="saida" ? "#ef4444" : "#a855f7";
+
+  // Blocos individuais por projeto
+  const blocos = dadosProjetos.map(d=>{
+    const rows = d.comIntervalos.map(r=>{
       const tiposR = getTipos(r);
-      const tagsTxt = tiposR.map(tk=>{ const tag=TAGS_FALHA.find(t=>t.key===tk)||TAG_OUTRO; return tk==="outro"?(r.tipoCustom||"Outro"):tag.label; }).join("; ");
+      const tagsTxt = tiposR.length
+        ? tiposR.map(tk=>{ const tag=TAGS_FALHA.find(t=>t.key===tk)||TAG_OUTRO; return tk==="outro"?(r.tipoCustom||"Outro"):tag.label; }).join("; ")
+        : "Não informado";
       const horaIni = getHoraInicio(r);
-      const dur = calcDuracaoFalha(horaIni, r.horaFim);
-      const impTxt = getImpactos(r).map(labelImpacto).join(", ");
-      const resp = r.responsaveisP607&&r.responsaveisP607.length ? r.responsaveisP607.join(", ") : "";
+      const minutos = calcMinutosFalha(horaIni, r.horaFim);
+      const tratativa = r.horaFim
+        ? `Voltou a funcionar às ${r.horaFim}${minutos?` (Duração: ${minutos} min)`:""}.${r.obs?" "+r.obs:""}`
+        : (r.obs ? r.obs : "Não informado");
+      const respTxt = getResponsavelTexto(r);
+      const impactosBadges = getImpactos(r).length
+        ? getImpactos(r).map(imp=>`<span style="display:inline-block;background:${corImpacto(imp)};color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;margin:1px 2px 1px 0;white-space:nowrap;">${imp==="entrada"?"ENTRADA":imp==="saida"?"SAÍDA":"INQUILINO"}</span>`).join("")
+        : "<span style='color:#94a3b8'>--</span>";
       return `<tr>
-        <td>${fmtDate(r.data)}</td>
-        <td>${horaIni}${r.horaFim?` – ${r.horaFim}`:""}${dur?` (${dur})`:""}</td>
+        <td style="white-space:nowrap"><strong>${fmtDate(r.data)}</strong><br>${horaIni}</td>
         <td>${tagsTxt}</td>
-        <td>${impTxt||"--"}</td>
-        <td>${r.registradoPor?.nome||"--"}</td>
-        <td style="font-size:10px">${[resp,r.obs].filter(Boolean).join(" — ")||"--"}</td>
-        <td style="color:#16a34a;font-weight:700">${r.diasDesdeAnterior!=null?r.diasDesdeAnterior+"d":"--"}</td>
+        <td>${impactosBadges}</td>
+        <td>${r.registradoPor?.nome||"Não informado"}</td>
+        <td style="font-size:10px">${[respTxt,tratativa].filter(Boolean).join(" — ")}</td>
       </tr>`;
     }).join("");
     return `<div class="card">
-      <h2>${pid} — ${proj?.name||""}${diasAtual!=null?` · ${diasAtual} dia(s) sem falha atualmente`:""}</h2>
-      <table><thead><tr><th>Data</th><th>Horário</th><th>Tipo(s) de Falha</th><th>Impacto</th><th>Registrado por</th><th>Obs/Responsável</th><th>Dias s/ falha antes</th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:#94a3b8">Nenhuma falha no período</td></tr>'}</tbody></table>
+      <div class="card-title">
+        <span>${d.pid} — ${d.proj?.name||""}</span>
+        <span class="badge-dias">${d.diasAtual!=null?d.diasAtual+" dia(s) sem falhas atualmente":"Sem registros"}</span>
+      </div>
+      <table><thead><tr><th>Data / Hora Início</th><th>Tipo de Falha</th><th>Impacto</th><th>Registrado por</th><th>Observação / Tratativa</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Nenhuma falha no período selecionado</td></tr>'}</tbody></table>
     </div>`;
   }).join("");
 
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><title>KeyAccess Falha — Relatório ${hoje}</title>
 <style>
+  @page { size:A4; margin:18mm 14mm; }
+  @page { @bottom-right { content:"Página " counter(page); font-size:9px; color:#94a3b8; } }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b}
-  .header{background:linear-gradient(135deg,#991b1b,#7f1d1d);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px}
-  .header h1{font-size:18px;margin-bottom:4px}
-  .header p{font-size:11px;opacity:.8}
-  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
-  .card h2{font-size:13px;color:#475569;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
-  table{width:100%;border-collapse:collapse;font-size:11px}
-  th{background:#1e293b;color:#fff;padding:7px 8px;text-align:left;font-size:10px}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:12px;padding:20px}
+  .brand{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+  .title{font-size:21px;font-weight:800;color:#1e293b;margin-bottom:6px}
+  .meta{font-size:11.5px;color:#475569;margin-bottom:18px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;page-break-inside:avoid}
+  .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:12px 8px;text-align:center}
+  .kpi .lbl{font-size:8.5px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px}
+  .kpi .val{font-size:21px;font-weight:800;color:#1e293b}
+  .kpi.danger .val{color:#dc2626}
+  .kpi.ok .val{color:#16a34a;font-size:16px}
+  .comparativo{border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:22px;page-break-inside:avoid}
+  .comparativo h2{font-size:13px;color:#334155;margin-bottom:10px;text-transform:uppercase;letter-spacing:.3px}
+  .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px;page-break-inside:avoid}
+  .card-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13.5px;font-weight:800;color:#1e293b;border-bottom:2px solid #dc2626;padding-bottom:8px;margin-bottom:10px}
+  .badge-dias{font-size:9.5px;color:#64748b;font-weight:600;white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:10.5px}
+  th{background:#1e293b;color:#fff;padding:7px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.2px}
   td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}
   tr:nth-child(even) td{background:#f8fafc}
-  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}
-  .meta{font-size:12px;margin-bottom:14px;color:#475569}
-  @media print{body{padding:8px}@page{margin:12mm}.no-print{display:none}}
+  .footer{text-align:center;margin-top:20px;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  .no-print{text-align:center;margin-bottom:18px}
+  @media print{.no-print{display:none}body{padding:0}}
 </style></head>
 <body>
-<div class="no-print" style="text-align:center;margin-bottom:16px">
+<div class="no-print">
   <button onclick="window.print()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
-<div class="header">
-  <h1>🚨 KeyAccess Falha — Relatório ${modo==="unitario"?"Unitário":"Consolidado"}</h1>
-  <p>Gerado em ${hoje} · Moked Consulting Security</p>
+
+<div class="brand">Moked Consulting Security</div>
+<div class="title">🚨 KeyAccess Falha — Relatório ${modo==="unitario"?"Unitário":"Consolidado Executivo"}</div>
+<div class="meta">Período de Auditoria: ${periodoIni} até ${periodoFim} | Gerado em: ${hoje}</div>
+
+<div class="kpis">
+  <div class="kpi danger"><div class="lbl">Total de Ocorrências</div><div class="val">${totalOcorrencias}</div></div>
+  <div class="kpi danger"><div class="lbl">Tempo Total Impactado</div><div class="val">${tempoTotalImpactado} min</div></div>
+  <div class="kpi"><div class="lbl">Parques Afetados</div><div class="val">${parquesAfetados} / ${dadosProjetos.length}</div></div>
+  <div class="kpi ${algumPendente?"danger":"ok"}"><div class="lbl">Status Atual Geral</div><div class="val">${algumPendente?"Pendente":"100% Online"}</div></div>
 </div>
-<div class="meta">
-  <b>Período:</b> ${dataIni?fmtDate(dataIni):"início"} até ${dataFim?fmtDate(dataFim):"hoje"}
-  ${impactoFiltro?` · <b>Impacto:</b> ${impactoFiltro==="entrada"?"Entrada":impactoFiltro==="saida"?"Saída":"Inquilino"}`:""}
+
+<div class="comparativo">
+  <h2>Métricas de Impacto de Inoperabilidade por Projeto</h2>
+  <table><thead><tr><th>Código do Projeto</th><th>Planta Operacional</th><th>Tempo Total Impactado</th></tr></thead>
+  <tbody>${linhasComparacao}</tbody></table>
 </div>
+
 ${blocos}
-<div class="footer">MokLog CheckTest © Moked Consulting Security · KeyAccess Falha</div>
+
+<div class="footer">MokLog CheckTest © Moked Consulting Security · Relatório Técnico ${modo==="unitario"?"Individual":"Consolidado"}</div>
 </body></html>`;
 
   const blob = new Blob([html],{type:"text/html"});
@@ -754,4 +849,4 @@ ${blocos}
   URL.revokeObjectURL(url);
 }
 
-export const _internal = { calcDiasSemFalha, calcIntervalos, diffDias, calcDuracaoFalha, getTipos, getImpactos };
+export const _internal = { calcDiasSemFalha, calcIntervalos, diffDias, calcDuracaoFalha, calcMinutosFalha, getTipos, getImpactos };
