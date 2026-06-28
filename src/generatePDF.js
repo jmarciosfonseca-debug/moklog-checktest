@@ -168,7 +168,7 @@ const COMPACT_THRESHOLD = 10;  // > 10 itens com falha no mesmo sistema → tabe
 function isCritical(diasAberto) { return diasAberto !== null && diasAberto > CRITICAL_DAYS; }
 
 // ── Shared CSS
-function getCSS(theme) {
+function getCSS(theme, kpiCols=4) {
   return `
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
@@ -177,7 +177,7 @@ function getCSS(theme) {
     .header-accent{height:5px;background:rgba(255,255,255,0.25)}
     .section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
     .section-title{font-size:11px;font-weight:800;color:${theme.primary};text-transform:uppercase;letter-spacing:1px;border-left:4px solid ${theme.headerBg};padding-left:10px;margin-bottom:14px}
-    .kpi-row{display:grid;grid-template-columns:repeat(${ctmkInfo?5:4},1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+    .kpi-row{display:grid;grid-template-columns:repeat(${kpiCols},1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
     .kpi{background:#fff;padding:16px 12px;text-align:center}
     .kpi-val{font-size:32px;font-weight:800;line-height:1;letter-spacing:-1px}
     .kpi-lbl{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:4px;letter-spacing:.5px}
@@ -401,7 +401,7 @@ export function generatePDF(project, state, meta, photos, ctmkInfo) {
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Teste Semanal — ${project.id} — ${fmtDate(meta.date)}</title>
-<style>${getCSS(theme)}</style></head>
+<style>${getCSS(theme, ctmkInfo?5:4)}</style></head>
 <body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="background:${theme.headerBg};color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
