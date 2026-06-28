@@ -607,11 +607,11 @@ function validarForm(tema, form) {
 // ════════════════════════════════════════════════════════════════════════
 // MÓDULO PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════
-export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
+export default function AcessoCCO({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark||true);
-  const [authLevel, setAuthLevel] = useState(null);
+  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
   const [tema, setTema] = useState("acesso");
-  const [screen, setScreen] = useState("pin"); // pin | list | form
+  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | form
   const [showArquivados, setShowArquivados] = useState(false);
 
   // registros de TODOS os temas (carregados sob demanda ao trocar de aba)
@@ -700,7 +700,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme }) {
 
   if(screen==="pin") return (
     <PinGate project={project||{}} dark={dark||true} onBack={onBack}
-      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); }}/>
+      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
   );
 
   // Barra de abas (temas)

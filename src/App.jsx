@@ -201,6 +201,7 @@ const JATINOX_SUBS = {
 const ADMIN_PIN = "872101";
 const MAX_HISTORY = 26;
 const SESSION_TIMEOUT = 10 * 60 * 1000;
+const PROJECT_SESSION_TIMEOUT = 45 * 60 * 1000; // sessão de PIN por projeto: 45min, compartilhada entre CCO/Equipe/Equipamentos/Empresas/Visita
 const INOP_ALERT_WEEKS = 2;
 const RECURRENCE_WARN = 2;
 const RECURRENCE_CRIT = 3;
@@ -2240,8 +2241,10 @@ export default function App(){
   },[screen,state,meta,photos,editingIdx]);
 
   const clearDraft=()=>{localStorage.removeItem("moklog_draft");setDraft(null);};
-  const checkAuth=(pid)=>{const ts=projectAuth[pid];return ts&&(Date.now()-ts)<SESSION_TIMEOUT;};
-  const grantAuth=(pid)=>setProjectAuth(prev=>({...prev,[pid]:Date.now()}));
+  const checkAuth=(pid)=>{const a=projectAuth[pid];return a&&(Date.now()-a.ts)<PROJECT_SESSION_TIMEOUT;};
+  const grantAuth=(pid,mode="lider")=>setProjectAuth(prev=>({...prev,[pid]:{mode,ts:Date.now()}}));
+  // modo já liberado para o projeto (null se sessão expirada/inexistente) — usado pelos módulos CCO/Equipe/Equipamentos/Empresas/Visita
+  const getProjectAuthMode=(pid)=>{const a=projectAuth[pid];if(!a||(Date.now()-a.ts)>=PROJECT_SESSION_TIMEOUT)return null;return a.mode;};
   const lastForProject=stored[project.id]?.history?.slice(-1)[0]??null;
   const recurrence=analyzeRecurrence(project,stored[project.id]?.history??[]);
 
@@ -2437,12 +2440,12 @@ export default function App(){
   );
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
-  if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}}/></ErrorBoundary>;
+  if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)}/></ErrorBoundary>;
   if(showRegistros) return <ErrorBoundary moduleName="Registros"><RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/></ErrorBoundary>;
-  if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}}/></ErrorBoundary>;
-  if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}}/></ErrorBoundary>;
-  if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}}/></ErrorBoundary>;
-  if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}}/></ErrorBoundary>;
+  if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}} sharedAuth={getProjectAuthMode(acessoCCOProject.id)} onAuthGranted={(mode)=>grantAuth(acessoCCOProject.id,mode)}/></ErrorBoundary>;
+  if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}} sharedAuth={getProjectAuthMode(empresaInfoProject.id)} onAuthGranted={(mode)=>grantAuth(empresaInfoProject.id,mode)}/></ErrorBoundary>;
+  if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}} sharedAuth={getProjectAuthMode(equipamentosProject.id)} onAuthGranted={(mode)=>grantAuth(equipamentosProject.id,mode)}/></ErrorBoundary>;
+  if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}} sharedAuth={getProjectAuthMode(visitaProject.id)} onAuthGranted={(mode)=>grantAuth(visitaProject.id,mode)}/></ErrorBoundary>;
   if(showPerimetral) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowPerimetral(false)}/></ErrorBoundary>;
   if(showKeyAccess) return <ErrorBoundary moduleName="KeyAccess Falha"><KeyAccessFalha dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowKeyAccess(false)}/></ErrorBoundary>;
   if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;

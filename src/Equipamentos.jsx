@@ -728,10 +728,10 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
 }
 
 // ── App principal
-export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
+export default function Equipamentos({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
-  const [authLevel, setAuthLevel] = useState(null);
-  const [screen, setScreen] = useState("pin");
+  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
+  const [screen, setScreen] = useState(sharedAuth?"main":"pin");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -751,7 +751,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme }) {
     setSaving(false);
   };
 
-  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("main");}}/>;
+  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("main");onAuthGranted?.(l);}}/>;
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>

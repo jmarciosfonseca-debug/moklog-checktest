@@ -258,15 +258,15 @@ function getStyles(dark) {
 }
 
 // ── PIN Gate
-function PinGate({ project, onSuccess, onBack, dark }) {
+function PinGate({ project, onSuccess, onBack, dark, initialStep, onPinOk }) {
   const S = getStyles(dark);
   const [pin, setPin] = useState("");
   const [consultor, setConsultor] = useState("");
-  const [step, setStep] = useState("pin"); // pin | consultor
+  const [step, setStep] = useState(initialStep||"pin"); // pin | consultor
   const [err, setErr] = useState(false);
 
   const tryPin = () => {
-    if(pin === ADMIN_PIN) { setStep("consultor"); setErr(false); }
+    if(pin === ADMIN_PIN) { setStep("consultor"); setErr(false); onPinOk?.(); }
     else { setErr(true); }
   };
 
@@ -316,7 +316,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   );
 }
 
-export default function Visita({ project, onBack, dark, onToggleTheme }) {
+export default function Visita({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
   const [screen, setScreen] = useState("pin");
   const [consultor, setConsultor] = useState("");
@@ -454,6 +454,7 @@ export default function Visita({ project, onBack, dark, onToggleTheme }) {
 
   if(screen==="pin") return (
     <PinGate project={project} dark={dark} onBack={onBack}
+      initialStep={sharedAuth==="admin"?"consultor":"pin"} onPinOk={()=>onAuthGranted?.("admin")}
       onSuccess={(cons)=>{ setConsultor(cons); setScreen("menu"); }}/>
   );
 

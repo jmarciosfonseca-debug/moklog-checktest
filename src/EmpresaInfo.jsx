@@ -607,10 +607,10 @@ function SecADM({ data, onSave, adminAuth, dark }) {
 }
 
 // ── App principal
-export default function EmpresaInfo({ project, onBack, dark, onToggleTheme }) {
+export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
-  const [authLevel, setAuthLevel] = useState(null);
-  const [screen, setScreen] = useState("pin");
+  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
+  const [screen, setScreen] = useState(sharedAuth?"main":"pin");
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -632,7 +632,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme }) {
 
   if(screen==="pin") return (
     <PinGate project={project} dark={dark} onBack={onBack}
-      onSuccess={(level)=>{ setAuthLevel(level); setScreen("main"); }}/>
+      onSuccess={(level)=>{ setAuthLevel(level); setScreen("main"); onAuthGranted?.(level); }}/>
   );
 
   if(loading) return (

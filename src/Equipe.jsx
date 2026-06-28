@@ -1288,10 +1288,10 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
 }
 
 // ── App principal
-export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme }) {
+export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted }) {
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
-  const [screen, setScreen] = useState("pin"); // pin | list | add | edit | view | addHist
-  const [authLevel, setAuthLevel] = useState(null); // null | "lider" | "admin"
+  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | add | edit | view | addHist
+  const [authLevel, setAuthLevel] = useState(sharedAuth||null); // null | "lider" | "admin"
   const [selColab, setSelColab] = useState(null);
   const [form, setForm] = useState(null);
   const [histForm, setHistForm] = useState({ tipo:"Falta", data:todayStr(), detalhe:"" });
@@ -1509,7 +1509,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   if(screen==="pin") return (
     <PinScreen project={project} dark={dark}
       onBack={onBack}
-      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); }}/>
+      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
   );
 
   // ── Formulário: cadastro (líder ou admin) / edição (admin only)
