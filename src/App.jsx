@@ -923,9 +923,11 @@ function MiniChart({data, width=200, height=60}) {
 
 function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) {
   const ctmkInfoFor = (pid) => {
-    const c = ctmkData[pid]; if(!c) return undefined;
-    const days = c.status==="offline" && c.offlineSince ? Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000) : null;
-    return { status: c.status, days };
+    try {
+      const c = ctmkData[pid]; if(!c) return undefined;
+      const days = c.status==="offline" && c.offlineSince ? Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000) : null;
+      return { status: c.status, days };
+    } catch(e) { return undefined; }
   };
   const [pin,setPin]=useState(""); const [auth,setAuth]=useState(false); const [err,setErr]=useState(false);
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
@@ -1346,9 +1348,11 @@ function HistoryScreen({project, stored, onBack}) {
 
 function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome}) {
   const ctmkInfo = (()=>{
-    const c = ctmkData[project.id]; if(!c) return undefined;
-    const days = c.status==="offline" && c.offlineSince ? Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000) : null;
-    return { status: c.status, days };
+    try {
+      const c = ctmkData[project.id]; if(!c) return undefined;
+      const days = c.status==="offline" && c.offlineSince ? Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000) : null;
+      return { status: c.status, days };
+    } catch(e) { return undefined; }
   })();
   const [copied,setCopied]=useState(false);
   const [emailSent,setEmailSent]=useState(false);
