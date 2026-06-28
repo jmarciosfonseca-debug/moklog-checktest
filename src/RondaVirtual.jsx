@@ -822,9 +822,13 @@ export function gerarPDFConsolidadoRonda(project, turnosSelecionados) {
   .kpi-val{font-size:23px;font-weight:800;line-height:1;letter-spacing:-1px}
   .kpi-lbl{font-size:8.5px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:5px;letter-spacing:.3px}
   .footer{text-align:center;font-size:10px;color:#94a3b8;padding:16px 0}
-  @media print{body{padding:10px}@page{margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+  @media print{body{padding:10px}@page{margin:12mm}.no-print{display:none!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
 </style></head>
 <body>
+
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
 
 <div class="section" style="background:linear-gradient(135deg,#4c1d95 0%,#7c3aed 55%,#8b5cf6 100%);color:#fff;box-shadow:0 8px 24px rgba(124,58,237,0.25)">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
