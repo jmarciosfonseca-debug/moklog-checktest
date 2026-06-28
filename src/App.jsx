@@ -9,7 +9,7 @@ import Visita from "./Visita";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import CCO from "./CCO";
-import { generatePDF, generateConsolidatedPDF } from "./generatePDF";
+import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 
 // ── Hook de conectividade
 function useOnlineStatus() {
@@ -1130,6 +1130,15 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
   const criticalAlerts=[];
   allProjects.forEach(p=>{const hist=stored[p.id]?.history??[];if(!hist.length)return;for(const cat of p.categories){if(cat.type==="items"){const lastState=hist[hist.length-1].state[cat.id];if(!lastState)continue;lastState.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok"){const wks=getConsecutiveInopWeeks(p,hist,cat.id,i);if(wks>=2)criticalAlerts.push({project:p.id,label:`${cat.label} — ${cat.itemLabels[i]}`,weeks:wks});}});}}});
   criticalAlerts.sort((a,b)=>b.weeks-a.weeks);
+  const buildGroupComparativeData = (ids) => ids.map(id=>{
+    const p=PROJECTS[id]; if(!p) return null;
+    const hist=stored[id]?.history??[]; if(!hist.length) return null;
+    const last4=hist.slice(-4);
+    const weeks=last4.map(r=>{const h=computeHealth(p,r.state);return{date:r.meta?.date,pct:h.pct,inop:h.inop};});
+    return {id, name:p.name, weeks};
+  }).filter(Boolean);
+  const GOLGI_IDS=["P601","P602","P604","P605","P606","P607"], MEGA_IDS=["P311A","P311B"];
+  const golgiData=buildGroupComparativeData(GOLGI_IDS), megaData=buildGroupComparativeData(MEGA_IDS);
   return(
     <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
@@ -1145,6 +1154,11 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
             <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:totalInopAll>0?"#ef4444":"#22c55e"}}>{totalInopAll}</div><div style={{fontSize:9,color:"#64748b",fontWeight:700}}>INOP TOTAL</div></div>
             <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div><div style={{fontSize:9,color:"#64748b",fontWeight:700}}>ALERTAS</div></div>
           </div>
+        </div>}
+        {(golgiData.length>=2||megaData.length>=2)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📊 Comparativo Interparques</div>
+          {golgiData.length>=2&&<button onClick={()=>generateGroupComparativePDF("Golgi",golgiData)} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:13}}>📊 Gerar Comparativo Golgi ({golgiData.length} projetos)</button>}
+          {megaData.length>=2&&<button onClick={()=>generateGroupComparativePDF("Mega",megaData)} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0ea5e9,#0369a1)",fontSize:13}}>📊 Gerar Comparativo Mega ({megaData.length} projetos)</button>}
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>

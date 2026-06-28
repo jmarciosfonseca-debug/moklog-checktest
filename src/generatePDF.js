@@ -751,3 +751,151 @@ ${resolvedRows?`<div class="section">
   a.href=url; a.download=`comparativo_${project.id}_${n}semanas.html`;
   a.click(); URL.revokeObjectURL(url);
 }
+
+// ── Relatório Comparativo Interparques (Painel Gerencial — acesso restrito)
+// groupData: [{ id, name, weeks: [{date, pct, inop}] }] — weeks em ordem cronológica (mais antiga → mais recente)
+export function generateGroupComparativePDF(groupLabel, groupData) {
+  if(!groupData || !groupData.length) return;
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const PALETTE = ["#1d4ed8","#dc2626","#15803d","#d97706","#7c3aed","#0ea5e9","#db2777","#65a30d"];
+
+  const rows = groupData.map((g,idx)=>{
+    const weeks = g.weeks||[];
+    const n = weeks.length;
+    const pcts = weeks.map(w=>w.pct);
+    const avgPct = n? Math.round(pcts.reduce((a,b)=>a+b,0)/n) : 0;
+    const latest = weeks[n-1] || {pct:0,inop:0,date:null};
+    const first = weeks[0] || {pct:latest.pct};
+    const trendDelta = latest.pct - first.pct;
+    const trendIcon = trendDelta>1 ? "↑ Melhorou" : trendDelta< -1 ? "↓ Piorou" : "→ Estável";
+    const trendColor = trendDelta>1 ? "#15803d" : trendDelta< -1 ? "#dc2626" : "#64748b";
+    const estagnado = n>=3 && Math.abs(trendDelta)<=1;
+    const tier = avgPct>=90?{label:"DESTAQUE POSITIVO",color:"#15803d",bg:"#dcfce7"}
+               : avgPct>=70?{label:"ATENÇÃO",color:"#d97706",bg:"#fef3c7"}
+               : {label:"CRÍTICO",color:"#dc2626",bg:"#fee2e2"};
+    return { id:g.id, name:g.name, n, avgPct, latestPct:latest.pct, latestInop:latest.inop, latestDate:latest.date,
+             trendDelta, trendIcon, trendColor, estagnado, tier, weeks, color: PALETTE[idx%PALETTE.length] };
+  }).sort((a,b)=>b.avgPct-a.avgPct);
+
+  const groupTotalInop = rows.reduce((a,r)=>a+r.latestInop,0);
+  const worst = rows[rows.length-1];
+  const best = rows[0];
+  const estagnados = rows.filter(r=>r.estagnado);
+
+  // ── Tabela ranking
+  const rankingRows = rows.map((r,i)=>`
+    <tr style="${i===0?'background:#f0fdf4':i===rows.length-1?'background:#fef2f2':''}">
+      <td style="font-weight:800;font-size:14px;text-align:center;color:${i===0?'#15803d':i===rows.length-1?'#dc2626':'#475569'}">${i+1}º</td>
+      <td style="font-weight:800;color:#1e293b">${r.id}</td>
+      <td>${r.name}</td>
+      <td style="text-align:center;font-weight:800;color:${r.tier.color}">${r.avgPct}%</td>
+      <td style="text-align:center;font-weight:700">${r.latestPct}%</td>
+      <td style="text-align:center;font-weight:700;color:${r.latestInop>0?'#dc2626':'#15803d'}">${r.latestInop}</td>
+      <td style="text-align:center;color:${r.trendColor};font-weight:700;font-size:11px">${r.trendIcon}</td>
+      <td style="text-align:center"><span class="badge" style="background:${r.tier.bg};color:${r.tier.color}">${r.tier.label}</span>${r.estagnado?'<br/><span class="badge" style="background:#f1f5f9;color:#64748b;margin-top:3px">⚠ Estagnado</span>':''}</td>
+    </tr>`).join("");
+
+  // ── Gráfico de barras (média do período) — SVG nativo
+  const barW=620, barH=rows.length*34+20, barPad=170;
+  const barChart = `<svg viewBox="0 0 ${barW} ${barH}" width="100%" style="max-height:${barH}px">
+    ${rows.map((r,i)=>{
+      const y=i*34+10; const w=Math.max(2,((barW-barPad-30)*r.avgPct/100));
+      return `<text x="0" y="${y+15}" font-size="11" font-weight="700" fill="#1e293b">${r.id}</text>
+        <rect x="${barPad}" y="${y}" width="${barW-barPad-30}" height="20" fill="#f1f5f9" rx="3"/>
+        <rect x="${barPad}" y="${y}" width="${w}" height="20" fill="${r.tier.color}" rx="3"/>
+        <text x="${barPad+w+8}" y="${y+15}" font-size="11" font-weight="800" fill="${r.tier.color}">${r.avgPct}%</text>`;
+    }).join("")}
+  </svg>`;
+
+  // ── Gráfico de evolução (linhas) — SVG nativo, alinhado à direita pela semana mais recente
+  const lineW=620, lineH=180, padL=36, padB=24, padT=12;
+  const maxWeeks = Math.max(...rows.map(r=>r.n),1);
+  const stepX = maxWeeks>1 ? (lineW-padL-10)/(maxWeeks-1) : 0;
+  const yFor = pct => padT + (100-pct)/100*(lineH-padT-padB);
+  const xForRight = (m,i) => { const weeksAgo=(m-1-i); return (lineW-10) - weeksAgo*stepX; };
+  const lineChart = `<svg viewBox="0 0 ${lineW} ${lineH}" width="100%" style="max-height:${lineH}px">
+    <line x1="${padL}" y1="${yFor(90)}" x2="${lineW-10}" y2="${yFor(90)}" stroke="#22c55e" stroke-dasharray="4,3" stroke-width="1"/>
+    <text x="${padL}" y="${yFor(90)-3}" font-size="9" fill="#22c55e">90%</text>
+    <line x1="${padL}" y1="${lineH-padB}" x2="${lineW-10}" y2="${lineH-padB}" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${lineH-padB}" stroke="#cbd5e1" stroke-width="1"/>
+    ${rows.map(r=>{
+      const m=r.n; if(m<2) return "";
+      const pts = r.weeks.map((w,i)=>`${xForRight(m,i)},${yFor(w.pct)}`).join(" ");
+      return `<polyline points="${pts}" fill="none" stroke="${r.color}" stroke-width="2.2"/>
+        ${r.weeks.map((w,i)=>`<circle cx="${xForRight(m,i)}" cy="${yFor(w.pct)}" r="3" fill="${r.color}"/>`).join("")}`;
+    }).join("")}
+  </svg>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;justify-content:center">
+    ${rows.map(r=>`<span style="font-size:10px;color:#475569"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.color};margin-right:4px"></span>${r.id}</span>`).join("")}
+  </div>`;
+
+  const html=`<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Comparativo Interparques — ${groupLabel}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+  .section-title{font-size:11px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #1d4ed8;padding-left:10px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:10px;text-transform:uppercase;color:#64748b;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0}
+  td{padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
+  .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+  .kpi{background:#fff;padding:16px 12px;text-align:center}
+  .kpi-val{font-size:28px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .kpi-lbl{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:4px}
+  .footer{text-align:center;font-size:10px;color:#94a3b8;padding:14px 0}
+</style></head>
+<body>
+
+<div class="section" style="background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff">
+  <div style="font-size:10px;opacity:.85;letter-spacing:1px;text-transform:uppercase">MOKED CONSULTING SECURITY · ACESSO GERENCIAL</div>
+  <div style="font-size:21px;font-weight:800;margin-top:4px">Relatório Comparativo Interparques</div>
+  <div style="font-size:13px;opacity:.92;margin-top:2px">Grupo ${groupLabel} — ${rows.length} unidades avaliadas</div>
+  <div style="font-size:11px;opacity:.8;margin-top:8px">Gerado em ${hoje} · José Fonseca · jose.fonseca@moked.com.br</div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-val" style="color:#15803d">${best.id}</div><div class="kpi-lbl">Melhor desempenho (${best.avgPct}%)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#dc2626">${worst.id}</div><div class="kpi-lbl">Requer atenção (${worst.avgPct}%)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#dc2626">${groupTotalInop}</div><div class="kpi-lbl">Inoperantes no grupo (atual)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#d97706">${estagnados.length}</div><div class="kpi-lbl">Projeto(s) estagnado(s)</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">Ranking de Eficiência Operacional</div>
+  <table>
+    <thead><tr><th>Pos.</th><th>Código</th><th>Projeto</th><th style="text-align:center">% Média</th><th style="text-align:center">% Atual</th><th style="text-align:center">Inop. Atual</th><th style="text-align:center">Tendência</th><th style="text-align:center">Status</th></tr></thead>
+    <tbody>${rankingRows}</tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Comparativo Visual — Média de Conformidade do Período</div>
+  ${barChart}
+</div>
+
+<div class="section">
+  <div class="section-title">Evolução Semanal por Projeto</div>
+  ${lineChart}
+</div>
+
+${estagnados.length?`<div class="section" style="border-left:4px solid #d97706">
+  <div class="section-title" style="color:#d97706;border-left-color:#d97706">⚠ Projetos em Estagnação</div>
+  <div style="font-size:12px;color:#475569">${estagnados.map(r=>`<strong>${r.id} — ${r.name}</strong> não apresentou evolução significativa no período avaliado (variação de ${r.trendDelta>=0?'+':''}${r.trendDelta} pontos).`).join("<br/><br/>")}</div>
+</div>`:""}
+
+<div class="footer">
+  <div>Relatório Comparativo Interparques © Moked Consulting Security</div>
+  <div style="font-weight:600;margin-top:2px">José Fonseca — Moked Consulting Security</div>
+  <div>jose.fonseca@moked.com.br · Grupo ${groupLabel} · ${hoje}</div>
+</div>
+</body></html>`;
+
+  const blob=new Blob([html],{type:"text/html"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`comparativo_${groupLabel.replace(/\s+/g,"_")}_${hoje.replace(/\//g,"-")}.html`;
+  a.click(); URL.revokeObjectURL(url);
+}
