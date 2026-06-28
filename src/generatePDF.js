@@ -177,7 +177,7 @@ function getCSS(theme) {
     .header-accent{height:5px;background:rgba(255,255,255,0.25)}
     .section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
     .section-title{font-size:11px;font-weight:800;color:${theme.primary};text-transform:uppercase;letter-spacing:1px;border-left:4px solid ${theme.headerBg};padding-left:10px;margin-bottom:14px}
-    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+    .kpi-row{display:grid;grid-template-columns:repeat(${ctmkInfo?5:4},1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
     .kpi{background:#fff;padding:16px 12px;text-align:center}
     .kpi-val{font-size:32px;font-weight:800;line-height:1;letter-spacing:-1px}
     .kpi-lbl{font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:4px;letter-spacing:.5px}
@@ -230,7 +230,7 @@ function buildHeader(theme, project, meta, weekLabel) {
 }
 
 // ── RELATÓRIO SEMANAL COMPLETO
-export function generatePDF(project, state, meta, photos) {
+export function generatePDF(project, state, meta, photos, ctmkInfo) {
   if(!project||!state||!meta) return;
   const theme = getTheme(project.id);
   const weekLabel = getWeekLabel(meta.date);
@@ -414,6 +414,7 @@ ${buildHeader(theme,project,meta,weekLabel)}
   <div class="kpi"><div class="kpi-val" style="color:#15803d">${totalOK}</div><div class="kpi-lbl">OK</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#d97706">${totalParcial}</div><div class="kpi-lbl">Parciais</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#dc2626">${totalInop}</div><div class="kpi-lbl">Inoperantes</div></div>
+  ${ctmkInfo?`<div class="kpi"><div class="kpi-val" style="color:${ctmkInfo.status==="offline"?"#dc2626":"#15803d"};font-size:15px">${ctmkInfo.status==="offline"?`🔴 OFF-LINE`:`🟢 ONLINE`}</div><div class="kpi-lbl">CTMK${ctmkInfo.status==="offline"&&ctmkInfo.days!=null?` · ${ctmkInfo.days}d s/ imagem`:""}</div></div>`:""}
 </div>
 
 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:13px 18px;margin-bottom:14px;font-size:12px;color:#475569;line-height:1.75">
