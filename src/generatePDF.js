@@ -752,12 +752,15 @@ ${resolvedRows?`<div class="section">
   a.click(); URL.revokeObjectURL(url);
 }
 
-// ── Relatório Comparativo Interparques (Painel Gerencial — acesso restrito)
-// groupData: [{ id, name, weeks: [{date, pct, inop}] }] — weeks em ordem cronológica (mais antiga → mais recente)
-export function generateGroupComparativePDF(groupLabel, groupData) {
+// ── Relatório Comparativo Interparques (Painel Gerencial — acesso restrito PIN)
+// groupData: [{ id, name, weeks:[{date,pct,inop}], chronicItems:[{label,since,days,note}] }]
+//   weeks em ordem cronológica (mais antiga → mais recente), recorte já escolhido pelo usuário
+// periodLabel: texto descritivo do recorte escolhido (ex: "Última semana (S4 Junho)", "Últimas 4 semanas", "6 semanas selecionadas")
+export function generateGroupComparativePDF(groupLabel, groupData, periodLabel) {
   if(!groupData || !groupData.length) return;
   const hoje = new Date().toLocaleDateString("pt-BR");
-  const PALETTE = ["#1d4ed8","#dc2626","#15803d","#d97706","#7c3aed","#0ea5e9","#db2777","#65a30d"];
+  const PALETTE = ["#2563eb","#dc2626","#16a34a","#d97706","#9333ea","#0891b2","#db2777","#65a30d"];
+  const MEDALS = ["🥇","🥈","🥉"];
 
   const rows = groupData.map((g,idx)=>{
     const weeks = g.weeks||[];
@@ -769,65 +772,94 @@ export function generateGroupComparativePDF(groupLabel, groupData) {
     const trendDelta = latest.pct - first.pct;
     const trendIcon = trendDelta>1 ? "↑ Melhorou" : trendDelta< -1 ? "↓ Piorou" : "→ Estável";
     const trendColor = trendDelta>1 ? "#15803d" : trendDelta< -1 ? "#dc2626" : "#64748b";
-    const estagnado = n>=3 && Math.abs(trendDelta)<=1;
+    const flat = n>=3 && Math.abs(trendDelta)<=1;
     const tier = avgPct>=90?{label:"DESTAQUE POSITIVO",color:"#15803d",bg:"#dcfce7"}
                : avgPct>=70?{label:"ATENÇÃO",color:"#d97706",bg:"#fef3c7"}
                : {label:"CRÍTICO",color:"#dc2626",bg:"#fee2e2"};
+    // Estagnação: só é alerta se a média está abaixo de 90% — estagnar no topo é mérito, não problema
+    const estagnadoCritico = flat && avgPct<90;
+    const estagnadoExcelencia = flat && avgPct>=90;
+    const chronicItems = (g.chronicItems||[]).slice().sort((a,b)=>b.days-a.days);
     return { id:g.id, name:g.name, n, avgPct, latestPct:latest.pct, latestInop:latest.inop, latestDate:latest.date,
-             trendDelta, trendIcon, trendColor, estagnado, tier, weeks, color: PALETTE[idx%PALETTE.length] };
+             trendDelta, trendIcon, trendColor, estagnadoCritico, estagnadoExcelencia, tier, weeks, chronicItems,
+             color: PALETTE[idx%PALETTE.length] };
   }).sort((a,b)=>b.avgPct-a.avgPct);
 
   const groupTotalInop = rows.reduce((a,r)=>a+r.latestInop,0);
   const worst = rows[rows.length-1];
   const best = rows[0];
-  const estagnados = rows.filter(r=>r.estagnado);
+  const estagnadosCriticos = rows.filter(r=>r.estagnadoCritico);
+  const allChronic = rows.flatMap(r=>r.chronicItems.map(c=>({...c, projectId:r.id, projectName:r.name})))
+                         .sort((a,b)=>b.days-a.days);
 
   // ── Tabela ranking
   const rankingRows = rows.map((r,i)=>`
-    <tr style="${i===0?'background:#f0fdf4':i===rows.length-1?'background:#fef2f2':''}">
-      <td style="font-weight:800;font-size:14px;text-align:center;color:${i===0?'#15803d':i===rows.length-1?'#dc2626':'#475569'}">${i+1}º</td>
-      <td style="font-weight:800;color:#1e293b">${r.id}</td>
-      <td>${r.name}</td>
-      <td style="text-align:center;font-weight:800;color:${r.tier.color}">${r.avgPct}%</td>
+    <tr style="${i===0?'background:#f0fdf4':i===rows.length-1&&rows.length>1?'background:#fef2f2':''}">
+      <td style="font-weight:800;font-size:15px;text-align:center">${MEDALS[i]||`${i+1}º`}</td>
+      <td style="font-weight:800;color:#1e293b;font-size:13px">${r.id}</td>
+      <td style="color:#475569">${r.name}</td>
+      <td style="text-align:center;font-weight:800;color:${r.tier.color};font-size:14px">${r.avgPct}%</td>
       <td style="text-align:center;font-weight:700">${r.latestPct}%</td>
       <td style="text-align:center;font-weight:700;color:${r.latestInop>0?'#dc2626':'#15803d'}">${r.latestInop}</td>
       <td style="text-align:center;color:${r.trendColor};font-weight:700;font-size:11px">${r.trendIcon}</td>
-      <td style="text-align:center"><span class="badge" style="background:${r.tier.bg};color:${r.tier.color}">${r.tier.label}</span>${r.estagnado?'<br/><span class="badge" style="background:#f1f5f9;color:#64748b;margin-top:3px">⚠ Estagnado</span>':''}</td>
+      <td style="text-align:center">
+        <span class="badge" style="background:${r.tier.bg};color:${r.tier.color}">${r.tier.label}</span>
+        ${r.estagnadoCritico?'<br/><span class="badge" style="background:#fee2e2;color:#dc2626;margin-top:3px">⚠ Sem evolução</span>':''}
+        ${r.estagnadoExcelencia?'<br/><span class="badge" style="background:#dbeafe;color:#1d4ed8;margin-top:3px">✓ Mantém excelência</span>':''}
+      </td>
     </tr>`).join("");
 
   // ── Gráfico de barras (média do período) — SVG nativo
-  const barW=620, barH=rows.length*34+20, barPad=170;
-  const barChart = `<svg viewBox="0 0 ${barW} ${barH}" width="100%" style="max-height:${barH}px">
+  const barW=640, barRowH=36, barH=rows.length*barRowH+16, barPad=185;
+  const barChart = `<svg viewBox="0 0 ${barW} ${barH}" width="100%" style="max-height:${barH}px" xmlns="http://www.w3.org/2000/svg">
     ${rows.map((r,i)=>{
-      const y=i*34+10; const w=Math.max(2,((barW-barPad-30)*r.avgPct/100));
-      return `<text x="0" y="${y+15}" font-size="11" font-weight="700" fill="#1e293b">${r.id}</text>
-        <rect x="${barPad}" y="${y}" width="${barW-barPad-30}" height="20" fill="#f1f5f9" rx="3"/>
-        <rect x="${barPad}" y="${y}" width="${w}" height="20" fill="${r.tier.color}" rx="3"/>
-        <text x="${barPad+w+8}" y="${y+15}" font-size="11" font-weight="800" fill="${r.tier.color}">${r.avgPct}%</text>`;
+      const y=i*barRowH+8; const fullW=barW-barPad-30; const w=Math.max(3,(fullW*r.avgPct/100));
+      return `<text x="0" y="${y+15}" font-size="12" font-weight="800" fill="#1e293b">${MEDALS[i]||""} ${r.id}</text>
+        <rect x="${barPad}" y="${y}" width="${fullW}" height="22" fill="#f1f5f9" rx="4"/>
+        <rect x="${barPad}" y="${y}" width="${w}" height="22" fill="${r.tier.color}" rx="4"/>
+        <text x="${barPad+w+8}" y="${y+16}" font-size="12" font-weight="800" fill="${r.tier.color}">${r.avgPct}%</text>`;
     }).join("")}
   </svg>`;
 
-  // ── Gráfico de evolução (linhas) — SVG nativo, alinhado à direita pela semana mais recente
-  const lineW=620, lineH=180, padL=36, padB=24, padT=12;
+  // ── Gráfico de evolução (linhas) com datas no eixo — SVG nativo, alinhado à direita pela semana mais recente
+  const lineW=640, lineH=210, padL=38, padB=34, padT=14, padR=14;
   const maxWeeks = Math.max(...rows.map(r=>r.n),1);
-  const stepX = maxWeeks>1 ? (lineW-padL-10)/(maxWeeks-1) : 0;
+  const stepX = maxWeeks>1 ? (lineW-padL-padR)/(maxWeeks-1) : 0;
   const yFor = pct => padT + (100-pct)/100*(lineH-padT-padB);
-  const xForRight = (m,i) => { const weeksAgo=(m-1-i); return (lineW-10) - weeksAgo*stepX; };
-  const lineChart = `<svg viewBox="0 0 ${lineW} ${lineH}" width="100%" style="max-height:${lineH}px">
-    <line x1="${padL}" y1="${yFor(90)}" x2="${lineW-10}" y2="${yFor(90)}" stroke="#22c55e" stroke-dasharray="4,3" stroke-width="1"/>
-    <text x="${padL}" y="${yFor(90)-3}" font-size="9" fill="#22c55e">90%</text>
-    <line x1="${padL}" y1="${lineH-padB}" x2="${lineW-10}" y2="${lineH-padB}" stroke="#cbd5e1" stroke-width="1"/>
+  const xForRight = (m,i) => { const weeksAgo=(m-1-i); return (lineW-padR) - weeksAgo*stepX; };
+  // Eixo X: usa as datas do projeto com mais semanas no período (referência mais completa)
+  const refRow = rows.find(r=>r.n===maxWeeks) || rows[0];
+  const axisLabels = (refRow?.weeks||[]).map((w,i)=>{
+    const x = xForRight(maxWeeks,i);
+    return `<text x="${x}" y="${lineH-padB+16}" font-size="9" fill="#64748b" text-anchor="middle">${fmtDate(w.date).slice(0,5)}</text>`;
+  }).join("");
+  const lineChart = `<svg viewBox="0 0 ${lineW} ${lineH}" width="100%" style="max-height:${lineH}px" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${padL}" y1="${yFor(90)}" x2="${lineW-padR}" y2="${yFor(90)}" stroke="#22c55e" stroke-dasharray="4,3" stroke-width="1"/>
+    <text x="${padL}" y="${yFor(90)-4}" font-size="9" fill="#22c55e" font-weight="700">Meta 90%</text>
+    <line x1="${padL}" y1="${lineH-padB}" x2="${lineW-padR}" y2="${lineH-padB}" stroke="#cbd5e1" stroke-width="1"/>
     <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${lineH-padB}" stroke="#cbd5e1" stroke-width="1"/>
+    ${[100,75,50,25,0].map(v=>`<text x="${padL-6}" y="${yFor(v)+3}" font-size="8" fill="#94a3b8" text-anchor="end">${v}</text>`).join("")}
     ${rows.map(r=>{
-      const m=r.n; if(m<2) return "";
+      const m=r.n; if(m<2) return `<circle cx="${xForRight(m,0)}" cy="${yFor(r.weeks[0].pct)}" r="4" fill="${r.color}"/>`;
       const pts = r.weeks.map((w,i)=>`${xForRight(m,i)},${yFor(w.pct)}`).join(" ");
-      return `<polyline points="${pts}" fill="none" stroke="${r.color}" stroke-width="2.2"/>
-        ${r.weeks.map((w,i)=>`<circle cx="${xForRight(m,i)}" cy="${yFor(w.pct)}" r="3" fill="${r.color}"/>`).join("")}`;
+      return `<polyline points="${pts}" fill="none" stroke="${r.color}" stroke-width="2.5" stroke-linejoin="round"/>
+        ${r.weeks.map((w,i)=>`<circle cx="${xForRight(m,i)}" cy="${yFor(w.pct)}" r="3.5" fill="#fff" stroke="${r.color}" stroke-width="2"/>`).join("")}`;
     }).join("")}
+    ${axisLabels}
   </svg>
-  <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px;justify-content:center">
-    ${rows.map(r=>`<span style="font-size:10px;color:#475569"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${r.color};margin-right:4px"></span>${r.id}</span>`).join("")}
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;justify-content:center">
+    ${rows.map(r=>`<span style="font-size:10.5px;color:#475569;font-weight:600"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:5px;vertical-align:middle"></span>${r.id}</span>`).join("")}
   </div>`;
+
+  // ── Itens crônicos cruzados (150+ dias) — munição de cobrança pra diretoria
+  const chronicRows = allChronic.map(c=>`
+    <tr>
+      <td style="font-weight:800;color:#1e293b">${c.projectId}</td>
+      <td>${c.projectName}</td>
+      <td>${c.label}</td>
+      <td style="text-align:center;font-weight:800;color:#dc2626;font-size:14px">🔥 ${c.days}d</td>
+      <td style="font-size:11px;color:#64748b">${c.note||"—"}</td>
+    </tr>`).join("");
 
   const html=`<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
@@ -835,55 +867,72 @@ export function generateGroupComparativePDF(groupLabel, groupData) {
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
-  .section{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
-  .section-title{font-size:11px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #1d4ed8;padding-left:10px;margin-bottom:14px}
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+  .section-title{font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #2563eb;padding-left:10px;margin-bottom:16px}
   table{width:100%;border-collapse:collapse}
-  th{font-size:10px;text-transform:uppercase;color:#64748b;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0}
-  td{padding:9px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
+  th{font-size:10px;text-transform:uppercase;color:#64748b;text-align:left;padding:9px 10px;border-bottom:2px solid #e2e8f0;letter-spacing:.5px}
+  td{padding:10px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
   .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700}
-  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;margin-bottom:14px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-  .kpi{background:#fff;padding:16px 12px;text-align:center}
-  .kpi-val{font-size:28px;font-weight:800;line-height:1;letter-spacing:-1px}
-  .kpi-lbl{font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:4px}
-  .footer{text-align:center;font-size:10px;color:#94a3b8;padding:14px 0}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e2e8f0;margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08)}
+  .kpi{background:#fff;padding:18px 12px;text-align:center}
+  .kpi-val{font-size:26px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .kpi-lbl{font-size:9.5px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:5px;letter-spacing:.4px}
+  .footer{text-align:center;font-size:10px;color:#94a3b8;padding:16px 0}
 </style></head>
 <body>
 
-<div class="section" style="background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff">
-  <div style="font-size:10px;opacity:.85;letter-spacing:1px;text-transform:uppercase">MOKED CONSULTING SECURITY · ACESSO GERENCIAL</div>
-  <div style="font-size:21px;font-weight:800;margin-top:4px">Relatório Comparativo Interparques</div>
-  <div style="font-size:13px;opacity:.92;margin-top:2px">Grupo ${groupLabel} — ${rows.length} unidades avaliadas</div>
-  <div style="font-size:11px;opacity:.8;margin-top:8px">Gerado em ${hoje} · José Fonseca · jose.fonseca@moked.com.br</div>
+<div class="section" style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 55%,#3b82f6 100%);color:#fff;box-shadow:0 8px 24px rgba(37,99,235,0.25)">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;opacity:.85;letter-spacing:1.5px;text-transform:uppercase;font-weight:600">MOKED CONSULTING SECURITY · ACESSO GERENCIAL</div>
+      <div style="font-size:23px;font-weight:800;margin-top:6px">📊 Relatório Comparativo Interparques</div>
+      <div style="font-size:14px;opacity:.95;margin-top:3px;font-weight:600">Grupo ${groupLabel} — ${rows.length} unidades avaliadas</div>
+      ${periodLabel?`<div style="font-size:12px;opacity:.85;margin-top:6px;display:inline-block;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px">🗓 ${periodLabel}</div>`:""}
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;opacity:.8">Gerado em ${hoje}</div>
+      <div style="font-size:11px;opacity:.8">José Fonseca · jose.fonseca@moked.com.br</div>
+    </div>
+  </div>
 </div>
 
 <div class="kpi-row">
-  <div class="kpi"><div class="kpi-val" style="color:#15803d">${best.id}</div><div class="kpi-lbl">Melhor desempenho (${best.avgPct}%)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#15803d">🥇 ${best.id}</div><div class="kpi-lbl">Melhor desempenho (${best.avgPct}%)</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#dc2626">${worst.id}</div><div class="kpi-lbl">Requer atenção (${worst.avgPct}%)</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#dc2626">${groupTotalInop}</div><div class="kpi-lbl">Inoperantes no grupo (atual)</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#d97706">${estagnados.length}</div><div class="kpi-lbl">Projeto(s) estagnado(s)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#d97706">${allChronic.length}</div><div class="kpi-lbl">Itens crônicos (150+ dias)</div></div>
 </div>
 
 <div class="section">
-  <div class="section-title">Ranking de Eficiência Operacional</div>
+  <div class="section-title">🏆 Ranking de Eficiência Operacional</div>
   <table>
-    <thead><tr><th>Pos.</th><th>Código</th><th>Projeto</th><th style="text-align:center">% Média</th><th style="text-align:center">% Atual</th><th style="text-align:center">Inop. Atual</th><th style="text-align:center">Tendência</th><th style="text-align:center">Status</th></tr></thead>
+    <thead><tr><th>Pos.</th><th>Código</th><th>Projeto</th><th style="text-align:center">% Médio</th><th style="text-align:center">% Atual</th><th style="text-align:center">Inop. Atual</th><th style="text-align:center">Tendência</th><th style="text-align:center">Status</th></tr></thead>
     <tbody>${rankingRows}</tbody>
   </table>
 </div>
 
 <div class="section">
-  <div class="section-title">Comparativo Visual — Média de Conformidade do Período</div>
+  <div class="section-title">📊 Comparativo Visual — Conformidade Média do Período</div>
   ${barChart}
 </div>
 
 <div class="section">
-  <div class="section-title">Evolução Semanal por Projeto</div>
+  <div class="section-title">📈 Evolução Semanal por Projeto</div>
   ${lineChart}
 </div>
 
-${estagnados.length?`<div class="section" style="border-left:4px solid #d97706">
-  <div class="section-title" style="color:#d97706;border-left-color:#d97706">⚠ Projetos em Estagnação</div>
-  <div style="font-size:12px;color:#475569">${estagnados.map(r=>`<strong>${r.id} — ${r.name}</strong> não apresentou evolução significativa no período avaliado (variação de ${r.trendDelta>=0?'+':''}${r.trendDelta} pontos).`).join("<br/><br/>")}</div>
+${allChronic.length?`<div class="section" style="border:1px solid #fecaca">
+  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">🔥 Itens Crônicos do Grupo — 150+ Dias em Aberto</div>
+  <div style="font-size:11px;color:#64748b;margin-bottom:10px">Pendências antigas cruzadas entre projetos — use para cobrança direcionada de equipes terceirizadas ou empresas de manutenção.</div>
+  <table>
+    <thead><tr><th>Cód.</th><th>Projeto</th><th>Item</th><th style="text-align:center">Dias</th><th>Descrição</th></tr></thead>
+    <tbody>${chronicRows}</tbody>
+  </table>
+</div>`:""}
+
+${estagnadosCriticos.length?`<div class="section" style="border:1px solid #fed7aa">
+  <div class="section-title" style="color:#d97706;border-left-color:#d97706">⚠ Projetos Sem Evolução — Atenção Necessária</div>
+  <div style="font-size:12px;color:#475569">${estagnadosCriticos.map(r=>`<strong>${r.id} — ${r.name}</strong> não apresentou evolução significativa no período avaliado (variação de ${r.trendDelta>=0?'+':''}${r.trendDelta} pontos, média de ${r.avgPct}%).`).join("<br/><br/>")}</div>
 </div>`:""}
 
 <div class="footer">

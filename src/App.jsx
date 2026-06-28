@@ -412,6 +412,35 @@ function buildFromLast(project, lastState) {
   return st;
 }
 
+function extractChronicItems(project, state) {
+  if(!state) return [];
+  const CHRONIC_DAYS = 150;
+  const out = [];
+  const calcDays = (since) => since ? Math.floor((Date.now()-new Date(since+"T12:00:00").getTime())/86400000) : null;
+  for(const cat of project.categories){
+    const s = state[cat.id]; if(!s) continue;
+    if(cat.type==="single" && s.status && s.status!=="ok" && s.since){
+      const days = calcDays(s.since);
+      if(days!==null && days>CHRONIC_DAYS) out.push({label:cat.label, since:s.since, days, note:s.note||""});
+    } else if(cat.type==="items" && Array.isArray(s)){
+      s.forEach((v,i)=>{
+        if(v?.status && v.status!=="ok" && v.since){
+          const days = calcDays(v.since);
+          if(days!==null && days>CHRONIC_DAYS) out.push({label:`${cat.label} — ${cat.itemLabels?.[i]||`Item ${i+1}`}`, since:v.since, days, note:v.note||""});
+        }
+      });
+    } else if(cat.type==="count" && Array.isArray(s.inoperative)){
+      s.inoperative.forEach(it=>{
+        if(it?.since){
+          const days = calcDays(it.since);
+          if(days!==null && days>CHRONIC_DAYS) out.push({label:`${cat.label} — ${it.id||"Item"}`, since:it.since, days, note:it.note||""});
+        }
+      });
+    }
+  }
+  return out;
+}
+
 function computeHealth(project, state) {
   let total=0, okCount=0, partial=0, inop=0;
   if(!state || typeof state!=="object") return { total:0, ok:0, partial:0, inop:0, pct:100 };
@@ -933,6 +962,23 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
   const [pendScreen,setPendScreen]=useState(false);
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
+  const GOLGI_IDS=["P601","P602","P604","P605","P606","P607"], MEGA_IDS=["P311A","P311B"];
+  const buildGroupComparativeData = (ids, selectedDates) => ids.map(id=>{
+    const p=PROJECTS[id]; if(!p) return null;
+    const hist=stored[id]?.history??[]; if(!hist.length) return null;
+    const filtered = selectedDates ? hist.filter(r=>selectedDates.has(r.meta?.date)) : hist;
+    if(!filtered.length) return null;
+    const weeks=filtered.map(r=>{const h=computeHealth(p,r.state);return{date:r.meta?.date,pct:h.pct,inop:h.inop};});
+    const lastReport=filtered[filtered.length-1];
+    const chronicItems = extractChronicItems(p, lastReport.state);
+    return {id, name:p.name, weeks, chronicItems};
+  }).filter(Boolean);
+  const getAvailableDates = (ids) => {
+    const set=new Set();
+    ids.forEach(id=>(stored[id]?.history??[]).forEach(r=>{if(r.meta?.date) set.add(r.meta.date);}));
+    return [...set].sort().reverse(); // mais recente primeiro
+  };
+  const [groupCompScreen,setGroupCompScreen]=useState(null); const [selWeeks,setSelWeeks]=useState(new Set());
   const [sessionTime,setSessionTime]=useState(Date.now());
   const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
   useEffect(()=>{
@@ -981,6 +1027,60 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
     </div>
   );
   if(pendScreen) return <PendenciesScreen stored={stored} onBack={()=>setPendScreen(false)}/>;
+  if(groupCompScreen){
+    const {label,ids}=groupCompScreen;
+    const availDates=(()=>{const set=new Set();ids.forEach(id=>(stored[id]?.history??[]).forEach(r=>{if(r.meta?.date)set.add(r.meta.date);}));return [...set].sort().reverse();})();
+    const countForDate=(d)=>ids.filter(id=>(stored[id]?.history??[]).some(r=>r.meta?.date===d)).length;
+    const toggleWeek=(d)=>setSelWeeks(prev=>{const next=new Set(prev);next.has(d)?next.delete(d):next.add(d);return next;});
+    const applyPreset=(preset)=>{
+      if(preset==="hoje") setSelWeeks(new Set(availDates.slice(0,1)));
+      else if(preset==="mes") setSelWeeks(new Set(availDates.slice(0,4)));
+      else if(preset==="tudo") setSelWeeks(new Set(availDates));
+    };
+    const gerar=()=>{
+      if(selWeeks.size===0) return;
+      const data=buildGroupComparativeData(ids, selWeeks);
+      const n=selWeeks.size;
+      const periodLabel = n===1?`Semana de ${fmtDate([...selWeeks][0])}`:n===availDates.length?`Período completo (${n} semanas)`:`${n} semanas selecionadas`;
+      generateGroupComparativePDF(label, data, periodLabel);
+    };
+    return(
+      <div style={S.page} onClick={resetSess}>
+        <div style={S.formWrap}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:12}}>
+            <button onClick={()=>setGroupCompScreen(null)} style={S.backBtn} aria-label="Voltar">← Painel</button>
+            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>📊 Comparativo {label}</div><div style={{fontSize:11,color:"#94a3b8"}}>Escolha o período a comparar</div></div>
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            <button onClick={()=>applyPreset("hoje")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>🗓 Última semana</button>
+            <button onClick={()=>applyPreset("mes")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>📅 Último mês</button>
+            <button onClick={()=>applyPreset("tudo")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>🗂 Tudo</button>
+          </div>
+          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Ou selecione manualmente ({selWeeks.size} selecionada{selWeeks.size===1?"":"s"})</div>
+          <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:90}}>
+            {availDates.length===0&&<div style={{fontSize:12,color:"#64748b",textAlign:"center",padding:20}}>Nenhum relatório encontrado para este grupo ainda.</div>}
+            {availDates.map(d=>{
+              const sel=selWeeks.has(d); const cnt=countForDate(d);
+              return(
+                <div key={d} onClick={()=>toggleWeek(d)} style={{display:"flex",alignItems:"center",gap:10,background:sel?"#0c1f3d":"#060c18",border:`1.5px solid ${sel?"#3b82f6":"#0f172a"}`,borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
+                  <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${sel?"#3b82f6":"#475569"}`,background:sel?"#3b82f6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{sel?"✓":""}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>{getWeekLabel(d)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(d)}</span></div>
+                  </div>
+                  <div style={{fontSize:10,color:"#64748b",fontWeight:700}}>{cnt}/{ids.length} projetos</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#020510",borderTop:"1px solid #0f172a",padding:14}}>
+          <button onClick={gerar} disabled={selWeeks.size===0} style={{...S.primaryBtn,width:"100%",background:selWeeks.size===0?"#1e293b":"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:14,opacity:selWeeks.size===0?0.6:1,maxWidth:480,margin:"0 auto",display:"block"}}>
+            📊 Gerar Comparativo ({selWeeks.size} semana{selWeeks.size===1?"":"s"})
+          </button>
+        </div>
+      </div>
+    );
+  }
   if(viewReport) return(
     <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
@@ -1130,15 +1230,6 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
   const criticalAlerts=[];
   allProjects.forEach(p=>{const hist=stored[p.id]?.history??[];if(!hist.length)return;for(const cat of p.categories){if(cat.type==="items"){const lastState=hist[hist.length-1].state[cat.id];if(!lastState)continue;lastState.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok"){const wks=getConsecutiveInopWeeks(p,hist,cat.id,i);if(wks>=2)criticalAlerts.push({project:p.id,label:`${cat.label} — ${cat.itemLabels[i]}`,weeks:wks});}});}}});
   criticalAlerts.sort((a,b)=>b.weeks-a.weeks);
-  const buildGroupComparativeData = (ids) => ids.map(id=>{
-    const p=PROJECTS[id]; if(!p) return null;
-    const hist=stored[id]?.history??[]; if(!hist.length) return null;
-    const last4=hist.slice(-4);
-    const weeks=last4.map(r=>{const h=computeHealth(p,r.state);return{date:r.meta?.date,pct:h.pct,inop:h.inop};});
-    return {id, name:p.name, weeks};
-  }).filter(Boolean);
-  const GOLGI_IDS=["P601","P602","P604","P605","P606","P607"], MEGA_IDS=["P311A","P311B"];
-  const golgiData=buildGroupComparativeData(GOLGI_IDS), megaData=buildGroupComparativeData(MEGA_IDS);
   return(
     <div style={S.page} onClick={resetSess}>
       <div style={S.formWrap}>
@@ -1155,10 +1246,10 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
             <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div><div style={{fontSize:9,color:"#64748b",fontWeight:700}}>ALERTAS</div></div>
           </div>
         </div>}
-        {(golgiData.length>=2||megaData.length>=2)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+        {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📊 Comparativo Interparques</div>
-          {golgiData.length>=2&&<button onClick={()=>generateGroupComparativePDF("Golgi",golgiData)} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:13}}>📊 Gerar Comparativo Golgi ({golgiData.length} projetos)</button>}
-          {megaData.length>=2&&<button onClick={()=>generateGroupComparativePDF("Mega",megaData)} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0ea5e9,#0369a1)",fontSize:13}}>📊 Gerar Comparativo Mega ({megaData.length} projetos)</button>}
+          {getAvailableDates(GOLGI_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Golgi",ids:GOLGI_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:13}}>📊 Comparativo Golgi</button>}
+          {getAvailableDates(MEGA_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Mega",ids:MEGA_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0ea5e9,#0369a1)",fontSize:13}}>📊 Comparativo Mega</button>}
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
