@@ -184,6 +184,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [salvando, setSalvando] = useState(false);
   const [erroSalvar, setErroSalvar] = useState(false);
   const [listaPendente, setListaPendente] = useState(null); // última gravação que falhou, p/ retry
+  const [selTurnos, setSelTurnos] = useState(new Set());
 
   // Relógio: recalcula status a cada 30s (e ao montar/abrir o app)
   useEffect(()=>{
@@ -390,6 +391,18 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
         <button onClick={()=>setShowArquivados(true)} style={{...S.btnSm,flex:1,padding:"7px",...(showArquivados?{background:"#64748b22",border:"1px solid #64748b66",color:"#94a3b8"}:{})}}>📦 Arquivados ({arquivados.length})</button>
       </div>
 
+      {showArquivados && arquivados.length>0 && (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,background:dark?"#0c0a1a":"#faf5ff",border:"1px solid #a855f733",borderRadius:8,padding:"8px 10px"}}>
+          <span style={{fontSize:11,color:"#a855f7",fontWeight:700}}>☑ {selTurnos.size} turno{selTurnos.size===1?"":"s"} selecionado{selTurnos.size===1?"":"s"} p/ consolidado</span>
+          {selTurnos.size>=2 && (
+            <button onClick={()=>gerarPDFConsolidadoRonda(project, arquivados.filter(t=>selTurnos.has(t.id)))}
+              style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap"}}>
+              📊 Gerar Consolidado
+            </button>
+          )}
+        </div>
+      )}
+
       {visiveis.length===0 && (
         <div style={{textAlign:"center",padding:"36px 0"}}>
           <div style={{fontSize:30,marginBottom:8}}>{showArquivados?"📦":"🎥"}</div>
@@ -398,10 +411,20 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       )}
 
       {visiveis.map(t=>(
-        <TurnoCard key={t.id} turno={t} projectId={project.id} dark={dark} S={S} adminAuth={adminAuth} tick={tick}
-          onUpd={updTurno} onArquivar={()=>arquivarTurno(t.id)} onDesarquivar={()=>desarquivarTurno(t.id)}
-          onExcluir={()=>{ if(window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
-          onPDF={()=>gerarPDFRonda(project, t)}/>
+        <div key={t.id} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+          {showArquivados && (
+            <button onClick={()=>setSelTurnos(prev=>{const next=new Set(prev);next.has(t.id)?next.delete(t.id):next.add(t.id);return next;})}
+              style={{marginTop:14,width:24,height:24,borderRadius:6,border:`2px solid ${selTurnos.has(t.id)?"#a855f7":"#475569"}`,background:selTurnos.has(t.id)?"#a855f733":"transparent",color:"#a855f7",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
+              {selTurnos.has(t.id)?"✓":""}
+            </button>
+          )}
+          <div style={{flex:1,minWidth:0}}>
+            <TurnoCard turno={t} projectId={project.id} dark={dark} S={S} adminAuth={adminAuth} tick={tick}
+              onUpd={updTurno} onArquivar={()=>arquivarTurno(t.id)} onDesarquivar={()=>desarquivarTurno(t.id)}
+              onExcluir={()=>{ if(window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
+              onPDF={()=>gerarPDFRonda(project, t)}/>
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -699,6 +722,171 @@ export function gerarPDFRonda(project, turno) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href=url; a.download=`cco_ronda_${project.id}_${turno.tipo}_${turno.dataInicio}.html`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PDF CONSOLIDADO — múltiplos turnos, ranking de atrasos/não-execuções por
+// colaborador, separando ocorrências COM justificativa preenchida (possível
+// causa operacional legítima) das SEM justificativa (negligência aparente).
+// Nota: o sistema não classifica o CONTEÚDO da justificativa como "válida"
+// ou não — isso é uma decisão humana. Aqui apenas separa "foi justificado"
+// de "não foi justificado", que é o que os dados permitem com segurança.
+// ════════════════════════════════════════════════════════════════════════
+export function gerarPDFConsolidadoRonda(project, turnosSelecionados) {
+  if(!turnosSelecionados || turnosSelecionados.length<2) return;
+  const turnos = turnosSelecionados.slice().sort((a,b)=>(a.dataInicio||"").localeCompare(b.dataInicio||""));
+  const hoje = new Date().toLocaleDateString("pt-BR");
+
+  const porColaborador = {};
+  let totalPrevistas=0, totalRealizadas=0, totalAtrasos=0, totalNaoExec=0, totalSemJust=0;
+  const ocorrenciasSemJust = [];
+
+  turnos.forEach(t=>{
+    const tinfo = RONDA_TURNOS[t.tipo] || RONDA_TURNOS.noturno;
+    const slots = buildSlots(t.tipo, project.id);
+    const agoraMin = minutosDesdeInicio(t.tipo, t.dataInicio);
+    const nome = t.plantonista?.nome || "—";
+    if(!porColaborador[nome]) porColaborador[nome]={nome,turnos:0,atrasos:0,naoexec:0,semJust:0,comJust:0};
+    porColaborador[nome].turnos++;
+    let realizadasTurno=0;
+
+    slots.forEach((s,i)=>{
+      const prox = slots[i+1] ? slots[i+1].offsetMin : null;
+      const reg = t.rondas?.[String(s.offsetMin)] || null;
+      const st = statusSlot(s, prox, agoraMin, reg);
+      if(reg && reg.inicio) realizadasTurno++;
+      const just = (reg?.justificativa||"").trim();
+      if(st==="feita_atrasada"){
+        totalAtrasos++; porColaborador[nome].atrasos++;
+        if(just){ porColaborador[nome].comJust++; }
+        else { totalSemJust++; porColaborador[nome].semJust++; ocorrenciasSemJust.push({nome,data:fmtDataBR(t.dataInicio),turno:tinfo.label,horario:s.label,tipo:"Atraso"}); }
+      } else if(st==="naoexec"||st==="bloqueado"){
+        totalNaoExec++; porColaborador[nome].naoexec++;
+        if(just){ porColaborador[nome].comJust++; }
+        else { totalSemJust++; porColaborador[nome].semJust++; ocorrenciasSemJust.push({nome,data:fmtDataBR(t.dataInicio),turno:tinfo.label,horario:s.label,tipo:"Não executada"}); }
+      }
+    });
+    totalPrevistas += slots.length;
+    totalRealizadas += realizadasTurno;
+  });
+
+  const ranking = Object.values(porColaborador).sort((a,b)=>(b.atrasos+b.naoexec)-(a.atrasos+a.naoexec));
+  const periodoIni = fmtDataBR(turnos[0]?.dataInicio), periodoFim = fmtDataBR(turnos[turnos.length-1]?.dataInicio);
+
+  const rankingRows = ranking.map((c,i)=>{
+    const totalProb = c.atrasos+c.naoexec;
+    const tier = c.semJust===0 ? {label:"REGULAR",color:"#15803d",bg:"#dcfce7"}
+               : c.semJust<=2 ? {label:"ATENÇÃO",color:"#d97706",bg:"#fef3c7"}
+               : {label:"CRÍTICO",color:"#dc2626",bg:"#fee2e2"};
+    return `<tr style="${i===0&&totalProb>0?'background:#fef2f2':''}">
+      <td style="font-weight:800;color:#1e293b">${c.nome}</td>
+      <td style="text-align:center">${c.turnos}</td>
+      <td style="text-align:center;font-weight:700;color:${c.atrasos>0?'#d97706':'#15803d'}">${c.atrasos}</td>
+      <td style="text-align:center;font-weight:700;color:${c.naoexec>0?'#dc2626':'#15803d'}">${c.naoexec}</td>
+      <td style="text-align:center;font-weight:700;color:#15803d">${c.comJust}</td>
+      <td style="text-align:center;font-weight:800;color:${c.semJust>0?'#dc2626':'#94a3b8'}">${c.semJust}</td>
+      <td style="text-align:center"><span class="badge" style="background:${tier.bg};color:${tier.color}">${tier.label}</span></td>
+    </tr>`;
+  }).join("");
+
+  const semJustRows = ocorrenciasSemJust.map(o=>`
+    <tr>
+      <td style="font-weight:700">${o.nome}</td>
+      <td>${o.data}</td>
+      <td>${o.turno}</td>
+      <td>${o.horario}</td>
+      <td style="color:${o.tipo==="Não executada"?"#dc2626":"#d97706"};font-weight:700">${o.tipo}</td>
+    </tr>`).join("");
+
+  const turnosListRows = turnos.map(t=>{
+    const tinfo = RONDA_TURNOS[t.tipo] || RONDA_TURNOS.noturno;
+    return `<tr><td>${fmtDataBR(t.dataInicio)}</td><td>${tinfo.label}</td><td>${t.plantonista?.nome||"—"}</td></tr>`;
+  }).join("");
+
+  const taxaExec = totalPrevistas>0 ? Math.round((totalRealizadas/totalPrevistas)*100) : 100;
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Consolidado Ronda Virtual — ${project.id}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+  .section-title{font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #7c3aed;padding-left:10px;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:10px;text-transform:uppercase;color:#64748b;text-align:left;padding:9px 10px;border-bottom:2px solid #e2e8f0;letter-spacing:.5px}
+  td{padding:10px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
+  .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700}
+  .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:#e2e8f0;margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08)}
+  .kpi{background:#fff;padding:16px 8px;text-align:center}
+  .kpi-val{font-size:23px;font-weight:800;line-height:1;letter-spacing:-1px}
+  .kpi-lbl{font-size:8.5px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:5px;letter-spacing:.3px}
+  .footer{text-align:center;font-size:10px;color:#94a3b8;padding:16px 0}
+  @media print{body{padding:10px}@page{margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+</style></head>
+<body>
+
+<div class="section" style="background:linear-gradient(135deg,#4c1d95 0%,#7c3aed 55%,#8b5cf6 100%);color:#fff;box-shadow:0 8px 24px rgba(124,58,237,0.25)">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:10px;opacity:.85;letter-spacing:1.5px;text-transform:uppercase;font-weight:600">MOKED CONSULTING SECURITY</div>
+      <div style="font-size:23px;font-weight:800;margin-top:6px">🎥 Consolidado de Ronda Virtual (CFTV)</div>
+      <div style="font-size:14px;opacity:.95;margin-top:3px;font-weight:600">${project.id} — ${project.name||""} · ${turnos.length} turnos</div>
+      <div style="font-size:12px;opacity:.85;margin-top:6px;display:inline-block;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px">🗓 ${periodoIni} a ${periodoFim}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:11px;opacity:.8">Gerado em ${hoje}</div>
+      <div style="font-size:11px;opacity:.8">José Fonseca · jose.fonseca@moked.com.br</div>
+    </div>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-val" style="color:#1e293b">${totalPrevistas}</div><div class="kpi-lbl">Rondas previstas</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${taxaExec>=90?'#15803d':taxaExec>=70?'#d97706':'#dc2626'}">${taxaExec}%</div><div class="kpi-lbl">Taxa de execução</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${totalAtrasos>0?'#d97706':'#15803d'}">${totalAtrasos}</div><div class="kpi-lbl">Atrasos</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${totalNaoExec>0?'#dc2626':'#15803d'}">${totalNaoExec}</div><div class="kpi-lbl">Não executadas</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${totalSemJust>0?'#dc2626':'#15803d'}">${totalSemJust}</div><div class="kpi-lbl">Sem justificativa</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">👤 Ranking de Desempenho por Colaborador</div>
+  <table>
+    <thead><tr><th>Colaborador</th><th style="text-align:center">Turnos</th><th style="text-align:center">Atrasos</th><th style="text-align:center">Não Exec.</th><th style="text-align:center">Com Justif.</th><th style="text-align:center">Sem Justif.</th><th style="text-align:center">Status</th></tr></thead>
+    <tbody>${rankingRows}</tbody>
+  </table>
+</div>
+
+${ocorrenciasSemJust.length?`<div class="section" style="border:1px solid #fecaca">
+  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">⚠ Ocorrências Sem Justificativa Registrada</div>
+  <div style="font-size:11px;color:#64748b;margin-bottom:10px">Atrasos e não execuções sem motivo informado pelo colaborador no momento — possível negligência operacional, recomenda-se follow-up.</div>
+  <table>
+    <thead><tr><th>Colaborador</th><th>Data</th><th>Turno</th><th>Horário</th><th>Ocorrência</th></tr></thead>
+    <tbody>${semJustRows}</tbody>
+  </table>
+</div>`:`<div class="section" style="border:1px solid #bbf7d0;background:#f0fdf4">
+  <div style="font-size:13px;color:#15803d;font-weight:700;text-align:center">✓ Todas as ocorrências do período foram devidamente justificadas pelos colaboradores.</div>
+</div>`}
+
+<div class="section">
+  <div class="section-title">📋 Turnos Incluídos no Consolidado</div>
+  <table>
+    <thead><tr><th>Data</th><th>Turno</th><th>Plantonista</th></tr></thead>
+    <tbody>${turnosListRows}</tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <div>Consolidado de Ronda Virtual © Moked Consulting Security</div>
+  <div style="font-weight:600;margin-top:2px">José Fonseca — Moked Consulting Security</div>
+  <div>jose.fonseca@moked.com.br · ${project.id} · ${periodoIni} a ${periodoFim}</div>
+</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`ronda_consolidado_${project.id}_${turnos[0]?.dataInicio}_${turnos[turnos.length-1]?.dataInicio}.html`; a.click();
   URL.revokeObjectURL(url);
 }
 

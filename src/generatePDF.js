@@ -170,7 +170,7 @@ function isCritical(diasAberto) { return diasAberto !== null && diasAberto > CRI
 // ── Shared CSS
 function getCSS(theme, kpiCols=4) {
   return `
-    *{box-sizing:border-box;margin:0;padding:0}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
     body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
     .header{background:${theme.headerBg};padding:0;border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.18)}
     .header-top{padding:22px 26px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
@@ -193,7 +193,7 @@ function getCSS(theme, kpiCols=4) {
     .info-item span{font-size:14px;font-weight:700;color:#0f172a}
     .pending{background:#fff8f0;border-left:4px solid #f59e0b;padding:10px 14px;margin-bottom:6px;border-radius:0 8px 8px 0}
     .footer{text-align:center;margin-top:16px;padding-top:14px;border-top:2px solid #e2e8f0;font-size:11px;color:#64748b;font-weight:500}
-    @media print{body{padding:10px;background:#fff}@page{margin:14mm}.no-print{display:none!important}}
+    @media print{body{padding:10px}@page{margin:14mm}.no-print{display:none!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
   `;
 }
 
@@ -865,7 +865,7 @@ export function generateGroupComparativePDF(groupLabel, groupData, periodLabel) 
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Comparativo Interparques — ${groupLabel}</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
   .section{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
   .section-title{font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #2563eb;padding-left:10px;margin-bottom:16px}
@@ -878,6 +878,7 @@ export function generateGroupComparativePDF(groupLabel, groupData, periodLabel) 
   .kpi-val{font-size:26px;font-weight:800;line-height:1;letter-spacing:-1px}
   .kpi-lbl{font-size:9.5px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:5px;letter-spacing:.4px}
   .footer{text-align:center;font-size:10px;color:#94a3b8;padding:16px 0}
+  @media print{body{padding:10px}@page{margin:12mm}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
 </style></head>
 <body>
 
