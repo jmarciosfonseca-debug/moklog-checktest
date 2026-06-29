@@ -252,6 +252,8 @@ function checkPendingNotifications(stored) {
   } catch(e){ console.log("Notif check error:",e); }
 }
 
+// Projetos elegíveis ao Teste Perimetral universal — todos os centros logísticos, exceto Jatinox (P260A/B/C)
+const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505"];
 const PROJECTS = {
   P601: {
     id:"P601", name:"Golgi Cajamar", short:"Cajamar",
@@ -648,6 +650,44 @@ function CtmkBadge({ info, onToggle, size="normal" }) {
   );
 }
 
+function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
+  const [customDate, setCustomDate] = useState(()=>new Date().toISOString().split("T")[0]);
+  if(!confirm) return null;
+  const goingOffline = confirm.status!=="offline"; // status atual antes do toque
+  const label = project?.id || confirm.pid;
+  return (
+    <div onClick={onCancel} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:14,padding:"20px 18px",maxWidth:360,width:"100%"}}>
+        <div style={{fontSize:28,textAlign:"center",marginBottom:10}}>{goingOffline?"📵":"📷"}</div>
+        <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",textAlign:"center",marginBottom:6}}>
+          {goingOffline ? `Confirmar CTMK Off-line — ${label}?` : `Confirmar volta do CTMK — ${label}?`}
+        </div>
+        <div style={{fontSize:12,color:"#94a3b8",textAlign:"center",lineHeight:1.5,marginBottom:goingOffline&&confirm.allowDateEdit?14:18}}>
+          {goingOffline
+            ? "Isso vai marcar a central de monitoramento remoto como sem imagem e começar a contar os dias offline."
+            : "Isso vai zerar o contador de dias offline e guardar o período anterior no histórico."}
+        </div>
+        {goingOffline && confirm.allowDateEdit && (
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Desde quando está off-line?</div>
+            <input type="date" value={customDate} max={new Date().toISOString().split("T")[0]}
+              onChange={e=>setCustomDate(e.target.value)}
+              style={{width:"100%",background:"#020510",border:"1px solid #1e293b",borderRadius:8,color:"#f1f5f9",padding:"10px 12px",fontSize:14,boxSizing:"border-box"}}/>
+            <div style={{fontSize:10,color:"#64748b",marginTop:4}}>Deixe como hoje se a queda acabou de acontecer. Mude a data se já está sem imagem há mais tempo.</div>
+          </div>
+        )}
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,background:"#0f172a",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+          <button onClick={()=>onConfirm(goingOffline&&confirm.allowDateEdit?customDate:undefined)}
+            style={{flex:1,background:goingOffline?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)",border:"none",color:"#fff",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
   const key = itemLabel ? `${catId}_${itemLabel}` : catId;
   const existing = photos.filter(p=>p.photoKey===key);
@@ -951,7 +991,8 @@ function MiniChart({data, width=200, height=60}) {
   );
 }
 
-function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) {
+function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport}) {
+  const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const ctmkInfoFor = (pid) => {
     try {
       const c = ctmkData[pid]; if(!c) return undefined;
@@ -1254,10 +1295,11 @@ function Dashboard({stored, ctmkData={}, onBack, onDeleteReport, onEditReport}) 
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>toggleCtmk(p.id)} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
+          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
         </div>
       </div>
       {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
+      {ctmkConfirm&&<CtmkConfirmModal confirm={ctmkConfirm} project={{id:ctmkConfirm.pid}} onCancel={()=>setCtmkConfirm(null)} onConfirm={(date)=>{onToggleCtmk(ctmkConfirm.pid,date);setCtmkConfirm(null);}}/>}
     </div>
   );
 }
@@ -2059,6 +2101,7 @@ export default function App(){
   const [showVisita,setShowVisita]=useState(false);
   const [visitaProject,setVisitaProject]=useState(null);
   const [showPerimetral,setShowPerimetral]=useState(false);
+  const [perimetralProject,setPerimetralProject]=useState(null);
   const [showKeyAccess,setShowKeyAccess]=useState(false); // 🚨 KeyAccess Falha (em construção)
   const [showIntervalos,setShowIntervalos]=useState(false);
   const [intervalosProject,setIntervalosProject]=useState(null);
@@ -2202,7 +2245,7 @@ export default function App(){
   },[loaded]);
 
   // ── Alterna status CTMK (sem senha) — calcula dias offline e guarda histórico da última queda
-  const toggleCtmk = async (pid) => {
+  const toggleCtmk = async (pid, customOfflineSince) => {
     const cur = ctmkData[pid] || {status:"online"};
     const nowIso = new Date().toISOString();
     let next;
@@ -2215,7 +2258,9 @@ export default function App(){
         updatedAt: nowIso
       };
     } else {
-      next = { status:"offline", offlineSince: nowIso, lastOfflinePeriod: cur.lastOfflinePeriod||null, updatedAt: nowIso };
+      // customOfflineSince permite ao gerencial registrar que a queda já vem de antes de hoje
+      const since = customOfflineSince ? new Date(customOfflineSince+"T12:00:00").toISOString() : nowIso;
+      next = { status:"offline", offlineSince: since, lastOfflinePeriod: cur.lastOfflinePeriod||null, updatedAt: nowIso };
     }
     setCtmkData(prev=>{
       const up={...prev,[pid]:next};
@@ -2223,6 +2268,13 @@ export default function App(){
       return up;
     });
     try{ await setDoc(doc(db,"ctmk",pid), next); }catch(e){}
+  };
+
+  // ── Confirmação antes de alternar o CTMK (evita perder o histórico por toque acidental)
+  const [ctmkConfirm, setCtmkConfirm] = useState(null); // {pid, status, allowDateEdit}
+  const requestCtmkToggle = (pid, allowDateEdit=false) => {
+    const status = ctmkData[pid]?.status || "online";
+    setCtmkConfirm({ pid, status, allowDateEdit });
   };
 
   useEffect(()=>{
@@ -2446,7 +2498,7 @@ export default function App(){
   if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}} sharedAuth={getProjectAuthMode(empresaInfoProject.id)} onAuthGranted={(mode)=>grantAuth(empresaInfoProject.id,mode)}/></ErrorBoundary>;
   if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}} sharedAuth={getProjectAuthMode(equipamentosProject.id)} onAuthGranted={(mode)=>grantAuth(equipamentosProject.id,mode)}/></ErrorBoundary>;
   if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}} sharedAuth={getProjectAuthMode(visitaProject.id)} onAuthGranted={(mode)=>grantAuth(visitaProject.id,mode)}/></ErrorBoundary>;
-  if(showPerimetral) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowPerimetral(false)}/></ErrorBoundary>;
+  if(showPerimetral&&perimetralProject) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral project={perimetralProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowPerimetral(false);setPerimetralProject(null);}} sharedAuth={getProjectAuthMode(perimetralProject.id)} onAuthGranted={(mode)=>grantAuth(perimetralProject.id,mode)}/></ErrorBoundary>;
   if(showKeyAccess) return <ErrorBoundary moduleName="KeyAccess Falha"><KeyAccessFalha dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowKeyAccess(false)}/></ErrorBoundary>;
   if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
   if(showCCO&&ccoProject) return <ErrorBoundary moduleName="CCO"><CCO project={ccoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowCCO(false);setCcoProject(null);}}/></ErrorBoundary>;
@@ -2485,7 +2537,7 @@ export default function App(){
 
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
   if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>;
-  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
+  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen("home")}/>;
 
@@ -2667,7 +2719,7 @@ export default function App(){
                       {jp.hasCaoGuarda&&<span style={{fontSize:9,color:"#22c55e",background:"#021a0d",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #22c55e22"}}>🐕 CÃO GUARDA</span>}
                     </div>
                   </div>
-                  <CtmkBadge info={ctmkData[jp.id]} onToggle={()=>toggleCtmk(jp.id)} size="small"/>
+                  <CtmkBadge info={ctmkData[jp.id]} onToggle={()=>requestCtmkToggle(jp.id,false)} size="small"/>
                   <div style={{color:"#94a3b8",fontSize:18,flexShrink:0}}>{isSel?"▲":"▼"}</div>
                 </div>
                 {isSel&&(
@@ -2704,6 +2756,7 @@ export default function App(){
           })}
         </div>
       </div>
+      {ctmkConfirm&&<CtmkConfirmModal confirm={ctmkConfirm} project={{id:ctmkConfirm.pid}} onCancel={()=>setCtmkConfirm(null)} onConfirm={(date)=>{toggleCtmk(ctmkConfirm.pid,date);setCtmkConfirm(null);}}/>}
     </div>
   );
 
@@ -2767,7 +2820,7 @@ export default function App(){
                       </div>:<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Sem registros ainda</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                      <CtmkBadge info={ctmkData[p.id]} onToggle={()=>toggleCtmk(p.id)}/>
+                      <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,false)}/>
                       {isActive&&<span style={{fontSize:9,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
                     </div>
                   </div>
@@ -2791,7 +2844,7 @@ export default function App(){
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
-                    {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
+                    {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                   </div>
                 </>
               ):(
@@ -2803,13 +2856,14 @@ export default function App(){
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
-                    {project.id==="P505"&&<button onClick={()=>setShowPerimetral(true)} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
+                    {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                   </div>
                 </>
               )}
             </div>
           )}
         </div>
+      {ctmkConfirm&&<CtmkConfirmModal confirm={ctmkConfirm} project={{id:ctmkConfirm.pid}} onCancel={()=>setCtmkConfirm(null)} onConfirm={(date)=>{toggleCtmk(ctmkConfirm.pid,date);setCtmkConfirm(null);}}/>}
       </div>
     );
   }
