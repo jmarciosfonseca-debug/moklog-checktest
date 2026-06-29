@@ -2214,7 +2214,11 @@ export default function App(){
           setStored(prev=>{
             const serverHist = snap.data()?.history||[];
             const localHist = prev[pid]?.history||[];
-            const mergedHist = mergeHistory(localHist, serverHist);
+            let mergedHist = mergeHistory(localHist, serverHist);
+            const tomb = deletedTombstoneRef.current[pid];
+            if(tomb && tomb.size>0){
+              mergedHist = mergedHist.filter(r=>!tomb.has(r.meta?.date));
+            }
             const up={...prev,[pid]:{...snap.data(), history: mergedHist}};
             try{ localStorage.setItem("seccheck_v4",JSON.stringify(up)); }catch(e){}
             if(mergedHist.length > serverHist.length){
@@ -2318,6 +2322,9 @@ export default function App(){
       return;
     }
     const prev=stored[project.id]?.history??[];
+    if(mt?.date && deletedTombstoneRef.current[project.id]?.has(mt.date)){
+      deletedTombstoneRef.current[project.id].delete(mt.date); // novo registro intencional na mesma data — remove o "veto"
+    }
     const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
     const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
     try {
@@ -2359,8 +2366,13 @@ export default function App(){
     sendNotification(`${project.id} – Relatorio Finalizado`,`${project.name}: ${h.pct}% · Assinado por ${mt.signature||"—"}`);
   };
 
+  const deletedTombstoneRef = useRef({}); // {[projectId]: Set(datas excluídas)} — impede que o merge com o servidor resuscite um relatório que o usuário acabou de excluir
   const deleteReport=async(projectId,idx)=>{
     const prev=stored[projectId]?.history??[];
+    const deletedDate = prev[idx]?.meta?.date;
+    if(deletedDate){
+      deletedTombstoneRef.current[projectId] = new Set([...(deletedTombstoneRef.current[projectId]||[]), deletedDate]);
+    }
     const next=prev.filter((_,i)=>i!==idx);
     const up={...stored,[projectId]:{...stored[projectId],history:next,updatedAt:new Date().toISOString()}};
     setStored(up);localStorage.setItem("seccheck_v4",JSON.stringify(up));
@@ -2385,7 +2397,7 @@ export default function App(){
   const startEditReport=(proj,report,idx)=>{
     setProject(proj);
     setState(JSON.parse(JSON.stringify(report.state)));
-    setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:"",...report.meta});
+    setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:"",...report.meta,date:report.meta?.date||todayStr()});
     setPhotos([]);
     setEditingIdx(idx);
     setActive(null);
@@ -2604,6 +2616,9 @@ export default function App(){
         </div>}
         <div style={S.metaCard}>
           <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabecalho do Relatorio</div>
+          {editingIdx!==null&&<div style={{background:"#1a1000",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 10px",marginBottom:10,fontSize:11,color:"#fbbf24"}}>
+            ✏️ Editando relatório existente — a data abaixo já é a data original deste teste ({fmtDate(meta.date)}). Só altere se for uma <strong>correção retroativa</strong> (ex: data errada no cadastro).
+          </div>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
             {[["Data","date","date"],["Inicio","start","time"],["Termino","end","time"],["Lider VSPP","leader","text"],["CCO","cco","text"],["Operador Moked 24h","moked","text"],["Horario Contato Moked","mokedTime","time"]].map(([label,key,type])=>(
               <div key={key}>
