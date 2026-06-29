@@ -209,6 +209,19 @@ function gerarPDFBolsao(project, placas, periodo) {
       <td style="text-align:center"><span class="badge" style="background:${STATUS_CFG[a.status].bg};color:${STATUS_CFG[a.status].color}">${STATUS_CFG[a.status].label}</span></td>
     </tr>`).join("");
 
+  // Veículos bloqueados com data de bloqueio dentro do período
+  const bloqueados = todasPlacas.filter(p=>p.bloqueado && p.dataBloqueio && new Date(p.dataBloqueio)>=periodo.from && new Date(p.dataBloqueio)<=periodo.to);
+  const bloqueadosRows = bloqueados.map(p=>`
+    <tr>
+      <td style="font-weight:900;letter-spacing:1px">${p.placa}</td>
+      <td>${p.bloqueioDados?.inquilino||"—"}</td>
+      <td>${p.bloqueioDados?.motorista||"—"}</td>
+      <td>${p.bloqueioDados?.empresa||"—"}</td>
+      <td style="font-weight:700;letter-spacing:1px">${p.bloqueioDados?.placaCavalo||"—"}</td>
+      <td style="font-size:11px">${fmtDateTime(p.dataBloqueio)}</td>
+      <td style="text-align:center">${p.bloqueioDados?`<span class="badge" style="background:#dcfce7;color:#15803d">Coletado</span>`:`<span class="badge" style="background:#fef3c7;color:#d97706">Pendente</span>`}</td>
+    </tr>`).join("");
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <title>Relatório Bolsão — ${project.id} — ${periodo.label}</title>
@@ -246,11 +259,12 @@ function gerarPDFBolsao(project, placas, periodo) {
   </div>
 </div>
 
-<div class="kpis">
-  <div class="kpi"><div class="kpi-val" style="color:#1e293b">${avistamentosPeriodo.length}</div><div class="kpi-lbl">Avistamentos no Período</div></div>
+<div class="kpis" style="grid-template-columns:repeat(5,1fr)">
+  <div class="kpi"><div class="kpi-val" style="color:#1e293b">${avistamentosPeriodo.length}</div><div class="kpi-lbl">Avistamentos</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${placasUnicas}</div><div class="kpi-lbl">Placas Únicas</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#d97706">${emAtencao}</div><div class="kpi-lbl">Em Atenção</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#dc2626">${emCritico}</div><div class="kpi-lbl">Em Crítico</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#7c2d2d">${bloqueados.length}</div><div class="kpi-lbl">Bloqueados</div></div>
 </div>
 
 <div class="section">
@@ -260,15 +274,15 @@ function gerarPDFBolsao(project, placas, periodo) {
 </div>
 
 <div class="section">
+  <div class="section-title">🔒 Veículos Bloqueados no Período — ${bloqueados.length}</div>
+  ${bloqueadosRows ? `<table><thead><tr><th>Placa</th><th>Inquilino</th><th>Motorista</th><th>Empresa/Transportadora</th><th>Placa Cavalo</th><th>Bloqueado em</th><th style="text-align:center">Dados</th></tr></thead><tbody>${bloqueadosRows}</tbody></table>`
+    : `<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:12px">Nenhum veículo bloqueado neste período.</div>`}
+</div>
+
+<div class="section">
   <div class="section-title">📋 Registro Detalhado — ${avistamentosPeriodo.length} Avistamento(s)${avistamentosPeriodo.length>150?" (mostrando os 150 mais recentes)":""}</div>
   ${detalheRows ? `<table><thead><tr><th>Data/Hora</th><th>Placa</th><th>Registrado por</th><th style="text-align:center">Status</th></tr></thead><tbody>${detalheRows}</tbody></table>`
     : `<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:12px">Sem registros neste período.</div>`}
-</div>
-
-<div class="section" style="background:#f8fafc;border-style:dashed">
-  <div style="font-size:11px;color:#94a3b8;text-align:center">
-    🔒 Volumetria de bloqueios aplicados e histórico de Ocorrência (RS) entram aqui automaticamente quando o módulo de Bloqueio/Liberação for ativado.
-  </div>
 </div>
 
 <div class="footer">
@@ -293,7 +307,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   const [placas, setPlacas] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [aba, setAba] = useState("todos"); // todos | alerta | critico
+  const [aba, setAba] = useState("todos"); // todos | alerta | critico | bloqueados
 
   // Registro
   const [placaInput, setPlacaInput] = useState("");
@@ -301,6 +315,11 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   const [feedback, setFeedback] = useState(null); // {placa,status,dias,novoDia}
   const [dataIni, setDataIni] = useState(todayStrLocal());
   const [dataFim, setDataFim] = useState(todayStrLocal());
+  const [placaBloqueioForm, setPlacaBloqueioForm] = useState(null); // placa em edição dos dados do motorista
+  const [formMotorista, setFormMotorista] = useState("");
+  const [formEmpresa, setFormEmpresa] = useState("");
+  const [formInquilino, setFormInquilino] = useState("");
+  const [formPlacaCavalo, setFormPlacaCavalo] = useState("");
 
   useEffect(()=>{ loadBolsao(project.id).then(p=>{ setPlacas(p||{}); setLoading(false); }); },[project.id]);
 
@@ -308,6 +327,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   const listaFiltrada = listaPlacas.filter(p=>{
     if(aba==="alerta") return p.status==="atencao"||p.status==="critico";
     if(aba==="critico") return p.status==="critico";
+    if(aba==="bloqueados") return !!p.bloqueado;
     return true;
   });
   const sugestoes = placaInput.length>=2
@@ -352,6 +372,43 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     setSaving(false);
     setFeedback({placa, status:entry.status, dias:entry.diasConsecutivos, novoDia});
     setPlacaInput("");
+  };
+
+  const toggleBloqueio = async (placa) => {
+    const existente = placas[placa]; if(!existente) return;
+    const next = {...placas, [placa]: existente.bloqueado
+      ? {...existente, bloqueado:false} // desmarca (engano ou liberado sem coleta de dados)
+      : {...existente, bloqueado:true, dataBloqueio:new Date().toISOString()}
+    };
+    setPlacas(next);
+    await saveBolsao(project.id, next);
+  };
+
+  const abrirFormMotorista = (placa) => {
+    const p = placas[placa];
+    setFormMotorista(p?.bloqueioDados?.motorista||"");
+    setFormEmpresa(p?.bloqueioDados?.empresa||"");
+    setFormInquilino(p?.bloqueioDados?.inquilino||"");
+    setFormPlacaCavalo(p?.bloqueioDados?.placaCavalo||"");
+    setPlacaBloqueioForm(placa);
+  };
+
+  const salvarDadosMotorista = async () => {
+    if(!formMotorista.trim()||!formEmpresa.trim()||!formInquilino.trim()){
+      alert("Preencha Motorista, Empresa/Transportadora e Inquilino Relacionado.");
+      return;
+    }
+    const placa = placaBloqueioForm;
+    const existente = placas[placa]; if(!existente) return;
+    const bloqueioDados = {
+      motorista: formMotorista.trim(), empresa: formEmpresa.trim(),
+      inquilino: formInquilino.trim(), placaCavalo: normalizaPlaca(formPlacaCavalo),
+      coletadoEm: new Date().toISOString(),
+    };
+    const next = {...placas, [placa]: {...existente, bloqueioDados}};
+    setPlacas(next);
+    await saveBolsao(project.id, next);
+    setPlacaBloqueioForm(null);
   };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
@@ -477,10 +534,10 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           <button onClick={()=>{setScreen("registrar");setFeedback(null);}} style={{...S.btn,fontSize:15,padding:"15px"}}>📋 Registrar Placa</button>
           <button onClick={()=>setScreen("relatorio")} style={{...S.btnSec,fontSize:13,color:"#92400e",borderColor:"#92400e44"}}>📄 Gerar Relatório</button>
 
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
-            {[{k:"todos",l:"Todos",n:listaPlacas.length},{k:"alerta",l:"Em Alerta",n:listaPlacas.filter(p=>p.status==="atencao"||p.status==="critico").length},{k:"critico",l:"Críticos",n:listaPlacas.filter(p=>p.status==="critico").length}].map(t=>(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+            {[{k:"todos",l:"Todos",n:listaPlacas.length},{k:"alerta",l:"Alerta",n:listaPlacas.filter(p=>p.status==="atencao"||p.status==="critico").length},{k:"critico",l:"Críticos",n:listaPlacas.filter(p=>p.status==="critico").length},{k:"bloqueados",l:"🔒 Bloq.",n:listaPlacas.filter(p=>p.bloqueado).length}].map(t=>(
               <button key={t.k} onClick={()=>setAba(t.k)}
-                style={{...S.btnSm,padding:"9px 4px",fontSize:11,fontWeight:700,...(aba===t.k?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}>
+                style={{...S.btnSm,padding:"9px 2px",fontSize:10.5,fontWeight:700,...(aba===t.k?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}>
                 {t.l} ({t.n})
               </button>
             ))}
@@ -494,16 +551,39 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           )}
 
           {listaFiltrada.map(p=>(
-            <div key={p.placa} style={{...S.card,border:`1px solid ${STATUS_CFG[p.status].border}`}}>
+            <div key={p.placa} style={{...S.card,border:`1px solid ${p.bloqueado?"#ef444466":STATUS_CFG[p.status].border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <span style={{fontSize:17,fontWeight:900,letterSpacing:1.5,...S.txt}}>{p.placa}</span>
-                <StatusBadge status={p.status}/>
+                <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                  {p.bloqueado&&<span style={{fontSize:10,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:5}}>🔒 Bloqueado</span>}
+                  <StatusBadge status={p.status}/>
+                </div>
               </div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:11,...S.txt2}}>
                 <span>{p.diasConsecutivos} dia{p.diasConsecutivos!==1?"s":""} consecutivo{p.diasConsecutivos!==1?"s":""}</span>
                 <span>Última: {fmtDateTime(p.ultimaVista)}</span>
               </div>
               <div style={{fontSize:10,...S.txt2,marginTop:3}}>{(p.sightings||[]).length} avistamento(s) registrado(s)</div>
+
+              {p.bloqueado && p.bloqueioDados && (
+                <div style={{marginTop:8,padding:"8px 10px",background:dark?"#020510":"#f8fafc",borderRadius:7,fontSize:11,...S.txt2}}>
+                  <div><strong style={S.txt}>Motorista:</strong> {p.bloqueioDados.motorista}</div>
+                  <div><strong style={S.txt}>Empresa:</strong> {p.bloqueioDados.empresa}</div>
+                  <div><strong style={S.txt}>Inquilino:</strong> {p.bloqueioDados.inquilino}</div>
+                  {p.bloqueioDados.placaCavalo&&<div><strong style={S.txt}>Placa Cavalo:</strong> {p.bloqueioDados.placaCavalo}</div>}
+                </div>
+              )}
+
+              <div style={{display:"flex",gap:6,marginTop:9}}>
+                {!p.bloqueado && (p.status==="atencao"||p.status==="critico") &&
+                  <button onClick={()=>toggleBloqueio(p.placa)} style={{...S.btnSm,flex:1,color:"#ef4444",borderColor:"#ef444444",fontWeight:700}}>🔒 Marcar Bloqueio</button>}
+                {p.bloqueado && !p.bloqueioDados &&
+                  <button onClick={()=>abrirFormMotorista(p.placa)} style={{...S.btnSm,flex:1,color:"#f59e0b",borderColor:"#f59e0b44",fontWeight:700}}>📝 Coletar Dados do Motorista</button>}
+                {p.bloqueado && p.bloqueioDados &&
+                  <button onClick={()=>abrirFormMotorista(p.placa)} style={{...S.btnSm,flex:1,fontWeight:700}}>✏️ Editar Dados</button>}
+                {p.bloqueado &&
+                  <button onClick={()=>{if(window.confirm("Desmarcar bloqueio desta placa?")) toggleBloqueio(p.placa);}} style={{...S.btnSm,color:"#64748b"}}>✕</button>}
+              </div>
             </div>
           ))}
 
@@ -512,6 +592,32 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           </div>
         </div>
       </div>
+
+      {placaBloqueioForm && (
+        <div onClick={()=>setPlacaBloqueioForm(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div onClick={e=>e.stopPropagation()} style={{...S.card,maxWidth:380,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
+            <div style={{fontSize:15,fontWeight:800,...S.txt,marginBottom:2}}>📝 Dados do Motorista</div>
+            <div style={{fontSize:18,fontWeight:900,letterSpacing:1.5,color:"#ef4444",marginBottom:14}}>{placaBloqueioForm}</div>
+
+            <label style={S.lbl}>Nome do Motorista *</label>
+            <input value={formMotorista} onChange={e=>setFormMotorista(e.target.value)} placeholder="Nome completo..." style={{...S.inp,marginBottom:10}}/>
+
+            <label style={S.lbl}>Empresa / Transportadora *</label>
+            <input value={formEmpresa} onChange={e=>setFormEmpresa(e.target.value)} placeholder="Razão social..." style={{...S.inp,marginBottom:10}}/>
+
+            <label style={S.lbl}>Inquilino Relacionado *</label>
+            <input value={formInquilino} onChange={e=>setFormInquilino(e.target.value)} placeholder="Nome do inquilino, ou 'Outros' se não for do condomínio..." style={{...S.inp,marginBottom:10}}/>
+
+            <label style={S.lbl}>Placa do Cavalo (se for carreta)</label>
+            <input value={formPlacaCavalo} onChange={e=>setFormPlacaCavalo(normalizaPlaca(e.target.value))} placeholder="Opcional..." autoCapitalize="characters" style={{...S.inp,marginBottom:14,textTransform:"uppercase"}}/>
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setPlacaBloqueioForm(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+              <button onClick={salvarDadosMotorista} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>✓ Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
