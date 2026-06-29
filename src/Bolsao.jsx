@@ -46,6 +46,11 @@ function fmtDateTime(iso){
   if(!iso) return "—";
   try { return new Date(iso).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); } catch { return "—"; }
 }
+function fmtDate(d){
+  if(!d) return "—";
+  try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d||"—"; }
+}
+function todayStrLocal(){ return new Date().toISOString().split("T")[0]; }
 
 async function loadBolsao(projectId) {
   try {
@@ -155,11 +160,139 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   );
 }
 
+function classificaTurno(date){
+  const h = date.getHours();
+  return (h>=6 && h<18) ? "Diurno" : "Noturno";
+}
+
+// ── Relatório PDF — Diário / Por Turno / Semanal / Personalizado
+// periodo: { label, from: Date, to: Date, turno: "Diurno"|"Noturno"|null }
+function gerarPDFBolsao(project, placas, periodo) {
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const todasPlacas = Object.values(placas);
+
+  // Avistamentos dentro do período (e turno, se aplicável)
+  const avistamentosPeriodo = [];
+  todasPlacas.forEach(p=>{
+    (p.sightings||[]).forEach(s=>{
+      const d = new Date(s.ts);
+      if(d>=periodo.from && d<=periodo.to && (!periodo.turno || classificaTurno(d)===periodo.turno)){
+        avistamentosPeriodo.push({...s, placa:p.placa, status:p.status, diasConsecutivos:p.diasConsecutivos});
+      }
+    });
+  });
+  avistamentosPeriodo.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+
+  // Ranking por nº de avistamentos no período (desempate por dias consecutivos atuais)
+  const porPlaca = {};
+  avistamentosPeriodo.forEach(a=>{
+    if(!porPlaca[a.placa]) porPlaca[a.placa] = {placa:a.placa, count:0, status:a.status, diasConsecutivos:a.diasConsecutivos};
+    porPlaca[a.placa].count++;
+  });
+  const ranking = Object.values(porPlaca).sort((a,b)=> b.count-a.count || b.diasConsecutivos-a.diasConsecutivos);
+
+  const placasUnicas = ranking.length;
+  const emAtencao = ranking.filter(r=>r.status==="atencao").length;
+  const emCritico = ranking.filter(r=>r.status==="critico").length;
+
+  const rankingRows = ranking.slice(0,30).map((r,i)=>`
+    <tr style="${r.status==="critico"?'background:#fef2f2':r.status==="atencao"?'background:#fffbeb':''}">
+      <td style="text-align:center;font-weight:800;color:#475569">${i+1}º</td>
+      <td style="font-weight:900;letter-spacing:1px">${r.placa}</td>
+      <td style="text-align:center;font-weight:700">${r.count}</td>
+      <td style="text-align:center;font-weight:700">${r.diasConsecutivos}d</td>
+      <td style="text-align:center"><span class="badge" style="background:${STATUS_CFG[r.status].bg};color:${STATUS_CFG[r.status].color}">${STATUS_CFG[r.status].label}</span></td>
+    </tr>`).join("");
+
+  const detalheRows = avistamentosPeriodo.slice(0,150).map(a=>`
+    <tr>
+      <td style="font-weight:700">${fmtDateTime(a.ts)}</td>
+      <td style="font-weight:900;letter-spacing:1px">${a.placa}</td>
+      <td>${a.registradoPor||"—"}</td>
+      <td style="text-align:center"><span class="badge" style="background:${STATUS_CFG[a.status].bg};color:${STATUS_CFG[a.status].color}">${STATUS_CFG[a.status].label}</span></td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório Bolsão — ${project.id} — ${periodo.label}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;font-size:13px}
+  .header{background:linear-gradient(135deg,#92400e,#78350f);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  .section-title{font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #f1f5f9;padding-bottom:7px;margin-bottom:10px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+  .kpi-val{font-size:24px;font-weight:900}
+  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#1e293b;color:#fff;padding:7px 9px;text-align:left;font-size:10px}
+  td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
+  .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700}
+  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+</style></head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#92400e;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+
+<div class="header">
+  <div>
+    <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
+    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">🚧 Fiscalização de Bolsão Externo</h1>
+    <p style="font-size:12px;opacity:.85">${project.id} — ${project.name||""} · ${periodo.label}</p>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.8">
+    <div>Gerado em ${hoje}</div>
+    <div style="margin-top:2px">José Fonseca — Moked Consulting</div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val" style="color:#1e293b">${avistamentosPeriodo.length}</div><div class="kpi-lbl">Avistamentos no Período</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${placasUnicas}</div><div class="kpi-lbl">Placas Únicas</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#d97706">${emAtencao}</div><div class="kpi-lbl">Em Atenção</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#dc2626">${emCritico}</div><div class="kpi-lbl">Em Crítico</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">🏆 Ranking de Recorrência — Placas Mais Avistadas no Período</div>
+  ${ranking.length ? `<table><thead><tr><th>Pos.</th><th>Placa</th><th style="text-align:center">Avist. no Período</th><th style="text-align:center">Dias Consec.</th><th style="text-align:center">Status</th></tr></thead><tbody>${rankingRows}</tbody></table>`
+    : `<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:12px">Nenhum avistamento registrado neste período.</div>`}
+</div>
+
+<div class="section">
+  <div class="section-title">📋 Registro Detalhado — ${avistamentosPeriodo.length} Avistamento(s)${avistamentosPeriodo.length>150?" (mostrando os 150 mais recentes)":""}</div>
+  ${detalheRows ? `<table><thead><tr><th>Data/Hora</th><th>Placa</th><th>Registrado por</th><th style="text-align:center">Status</th></tr></thead><tbody>${detalheRows}</tbody></table>`
+    : `<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:12px">Sem registros neste período.</div>`}
+</div>
+
+<div class="section" style="background:#f8fafc;border-style:dashed">
+  <div style="font-size:11px;color:#94a3b8;text-align:center">
+    🔒 Volumetria de bloqueios aplicados e histórico de Ocorrência (RS) entram aqui automaticamente quando o módulo de Bloqueio/Liberação for ativado.
+  </div>
+</div>
+
+<div class="footer">
+  <div>Relatório de Fiscalização de Bolsão © Moked Consulting Security</div>
+  <div style="margin-top:3px">${project.id} — ${project.name||""} · ${periodo.label} · ${hoje}</div>
+</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`bolsao_${project.id}_${periodo.label.replace(/\s+/g,"_")}_${hoje.replace(/\//g,"-")}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── App principal
 export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
   const [authLevel, setAuthLevel] = useState(sharedAuth||null);
-  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | registrar
+  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | registrar | relatorio
   const [placas, setPlacas] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -169,6 +302,8 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   const [placaInput, setPlacaInput] = useState("");
   const [registradoPor, setRegistradoPor] = useState(()=>{ try{return localStorage.getItem("bolsao_ultimo_nome")||"";}catch{return"";} });
   const [feedback, setFeedback] = useState(null); // {placa,status,dias,novoDia}
+  const [dataIni, setDataIni] = useState(todayStrLocal());
+  const [dataFim, setDataFim] = useState(todayStrLocal());
 
   useEffect(()=>{ loadBolsao(project.id).then(p=>{ setPlacas(p||{}); setLoading(false); }); },[project.id]);
 
@@ -228,6 +363,48 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   );
 
   // ── Tela de registro (foco em uso de campo, uma mão)
+  // ── Tela de Relatório — seleção de período
+  if(screen==="relatorio") {
+    const gerar = (periodo) => { gerarPDFBolsao(project, placas, periodo); setScreen("list"); };
+    const hojeInicio = (h=0) => { const d=new Date(); d.setHours(h,0,0,0); return d; };
+    const hojeFim = () => new Date();
+    return (
+      <div style={S.page}>
+        <div style={S.wrap}>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
+            <button onClick={()=>setScreen("list")} style={S.backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:800,...S.txt}}>📄 Gerar Relatório</div>
+              <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
+            </div>
+          </div>
+          <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+            <button onClick={()=>gerar({label:"Hoje (últimas 24h)", from:new Date(Date.now()-86400000), to:hojeFim(), turno:null})} style={{...S.btn,fontSize:14}}>🗓 Hoje (últimas 24h)</button>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>gerar({label:"Turno Diurno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Diurno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>☀️ Turno Diurno</button>
+              <button onClick={()=>gerar({label:"Turno Noturno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Noturno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#6366f1",borderColor:"#6366f133"}}>🌙 Turno Noturno</button>
+            </div>
+            <button onClick={()=>gerar({label:"Última semana (7 dias)", from:new Date(Date.now()-7*86400000), to:hojeFim(), turno:null})} style={{...S.btnSec,fontSize:14}}>📅 Última semana (7 dias)</button>
+
+            <div style={{...S.card,marginTop:6}}>
+              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>🗂 Período personalizado</div>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <div style={{flex:1}}><label style={S.lbl}>De</label><input type="date" value={dataIni} max={dataFim} onChange={e=>setDataIni(e.target.value)} style={S.inp}/></div>
+                <div style={{flex:1}}><label style={S.lbl}>Até</label><input type="date" value={dataFim} min={dataIni} max={todayStrLocal()} onChange={e=>setDataFim(e.target.value)} style={S.inp}/></div>
+              </div>
+              <button onClick={()=>{
+                const from = new Date(dataIni+"T00:00:00");
+                const to = new Date(dataFim+"T23:59:59");
+                const label = dataIni===dataFim ? `Dia ${fmtDate(dataIni)}` : `${fmtDate(dataIni)} a ${fmtDate(dataFim)}`;
+                gerar({label, from, to, turno:null});
+              }} style={{...S.btn,background:"linear-gradient(135deg,#92400e,#78350f)",fontSize:13}}>📄 Gerar Personalizado</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if(screen==="registrar") return (
     <div style={S.page}>
       <div style={S.wrap}>
@@ -300,6 +477,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
           <button onClick={()=>{setScreen("registrar");setFeedback(null);}} style={{...S.btn,fontSize:15,padding:"15px"}}>📋 Registrar Placa</button>
+          <button onClick={()=>setScreen("relatorio")} style={{...S.btnSec,fontSize:13,color:"#92400e",borderColor:"#92400e44"}}>📄 Gerar Relatório</button>
 
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}}>
             {[{k:"todos",l:"Todos",n:listaPlacas.length},{k:"alerta",l:"Em Alerta",n:listaPlacas.filter(p=>p.status==="atencao"||p.status==="critico").length},{k:"critico",l:"Críticos",n:listaPlacas.filter(p=>p.status==="critico").length}].map(t=>(
