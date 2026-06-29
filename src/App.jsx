@@ -6,6 +6,7 @@ import AcessoCCO from "./AcessoCCO";
 import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos from "./Equipamentos";
 import Visita from "./Visita";
+import Bolsao from "./Bolsao";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import CCO from "./CCO";
@@ -252,6 +253,8 @@ function checkPendingNotifications(stored) {
   } catch(e){ console.log("Notif check error:",e); }
 }
 
+// Projetos elegíveis ao módulo de Fiscalização de Bolsão Externo — por ora só Mega CL (P311A/B)
+const BOLSAO_ELIGIBLE = ["P311A","P311B"];
 // Projetos elegíveis ao Teste Perimetral universal — todos os centros logísticos, exceto Jatinox (P260A/B/C)
 const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505"];
 const PROJECTS = {
@@ -2099,6 +2102,8 @@ export default function App(){
   const [showEquipamentos,setShowEquipamentos]=useState(false);
   const [equipamentosProject,setEquipamentosProject]=useState(null);
   const [showVisita,setShowVisita]=useState(false);
+  const [showBolsao,setShowBolsao]=useState(false);
+  const [bolsaoProject,setBolsaoProject]=useState(null);
   const [visitaProject,setVisitaProject]=useState(null);
   const [showPerimetral,setShowPerimetral]=useState(false);
   const [perimetralProject,setPerimetralProject]=useState(null);
@@ -2510,6 +2515,7 @@ export default function App(){
   if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}} sharedAuth={getProjectAuthMode(empresaInfoProject.id)} onAuthGranted={(mode)=>grantAuth(empresaInfoProject.id,mode)}/></ErrorBoundary>;
   if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}} sharedAuth={getProjectAuthMode(equipamentosProject.id)} onAuthGranted={(mode)=>grantAuth(equipamentosProject.id,mode)}/></ErrorBoundary>;
   if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}} sharedAuth={getProjectAuthMode(visitaProject.id)} onAuthGranted={(mode)=>grantAuth(visitaProject.id,mode)}/></ErrorBoundary>;
+  if(showBolsao&&bolsaoProject) return <ErrorBoundary moduleName="Fiscalização de Bolsão"><Bolsao project={bolsaoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowBolsao(false);setBolsaoProject(null);}} sharedAuth={getProjectAuthMode(bolsaoProject.id)} onAuthGranted={(mode)=>grantAuth(bolsaoProject.id,mode)}/></ErrorBoundary>;
   if(showPerimetral&&perimetralProject) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral project={perimetralProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowPerimetral(false);setPerimetralProject(null);}} sharedAuth={getProjectAuthMode(perimetralProject.id)} onAuthGranted={(mode)=>grantAuth(perimetralProject.id,mode)}/></ErrorBoundary>;
   if(showKeyAccess) return <ErrorBoundary moduleName="KeyAccess Falha"><KeyAccessFalha dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowKeyAccess(false)}/></ErrorBoundary>;
   if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
@@ -2860,6 +2866,7 @@ export default function App(){
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
+                    {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
                   </div>
                 </>
               ):(
@@ -2872,6 +2879,7 @@ export default function App(){
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
+                    {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
                   </div>
                 </>
               )}
