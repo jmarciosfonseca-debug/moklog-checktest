@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { SEED_P311B_JUN2026 } from "./BolsaoSeedP311B";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -22,8 +23,8 @@ const PROJECT_PINS = {
 
 // ── Regras do POP — janela de 12h e limiares de status (ajustáveis)
 const JANELA_HORAS = 12;       // mesma placa vista de novo só conta como "+1 dia" se passou desse tempo
-const DIAS_ATENCAO = 2;        // a partir de quantos dias consecutivos entra em "Atenção"
-const DIAS_CRITICO = 4;        // a partir de quantos dias consecutivos entra em "Crítico"
+const DIAS_ATENCAO = 5;        // a partir de quantos dias consecutivos entra em "Atenção" (calibrado com dados reais do P311B)
+const DIAS_CRITICO = 8;        // a partir de quantos dias consecutivos entra em "Crítico" (calibrado com dados reais do P311B)
 const MAX_SIGHTINGS = 40;      // histórico de avistamentos guardado por placa (evita doc crescer infinito)
 
 const STATUS_CFG = {
@@ -40,6 +41,30 @@ function statusFromDias(dias){
 
 function normalizaPlaca(s){
   return (s||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,7);
+}
+
+// ── Correção posicional O/0 — placas BR têm posições fixas de letra/número (tanto no
+// padrão antigo LLL-NNNN quanto no Mercosul LLL N L NN). Posições 1-3 são SEMPRE letra;
+// posições 4, 6 e 7 são SEMPRE número. A posição 5 é ambígua (letra no Mercosul, número
+// no antigo) então não corrigimos ela automaticamente — fica como o vigilante digitou.
+function corrigirOZero(placa){
+  if(!placa || placa.length<4) return placa;
+  const chars = placa.split("");
+  for(let i=0;i<chars.length;i++){
+    if(i<3){ if(chars[i]==="0") chars[i]="O"; }       // posições 1-3: força letra
+    else if(i===3||i===5||i===6){ if(chars[i]==="O") chars[i]="0"; } // posições 4,6,7: força número
+  }
+  return chars.join("");
+}
+
+// ── Resolve placa digitada para a "placa principal" se ela bater com algum alias
+// conhecido (variação de digitação já registrada antes) — redireciona de forma invisível.
+function resolveAliasPrincipal(placaDigitada, placas){
+  if(placas[placaDigitada]) return placaDigitada; // já é a principal
+  for(const principal in placas){
+    if((placas[principal].aliases||[]).includes(placaDigitada)) return principal;
+  }
+  return placaDigitada;
 }
 
 function fmtDateTime(iso){
@@ -311,11 +336,13 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
   // Registro
   const [placaInput, setPlacaInput] = useState("");
+  const [tipoInput, setTipoInput] = useState("caminhao"); // caminhao | carreta_desengatada
   const [registradoPor, setRegistradoPor] = useState(()=>{ try{return localStorage.getItem("bolsao_ultimo_nome")||"";}catch{return"";} });
   const [feedback, setFeedback] = useState(null); // {placa,status,dias,novoDia}
   const [dataIni, setDataIni] = useState(todayStrLocal());
   const [dataFim, setDataFim] = useState(todayStrLocal());
   const [placaBloqueioForm, setPlacaBloqueioForm] = useState(null); // placa em edição dos dados do motorista
+  const [importStatus, setImportStatus] = useState(null); // null | "importando" | {added, skipped}
   const [formMotorista, setFormMotorista] = useState("");
   const [formEmpresa, setFormEmpresa] = useState("");
   const [formInquilino, setFormInquilino] = useState("");
@@ -338,10 +365,14 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     : [];
 
   const registrar = async () => {
-    const placa = normalizaPlaca(placaInput);
-    if(placa.length<6){ alert("Placa incompleta — confira os caracteres."); return; }
+    const digitada = normalizaPlaca(placaInput);
+    if(digitada.length<6){ alert("Placa incompleta — confira os caracteres."); return; }
     if(!registradoPor.trim()){ alert("Informe quem está registrando."); return; }
     try{ localStorage.setItem("bolsao_ultimo_nome",registradoPor.trim()); }catch(e){}
+
+    // Higienização: maiúscula + corrige O/0 nas posições previsíveis + resolve alias conhecido (silencioso)
+    const corrigida = corrigirOZero(digitada);
+    const placa = resolveAliasPrincipal(corrigida, placas);
 
     setSaving(true);
     const now = new Date();
@@ -351,12 +382,12 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     let entry;
 
     if(!existente){
-      entry = { placa, primeiraVista:nowIso, ultimaVista:nowIso, diasConsecutivos:1, status:"normal",
-        sightings:[{ts:nowIso,registradoPor:registradoPor.trim()}] };
+      entry = { placa, primeiraVista:nowIso, ultimaVista:nowIso, diasConsecutivos:1, status:"normal", aliases:[],
+        sightings:[{ts:nowIso,registradoPor:registradoPor.trim(),tipo:tipoInput}] };
       novoDia = true;
     } else {
       const horasDesde = (now.getTime()-new Date(existente.ultimaVista).getTime())/3600000;
-      const sightings = [...(existente.sightings||[]), {ts:nowIso,registradoPor:registradoPor.trim()}].slice(-MAX_SIGHTINGS);
+      const sightings = [...(existente.sightings||[]), {ts:nowIso,registradoPor:registradoPor.trim(),tipo:tipoInput}].slice(-MAX_SIGHTINGS);
       if(horasDesde>=JANELA_HORAS){
         const dias = existente.diasConsecutivos+1;
         entry = { ...existente, ultimaVista:nowIso, diasConsecutivos:dias, status:statusFromDias(dias), sightings };
@@ -370,7 +401,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     setPlacas(next);
     await saveBolsao(project.id, next);
     setSaving(false);
-    setFeedback({placa, status:entry.status, dias:entry.diasConsecutivos, novoDia});
+    setFeedback({placa, status:entry.status, dias:entry.diasConsecutivos, novoDia, aliasRedirect: placa!==digitada?digitada:null});
     setPlacaInput("");
   };
 
@@ -409,6 +440,21 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     setPlacas(next);
     await saveBolsao(project.id, next);
     setPlacaBloqueioForm(null);
+  };
+
+  const importarHistorico = async () => {
+    if(!window.confirm(`Importar histórico de Junho/2026 (177 placas) para ${project.id}? Placas que você já tenha registrado manualmente NÃO serão sobrescritas.`)) return;
+    setImportStatus("importando");
+    let added=0, skipped=0;
+    const next = {...placas};
+    for(const placa in SEED_P311B_JUN2026){
+      if(next[placa]){ skipped++; continue; } // já existe (registro real) — nunca sobrescreve
+      next[placa] = SEED_P311B_JUN2026[placa];
+      added++;
+    }
+    setPlacas(next);
+    await saveBolsao(project.id, next);
+    setImportStatus({added, skipped});
   };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
@@ -478,6 +524,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
             <div style={{...S.card,textAlign:"center",border:`2px solid ${STATUS_CFG[feedback.status].border}`,background:STATUS_CFG[feedback.status].bg}}>
               <div style={{fontSize:11,...S.txt2,marginBottom:4}}>{feedback.novoDia?"✅ Registrado — novo dia computado":"✅ Registrado — dentro da janela de 12h (mesmo dia)"}</div>
               <div style={{fontSize:20,fontWeight:900,letterSpacing:2,...S.txt}}>{feedback.placa}</div>
+              {feedback.aliasRedirect&&<div style={{fontSize:10,color:"#0ea5e9",marginTop:2}}>🔁 Digitado "{feedback.aliasRedirect}" — reconhecido como a mesma placa</div>}
               <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:6,alignItems:"center"}}>
                 <StatusBadge status={feedback.status}/>
                 <span style={{fontSize:12,fontWeight:700,color:STATUS_CFG[feedback.status].color}}>{feedback.dias}d consecutivo{feedback.dias!==1?"s":""}</span>
@@ -486,6 +533,12 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           )}
 
           <div style={S.card}>
+            <label style={S.lbl}>Tipo de Veículo</label>
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <button onClick={()=>setTipoInput("caminhao")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(tipoInput==="caminhao"?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}>🚛 Caminhão</button>
+              <button onClick={()=>setTipoInput("carreta_desengatada")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(tipoInput==="carreta_desengatada"?{background:"#ef444422",borderColor:"#ef444466",color:"#f87171"}:{})}}>🔓 Carreta Desengatada</button>
+            </div>
+
             <label style={S.lbl}>Placa</label>
             <PlacaInputNativo value={placaInput} onChange={setPlacaInput} dark={dark}/>
             <div style={{fontSize:10,...S.txt2,textAlign:"center",marginTop:6}}>Digite com o teclado do celular — sai sempre em maiúscula</div>
@@ -534,6 +587,22 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           <button onClick={()=>{setScreen("registrar");setFeedback(null);}} style={{...S.btn,fontSize:15,padding:"15px"}}>📋 Registrar Placa</button>
           <button onClick={()=>setScreen("relatorio")} style={{...S.btnSec,fontSize:13,color:"#92400e",borderColor:"#92400e44"}}>📄 Gerar Relatório</button>
 
+          {authLevel==="admin" && project.id==="P311B" && (
+            <div style={{...S.card,border:"1px dashed #0ea5e944"}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#0ea5e9",marginBottom:6}}>📥 Importação de Histórico (Gerencial)</div>
+              <div style={{fontSize:10,...S.txt2,marginBottom:8,lineHeight:1.4}}>
+                Carrega o relatório de reincidências de Junho/2026 (177 placas) pra dar histórico ao módulo. Nunca sobrescreve placas já registradas no app.
+              </div>
+              {importStatus==="importando" && <div style={{fontSize:12,color:"#0ea5e9",textAlign:"center"}}>Importando...</div>}
+              {importStatus && importStatus!=="importando" && (
+                <div style={{fontSize:11,color:"#22c55e",textAlign:"center",marginBottom:6}}>✅ {importStatus.added} importada(s){importStatus.skipped>0?`, ${importStatus.skipped} já existiam (preservadas)`:""}</div>
+              )}
+              {(!importStatus || importStatus==="importando") && (
+                <button onClick={importarHistorico} disabled={importStatus==="importando"} style={{...S.btnSm,width:"100%",color:"#0ea5e9",borderColor:"#0ea5e944",fontWeight:700,padding:"9px"}}>Importar Histórico Jun/2026</button>
+              )}
+            </div>
+          )}
+
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
             {[{k:"todos",l:"Todos",n:listaPlacas.length},{k:"alerta",l:"Alerta",n:listaPlacas.filter(p=>p.status==="atencao"||p.status==="critico").length},{k:"critico",l:"Críticos",n:listaPlacas.filter(p=>p.status==="critico").length},{k:"bloqueados",l:"🔒 Bloq.",n:listaPlacas.filter(p=>p.bloqueado).length}].map(t=>(
               <button key={t.k} onClick={()=>setAba(t.k)}
@@ -550,10 +619,12 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
             </div>
           )}
 
-          {listaFiltrada.map(p=>(
+          {listaFiltrada.map(p=>{
+            const ultimoTipo = (p.sightings||[]).length ? p.sightings[p.sightings.length-1].tipo : "caminhao";
+            return (
             <div key={p.placa} style={{...S.card,border:`1px solid ${p.bloqueado?"#ef444466":STATUS_CFG[p.status].border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:17,fontWeight:900,letterSpacing:1.5,...S.txt}}>{p.placa}</span>
+                <span style={{fontSize:17,fontWeight:900,letterSpacing:1.5,...S.txt}}>{ultimoTipo==="carreta_desengatada"?"🔓":"🚛"} {p.placa}</span>
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
                   {p.bloqueado&&<span style={{fontSize:10,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:5}}>🔒 Bloqueado</span>}
                   <StatusBadge status={p.status}/>
@@ -563,7 +634,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
                 <span>{p.diasConsecutivos} dia{p.diasConsecutivos!==1?"s":""} consecutivo{p.diasConsecutivos!==1?"s":""}</span>
                 <span>Última: {fmtDateTime(p.ultimaVista)}</span>
               </div>
-              <div style={{fontSize:10,...S.txt2,marginTop:3}}>{(p.sightings||[]).length} avistamento(s) registrado(s)</div>
+              <div style={{fontSize:10,...S.txt2,marginTop:3}}>{(p.sightings||[]).length} avistamento(s) registrado(s){p.aliases?.length?` · alias: ${p.aliases.join(", ")}`:""}</div>
 
               {p.bloqueado && p.bloqueioDados && (
                 <div style={{marginTop:8,padding:"8px 10px",background:dark?"#020510":"#f8fafc",borderRadius:7,fontSize:11,...S.txt2}}>
@@ -585,7 +656,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
                   <button onClick={()=>{if(window.confirm("Desmarcar bloqueio desta placa?")) toggleBloqueio(p.placa);}} style={{...S.btnSm,color:"#64748b"}}>✕</button>}
               </div>
             </div>
-          ))}
+          );})}
 
           <div style={{fontSize:10,...S.txt2,textAlign:"center",marginTop:6,lineHeight:1.5}}>
             Regra do POP: mesma placa avistada de novo após {JANELA_HORAS}h conta +1 dia. Atenção a partir de {DIAS_ATENCAO}d · Crítico a partir de {DIAS_CRITICO}d.
