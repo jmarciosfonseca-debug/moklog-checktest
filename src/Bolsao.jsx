@@ -96,26 +96,23 @@ function StatusBadge({ status }) {
 }
 
 // ── Teclado próprio — letras maiúsculas + números juntos, pensado para uso com uma mão em campo
-function TecladoPlaca({ value, onChange, dark }) {
-  const ROWS = [
-    ["1","2","3","4","5","6","7","8","9","0"],
-    ["Q","W","E","R","T","Y","U","I","O","P"],
-    ["A","S","D","F","G","H","J","K","L"],
-    ["Z","X","C","V","B","N","M"],
-  ];
-  const press = (ch) => { if(value.length<7) onChange(normalizaPlaca(value+ch)); };
-  const back = () => onChange(value.slice(0,-1));
-  const keyBtn = { flex:1, minWidth:0, height:42, borderRadius:8, border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`, background:dark?"#0c1424":"#fff", color:dark?"#f1f5f9":"#1e293b", fontSize:15, fontWeight:700, cursor:"pointer" };
+function PlacaInputNativo({ value, onChange, dark }) {
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:6,background:dark?"#020510":"#f1f5f9",borderRadius:10,padding:8}}>
-      {ROWS.map((row,i)=>(
-        <div key={i} style={{display:"flex",gap:5}}>
-          {row.map(ch=><button key={ch} onClick={()=>press(ch)} style={keyBtn}>{ch}</button>)}
-          {i===0&&<button onClick={back} style={{...keyBtn,flex:1.4,background:"#7c2d2d",color:"#fff",borderColor:"#7c2d2d"}}>⌫</button>}
-        </div>
-      ))}
-      <button onClick={()=>onChange("")} style={{...keyBtn,height:34,flex:"none",background:"transparent",color:dark?"#64748b":"#94a3b8",border:"none",fontSize:11,fontWeight:600}}>Limpar tudo</button>
-    </div>
+    <input
+      value={value}
+      onChange={e=>onChange(normalizaPlaca(e.target.value))}
+      placeholder="Digite a placa..."
+      autoCapitalize="characters"
+      autoCorrect="off"
+      autoComplete="off"
+      spellCheck={false}
+      inputMode="text"
+      style={{
+        width:"100%", background:dark?"#020510":"#fff", border:`2px solid ${dark?"#1e293b":"#cbd5e1"}`,
+        borderRadius:10, color:dark?"#f1f5f9":"#1e293b", padding:"14px 12px", fontSize:26, fontWeight:900,
+        letterSpacing:4, textAlign:"center", textTransform:"uppercase", boxSizing:"border-box", outline:"none"
+      }}
+    />
   );
 }
 
@@ -313,8 +310,11 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     if(aba==="critico") return p.status==="critico";
     return true;
   });
-  const sugestoes = placaInput.length>=3
-    ? listaPlacas.filter(p=>p.placa.startsWith(placaInput) && p.placa!==placaInput && (p.status==="atencao"||p.status==="critico")).slice(0,5)
+  const sugestoes = placaInput.length>=2
+    ? listaPlacas
+        .filter(p=>p.placa.startsWith(placaInput) && p.placa!==placaInput)
+        .sort((a,b)=>new Date(b.ultimaVista)-new Date(a.ultimaVista))
+        .slice(0,6)
     : [];
 
   const registrar = async () => {
@@ -430,12 +430,12 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
           <div style={S.card}>
             <label style={S.lbl}>Placa</label>
-            <input value={placaInput} readOnly placeholder="Toque no teclado abaixo"
-              style={{...S.inp,fontSize:24,fontWeight:900,letterSpacing:4,textAlign:"center",marginBottom:10}}/>
+            <PlacaInputNativo value={placaInput} onChange={setPlacaInput} dark={dark}/>
+            <div style={{fontSize:10,...S.txt2,textAlign:"center",marginTop:6}}>Digite com o teclado do celular — sai sempre em maiúscula</div>
 
             {sugestoes.length>0 && (
-              <div style={{marginBottom:10}}>
-                <div style={{fontSize:10,...S.txt2,fontWeight:700,marginBottom:6}}>⚠️ Placas frequentes (Atenção/Crítico) que começam assim:</div>
+              <div style={{marginTop:12}}>
+                <div style={{fontSize:10,...S.txt2,fontWeight:700,marginBottom:6}}>🕘 Já registradas antes, começando assim:</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {sugestoes.map(s=>(
                     <button key={s.placa} onClick={()=>setPlacaInput(s.placa)}
@@ -446,8 +446,6 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
                 </div>
               </div>
             )}
-
-            <TecladoPlaca value={placaInput} onChange={setPlacaInput} dark={dark}/>
           </div>
 
           <div style={S.card}>
