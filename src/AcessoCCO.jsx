@@ -160,14 +160,14 @@ function getStyles(dark) {
     wrap:    { width:"100%", maxWidth:480, display:"flex", flexDirection:"column" },
     card:    { background:dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"14px 16px" },
     btn:     { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
-    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
+    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#94a3b8":"#64748b", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#94a3b8", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
     inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color:dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
-    lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    lbl:     { display:"block", fontSize:11, color:dark?"#64748b":"#94a3b8", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
     hdrBg:   { background:dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
     txt:     { color:dark?"#f1f5f9":"#0f172a" },
-    txt2:    { color:dark?"#475569":"#64748b" },
+    txt2:    { color:dark?"#64748b":"#94a3b8" },
   };
 }
 
@@ -232,7 +232,7 @@ function gerarPDFTema(tema, project, registros) {
   const ivCell = (col,key)=>{ const iv=col.intervalos?.[key]; return iv&&(iv.saida||iv.retorno)?`${iv.saida||"--"}→${iv.retorno||"--"}`:"--"; };
   const rowFn = {
     acesso: (r)=>`<tr><td><strong>${r.nome||"--"}</strong></td><td>${r.empresa||"--"}</td><td>${fmtDate(r.data)}</td><td>${r.horaEntrada||"--"}</td><td>${r.obs||"--"}</td></tr>`,
-    intervalo: (r)=>(r.colaboradores||[]).map(col=>`<tr><td>${fmtDate(r.data)}</td><td>${turnoLabel(r.turno)}</td><td><strong>${col.nome||"--"}</strong><br><span style="font-size:10px;color:#64748b">${col.cargo||""}</span></td><td>${ivCell(col,"cafe1")}</td><td>${ivCell(col,"refeicao")}</td><td>${ivCell(col,"cafe2")}</td></tr>`).join(""),
+    intervalo: (r)=>(r.colaboradores||[]).map(col=>`<tr><td>${fmtDate(r.data)}</td><td>${turnoLabel(r.turno)}</td><td><strong>${col.nome||"--"}</strong><br><span style="font-size:10px;color:#94a3b8">${col.cargo||""}</span></td><td>${ivCell(col,"cafe1")}</td><td>${ivCell(col,"refeicao")}</td><td>${ivCell(col,"cafe2")}</td></tr>`).join(""),
     supervisao: (r)=>{
       const eqs=(r.equipamentos||[]).filter(e=>e.acao).map(e=>`${e.acao==="trocado"?"✔":"✗"} ${e.catLabel}${e.identificacao?` (${e.identificacao})`:""}`).join("<br>")||"--";
       return `<tr><td><strong>${r.supervisor||"--"}</strong></td><td>${turnoLabel(r.turno)}</td><td>${fmtDate(r.data)}</td><td>${r.chegada||"--"}</td><td>${r.saida||"--"}</td><td>${r.resumo||"--"}</td><td style="font-size:10px">${eqs}</td></tr>`;
@@ -258,7 +258,7 @@ function gerarPDFTema(tema, project, registros) {
   .header h1{font-size:18px;margin-bottom:4px}
   .header p{font-size:11px;opacity:.75}
   .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
-  .card h2{font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
+  .card h2{font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
   table{width:100%;border-collapse:collapse;font-size:12px}
   th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
   td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
@@ -267,7 +267,7 @@ function gerarPDFTema(tema, project, registros) {
   .kpi{display:flex;gap:10px;margin-bottom:14px}
   .kpibox{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
   .kpibox .n{font-size:22px;font-weight:800;color:#0c2340}
-  .kpibox .l{font-size:10px;color:#64748b;font-weight:700}
+  .kpibox .l{font-size:10px;color:#94a3b8;font-weight:700}
   @media print{body{padding:8px}@page{margin:12mm}.no-print{display:none}}
 </style></head>
 <body>
@@ -317,7 +317,7 @@ function PillGroup({ options, value, onChange, dark }) {
           <button key={o.key} onClick={()=>onChange(o.key)}
             style={{flex:1, minWidth:90, background:sel?o.bg:"transparent",
               border:`1px solid ${sel?o.color+"66":dark?"#0f172a":"#e2e8f0"}`,
-              color:sel?o.color:dark?"#475569":"#94a3b8",
+              color:sel?o.color:dark?"#64748b":"#94a3b8",
               borderRadius:8, padding:"9px 8px", fontSize:12, cursor:"pointer",
               fontWeight:sel?700:500}}>
             {o.icon} {o.label}
@@ -332,7 +332,7 @@ function KPI({ S, val, label, color }) {
   return (
     <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
       <div style={{fontSize:22,fontWeight:900,color}}>{val}</div>
-      <div style={{fontSize:9,...S.txt2,fontWeight:700}}>{label}</div>
+      <div style={{fontSize:11,...S.txt2,fontWeight:700}}>{label}</div>
     </div>
   );
 }
@@ -366,17 +366,17 @@ function RegistroCard({ tema, r, dark, S, adminAuth, onArquivar, onDesarquivar, 
         </div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:700,...S.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {titulo}{r.arquivado&&<span style={{fontSize:9,color:"#64748b",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}>📦 Arquivado</span>}
+            {titulo}{r.arquivado&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}>📦 Arquivado</span>}
           </div>
           {sub&&<div style={{fontSize:11,...S.txt2}}>{sub}</div>}
           <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
-            <span style={{fontSize:10,...S.txt2}}>📅 {fmtDate(r.data)}</span>
-            {tema==="acesso"&&r.horaEntrada&&<span style={{fontSize:10,color:"#22c55e"}}>⏱ {r.horaEntrada}</span>}
-            {tema==="supervisao"&&r.chegada&&<span style={{fontSize:10,color:"#22c55e"}}>↗ {r.chegada}</span>}
-            {tema==="supervisao"&&r.saida&&<span style={{fontSize:10,color:"#f59e0b"}}>↘ {r.saida}</span>}
-            {tn&&<span style={{fontSize:10,color:tn.color,fontWeight:700}}>{tn.icon} {tn.label}</span>}
-            {st&&<span style={{fontSize:10,color:st.color,fontWeight:700}}>{st.label}</span>}
-            {tema==="acesso"&&dias!==null&&<span style={{fontSize:10,color:dias===0?"#22c55e":dias>7?"#ef4444":"#64748b",fontWeight:700}}>{dias===0?"Hoje":dias===1?"Ontem":`${dias}d atrás`}</span>}
+            <span style={{fontSize:11,...S.txt2}}>📅 {fmtDate(r.data)}</span>
+            {tema==="acesso"&&r.horaEntrada&&<span style={{fontSize:11,color:"#22c55e"}}>⏱ {r.horaEntrada}</span>}
+            {tema==="supervisao"&&r.chegada&&<span style={{fontSize:11,color:"#22c55e"}}>↗ {r.chegada}</span>}
+            {tema==="supervisao"&&r.saida&&<span style={{fontSize:11,color:"#f59e0b"}}>↘ {r.saida}</span>}
+            {tn&&<span style={{fontSize:11,color:tn.color,fontWeight:700}}>{tn.icon} {tn.label}</span>}
+            {st&&<span style={{fontSize:11,color:st.color,fontWeight:700}}>{st.label}</span>}
+            {tema==="acesso"&&dias!==null&&<span style={{fontSize:11,color:dias===0?"#22c55e":dias>7?"#ef4444":"#94a3b8",fontWeight:700}}>{dias===0?"Hoje":dias===1?"Ontem":`${dias}d atrás`}</span>}
           </div>
         </div>
         <span style={{...S.txt2,fontSize:12}}>{open?"▲":"▼"}</span>
@@ -408,7 +408,7 @@ function RegistroCard({ tema, r, dark, S, adminAuth, onArquivar, onDesarquivar, 
           {r.obs&&<div style={{fontSize:12,...S.txt2,marginBottom:8,lineHeight:1.5}}>{r.obs}</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
             {!r.arquivado
-              ? <button onClick={onArquivar} style={{...S.btnSm,color:"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`}}>📦 Arquivar</button>
+              ? <button onClick={onArquivar} style={{...S.btnSm,color:"#94a3b8",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`}}>📦 Arquivar</button>
               : <button onClick={onDesarquivar} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>↩ Desarquivar</button>}
             {adminAuth && <button onClick={onExcluir} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433"}}>🗑 Excluir</button>}
           </div>
@@ -551,14 +551,14 @@ function TemaForm({ tema, form, setF, S, dark, equipe }) {
             {(form.equipamentos||[]).map((eq,i)=>(
               <div key={i} style={{background:dark?"#020510":"#f8fafc",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"8px 10px",marginBottom:6}}>
                 <div style={{fontSize:12,fontWeight:700,...S.txt}}>{eq.catLabel}{eq.identificacao?` — ${eq.identificacao}`:""}</div>
-                <div style={{fontSize:10,color:"#ef4444",marginBottom:6}}>Status: {eq.status}{eq.justificativa?` · ${eq.justificativa}`:""}</div>
+                <div style={{fontSize:11,color:"#ef4444",marginBottom:6}}>Status: {eq.status}{eq.justificativa?` · ${eq.justificativa}`:""}</div>
                 <div style={{display:"flex",gap:6}}>
                   {[{k:"trocado",l:"✅ Trocado/Resolvido",col:"#22c55e"},{k:"aberto",l:"⏳ Continua em aberto",col:"#ef4444"}].map(opt=>{
                     const sel=eq.acao===opt.k;
                     return (
                       <button key={opt.k} onClick={()=>{
                         const novos=[...form.equipamentos]; novos[i]={...eq,acao:opt.k}; setF("equipamentos",novos);
-                      }} style={{flex:1,background:sel?opt.col+"22":"transparent",border:`1px solid ${sel?opt.col+"66":dark?"#0f172a":"#e2e8f0"}`,color:sel?opt.col:dark?"#475569":"#94a3b8",borderRadius:7,padding:"6px",fontSize:11,cursor:"pointer",fontWeight:sel?700:500}}>{opt.l}</button>
+                      }} style={{flex:1,background:sel?opt.col+"22":"transparent",border:`1px solid ${sel?opt.col+"66":dark?"#0f172a":"#e2e8f0"}`,color:sel?opt.col:dark?"#64748b":"#94a3b8",borderRadius:7,padding:"6px",fontSize:11,cursor:"pointer",fontWeight:sel?700:500}}>{opt.l}</button>
                     );
                   })}
                 </div>
@@ -705,15 +705,15 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
   // Barra de abas (temas)
   const TabBar = () => (
-    <div style={{display:"flex",gap:5,padding:"0 16px 10px",overflowX:"auto"}}>
+    <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"0 16px 12px"}}>
       {TEMAS.map(t=>{
         const sel = tema===t.key;
         return (
           <button key={t.key} onClick={()=>{setTema(t.key);setScreen("list");}}
-            style={{flex:"1 0 auto",background:sel?t.color+"22":"transparent",
-              border:`1px solid ${sel?t.color+"66":dark?"#0f172a":"#e2e8f0"}`,
-              color:sel?t.color:dark?"#475569":"#94a3b8",
-              borderRadius:9,padding:"8px 10px",fontSize:12,cursor:"pointer",fontWeight:sel?700:500,whiteSpace:"nowrap"}}>
+            style={{flex:"1 1 30%",minWidth:100,background:sel?t.color+"22":"transparent",
+              border:`1px solid ${sel?t.color+"66":dark?"#1e293b":"#e2e8f0"}`,
+              color:sel?t.color:dark?"#94a3b8":"#94a3b8",
+              borderRadius:9,padding:"9px 8px",fontSize:12,cursor:"pointer",fontWeight:sel?700:600,whiteSpace:"nowrap",textAlign:"center"}}>
             {t.icon} {t.label}
           </button>
         );
@@ -788,7 +788,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
                 <KPI S={S} val={registros.length} label="TOTAL" color={temaInfo.color}/>
                 <KPI S={S} val={ativos.length} label="ATIVOS" color="#22c55e"/>
-                <KPI S={S} val={arquivados.length} label="ARQUIVADOS" color="#64748b"/>
+                <KPI S={S} val={arquivados.length} label="ARQUIVADOS" color="#94a3b8"/>
               </div>
 
               {hasDraft && (
@@ -811,7 +811,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
               {/* Toggle ativos / arquivados */}
               <div style={{display:"flex",gap:6}}>
                 <button onClick={()=>setShowArquivados(false)} style={{...S.btnSm,flex:1,padding:"7px",...(!showArquivados?{background:temaInfo.color+"22",border:`1px solid ${temaInfo.color}66`,color:temaInfo.color}:{})}}>Ativos ({ativos.length})</button>
-                <button onClick={()=>setShowArquivados(true)} style={{...S.btnSm,flex:1,padding:"7px",...(showArquivados?{background:"#64748b22",border:"1px solid #64748b66",color:"#94a3b8"}:{})}}>📦 Arquivados ({arquivados.length})</button>
+                <button onClick={()=>setShowArquivados(true)} style={{...S.btnSm,flex:1,padding:"7px",...(showArquivados?{background:"#94a3b822",border:"1px solid #94a3b866",color:"#94a3b8"}:{})}}>📦 Arquivados ({arquivados.length})</button>
               </div>
 
               {visiveis.length===0 && (
@@ -822,13 +822,13 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
               )}
 
               {hoje.length>0 && (<>
-                <div style={{fontSize:10,color:temaInfo.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
+                <div style={{fontSize:11,color:temaInfo.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
                 {hoje.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
                   onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
               </>)}
               {anteriores.length>0 && (<>
-                <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
+                <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
                 {anteriores.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
                   onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}

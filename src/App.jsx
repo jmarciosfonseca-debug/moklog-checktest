@@ -104,7 +104,7 @@ class ErrorBoundary extends React.Component {
             <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>
               Módulo: <strong style={{color:"#f59e0b"}}>{moduleName}</strong>
             </div>
-            <div style={{fontSize:11,color:"#64748b",marginBottom:20,background:"#0f0202",borderRadius:8,padding:"8px 12px",textAlign:"left",wordBreak:"break-word"}}>
+            <div style={{fontSize:11,color:"#94a3b8",marginBottom:20,background:"#0f0202",borderRadius:8,padding:"8px 12px",textAlign:"left",wordBreak:"break-word"}}>
               {friendlyMsg}
             </div>
             <button onClick={()=>this.setState({hasError:false,error:null,errorInfo:null})}
@@ -112,10 +112,10 @@ class ErrorBoundary extends React.Component {
               🔄 Tentar novamente
             </button>
             <button onClick={()=>window.location.reload()}
-              style={{background:"transparent",color:"#64748b",border:"1px solid #1e293b",borderRadius:10,padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
+              style={{background:"transparent",color:"#94a3b8",border:"1px solid #1e293b",borderRadius:10,padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
               ↩ Recarregar app
             </button>
-            <div style={{fontSize:10,color:"#94a3b8",marginTop:12}}>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:12}}>
               Os dados salvos localmente estão protegidos.
             </div>
           </div>
@@ -672,11 +672,11 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
         </div>
         {goingOffline && confirm.allowDateEdit && (
           <div style={{marginBottom:16}}>
-            <div style={{fontSize:10,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Desde quando está off-line?</div>
+            <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Desde quando está off-line?</div>
             <input type="date" value={customDate} max={new Date().toISOString().split("T")[0]}
               onChange={e=>setCustomDate(e.target.value)}
               style={{width:"100%",background:"#020510",border:"1px solid #1e293b",borderRadius:8,color:"#f1f5f9",padding:"10px 12px",fontSize:14,boxSizing:"border-box"}}/>
-            <div style={{fontSize:10,color:"#64748b",marginTop:4}}>Deixe como hoje se a queda acabou de acontecer. Mude a data se já está sem imagem há mais tempo.</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Deixe como hoje se a queda acabou de acontecer. Mude a data se já está sem imagem há mais tempo.</div>
           </div>
         )}
         <div style={{display:"flex",gap:8}}>
@@ -751,7 +751,7 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
   if(existing.length>0) return (
     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 8px",background:"#020510",borderRadius:6,border:"1px solid #0f172a"}}>
       <img src={existing[0].url} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:"1px solid #1e293b"}}/>
-      <div style={{flex:1,fontSize:10,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{itemLabel||catLabel}</div>
+      <div style={{flex:1,fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{itemLabel||catLabel}</div>
       <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}} aria-label="Remover">✕</button>
     </div>
   );
@@ -773,7 +773,7 @@ function SingleCat({cat, value, onChange, photos, setPhotos, recurrence}){
       <div style={S.catHeader}>
         <div style={{display:"flex",alignItems:"center",gap:6,flex:1}}>
           <span style={S.catLabel}>{cat.label}</span>
-          {badge&&<span style={{fontSize:9,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 5px",borderRadius:8}}>{badge.label}</span>}
+          {badge&&<span style={{fontSize:11,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 5px",borderRadius:8}}>{badge.label}</span>}
         </div>
         <div style={{display:"flex",gap:4,flexShrink:0}}>
           <button onClick={()=>onChange({...value,status:"ok",note:"",since:""})} style={{...S.sm,...(st==="ok"?S.smOk:{})}}>OK</button>
@@ -805,7 +805,7 @@ function ItemsCat({cat, values, onChange, photos, setPhotos, recurrence}){
         <span style={S.catLabel}>{cat.label}</span>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:13,fontWeight:800,color:dotColor}}>{p}%</span>
-          <span style={{fontSize:11,color:"#475569"}}>{okN}/{values.length}</span>
+          <span style={{fontSize:11,color:"#64748b"}}>{okN}/{values.length}</span>
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:10}}>
@@ -853,11 +853,11 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
       <div style={S.catHeader}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <span style={S.catLabel}>{cat.label}</span>
-          {badge&&<span style={{fontSize:9,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 5px",borderRadius:8}}>{badge.label}</span>}
+          {badge&&<span style={{fontSize:11,fontWeight:700,color:badge.color,background:badge.bg,padding:"1px 5px",borderRadius:8}}>{badge.label}</span>}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:13,fontWeight:800,color:p===100?"#22c55e":"#ef4444"}}>{p}%</span>
-          <span style={{fontSize:11,color:"#475569"}}>{total-inop.length}/{total} OK</span>
+          <span style={{fontSize:11,color:"#64748b"}}>{total-inop.length}/{total} OK</span>
           <button onClick={()=>onChange({...value,total:total+1})} style={S.iconBtn}>+</button>
           {total>1&&<button onClick={()=>onChange({...value,total:total-1})} style={S.iconBtn}>-</button>}
         </div>
@@ -922,7 +922,7 @@ function MaintenanceCat({cat,value,onChange}){
     <div style={S.catCard}>
       <div style={S.catHeader}>
         <span style={S.catLabel}>{cat.label}</span>
-        <span style={{fontSize:11,color:visits.length?"#f59e0b":"#475569",fontWeight:700}}>{visits.length?`${visits.length} visita(s)`:"Nenhuma visita"}</span>
+        <span style={{fontSize:11,color:visits.length?"#f59e0b":"#64748b",fontWeight:700}}>{visits.length?`${visits.length} visita(s)`:"Nenhuma visita"}</span>
       </div>
       <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:12}}>
         {visits.map((v,i)=>(
@@ -957,7 +957,7 @@ function ProjectPinGate({project, onSuccess, onBack}) {
         <MoklogLogo size={48}/>
         <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#94a3b8",marginBottom:4}}>{project.id} - {project.name}</div>
-        <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Insira o PIN do projeto</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Insira o PIN do projeto</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
           onKeyDown={e=>{if(e.key==="Enter") try_();}}
@@ -1060,7 +1060,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Painel Gerencial</h1>
         <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
-        <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Acesso restrito</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
           onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}}}
@@ -1101,18 +1101,18 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             <button onClick={()=>applyPreset("mes")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>📅 Último mês</button>
             <button onClick={()=>applyPreset("tudo")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>🗂 Tudo</button>
           </div>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Ou selecione manualmente ({selWeeks.size} selecionada{selWeeks.size===1?"":"s"})</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Ou selecione manualmente ({selWeeks.size} selecionada{selWeeks.size===1?"":"s"})</div>
           <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:90}}>
-            {availDates.length===0&&<div style={{fontSize:12,color:"#64748b",textAlign:"center",padding:20}}>Nenhum relatório encontrado para este grupo ainda.</div>}
+            {availDates.length===0&&<div style={{fontSize:12,color:"#94a3b8",textAlign:"center",padding:20}}>Nenhum relatório encontrado para este grupo ainda.</div>}
             {availDates.map(d=>{
               const sel=selWeeks.has(d); const cnt=countForDate(d);
               return(
                 <div key={d} onClick={()=>toggleWeek(d)} style={{display:"flex",alignItems:"center",gap:10,background:sel?"#0c1f3d":"#060c18",border:`1.5px solid ${sel?"#3b82f6":"#0f172a"}`,borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
-                  <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${sel?"#3b82f6":"#475569"}`,background:sel?"#3b82f6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{sel?"✓":""}</div>
+                  <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${sel?"#3b82f6":"#64748b"}`,background:sel?"#3b82f6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{sel?"✓":""}</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>{getWeekLabel(d)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(d)}</span></div>
                   </div>
-                  <div style={{fontSize:10,color:"#64748b",fontWeight:700}}>{cnt}/{ids.length} projetos</div>
+                  <div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{cnt}/{ids.length} projetos</div>
                 </div>
               );
             })}
@@ -1203,21 +1203,21 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
               <div>
                 <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>🔗 Link Manutencao</div>
-                <div style={{fontSize:10,color:"#64748b"}}>{viewToken?"Ativo":"Inativo"}</div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{viewToken?"Ativo":"Inativo"}</div>
               </div>
               <button onClick={()=>toggleViewLink(p.id)} style={{...S.sm,...(viewToken?S.smBad:S.smOk),fontSize:11,padding:"5px 10px"}}>
                 {viewToken?"Desativar":"Ativar"}
               </button>
             </div>
             {viewToken&&<div style={{marginTop:8}}>
-              <div style={{fontSize:9,color:"#64748b",wordBreak:"break-all",background:"#020510",padding:"5px 8px",borderRadius:5,marginBottom:5}}>{viewUrl}</div>
-              <button onClick={()=>navigator.clipboard.writeText(viewUrl)} style={{...S.sm,fontSize:10,width:"100%"}}>📋 Copiar Link</button>
+              <div style={{fontSize:11,color:"#94a3b8",wordBreak:"break-all",background:"#020510",padding:"5px 8px",borderRadius:5,marginBottom:5}}>{viewUrl}</div>
+              <button onClick={()=>navigator.clipboard.writeText(viewUrl)} style={{...S.sm,fontSize:11,width:"100%"}}>📋 Copiar Link</button>
             </div>}
           </div>
           {sel.length>=2&&<button onClick={()=>generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")))}
             style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:8,fontSize:14}}>
             📊 Gerar Consolidado ({sel.length} semanas)</button>}
-          {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#64748b",marginBottom:8}}>☑ Selecione 2 a 6 relatorios para consolidado</div>}
+          {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#94a3b8",marginBottom:8}}>☑ Selecione 2 a 6 relatorios para consolidado</div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {hist.slice().reverse().map((r,revIdx)=>{
               const realIdx=hist.length-1-revIdx;
@@ -1234,8 +1234,8 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                     <HealthRing pct={h.pct} size={44}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
-                      <div style={{fontSize:11,color:"#475569"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
-                      {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
+                      <div style={{fontSize:11,color:"#64748b"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
+                      {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}>✍ {r.meta.signature}</div>}
                       <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inop`:"✔ OK"}</div>
                     </div>
                   </div>
@@ -1256,7 +1256,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
             <div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}>
               <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div>
-              <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div>
+              <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);setSelProject(null);}}
                   style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button>
@@ -1286,22 +1286,22 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         </div>
         {avgPct!==null&&<div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"14px 16px",marginBottom:8}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
-            <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:avgPct>=90?"#22c55e":"#ef4444"}}>{avgPct}%</div><div style={{fontSize:9,color:"#64748b",fontWeight:700}}>SAÚDE GERAL</div></div>
-            <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:totalInopAll>0?"#ef4444":"#22c55e"}}>{totalInopAll}</div><div style={{fontSize:9,color:"#64748b",fontWeight:700}}>INOP TOTAL</div></div>
-            <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div><div style={{fontSize:9,color:"#64748b",fontWeight:700}}>ALERTAS</div></div>
+            <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:avgPct>=90?"#22c55e":"#ef4444"}}>{avgPct}%</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>SAÚDE GERAL</div></div>
+            <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:totalInopAll>0?"#ef4444":"#22c55e"}}>{totalInopAll}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>INOP TOTAL</div></div>
+            <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>ALERTAS</div></div>
           </div>
         </div>}
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📊 Comparativo Interparques</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📊 Comparativo Interparques</div>
           {getAvailableDates(GOLGI_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Golgi",ids:GOLGI_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:13}}>📊 Comparativo Golgi</button>}
           {getAvailableDates(MEGA_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Mega",ids:MEGA_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0ea5e9,#0369a1)",fontSize:13}}>📊 Comparativo Mega</button>}
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
+          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
         </div>
       </div>
-      {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#64748b",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
+      {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
       {ctmkConfirm&&<CtmkConfirmModal confirm={ctmkConfirm} project={{id:ctmkConfirm.pid}} onCancel={()=>setCtmkConfirm(null)} onConfirm={(date)=>{onToggleCtmk(ctmkConfirm.pid,date);setCtmkConfirm(null);}}/>}
     </div>
   );
@@ -1323,9 +1323,9 @@ function PendenciesScreen({stored, onBack}) {
             <div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Pendências Globais</div><div style={{fontSize:11,color:"#94a3b8"}}>Todos os projetos · {all.length} itens</div></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:10}}>
-          <div style={{background:"#060c18",border:"1px solid #ef444433",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{critCount}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>INOP</div></div>
-          <div style={{background:"#060c18",border:"1px solid #f59e0b33",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#f59e0b"}}>{partCount}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>PARCIAL</div></div>
-          <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#94a3b8"}}>{all.length}</div><div style={{fontSize:10,color:"#64748b",fontWeight:700}}>TOTAL</div></div>
+          <div style={{background:"#060c18",border:"1px solid #ef444433",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#ef4444"}}>{critCount}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>INOP</div></div>
+          <div style={{background:"#060c18",border:"1px solid #f59e0b33",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#f59e0b"}}>{partCount}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>PARCIAL</div></div>
+          <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:10,padding:"10px",textAlign:"center"}}><div style={{fontSize:22,fontWeight:900,color:"#94a3b8"}}>{all.length}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>TOTAL</div></div>
         </div>
         <div style={{display:"flex",gap:6,marginBottom:10}}>
           {[["all","Todos",all.length],["critical","Inop",critCount],["partial","Parcial",partCount]].map(([key,label,count])=>(
@@ -1343,14 +1343,14 @@ function PendenciesScreen({stored, onBack}) {
                   <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{urgency}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
-                      <span style={{fontSize:10,fontWeight:700,color:"#f1f5f9",background:"#0f172a",padding:"2px 6px",borderRadius:5}}>{p.project.id}</span>
-                      <span style={{fontSize:10,fontWeight:700,color:color,background:color+"22",padding:"2px 6px",borderRadius:5}}>{p.status==="inop"?"INOP":"PARCIAL"}</span>
-                      {p.days!==null&&<span style={{fontSize:10,color:p.days>=30?"#ef4444":p.days>=14?"#f59e0b":"#64748b",fontWeight:700}}>há {p.days} dia{p.days!==1?"s":""}</span>}
+                      <span style={{fontSize:11,fontWeight:700,color:"#f1f5f9",background:"#0f172a",padding:"2px 6px",borderRadius:5}}>{p.project.id}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:color,background:color+"22",padding:"2px 6px",borderRadius:5}}>{p.status==="inop"?"INOP":"PARCIAL"}</span>
+                      {p.days!==null&&<span style={{fontSize:11,color:p.days>=30?"#ef4444":p.days>=14?"#f59e0b":"#94a3b8",fontWeight:700}}>há {p.days} dia{p.days!==1?"s":""}</span>}
                     </div>
                     <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",marginBottom:2}}>{p.cat}</div>
                     {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
-                    {p.note&&<div style={{fontSize:11,color:"#64748b",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
-                    <div style={{fontSize:10,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"} · {p.project.name}</div>
+                    {p.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
+                    <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"} · {p.project.name}</div>
                   </div>
                 </div>
               </div>
@@ -1383,17 +1383,17 @@ function HistoryScreen({project, stored, onBack}) {
           <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
         </div>
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-          <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📂 Últimos testes</div>
+          <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📂 Últimos testes</div>
           {ultimos.map((u,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:i<ultimos.length-1?"1px solid #0a0f1e":"none"}}>
               <span style={{fontSize:11,fontWeight:800,color:"#cbd5e1",minWidth:54}}>{u.wk}</span>
-              <span style={{fontSize:10,color:"#475569",minWidth:74}}>{u.data}</span>
+              <span style={{fontSize:11,color:"#64748b",minWidth:74}}>{u.data}</span>
               <span style={{fontSize:11,color:"#94a3b8",flex:1}}>Líder: {u.leader} · CCO: {u.cco}</span>
             </div>
           ))}
         </div>
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-          <div style={{fontSize:10,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📋 Cabeçalho</div>
+          <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📋 Cabeçalho</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             {[
               ["Data",        fmtDate(repMeta.date)],
@@ -1405,7 +1405,7 @@ function HistoryScreen({project, stored, onBack}) {
               ["Assinatura",  repMeta.signature||"—"],
             ].map(([label,val])=>(
               <div key={label}>
-                <div style={{fontSize:9,color:"#475569",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>{label}</div>
+                <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",marginBottom:2}}>{label}</div>
                 <div style={{fontSize:12,color:"#f1f5f9",fontWeight:600}}>{val}</div>
               </div>
             ))}
@@ -1439,18 +1439,18 @@ function HistoryScreen({project, stored, onBack}) {
                 <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:3}}>▸ {it?.label}{it?.note?` — ${it.note}`:""}</div>
               ))}
               {cat.type==="maintenance"&&Array.isArray(sv.visits)&&sv.visits.map((v,i)=>(
-                <div key={i} style={{fontSize:11,color:"#64748b",marginLeft:16,marginTop:3}}>🔧 {fmtDate(v?.date)} · {v?.empresa||"—"} · {v?.tec1||"—"}</div>
+                <div key={i} style={{fontSize:11,color:"#94a3b8",marginLeft:16,marginTop:3}}>🔧 {fmtDate(v?.date)} · {v?.empresa||"—"} · {v?.tec1||"—"}</div>
               ))}
             </div>
           );
         })}
         {repMeta.obs&&(
           <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:8,padding:"10px 14px",marginTop:4}}>
-            <div style={{fontSize:10,color:"#475569",fontWeight:700,marginBottom:4}}>OBSERVAÇÕES</div>
+            <div style={{fontSize:11,color:"#64748b",fontWeight:700,marginBottom:4}}>OBSERVAÇÕES</div>
             <div style={{fontSize:12,color:"#94a3b8"}}>{repMeta.obs}</div>
           </div>
         )}
-        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
+        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
       </div>
     </div>
     );
@@ -1474,8 +1474,8 @@ function HistoryScreen({project, stored, onBack}) {
                   <HealthRing pct={h.pct} size={46}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
-                    <div style={{fontSize:11,color:"#475569"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
-                    {r.meta?.signature&&<div style={{fontSize:11,color:"#64748b"}}>✍ {r.meta.signature}</div>}
+                    <div style={{fontSize:11,color:"#64748b"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
+                    {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}>✍ {r.meta.signature}</div>}
                     <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inoperante(s)`:"✔ Tudo OK"}</div>
                   </div>
                 </div>
@@ -1538,7 +1538,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
         </div>
         <div style={{background:"#021a0d",border:"1px solid #22c55e",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:18}}>✅</span>
-          <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#475569"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}</div></div>
+          <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
           <button onClick={()=>generatePDF(project,state,meta,photos,ctmkInfo)} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
@@ -1550,7 +1550,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
         </div>
         <button onClick={onHome} style={{...S.secBtn,width:"100%",fontSize:13}}>🏠 Inicio</button>
         <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"45vh",overflowY:"auto",marginTop:12}}>
-          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:10,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
+          <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:11,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
         </div>
       </div>
     </div>
@@ -1583,11 +1583,11 @@ function ViewScreen({projectId, token, stored}) {
 
   if(checking) return (
     <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{fontSize:13,color:"#64748b"}}>Verificando acesso...</div>
+      <div style={{fontSize:13,color:"#94a3b8"}}>Verificando acesso...</div>
     </div>
   );
   if(!project || !validToken || (token !== validToken && token !== (projectId+"_"+validToken) && token !== validToken.split("_").pop())) {
-    return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#64748b"}}>Solicite um novo link ao gestor.</div></div></div>);
+    return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#94a3b8"}}>Solicite um novo link ao gestor.</div></div></div>);
   }
   const hist = stored[projectId]?.history??[];
   const last = hist.slice(-1)[0];
@@ -1601,7 +1601,7 @@ function ViewScreen({projectId, token, stored}) {
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"16px",marginBottom:12}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <MoklogLogo size={40}/>
-            <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>MokLog CheckTest</div><div style={{fontSize:12,color:"#cc2222",fontWeight:700}}>{project.id} – {project.name}</div><div style={{fontSize:11,color:"#475569"}}>Pendencias para manutencao · {fmtDate(last.meta?.date)}</div></div>
+            <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>MokLog CheckTest</div><div style={{fontSize:12,color:"#cc2222",fontWeight:700}}>{project.id} – {project.name}</div><div style={{fontSize:11,color:"#64748b"}}>Pendencias para manutencao · {fmtDate(last.meta?.date)}</div></div>
             <HealthRing pct={h.pct} size={52}/>
           </div>
         </div>
@@ -1611,16 +1611,16 @@ function ViewScreen({projectId, token, stored}) {
           {issues.map((iss,i)=>(
             <div key={i} style={{background:"#060c18",border:`1px solid ${iss.status==="partial"?"#f59e0b33":"#ef444433"}`,borderRadius:8,padding:"10px 12px"}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <span style={{fontSize:9,fontWeight:700,color:iss.status==="partial"?"#f59e0b":"#ef4444",background:iss.status==="partial"?"#fef3c7":"#fee2e2",padding:"2px 6px",borderRadius:8}}>{iss.status==="partial"?"PARCIAL":"INOP"}</span>
+                <span style={{fontSize:11,fontWeight:700,color:iss.status==="partial"?"#f59e0b":"#ef4444",background:iss.status==="partial"?"#fef3c7":"#fee2e2",padding:"2px 6px",borderRadius:8}}>{iss.status==="partial"?"PARCIAL":"INOP"}</span>
                 <span style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>{iss.cat}</span>
               </div>
               {iss.item&&iss.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8",marginBottom:2}}>Item: {iss.item}</div>}
-              {iss.since&&<div style={{fontSize:11,color:"#64748b"}}>Desde: {fmtDate(iss.since)}</div>}
+              {iss.since&&<div style={{fontSize:11,color:"#94a3b8"}}>Desde: {fmtDate(iss.since)}</div>}
               {iss.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{iss.note}</div>}
             </div>
           ))}
         </div>
-        <div style={{marginTop:16,fontSize:10,color:"#94a3b8",textAlign:"center"}}>MokLog CheckTest © Moked Security Consulting · Somente leitura</div>
+        <div style={{marginTop:16,fontSize:11,color:"#94a3b8",textAlign:"center"}}>MokLog CheckTest © Moked Security Consulting · Somente leitura</div>
       </div>
     </div>
   );
@@ -1634,7 +1634,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const cardBg=dark?"#060c18":"#ffffff";
   const border=dark?"#0f172a":"#e2e8f0";
   const txt=dark?"#f1f5f9":"#0f172a";
-  const txt2=dark?"#475569":"#64748b";
+  const txt2=dark?"#64748b":"#94a3b8";
   const hdrBg=dark?"#04080f":"#f8fafc";
   const hdrBorder=dark?"#0a0f1e":"#e2e8f0";
   const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
@@ -1705,13 +1705,13 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
                     <div style={{fontSize:11,color:txt2}}>{p.name}</div>
                     {total>0?(
                       <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
-                        <span style={{fontSize:9,fontWeight:700,color:"#0ea5e9",background:"#001a2e",padding:"1px 6px",borderRadius:4}}>{total} itens</span>
-                        {inop>0&&<span style={{fontSize:9,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"1px 6px",borderRadius:4}}>🔴 {inop} inop</span>}
-                        {parcial>0&&<span style={{fontSize:9,fontWeight:700,color:"#f59e0b",background:"#1a1000",padding:"1px 6px",borderRadius:4}}>⚠️ {parcial} parcial</span>}
-                        {!hasProb&&<span style={{fontSize:9,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}>✅ OK</span>}
+                        <span style={{fontSize:11,fontWeight:700,color:"#0ea5e9",background:"#001a2e",padding:"1px 6px",borderRadius:4}}>{total} itens</span>
+                        {inop>0&&<span style={{fontSize:11,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"1px 6px",borderRadius:4}}>🔴 {inop} inop</span>}
+                        {parcial>0&&<span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#1a1000",padding:"1px 6px",borderRadius:4}}>⚠️ {parcial} parcial</span>}
+                        {!hasProb&&<span style={{fontSize:11,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}>✅ OK</span>}
                       </div>
                     ):(
-                      <div style={{fontSize:10,color:txt2,marginTop:3}}>Sem itens cadastrados</div>
+                      <div style={{fontSize:11,color:txt2,marginTop:3}}>Sem itens cadastrados</div>
                     )}
                   </div>
                   <span style={{color:txt2,fontSize:16}}>›</span>
@@ -1739,7 +1739,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const cardBg = dark ? "#060c18" : "#ffffff";
   const border = dark ? "#0f172a" : "#e2e8f0";
   const txt  = dark ? "#f1f5f9" : "#0f172a";
-  const txt2 = dark ? "#475569" : "#64748b";
+  const txt2 = dark ? "#64748b" : "#94a3b8";
   const hdrBg = dark ? "#04080f" : "#f8fafc";
   const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
   const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
@@ -1765,7 +1765,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     const cardBg=dark?"#060c18":"#ffffff";
     const border=dark?"#0f172a":"#e2e8f0";
     const txt=dark?"#f1f5f9":"#0f172a";
-    const txt2=dark?"#475569":"#64748b";
+    const txt2=dark?"#64748b":"#94a3b8";
     return (
       <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
@@ -1928,7 +1928,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
   const cardBg = dark ? "#060c18" : "#ffffff";
   const border = dark ? "#0f172a" : "#e2e8f0";
   const txt  = dark ? "#f1f5f9" : "#0f172a";
-  const txt2 = dark ? "#475569" : "#64748b";
+  const txt2 = dark ? "#64748b" : "#94a3b8";
   const hdrBg = dark ? "#04080f" : "#f8fafc";
   const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
   const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
@@ -2035,7 +2035,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
                     <div style={{ background:tc.bg, padding:"10px 14px", display:"flex", alignItems:"center", gap:8 }}>
                       <span style={{ fontSize:15 }}>{tc.icon}</span>
                       <span style={{ fontSize:13, fontWeight:700, color:tc.badge }}>{turno}</span>
-                      <span style={{ fontSize:10, color:txt2, background: dark?"#0a0f1e":"#f1f5f9", padding:"2px 8px", borderRadius:10 }}>{cols.length}</span>
+                      <span style={{ fontSize:11, color:txt2, background: dark?"#0a0f1e":"#f1f5f9", padding:"2px 8px", borderRadius:10 }}>{cols.length}</span>
                     </div>
                     <div style={{ background: dark?"#04080f":"#f8fafc", padding:"8px" }}>
                       {cols.map(c=>{
@@ -2051,15 +2051,15 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
                               <div style={{ fontSize:13, fontWeight:700, color:txt, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
                               <div style={{ fontSize:11, color:txt2 }}>{c.cargo}</div>
                               <div style={{ display:"flex", gap:5, marginTop:3, flexWrap:"wrap" }}>
-                                {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background: dark?"#001a2e":"#e0f2fe", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
-                                {c.telefone && <span style={{ fontSize:9, color:txt2 }}>📱 {c.telefone}</span>}
-                                {c.dataContratacao && <span style={{ fontSize:9, color:txt2 }}>📅 {fmtDate(c.dataContratacao)}</span>}
+                                {c.escala && <span style={{ fontSize:11, color:"#0ea5e9", background: dark?"#001a2e":"#e0f2fe", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
+                                {c.telefone && <span style={{ fontSize:11, color:txt2 }}>📱 {c.telefone}</span>}
+                                {c.dataContratacao && <span style={{ fontSize:11, color:txt2 }}>📅 {fmtDate(c.dataContratacao)}</span>}
                               </div>
                             </div>
                             <div style={{ flexShrink:0, textAlign:"right" }}>
-                              {faltas>0 && <div style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{faltas}F</div>}
-                              {fts>0    && <div style={{ fontSize:9, color:"#f59e0b", fontWeight:700 }}>{fts}FT</div>}
-                              {mds>0    && <div style={{ fontSize:9, color:"#a855f7", fontWeight:700 }}>{mds}MD</div>}
+                              {faltas>0 && <div style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>{faltas}F</div>}
+                              {fts>0    && <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700 }}>{fts}FT</div>}
+                              {mds>0    && <div style={{ fontSize:11, color:"#a855f7", fontWeight:700 }}>{mds}MD</div>}
                             </div>
                           </div>
                         );
@@ -2247,6 +2247,26 @@ export default function App(){
           const up={...prev,[pid]: snap.exists()?snap.data():(prev[pid]||{status:"online"})};
           try{ localStorage.setItem("seccheck_ctmk_v1",JSON.stringify(up)); }catch(e){}
           return up;
+        });
+      },()=>{})
+    );
+    return ()=>unsubs.forEach(u=>u());
+  },[loaded]);
+
+  // ── Monitor de falhas KeyAccess ainda abertas (sem horaFim) — alimenta o banner da Home
+  const [keyAccessOpenCount, setKeyAccessOpenCount] = useState(0);
+  useEffect(()=>{
+    if(!loaded) return;
+    const ids=Object.keys(PROJECTS);
+    const unsubs=ids.map(pid=>
+      onSnapshot(doc(db,"keyaccess_falhas",pid),(snap)=>{
+        const registros = snap.exists() ? (snap.data().registros||[]) : [];
+        const abertas = registros.filter(r=>!r.horaFim).length;
+        setKeyAccessOpenCount(prev=>{
+          // recalcula o total somando por projeto — guarda por pid num mapa auxiliar
+          window.__keyAccessByProject = window.__keyAccessByProject||{};
+          window.__keyAccessByProject[pid] = abertas;
+          return Object.values(window.__keyAccessByProject).reduce((a,b)=>a+b,0);
         });
       },()=>{})
     );
@@ -2527,7 +2547,7 @@ export default function App(){
       <div style={{background:"#060c18",border:"1px solid #7c3aed",borderRadius:16,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <div style={{fontSize:28,marginBottom:10}}>📊</div>
         <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Último teste do mês!</div>
-        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Este é o último domingo do mês.<br/>Deseja gerar o consolidado mensal após finalizar?</div>
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>Este é o último domingo do mês.<br/>Deseja gerar o consolidado mensal após finalizar?</div>
         <div style={{display:"flex",gap:8,flexDirection:"column"}}>
           <button onClick={()=>{setShowMonthlyPrompt(false);if(!meta.signature||meta.signature.trim()===""){setSigError(true);return;}saveReport(state,meta);setScreen("report");setTimeout(()=>{const hist=stored[project.id]?.history??[];const now=new Date();const monthReports=hist.map((r,i)=>({r,i})).filter(({r})=>{if(!r.meta?.date)return false;const d=new Date(r.meta.date+"T12:00:00");return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});if(monthReports.length>=2){generateConsolidatedPDF(project,monthReports.map(({r})=>r));}},1500);}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:14}}>
             ✓ Finalizar + Gerar Consolidado
@@ -2544,7 +2564,7 @@ export default function App(){
       <div style={{background:"#060c18",border:"1px solid #f59e0b",borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
         <div style={{fontSize:28,marginBottom:10}}>📝</div>
         <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Rascunho encontrado</div>
-        <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Relatorio em andamento de {project.id}. Continuar?</div>
+        <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>Relatorio em andamento de {project.id}. Continuar?</div>
         <div style={{display:"flex",gap:8,flexDirection:"column"}}>
           <button onClick={continueDraft} style={{...S.primaryBtn,width:"100%",fontSize:14}}>↩ Continuar rascunho</button>
           <button onClick={discardDraft} style={{...S.secBtn,width:"100%",fontSize:14}}>🗑 Descartar e comecar novo</button>
@@ -2567,12 +2587,12 @@ export default function App(){
           <div style={{background:dark?"#060c18":"#fff",border:"2px solid #f59e0b66",borderRadius:16,padding:"26px 22px",maxWidth:360,width:"100%"}}>
             <div style={{fontSize:28,textAlign:"center",marginBottom:10}}>⚠️</div>
             <div style={{fontSize:15,fontWeight:800,color:dark?"#f1f5f9":"#1e293b",textAlign:"center",marginBottom:10}}>Atenção Líder!</div>
-            <div style={{fontSize:13,color:dark?"#94a3b8":"#475569",lineHeight:1.65,marginBottom:20,textAlign:"center"}}>
+            <div style={{fontSize:13,color:dark?"#94a3b8":"#64748b",lineHeight:1.65,marginBottom:20,textAlign:"center"}}>
               Por favor, revise todo o relatório antes de enviar. Verifique se os textos explicativos estão corretos e se você inseriu a <strong style={{color:dark?"#f1f5f9":"#1e293b"}}>data inicial de todas as ocorrências</strong> e dispositivos inoperantes/parciais.
             </div>
             <div style={{display:"flex",gap:10}}>
               <button onClick={()=>setShowConfirmModal(false)}
-                style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:dark?"#94a3b8":"#64748b",borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:dark?"#94a3b8":"#94a3b8",borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                 ← Voltar e Revisar
               </button>
               <button onClick={confirmAndSend}
@@ -2599,7 +2619,7 @@ export default function App(){
             <span style={{fontSize:16}}>✏️</span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>Modo edição gerencial</div>
-              <div style={{fontSize:11,color:"#64748b"}}>Você está editando um relatório já salvo. Ao confirmar, ele será sobrescrito (sem duplicar).</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>Você está editando um relatório já salvo. Ao confirmar, ele será sobrescrito (sem duplicar).</div>
             </div>
           </div>
         )}
@@ -2616,9 +2636,9 @@ export default function App(){
           <div style={{height:"100%",width:`${health.pct}%`,background:health.pct>=90?"#22c55e":health.pct>=70?"#f59e0b":"#ef4444",borderRadius:2,transition:"width .4s"}}/>
         </div>}
         {health&&<div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:10,color:"#22c55e",background:"#021a0d",padding:"2px 8px",borderRadius:4,fontWeight:700}}>✅ {health.ok} OK</span>
-          {health.partial>0&&<span style={{fontSize:10,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}>⚠️ {health.partial} Parcial</span>}
-          {health.inop>0&&<span style={{fontSize:10,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}>🔴 {health.inop} Inop</span>}
+          <span style={{fontSize:11,color:"#22c55e",background:"#021a0d",padding:"2px 8px",borderRadius:4,fontWeight:700}}>✅ {health.ok} OK</span>
+          {health.partial>0&&<span style={{fontSize:11,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}>⚠️ {health.partial} Parcial</span>}
+          {health.inop>0&&<span style={{fontSize:11,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}>🔴 {health.inop} Inop</span>}
         </div>}
         <div style={S.metaCard}>
           <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabecalho do Relatorio</div>
@@ -2661,7 +2681,7 @@ export default function App(){
                 <span style={{width:8,height:8,borderRadius:"50%",flexShrink:0,background:dotColor}}/>
                 <span style={{fontSize:12,fontWeight:600,color:"#cbd5e1",textAlign:"left",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cat.label}</span>
                 {cat.type!=="maintenance"&&cat.type!=="notes"&&<span style={{fontSize:11,color:cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444",fontWeight:800,flexShrink:0}}>{cp}%</span>}
-                <span style={{color:"#94a3b8",fontSize:10,flexShrink:0,marginLeft:4}}>{isOpen?"▲":"▼"}</span>
+                <span style={{color:"#94a3b8",fontSize:11,flexShrink:0,marginLeft:4}}>{isOpen?"▲":"▼"}</span>
               </button>
               {isOpen&&sv&&(
                 <div style={{paddingBottom:8}}>
@@ -2685,7 +2705,7 @@ export default function App(){
             <input id="campo-assinatura" placeholder="Digite seu nome completo para assinar..." value={meta.signature||""}
               onChange={e=>{setMeta(m=>({...m,signature:e.target.value}));setSigError(false);}}
               style={{...S.inp,fontSize:13,fontWeight:600}}/>
-            <div style={{fontSize:10,color:"#94a3b8",marginTop:5}}>Obrigatorio para finalizar o relatorio.</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:5}}>Obrigatorio para finalizar o relatorio.</div>
           </div>
         )}
         {state&&(
@@ -2705,7 +2725,7 @@ export default function App(){
             <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
-        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
+        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
       </div>
     </div>
   );
@@ -2733,11 +2753,11 @@ export default function App(){
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{jp.id}</div>
-                    <div style={{fontSize:12,color:"#64748b"}}>{jp.name}</div>
+                    <div style={{fontSize:12,color:"#94a3b8"}}>{jp.name}</div>
                     <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
-                      {jp.hasAcesso&&<span style={{fontSize:9,color:"#f59e0b",background:"#1a1000",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #f59e0b22"}}>🚛 ACESSO</span>}
-                      {jp.hasEquipe&&<span style={{fontSize:9,color:"#0ea5e9",background:"#001a2e",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #0ea5e922"}}>👥 EQUIPE</span>}
-                      {jp.hasCaoGuarda&&<span style={{fontSize:9,color:"#22c55e",background:"#021a0d",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #22c55e22"}}>🐕 CÃO GUARDA</span>}
+                      {jp.hasAcesso&&<span style={{fontSize:11,color:"#f59e0b",background:"#1a1000",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #f59e0b22"}}>🚛 ACESSO</span>}
+                      {jp.hasEquipe&&<span style={{fontSize:11,color:"#0ea5e9",background:"#001a2e",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #0ea5e922"}}>👥 EQUIPE</span>}
+                      {jp.hasCaoGuarda&&<span style={{fontSize:11,color:"#22c55e",background:"#021a0d",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #22c55e22"}}>🐕 CÃO GUARDA</span>}
                     </div>
                   </div>
                   <CtmkBadge info={ctmkData[jp.id]} onToggle={()=>requestCtmkToggle(jp.id,false)} size="small"/>
@@ -2808,7 +2828,7 @@ export default function App(){
               <span style={{fontSize:16}}>📝</span>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
-                <div style={{fontSize:11,color:"#64748b"}}>{draft.projectId} — salvo automaticamente</div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>{draft.projectId} — salvo automaticamente</div>
               </div>
               <button onClick={()=>{setProject(PROJECTS[draft.projectId]);setShowDraftPrompt(true);}} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Continuar</button>
             </div>
@@ -2832,17 +2852,17 @@ export default function App(){
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
                         <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id}</div>
-                        <div style={{fontSize:12,color:"#64748b"}}>— {p.name}</div>
-                        {score&&<span style={{fontSize:9,fontWeight:900,color:score.color,background:score.color+"22",padding:"1px 5px",borderRadius:5}}>{score.grade}</span>}
+                        <div style={{fontSize:12,color:"#94a3b8"}}>— {p.name}</div>
+                        {score&&<span style={{fontSize:11,fontWeight:900,color:score.color,background:score.color+"22",padding:"1px 5px",borderRadius:5}}>{score.grade}</span>}
                       </div>
-                      {h?<div style={{fontSize:11,color:"#475569",marginTop:2}}>
+                      {h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>
                         {h.inop>0&&<span style={{color:"#ef4444",fontWeight:700}}>{h.inop} inop · </span>}
                         Último: {fmtDate(last?.meta?.date)}
                       </div>:<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Sem registros ainda</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
                       <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,false)}/>
-                      {isActive&&<span style={{fontSize:9,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
+                      {isActive&&<span style={{fontSize:11,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
                     </div>
                   </div>
                   {h&&<div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
@@ -2914,12 +2934,12 @@ export default function App(){
           <div>
             <div style={{fontSize:22,fontWeight:900,color:"#f8fafc",letterSpacing:-0.5}}>MokLog</div>
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
-            <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
+            <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}} aria-label="Ver pendências">🔴 Inop</button>
             <button onClick={()=>setShowRegistros(true)} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}} aria-label="Ver registros">📋 Registros</button>
-            <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#64748b"}} aria-label="Abrir painel gerencial">📊 Painel</button>
+            <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#94a3b8"}} aria-label="Abrir painel gerencial">📊 Painel</button>
             <button onClick={()=>setDark(!dark)} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:14,color:"#94a3b8"}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
@@ -2929,7 +2949,7 @@ export default function App(){
             <span style={{fontSize:16}}>🔔</span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Ativar notificacoes</div>
-              <div style={{fontSize:11,color:"#64748b"}}>Receba lembretes semanais e alertas</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>Receba lembretes semanais e alertas</div>
             </div>
             <button onClick={()=>requestNotificationPermission().then(g=>setNotifGranted(g))}
               style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Ativar</button>
@@ -2941,14 +2961,14 @@ export default function App(){
             <span style={{fontSize:16}}>📝</span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
-              <div style={{fontSize:11,color:"#64748b"}}>{project.id} — salvo automaticamente</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>{project.id} — salvo automaticamente</div>
             </div>
             <button onClick={()=>setShowDraftPrompt(true)} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Continuar</button>
           </div>
         )}
 
         <div style={{width:"100%"}}>
-          <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Seleção de Projeto</div>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Seleção de Projeto</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
               {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"]},
@@ -2973,34 +2993,34 @@ export default function App(){
                     <line x1="26" y1="26" x2="26" y2="42" stroke={grp.color} strokeWidth="1.5"/>
                   </svg>
                   <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9",lineHeight:1.2}}>{grp.label}</div>
-                  <div style={{fontSize:11,color:"#475569"}}>{grp.sub}</div>
+                  <div style={{fontSize:11,color:"#64748b"}}>{grp.sub}</div>
                   {avgPct!==null&&(
                     <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
                       <span style={{fontSize:13,fontWeight:900,color:avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}}>{avgPct}%</span>
-                      {totalInop>0&&<span style={{fontSize:10,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
+                      {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
                     </div>
                   )}
-                  {avgPct===null&&<div style={{fontSize:10,color:"#94a3b8"}}>Sem dados</div>}
+                  {avgPct===null&&<div style={{fontSize:11,color:"#94a3b8"}}>Sem dados</div>}
                 </button>
               );
             })}
           </div>
 
-          {/* 🚨 KeyAccess Falha — registro rápido de campo, sem PIN */}
+          {/* 🚨 KeyAccess Falha — registro rápido de campo, sem PIN. Cor reage a falhas realmente abertas */}
           <button onClick={()=>setShowKeyAccess(true)}
-            style={{marginTop:10,width:"100%",background:dark?"#1a0202":"#fef2f2",border:"2px solid #ef444466",borderRadius:16,padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
-            <div style={{flexShrink:0,width:44,height:44,borderRadius:12,background:dark?"#0f172a":"#fff",border:"1px solid #22c55e44",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            style={{marginTop:10,width:"100%",background:keyAccessOpenCount>0?(dark?"#1a0202":"#fef2f2"):(dark?"#060c18":"#f8fafc"),border:`2px solid ${keyAccessOpenCount>0?"#ef444466":dark?"#1e293b":"#e2e8f0"}`,borderRadius:16,padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+            <div style={{flexShrink:0,width:44,height:44,borderRadius:12,background:dark?"#0f172a":"#fff",border:`1px solid ${keyAccessOpenCount>0?"#ef444444":"#22c55e44"}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                <path d="M5 4v14" stroke="#22c55e" strokeWidth="2.6" strokeLinecap="round"/>
-                <path d="M9 11l3 3 6-7" stroke="#22c55e" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5 4v14" stroke={keyAccessOpenCount>0?"#ef4444":"#22c55e"} strokeWidth="2.6" strokeLinecap="round"/>
+                <path d="M9 11l3 3 6-7" stroke={keyAccessOpenCount>0?"#ef4444":"#22c55e"} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <div style={{position:"absolute",bottom:-4,right:-4,width:16,height:16,borderRadius:"50%",background:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:900,color:"#fff",border:`2px solid ${dark?"#04080f":"#fef2f2"}`}}>!</div>
+              {keyAccessOpenCount>0&&<div style={{position:"absolute",bottom:-4,right:-4,width:16,height:16,borderRadius:"50%",background:"#ef4444",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,color:"#fff",border:`2px solid ${dark?"#04080f":"#fef2f2"}`}}>{keyAccessOpenCount>9?"9+":keyAccessOpenCount}</div>}
             </div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:14,fontWeight:800,color:"#ef4444"}}>KeyAccess Falha</div>
-              <div style={{fontSize:11,color:dark?"#94a3b8":"#64748b"}}>Registrar falha de acesso/saída em campo</div>
+              <div style={{fontSize:14,fontWeight:800,color:keyAccessOpenCount>0?"#ef4444":(dark?"#f1f5f9":"#1e293b")}}>KeyAccess Falha</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>{keyAccessOpenCount>0?`${keyAccessOpenCount} falha${keyAccessOpenCount!==1?"s":""} aberta${keyAccessOpenCount!==1?"s":""} agora`:"Registrar falha de acesso/saída em campo"}</div>
             </div>
-            <span style={{color:"#ef4444",fontSize:18,flexShrink:0}}>›</span>
+            <span style={{color:keyAccessOpenCount>0?"#ef4444":"#94a3b8",fontSize:18,flexShrink:0}}>›</span>
           </button>
 
           {(()=>{
@@ -3021,7 +3041,7 @@ export default function App(){
           })()}
         </div>
 
-        <div style={{fontSize:10,color:"#94a3b8",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
+        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
     </div>
   );
@@ -3033,11 +3053,11 @@ const S={
   homeWrap:{width:"100%",maxWidth:440,padding:"40px 16px 40px",display:"flex",flexDirection:"column",gap:14},
   formWrap:{width:"100%",maxWidth:720,padding:"16px 12px 40px",display:"flex",flexDirection:"column",gap:8},
   primaryBtn:{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 4px 20px rgba(29,78,216,.3)"},
-  secBtn:{background:"#060c18",color:"#64748b",border:"1px solid #0f172a",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5},
+  secBtn:{background:"#060c18",color:"#94a3b8",border:"1px solid #0f172a",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5},
   backBtn:{background:"transparent",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"},
   projCard:{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#060c18",border:"1px solid #0a0f1e",borderRadius:10,padding:"10px 13px",cursor:"pointer",width:"100%",textAlign:"left"},
   metaCard:{background:"#060c18",borderRadius:11,padding:"12px 14px",border:"1px solid #0f172a"},
-  lbl:{display:"block",fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:.5},
+  lbl:{display:"block",fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:.5},
   inp:{width:"100%",background:"#020510",border:"1px solid #0f172a",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:12,boxSizing:"border-box",outline:"none"},
   accordion:{width:"100%",background:"transparent",border:"none",display:"flex",alignItems:"center",gap:8,padding:"12px 4px",cursor:"pointer"},
   catCard:{background:"#060c18",borderRadius:9,padding:"11px 13px",margin:"0 0 4px"},
@@ -3053,7 +3073,7 @@ const S={
   smOk:{background:"#021a0d",border:"1px solid #22c55e",color:"#22c55e"},
   smPartial:{background:"#1a130a",border:"1px solid #f59e0b",color:"#f59e0b"},
   smBad:{background:"#1a0202",border:"1px solid #ef4444",color:"#ef4444"},
-  iconBtn:{background:"#020510",border:"1px solid #0f172a",color:"#475569",borderRadius:5,width:24,height:24,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0},
+  iconBtn:{background:"#020510",border:"1px solid #0f172a",color:"#64748b",borderRadius:5,width:24,height:24,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,flexShrink:0},
   addBtn:{background:"transparent",border:"1px dashed #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",marginTop:4},
   subRow:{display:"flex",flexDirection:"column",gap:6,marginTop:8,paddingTop:8,borderTop:"1px solid #0f172a"},
 };
