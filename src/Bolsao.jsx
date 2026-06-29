@@ -189,13 +189,106 @@ function classificaTurno(date){
 
 // ── Relatório PDF — Diário / Por Turno / Semanal / Personalizado
 // periodo: { label, from: Date, to: Date, turno: "Diurno"|"Noturno"|null }
-function gerarPDFBolsao(project, placas, periodo) {
+// ── Relatório focado em UMA placa — histórico completo dela, bem mais curto, ideal pra evidência pontual
+function gerarPDFBolsaoPlaca(project, p) {
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const sightings = [...(p.sightings||[])].sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+  const cfg = STATUS_CFG[p.status]||STATUS_CFG.normal;
+
+  const sightingsRows = sightings.map(s=>`
+    <tr>
+      <td style="font-weight:700">${fmtDateTime(s.ts)}</td>
+      <td>${s.tipo==="carreta_desengatada"?"🔓 Carreta Desengatada":"🚛 Caminhão"}</td>
+      <td>${s.registradoPor||"—"}</td>
+    </tr>`).join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório Bolsão — ${p.placa}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;font-size:13px}
+  .header{background:linear-gradient(135deg,#92400e,#78350f);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  .section-title{font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #f1f5f9;padding-bottom:7px;margin-bottom:10px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+  .kpi-val{font-size:24px;font-weight:900}
+  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#1e293b;color:#fff;padding:7px 9px;text-align:left;font-size:10px}
+  td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
+  .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700}
+  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+</style></head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#92400e;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+
+<div class="header">
+  <div>
+    <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
+    <h1 style="font-size:22px;font-weight:900;margin-bottom:3px;letter-spacing:2px">${p.placa}</h1>
+    <p style="font-size:12px;opacity:.85">${project.id} — ${project.name||""} · Relatório de placa específica</p>
+  </div>
+  <div style="text-align:right;font-size:11px;opacity:.8">
+    <div>Gerado em ${hoje}</div>
+    <div style="margin-top:2px">José Fonseca — Moked Consulting</div>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val" style="color:${cfg.color}">${p.diasConsecutivos}</div><div class="kpi-lbl">Dias Consecutivos</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${sightings.length}</div><div class="kpi-lbl">Avistamentos</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${cfg.color}">${cfg.label}</div><div class="kpi-lbl">Status Atual</div></div>
+</div>
+
+${p.aliases?.length ? `<div class="section" style="background:#f0f9ff;border-color:#bae6fd">
+  <div style="font-size:11px;color:#0369a1"><strong>Variações de digitação já reconhecidas:</strong> ${p.aliases.join(", ")}</div>
+</div>` : ""}
+
+${p.bloqueado ? `<div class="section" style="border-color:#fecaca;background:#fef2f2">
+  <div class="section-title" style="color:#dc2626;border-bottom-color:#fecaca">🔒 Bloqueio</div>
+  ${p.bloqueioDados ? `
+    <div style="font-size:12px;line-height:1.6">
+      <div><strong>Motorista:</strong> ${p.bloqueioDados.motorista}</div>
+      <div><strong>Empresa/Transportadora:</strong> ${p.bloqueioDados.empresa}</div>
+      <div><strong>Inquilino Relacionado:</strong> ${p.bloqueioDados.inquilino}</div>
+      ${p.bloqueioDados.placaCavalo?`<div><strong>Placa do Cavalo:</strong> ${p.bloqueioDados.placaCavalo}</div>`:""}
+      <div style="margin-top:4px;color:#64748b;font-size:11px">Bloqueado em ${fmtDateTime(p.dataBloqueio)} · Dados coletados em ${fmtDateTime(p.bloqueioDados.coletadoEm)}</div>
+    </div>` : `<div style="font-size:12px;color:#d97706">⚠ Bloqueado em ${fmtDateTime(p.dataBloqueio)} — dados do motorista ainda não coletados.</div>`}
+</div>` : ""}
+
+<div class="section">
+  <div class="section-title">📋 Histórico Completo de Avistamentos — ${sightings.length}</div>
+  ${sightingsRows ? `<table><thead><tr><th>Data/Hora</th><th>Tipo</th><th>Registrado por</th></tr></thead><tbody>${sightingsRows}</tbody></table>`
+    : `<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:12px">Sem avistamentos registrados.</div>`}
+</div>
+
+<div class="footer">
+  <div>Relatório de Fiscalização de Bolsão © Moked Consulting Security</div>
+  <div style="margin-top:3px">${project.id} — ${project.name||""} · Placa ${p.placa} · ${hoje}</div>
+</div>
+</body></html>`;
+
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`bolsao_placa_${p.placa}_${hoje.replace(/\//g,"-")}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function gerarPDFBolsao(project, placas, periodo, modo="geral") {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const todasPlacas = Object.values(placas);
 
-  // Avistamentos dentro do período (e turno, se aplicável)
+  // Avistamentos dentro do período (e turno, se aplicável) — no modo "alerta" já filtra fora as placas Normais
   const avistamentosPeriodo = [];
   todasPlacas.forEach(p=>{
+    if(modo==="alerta" && p.status==="normal") return;
     (p.sightings||[]).forEach(s=>{
       const d = new Date(s.ts);
       if(d>=periodo.from && d<=periodo.to && (!periodo.turno || classificaTurno(d)===periodo.turno)){
@@ -216,8 +309,11 @@ function gerarPDFBolsao(project, placas, periodo) {
   const placasUnicas = ranking.length;
   const emAtencao = ranking.filter(r=>r.status==="atencao").length;
   const emCritico = ranking.filter(r=>r.status==="critico").length;
+  const tituloModo = modo==="alerta" ? " — Somente Atenção/Crítico" : "";
+  const limiteRanking = modo==="alerta" ? 60 : 30;
+  const limiteDetalhe = modo==="alerta" ? 300 : 50;
 
-  const rankingRows = ranking.slice(0,30).map((r,i)=>`
+  const rankingRows = ranking.slice(0,limiteRanking).map((r,i)=>`
     <tr style="${r.status==="critico"?'background:#fef2f2':r.status==="atencao"?'background:#fffbeb':''}">
       <td style="text-align:center;font-weight:800;color:#475569">${i+1}º</td>
       <td style="font-weight:900;letter-spacing:1px">${r.placa}</td>
@@ -226,7 +322,7 @@ function gerarPDFBolsao(project, placas, periodo) {
       <td style="text-align:center"><span class="badge" style="background:${STATUS_CFG[r.status].bg};color:${STATUS_CFG[r.status].color}">${STATUS_CFG[r.status].label}</span></td>
     </tr>`).join("");
 
-  const detalheRows = avistamentosPeriodo.slice(0,150).map(a=>`
+  const detalheRows = avistamentosPeriodo.slice(0,limiteDetalhe).map(a=>`
     <tr>
       <td style="font-weight:700">${fmtDateTime(a.ts)}</td>
       <td style="font-weight:900;letter-spacing:1px">${a.placa}</td>
@@ -275,7 +371,7 @@ function gerarPDFBolsao(project, placas, periodo) {
 <div class="header">
   <div>
     <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">🚧 Fiscalização de Bolsão Externo</h1>
+    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">🚧 Fiscalização de Bolsão Externo${tituloModo}</h1>
     <p style="font-size:12px;opacity:.85">${project.id} — ${project.name||""} · ${periodo.label}</p>
   </div>
   <div style="text-align:right;font-size:11px;opacity:.8">
@@ -305,7 +401,7 @@ function gerarPDFBolsao(project, placas, periodo) {
 </div>
 
 <div class="section">
-  <div class="section-title">📋 Registro Detalhado — ${avistamentosPeriodo.length} Avistamento(s)${avistamentosPeriodo.length>150?" (mostrando os 150 mais recentes)":""}</div>
+  <div class="section-title">📋 Registro Detalhado — ${avistamentosPeriodo.length} Avistamento(s)${avistamentosPeriodo.length>limiteDetalhe?` (mostrando os ${limiteDetalhe} mais recentes)`:""}</div>
   ${detalheRows ? `<table><thead><tr><th>Data/Hora</th><th>Placa</th><th>Registrado por</th><th style="text-align:center">Status</th></tr></thead><tbody>${detalheRows}</tbody></table>`
     : `<div style="text-align:center;color:#94a3b8;padding:20px 0;font-size:12px">Sem registros neste período.</div>`}
 </div>
@@ -341,6 +437,8 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   const [feedback, setFeedback] = useState(null); // {placa,status,dias,novoDia}
   const [dataIni, setDataIni] = useState(todayStrLocal());
   const [dataFim, setDataFim] = useState(todayStrLocal());
+  const [modoRelatorio, setModoRelatorio] = useState("geral"); // geral | alerta
+  const [buscaPlacaRelatorio, setBuscaPlacaRelatorio] = useState("");
   const [placaBloqueioForm, setPlacaBloqueioForm] = useState(null); // placa em edição dos dados do motorista
   const [importStatus, setImportStatus] = useState(null); // null | "importando" | {added, skipped}
   const [formMotorista, setFormMotorista] = useState("");
@@ -363,6 +461,12 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
         .sort((a,b)=>new Date(b.ultimaVista)-new Date(a.ultimaVista))
         .slice(0,6)
     : [];
+
+  // ── Alerta proativo: enquanto digita, se a placa (já corrigida/resolvida por alias) já é
+  // conhecida e está em Atenção/Crítico, avisa o vigilante na hora — antes mesmo de confirmar o registro.
+  const matchAtual = placaInput.length>=6
+    ? placas[resolveAliasPrincipal(corrigirOZero(normalizaPlaca(placaInput)), placas)]
+    : null;
 
   const registrar = async () => {
     const digitada = normalizaPlaca(placaInput);
@@ -468,9 +572,12 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
   // ── Tela de registro (foco em uso de campo, uma mão)
   // ── Tela de Relatório — seleção de período
   if(screen==="relatorio") {
-    const gerar = (periodo) => { gerarPDFBolsao(project, placas, periodo); setScreen("list"); };
+    const gerar = (periodo) => { gerarPDFBolsao(project, placas, periodo, modoRelatorio); setScreen("list"); };
     const hojeInicio = (h=0) => { const d=new Date(); d.setHours(h,0,0,0); return d; };
     const hojeFim = () => new Date();
+    const buscaResultados = buscaPlacaRelatorio.length>=2
+      ? listaPlacas.filter(p=>p.placa.startsWith(normalizaPlaca(buscaPlacaRelatorio))).slice(0,8)
+      : [];
     return (
       <div style={S.page}>
         <div style={S.wrap}>
@@ -482,6 +589,28 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
             </div>
           </div>
           <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
+
+            <div style={S.card}>
+              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>🎯 Relatório de 1 Placa Específica</div>
+              <div style={{fontSize:10,...S.txt2,marginBottom:8}}>Histórico completo só dela — ideal pra evidência pontual, fica bem mais curto.</div>
+              <input value={buscaPlacaRelatorio} onChange={e=>setBuscaPlacaRelatorio(normalizaPlaca(e.target.value))} placeholder="Digite a placa..." autoCapitalize="characters" style={{...S.inp,fontWeight:800,letterSpacing:2,marginBottom:buscaResultados.length?8:0}}/>
+              {buscaResultados.map(p=>(
+                <button key={p.placa} onClick={()=>{ gerarPDFBolsaoPlaca(project, p); setScreen("list"); }}
+                  style={{...S.btnSm,width:"100%",display:"flex",justifyContent:"space-between",marginBottom:5,padding:"9px 12px",color:STATUS_CFG[p.status].color,borderColor:STATUS_CFG[p.status].border}}>
+                  <span style={{fontWeight:800}}>{p.placa}</span>
+                  <span>{p.diasConsecutivos}d · {STATUS_CFG[p.status].label} →</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginTop:4}}>📊 Relatório por Período</div>
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setModoRelatorio("geral")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:12,fontWeight:700,...(modoRelatorio==="geral"?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}>📚 Geral (todas)</button>
+              <button onClick={()=>setModoRelatorio("alerta")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:12,fontWeight:700,...(modoRelatorio==="alerta"?{background:"#ef444422",borderColor:"#ef444466",color:"#f87171"}:{})}}>⚠️ Só Atenção/Crítico</button>
+            </div>
+            <div style={{fontSize:10,...S.txt2,marginTop:-4}}>{modoRelatorio==="alerta"?"Relatório bem mais curto — ignora as placas Normais.":"Inclui todas as placas do período (pode ficar longo)."}</div>
+
             <button onClick={()=>gerar({label:"Hoje (últimas 24h)", from:new Date(Date.now()-86400000), to:hojeFim(), turno:null})} style={{...S.btn,fontSize:14}}>🗓 Hoje (últimas 24h)</button>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>gerar({label:"Turno Diurno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Diurno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>☀️ Turno Diurno</button>
@@ -542,6 +671,26 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
             <label style={S.lbl}>Placa</label>
             <PlacaInputNativo value={placaInput} onChange={setPlacaInput} dark={dark}/>
             <div style={{fontSize:10,...S.txt2,textAlign:"center",marginTop:6}}>Digite com o teclado do celular — sai sempre em maiúscula</div>
+
+            {matchAtual && matchAtual.status!=="normal" && (
+              <div style={{marginTop:12,padding:"12px 14px",borderRadius:9,background:STATUS_CFG[matchAtual.status].bg,border:`2px solid ${STATUS_CFG[matchAtual.status].border}`}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                  <span style={{fontSize:18}}>{matchAtual.status==="critico"?"🚨":"⚠️"}</span>
+                  <span style={{fontSize:13,fontWeight:800,color:STATUS_CFG[matchAtual.status].color}}>
+                    Placa já reincidente — {matchAtual.diasConsecutivos} dia{matchAtual.diasConsecutivos!==1?"s":""} consecutivo{matchAtual.diasConsecutivos!==1?"s":""}
+                  </span>
+                </div>
+                <div style={{fontSize:11,...S.txt2,marginBottom:matchAtual.status==="critico"&&!matchAtual.bloqueado?10:0}}>
+                  {matchAtual.status==="critico"
+                    ? "Já passou do limite do POP. Sugestão: avaliar bloqueio agora."
+                    : `Em observação — entra em Crítico a partir de ${DIAS_CRITICO} dias.`}
+                </div>
+                {matchAtual.status==="critico" && !matchAtual.bloqueado && (
+                  <button onClick={()=>toggleBloqueio(matchAtual.placa)} style={{...S.btnSm,width:"100%",background:"#ef444422",color:"#ef4444",borderColor:"#ef444466",fontWeight:800,padding:"9px"}}>🔒 Marcar Bloqueio Agora</button>
+                )}
+                {matchAtual.bloqueado && <div style={{fontSize:11,color:"#ef4444",fontWeight:700,textAlign:"center"}}>🔒 Já está marcada como Bloqueada</div>}
+              </div>
+            )}
 
             {sugestoes.length>0 && (
               <div style={{marginTop:12}}>
