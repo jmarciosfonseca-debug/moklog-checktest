@@ -65,18 +65,36 @@ function fmtDate(d) {
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
 }
 
+function dedupTestes(testes) {
+  const seen = new Set();
+  let changed = false;
+  const fixed = (testes||[]).map(t=>{
+    if(!t.id || seen.has(t.id)){
+      changed = true;
+      const newId = (typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,10)}-${Math.random().toString(36).slice(2,10)}`;
+      seen.add(newId);
+      return {...t, id:newId};
+    }
+    seen.add(t.id);
+    return t;
+  });
+  return {fixed, changed};
+}
+
 async function loadTestes(projectId) {
   try {
     const snap = await getDoc(doc(db,"perimetral",projectId));
     if(snap.exists()) {
       const data = snap.data().testes||[];
-      try { localStorage.setItem(`perimetral_${projectId}`, JSON.stringify(data)); } catch(e){}
-      return data;
+      const {fixed, changed} = dedupTestes(data);
+      try { localStorage.setItem(`perimetral_${projectId}`, JSON.stringify(fixed)); } catch(e){}
+      if(changed){ try{ await setDoc(doc(db,"perimetral",projectId),{testes:fixed,updatedAt:new Date().toISOString()}); }catch(e){} }
+      return fixed;
     }
   } catch(e){}
   try {
     const local = localStorage.getItem(`perimetral_${projectId}`);
-    if(local) return JSON.parse(local);
+    if(local) { const {fixed} = dedupTestes(JSON.parse(local)); return fixed; }
   } catch(e){}
   return [];
 }
@@ -495,7 +513,7 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg) {
 
 function emptyTeste(turnoDefault, pcfg) {
   return {
-    id: Date.now().toString()+Math.random().toString(36).substring(2,5),
+    id: (typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,10)}-${Math.random().toString(36).slice(2,10)}`,
     data: todayStr(),
     hora: nowTime(),
     turno: turnoDefault||"Diurno",
@@ -914,6 +932,10 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                     if(selecionados.length>0){
                       const periodo = `${selecionados.length} teste(s) selecionado(s)`;
                       const testsSelected = testesFiltrados.filter(t=>selecionados.includes(t.id));
+                      if(testsSelected.length!==selecionados.length){
+                        alert(`Atenção: ${selecionados.length} teste(s) selecionado(s), mas apenas ${testsSelected.length} foram encontrados para gerar o PDF. Cancelado por segurança — tente selecionar novamente. Se persistir, avise o suporte.`);
+                        return;
+                      }
                       gerarPDFConsolidado(testsSelected, periodo, project, pcfg);
                     }
                     setModoSelecao(false); setSelecionados([]);
