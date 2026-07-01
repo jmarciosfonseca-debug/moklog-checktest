@@ -124,7 +124,7 @@ function gerarPDFRondaVSPP(project, reg, todosRegistros){
 <div class="header">
   <div>
     <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">🏃 Ronda VSPP — Turno Diurno</h1>
+    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">🚗 Ronda VSPP — Turno Diurno</h1>
     <p style="font-size:12px;opacity:.85">${project.id} — Golgi Cajamar · ${fmtDate(reg.data)}</p>
   </div>
   <div style="text-align:right;font-size:11px;opacity:.8">
@@ -233,7 +233,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
 
   if(loading) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🏃</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🚗</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
     </div>
   );
 
@@ -244,14 +244,14 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
     const naoFeito=slots.filter(h=>diaAtual.marcacoes?.[h]?.status==="nao_feito").length;
     const pct=slots.length?Math.round((feitos/slots.length)*100):0;
     const pctColor=pct>=90?"#22c55e":pct>=60?"#f59e0b":"#ef4444";
-    const colabs=equipe.filter(c=>{const g=(c.cargo||"").toLowerCase(); return g.includes("lider")||g.includes("líder")||g.includes("ronda")||g.includes("vigilante")||g.includes("agente");});
+    const colabs=equipe.filter(c=>{const g=(c.cargo||"").toLowerCase(); return g.includes("vspp");});
     return(
       <div style={S.page}>
         <div style={S.wrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
             <button onClick={()=>setScreen("list")} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:800,...S.txt}}>🏃 Ronda VSPP — {fmtDate(diaAtual.data)}</div>
+              <div style={{fontSize:14,fontWeight:800,...S.txt}}>🚗 Ronda VSPP — {fmtDate(diaAtual.data)}</div>
               <div style={{fontSize:11,...S.txt2}}>P601 · Diurno · <span style={{color:pctColor,fontWeight:700}}>{pct}% executado</span></div>
             </div>
             <button onClick={()=>gerarPDFRondaVSPP(project,diaAtual,data.registros||[])}
@@ -380,7 +380,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:800,...S.txt}}>🏃 Ronda VSPP</div>
+            <div style={{fontSize:14,fontWeight:800,...S.txt}}>🚗 Ronda VSPP</div>
             <div style={{fontSize:11,...S.txt2}}>P601 · Golgi Cajamar · Turno Diurno · {data.slots?.length||15} horários</div>
           </div>
         </div>
@@ -390,7 +390,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
             <img src={`data:image/jpeg;base64,${MAPA_B64}`} alt="Rota de Ronda VSPP" style={{width:"100%",borderRadius:8}}/>
           </div>
 
-          {!temHoje&&<button onClick={()=>abrirDia(hoje)} style={{...S.btn,fontSize:15,padding:"15px"}}>🏃 Iniciar Ronda de Hoje</button>}
+          {!temHoje&&<button onClick={()=>abrirDia(hoje)} style={{...S.btn,fontSize:15,padding:"15px"}}>🚗 Iniciar Ronda de Hoje</button>}
           {temHoje&&<button onClick={()=>abrirDia(hoje)} style={{...S.btn,fontSize:14}}>▶ Continuar Ronda de Hoje</button>}
 
           {adminAuth&&(

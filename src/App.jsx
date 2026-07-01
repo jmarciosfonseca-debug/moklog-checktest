@@ -2890,7 +2890,7 @@ export default function App(){
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
-                    {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🏃 Ronda VSPP</button>}
+                    {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🚗 Ronda VSPP</button>}
                   </div>
                 </>
               ):(
@@ -2904,7 +2904,7 @@ export default function App(){
                     <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
-                    {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🏃 Ronda VSPP</button>}
+                    {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🚗 Ronda VSPP</button>}
                   </div>
                 </>
               )}
