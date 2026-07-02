@@ -995,8 +995,129 @@ function MiniChart({data, width=200, height=60}) {
   );
 }
 
+// ── VISÃO 360 — score composto de saúde operacional por planta, cruzando todos os módulos.
+// Pesos transparentes e calibráveis:
+const SCORE360_CFG = {
+  ctmkPorDia: 2,   ctmkMax: 20,      // CTMK offline: -2/dia, teto -20
+  keyAccess: 5,    keyAccessMax: 15, // falha de acesso aberta: -5 cada, teto -15
+  bolsaoCritico: 3, bolsaoMax: 12,   // placa crítica no bolsão: -3 cada, teto -12
+  perimetralZona: 2, perimetralMax: 10, // zona não-OK no último teste: -2 cada, teto -10
+  rondaBaixa: 10, rondaMedia: 5,     // ronda VSPP do último dia <60%: -10; 60–89%: -5
+};
+
+function computeScore360(base, ex) {
+  const c = SCORE360_CFG;
+  const pen = [];
+  if(ex.ctmkDias>0) pen.push({label:`CTMK ${ex.ctmkDias}d off-line`, val:Math.min(c.ctmkMax, ex.ctmkDias*c.ctmkPorDia)});
+  if(ex.keyAbertas>0) pen.push({label:`${ex.keyAbertas} falha(s) KeyAccess aberta(s)`, val:Math.min(c.keyAccessMax, ex.keyAbertas*c.keyAccess)});
+  if(ex.bolsaoCriticos>0) pen.push({label:`${ex.bolsaoCriticos} placa(s) crítica(s) no bolsão`, val:Math.min(c.bolsaoMax, ex.bolsaoCriticos*c.bolsaoCritico)});
+  if(ex.perimetralZonasRuins>0) pen.push({label:`${ex.perimetralZonasRuins} zona(s) perimetral(is) com problema`, val:Math.min(c.perimetralMax, ex.perimetralZonasRuins*c.perimetralZona)});
+  if(ex.rondaPct!==null && ex.rondaPct!==undefined && ex.rondaPct<90) pen.push({label:`Ronda VSPP ${ex.rondaPct}% no último dia`, val:ex.rondaPct<60?c.rondaBaixa:c.rondaMedia});
+  const totalPen = pen.reduce((a,p)=>a+p.val,0);
+  return { score: Math.max(0, Math.round(base - totalPen)), base: Math.round(base), penalidades: pen };
+}
+
+function gerarPDFVisao360(rows, mediaGeral) {
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  const hora = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
+  const scoreColor = (s)=> s>=90?"#15803d":s>=75?"#d97706":"#dc2626";
+  const rowsHtml = rows.map((r,i)=>`
+    <tr style="${r.score<75?'background:#fff8f8':''}">
+      <td style="text-align:center;font-weight:800">${medal(i)}</td>
+      <td style="font-weight:800">${r.id}<div style="font-weight:400;font-size:10px;color:#64748b">${r.name}</div></td>
+      <td style="text-align:center"><span style="font-size:18px;font-weight:900;color:${scoreColor(r.score)}">${r.score}</span><span style="font-size:10px;color:#94a3b8">/100</span></td>
+      <td style="text-align:center;color:#64748b">${r.base}%</td>
+      <td style="font-size:10px;color:#64748b">${r.penalidades.length? r.penalidades.map(p=>`<div>−${p.val} · ${p.label}</div>`).join("") : '<span style="color:#15803d;font-weight:700">✓ Sem penalidades</span>'}</td>
+    </tr>`).join("");
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Visão 360 — ${hoje}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;font-size:13px}
+  .header{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
+  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase}
+  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  .legend{font-size:10px;color:#94a3b8;margin-top:10px;line-height:1.6}
+  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<div class="header">
+  <div>
+    <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
+    <h1 style="font-size:19px;font-weight:900;margin-bottom:3px">🎯 Visão 360 — Saúde Operacional</h1>
+    <p style="font-size:12px;opacity:.85">Ranking consolidado: checklist + CTMK + KeyAccess + Bolsão + Perimetral + Ronda VSPP</p>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:30px;font-weight:900">${mediaGeral}<span style="font-size:13px;opacity:.7">/100</span></div>
+    <div style="font-size:10px;opacity:.8">MÉDIA DO GRUPO · ${hoje} ${hora}</div>
+  </div>
+</div>
+<table>
+  <thead><tr><th style="width:44px;text-align:center">Pos.</th><th>Planta</th><th style="text-align:center;width:80px">Score 360</th><th style="text-align:center;width:70px">Checklist</th><th>Penalidades aplicadas</th></tr></thead>
+  <tbody>${rowsHtml}</tbody>
+</table>
+<div class="legend">
+  <strong>Como o score é calculado:</strong> parte do % do último checklist semanal e desconta penalidades por pendências ativas nos demais módulos —
+  CTMK off-line (−${SCORE360_CFG.ctmkPorDia}/dia, máx −${SCORE360_CFG.ctmkMax}) · falha KeyAccess aberta (−${SCORE360_CFG.keyAccess} cada, máx −${SCORE360_CFG.keyAccessMax}) ·
+  placa crítica no bolsão (−${SCORE360_CFG.bolsaoCritico} cada, máx −${SCORE360_CFG.bolsaoMax}) · zona perimetral com problema (−${SCORE360_CFG.perimetralZona} cada, máx −${SCORE360_CFG.perimetralMax}) ·
+  Ronda VSPP abaixo de 90% (−${SCORE360_CFG.rondaMedia}) ou de 60% (−${SCORE360_CFG.rondaBaixa}).
+</div>
+<div class="footer">
+  <div>MokLog CheckTest © Moked Consulting Security · Visão 360 Executiva</div>
+  <div style="margin-top:3px">José Fonseca · ${hoje} ${hora}</div>
+</div>
+</body></html>`;
+  const blob=new Blob([html],{type:"text/html"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`visao360_${hoje.replace(/\//g,"-")}.html`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
 function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
+  const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
+  const carregarVisao360 = async () => {
+    setV360("loading");
+    try {
+      const ids = Object.keys(PROJECTS);
+      // Busca em paralelo os módulos que não estão em memória (KeyAccess, Bolsão, Perimetral, Ronda VSPP)
+      const [keySnaps, bolsaoSnaps, periSnaps, rondaSnap] = await Promise.all([
+        Promise.all(ids.map(pid=>getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null))),
+        Promise.all(["P311A","P311B"].map(pid=>getDoc(doc(db,"bolsao",pid)).catch(()=>null))),
+        Promise.all(ids.map(pid=>getDoc(doc(db,"perimetral",pid)).catch(()=>null))),
+        getDoc(doc(db,"ronda_vspp","P601")).catch(()=>null),
+      ]);
+      const keyAbertasBy = {}; ids.forEach((pid,i)=>{ const regs=keySnaps[i]?.exists()?(keySnaps[i].data().registros||[]):[]; keyAbertasBy[pid]=regs.filter(r=>!r.horaFim).length; });
+      const bolsaoBy = {}; ["P311A","P311B"].forEach((pid,i)=>{ const placas=bolsaoSnaps[i]?.exists()?(bolsaoSnaps[i].data().placas||{}):{}; bolsaoBy[pid]=Object.values(placas).filter(p=>p.status==="critico").length; });
+      const periBy = {}; ids.forEach((pid,i)=>{ const testes=periSnaps[i]?.exists()?(periSnaps[i].data().testes||[]):[]; if(!testes.length){periBy[pid]=0;return;} const ult=[...testes].sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0]; periBy[pid]=Object.values(ult.zonas||{}).filter(z=>(z?.status||"ok")!=="ok").length; });
+      let rondaPct = null;
+      if(rondaSnap?.exists()){ const regs=(rondaSnap.data().registros||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")); const ult=regs[0]; if(ult){ const slots=ult.slots||[]; const f=slots.filter(h=>ult.marcacoes?.[h]?.status==="feito").length; rondaPct = slots.length?Math.round((f/slots.length)*100):null; } }
+      const rows = ids.map(pid=>{
+        const p=PROJECTS[pid];
+        const hist=stored[pid]?.history??[];
+        const last=hist[hist.length-1];
+        const base = last ? computeHealth(p,last.state).pct : 0;
+        const c = ctmkData[pid];
+        const ctmkDias = c?.status==="offline"&&c.offlineSince ? Math.max(1,Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000)) : 0;
+        const r = computeScore360(base, {
+          ctmkDias,
+          keyAbertas: keyAbertasBy[pid]||0,
+          bolsaoCriticos: bolsaoBy[pid]||0,
+          perimetralZonasRuins: periBy[pid]||0,
+          rondaPct: pid==="P601"?rondaPct:null,
+        });
+        return { id:pid, name:p.name, ...r, semChecklist: !last };
+      }).sort((a,b)=>b.score-a.score);
+      const media = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
+      setV360({rows, media});
+    } catch(e){ setV360({rows:[], media:0, erro:true}); }
+  };
   const ctmkInfoFor = (pid) => {
     try {
       const c = ctmkData[pid]; if(!c) return undefined;
@@ -1072,6 +1193,73 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       </div>
     </div>
   );
+  if(v360) {
+    const loadingV = v360==="loading";
+    const rows = loadingV?[]:(v360.rows||[]);
+    const scoreColor = (s)=> s>=90?"#22c55e":s>=75?"#f59e0b":"#ef4444";
+    const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
+    return (
+      <div style={S.page}>
+        <div style={S.formWrap}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
+            <button onClick={()=>setV360(null)} style={S.backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>🎯 Visão 360</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>Saúde operacional consolidada — todos os módulos</div>
+            </div>
+            {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, v360.media)}
+              style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}>📄 PDF Executivo</button>}
+          </div>
+
+          {loadingV&&<div style={{textAlign:"center",padding:"50px 0"}}>
+            <div style={{fontSize:28,marginBottom:10}}>🎯</div>
+            <div style={{fontSize:13,color:"#94a3b8"}}>Cruzando dados de todos os módulos...</div>
+          </div>}
+
+          {!loadingV&&v360.erro&&<div style={{textAlign:"center",padding:"40px 0",color:"#ef4444",fontSize:13}}>Erro ao carregar. Tente novamente.</div>}
+
+          {!loadingV&&rows.length>0&&<>
+            <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"14px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:14}}>
+              <div style={{fontSize:34,fontWeight:900,color:scoreColor(v360.media)}}>{v360.media}<span style={{fontSize:14,color:"#94a3b8"}}>/100</span></div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#f1f5f9"}}>Média do Grupo</div>
+                <div style={{fontSize:11,color:"#94a3b8"}}>Checklist + CTMK + KeyAccess + Bolsão + Perimetral + Ronda VSPP</div>
+              </div>
+            </div>
+
+            {rows.map((r,i)=>(
+              <div key={r.id} style={{background:"#060c18",border:`1px solid ${r.score<75?"#ef444433":"#0f172a"}`,borderRadius:12,padding:"12px 14px",marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:r.penalidades.length?8:0}}>
+                  <span style={{fontSize:16,minWidth:32,textAlign:"center"}}>{medal(i)}</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{r.id} <span style={{fontWeight:400,color:"#94a3b8",fontSize:11}}>· {r.name}</span></div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:22,fontWeight:900,color:scoreColor(r.score)}}>{r.score}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>/100</div>
+                  </div>
+                </div>
+                {r.penalidades.length>0&&<div style={{borderTop:"1px solid #0a0f1e",paddingTop:8,display:"flex",flexDirection:"column",gap:3}}>
+                  {r.penalidades.map((p,j)=>(
+                    <div key={j} style={{fontSize:11,color:"#f59e0b",display:"flex",justifyContent:"space-between"}}>
+                      <span>⚠ {p.label}</span><span style={{fontWeight:800,color:"#ef4444"}}>−{p.val}</span>
+                    </div>
+                  ))}
+                </div>}
+                {r.penalidades.length===0&&!r.semChecklist&&<div style={{fontSize:11,color:"#22c55e",marginTop:2}}>✓ Sem pendências ativas em nenhum módulo</div>}
+              </div>
+            ))}
+
+            <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.6,padding:"8px 4px"}}>
+              O score parte do último checklist semanal e desconta pendências ativas: CTMK off-line, falhas KeyAccess abertas, placas críticas no bolsão, zonas perimetrais com problema e ronda VSPP abaixo da meta. Pesos documentados no PDF.
+            </div>
+          </>}
+        </div>
+      </div>
+    );
+  }
+
   if(pendScreen) return <PendenciesScreen stored={stored} onBack={()=>setPendScreen(false)}/>;
   if(groupCompScreen){
     const {label,ids}=groupCompScreen;
@@ -1292,6 +1480,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>ALERTAS</div></div>
           </div>
         </div>}
+        <button onClick={carregarVisao360} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0f172a,#1e3a8a)",fontSize:13,marginBottom:8,border:"1px solid #1d4ed844"}}>🎯 Visão 360 — Saúde Consolidada</button>
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📊 Comparativo Interparques</div>
           {getAvailableDates(GOLGI_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Golgi",ids:GOLGI_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:13}}>📊 Comparativo Golgi</button>}
