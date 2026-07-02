@@ -1017,9 +1017,10 @@ function computeScore360(base, ex) {
   return { score: Math.max(0, Math.round(base - totalPen)), base: Math.round(base), penalidades: pen };
 }
 
-function gerarPDFVisao360(rows, mediaGeral) {
+function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const hora = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const tituloGrupo = grupoLabel ? `Grupo ${grupoLabel}` : "Consolidado Interno Moked";
   const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
   const scoreColor = (s)=> s>=90?"#15803d":s>=75?"#d97706":"#dc2626";
   const rowsHtml = rows.map((r,i)=>`
@@ -1049,8 +1050,8 @@ function gerarPDFVisao360(rows, mediaGeral) {
 <div class="header">
   <div>
     <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:19px;font-weight:900;margin-bottom:3px">🎯 Visão 360 — Saúde Operacional</h1>
-    <p style="font-size:12px;opacity:.85">Ranking consolidado: checklist + CTMK + KeyAccess + Bolsão + Perimetral + Ronda VSPP</p>
+    <h1 style="font-size:19px;font-weight:900;margin-bottom:3px">🎯 Visão 360 — ${tituloGrupo}</h1>
+    <p style="font-size:12px;opacity:.85">Saúde operacional consolidada: checklist + CTMK + KeyAccess + Bolsão + Perimetral + Ronda VSPP</p>
   </div>
   <div style="text-align:right">
     <div style="font-size:30px;font-weight:900">${mediaGeral}<span style="font-size:13px;opacity:.7">/100</span></div>
@@ -1075,13 +1076,15 @@ function gerarPDFVisao360(rows, mediaGeral) {
   const blob=new Blob([html],{type:"text/html"});
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
-  a.href=url; a.download=`visao360_${hoje.replace(/\//g,"-")}.html`;
+  a.href=url; a.download=`visao360_${grupoLabel?grupoLabel.toLowerCase()+"_":""}${hoje.replace(/\//g,"-")}.html`;
   a.click(); URL.revokeObjectURL(url);
 }
 
 function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
+  const [v360Grupo, setV360Grupo] = useState("todos"); // todos | golgi | mega | klog — "todos" é uso interno Moked; PDF por cliente nunca mistura
+  const V360_GRUPOS = { golgi:{label:"Golgi",ids:["P601","P602","P604","P605","P606","P607"]}, mega:{label:"Mega",ids:["P311A","P311B"]}, klog:{label:"Klog",ids:["P505"]} };
   const carregarVisao360 = async () => {
     setV360("loading");
     try {
@@ -1195,7 +1198,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   );
   if(v360) {
     const loadingV = v360==="loading";
-    const rows = loadingV?[]:(v360.rows||[]);
+    const allRows = loadingV?[]:(v360.rows||[]);
+    const grupoSel = v360Grupo!=="todos" ? V360_GRUPOS[v360Grupo] : null;
+    const rows = grupoSel ? allRows.filter(r=>grupoSel.ids.includes(r.id)) : allRows;
+    const mediaGrupo = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
+    const tituloGrupo = grupoSel ? grupoSel.label : "Todos (interno Moked)";
     const scoreColor = (s)=> s>=90?"#22c55e":s>=75?"#f59e0b":"#ef4444";
     const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
     return (
@@ -1204,12 +1211,24 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
             <button onClick={()=>setV360(null)} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>🎯 Visão 360</div>
+              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>🎯 Visão 360 — {tituloGrupo}</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>Saúde operacional consolidada — todos os módulos</div>
             </div>
-            {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, v360.media)}
+            {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, mediaGrupo, grupoSel?grupoSel.label:null)}
               style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}>📄 PDF Executivo</button>}
           </div>
+
+          {!loadingV&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
+            {[["todos","Todos"],["golgi","Golgi"],["mega","Mega"],["klog","Klog"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setV360Grupo(k)}
+                style={{background:v360Grupo===k?"#1d4ed822":"transparent",border:`1px solid ${v360Grupo===k?"#1d4ed866":"#0f172a"}`,color:v360Grupo===k?"#60a5fa":"#94a3b8",borderRadius:8,padding:"9px 4px",fontSize:12,fontWeight:700,cursor:"pointer"}}>
+                {l}
+              </button>
+            ))}
+          </div>}
+          {!loadingV&&v360Grupo==="todos"&&<div style={{fontSize:11,color:"#f59e0b",background:"#1a1000",border:"1px solid #f59e0b33",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
+            ⚠ Visão "Todos" é de uso interno Moked. Para enviar a um cliente, selecione o grupo dele — o PDF nunca mistura clientes.
+          </div>}
 
           {loadingV&&<div style={{textAlign:"center",padding:"50px 0"}}>
             <div style={{fontSize:28,marginBottom:10}}>🎯</div>
@@ -1220,9 +1239,9 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 
           {!loadingV&&rows.length>0&&<>
             <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"14px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:14}}>
-              <div style={{fontSize:34,fontWeight:900,color:scoreColor(v360.media)}}>{v360.media}<span style={{fontSize:14,color:"#94a3b8"}}>/100</span></div>
+              <div style={{fontSize:34,fontWeight:900,color:scoreColor(mediaGrupo)}}>{mediaGrupo}<span style={{fontSize:14,color:"#94a3b8"}}>/100</span></div>
               <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:800,color:"#f1f5f9"}}>Média do Grupo</div>
+                <div style={{fontSize:12,fontWeight:800,color:"#f1f5f9"}}>Média — {tituloGrupo}</div>
                 <div style={{fontSize:11,color:"#94a3b8"}}>Checklist + CTMK + KeyAccess + Bolsão + Perimetral + Ronda VSPP</div>
               </div>
             </div>
