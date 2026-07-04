@@ -2785,7 +2785,7 @@ export default function App(){
   if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);}} sharedAuth={getProjectAuthMode(acessoCCOProject.id)} onAuthGranted={(mode)=>grantAuth(acessoCCOProject.id,mode)}/></ErrorBoundary>;
   if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}} sharedAuth={getProjectAuthMode(empresaInfoProject.id)} onAuthGranted={(mode)=>grantAuth(empresaInfoProject.id,mode)}/></ErrorBoundary>;
   if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}} sharedAuth={getProjectAuthMode(equipamentosProject.id)} onAuthGranted={(mode)=>grantAuth(equipamentosProject.id,mode)}/></ErrorBoundary>;
-  if(showVisita&&visitaProject) return <ErrorBoundary moduleName="Visita Diária"><Visita project={visitaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowVisita(false);setVisitaProject(null);}} sharedAuth={getProjectAuthMode(visitaProject.id)} onAuthGranted={(mode)=>grantAuth(visitaProject.id,mode)}/></ErrorBoundary>;
+  // Visita Diária removida a pedido — componente Visita.jsx permanece no repo por histórico
   if(showBolsao&&bolsaoProject) return <ErrorBoundary moduleName="Fiscalização de Bolsão"><Bolsao project={bolsaoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowBolsao(false);setBolsaoProject(null);}} sharedAuth={getProjectAuthMode(bolsaoProject.id)} onAuthGranted={(mode)=>grantAuth(bolsaoProject.id,mode)}/></ErrorBoundary>;
   if(showRondaVSPP) return <ErrorBoundary moduleName="Ronda VSPP"><RondaVSPP project={PROJECTS["P601"]} dark={dark} onBack={()=>setShowRondaVSPP(false)} sharedAuth={getProjectAuthMode("P601")} onAuthGranted={(mode)=>grantAuth("P601",mode)}/></ErrorBoundary>;
   if(showPerimetral&&perimetralProject) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral project={perimetralProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowPerimetral(false);setPerimetralProject(null);}} sharedAuth={getProjectAuthMode(perimetralProject.id)} onAuthGranted={(mode)=>grantAuth(perimetralProject.id,mode)}/></ErrorBoundary>;
@@ -2827,10 +2827,66 @@ export default function App(){
   );
 
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
-  if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={(mode)=>{grantAuth(project.id,mode||"lider");setScreen("home");}} onBack={()=>setScreen("home")}/>;
+  if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={(mode)=>{grantAuth(project.id,mode||"lider");setScreen(project.id==="P260A"?"p260a_home":"home");}} onBack={()=>setScreen("home")}/>;
+
+  // ── Tela dedicada do P260A (checklist semanal Jatinox) — mesmo padrão visual dos projetos de grupo
+  if(screen==="p260a_home"&&project?.id==="P260A") {
+    const hist=stored["P260A"]?.history??[];
+    const last=hist.length?hist[hist.length-1]:null;
+    const h=last?computeHealth(project,last.state):null;
+    const lastForP260A=last;
+    const isAdmin=getProjectAuthMode("P260A")==="admin";
+    return(
+      <div style={S.page}>
+        <div style={S.formWrap}>
+          <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
+            <button onClick={()=>{setHomeGroup("jatinox");setScreen("home");}} style={S.backBtn}>← Voltar</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:900,color:"#f1f5f9"}}>P260A — Jatinox Unidade A</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>Checklist Semanal · {project.categories.length} categorias</div>
+            </div>
+            {h&&<HealthRing pct={h.pct} size={50}/>}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:10}}>
+            {h&&(
+              <div style={{background:"#060c18",border:`1px solid ${h.pct>=90?"#22c55e44":h.pct>=70?"#f59e0b44":"#ef444444"}`,borderRadius:12,padding:"14px",display:"flex",alignItems:"center",gap:14}}>
+                <HealthRing pct={h.pct} size={56}/>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{h.pct}% — {h.inop} inoperante{h.inop!==1?"s":""}</div>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>Último: {fmtDate(last?.meta?.date)} · {getWeekLabel(last?.meta?.date)}</div>
+                  {last?.meta?.leader&&<div style={{fontSize:11,color:"#64748b"}}>Líder: {last.meta.leader}</div>}
+                </div>
+              </div>
+            )}
+            {!h&&(
+              <div style={{background:"#060c18",border:"1px solid #7c3aed33",borderRadius:12,padding:"20px",textAlign:"center"}}>
+                <div style={{fontSize:28,marginBottom:6}}>📋</div>
+                <div style={{fontSize:13,color:"#a78bfa",fontWeight:700}}>Nenhum teste realizado ainda</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Toque em "Novo Relatório" pra começar</div>
+              </div>
+            )}
+
+            <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);setScreen("form");setActive(null);}}
+              style={{...S.primaryBtn,fontSize:14,width:"100%"}}>📋 Novo Relatório — P260A</button>
+
+            <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico</button>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <button onClick={()=>{setEquipeProject({id:"P260A",name:"Jatinox Unidade A"});setShowEquipe(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe</button>
+              <button onClick={()=>{setAcessoCCOProject({id:"P260A",name:"Jatinox Unidade A"});setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
+            </div>
+
+            <CtmkBadge info={ctmkData["P260A"]} onToggle={()=>requestCtmkToggle("P260A",false)} size="large"/>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
-  if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
-  if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen("home")}/>;
+  if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
+  if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
 
   // ── FORM
   if(screen==="form") return(
@@ -3039,8 +3095,7 @@ export default function App(){
                         style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:jp.id==="P260A"?"auto":"1/-1"}}>🛡️ Equipamentos</button>
                       <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
-                      <button onClick={()=>{setVisitaProject({id:jp.id,name:jp.name});setShowVisita(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
+
                       {jp.id==="P260A"&&(
                         <button onClick={()=>{setHomeGroup(null);setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"home":"pin_gate");}}
                           style={{...S.secBtn,fontSize:12,color:"#7c3aed",borderColor:"#7c3aed22",gridColumn:"1/-1"}}>📋 Checklist Semanal</button>
@@ -3141,7 +3196,7 @@ export default function App(){
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
-                    <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
+
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
                     {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🚗 Ronda VSPP</button>}
@@ -3155,7 +3210,7 @@ export default function App(){
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{...S.secBtn,fontSize:12,color:"#22c55e",borderColor:"#22c55e22"}}>🚪 CCO</button>
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22"}}>🛡️ Equipamentos</button>
                     <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722"}}>🏢 Empresas</button>
-                    <button onClick={()=>{setVisitaProject(project);setShowVisita(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
+
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
                     {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🚗 Ronda VSPP</button>}
