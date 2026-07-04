@@ -3042,7 +3042,7 @@ export default function App(){
                       <button onClick={()=>{setVisitaProject({id:jp.id,name:jp.name});setShowVisita(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922",gridColumn:"1/-1"}}>📋 Visita Diária</button>
                       {jp.id==="P260A"&&(
-                        <button onClick={()=>{setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"home":"pin_gate");}}
+                        <button onClick={()=>{setHomeGroup(null);setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"home":"pin_gate");}}
                           style={{...S.secBtn,fontSize:12,color:"#7c3aed",borderColor:"#7c3aed22",gridColumn:"1/-1"}}>📋 Checklist Semanal</button>
                       )}
                     </div>
