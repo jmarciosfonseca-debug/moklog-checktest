@@ -277,7 +277,7 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
 
           {/* Ações */}
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {adminAuth&&<button onClick={()=>{setShowAdd(true);setEditId(null);setForm({...blank});}} style={{...S.btnSm,color:"#22c55e",borderColor:"#22c55e44",fontWeight:700,padding:"8px 14px",fontSize:12}}>+ Adicionar Unidade</button>}
+            <button onClick={()=>{setShowAdd(true);setEditId(null);setForm({...blank});}} style={{...S.btnSm,color:"#22c55e",borderColor:"#22c55e44",fontWeight:700,padding:"8px 14px",fontSize:12}}>+ Adicionar Unidade</button>
             <div style={{marginLeft:"auto",display:"flex",gap:4}}>
               {[["todos","Todos"],["ativos","✅ Ativos"],["vazios","🔴 Vazios"]].map(([k,l])=>(
                 <button key={k} onClick={()=>setFiltro(k)}
