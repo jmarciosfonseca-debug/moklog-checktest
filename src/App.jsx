@@ -584,27 +584,29 @@ function generateReportText(project, state, meta, photos) {
   return L.join("\n");
 }
 
-// ── StatusRing: anel de progresso com gradiente e brilho (guia de design da Home)
-function StatusRing({ pct=0, size=56, color="#22c55e", empty=false }) {
-  const sw = 5.5;
-  const r = (size - sw*2 - 2)/2, C = 2*Math.PI*r;
+// ── StatusRing: anel de progresso com gradiente, trilho e brilho
+function StatusRing({ pct=0, size=64, color="#22c55e", empty=false }) {
+  const sw = 6;
+  const r = (size - sw*2)/2, C = 2*Math.PI*r;
   const val = Math.max(0, Math.min(100, pct));
   const off = C*(1 - (empty?0:val)/100);
   const gid = "mkring-"+color.replace("#","")+"-"+(empty?"e":val);
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{filter:`drop-shadow(0 0 5px ${color}55)`,flexShrink:0}} aria-hidden="true">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{filter:`drop-shadow(0 0 8px ${color}44)`,flexShrink:0}} aria-hidden="true">
       <defs>
         <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor={color}/>
-          <stop offset="100%" stopColor={color+"88"}/>
+          <stop offset="100%" stopColor={color+"77"}/>
         </linearGradient>
       </defs>
-      <circle cx={size/2} cy={size/2} r={r} stroke="#0f172a" strokeWidth={sw} fill="none"/>
+      {/* Trilho escuro (sempre visível) */}
+      <circle cx={size/2} cy={size/2} r={r} stroke="#1a2236" strokeWidth={sw} fill="none"/>
+      {/* Arco de progresso com gradiente */}
       {!empty&&<circle cx={size/2} cy={size/2} r={r} stroke={`url(#${gid})`} strokeWidth={sw} fill="none"
         strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off}
-        transform={`rotate(-90 ${size/2} ${size/2})`}/>}
-      <text x="50%" y="52%" dominantBaseline="central" textAnchor="middle" fill={empty?"#8b5cf6":color}
-        fontSize={empty?size*0.3:size*0.25} fontWeight="900" fontFamily="inherit">{empty?"—":val+"%"}</text>
+        transform={`rotate(-90 ${size/2} ${size/2})`} style={{filter:`drop-shadow(0 0 4px ${color}88)`}}/>}
+      <text x="50%" y="52%" dominantBaseline="central" textAnchor="middle" fill={empty?"#7c3aed":color}
+        fontSize={empty?size*0.28:size*0.28} fontWeight="900" fontFamily="inherit">{empty?"—":val+"%"}</text>
     </svg>
   );
 }
@@ -3167,10 +3169,12 @@ export default function App(){
 
   // ── HOME — Main cards
   return(
-    <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
+    <div style={{...S.page, background:dark?"radial-gradient(ellipse at 50% -5%, #0a1628 0%, #04080f 55%)":"#f1f5f9", minHeight:"100vh"}}>
       <style>{`
-        @keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 7px rgba(239,68,68,0)}}
-        @keyframes mkGlow{0%,100%{opacity:.55}50%{opacity:1}}
+        @keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+        @keyframes mkGlow{0%,100%{opacity:.5}50%{opacity:1}}
+        @keyframes mkFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+        @keyframes mkRingSpin{0%{transform:rotate(-90deg)}100%{transform:rotate(270deg)}}
       `}</style>
       {!isOnline && (
         <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#92400e",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
@@ -3196,7 +3200,9 @@ export default function App(){
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
             <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:"mkPulse 2.2s infinite"}} aria-label="Ver pendências">🔴 Inop</button>
-            <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700}} aria-label="Ver registros">📋 Registros</button>
+            <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700,position:"relative"}} aria-label="Ver registros">📋 Registros
+              {(()=>{const t=Object.values(stored).reduce((a,p)=>{const h=p.history||[];const last=h[h.length-1];if(!last)return a;const inop=Object.values(last.state||{}).reduce((s,cat)=>{if(cat.count!==undefined)return s+(cat.count===0?1:0);return s+Object.values(cat).filter(v=>v==="inop").length;},0);return a+inop;},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
+            </button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"rgba(148,163,184,.06)",border:"1px solid #263248",borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:"#a8b6c8",fontWeight:600}} aria-label="Abrir painel gerencial">📊 Painel</button>
             <button onClick={()=>setDark(!dark)} style={{background:"rgba(148,163,184,.06)",border:"1px solid #263248",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:"#a8b6c8"}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
@@ -3227,7 +3233,11 @@ export default function App(){
         )}
 
         <div style={{width:"100%"}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>Seleção de Projeto</div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+            <div style={{height:1,flex:1,background:"linear-gradient(90deg,transparent,#1e293b)"}}/>
+            <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1.5}}>Seleção de Projeto</div>
+            <div style={{height:1,flex:1,background:"linear-gradient(90deg,#1e293b,transparent)"}}/>
+          </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
               {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"]},
@@ -3242,7 +3252,7 @@ export default function App(){
               const totalInop = healths.reduce((a,h)=>a+h.inop,0);
               return(
                 <button key={grp.key} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
-                  style={{background:"linear-gradient(165deg,#0c1526 0%,#060c18 65%)",border:`1px solid ${hasProblems?grp.color+"77":grp.color+"30"}`,borderRadius:18,padding:"18px 12px 15px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:7,position:"relative",boxShadow:`0 10px 26px rgba(0,0,0,.5), 0 0 18px ${grp.color}16, inset 0 1px 0 rgba(255,255,255,.045)`}}>
+                  style={{background:"linear-gradient(165deg,#0c1526 0%,#060c18 65%)",border:`1.5px solid ${hasProblems?grp.color+"99":grp.color+"44"}`,borderRadius:20,padding:"20px 14px 18px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",boxShadow:`0 12px 30px rgba(0,0,0,.55), 0 0 20px ${grp.color}12, inset 0 1px 0 rgba(255,255,255,.05)`}}>
                   {hasProblems&&<div style={{position:"absolute",top:10,right:10,width:8,height:8,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444aa",animation:"mkGlow 1.6s infinite"}}/>}
                   <svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 18L26 4L48 18V42H4V18Z" stroke={grp.color} strokeWidth="2.5" strokeLinejoin="round" fill={grp.color+"11"}/>
@@ -3254,14 +3264,14 @@ export default function App(){
                   <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9",lineHeight:1.2}}>{grp.label}</div>
                   <div style={{fontSize:11,color:"#64748b"}}>{grp.sub}</div>
                   {avgPct!==null?(
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                      <StatusRing pct={avgPct} size={54} color={avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}/>
-                      {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+                      <StatusRing pct={avgPct} size={64} color={avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}/>
+                      {totalInop>0&&<span style={{fontSize:12,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
                     </div>
                   ):(
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                      <StatusRing empty size={54} color="#7c3aed"/>
-                      <span style={{fontSize:11,color:"#a78bfa"}}>Sem dados</span>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
+                      <StatusRing empty size={64} color="#7c3aed"/>
+                      <span style={{fontSize:12,color:"#a78bfa"}}>Sem dados</span>
                     </div>
                   )}
                 </button>
@@ -3301,8 +3311,8 @@ export default function App(){
                     <span style={{fontSize:17,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444",textShadow:`0 0 12px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}55`}}>{avg}%</span>
                   </div>
                 </div>
-                <div style={{height:5,background:"#0f172a",borderRadius:3,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${avg}%`,background:`linear-gradient(90deg,${avg>=90?"#16a34a,#22c55e":avg>=70?"#d97706,#f59e0b":"#dc2626,#ef4444"})`,borderRadius:3,boxShadow:`0 0 8px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}88`}}/>
+                <div style={{height:6,background:"#0f172a",borderRadius:4,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${avg}%`,background:`linear-gradient(90deg,${avg>=90?"#16a34a,#22c55e":avg>=70?"#d97706,#f59e0b":"#dc2626,#ef4444"})`,borderRadius:4,boxShadow:`0 0 12px ${avg>=90?"#22c55e":"#f59e0b"}66`}}/>
                 </div>
               </div>
             );
