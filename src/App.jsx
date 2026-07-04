@@ -242,7 +242,7 @@ function checkPendingNotifications(stored) {
     const hist = stored[p.id]?.history??[];
     const lastReport = hist.slice(-1)[0];
     const lastDate = lastReport?.meta?.date;
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = now.toLocaleDateString("sv-SE");
     const filledToday = lastDate === todayStr;
     if(hour >= 8 && hour < 14) {
       sendNotification("MokLog CheckTest", `${p.id} – ${p.name}: Lembrete do teste semanal de hoje!`);
@@ -295,7 +295,7 @@ const PROJECTS = {
   P605: {id:"P605",name:"Golgi Dutra",short:"Dutra",categories:[{id:"panic_fix",label:"01 - P\u00e2nico Fixo",type:"items",itemLabels:["CCO","Portaria"]},{id:"panic_mob",label:"02 - P\u00e2nico M\u00f3vel",type:"items",itemLabels:["GA L\u00edder 01","GA L\u00edder 02","GB VSPP 01","GB VSPP 02"]},{id:"giroflex",label:"03 - Giroflex Eclusas",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},{id:"fire",label:"04 - Alarme SDAI",type:"items",itemLabels:["Galp\u00e3o A","Galp\u00e3o B"]},{id:"bollards",label:"05 - Bollards / Pinos",type:"items",itemLabels:["Entrada 01 \u2013 Pino 01","Entrada 01 \u2013 Pino 02","Reversiva 02 \u2013 Pino 03","Reversiva 02 \u2013 Pino 04","Sa\u00edda 04 \u2013 Pino 05","Sa\u00edda 04 \u2013 Pino 06"]},{id:"cftv",label:"06 - CFTV",type:"count",total:54},{id:"monitores",label:"07 - Monitores",type:"items",itemLabels:["CCO 01","CCO 02","CCO 03","CCO 04","CCO 05","CCO 06","CCO 07","Portaria 01","Portaria 02","Portaria 03","Portaria 04"]},{id:"totens",label:"08 - Totens",type:"items",itemLabels:["Visitantes","Motorista (CDA)"]},{id:"cofres",label:"09 - Cofres",type:"items",itemLabels:["CCO","Portaria"]},{id:"cancelas",label:"10 - Cancelas",type:"items",itemLabels:["Entrada 01","Entrada 02 Reversa","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},{id:"perimeter",label:"11 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04"]},{id:"eclusas",label:"12 - Eclusas",type:"items",itemLabels:["CCO Porta 01 Ext.","CCO Porta 02 Int.","Portaria Porta 01 Int.","Portaria Porta 01 Ext."]},{id:"internet",label:"13 - Internet",type:"items",itemLabels:["ADM","Visitantes"]},{id:"qr_cancelas",label:"14 - Leitores QR Cancelas",type:"items",itemLabels:["Entrada 01 \u2013 Sup","Entrada 01 \u2013 Inf","Entrada 02 \u2013 Sup","Entrada 02 \u2013 Inf","Sa\u00edda 03 \u2013 Sup","Sa\u00edda 03 \u2013 Inf","Sa\u00edda 04 \u2013 Sup","Sa\u00edda 04 \u2013 Inf"]},{id:"torniquetes",label:"15 - Torniquetes",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},{id:"mesa",label:"16 - Mesa Controladora",type:"items",itemLabels:["CCO","Portaria"]},{id:"semaforos",label:"17 - Sem\u00e1foros / L\u00e2mpadas Piloto",type:"items",itemLabels:["Entrada 01","Entrada 02 Reversa","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},{id:"pictogramas",label:"18 - Pictogramas / Far\u00f3is",type:"items",itemLabels:["Farol 01","Farol 02","Farol 03","Farol 04","Farol 05","Farol 06"]},{id:"ac",label:"19 - Ar-Condicionado",type:"items",itemLabels:["CCO Servidores","CCO Monitores","Portaria"]},{id:"telefone",label:"20 - Telefones",type:"items",itemLabels:["CCO Ramal","CCO Emergencial","CCO Fixo","Portaria 01","Portaria 02"]},{id:"intercomunicador",label:"21 - Intercomunicadores",type:"items",itemLabels:["CCO","CDA","Elevador"]},{id:"joystick",label:"22 - Joystick Digifort",type:"items",itemLabels:["CCO","Portaria"]},{id:"nobreak",label:"23 - Nobreak CCO",type:"items",itemLabels:["CCO"]},{id:"manutencao",label:"24 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"25 - Infraestrutura / Obs.",type:"notes"}]},
   P606: {id:"P606",name:"Golgi Duque de Caxias",short:"Duque",categories:[{id:"fire",label:"01 - Alarme de Inc\u00eandio",type:"items",itemLabels:["CCO","Galp\u00e3o 01","Galp\u00e3o 02","Galp\u00e3o 03","Galp\u00e3o 04","Galp\u00e3o 05","Galp\u00e3o 06","Galp\u00e3o 07","Galp\u00e3o 08","Galp\u00e3o 09","Galp\u00e3o 10"]},{id:"portoes_portaria",label:"02 - Port\u00f5es Portaria",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02","Port\u00e3o 03","Port\u00e3o 04","Port\u00e3o 05","Port\u00e3o 06"]},{id:"portoes_balanca",label:"03 - Port\u00f5es Balan\u00e7a HubLog",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02","Port\u00e3o 03","Port\u00e3o 04"]},{id:"dilaceradores",label:"04 - Dilaceradores",type:"items",itemLabels:["Entrada 01","Reversiva 02","Sa\u00edda 03"]},{id:"cftv",label:"05 - CFTV",type:"count",total:72},{id:"monitores",label:"06 - Monitores",type:"items",itemLabels:["CCO 01","CCO 02","CCO 03","CCO 04","CCO 05","Portaria 01"]},{id:"joystick",label:"07 - Joystick CFTV",type:"items",itemLabels:["CCO"]},{id:"cancela",label:"08 - Cancela",type:"items",itemLabels:["Entrada Principal"]},{id:"perimeter",label:"09 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03"]},{id:"panic",label:"10 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02","Fixo CCO","Fixo Recep\u00e7\u00e3o","Fixo Guarita"]},{id:"totens",label:"11 - Totens Keyaccess",type:"items",itemLabels:["\u00c1rea Externa","\u00c1rea Interna"]},{id:"qr_eclusas",label:"12 - Leitoras QR Eclusas",type:"items",itemLabels:["QR 01","QR 02","QR 03","QR 04","QR 05","QR 06","QR 07","QR 08","QR 09","QR 10","QR 11","QR 12"]},{id:"qr_torn",label:"13 - Leitoras QR Torniquetes",type:"items",itemLabels:["QR 01","QR 02","QR 03","QR 04"]},{id:"telefone",label:"14 - Telefone Fixo CCO",type:"items",itemLabels:["CCO"]},{id:"mesa",label:"15 - Mesa Controladora",type:"items",itemLabels:["Portaria","CFTV"]},{id:"interfone",label:"16 - Interfones",type:"items",itemLabels:["Portaria 01","Portaria 02","Portaria 03","Guarita Entrada"]},{id:"televisores",label:"17 - Televisores",type:"items",itemLabels:["Apoio Caminhoneiro","Recep\u00e7\u00e3o"]},{id:"manutencao",label:"18 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"19 - Infraestrutura / Obs.",type:"notes"}]},
   P607: {id:"P607",name:"Golgi Bras\u00edlia",short:"Bras\u00edlia",categories:[{id:"fire",label:"01 - Alarme de Inc\u00eandio",type:"items",itemLabels:["Painel CCO","Painel Guarita","Painel ADM"]},{id:"cftv",label:"02 - CFTV",type:"count",total:44},{id:"monitores_cco",label:"03 - Monitores CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03"]},{id:"monitor_ka",label:"04 - Monitor KeyAccess",type:"items",itemLabels:["Monitor 01"]},{id:"joystick",label:"05 - Joystick",type:"items",itemLabels:["CCO"]},{id:"nobreak",label:"06 - Nobreak",type:"items",itemLabels:["CCO"]},{id:"ac",label:"07 - Ar-Condicionado CCO",type:"items",itemLabels:["Aparelho 01"]},{id:"botoeiras",label:"08 - Botoeiras Port\u00f5es",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},{id:"perimeter",label:"09 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04"]},{id:"panic",label:"10 - P\u00e2nico M\u00f3vel",type:"items",itemLabels:["Ronda","Pista","CCO"]},{id:"totens",label:"11 - Totens",type:"items",itemLabels:["Entrada","Sa\u00edda"]},{id:"qr_leitores",label:"12 - Leitores QR Code",type:"items",itemLabels:["Torniquete 1 Entrada","Torniquete 1 Sa\u00edda","Torniquete 2 Entrada","Torniquete 2 Sa\u00edda","Eclusa Ent 1 \u2013 QR 01","Eclusa Ent 1 \u2013 QR 02","Eclusa Ent 2 \u2013 QR 01","Eclusa Ent 2 \u2013 QR 02","Eclusa Sa\u00ed 1 \u2013 QR 01","Eclusa Sa\u00ed 1 \u2013 QR 02","Eclusa Sa\u00ed 2 \u2013 QR 01","Eclusa Sa\u00ed 2 \u2013 QR 02"]},{id:"tablets",label:"13 - Tablets KeyAccess",type:"items",itemLabels:["Tablet 01","Tablet 02"]},{id:"portoes",label:"14 - Port\u00f5es",type:"items",itemLabels:["Eclusa Ent 1 \u2013 P01","Eclusa Ent 1 \u2013 P02","Eclusa Ent 2 \u2013 P01","Eclusa Ent 2 \u2013 P02","Eclusa Sa\u00ed 1 \u2013 P01","Eclusa Sa\u00ed 1 \u2013 P02","Eclusa Sa\u00ed 2 \u2013 P01","Eclusa Sa\u00ed 2 \u2013 P02"]},{id:"motores",label:"15 - Motores dos Port\u00f5es",type:"items",itemLabels:["Ent 1 \u2013 M01","Ent 1 \u2013 M02","Ent 1 \u2013 M03","Ent 2 \u2013 M01","Ent 2 \u2013 M02","Ent 2 \u2013 M03","Sa\u00ed 1 \u2013 M01","Sa\u00ed 1 \u2013 M02","Sa\u00ed 1 \u2013 M03","Sa\u00ed 1 \u2013 M04","Sa\u00ed 2 \u2013 M01","Sa\u00ed 2 \u2013 M02","Sa\u00ed 2 \u2013 M03","Sa\u00ed 2 \u2013 M04"]},{id:"sensores",label:"16 - Sensores dos Port\u00f5es",type:"items",itemLabels:["Ent 1 \u2013 S01","Ent 1 \u2013 S02","Ent 1 \u2013 S03","Ent 1 \u2013 S04","Ent 2 \u2013 S01","Ent 2 \u2013 S02","Ent 2 \u2013 S03","Ent 2 \u2013 S04","Sa\u00ed 1 \u2013 S01","Sa\u00ed 1 \u2013 S02","Sa\u00ed 1 \u2013 S03","Sa\u00ed 1 \u2013 S04","Sa\u00ed 2 \u2013 S01","Sa\u00ed 2 \u2013 S02","Sa\u00ed 2 \u2013 S03","Sa\u00ed 2 \u2013 S04"]},{id:"anti_esmag",label:"17 - Anti-esmagamento",type:"items",itemLabels:["Eclusa Ent 1 \u2013 AE 01","Eclusa Ent 1 \u2013 AE 02","Eclusa Ent 2 \u2013 AE 01","Eclusa Ent 2 \u2013 AE 02"]},{id:"guarita",label:"18 - Guarita / Recep\u00e7\u00e3o",type:"items",itemLabels:["Computador","Monitor 01","Monitor 02","Modem Internet"]},{id:"manutencao",label:"19 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"20 - Infraestrutura / Obs.",type:"notes"}]},
-  P311A: {id:"P311A",name:"Mega CL Curitiba",short:"Curitiba",categories:[{id:"cftv",label:"01 - CFTV",type:"count",total:140},{id:"perimeter",label:"02 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},{id:"botoeiras",label:"03 - Botoeiras / Port\u00f5es de Acesso",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},{id:"panic",label:"04 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["L\u00edder","CCO"]},{id:"alertas",label:"05 - Recebimento de Alertas Externos",type:"items",itemLabels:["Central Moked","Central Auxiliar"]},{id:"portas_cco",label:"06 - CCO / Abertura de Portas",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},{id:"keyaccess",label:"07 - Sistema KeyAccess",type:"items",itemLabels:["Torniquete 01","Torniquete 02","Torniquete 03"]},{id:"totens",label:"08 - Totens de Autoatendimento",type:"items",itemLabels:["Entrada","Sa\u00edda"]},{id:"qr_code",label:"09 - Leitores de QR Code",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},{id:"computadores",label:"10 - Computadores / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},{id:"portoes",label:"11 - Port\u00f5es",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},{id:"cancelas",label:"12 - Cancelas de Acesso",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},{id:"dilaceradores",label:"13 - Dilaceradores",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},{id:"ac",label:"14 - Ar-Condicionado",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},{id:"intercomunicadores",label:"15 - Intercomunicadores",type:"items",itemLabels:["Intercomunicador 01","Intercomunicador 02","Intercomunicador 03","V\u00eddeo Porteiro 01","V\u00eddeo Porteiro 02","V\u00eddeo Porteiro 03","V\u00eddeo Porteiro 04","Totem Superior 01","Totem Superior 02","Totem Superior 03","Totem Superior 04","Totem Superior 05","Totem Superior 06","Totem Inferior 01","Totem Inferior 02","Totem Inferior 03","Totem Inferior 04","Totem Inferior 05","Totem Inferior 06"]},{id:"sdai",label:"16 - SDAI (Inc\u00eandio)",type:"items",itemLabels:["Central 01","Central 02","Central 03","Central 04","Central 05"]},{id:"materiais",label:"17 - Materiais Operacionais",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},{id:"manutencao",label:"18 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"19 - Infraestrutura / Obs.",type:"notes"}]},
+  P311A: {id:"P311A",name:"Mega CL Curitiba",short:"Curitiba",categories:[{id:"cftv",label:"01 - CFTV",type:"count",total:140},{id:"perimeter",label:"02 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},{id:"botoeiras",label:"03 - Botoeiras / Port\u00f5es de Acesso",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},{id:"panic",label:"04 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["L\u00edder","CCO"]},{id:"alertas",label:"05 - Recebimento de Alertas Externos",type:"items",itemLabels:["Central Moked","Central Auxiliar"]},{id:"portas_cco",label:"06 - CCO / Abertura de Portas",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},{id:"keyaccess",label:"07 - Sistema KeyAccess",type:"items",itemLabels:["Torniquete 01","Torniquete 02","Torniquete 03"]},{id:"totens",label:"08 - Totens de Autoatendimento",type:"items",itemLabels:["Entrada","Sa\u00edda"]},{id:"qr_code",label:"09 - Leitores de QR Code",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},{id:"computadores",label:"10 - Computadores / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},{id:"portoes",label:"11 - Port\u00f5es",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},{id:"cancelas",label:"12 - Cancelas de Acesso",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},{id:"dilaceradores",label:"13 - Dilaceradores",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},{id:"ac",label:"14 - Ar-Condicionado",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},{id:"intercomunicadores",label:"15 - Intercomunicadores",type:"items",itemLabels:["Intercomunicador 01","Intercomunicador 02","Intercomunicador 03"]},{id:"video_porteiro",label:"16 - V\u00eddeo Porteiro",type:"items",itemLabels:["V\u00eddeo Porteiro 01","V\u00eddeo Porteiro 02","V\u00eddeo Porteiro 03","V\u00eddeo Porteiro 04"]},{id:"intercom_totem",label:"17 - Intercomunicadores de Totem",type:"items",itemLabels:["Totem Superior 01","Totem Superior 02","Totem Superior 03","Totem Superior 04","Totem Superior 05","Totem Superior 06","Totem Inferior 01","Totem Inferior 02","Totem Inferior 03","Totem Inferior 04","Totem Inferior 05","Totem Inferior 06"]},{id:"sdai",label:"18 - SDAI (Inc\u00eandio)",type:"items",itemLabels:["Central 01","Central 02","Central 03","Central 04","Central 05"]},{id:"materiais",label:"19 - Materiais Operacionais",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},{id:"manutencao",label:"20 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"21 - Infraestrutura / Obs.",type:"notes"}]},
   P311B: {id:"P311B",name:"Mega CL Itaja\u00ed",short:"Itaja\u00ed",categories:[{id:"cftv",label:"01 - CFTV",type:"count",total:114},{id:"perimeter",label:"02 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06"]},{id:"botoeiras",label:"03 - Botoeiras do Dilacerador",type:"items",itemLabels:["Botoeira 01","Botoeira 02","Botoeira 03"]},{id:"panic",label:"04 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["CCO Fixo","Ronda M\u00f3vel","L\u00edder M\u00f3vel"]},{id:"portas_cco",label:"05 - CCO / Controle de Acesso",type:"items",itemLabels:["Porta 01 Externa \u2013 Local","Porta 01 Externa \u2013 Remota","Porta 02 Interna \u2013 Local","Porta 02 Interna \u2013 Remota"]},{id:"keyaccess",label:"06 - Sistema KeyAccess",type:"items",itemLabels:["Catraca 01","Catraca 02","Catraca 03"]},{id:"totens_cancela",label:"07 - Totens nas Cancelas",type:"items",itemLabels:["Totem Cancela 01","Totem Cancela 02","Totem Cancela 03","Totem Cancela 04","Totem Cancela 05","Totem Cancela 06"]},{id:"qr_code",label:"08 - Leitores QR Code",type:"items",itemLabels:["Cancela 01 Sup","Cancela 01 Inf","Cancela 02 Sup","Cancela 02 Inf","Cancela 04 Sup","Cancela 04 Inf","Sa\u00edda Cancela 02 Sup","Sa\u00edda Cancela 02 Inf","Sa\u00edda Cancela 03 Sup","Sa\u00edda Cancela 03 Inf","Sa\u00edda Cancela 04 Sup","Sa\u00edda Cancela 04 Inf"]},{id:"computadores",label:"09 - Computadores / CCO",type:"items",itemLabels:["Computador Principal","Computador Secund\u00e1rio","Internet"]},{id:"portoes",label:"10 - Port\u00f5es",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02","Port\u00e3o 03","Port\u00e3o 04"]},{id:"dilaceradores",label:"11 - Dilaceradores",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},{id:"ac",label:"12 - Ar-Condicionado",type:"items",itemLabels:["CCO","Sala T\u00e9cnica"]},{id:"materiais",label:"13 - Materiais Operacionais",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x2)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},{id:"sdai",label:"14 - SDAI (Inc\u00eandio)",type:"items",itemLabels:["Central Portaria","Central Casa de Bombas","Central Sala T\u00e9cnica"]},{id:"manutencao",label:"15 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"16 - Infraestrutura / Obs.",type:"notes"}]},
   P505: {id:"P505",name:"Klog Guarulhos",short:"Guarulhos",categories:[{id:"panic",label:"01 - Bot\u00f5es de P\u00e2nico",type:"items",itemLabels:["Fixo CCO"]},{id:"giroflex",label:"02 - Giroflex das Eclusas",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},{id:"sdai",label:"03 - Alarme SDAI Portaria",type:"items",itemLabels:["G100","G200"]},{id:"garra",label:"04 - Garra de Tigre",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Reversiva 03","Eclusa Sa\u00edda 04"]},{id:"cftv",label:"05 - CFTV",type:"count",total:73},{id:"monitores",label:"06 - Monitores CCO e Portaria",type:"items",itemLabels:["CCO 01","CCO 02","CCO 03","Portaria 01","Portaria 02","Portaria 03"]},{id:"totens",label:"07 - Totens Visitantes / Motoristas",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},{id:"cofres",label:"08 - Cofres",type:"items",itemLabels:["CCO","Portaria"]},{id:"cancelas",label:"09 - Cancelas, Hastes e Motores",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},{id:"perimeter",label:"10 - Alarme Perimetral",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08","Zona 09","Zona 10","Zona 11","Zona 12"]},{id:"eclusas",label:"11 - Eclusas CCO e Portaria",type:"items",itemLabels:["CCO Porta 01 Ext \u2013 Local","CCO Porta 02 Int \u2013 Local","Portaria Porta 01 Int \u2013 Local","Portaria Porta 02 Ext \u2013 Local"]},{id:"internet",label:"12 - Internet",type:"single"},{id:"facial",label:"13 - Leitores Faciais Eclusas/Cancelas",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Sa\u00edda 03 Reversiva","Eclusa Sa\u00edda 04"]},{id:"torniquetes",label:"14 - Torniquetes Leitores Faciais",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},{id:"mesa",label:"15 - Mesa Controladora CCO e Portaria",type:"items",itemLabels:["CCO","Portaria"]},{id:"ac",label:"16 - Ar-Condicionado",type:"items",itemLabels:["CCO","Portaria Aparelho 01"]},{id:"telefone",label:"17 - Telefone Fixo CCO e Portaria",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},{id:"intercomunicadores",label:"18 - Intercomunicadores",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},{id:"eletroima",label:"19 - Eletroim\u00e3 / Eclusa / Portas",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},{id:"portoes",label:"20 - Port\u00f5es / Anti-esmagamento",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},{id:"farois",label:"21 - Far\u00f3is das Cancelas",type:"items",itemLabels:["Cancela Eclusa 01 Ext","Cancela Eclusa 01 Int","Cancela Eclusa 02 Ext","Cancela Eclusa 02 Int","Cancela Eclusa 03 Ext","Cancela Eclusa 03 Int","Cancela Eclusa 04 Ext"]},{id:"manutencao",label:"22 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"23 - Infraestrutura / Obs.",type:"notes"}]},
 };
@@ -361,7 +361,7 @@ function getAllPendencies(stored) {
   return result.sort((a,b) => (b.days||0) - (a.days||0));
 }
 
-const todayStr = () => new Date().toISOString().split("T")[0];
+const todayStr = () => new Date().toLocaleDateString("sv-SE");
 const fmtDate = (d) => { if(!d)return"\u2014"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
@@ -584,6 +584,31 @@ function generateReportText(project, state, meta, photos) {
   return L.join("\n");
 }
 
+// ── StatusRing: anel de progresso com gradiente e brilho (guia de design da Home)
+function StatusRing({ pct=0, size=56, color="#22c55e", empty=false }) {
+  const sw = 5.5;
+  const r = (size - sw*2 - 2)/2, C = 2*Math.PI*r;
+  const val = Math.max(0, Math.min(100, pct));
+  const off = C*(1 - (empty?0:val)/100);
+  const gid = "mkring-"+color.replace("#","")+"-"+(empty?"e":val);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{filter:`drop-shadow(0 0 5px ${color}55)`,flexShrink:0}} aria-hidden="true">
+      <defs>
+        <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={color}/>
+          <stop offset="100%" stopColor={color+"88"}/>
+        </linearGradient>
+      </defs>
+      <circle cx={size/2} cy={size/2} r={r} stroke="#0f172a" strokeWidth={sw} fill="none"/>
+      {!empty&&<circle cx={size/2} cy={size/2} r={r} stroke={`url(#${gid})`} strokeWidth={sw} fill="none"
+        strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off}
+        transform={`rotate(-90 ${size/2} ${size/2})`}/>}
+      <text x="50%" y="52%" dominantBaseline="central" textAnchor="middle" fill={empty?"#8b5cf6":color}
+        fontSize={empty?size*0.3:size*0.25} fontWeight="900" fontFamily="inherit">{empty?"—":val+"%"}</text>
+    </svg>
+  );
+}
+
 function MoklogLogo({ size = 44 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -655,7 +680,7 @@ function CtmkBadge({ info, onToggle, size="normal" }) {
 }
 
 function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
-  const [customDate, setCustomDate] = useState(()=>new Date().toISOString().split("T")[0]);
+  const [customDate, setCustomDate] = useState(()=>new Date().toLocaleDateString("sv-SE"));
   if(!confirm) return null;
   const goingOffline = confirm.status!=="offline"; // status atual antes do toque
   const label = project?.id || confirm.pid;
@@ -674,7 +699,7 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
         {goingOffline && confirm.allowDateEdit && (
           <div style={{marginBottom:16}}>
             <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Desde quando está off-line?</div>
-            <input type="date" value={customDate} max={new Date().toISOString().split("T")[0]}
+            <input type="date" value={customDate} max={new Date().toLocaleDateString("sv-SE")}
               onChange={e=>setCustomDate(e.target.value)}
               style={{width:"100%",background:"#020510",border:"1px solid #1e293b",borderRadius:8,color:"#f1f5f9",padding:"10px 12px",fontSize:14,boxSizing:"border-box"}}/>
             <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Deixe como hoje se a queda acabou de acontecer. Mude a data se já está sem imagem há mais tempo.</div>
@@ -3127,6 +3152,10 @@ export default function App(){
   // ── HOME — Main cards
   return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
+      <style>{`
+        @keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 7px rgba(239,68,68,0)}}
+        @keyframes mkGlow{0%,100%{opacity:.55}50%{opacity:1}}
+      `}</style>
       {!isOnline && (
         <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#92400e",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
           <span style={{fontSize:14}}>📡</span>
@@ -3150,10 +3179,10 @@ export default function App(){
             <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button onClick={()=>setScreen("pendencies")} style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700}} aria-label="Ver pendências">🔴 Inop</button>
-            <button onClick={()=>setShowRegistros(true)} style={{background:"#0a0202",border:"1px solid #cc222244",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:11,color:"#cc2222",fontWeight:700}} aria-label="Ver registros">📋 Registros</button>
-            <button onClick={()=>setScreen("dashboard")} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,color:"#94a3b8"}} aria-label="Abrir painel gerencial">📊 Painel</button>
-            <button onClick={()=>setDark(!dark)} style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",cursor:"pointer",fontSize:14,color:"#94a3b8"}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:"mkPulse 2.2s infinite"}} aria-label="Ver pendências">🔴 Inop</button>
+            <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700}} aria-label="Ver registros">📋 Registros</button>
+            <button onClick={()=>setScreen("dashboard")} style={{background:"rgba(148,163,184,.06)",border:"1px solid #263248",borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:"#a8b6c8",fontWeight:600}} aria-label="Abrir painel gerencial">📊 Painel</button>
+            <button onClick={()=>setDark(!dark)} style={{background:"rgba(148,163,184,.06)",border:"1px solid #263248",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:"#a8b6c8"}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
           </div>
         </div>
 
@@ -3170,13 +3199,13 @@ export default function App(){
         )}
 
         {draft&&draft.projectId===project.id&&(
-          <div style={{background:"#0f172a",border:"1px solid #f59e0b55",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{background:"linear-gradient(120deg,#131a2b 0%,#0f172a 55%,#1a1610 100%)",border:"1px solid #f59e0b55",borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 6px 18px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)"}}>
             <span style={{fontSize:16}}>📝</span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>{project.id} — salvo automaticamente</div>
             </div>
-            <button onClick={()=>setShowDraftPrompt(true)} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Continuar</button>
+            <button onClick={()=>setShowDraftPrompt(true)} style={{background:"linear-gradient(135deg,#f5b60b,#b45309)",border:"none",borderRadius:9,padding:"8px 16px",fontSize:12,fontWeight:800,color:"#180e00",cursor:"pointer",boxShadow:"0 2px 10px rgba(245,158,11,.35)"}}>Continuar</button>
           </div>
         )}
 
@@ -3196,8 +3225,8 @@ export default function App(){
               const totalInop = healths.reduce((a,h)=>a+h.inop,0);
               return(
                 <button key={grp.key} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
-                  style={{background:"#060c18",border:`2px solid ${hasProblems?grp.color+"88":grp.color+"22"}`,borderRadius:16,padding:"20px 14px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative"}}>
-                  {hasProblems&&<div style={{position:"absolute",top:8,right:8,width:8,height:8,borderRadius:"50%",background:"#ef4444"}}/>}
+                  style={{background:"linear-gradient(165deg,#0c1526 0%,#060c18 65%)",border:`1px solid ${hasProblems?grp.color+"77":grp.color+"30"}`,borderRadius:18,padding:"18px 12px 15px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:7,position:"relative",boxShadow:`0 10px 26px rgba(0,0,0,.5), 0 0 18px ${grp.color}16, inset 0 1px 0 rgba(255,255,255,.045)`}}>
+                  {hasProblems&&<div style={{position:"absolute",top:10,right:10,width:8,height:8,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444aa",animation:"mkGlow 1.6s infinite"}}/>}
                   <svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 18L26 4L48 18V42H4V18Z" stroke={grp.color} strokeWidth="2.5" strokeLinejoin="round" fill={grp.color+"11"}/>
                     <rect x="18" y="26" width="16" height="16" rx="1" stroke={grp.color} strokeWidth="2" fill={grp.color+"22"}/>
@@ -3207,13 +3236,17 @@ export default function App(){
                   </svg>
                   <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9",lineHeight:1.2}}>{grp.label}</div>
                   <div style={{fontSize:11,color:"#64748b"}}>{grp.sub}</div>
-                  {avgPct!==null&&(
-                    <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
-                      <span style={{fontSize:13,fontWeight:900,color:avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}}>{avgPct}%</span>
+                  {avgPct!==null?(
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+                      <StatusRing pct={avgPct} size={54} color={avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}/>
                       {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
                     </div>
+                  ):(
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+                      <StatusRing empty size={54} color="#7c3aed"/>
+                      <span style={{fontSize:11,color:"#a78bfa"}}>Sem dados</span>
+                    </div>
                   )}
-                  {avgPct===null&&<div style={{fontSize:11,color:"#94a3b8"}}>Sem dados</div>}
                 </button>
               );
             })}
@@ -3221,7 +3254,7 @@ export default function App(){
 
           {/* 🚨 KeyAccess Falha — registro rápido de campo, sem PIN. Cor reage a falhas realmente abertas */}
           <button onClick={()=>setShowKeyAccess(true)}
-            style={{marginTop:10,width:"100%",background:keyAccessOpenCount>0?(dark?"#1a0202":"#fef2f2"):(dark?"#060c18":"#f8fafc"),border:`2px solid ${keyAccessOpenCount>0?"#ef444466":dark?"#1e293b":"#e2e8f0"}`,borderRadius:16,padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left"}}>
+            style={{marginTop:10,width:"100%",background:keyAccessOpenCount>0?"linear-gradient(160deg,#1e0505,#12060a)":"linear-gradient(165deg,#0c1526 0%,#060c18 65%)",border:`1px solid ${keyAccessOpenCount>0?"#ef444466":"#263248"}`,borderRadius:16,padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:keyAccessOpenCount>0?"0 8px 22px rgba(0,0,0,.5), 0 0 22px #ef444426":"0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)"}}>
             <div style={{flexShrink:0,width:44,height:44,borderRadius:12,background:dark?"#0f172a":"#fff",border:`1px solid ${keyAccessOpenCount>0?"#ef444444":"#22c55e44"}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                 <path d="M5 4v14" stroke={keyAccessOpenCount>0?"#ef4444":"#22c55e"} strokeWidth="2.6" strokeLinecap="round"/>
@@ -3243,18 +3276,23 @@ export default function App(){
             const avg=Math.round(valid.reduce((a,h)=>a+h.pct,0)/valid.length);
             const totalInop=valid.reduce((a,h)=>a+h.inop,0);
             return(
-              <div style={{marginTop:10,background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>Saúde Geral da Operação</div>
-                <div style={{display:"flex",alignItems:"center",gap:12}}>
-                  {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop</span>}
-                  <span style={{fontSize:16,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}}>{avg}%</span>
+              <div style={{marginTop:10,background:"linear-gradient(165deg,#0a1a12 0%,#060c18 70%)",border:"1px solid #22c55e2e",borderRadius:14,padding:"12px 14px",boxShadow:"0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <div style={{fontSize:11,color:"#a8b6c8",fontWeight:700}}>Saúde Geral da Operação</div>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop</span>}
+                    <span style={{fontSize:17,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444",textShadow:`0 0 12px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}55`}}>{avg}%</span>
+                  </div>
+                </div>
+                <div style={{height:5,background:"#0f172a",borderRadius:3,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${avg}%`,background:`linear-gradient(90deg,${avg>=90?"#16a34a,#22c55e":avg>=70?"#d97706,#f59e0b":"#dc2626,#ef4444"})`,borderRadius:3,boxShadow:`0 0 8px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}88`}}/>
                 </div>
               </div>
             );
           })()}
         </div>
 
-        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
+        <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
     </div>
   );

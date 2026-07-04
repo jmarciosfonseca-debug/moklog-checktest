@@ -159,7 +159,7 @@ const STATUS_META = {
   bloqueado:      { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:"🔒" },
 };
 
-function hojeISO(){ return new Date().toISOString().split("T")[0]; }
+function hojeISO(){ return new Date().toLocaleDateString("sv-SE"); }
 function nowHM(){ const n=new Date(); return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`; }
 function fmtDataBR(d){ if(!d) return "--"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 function isFimDeSemana(dISO){ try{ const dt=new Date(dISO+"T12:00:00"); const w=dt.getDay(); return w===0||w===6; }catch{ return false; } }
@@ -257,9 +257,10 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     // selecionado. Não bloqueia (trocas de plantão e extras acontecem), mas
     // pede confirmação explícita pra evitar mistura sem querer.
     const turnoColab = (col.turno||"").toLowerCase();
+    const ehFolguista = (col.cargo||"").toLowerCase().includes("folg") || turnoColab.includes("folg");
     const ehNoturnoColab = turnoColab.includes("noturno");
     const ehDiurnoColab = turnoColab.includes("diurno");
-    const bateTurno = (novoTipo==="diurno" && ehDiurnoColab) || (novoTipo==="noturno" && ehNoturnoColab);
+    const bateTurno = ehFolguista || (novoTipo==="diurno" && ehDiurnoColab) || (novoTipo==="noturno" && ehNoturnoColab);
     if(turnoColab && !bateTurno){
       const confirma = window.confirm(
         `${col.nome} está cadastrado(a) como turno "${col.turno}".\n\n`+

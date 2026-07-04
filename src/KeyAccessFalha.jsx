@@ -109,7 +109,7 @@ function calcMinutosFalha(horaInicio, horaFim){
   }catch{ return null; }
 }
 
-function todayStr(){ return new Date().toISOString().split("T")[0]; }
+function todayStr(){ return new Date().toLocaleDateString("sv-SE"); }
 function nowHM(){ const n=new Date(); return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`; }
 function fmtDate(d){ if(!d) return "--"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 function diffDias(d1, d2){

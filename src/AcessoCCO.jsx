@@ -66,7 +66,7 @@ const TURNOS = [
   { key:"noturno", label:"Noturno", color:"#818cf8", bg:"#0a0a2e", icon:"🌙" },
 ];
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
 function nowTime() {
   const n = new Date();
   return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;

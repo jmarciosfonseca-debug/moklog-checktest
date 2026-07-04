@@ -75,7 +75,7 @@ function fmtDate(d){
   if(!d) return "—";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d||"—"; }
 }
-function todayStrLocal(){ return new Date().toISOString().split("T")[0]; }
+function todayStrLocal(){ return new Date().toLocaleDateString("sv-SE"); }
 
 async function loadBolsao(projectId) {
   try {

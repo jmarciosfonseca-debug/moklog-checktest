@@ -18,7 +18,7 @@ const MAPA_B64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJCh
 const SLOTS_DEFAULT = ["06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"];
 
 
-function todayStr(){ return new Date().toISOString().split("T")[0]; }
+function todayStr(){ return new Date().toLocaleDateString("sv-SE"); }
 function nowTime(){ const d=new Date(); return d.getHours().toString().padStart(2,"0")+":"+d.getMinutes().toString().padStart(2,"0"); }
 function fmtDate(d){ if(!d) return "--"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 

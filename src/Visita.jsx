@@ -19,7 +19,7 @@ const CONSULTORES = [
   { nome: "Cristian", pin: "872101" }
 ];
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
 function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }

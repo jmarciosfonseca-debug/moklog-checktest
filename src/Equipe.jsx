@@ -79,7 +79,7 @@ const TURNO_CONFIG = {
   "Perista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:"🔄" },
 };
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
 function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
@@ -439,7 +439,7 @@ ${semTurnoSection}
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `mapa_equipe_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+  a.download = `mapa_equipe_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1095,7 +1095,7 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, 
     const blob = new Blob([html],{type:"text/html"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href=url; a.download=`ferias_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+    a.href=url; a.download=`ferias_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`;
     a.click(); URL.revokeObjectURL(url);
   };
 

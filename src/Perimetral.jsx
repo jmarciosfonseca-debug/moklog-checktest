@@ -55,7 +55,7 @@ const STATUS_CFG = {
   inop:    {label:"Inoperante",color:"#ef4444", bg:"#1a0202", border:"#ef444444", dot:"#ef4444"},
 };
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
 function nowTime() {
   const n=new Date();
   return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
