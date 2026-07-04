@@ -8,6 +8,7 @@ import Equipamentos from "./Equipamentos";
 import Visita from "./Visita";
 import Bolsao from "./Bolsao";
 import RondaVSPP from "./RondaVSPP";
+import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import CCO from "./CCO";
@@ -2348,6 +2349,8 @@ export default function App(){
   const [showBolsao,setShowBolsao]=useState(false);
   const [bolsaoProject,setBolsaoProject]=useState(null);
   const [showRondaVSPP,setShowRondaVSPP]=useState(false);
+  const [showInquilinos,setShowInquilinos]=useState(false);
+  const [inquilinosProject,setInquilinosProject]=useState(null);
   const [visitaProject,setVisitaProject]=useState(null);
   const [showPerimetral,setShowPerimetral]=useState(false);
   const [perimetralProject,setPerimetralProject]=useState(null);
@@ -2788,6 +2791,7 @@ export default function App(){
   // Visita Diária removida a pedido — componente Visita.jsx permanece no repo por histórico
   if(showBolsao&&bolsaoProject) return <ErrorBoundary moduleName="Fiscalização de Bolsão"><Bolsao project={bolsaoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowBolsao(false);setBolsaoProject(null);}} sharedAuth={getProjectAuthMode(bolsaoProject.id)} onAuthGranted={(mode)=>grantAuth(bolsaoProject.id,mode)}/></ErrorBoundary>;
   if(showRondaVSPP) return <ErrorBoundary moduleName="Ronda VSPP"><RondaVSPP project={PROJECTS["P601"]} dark={dark} onBack={()=>setShowRondaVSPP(false)} sharedAuth={getProjectAuthMode("P601")} onAuthGranted={(mode)=>grantAuth("P601",mode)}/></ErrorBoundary>;
+  if(showInquilinos&&inquilinosProject) return <ErrorBoundary moduleName="Inquilinos"><Inquilinos project={inquilinosProject} dark={dark} onBack={()=>{setShowInquilinos(false);setInquilinosProject(null);}} sharedAuth={getProjectAuthMode(inquilinosProject.id)} onAuthGranted={(mode)=>grantAuth(inquilinosProject.id,mode)}/></ErrorBoundary>;
   if(showPerimetral&&perimetralProject) return <ErrorBoundary moduleName="Teste Perimetral"><Perimetral project={perimetralProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowPerimetral(false);setPerimetralProject(null);}} sharedAuth={getProjectAuthMode(perimetralProject.id)} onAuthGranted={(mode)=>grantAuth(perimetralProject.id,mode)}/></ErrorBoundary>;
   if(showKeyAccess) return <ErrorBoundary moduleName="KeyAccess Falha"><KeyAccessFalha dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowKeyAccess(false)}/></ErrorBoundary>;
   if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
@@ -3200,6 +3204,7 @@ export default function App(){
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
                     {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🚗 Ronda VSPP</button>}
+                    <button onClick={()=>{setInquilinosProject(project);setShowInquilinos(true);}} style={{...S.secBtn,fontSize:12,color:"#64748b",borderColor:"#64748b22",gridColumn:"1/-1"}}>🏢 Inquilinos / Galpões</button>
                   </div>
                 </>
               ):(
@@ -3214,6 +3219,7 @@ export default function App(){
                     {PERIMETRAL_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🔒 Teste Perimetral</button>}
                     {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:"1/-1"}}>🚧 Fiscalização de Bolsão</button>}
                     {project.id==="P601"&&<button onClick={()=>setShowRondaVSPP(true)} style={{...S.secBtn,fontSize:12,color:"#0f6e56",borderColor:"#0f6e5622",gridColumn:"1/-1"}}>🚗 Ronda VSPP</button>}
+                    <button onClick={()=>{setInquilinosProject(project);setShowInquilinos(true);}} style={{...S.secBtn,fontSize:12,color:"#64748b",borderColor:"#64748b22",gridColumn:"1/-1"}}>🏢 Inquilinos / Galpões</button>
                   </div>
                 </>
               )}
