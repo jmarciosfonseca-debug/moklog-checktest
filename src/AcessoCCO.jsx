@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import RondaVirtual from "./RondaVirtual"; // ◀ NOVO — aba de ronda virtual CFTV
+import TempoGravacao from "./TempoGravacao"; // ◀ aba CFTV Tempo de Gravação
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -35,6 +36,7 @@ const TEMAS = [
   { key:"intervalo",  label:"Intervalo",  icon:"⏱️", color:"#22c55e" },
   { key:"supervisao", label:"Supervisão", icon:"👁️", color:"#a855f7" },
   { key:"ronda",      label:"Ronda Virtual", icon:"🎥", color:"#818cf8" }, // ◀ NOVO
+  { key:"cftv",       label:"CFTV Gravação", icon:"📹", color:"#0ea5e9" },
   { key:"manutencao", label:"Manutenção", icon:"🛠️", color:"#f59e0b" },
 ];
 
@@ -629,11 +631,12 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const registros = dados[tema] || [];
   const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
   const isRonda = tema==="ronda"; // ◀ NOVO — a aba ronda tem fluxo próprio (não usa o CRUD genérico)
+  const isCftv = tema==="cftv"; // ◀ aba CFTV Tempo de Gravação — fluxo próprio
 
   // Carrega o tema atual ao entrar / trocar de aba
   useEffect(()=>{
     if(!project?.id || screen==="pin") return;
-    if(isRonda){ setLoadingTema(false); setShowArquivados(false); return; } // ◀ ronda gerencia o próprio load
+    if(isRonda||isCftv){ setLoadingTema(false); setShowArquivados(false); return; } // ◀ ronda/cftv gerenciam o próprio load
     setLoadingTema(true);
     loadTema(tema, project.id).then(r=>{
       setDados(prev=>({...prev,[tema]:r||[]}));
@@ -648,7 +651,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
   // Autosave do rascunho enquanto preenche
   useEffect(()=>{
-    if(screen==="form" && project?.id && !isRonda) {
+    if(screen==="form" && project?.id && !isRonda && !isCftv) {
       saveDraft(tema, project.id, form);
       setHasDraft(true);
     }
@@ -776,6 +779,10 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
           {/* ◀ NOVO: aba ronda renderiza o componente próprio */}
           {isRonda ? (
             <RondaVirtual
+              project={project} dark={dark||true} S={S} adminAuth={adminAuth}
+              loadEquipe={loadEquipe} db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
+          ) : isCftv ? (
+            <TempoGravacao
               project={project} dark={dark||true} S={S} adminAuth={adminAuth}
               loadEquipe={loadEquipe} db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
           ) : loadingTema ? (
