@@ -173,9 +173,9 @@ function ItemCard({ item, icon, title, children, onRemove, adminAuth, dark, prob
   return (
     <div style={{ background:dark?"#060c18":"#ffffff", border:`2px solid ${hasProblema?(STATUS_CONFIG[item.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, overflow:"hidden", marginBottom:6 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }} onClick={()=>setOpen(!open)}>
-        <span style={{ fontSize:20, flexShrink:0 }}>{icon}</span>
+        <span style={{ fontSize:22, flexShrink:0 }}>{icon}</span>
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:13, fontWeight:700, ...S.txt }}>{title}</div>
+          <div style={{ fontSize:15, fontWeight:700, ...S.txt }}>{title}</div>
           <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap", alignItems:"center" }}>
             <StatusBadge status={item.status||"ok"}/>
             {hasProblema && <DiasAberto dataProblem={item.dataProblem}/>}
@@ -476,26 +476,33 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
   const addItem = (item) => { onUpdate([...items, item]); setShowForm(false); };
 
   const problemCount = items.filter(it=>it.status&&it.status!=="ok").length;
+  const [aberto, setAberto] = useState(false);
+  const temConteudo = items.length>0 || showForm;
 
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:18}}>{icon}</span>
-          <span style={{fontSize:13,fontWeight:700,...S.txt}}>{titulo}</span>
-          <span style={{fontSize:10,...S.txt2,background:dark?"#0f172a":"#f1f5f9",padding:"2px 8px",borderRadius:8}}>{items.length}</span>
-          {problemCount>0 && <span style={{fontSize:9,color:"#ef4444",fontWeight:700,background:"#1a0202",padding:"2px 6px",borderRadius:4}}>{problemCount} problema(s)</span>}
+    <div style={{background:dark?"#060c18":"#fff",border:`1px solid ${problemCount>0?"#ef444455":dark?"#0f172a":"#e2e8f0"}`,borderRadius:14,overflow:"hidden"}}>
+      {/* Cabeçalho da seção — toque abre/fecha em cascata */}
+      <div onClick={()=>setAberto(a=>!a)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 14px",cursor:"pointer",userSelect:"none"}}>
+        <span style={{fontSize:22}}>{icon}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15,fontWeight:800,...S.txt}}>{titulo}</div>
+          <div style={{fontSize:12,marginTop:2,color:problemCount>0?"#ef4444":items.length?"#22c55e":(dark?"#64748b":"#94a3b8"),fontWeight:problemCount>0?700:600}}>
+            {items.length===0?"Nenhum item":`${items.length} ite${items.length!==1?"ns":"m"} · ${problemCount>0?`⚠ ${problemCount} problema${problemCount!==1?"s":""}`:"✅ tudo OK"}`}
+          </div>
         </div>
-        <button onClick={()=>setShowForm(true)} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"4px 10px"}}>+ Adicionar</button>
+        {adminAuth&&aberto&&<button onClick={(e)=>{e.stopPropagation();setShowForm(true);}} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:11,padding:"6px 12px",flexShrink:0}}>+ Adicionar</button>}
+        <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
 
-      {showForm && <NovoItemForm tipo={tipo} project={project} dark={dark} onSave={addItem} onCancel={()=>setShowForm(false)}/>}
+      {aberto&&(
+        <div style={{padding:"0 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
+          {showForm && <NovoItemForm tipo={tipo} project={project} dark={dark} onSave={addItem} onCancel={()=>setShowForm(false)}/>}
 
-      {items.length===0 && !showForm && (
-        <div style={{...S.card,textAlign:"center",padding:"14px",fontSize:12,...S.txt2}}>
-          Nenhum item cadastrado — toque em + Adicionar
-        </div>
-      )}
+          {items.length===0 && !showForm && (
+            <div style={{textAlign:"center",padding:"10px",fontSize:13,...S.txt2}}>
+              Nenhum item cadastrado{adminAuth?" — toque em + Adicionar":""}
+            </div>
+          )}
 
       {items.map(item => (
         <ItemCard key={item.id} item={item} icon={icon} title={item.identificacao||(item.tipo||tipo)}
@@ -585,6 +592,8 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
           </div>
         </ItemCard>
       ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -976,7 +976,8 @@ function ProjectPinGate({project, onSuccess, onBack}) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
   const correct = PROJECT_PINS[project.id];
-  const try_ = () => { if(pin===correct) onSuccess(); else setErr(true); };
+  // PIN do projeto entra como líder; PIN master (gerencial) entra como admin em qualquer projeto
+  const try_ = () => { if(pin===correct) onSuccess("lider"); else if(pin===ADMIN_PIN) onSuccess("admin"); else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
@@ -1596,7 +1597,7 @@ function PendenciesScreen({stored, onBack}) {
   );
 }
 
-function HistoryScreen({project, stored, onBack}) {
+function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
   const [viewReport, setViewReport] = useState(null);
   const hist=(stored[project.id]?.history??[]).slice().reverse();
 
@@ -1612,10 +1613,16 @@ function HistoryScreen({project, stored, onBack}) {
           <button onClick={()=>setViewReport(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
-            <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)} · somente leitura</div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)}{canManage?"":" · somente leitura"}</div>
           </div>
           <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
         </div>
+        {canManage&&(
+          <div style={{display:"flex",gap:8,marginBottom:8}}>
+            <button onClick={()=>onEdit&&onEdit(project,rep,viewReport.idx)} style={{...S.secBtn,flex:1,fontSize:13,color:"#f59e0b",border:"1px solid #f59e0b44"}}>✏️ Editar este relatório</button>
+            <button onClick={()=>{if(window.confirm("Excluir definitivamente o relatório de "+fmtDate(repMeta.date)+"? Essa ação não pode ser desfeita.")){onDelete&&onDelete(project.id,viewReport.idx);setViewReport(null);}}} style={{...S.secBtn,flex:1,fontSize:13,color:"#ef4444",border:"1px solid #ef444444"}}>🗑 Excluir</button>
+          </div>
+        )}
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
           <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📂 Últimos testes</div>
           {ultimos.map((u,i)=>(
@@ -1717,7 +1724,7 @@ function HistoryScreen({project, stored, onBack}) {
                   <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
                 </div>
                 <div style={{marginTop:10}}>
-                  <button onClick={()=>setViewReport({project,report:r,idx:i})}
+                  <button onClick={()=>setViewReport({project,report:r,idx:hist.length-1-i})}
                     style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px"}}>
                     👁 Ver Relatório Completo
                   </button>
@@ -2541,8 +2548,14 @@ export default function App(){
     setCtmkConfirm({ pid, status, allowDateEdit });
   };
 
+  // Refs do estado inicial do form — o rascunho só é salvo depois que o usuário MEXE em algo
+  // (antes, abrir um form vazio já recriava o rascunho, tornando impossível descartá-lo)
+  const initialFormRef = useRef({state:null, meta:null});
+
   useEffect(()=>{
     if(screen==="form"&&state&&editingIdx===null){
+      const untouched = state===initialFormRef.current.state && meta===initialFormRef.current.meta && photos.length===0;
+      if(untouched) return; // form aberto mas intocado — não cria rascunho
       try {
         const d={projectId:project.id,state,meta,photoCount:photos.length,savedAt:Date.now()};
         localStorage.setItem("moklog_draft",JSON.stringify(d));
@@ -2672,8 +2685,9 @@ export default function App(){
     setPhotos([]);setScreen("form");setActive(null);
   };
 
-  const continueDraft=()=>{setState(draft.state);setMeta(draft.meta);setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);};
-  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);};
+  const continueDraft=()=>{setState(draft.state);setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);};
+  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setScreen("form");setActive(null);};
+  const deleteDraftOnly=()=>{clearDraft();setShowDraftPrompt(false);}; // exclui o rascunho e fica onde está
 
   // Required fields validation
   const missingFields = () => {
@@ -2803,16 +2817,17 @@ export default function App(){
         <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>Relatorio em andamento de {project.id}. Continuar?</div>
         <div style={{display:"flex",gap:8,flexDirection:"column"}}>
           <button onClick={continueDraft} style={{...S.primaryBtn,width:"100%",fontSize:14}}>↩ Continuar rascunho</button>
-          <button onClick={discardDraft} style={{...S.secBtn,width:"100%",fontSize:14}}>🗑 Descartar e comecar novo</button>
+          <button onClick={discardDraft} style={{...S.secBtn,width:"100%",fontSize:14}}>📝 Descartar e comecar novo</button>
+          <button onClick={deleteDraftOnly} style={{...S.secBtn,width:"100%",fontSize:14,color:"#ef4444",borderColor:"#ef444444"}}>🗑 Excluir rascunho</button>
         </div>
       </div>
     </div>
   );
 
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
-  if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={()=>{grantAuth(project.id);setScreen("home");}} onBack={()=>setScreen("home")}/>;
+  if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={(mode)=>{grantAuth(project.id,mode||"lider");setScreen("home");}} onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
-  if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")}/></ErrorBoundary>;
+  if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen("home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen("home")}/>;
 
   // ── FORM
@@ -3067,6 +3082,7 @@ export default function App(){
                 <div style={{fontSize:11,color:"#94a3b8"}}>{draft.projectId} — salvo automaticamente</div>
               </div>
               <button onClick={()=>{setProject(PROJECTS[draft.projectId]);setShowDraftPrompt(true);}} style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Continuar</button>
+              <button onClick={()=>{if(window.confirm("Excluir este rascunho? Essa ação não pode ser desfeita."))clearDraft();}} aria-label="Excluir rascunho" style={{background:"transparent",border:"1px solid #47556955",borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8",cursor:"pointer",fontSize:14,flexShrink:0,padding:0}}>×</button>
             </div>
           )}
 
@@ -3113,7 +3129,7 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
               {checkAuth(project.id)?(
                 <>
-                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);setState(base);setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});setPhotos([]);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:13}}>📋 Novo Relatório — {project.id}</button>
+                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:13}}>📋 Novo Relatório — {project.id}</button>
                   <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico</button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{...S.secBtn,fontSize:12,color:"#0ea5e9",borderColor:"#0ea5e922"}}>👥 Equipe</button>
@@ -3206,6 +3222,7 @@ export default function App(){
               <div style={{fontSize:11,color:"#94a3b8"}}>{project.id} — salvo automaticamente</div>
             </div>
             <button onClick={()=>setShowDraftPrompt(true)} style={{background:"linear-gradient(135deg,#f5b60b,#b45309)",border:"none",borderRadius:9,padding:"8px 16px",fontSize:12,fontWeight:800,color:"#180e00",cursor:"pointer",boxShadow:"0 2px 10px rgba(245,158,11,.35)"}}>Continuar</button>
+            <button onClick={()=>{if(window.confirm("Excluir este rascunho? Essa ação não pode ser desfeita."))clearDraft();}} aria-label="Excluir rascunho" style={{background:"transparent",border:"1px solid #47556955",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:"#94a3b8",cursor:"pointer",fontSize:15,flexShrink:0,padding:0}}>×</button>
           </div>
         )}
 

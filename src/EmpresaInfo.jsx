@@ -260,15 +260,25 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
     onSave(updated);
   };
 
+  const [aberto, setAberto] = useState(false);
   return (
-    <div style={{display:"flex", flexDirection:"column", gap:8}}>
-      {/* Header */}
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-        <div style={{fontSize:13, fontWeight:700, color:"#0ea5e9"}}>🏢 Empresa de Segurança</div>
-        {adminAuth && !editing && (
-          <button onClick={()=>setEditing(true)} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:10}}>✏️ Editar</button>
+    <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
+      <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
+        <span style={{fontSize:22}}>🏢</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15, fontWeight:800, color:"#0ea5e9"}}>Empresa de Segurança</div>
+          <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{form.nome||"Não cadastrada"}{(form.visitas||[]).length?` · ${(form.visitas||[]).length} visita(s)`:""}</div>
+          {(()=>{const vs=data.visitas||[];const u=vs.length?vs[0]:null;const d=u?daysSince(u.data):null;
+            if(!u) return <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginTop:2}}>🔴 Nenhuma visita registrada</div>;
+            if(d>=VISITA_ALERTA_DIAS) return <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginTop:2}}>🔴 Visita em atraso — {d} dias</div>;
+            return null;})()}
+        </div>
+        {adminAuth && aberto && !editing && (
+          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:11, padding:"6px 12px", flexShrink:0}}>✏️ Editar</button>
         )}
+        <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
+      {aberto&&(<div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
@@ -411,6 +421,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
           ))}
         </div>
       </div>
+      </div>)}
     </div>
   );
 }
@@ -440,14 +451,21 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode }) {
     setForm(updated); onSave(updated);
   };
 
+  const [aberto, setAberto] = useState(false);
   return (
-    <div style={{display:"flex", flexDirection:"column", gap:8}}>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-        <div style={{fontSize:13, fontWeight:700, color:"#f59e0b"}}>🔧 Empresa de Manutenção</div>
-        {adminAuth && !editing && (
-          <button onClick={()=>setEditing(true)} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:10}}>✏️ Editar</button>
+    <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
+      <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
+        <span style={{fontSize:22}}>🔧</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15, fontWeight:800, color:"#f59e0b"}}>Empresa de Manutenção</div>
+          <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{form.nome||"Não cadastrada"}{(form.visitas||[]).length?` · ${(form.visitas||[]).length} visita(s)`:""}</div>
+        </div>
+        {adminAuth && aberto && !editing && (
+          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:11, padding:"6px 12px", flexShrink:0}}>✏️ Editar</button>
         )}
+        <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
+      {aberto&&(<div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
@@ -542,6 +560,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode }) {
           ))}
         </div>
       </div>
+      </div>)}
     </div>
   );
 }
@@ -555,14 +574,22 @@ function SecADM({ data, onSave, adminAuth, dark }) {
   const saveEdit = () => { onSave(form); setEditing(false); };
   const upd = (i,k,v) => { const n=[...form]; n[i]={...n[i],[k]:v}; setForm(n); };
 
+  const [aberto, setAberto] = useState(false);
+  const admPreenchidos = form.filter(m=>m&&m.nome).length;
   return (
-    <div style={{display:"flex", flexDirection:"column", gap:8}}>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-        <div style={{fontSize:13, fontWeight:700, color:"#a855f7"}}>👔 ADM</div>
-        {adminAuth && !editing && (
-          <button onClick={()=>setEditing(true)} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:10}}>✏️ Editar</button>
+    <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
+      <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
+        <span style={{fontSize:22}}>👔</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:15, fontWeight:800, color:"#a855f7"}}>ADM</div>
+          <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{admPreenchidos?`${admPreenchidos} contato(s)`:"Nenhum contato"}</div>
+        </div>
+        {adminAuth && aberto && !editing && (
+          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:11, padding:"6px 12px", flexShrink:0}}>✏️ Editar</button>
         )}
+        <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
+      {aberto&&(<div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
@@ -602,6 +629,7 @@ function SecADM({ data, onSave, adminAuth, dark }) {
           )}
         </div>
       )}
+      </div>)}
     </div>
   );
 }
