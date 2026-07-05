@@ -18,11 +18,11 @@ function fmtDate(d){ if(!d) return "—"; try{ return new Date(d+"T12:00:00").to
 
 // Tipos de unidade sugeridos por cliente (o usuário pode digitar qualquer um)
 const TIPOS_SUGERIDOS = {
-  mega: ["Armazém"],
-  golgi: ["Bloco"],
-  klog: ["Bloco"],
-  jatinox: ["Galpão","Unidade"],
-  default: ["Armazém","Bloco","Galpão","Módulo","Unidade"],
+  mega: ["Armazém","Bloco","Barracão","Galpão"],
+  golgi: ["Bloco","Armazém","Barracão","Galpão"],
+  klog: ["Bloco","Armazém","Barracão","Galpão"],
+  jatinox: ["Galpão","Unidade","Armazém","Bloco"],
+  default: ["Armazém","Bloco","Barracão","Galpão"],
 };
 
 function getCliente(pid) {
@@ -204,7 +204,7 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
         </div>
         <div>
           <label style={S.lbl}>Número / Nome</label>
-          <input value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} placeholder="Ex: 01, A, 100..." style={S.inp}/>
+          <input value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} placeholder={form.tipo==="Armazém"?"Ex: A, B, 01...":form.tipo==="Bloco"?"Ex: A, 100, 200...":"Ex: 01, 02..."} style={S.inp}/>
         </div>
       </div>
       <div>
@@ -332,6 +332,11 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
                       <div style={{display:"flex",gap:8,marginTop:6}}>
                         <button onClick={()=>startEdit(u)} style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 12px",fontSize:12,fontWeight:700}}>✏️ Editar</button>
                         <button onClick={()=>removeUnidade(u.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444444",padding:"7px 12px",fontSize:12}}>🗑 Remover</button>
+                      </div>
+                    )}
+                    {!adminAuth&&(
+                      <div style={{display:"flex",gap:8,marginTop:6}}>
+                        <button onClick={()=>startEdit(u)} style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 12px",fontSize:12,fontWeight:700}}>✏️ Editar</button>
                       </div>
                     )}
                   </div>
