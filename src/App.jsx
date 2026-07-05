@@ -685,21 +685,41 @@ function CtmkBadge({ info, onToggle, size="normal" }) {
 
 function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
   const [customDate, setCustomDate] = useState(()=>new Date().toLocaleDateString("sv-SE"));
+  const [countdown, setCountdown] = useState(10);
+  useEffect(()=>{
+    if(!confirm) return;
+    setCountdown(10);
+    const t = setInterval(()=>setCountdown(c=>c>0?c-1:0), 1000);
+    return ()=>clearInterval(t);
+  },[confirm]);
   if(!confirm) return null;
   const goingOffline = confirm.status!=="offline"; // status atual antes do toque
   const label = project?.id || confirm.pid;
+  const diasOff = confirm.status==="offline"&&confirm.offlineSince ? Math.max(0,Math.floor((Date.now()-new Date(confirm.offlineSince).getTime())/86400000)) : 0;
   return (
     <div onClick={onCancel} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:16}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:14,padding:"20px 18px",maxWidth:360,width:"100%"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#060c18",border:`1px solid ${goingOffline?"#ef444444":"#22c55e44"}`,borderRadius:14,padding:"20px 18px",maxWidth:360,width:"100%"}}>
         <div style={{fontSize:28,textAlign:"center",marginBottom:10}}>{goingOffline?"📵":"📷"}</div>
         <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9",textAlign:"center",marginBottom:6}}>
           {goingOffline ? `Confirmar CTMK Off-line — ${label}?` : `Confirmar volta do CTMK — ${label}?`}
         </div>
-        <div style={{fontSize:12,color:"#94a3b8",textAlign:"center",lineHeight:1.5,marginBottom:goingOffline&&confirm.allowDateEdit?14:18}}>
+        <div style={{fontSize:12,color:"#94a3b8",textAlign:"center",lineHeight:1.5,marginBottom:8}}>
           {goingOffline
             ? "Isso vai marcar a central de monitoramento remoto como sem imagem e começar a contar os dias offline."
-            : "Isso vai zerar o contador de dias offline e guardar o período anterior no histórico."}
+            : `Isso vai zerar o contador de dias offline${diasOff>0?` (${diasOff} dias)`:""} e guardar o período anterior no histórico.`}
         </div>
+
+        <div style={{background:goingOffline?"#1a020233":"#021a0d33",border:`1px solid ${goingOffline?"#ef444433":"#22c55e33"}`,borderRadius:8,padding:"10px 12px",marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:13,fontWeight:800,color:goingOffline?"#ef4444":"#22c55e",marginBottom:4}}>
+            {goingOffline ? "⚠ Você certificou que a central está sem imagem?" : "⚠ Você certificou que a central voltou a operar?"}
+          </div>
+          <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4}}>
+            {goingOffline
+              ? "Confirme apenas se realmente verificou que as imagens estão indisponíveis na central de monitoramento."
+              : `Confirme apenas se realmente verificou que as imagens estão funcionando normalmente.${diasOff>0?` O registro de ${diasOff} dia(s) offline será arquivado.`:""}`}
+          </div>
+        </div>
+
         {goingOffline && confirm.allowDateEdit && (
           <div style={{marginBottom:16}}>
             <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Desde quando está off-line?</div>
@@ -711,9 +731,10 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
         )}
         <div style={{display:"flex",gap:8}}>
           <button onClick={onCancel} style={{flex:1,background:"#0f172a",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
-          <button onClick={()=>onConfirm(goingOffline&&confirm.allowDateEdit?customDate:undefined)}
-            style={{flex:1,background:goingOffline?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)",border:"none",color:"#fff",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-            Confirmar
+          <button onClick={()=>{ if(countdown>0) return; onConfirm(goingOffline&&confirm.allowDateEdit?customDate:undefined); }}
+            disabled={countdown>0}
+            style={{flex:1,background:countdown>0?"#1e293b":(goingOffline?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)"),border:"none",color:countdown>0?"#475569":"#fff",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:countdown>0?"not-allowed":"pointer",opacity:countdown>0?.6:1}}>
+            {countdown>0 ? `Aguarde ${countdown}s...` : "Confirmar"}
           </button>
         </div>
       </div>
@@ -1537,7 +1558,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
+          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
         </div>
       </div>
       {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
@@ -2549,8 +2570,9 @@ export default function App(){
   // ── Confirmação antes de alternar o CTMK (evita perder o histórico por toque acidental)
   const [ctmkConfirm, setCtmkConfirm] = useState(null); // {pid, status, allowDateEdit}
   const requestCtmkToggle = (pid, allowDateEdit=false) => {
-    const status = ctmkData[pid]?.status || "online";
-    setCtmkConfirm({ pid, status, allowDateEdit });
+    const info = ctmkData[pid] || {};
+    const status = info.status || "online";
+    setCtmkConfirm({ pid, status, allowDateEdit, offlineSince:info.offlineSince||null });
   };
 
   // Refs do estado inicial do form — o rascunho só é salvo depois que o usuário MEXE em algo
