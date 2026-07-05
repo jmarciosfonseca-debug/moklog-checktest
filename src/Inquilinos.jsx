@@ -190,61 +190,6 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
   const vazios = unidades.filter(u=>u.status==="vazio").length;
   const pctOcup = unidades.length?Math.round((ativos/unidades.length)*100):0;
 
-  const FormFields = ({isEdit})=>(
-    <div style={{display:"flex",flexDirection:"column",gap:10}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-        <div>
-          <label style={S.lbl}>Tipo de unidade</label>
-          <select value={form.tipo} onChange={e=>setForm(f=>({...f,tipo:e.target.value}))} style={S.inp}>
-            {tiposSugeridos.map(t=><option key={t} value={t}>{t}</option>)}
-            {!tiposSugeridos.includes(form.tipo)&&<option value={form.tipo}>{form.tipo}</option>}
-            <option value="__outro">Outro...</option>
-          </select>
-          {form.tipo==="__outro"&&<input style={{...S.inp,marginTop:6}} placeholder="Tipo customizado..." onChange={e=>setForm(f=>({...f,tipo:e.target.value}))}/>}
-        </div>
-        <div>
-          <label style={S.lbl}>Número / Nome</label>
-          <input value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} placeholder={form.tipo==="Armazém"?"Ex: A, B, 01...":form.tipo==="Bloco"?"Ex: A, 100, 200...":"Ex: 01, 02..."} style={S.inp}/>
-        </div>
-      </div>
-      <div>
-        <label style={S.lbl}>Inquilino (empresa)</label>
-        <input value={form.inquilino} onChange={e=>setForm(f=>({...f,inquilino:e.target.value}))} placeholder="Nome da empresa locatária" style={S.inp}/>
-      </div>
-      <div>
-        <label style={S.lbl}>Faixa de docas</label>
-        <input value={form.docas} onChange={e=>setForm(f=>({...f,docas:e.target.value}))} placeholder="Ex: 80 a 112" style={S.inp}/>
-      </div>
-      <div>
-        <label style={S.lbl}>Operação</label>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>setForm(f=>({...f,opera24h:true,horarioOperacao:""}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>🕐 24h</button>
-          <button onClick={()=>setForm(f=>({...f,opera24h:false}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}>⏰ Horário definido</button>
-        </div>
-        {!form.opera24h&&<input value={form.horarioOperacao} onChange={e=>setForm(f=>({...f,horarioOperacao:e.target.value}))} placeholder="Ex: 06h às 22h, Seg a Sex" style={{...S.inp,marginTop:6}}/>}
-      </div>
-      <div>
-        <label style={S.lbl}>Contato do responsável</label>
-        <input value={form.contato} onChange={e=>setForm(f=>({...f,contato:e.target.value}))} placeholder="Nome — (xx) xxxxx-xxxx" style={S.inp}/>
-      </div>
-      <div>
-        <label style={S.lbl}>Status</label>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={()=>setForm(f=>({...f,status:"ativo"}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>✅ Ativo</button>
-          <button onClick={()=>setForm(f=>({...f,status:"vazio",inquilino:"",docas:"",opera24h:false,horarioOperacao:"",contato:""}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}>🔴 Vazio</button>
-        </div>
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>{setShowAdd(false);setEditId(null);setForm({...blank});}} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-        <button onClick={isEdit?updateUnidade:addUnidade} style={{...S.btn,fontSize:13}}>✓ {isEdit?"Salvar alterações":"Adicionar"}</button>
-      </div>
-    </div>
-  );
-
   return(
     <div style={S.page}>
       <div style={S.wrap}>
@@ -294,7 +239,58 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
           {showAdd&&!editId&&(
             <div style={{...S.card,border:"1px solid #22c55e44"}}>
               <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:10}}>Nova Unidade</div>
-              <FormFields isEdit={false}/>
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <div>
+          <label style={S.lbl}>Tipo de unidade</label>
+          <select value={form.tipo} onChange={e=>setForm(f=>({...f,tipo:e.target.value}))} style={S.inp}>
+            {tiposSugeridos.map(t=><option key={t} value={t}>{t}</option>)}
+            {!tiposSugeridos.includes(form.tipo)&&<option value={form.tipo}>{form.tipo}</option>}
+            <option value="__outro">Outro...</option>
+          </select>
+          {form.tipo==="__outro"&&<input style={{...S.inp,marginTop:6}} placeholder="Tipo customizado..." onChange={e=>setForm(f=>({...f,tipo:e.target.value}))}/>}
+        </div>
+        <div>
+          <label style={S.lbl}>Número / Nome</label>
+          <input value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} placeholder={form.tipo==="Armazém"?"Ex: A, B, 01...":form.tipo==="Bloco"?"Ex: A, 100, 200...":"Ex: 01, 02..."} style={S.inp}/>
+        </div>
+      </div>
+      <div>
+        <label style={S.lbl}>Inquilino (empresa)</label>
+        <input value={form.inquilino} onChange={e=>setForm(f=>({...f,inquilino:e.target.value}))} placeholder="Nome da empresa locatária" style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Faixa de docas</label>
+        <input value={form.docas} onChange={e=>setForm(f=>({...f,docas:e.target.value}))} placeholder="Ex: 80 a 112" style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Operação</label>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setForm(f=>({...f,opera24h:true,horarioOperacao:""}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>🕐 24h</button>
+          <button onClick={()=>setForm(f=>({...f,opera24h:false}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}>⏰ Horário definido</button>
+        </div>
+        {!form.opera24h&&<input value={form.horarioOperacao} onChange={e=>setForm(f=>({...f,horarioOperacao:e.target.value}))} placeholder="Ex: 06h às 22h, Seg a Sex" style={{...S.inp,marginTop:6}}/>}
+      </div>
+      <div>
+        <label style={S.lbl}>Contato do responsável</label>
+        <input value={form.contato} onChange={e=>setForm(f=>({...f,contato:e.target.value}))} placeholder="Nome — (xx) xxxxx-xxxx" style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Status</label>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setForm(f=>({...f,status:"ativo"}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>✅ Ativo</button>
+          <button onClick={()=>setForm(f=>({...f,status:"vazio",inquilino:"",docas:"",opera24h:false,horarioOperacao:"",contato:""}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}>🔴 Vazio</button>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>{setShowAdd(false);setEditId(null);setForm({...blank});}} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
+        <button onClick={addUnidade} style={{...S.btn,fontSize:13}}>✓ Adicionar</button>
+      </div>
+    </div>
             </div>
           )}
 
@@ -345,7 +341,58 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
                 {/* Form de edição inline */}
                 {isExpanded&&isEditing&&(
                   <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`}}>
-                    <FormFields isEdit={true}/>
+                        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        <div>
+          <label style={S.lbl}>Tipo de unidade</label>
+          <select value={form.tipo} onChange={e=>setForm(f=>({...f,tipo:e.target.value}))} style={S.inp}>
+            {tiposSugeridos.map(t=><option key={t} value={t}>{t}</option>)}
+            {!tiposSugeridos.includes(form.tipo)&&<option value={form.tipo}>{form.tipo}</option>}
+            <option value="__outro">Outro...</option>
+          </select>
+          {form.tipo==="__outro"&&<input style={{...S.inp,marginTop:6}} placeholder="Tipo customizado..." onChange={e=>setForm(f=>({...f,tipo:e.target.value}))}/>}
+        </div>
+        <div>
+          <label style={S.lbl}>Número / Nome</label>
+          <input value={form.nome} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} placeholder={form.tipo==="Armazém"?"Ex: A, B, 01...":form.tipo==="Bloco"?"Ex: A, 100, 200...":"Ex: 01, 02..."} style={S.inp}/>
+        </div>
+      </div>
+      <div>
+        <label style={S.lbl}>Inquilino (empresa)</label>
+        <input value={form.inquilino} onChange={e=>setForm(f=>({...f,inquilino:e.target.value}))} placeholder="Nome da empresa locatária" style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Faixa de docas</label>
+        <input value={form.docas} onChange={e=>setForm(f=>({...f,docas:e.target.value}))} placeholder="Ex: 80 a 112" style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Operação</label>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setForm(f=>({...f,opera24h:true,horarioOperacao:""}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>🕐 24h</button>
+          <button onClick={()=>setForm(f=>({...f,opera24h:false}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}>⏰ Horário definido</button>
+        </div>
+        {!form.opera24h&&<input value={form.horarioOperacao} onChange={e=>setForm(f=>({...f,horarioOperacao:e.target.value}))} placeholder="Ex: 06h às 22h, Seg a Sex" style={{...S.inp,marginTop:6}}/>}
+      </div>
+      <div>
+        <label style={S.lbl}>Contato do responsável</label>
+        <input value={form.contato} onChange={e=>setForm(f=>({...f,contato:e.target.value}))} placeholder="Nome — (xx) xxxxx-xxxx" style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Status</label>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setForm(f=>({...f,status:"ativo"}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>✅ Ativo</button>
+          <button onClick={()=>setForm(f=>({...f,status:"vazio",inquilino:"",docas:"",opera24h:false,horarioOperacao:"",contato:""}))}
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}>🔴 Vazio</button>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>{setShowAdd(false);setEditId(null);setForm({...blank});}} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
+        <button onClick={updateUnidade} style={{...S.btn,fontSize:13}}>✓ Salvar alterações</button>
+      </div>
+    </div>
                   </div>
                 )}
               </div>
