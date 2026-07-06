@@ -211,6 +211,7 @@ function buildHeader(theme, project, meta, weekLabel) {
             <span style="font-size:12px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px">📅 ${fmtDate(meta.date)}</span>
             <span style="font-size:12px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px">📆 ${weekLabel}</span>
             ${meta.start?`<span style="font-size:12px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px">⏱ ${meta.start}–${meta.end||"--"}</span>`:""}
+            ${meta.tempoPreenchimentoSeg?`<span style="font-size:11px;color:rgba(96,165,250,.9);background:rgba(96,165,250,.12);padding:3px 10px;border-radius:20px;margin-left:6px">⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min preenchimento</span>`:""}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0">
@@ -428,6 +429,8 @@ ${buildHeader(theme,project,meta,weekLabel)}
     <div class="info-item"><label>CCO</label><span>${meta.cco||"--"}</span></div>
     <div class="info-item"><label>Operador Moked 24h</label><span>${meta.moked||"--"}</span></div>
     <div class="info-item"><label>Horário do Teste</label><span>${meta.start||"--"} – ${meta.end||"--"}</span></div>
+    ${meta.tempoPreenchimentoSeg?`<div class="info-item"><label>⏱️ Tempo de Preenchimento</label><span style="color:#60a5fa;font-weight:800">${Math.floor(meta.tempoPreenchimentoSeg/60)}min ${(meta.tempoPreenchimentoSeg%60)>0?(meta.tempoPreenchimentoSeg%60)+"s":""}</span></div>`:""}
+    ${meta.formAberturaAuto?`<div class="info-item"><label>Abertura automática</label><span style="font-size:11px;color:#94a3b8">${new Date(meta.formAberturaAuto).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</span></div>`:""}
     <div class="info-item"><label>Contato Moked</label><span style="color:${meta.mokedContact?"#15803d":"#dc2626"};font-size:15px">${meta.mokedContact?"✓ Realizado":"✗ Não realizado"}</span></div>
     <div class="info-item"><label>Horário do Contato</label><span>${meta.mokedTime||"--"}</span></div>
   </div>
@@ -584,6 +587,7 @@ export function generateConsolidatedPDF(project, reports) {
     ["Líder",      sorted.map(r=>r.meta?.leader||"--")],
     ["CCO",        sorted.map(r=>r.meta?.cco||"--")],
     ["Horário",    sorted.map(r=>r.meta?.start&&r.meta?.end?`${r.meta.start}–${r.meta.end}`:"--")],
+    ["⏱️ Preench.", sorted.map(r=>r.meta?.tempoPreenchimentoSeg?`${Math.floor(r.meta.tempoPreenchimentoSeg/60)}min`:"--")],
   ].map(([label,vals])=>`<tr><td style="font-weight:600">${label}</td>${vals.map(v=>`<td>${v}</td>`).join("")}</tr>`).join("");
 
   // Comparative device rows

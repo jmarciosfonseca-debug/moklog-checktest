@@ -1493,7 +1493,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                     <HealthRing pct={h.pct} size={44}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
-                      <div style={{fontSize:11,color:"#64748b"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
+                      <div style={{fontSize:11,color:"#64748b"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}{r.meta?.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(r.meta.tempoPreenchimentoSeg/60)}min`:""}</div>
                       {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}>✍ {r.meta.signature}</div>}
                       <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inop`:"✔ OK"}</div>
                     </div>
@@ -1638,7 +1638,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
           <button onClick={()=>setViewReport(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
-            <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)}{canManage?"":" · somente leitura"}</div>
+            <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)}{repMeta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(repMeta.tempoPreenchimentoSeg/60)}min`:""}{canManage?"":" · somente leitura"}</div>
           </div>
           <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
         </div>
@@ -1804,7 +1804,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
         </div>
         <div style={{background:"#021a0d",border:"1px solid #22c55e",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:18}}>✅</span>
-          <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}</div></div>
+          <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
           <button onClick={()=>generatePDF(project,state,meta,photos,ctmkInfo)} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
@@ -2411,6 +2411,8 @@ export default function App(){
   const [notifGranted,setNotifGranted]=useState(false);
   const [pendingSync,setPendingSync]=useState(null); // {projectId, history} aguardando sincronizar com o servidor
   const savingRef = useRef(false); // trava contra duplo clique no "Confirmar e Enviar"
+  const formTimerRef = useRef(null); // timestamp de abertura do formulário
+  const [formElapsed, setFormElapsed] = useState(0); // segundos desde a abertura
   const [firestoreDown,setFirestoreDown]=useState(false); // alarme geral: banco fora do ar/bloqueado
 
   useEffect(()=>{
@@ -2579,6 +2581,17 @@ export default function App(){
   // (antes, abrir um form vazio já recriava o rascunho, tornando impossível descartá-lo)
   const initialFormRef = useRef({state:null, meta:null});
 
+  // ── Cronômetro de preenchimento — conta segundos enquanto o formulário está aberto
+  useEffect(()=>{
+    if(screen==="form"){
+      if(!formTimerRef.current) formTimerRef.current = Date.now();
+      const t = setInterval(()=>setFormElapsed(Math.floor((Date.now()-formTimerRef.current)/1000)), 1000);
+      return ()=>clearInterval(t);
+    } else {
+      // Não zeramos ao sair — o valor fica disponível pro relatório
+    }
+  },[screen]);
+
   useEffect(()=>{
     if(screen==="form"&&state&&editingIdx===null){
       const untouched = state===initialFormRef.current.state && meta===initialFormRef.current.meta && photos.length===0;
@@ -2713,7 +2726,7 @@ export default function App(){
   };
 
   const continueDraft=()=>{setState(draft.state);setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);};
-  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setScreen("form");setActive(null);};
+  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);};
   const deleteDraftOnly=()=>{clearDraft();setShowDraftPrompt(false);}; // exclui o rascunho e fica onde está
 
   // Required fields validation
@@ -2762,7 +2775,16 @@ export default function App(){
     if(savingRef.current) return;
     savingRef.current = true;
     setShowConfirmModal(false);
-    saveReport(state,meta).finally(()=>{ savingRef.current = false; });
+    // Gravar cronômetro e timestamps automáticos no meta
+    const tempoPreenchimento = formTimerRef.current ? Math.floor((Date.now()-formTimerRef.current)/1000) : null;
+    const metaComTempo = {
+      ...meta,
+      formAberturaAuto: formTimerRef.current ? new Date(formTimerRef.current).toISOString() : null,
+      formEnvioAuto: new Date().toISOString(),
+      tempoPreenchimentoSeg: tempoPreenchimento,
+    };
+    saveReport(state, metaComTempo).finally(()=>{ savingRef.current = false; });
+    setMeta(metaComTempo);
     setScreen("report");
   };
 
@@ -2893,7 +2915,7 @@ export default function App(){
               </div>
             )}
 
-            <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);setScreen("form");setActive(null);}}
+            <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
               style={{...S.primaryBtn,fontSize:14,width:"100%"}}>📋 Novo Relatório — P260A</button>
 
             <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico</button>
@@ -2975,6 +2997,15 @@ export default function App(){
           {health.partial>0&&<span style={{fontSize:11,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}>⚠️ {health.partial} Parcial</span>}
           {health.inop>0&&<span style={{fontSize:11,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}>🔴 {health.inop} Inop</span>}
         </div>}
+        {editingIdx===null&&formTimerRef.current&&(
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"8px 12px",background:"linear-gradient(165deg,#0f172a,#060c18)",border:"1px solid #1d4ed844",borderRadius:10,marginBottom:8}}>
+            <span style={{fontSize:14}}>⏱️</span>
+            <span style={{fontSize:13,fontWeight:800,color:"#60a5fa",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>
+              {String(Math.floor(formElapsed/3600)).padStart(2,"0")}:{String(Math.floor((formElapsed%3600)/60)).padStart(2,"0")}:{String(formElapsed%60).padStart(2,"0")}
+            </span>
+            <span style={{fontSize:11,color:"#94a3b8"}}>preenchimento</span>
+          </div>
+        )}
         <div style={S.metaCard}>
           <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabecalho do Relatorio</div>
           {editingIdx!==null&&<div style={{background:"#1a1000",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 10px",marginBottom:10,fontSize:11,color:"#fbbf24"}}>
@@ -3215,7 +3246,7 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
               {checkAuth(project.id)?(
                 <>
-                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:13}}>📋 Novo Relatório — {project.id}</button>
+                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:13}}>📋 Novo Relatório — {project.id}</button>
                   <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico</button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
@@ -3413,27 +3444,27 @@ export default function App(){
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const S={
-  page:{minHeight:"100vh",background:"#04080f",display:"flex",justifyContent:"center",padding:"0 0 60px",fontFamily:"'Segoe UI',system-ui,sans-serif"},
+  page:{minHeight:"100vh",background:"radial-gradient(ellipse at 50% -5%, #0a1628 0%, #04080f 55%)",display:"flex",justifyContent:"center",padding:"0 0 60px",fontFamily:"'Segoe UI',system-ui,sans-serif"},
   homeWrap:{width:"100%",maxWidth:440,padding:"40px 16px 40px",display:"flex",flexDirection:"column",gap:14},
   formWrap:{width:"100%",maxWidth:720,padding:"16px 12px 40px",display:"flex",flexDirection:"column",gap:8},
-  primaryBtn:{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 4px 20px rgba(29,78,216,.3)"},
-  secBtn:{background:"#060c18",color:"#94a3b8",border:"1px solid #0f172a",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5},
-  backBtn:{background:"transparent",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"},
-  projCard:{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#060c18",border:"1px solid #0a0f1e",borderRadius:10,padding:"10px 13px",cursor:"pointer",width:"100%",textAlign:"left"},
-  metaCard:{background:"#060c18",borderRadius:11,padding:"12px 14px",border:"1px solid #0f172a"},
-  lbl:{display:"block",fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:3,textTransform:"uppercase",letterSpacing:.5},
-  inp:{width:"100%",background:"#020510",border:"1px solid #0f172a",borderRadius:7,color:"#e2e8f0",padding:"8px 10px",fontSize:12,boxSizing:"border-box",outline:"none"},
+  primaryBtn:{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:12,padding:"14px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 4px 20px rgba(29,78,216,.3), inset 0 1px 0 rgba(255,255,255,.08)"},
+  secBtn:{background:"linear-gradient(165deg,#0c1526,#060c18)",color:"#94a3b8",border:"1px solid #1e293b",borderRadius:12,padding:"14px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"},
+  backBtn:{background:"transparent",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",fontWeight:600},
+  projCard:{display:"flex",alignItems:"center",justifyContent:"space-between",background:"linear-gradient(165deg,#0c1526,#060c18)",border:"1px solid #1e293b",borderRadius:14,padding:"12px 14px",cursor:"pointer",width:"100%",textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"},
+  metaCard:{background:"linear-gradient(165deg,#0c1526,#060c18)",borderRadius:14,padding:"14px 16px",border:"1px solid #1e293b",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"},
+  lbl:{display:"block",fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:.5},
+  inp:{width:"100%",background:"#020510",border:"1px solid #1e293b",borderRadius:8,color:"#e2e8f0",padding:"10px 12px",fontSize:13,boxSizing:"border-box",outline:"none"},
   accordion:{width:"100%",background:"transparent",border:"none",display:"flex",alignItems:"center",gap:8,padding:"12px 4px",cursor:"pointer"},
-  catCard:{background:"#060c18",borderRadius:9,padding:"11px 13px",margin:"0 0 4px"},
+  catCard:{background:"linear-gradient(165deg,#0c1526,#060c18)",borderRadius:12,padding:"12px 14px",margin:"0 0 6px",border:"1px solid #1e293b",boxShadow:"0 2px 10px rgba(0,0,0,.25)"},
   catHeader:{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:5},
-  catLabel:{fontSize:12,fontWeight:700,color:"#94a3b8"},
+  catLabel:{fontSize:13,fontWeight:700,color:"#94a3b8"},
   itemRow:{display:"flex",alignItems:"center",gap:6},
-  iLabel:{fontSize:11,color:"#94a3b8",minWidth:80,flexShrink:0},
-  tog:{background:"#020510",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",fontWeight:600},
+  iLabel:{fontSize:12,color:"#94a3b8",minWidth:80,flexShrink:0},
+  tog:{background:"#020510",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",fontWeight:600},
   togOk:{background:"#021a0d",border:"1px solid #22c55e",color:"#22c55e"},
   togPartial:{background:"#1a130a",border:"1px solid #f59e0b",color:"#f59e0b"},
   togBad:{background:"#1a0202",border:"1px solid #ef4444",color:"#ef4444"},
-  sm:{background:"#020510",border:"1px solid #0f172a",color:"#94a3b8",borderRadius:5,padding:"4px 8px",fontSize:11,cursor:"pointer",fontWeight:600},
+  sm:{background:"#020510",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:600},
   smOk:{background:"#021a0d",border:"1px solid #22c55e",color:"#22c55e"},
   smPartial:{background:"#1a130a",border:"1px solid #f59e0b",color:"#f59e0b"},
   smBad:{background:"#1a0202",border:"1px solid #ef4444",color:"#ef4444"},
