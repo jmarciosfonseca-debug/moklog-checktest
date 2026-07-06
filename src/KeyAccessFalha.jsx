@@ -241,27 +241,52 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
           </div>
         </div>
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:8}}>
+          <style>{`@keyframes kaGlow{0%,100%{box-shadow:0 0 14px #ef444455, inset 0 1px 0 #ef444422}50%{box-shadow:0 0 6px #ef444422, inset 0 1px 0 #ef444411}}`}</style>
           {PROJETOS_KA.map(p=>{
             const dias = diasPorProjeto[p.id];
+            const temDias = dias!==undefined && dias!==null;
+            const falhaRecente = temDias && dias<2;             // falha hoje ou ontem → glow vermelho
+            const cor = !temDias?"#64748b":dias>=7?"#22c55e":dias>=2?"#f59e0b":"#ef4444";
+            const META = 30;                                     // 30 dias sem falha = barra cheia
+            const pct = temDias ? Math.min(dias/META,1)*100 : 0;
             return (
             <button key={p.id} onClick={()=>abrirProjeto(p)}
-              style={{...S.card,cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
-              <div style={{width:40,height:40,borderRadius:10,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>🚨</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:800,...S.txt}}>{p.id}</div>
-                <div style={{fontSize:11,...S.txt2}}>{p.name}</div>
+              style={{...S.card,cursor:"pointer",textAlign:"left",display:"flex",flexDirection:"column",gap:0,
+                border:`1px solid ${falhaRecente?"#ef444488":(dark?"#0f172a":"#e2e8f0")}`,
+                boxShadow:falhaRecente?"0 0 14px #ef444455":"none",
+                animation:falhaRecente?"kaGlow 1.6s ease-in-out infinite":"none"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12,width:"100%"}}>
+                <div style={{width:40,height:40,borderRadius:10,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>🚨</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:800,...S.txt}}>{p.id}</div>
+                  <div style={{fontSize:11,...S.txt2}}>{p.name}</div>
+                </div>
+                {dias!==undefined && (
+                  dias===null ? (
+                    <span style={{fontSize:10,...S.txt2,flexShrink:0}}>Sem registros</span>
+                  ) : (
+                    <div style={{textAlign:"center",flexShrink:0}}>
+                      <div style={{fontSize:16,fontWeight:900,color:cor}}>{dias}</div>
+                      <div style={{fontSize:8,...S.txt2,fontWeight:700,whiteSpace:"nowrap"}}>DIAS S/ FALHA</div>
+                    </div>
+                  )
+                )}
+                <span style={{...S.txt2,fontSize:16}}>›</span>
               </div>
-              {dias!==undefined && (
-                dias===null ? (
-                  <span style={{fontSize:10,...S.txt2,flexShrink:0}}>Sem registros</span>
-                ) : (
-                  <div style={{textAlign:"center",flexShrink:0}}>
-                    <div style={{fontSize:16,fontWeight:900,color:dias>=7?"#22c55e":dias>=2?"#f59e0b":"#ef4444"}}>{dias}</div>
-                    <div style={{fontSize:8,...S.txt2,fontWeight:700,whiteSpace:"nowrap"}}>DIAS S/ FALHA</div>
+              {temDias && (
+                <div style={{width:"100%",marginTop:10}}>
+                  <div style={{width:"100%",height:6,borderRadius:4,background:dark?"#0a0f1e":"#e2e8f0",overflow:"hidden"}}>
+                    <div style={{width:`${pct}%`,height:"100%",borderRadius:4,
+                      background:`linear-gradient(90deg, ${cor}99, ${cor})`,
+                      boxShadow:`0 0 8px ${cor}66`,
+                      transition:"width .5s ease"}}/>
                   </div>
-                )
+                  <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                    <span style={{fontSize:8,...S.txt2,fontWeight:700}}>{dias>=META?"META ATINGIDA \u2705":`META ${META}D`}</span>
+                    <span style={{fontSize:8,fontWeight:800,color:cor}}>{Math.round(pct)}%</span>
+                  </div>
+                </div>
               )}
-              <span style={{...S.txt2,fontSize:16}}>›</span>
             </button>
             );
           })}
