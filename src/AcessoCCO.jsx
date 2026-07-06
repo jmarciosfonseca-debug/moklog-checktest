@@ -156,6 +156,45 @@ function clearDraft(tema, projectId) {
   try { localStorage.removeItem(draftKey(tema,projectId)); } catch(e){}
 }
 
+// \u2500\u2500 Dots de atividade das abas (chips premium)
+function computeCrudDot(registros, temDraft, hoje){
+  const h = hoje || todayStr();
+  const ativoHoje = (registros||[]).some(r=>!r.arquivado && r.data===h);
+  if(ativoHoje) return {color:"#22c55e", pulse:true};   // registro ativo hoje
+  if(temDraft)  return {color:"#f59e0b", pulse:false};  // rascunho pendente
+  return null;
+}
+async function loadActivityDots(projectId){
+  const hoje = todayStr();
+  const out = {};
+  const crud = ["acesso","intervalo","supervisao","manutencao"];
+  await Promise.all([
+    ...crud.map(async t=>{
+      const regs = await loadTema(t, projectId);
+      out[t] = computeCrudDot(regs, !!loadDraft(t, projectId), hoje);
+    }),
+    (async()=>{
+      try{
+        const snap = await getDoc(doc(db,"cco_ronda",projectId));
+        if(snap.exists() && (snap.data().turnos||[]).some(t=>t.dataInicio===hoje))
+          out.ronda = {color:"#22c55e", pulse:true}; // turno registrado hoje
+      }catch(e){}
+    })(),
+    (async()=>{
+      try{
+        const snap = await getDoc(doc(db,"cftv_gravacao",projectId));
+        if(snap.exists()){
+          const cams = snap.data().cameras||[];
+          const has = f => cams.some(c=>c.diasGravacao!==null&&c.diasGravacao!==undefined&&f(c.diasGravacao));
+          if(has(d=>d<15))      out.cftv = {color:"#ef4444", pulse:true};   // camera critica
+          else if(has(d=>d<30)) out.cftv = {color:"#f59e0b", pulse:false};  // camera em atencao
+        }
+      }catch(e){}
+    })(),
+  ]);
+  return out;
+}
+
 function getStyles(dark) {
   return {
     page:    { minHeight:"100vh", background:dark?"#04080f":"#f1f5f9", display:"flex", justifyContent:"center", padding:"0 0 80px", fontFamily:"'Segoe UI',system-ui,sans-serif" },
@@ -622,6 +661,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const [saving, setSaving] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
 
+  const [dots, setDots] = useState({});
   const [form, setForm] = useState(emptyForm("acesso"));
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
   const [equipe, setEquipe] = useState([]);
@@ -632,6 +672,18 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
   const isRonda = tema==="ronda"; // ◀ NOVO — a aba ronda tem fluxo próprio (não usa o CRUD genérico)
   const isCftv = tema==="cftv"; // ◀ aba CFTV Tempo de Gravação — fluxo próprio
+
+  // Carrega dots de atividade de todas as abas (1x na entrada)
+  useEffect(()=>{
+    if(!project?.id || screen==="pin") return;
+    loadActivityDots(project.id).then(setDots);
+  },[project?.id, screen==="pin"]);
+
+  // Recalcula o dot da aba atual em tempo real (registros/rascunho)
+  useEffect(()=>{
+    if(screen==="pin" || isRonda || isCftv) return;
+    setDots(prev=>({...prev, [tema]: computeCrudDot(dados[tema]||[], hasDraft)}));
+  },[dados, hasDraft, tema, screen]);
 
   // Carrega o tema atual ao entrar / trocar de aba
   useEffect(()=>{
@@ -706,18 +758,33 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
       onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
   );
 
-  // Barra de abas (temas)
+  // Barra de abas (temas) \u2014 chips premium com icon box, gradiente e dot de atividade
   const TabBar = () => (
     <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"0 16px 12px"}}>
+      <style>{`@keyframes ccoDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}`}</style>
       {TEMAS.map(t=>{
         const sel = tema===t.key;
+        const dot = dots[t.key];
         return (
           <button key={t.key} onClick={()=>{setTema(t.key);setScreen("list");}}
-            style={{flex:"1 1 30%",minWidth:100,background:sel?t.color+"22":"transparent",
-              border:`1px solid ${sel?t.color+"66":dark?"#1e293b":"#e2e8f0"}`,
-              color:sel?t.color:dark?"#94a3b8":"#94a3b8",
-              borderRadius:9,padding:"9px 8px",fontSize:12,cursor:"pointer",fontWeight:sel?700:600,whiteSpace:"nowrap",textAlign:"center"}}>
-            {t.icon} {t.label}
+            style={{flex:"1 1 30%",minWidth:104,position:"relative",display:"flex",alignItems:"center",gap:7,
+              background:sel
+                ? `linear-gradient(135deg, ${t.color}30, ${t.color}12)`
+                : (dark?"#060c18":"#f8fafc"),
+              border:`1px solid ${sel?t.color+"77":(dark?"#0f172a":"#e2e8f0")}`,
+              boxShadow:sel?`0 0 14px ${t.color}30, inset 0 1px 0 ${t.color}22`:"none",
+              color:sel?t.color:(dark?"#94a3b8":"#64748b"),
+              borderRadius:11,padding:"8px 9px",fontSize:12,cursor:"pointer",fontWeight:sel?800:600,
+              whiteSpace:"nowrap",textAlign:"left",transition:"all .18s ease"}}>
+            <span style={{width:26,height:26,borderRadius:8,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,
+              background:sel?t.color+"2a":(dark?"#0a0f1e":"#eef2f7"),
+              border:`1px solid ${sel?t.color+"55":"transparent"}`}}>{t.icon}</span>
+            <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis"}}>{t.label}</span>
+            {dot&&(
+              <span style={{position:"absolute",top:6,right:6,width:8,height:8,borderRadius:"50%",
+                background:dot.color,boxShadow:`0 0 6px ${dot.color}`,
+                animation:dot.pulse?"ccoDot 1.4s ease-in-out infinite":"none"}}/>
+            )}
           </button>
         );
       })}
