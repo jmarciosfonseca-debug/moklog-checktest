@@ -88,6 +88,9 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
   const [editingId, setEditingId] = useState(null);
   const [editDias, setEditDias] = useState("");
   const [editPor, setEditPor] = useState("");
+  const [editCamId, setEditCamId] = useState(null);
+  const [editCamNome, setEditCamNome] = useState("");
+  const [editCamEspec, setEditCamEspec] = useState("");
   const [filtro, setFiltro] = useState("todos"); // todos | alerta | ok
 
   useEffect(()=>{
@@ -129,6 +132,18 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
     const lista = cameras.map(c=>c.id===id?{...c, diasGravacao:dias, ultimaChecagem:new Date().toISOString(), checadoPor:editPor||"—"}:c);
     salvar(lista);
     setEditingId(null); setEditDias(""); setEditPor("");
+  };
+
+  const abrirEdicaoCamera = (cam) => {
+    setEditingId(null); setEditDias(""); setEditPor("");
+    setEditCamId(cam.id); setEditCamNome(cam.nome||""); setEditCamEspec(cam.especificacao||"");
+  };
+
+  const salvarEdicaoCamera = (id) => {
+    if(!editCamNome.trim()){ alert("O nome da c\u00e2mera n\u00e3o pode ficar vazio."); return; }
+    const lista = cameras.map(c=>c.id===id?{...c, nome:editCamNome.trim(), especificacao:editCamEspec.trim()}:c);
+    salvar(lista);
+    setEditCamId(null); setEditCamNome(""); setEditCamEspec("");
   };
 
   if(loading) return(
@@ -202,6 +217,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
         const temDias = dias!==null&&dias!==undefined;
         const cor = !temDias?"#94a3b8":dias<15?"#ef4444":dias<30?"#f59e0b":"#22c55e";
         const isEditing = editingId===cam.id;
+        const isEditingCam = editCamId===cam.id;
         return(
           <div key={cam.id} style={{...S.card,border:`1px solid ${temDias&&dias<30?cor+"44":(dark?"#0f172a":"#e2e8f0")}`}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -219,11 +235,33 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
                   {cam.ultimaChecagem&&<span style={{fontSize:10,...S.txt2}}>Check: {fmtDateTime(cam.ultimaChecagem)}</span>}
                 </div>
               </div>
-              <button onClick={()=>{setEditingId(isEditing?null:cam.id);setEditDias(temDias?String(dias):"");setEditPor("");}}
+              <button onClick={()=>{setEditCamId(null);setEditingId(isEditing?null:cam.id);setEditDias(temDias?String(dias):"");setEditPor("");}}
                 style={{...S.btnSm,color:"#0ea5e9",borderColor:"#0ea5e944",padding:"7px 10px",fontSize:11,fontWeight:700,flexShrink:0}}>
                 {isEditing?"✕":"📝 Check"}
               </button>
+              <button onClick={()=>{isEditingCam?setEditCamId(null):abrirEdicaoCamera(cam);}}
+                style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 10px",fontSize:11,fontWeight:700,flexShrink:0}}>
+                {isEditingCam?"✕":"✏️"}
+              </button>
             </div>
+
+            {isEditingCam&&(
+              <div style={{marginTop:10,padding:"10px 12px",background:dark?"#020510":"#f8fafc",borderRadius:8,display:"flex",flexDirection:"column",gap:8,border:"1px solid #f59e0b33"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#f59e0b",textTransform:"uppercase",letterSpacing:".5px"}}>✏️ Editar Câmera</div>
+                <div>
+                  <label style={S.lbl}>Nome da câmera</label>
+                  <input value={editCamNome} onChange={e=>setEditCamNome(e.target.value)} placeholder="Ex: CAM-01 Doca Norte" style={{...S.inp,fontSize:13,fontWeight:700}}/>
+                </div>
+                <div>
+                  <label style={S.lbl}>Especificação</label>
+                  <input value={editCamEspec} onChange={e=>setEditCamEspec(e.target.value)} placeholder="Ex: Hikvision DS-2CD2T47, 4MP" style={{...S.inp,fontSize:12}}/>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setEditCamId(null);setEditCamNome("");setEditCamEspec("");}} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+                  <button onClick={()=>salvarEdicaoCamera(cam.id)} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+                </div>
+              </div>
+            )}
 
             {isEditing&&(
               <div style={{marginTop:10,padding:"10px 12px",background:dark?"#020510":"#f8fafc",borderRadius:8,display:"flex",flexDirection:"column",gap:8}}>
@@ -250,7 +288,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
               </div>
             )}
 
-            {adminAuth&&!isEditing&&(
+            {adminAuth&&!isEditing&&!isEditingCam&&(
               <div style={{marginTop:6,display:"flex",justifyContent:"flex-end"}}>
                 <button onClick={()=>removeCamera(cam.id)} style={{background:"transparent",border:"none",color:"#ef444466",fontSize:11,cursor:"pointer",padding:"4px 8px"}}>🗑 Remover</button>
               </div>
