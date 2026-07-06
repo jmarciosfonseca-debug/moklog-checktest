@@ -2741,6 +2741,16 @@ export default function App(){
       if(!meta.moked||meta.moked.trim()==="") missing.push("Nome do operador Moked 24h");
     }
     if(!meta.signature||meta.signature.trim()==="") missing.push("Assinatura do líder");
+    // Trava de Segurança: Visita Técnica Obrigatória — mínimo 2 visitas completas (não se aplica a P311A/P311B)
+    if(state && project.id!=="P311A" && project.id!=="P311B"){
+      const matCat = project.categories.find(c=>c.type==="maintenance");
+      if(matCat){
+        const mv = state[matCat.id];
+        const visits = (mv && Array.isArray(mv.visits)) ? mv.visits : [];
+        const completas = visits.filter(v=>v && v.date && (v.empresa||"").trim() && (v.tec1||"").trim()).length;
+        if(completas<2) missing.push("⚠️ Favor inserir visitas técnicas — mínimo 2 com data, técnico e prestador");
+      }
+    }
     if(state){
       const badWords=["inoperante","inop","inop.","parcial","parc.","sem motivo","problema","defeito"];
       const isBadNote=(note)=>{const n=(note||"").trim().toLowerCase().replace(/[.,!]/g,"");return n===""||badWords.includes(n);};
