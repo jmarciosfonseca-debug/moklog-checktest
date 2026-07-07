@@ -1614,8 +1614,9 @@ function PendenciesScreen({stored, onBack}) {
               {todosAbertos?"▲ Recolher todos":"▼ Expandir todos"}
             </button>
           )}
+          <style>{`@keyframes mkFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes mkBadgePulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {grupos.map(g=>{
+            {grupos.map((g,gi)=>{
               const pid=g.project.id;
               const aberto=!!openProj[pid];
               const nInop=g.itens.filter(p=>p.status==="inop").length;
@@ -1623,7 +1624,7 @@ function PendenciesScreen({stored, onBack}) {
               const maisAntiga=g.itens.reduce((m,p)=>(p.days||0)>m?(p.days||0):m,0);
               const corBorda=nInop>0?"#ef4444":"#f59e0b";
               return (
-                <div key={pid} style={{background:"#060c18",border:`1px solid ${corBorda}33`,borderRadius:12,overflow:"hidden"}}>
+                <div key={pid} style={{background:"#060c18",border:`1px solid ${corBorda}33`,borderRadius:12,overflow:"hidden",animation:"mkFadeIn .3s ease both",animationDelay:`${Math.min(gi*45,400)}ms`}}>
                   <div onClick={()=>toggleProj(pid)} role="button"
                     style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",
                       background:aberto?`linear-gradient(135deg, ${corBorda}14, transparent)`:"transparent"}}>
@@ -1635,10 +1636,11 @@ function PendenciesScreen({stored, onBack}) {
                       </div>
                     </div>
                     <div style={{display:"flex",gap:5,flexShrink:0}}>
-                      {nInop>0&&<span style={{fontSize:10,fontWeight:800,color:"#ef4444",background:"#ef444422",border:"1px solid #ef444444",padding:"3px 8px",borderRadius:6}}>{nInop} inop</span>}
+                      {nInop>0&&<span style={{fontSize:10,fontWeight:800,color:"#ef4444",background:"#ef444422",border:"1px solid #ef444444",padding:"3px 8px",borderRadius:6,animation:"mkBadgePulse 1.8s ease-in-out infinite"}}>{nInop} inop</span>}
                       {nParc>0&&<span style={{fontSize:10,fontWeight:800,color:"#f59e0b",background:"#f59e0b22",border:"1px solid #f59e0b44",padding:"3px 8px",borderRadius:6}}>{nParc} parc</span>}
                     </div>
                   </div>
+                  <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
                   {aberto&&(
                     <div style={{display:"flex",flexDirection:"column",gap:6,padding:"0 10px 10px"}}>
                       {g.itens.map((p,i)=>{
@@ -1664,6 +1666,7 @@ function PendenciesScreen({stored, onBack}) {
                       })}
                     </div>
                   )}
+                  </div></div>
                 </div>
               );
             })}
@@ -2243,13 +2246,13 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         </div>
 
         <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
-          <style>{`@keyframes regPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+          <style>{`@keyframes regPulse{0%,100%{opacity:1}50%{opacity:.4}}@keyframes mkFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes mkBadgePulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
           {(()=>{
             const st = dashStats;
             const disp = st&&st.ativos>0 ? Math.round(((st.ativos-st.feriasHoje)/st.ativos)*100) : null;
             const okPct = st&&st.totalEquip>0 ? Math.round(((st.totalEquip-st.inop-st.parcial)/st.totalEquip)*100) : null;
-            const Badge = ({cor,children}) => (
-              <span style={{fontSize:11,fontWeight:800,color:cor,background:cor+"1c",border:`1px solid ${cor}44`,padding:"3px 10px",borderRadius:7}}>{children}</span>
+            const Badge = ({cor,pulse,children}) => (
+              <span style={{fontSize:11,fontWeight:800,color:cor,background:cor+"1c",border:`1px solid ${cor}44`,padding:"3px 10px",borderRadius:7,animation:pulse?"mkBadgePulse 1.8s ease-in-out infinite":"none"}}>{children}</span>
             );
             const Bar = ({pct,cor}) => (
               <div style={{width:"100%",height:5,borderRadius:3,background:dark?"#0a0f1e":"#e2e8f0",overflow:"hidden",marginTop:9}}>
@@ -2259,7 +2262,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
             return (<>
             <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
               style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
-                boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none" }}>
+                boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
               <div style={{display:"flex",alignItems:"center",gap:14}}>
                 <div style={{ width:54, height:54, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e955":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #0ea5e922":"none" }}>
                   <span style={{ fontSize:25 }}>👥</span>
@@ -2291,7 +2294,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 
             <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
               style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
-                boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none") }}>
+                boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none"), animation:"mkFadeIn .35s ease both", animationDelay:"60ms" }}>
               <div style={{display:"flex",alignItems:"center",gap:14}}>
                 <div style={{ width:54, height:54, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b55":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #f59e0b22":"none", position:"relative" }}>
                   <span style={{ fontSize:25 }}>🛡️</span>
@@ -2309,7 +2312,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                     {st.inop===0&&st.parcial===0
                       ? <Badge cor="#22c55e">✅ Tudo operacional</Badge>
                       : (<>
-                          {st.inop>0&&<Badge cor="#ef4444">🔴 {st.inop} inop</Badge>}
+                          {st.inop>0&&<Badge cor="#ef4444" pulse>🔴 {st.inop} inop</Badge>}
                           {st.parcial>0&&<Badge cor="#f59e0b">⚠️ {st.parcial} parcial</Badge>}
                         </>)
                     }

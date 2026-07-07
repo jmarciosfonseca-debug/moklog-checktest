@@ -486,7 +486,8 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
         <span style={{fontSize:22}}>{icon}</span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:15,fontWeight:800,...S.txt}}>{titulo}</div>
-          <div style={{fontSize:12,marginTop:2,color:problemCount>0?"#ef4444":items.length?"#22c55e":(dark?"#64748b":"#94a3b8"),fontWeight:problemCount>0?700:600}}>
+          <div style={{fontSize:12,marginTop:2,color:problemCount>0?"#ef4444":items.length?"#22c55e":(dark?"#64748b":"#94a3b8"),fontWeight:problemCount>0?700:600,animation:problemCount>0?"mkBadgePulse 1.8s ease-in-out infinite":"none"}}>
+            <style>{`@keyframes mkBadgePulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
             {items.length===0?"Nenhum item":`${items.length} ite${items.length!==1?"ns":"m"} · ${problemCount>0?`⚠ ${problemCount} problema${problemCount!==1?"s":""}`:"✅ tudo OK"}`}
           </div>
         </div>
@@ -494,7 +495,7 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
 
-      {aberto&&(
+      <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
         <div style={{padding:"0 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
           {showForm && <NovoItemForm tipo={tipo} project={project} dark={dark} onSave={addItem} onCancel={()=>setShowForm(false)}/>}
 
@@ -593,7 +594,7 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
         </ItemCard>
       ))}
         </div>
-      )}
+      </div></div>
     </div>
   );
 }

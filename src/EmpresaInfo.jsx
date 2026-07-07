@@ -278,7 +278,8 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
         )}
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
-      {aberto&&(<div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
+      <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
@@ -421,7 +422,8 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
           ))}
         </div>
       </div>
-      </div>)}
+      </div>
+      </div></div>
     </div>
   );
 }
@@ -465,7 +467,8 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode }) {
         )}
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
-      {aberto&&(<div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
+      <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
@@ -560,7 +563,8 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode }) {
           ))}
         </div>
       </div>
-      </div>)}
+      </div>
+      </div></div>
     </div>
   );
 }
@@ -589,7 +593,8 @@ function SecADM({ data, onSave, adminAuth, dark }) {
         )}
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
-      {aberto&&(<div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
+      <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
@@ -629,7 +634,8 @@ function SecADM({ data, onSave, adminAuth, dark }) {
           )}
         </div>
       )}
-      </div>)}
+      </div>
+      </div></div>
     </div>
   );
 }

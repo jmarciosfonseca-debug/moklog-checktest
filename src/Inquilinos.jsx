@@ -317,8 +317,9 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
                   <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:isExpanded?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
                 </div>
 
-                {/* Corpo expandido */}
-                {isExpanded&&!isEditing&&(
+                {/* Corpo expandido — altura animada */}
+                <div style={{display:"grid",gridTemplateRows:isExpanded?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
+                {!isEditing&&(
                   <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,display:"flex",flexDirection:"column",gap:6}}>
                     {u.inquilino&&<div style={{fontSize:13,...S.txt}}><span style={{...S.txt2,fontSize:11}}>Inquilino: </span><strong>{u.inquilino}</strong></div>}
                     {u.docas&&<div style={{fontSize:13,...S.txt}}><span style={{...S.txt2,fontSize:11}}>Docas: </span>{u.docas}</div>}
@@ -395,6 +396,7 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
     </div>
                   </div>
                 )}
+                </div></div>
               </div>
             );
           })}
