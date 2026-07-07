@@ -13,6 +13,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
+import { getAccess, grantSession } from "./session";
+
 const PIN_ADMIN = "872101";
 const PROJECT_PINS = {
   P601:"16601", P602:"16602", P604:"16604", P605:"16605",
@@ -559,8 +561,8 @@ function PinGate({ onSuccess, onBack, dark, project, pcfg }) {
 export default function Perimetral({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark||true);
   const pcfg = getPerimetralConfig(project.id);
-  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
-  const [screen, setScreen] = useState(sharedAuth?"list":"pin");
+  const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
+  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin");
   const [testes, setTestes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -632,7 +634,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
   });
   const sortedDates = Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
 
-  if(screen==="pin") return <PinGate project={project} pcfg={pcfg} dark={dark||true} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
+  if(screen==="pin") return <PinGate project={project} pcfg={pcfg} dark={dark||true} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
 
   // ── Projeto ainda sem zonas/mapa cadastrados — aguardando configuração
   if(pcfg.zonas.length===0) return (

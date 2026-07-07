@@ -13,6 +13,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
+import { getAccess, grantSession, clearSession } from "./session";
+
 const ADMIN_PIN = "872101";
 const PROJECT_PINS = {
   P601:"16601",P602:"16602",P604:"16604",P605:"16605",
@@ -643,8 +645,8 @@ function SecADM({ data, onSave, adminAuth, dark }) {
 // ── App principal
 export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
-  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
-  const [screen, setScreen] = useState(sharedAuth?"main":"pin");
+  const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
+  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"main":"pin");
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -666,7 +668,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
 
   if(screen==="pin") return (
     <PinGate project={project} dark={dark} onBack={onBack}
-      onSuccess={(level)=>{ setAuthLevel(level); setScreen("main"); onAuthGranted?.(level); }}/>
+      onSuccess={(level)=>{ grantSession(level, project.id); setAuthLevel(level); setScreen("main"); onAuthGranted?.(level); }}/>
   );
 
   if(loading) return (
@@ -701,13 +703,13 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
               <div style={{fontSize:12, color:"#22c55e", fontWeight:700}}>🔓 Modo Gerencial — pode editar tudo</div>
               <div style={{display:"flex",gap:6}}>
                 <button onClick={()=>gerarPDFEmpresa(project,info,dark)} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:10}}>📄 PDF</button>
-                <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
+                <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
               </div>
             </div>
           ) : (
             <div style={{background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"8px 14px", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
               <div style={{fontSize:12, color:"#0ea5e9", fontWeight:700}}>👁 Somente leitura</div>
-              <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
+              <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
             </div>
           )}
 

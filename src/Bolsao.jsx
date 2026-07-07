@@ -14,6 +14,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
+import { getAccess, grantSession } from "./session";
+
 const ADMIN_PIN = "872101";
 const PROJECT_PINS = {
   P601:"16601",P602:"16602",P604:"16604",P605:"16605",
@@ -423,8 +425,8 @@ function gerarPDFBolsao(project, placas, periodo, modo="geral") {
 // ── App principal
 export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
-  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
-  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | registrar | relatorio
+  const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
+  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | registrar | relatorio
   const [placas, setPlacas] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -561,7 +563,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
     setImportStatus({added, skipped});
   };
 
-  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
+  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>

@@ -11,6 +11,7 @@ import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
+import { grantSession, getAccess, hasGerencial, touchSession } from "./session";
 import CCO from "./CCO";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 
@@ -203,8 +204,7 @@ const JATINOX_SUBS = {
 
 const ADMIN_PIN = "872101";
 const MAX_HISTORY = 26;
-const SESSION_TIMEOUT = 10 * 60 * 1000;
-const PROJECT_SESSION_TIMEOUT = 45 * 60 * 1000; // sessão de PIN por projeto: 45min, compartilhada entre CCO/Equipe/Equipamentos/Empresas/Visita
+// Sessão de PIN centralizada em src/session.js (expiração por inatividade: gerencial 30min, equipe 5min)
 const INOP_ALERT_WEEKS = 2;
 const RECURRENCE_WARN = 2;
 const RECURRENCE_CRIT = 3;
@@ -1179,7 +1179,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       return { status: c.status, days };
     } catch(e) { return undefined; }
   };
-  const [pin,setPin]=useState(""); const [auth,setAuth]=useState(false); const [err,setErr]=useState(false);
+  const [pin,setPin]=useState(""); const [auth,setAuth]=useState(()=>hasGerencial()); const [err,setErr]=useState(false);
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
   const [pendScreen,setPendScreen]=useState(false);
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
@@ -1218,10 +1218,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   },[]);
   useEffect(()=>{
     if(!auth) return;
-    const t=setInterval(()=>{if(Date.now()-sessionTime>SESSION_TIMEOUT){setAuth(false);setPin("");}},30000);
+    const t=setInterval(()=>{if(!hasGerencial()){setAuth(false);setPin("");}},30000);
     return ()=>clearInterval(t);
-  },[auth,sessionTime]);
-  const resetSess=()=>setSessionTime(Date.now());
+  },[auth]);
+  const resetSess=()=>{setSessionTime(Date.now());touchSession();};
   const toggleViewLink=async(pid)=>{
     const cur=viewLinks[pid]; const next={...viewLinks};
     if(cur) delete next[pid]; else next[pid]=generateViewToken(pid);
@@ -1239,10 +1239,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}}}
+          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){grantSession("admin");setAuth(true);resetSess();}else setErr(true);}}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {err&&<div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(pin===ADMIN_PIN){setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
+        <button onClick={()=>{if(pin===ADMIN_PIN){grantSession("admin");setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
         <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}} aria-label="Voltar">← Voltar</button>
       </div>
     </div>
@@ -2050,10 +2050,10 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
 function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEquipamentos, onBack }) {
   const [subScreen, setSubScreen] = useState(null);
   const [selProject, setSelProject] = useState(null);
-  const [pinAuth, setPinAuth] = useState(false);
+  const [pinAuth, setPinAuth] = useState(()=>hasGerencial());
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState(false);
-  const [equipPinAuth, setEquipPinAuth] = useState(false);
+  const [equipPinAuth, setEquipPinAuth] = useState(()=>hasGerencial());
   const [equipPinInput, setEquipPinInput] = useState("");
   const [equipPinErr, setEquipPinErr] = useState(false);
 
@@ -2121,7 +2121,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     );
   }
 
-  if(subScreen==="equipamentos" && !equipPinAuth) {
+  if(subScreen==="equipamentos" && !equipPinAuth && !hasGerencial()) {
     const bg=dark?"#04080f":"#f1f5f9";
     const cardBg=dark?"#060c18":"#ffffff";
     const border=dark?"#0f172a":"#e2e8f0";
@@ -2135,7 +2135,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial para ver todos os projetos</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
             onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){if(equipPinInput==="872101"){setEquipPinAuth(true);}else setEquipPinErr(true);}}}
+            onKeyDown={e=>{if(e.key==="Enter"){if(equipPinInput==="872101"){grantSession("admin");setEquipPinAuth(true);}else setEquipPinErr(true);}}}
             style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
           {equipPinErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
           <div style={{display:"flex",gap:8}}>
@@ -2143,7 +2143,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{if(equipPinInput==="872101"){setEquipPinAuth(true);}else setEquipPinErr(true);}}
+            <button onClick={()=>{if(equipPinInput==="872101"){grantSession("admin");setEquipPinAuth(true);}else setEquipPinErr(true);}}
               style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
               Entrar
             </button>
@@ -2153,13 +2153,13 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     );
   }
 
-  if(subScreen==="equipamentos" && equipPinAuth) {
+  if(subScreen==="equipamentos" && (equipPinAuth||hasGerencial())) {
     return <EquipamentosListagem dark={dark} stored={stored} onToggleTheme={onToggleTheme}
       onBack={()=>{setSubScreen(null);setEquipPinAuth(false);setEquipPinInput("");}}
       onOpenEquip={onEquipamentos}/>;
   }
 
-  if(subScreen==="colaboradores" && !pinAuth) {
+  if(subScreen==="colaboradores" && !pinAuth && !hasGerencial()) {
     return (
       <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
         <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
@@ -2168,7 +2168,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial para ver os colaboradores</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
             onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
-            onKeyDown={e=>{ if(e.key==="Enter"){ if(pinInput==="872101"){setPinAuth(true);}else setPinErr(true); } }}
+            onKeyDown={e=>{ if(e.key==="Enter"){ if(pinInput==="872101"){grantSession("admin");setPinAuth(true);}else setPinErr(true); } }}
             style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
           {pinErr && <div role="alert" style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
           <div style={{ display:"flex", gap:8 }}>
@@ -2176,7 +2176,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{ if(pinInput==="872101"){setPinAuth(true);}else setPinErr(true); }}
+            <button onClick={()=>{ if(pinInput==="872101"){grantSession("admin");setPinAuth(true);}else setPinErr(true); }}
               style={{ flex:1, background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
               Entrar
             </button>
@@ -2554,6 +2554,12 @@ export default function App(){
   const [syncStatus,setSyncStatus]=useState("");
   const [loaded,setLoaded]=useState(false);
   const [projectAuth,setProjectAuth]=useState({});
+  useEffect(()=>{ // sessão global: qualquer toque/clique renova a atividade (throttle em session.js)
+    const renew=()=>touchSession();
+    window.addEventListener("click",renew,{passive:true});
+    window.addEventListener("touchstart",renew,{passive:true});
+    return ()=>{window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);};
+  },[]);
   const [sigError,setSigError]=useState(false);
   const [showConfirmModal,setShowConfirmModal]=useState(false);
   const [showMonthlyPrompt,setShowMonthlyPrompt]=useState(false);
@@ -2762,10 +2768,10 @@ export default function App(){
   },[screen,state,meta,photos,editingIdx]);
 
   const clearDraft=()=>{localStorage.removeItem("moklog_draft");setDraft(null);};
-  const checkAuth=(pid)=>{const a=projectAuth[pid];return a&&(Date.now()-a.ts)<PROJECT_SESSION_TIMEOUT;};
-  const grantAuth=(pid,mode="lider")=>setProjectAuth(prev=>({...prev,[pid]:{mode,ts:Date.now()}}));
+  const checkAuth=(pid)=>!!getAccess(pid);
+  const grantAuth=(pid,mode="lider")=>{grantSession(mode,pid);setProjectAuth(prev=>({...prev,[pid]:{mode,ts:Date.now()}}));};
   // modo já liberado para o projeto (null se sessão expirada/inexistente) — usado pelos módulos CCO/Equipe/Equipamentos/Empresas/Visita
-  const getProjectAuthMode=(pid)=>{const a=projectAuth[pid];if(!a||(Date.now()-a.ts)>=PROJECT_SESSION_TIMEOUT)return null;return a.mode;};
+  const getProjectAuthMode=(pid)=>getAccess(pid);
   const lastForProject=stored[project.id]?.history?.slice(-1)[0]??null;
   const recurrence=analyzeRecurrence(project,stored[project.id]?.history??[]);
 

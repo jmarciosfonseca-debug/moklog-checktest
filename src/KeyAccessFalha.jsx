@@ -26,6 +26,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
+import { grantSession, hasGerencial } from "./session";
+
 const ADMIN_PIN = "872101";
 const COL = "keyaccess_falhas";
 
@@ -290,7 +292,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
             </button>
             );
           })}
-          <button onClick={()=>setScreen("relatorios_pin")} style={{...S.btnSec,marginTop:10,color:"#a855f7",borderColor:"#a855f733"}}>📊 Relatórios Gerenciais</button>
+          <button onClick={()=>setScreen(hasGerencial()?"relatorios":"relatorios_pin")} style={{...S.btnSec,marginTop:10,color:"#a855f7",borderColor:"#a855f733"}}>📊 Relatórios Gerenciais</button>
         </div>
       </div>
     </div>
@@ -386,7 +388,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
   if(screen==="relatorios_pin") return (
     <RelatoriosPinGate dark={dark} S={S}
       onBack={()=>setScreen("projetos")}
-      onSuccess={()=>setScreen("relatorios")}/>
+      onSuccess={()=>{grantSession("admin");setScreen("relatorios");}}/>
   );
 
   if(screen==="relatorios") return (

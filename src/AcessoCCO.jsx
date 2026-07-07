@@ -15,6 +15,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
+import { getAccess, grantSession } from "./session";
+
 const ADMIN_PIN = "872101";
 const PROJECT_PINS = {
   P601:"16601",P602:"16602",P604:"16604",P605:"16605",
@@ -650,9 +652,9 @@ function validarForm(tema, form) {
 // ════════════════════════════════════════════════════════════════════════
 export default function AcessoCCO({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark||true);
-  const [authLevel, setAuthLevel] = useState(sharedAuth||null);
+  const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [tema, setTema] = useState("acesso");
-  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | form
+  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | form
   const [showArquivados, setShowArquivados] = useState(false);
 
   // registros de TODOS os temas (carregados sob demanda ao trocar de aba)
@@ -755,7 +757,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
   if(screen==="pin") return (
     <PinGate project={project||{}} dark={dark||true} onBack={onBack}
-      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
+      onSuccess={(level)=>{ grantSession(level, project.id); setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
   );
 
   // Barra de abas (temas) \u2014 chips premium com icon box, gradiente e dot de atividade

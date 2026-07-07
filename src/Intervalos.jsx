@@ -18,6 +18,8 @@ const PROJECT_PINS = {
   P606:"16606",P607:"16607",P311A:"16311",P311B:"16311",
   P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
 };
+import { getAccess, grantSession } from "./session";
+
 const ADMIN_PIN = "872101";
 
 const TIPOS_INTERVALO = [
@@ -144,8 +146,8 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 
 export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
   const S = getStyles(dark||true);
-  const [authLevel, setAuthLevel] = useState(null);
-  const [screen, setScreen] = useState("pin");
+  const [authLevel, setAuthLevel] = useState(()=>getAccess(project?.id)||null);
+  const [screen, setScreen] = useState(()=>getAccess(project?.id)?"list":"pin");
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -256,7 +258,7 @@ export default function Intervalos({ project, onBack, dark, onToggleTheme }) {
     setScreen("form");
   };
 
-  if(screen==="pin") return <PinGate project={project||{}} dark={dark||true} onBack={onBack} onSuccess={(l)=>{setAuthLevel(l);setScreen("list");}}/>;
+  if(screen==="pin") return <PinGate project={project||{}} dark={dark||true} onBack={onBack} onSuccess={(l)=>{grantSession(l,project?.id);setAuthLevel(l);setScreen("list");}}/>;
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>

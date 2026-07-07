@@ -30,6 +30,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
+import { getAccess, grantSession, clearSession } from "./session";
+
 const ADMIN_PIN = "872101";
 // Sem limite para desligados — ficam todos para consulta
 
@@ -1290,8 +1292,8 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
 // ── App principal
 export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted }) {
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
-  const [screen, setScreen] = useState(sharedAuth?"list":"pin"); // pin | list | add | edit | view | addHist
-  const [authLevel, setAuthLevel] = useState(sharedAuth||null); // null | "lider" | "admin"
+  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | add | edit | view | addHist
+  const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null); // null | "lider" | "admin"
   const [selColab, setSelColab] = useState(null);
   const [form, setForm] = useState(null);
   const [histForm, setHistForm] = useState({ tipo:"Falta", data:todayStr(), detalhe:"" });
@@ -1509,7 +1511,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   if(screen==="pin") return (
     <PinScreen project={project} dark={dark}
       onBack={onBack}
-      onSuccess={(level)=>{ setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
+      onSuccess={(level)=>{ grantSession(level, project.id); setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
   );
 
   // ── Formulário: cadastro (líder ou admin) / edição (admin only)
@@ -1600,7 +1602,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                     style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
                     🏖️ Férias
                   </button>
-                  <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
+                  <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
                 </div>
               </div>
               {modoSel&&(
@@ -1644,7 +1646,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                   style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
                   🏖️ Férias
                 </button>
-                <button onClick={()=>{setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
+                <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
               </div>
             </div>
           ) : null}
