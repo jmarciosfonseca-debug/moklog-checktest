@@ -1569,6 +1569,8 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 
 function PendenciesScreen({stored, onBack}) {
   const [filter, setFilter] = useState("all");
+  const [openProj, setOpenProj] = useState({});
+  const toggleProj = (pid) => setOpenProj(o=>({...o,[pid]:!o[pid]}));
   const all = getAllPendencies(stored);
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
   const critCount = all.filter(p => p.status === "inop").length;
@@ -1593,30 +1595,81 @@ function PendenciesScreen({stored, onBack}) {
           ))}
         </div>
         {filtered.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:"#22c55e",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>✅</div>Nenhuma pendência encontrada!</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:6}}>
-          {filtered.map((p,i)=>{
-            const color = p.status==="inop" ? "#ef4444" : "#f59e0b";
-            const urgency = p.days && p.days >= 30 ? "🔴" : p.days && p.days >= 14 ? "🟡" : "⚪";
-            return(
-              <div key={i} style={{background:"#060c18",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 12px"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                  <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{urgency}</span>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
-                      <span style={{fontSize:11,fontWeight:700,color:"#f1f5f9",background:"#0f172a",padding:"2px 6px",borderRadius:5}}>{p.project.id}</span>
-                      <span style={{fontSize:11,fontWeight:700,color:color,background:color+"22",padding:"2px 6px",borderRadius:5}}>{p.status==="inop"?"INOP":"PARCIAL"}</span>
-                      {p.days!==null&&<span style={{fontSize:11,color:p.days>=30?"#ef4444":p.days>=14?"#f59e0b":"#94a3b8",fontWeight:700}}>há {p.days} dia{p.days!==1?"s":""}</span>}
+        {(()=>{
+          // Agrupa por projeto preservando a ordem (mais antiga primeiro, pois filtered já vem ordenado por dias desc)
+          const grupos=[]; const gIdx={};
+          filtered.forEach(p=>{
+            const pid=p.project.id;
+            if(gIdx[pid]===undefined){ gIdx[pid]=grupos.length; grupos.push({project:p.project,itens:[]}); }
+            grupos[gIdx[pid]].itens.push(p);
+          });
+          const todosAbertos = grupos.length>0 && grupos.every(g=>openProj[g.project.id]);
+          return (<>
+          {grupos.length>1&&(
+            <button onClick={()=>{
+                const novo={}; if(!todosAbertos) grupos.forEach(g=>{novo[g.project.id]=true;});
+                setOpenProj(novo);
+              }}
+              style={{...S.sm,width:"100%",padding:"7px",fontSize:11,marginBottom:8}}>
+              {todosAbertos?"▲ Recolher todos":"▼ Expandir todos"}
+            </button>
+          )}
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {grupos.map(g=>{
+              const pid=g.project.id;
+              const aberto=!!openProj[pid];
+              const nInop=g.itens.filter(p=>p.status==="inop").length;
+              const nParc=g.itens.length-nInop;
+              const maisAntiga=g.itens.reduce((m,p)=>(p.days||0)>m?(p.days||0):m,0);
+              const corBorda=nInop>0?"#ef4444":"#f59e0b";
+              return (
+                <div key={pid} style={{background:"#060c18",border:`1px solid ${corBorda}33`,borderRadius:12,overflow:"hidden"}}>
+                  <div onClick={()=>toggleProj(pid)} role="button"
+                    style={{display:"flex",alignItems:"center",gap:10,padding:"12px 14px",cursor:"pointer",
+                      background:aberto?`linear-gradient(135deg, ${corBorda}14, transparent)`:"transparent"}}>
+                    <span style={{fontSize:12,color:"#94a3b8",flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s ease"}}>▶</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{pid} <span style={{fontWeight:600,color:"#64748b",fontSize:11}}>— {g.project.name}</span></div>
+                      <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>
+                        {g.itens.length} pendência{g.itens.length!==1?"s":""}{maisAntiga>0?` · mais antiga: ${maisAntiga} dia${maisAntiga!==1?"s":""}`:""}
+                      </div>
                     </div>
-                    <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",marginBottom:2}}>{p.cat}</div>
-                    {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
-                    {p.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
-                    <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"} · {p.project.name}</div>
+                    <div style={{display:"flex",gap:5,flexShrink:0}}>
+                      {nInop>0&&<span style={{fontSize:10,fontWeight:800,color:"#ef4444",background:"#ef444422",border:"1px solid #ef444444",padding:"3px 8px",borderRadius:6}}>{nInop} inop</span>}
+                      {nParc>0&&<span style={{fontSize:10,fontWeight:800,color:"#f59e0b",background:"#f59e0b22",border:"1px solid #f59e0b44",padding:"3px 8px",borderRadius:6}}>{nParc} parc</span>}
+                    </div>
                   </div>
+                  {aberto&&(
+                    <div style={{display:"flex",flexDirection:"column",gap:6,padding:"0 10px 10px"}}>
+                      {g.itens.map((p,i)=>{
+                        const color = p.status==="inop" ? "#ef4444" : "#f59e0b";
+                        const urgency = p.days && p.days >= 30 ? "🔴" : p.days && p.days >= 14 ? "🟡" : "⚪";
+                        return(
+                          <div key={i} style={{background:"#04080f",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 12px"}}>
+                            <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                              <span style={{fontSize:14,flexShrink:0,marginTop:1}}>{urgency}</span>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:3}}>
+                                  <span style={{fontSize:11,fontWeight:700,color:color,background:color+"22",padding:"2px 6px",borderRadius:5}}>{p.status==="inop"?"INOP":"PARCIAL"}</span>
+                                  {p.days!==null&&<span style={{fontSize:11,color:p.days>=30?"#ef4444":p.days>=14?"#f59e0b":"#94a3b8",fontWeight:700}}>há {p.days} dia{p.days!==1?"s":""}</span>}
+                                </div>
+                                <div style={{fontSize:12,fontWeight:600,color:"#cbd5e1",marginBottom:2}}>{p.cat}</div>
+                                {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
+                                {p.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
+                                <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          </>);
+        })()}
       </div>
     </div>
   );
@@ -2016,6 +2069,46 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   ];
   const allProjects = [...Object.values(PROJECTS), ...JATINOX_LIST];
 
+  // Estatísticas do dashboard (Colaboradores + Equipamentos) — Firestore com fallback localStorage
+  const [dashStats, setDashStats] = useState(null);
+  useEffect(()=>{
+    let alive = true;
+    (async()=>{
+      const hoje = new Date().toLocaleDateString("sv-SE");
+      let ativos=0, feriasHoje=0, projsColab=0, inop=0, parcial=0, totalEquip=0, projsEquip=0;
+      await Promise.all(allProjects.map(async p=>{
+        let eqData=null;
+        try{ const snap=await getDoc(doc(db,"equipes",p.id)); if(snap.exists()) eqData=snap.data(); }catch(e){}
+        if(!eqData){ try{ const l=localStorage.getItem(`equipe_${p.id}`); if(l) eqData=JSON.parse(l); }catch(e){} }
+        if(eqData){
+          const cols=(eqData.colaboradores||[]).filter(c=>c.status==="ativo");
+          if(cols.length>0) projsColab++;
+          ativos+=cols.length;
+          (Array.isArray(eqData.ferias)?eqData.ferias:[]).forEach(f=>{
+            if(f&&f.dataInicio&&f.dataRetorno&&f.dataInicio<=hoje&&hoje<=f.dataRetorno) feriasHoje++;
+          });
+        }
+        let eqpData=null;
+        try{ const snap=await getDoc(doc(db,"equipamentos",p.id)); if(snap.exists()) eqpData=snap.data(); }catch(e){}
+        if(!eqpData){ try{ const l=localStorage.getItem(`equipamentos_${p.id}`); if(l) eqpData=JSON.parse(l); }catch(e){} }
+        if(eqpData){
+          let tem=false;
+          const contar=(it)=>{
+            if(!it||typeof it!=="object"||!it.status) return;
+            tem=true; totalEquip++;
+            if(it.status==="inop"||it.status==="critico") inop++;
+            else if(it.status==="parcial"||it.status==="baixo") parcial++;
+          };
+          Object.values(eqpData).forEach(v=>{ if(Array.isArray(v)) v.forEach(contar); });
+          if(eqpData.moto) contar(eqpData.moto);
+          if(tem) projsEquip++;
+        }
+      }));
+      if(alive) setDashStats({ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip});
+    })();
+    return ()=>{ alive=false; };
+  },[]);
+
   if(subScreen==="colaboradores" && selProject) {
     return (
       <EquipeReadOnly project={selProject} dark={dark} stored={stored}
@@ -2150,35 +2243,91 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         </div>
 
         <div style={{ padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
-          <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
-            style={{ background:cardBg, border:`2px solid ${dark?"#0ea5e933":"#bae6fd"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
-            <div style={{ width:56, height:56, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e933":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span style={{ fontSize:26 }}>👥</span>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
-              <div style={{ fontSize:12, color:txt2, marginTop:3 }}>Ver equipes cadastradas em todos os projetos</div>
-              <div style={{ fontSize:11, color:dark?"#334155":"#94a3b8", marginTop:5 }}>
-                {allProjects.length} projeto(s) disponíveis
+          <style>{`@keyframes regPulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
+          {(()=>{
+            const st = dashStats;
+            const disp = st&&st.ativos>0 ? Math.round(((st.ativos-st.feriasHoje)/st.ativos)*100) : null;
+            const okPct = st&&st.totalEquip>0 ? Math.round(((st.totalEquip-st.inop-st.parcial)/st.totalEquip)*100) : null;
+            const Badge = ({cor,children}) => (
+              <span style={{fontSize:11,fontWeight:800,color:cor,background:cor+"1c",border:`1px solid ${cor}44`,padding:"3px 10px",borderRadius:7}}>{children}</span>
+            );
+            const Bar = ({pct,cor}) => (
+              <div style={{width:"100%",height:5,borderRadius:3,background:dark?"#0a0f1e":"#e2e8f0",overflow:"hidden",marginTop:9}}>
+                <div style={{width:`${pct}%`,height:"100%",borderRadius:3,background:`linear-gradient(90deg,${cor}99,${cor})`,boxShadow:`0 0 8px ${cor}55`,transition:"width .5s ease"}}/>
               </div>
-            </div>
-            <span style={{ color:txt2, fontSize:20 }}>›</span>
-          </button>
+            );
+            return (<>
+            <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
+              style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
+                boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none" }}>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{ width:54, height:54, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e955":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #0ea5e922":"none" }}>
+                  <span style={{ fontSize:25 }}>👥</span>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
+                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsColab} projeto(s) com equipe cadastrada`:"Carregando equipes..."}</div>
+                </div>
+                <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>
+              </div>
+              {st&&(
+                <>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:11}}>
+                    <Badge cor="#22c55e">🟢 {st.ativos} ativo(s)</Badge>
+                    <Badge cor="#0ea5e9">🏖️ {st.feriasHoje} em férias</Badge>
+                  </div>
+                  {disp!==null&&(
+                    <>
+                      <Bar pct={disp} cor="#0ea5e9"/>
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                        <span style={{fontSize:9,color:txt2,fontWeight:700}}>DISPONIBILIDADE HOJE</span>
+                        <span style={{fontSize:9,fontWeight:800,color:"#0ea5e9"}}>{disp}%</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </button>
 
-          <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
-            style={{ background:cardBg, border:`2px solid ${dark?"#f59e0b33":"#fde68a"}`, borderRadius:16, padding:"22px 20px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:16 }}>
-            <div style={{ width:56, height:56, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b33":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span style={{ fontSize:26 }}>🛡️</span>
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
-              <div style={{ fontSize:12, color:txt2, marginTop:3 }}>Inventário de equipamentos por projeto</div>
-              <div style={{ fontSize:11, color:dark?"#334155":"#94a3b8", marginTop:5 }}>
-                Ver status, problemas e gerar PDF
+            <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
+              style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
+                boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none") }}>
+              <div style={{display:"flex",alignItems:"center",gap:14}}>
+                <div style={{ width:54, height:54, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b55":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #f59e0b22":"none", position:"relative" }}>
+                  <span style={{ fontSize:25 }}>🛡️</span>
+                  {st&&st.inop>0&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444",animation:"regPulse 1.4s ease-in-out infinite"}}/>}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
+                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} item(ns)`:"Carregando inventário..."}</div>
+                </div>
+                <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>
               </div>
-            </div>
-            <span style={{ color:txt2, fontSize:20 }}>›</span>
-          </button>
+              {st&&(
+                <>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:11}}>
+                    {st.inop===0&&st.parcial===0
+                      ? <Badge cor="#22c55e">✅ Tudo operacional</Badge>
+                      : (<>
+                          {st.inop>0&&<Badge cor="#ef4444">🔴 {st.inop} inop</Badge>}
+                          {st.parcial>0&&<Badge cor="#f59e0b">⚠️ {st.parcial} parcial</Badge>}
+                        </>)
+                    }
+                  </div>
+                  {okPct!==null&&(
+                    <>
+                      <Bar pct={okPct} cor={okPct>=90?"#22c55e":okPct>=70?"#f59e0b":"#ef4444"}/>
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                        <span style={{fontSize:9,color:txt2,fontWeight:700}}>OPERACIONAIS</span>
+                        <span style={{fontSize:9,fontWeight:800,color:okPct>=90?"#22c55e":okPct>=70?"#f59e0b":"#ef4444"}}>{okPct}%</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </button>
+            </>);
+          })()}
         </div>
       </div>
     </div>
