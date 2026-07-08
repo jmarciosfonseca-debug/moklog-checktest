@@ -1,12 +1,15 @@
 // ─────────────────────────────────────────────────────────────
-// Iluminacao.jsx — Teste de Iluminação v2 (mapa por quadrantes)
-// • Mapa real do projeto (public/mapas/{ID}.jpg) com grade de quadrantes
-//   sobreposta (divisórias em %, ajustáveis pelo gerencial)
-// • Levantamento (líder/admin): total de pontos por quadrante
-// • Teste semanal: INOPERANTES por quadrante (total − inoperantes = operantes)
-// • Mapa ↔ lista sincronizados: tocar no quadrante mostra só ele,
-//   com cor de status (≥95% verde · ≥80% âmbar · <80% vermelho)
-// • Compatibilidade: registros v1 (campo "acesas") continuam válidos
+// Iluminacao.jsx — Teste de Iluminação v3
+// • Tela da equipe LIMPA: mapa + lista de quadrantes (pontos, inoperantes,
+//   % operante). Nada de percentuais/grade na frente da operação.
+// • Quadrantes de ÁREA LIVRE: cada quadrante pode ter sua própria área
+//   {x,y,w,h} em % do mapa — cobre os desenhos irregulares (P601, P505,
+//   P311B, P604). A grade continua existindo para os simétricos e agora
+//   também gera as áreas automaticamente. Compatível com configs antigas.
+// • Selecionou A1 (no mapa ou na lista) → o A1 PULSA destacado no mapa.
+// • Permissões: equipe edita totais (levantamento) e registra testes;
+//   gerencial exclui quadrante/teste e pode LIMPAR TUDO do projeto.
+// • Registros v1 (campo "acesas") continuam válidos.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -31,7 +34,6 @@ const PROJECT_PINS = {
   P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
 };
 
-// ── Limiares de status por percentual OPERANTE (ajustáveis)
 const PCT_OK = 95;
 const PCT_ATENCAO = 80;
 
@@ -53,7 +55,6 @@ function fmtDate(d){
 function todayStrLocal(){ return new Date().toLocaleDateString("sv-SE"); }
 function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 
-// ── Semana atual (domingo → sábado)
 function inicioSemana(){
   const d = new Date(); d.setHours(0,0,0,0);
   d.setDate(d.getDate() - d.getDay());
@@ -84,8 +85,8 @@ function pctQuad(q){
   return total ? Math.round((opsDe(q)/total)*1000)/10 : 0;
 }
 
-// ── Grade do mapa: divisórias (%) → células nomeadas A1, A2… B1…
-function gradeCells(mapa){
+// ── Grade → células; usada quando os quadrantes não têm área própria
+export function gradeCells(mapa){
   const norm = (arr)=>[...new Set((arr||[]).map(Number).filter(n=>n>0&&n<100))].sort((a,b)=>a-b);
   const cols = [0,...norm(mapa?.cols),100];
   const rows = [0,...norm(mapa?.rows),100];
@@ -104,6 +105,14 @@ function gradeCells(mapa){
 function parsePcts(str){
   return String(str||"").split(/[,;\s]+/).map(s=>Number(s)).filter(n=>!isNaN(n)&&n>0&&n<100);
 }
+// Células a desenhar: áreas próprias dos quadrantes (se houver) ou grade
+export function cellsDoMapa(mapa, quadrantes){
+  const comArea = (quadrantes||[]).filter(q=>q.area && Number(q.area.w)>0 && Number(q.area.h)>0);
+  if(comArea.length>0){
+    return comArea.map(q=>({ nome:q.nome, left:Number(q.area.x)||0, top:Number(q.area.y)||0, w:Number(q.area.w), h:Number(q.area.h) }));
+  }
+  return gradeCells(mapa);
+}
 
 // ── Firestore: doc único por projeto, tombstone + fallback localStorage
 export async function loadIluminacao(projectId){
@@ -121,7 +130,7 @@ export async function loadIluminacao(projectId){
   data = data || {};
   const del = new Set(data.deletedIds||[]);
   return {
-    mapa: data.mapa||null, // { url, cols:[%], rows:[%] }
+    mapa: data.mapa||null,
     quadrantes: data.quadrantes||[],
     history: (data.history||[]).filter(t=>!del.has(t.id)),
     deletedIds: data.deletedIds||[],
@@ -164,13 +173,13 @@ function BarraPct({ pct, dark }) {
   );
 }
 
-// ── Mapa interativo com overlay de quadrantes
-// ultimoPorNome: { "A1": quadDoTeste } — cor de status por célula
-function MapaQuadrantes({ mapa, selNome, onSelect, ultimoPorNome, dark }) {
-  const cells = gradeCells(mapa);
+// ── Mapa interativo: quadrantes de área livre (ou grade), com PULSO no selecionado
+function MapaQuadrantes({ mapa, quadrantes, selNome, onSelect, ultimoPorNome, dark }) {
+  const cells = cellsDoMapa(mapa, quadrantes);
   if(!mapa?.url || cells.length===0) return null;
   return (
     <div style={{position:"relative", borderRadius:12, overflow:"hidden", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, lineHeight:0}}>
+      <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,.65);}50%{box-shadow:0 0 0 7px rgba(56,189,248,0);}}`}</style>
       <img src={mapa.url} alt="Mapa do projeto" style={{width:"100%",display:"block"}}
         onError={(e)=>{e.currentTarget.style.minHeight="180px";e.currentTarget.alt="Mapa não encontrado em "+mapa.url;}}/>
       {cells.map(cell=>{
@@ -182,9 +191,11 @@ function MapaQuadrantes({ mapa, selNome, onSelect, ultimoPorNome, dark }) {
           <div key={cell.nome} role="button" aria-label={`Quadrante ${cell.nome}`}
             onClick={()=>onSelect(sel?null:cell.nome)}
             style={{position:"absolute", left:`${cell.left}%`, top:`${cell.top}%`, width:`${cell.w}%`, height:`${cell.h}%`,
-              boxSizing:"border-box", cursor:"pointer",
+              boxSizing:"border-box", cursor:"pointer", borderRadius:sel?6:0,
               border: sel? "3px solid #38bdf8" : `1.5px solid ${cor}99`,
-              background: sel? "#38bdf81f" : `${cor}${pct===null?"10":"1f"}`,
+              background: sel? "#38bdf82e" : `${cor}${pct===null?"10":"1f"}`,
+              animation: sel? "mkPulse 1.1s ease-in-out infinite" : "none",
+              zIndex: sel?2:1,
               transition:"background .2s ease, border .2s ease"}}>
             <span style={{position:"absolute", top:4, left:6, background:"rgba(2,6,16,.75)", color: sel?"#38bdf8":cor,
               fontSize:11, fontWeight:900, padding:"2px 7px", borderRadius:5, lineHeight:"14px", letterSpacing:.5}}>
@@ -197,7 +208,7 @@ function MapaQuadrantes({ mapa, selNome, onSelect, ultimoPorNome, dark }) {
   );
 }
 
-// ── PIN Gate (fallback — só aparece se não houver sessão válida)
+// ── PIN Gate (fallback — só aparece sem sessão válida)
 function PinGate({ project, onSuccess, onBack, dark }) {
   const S = getStyles(dark);
   const [mode, setMode] = useState(null);
@@ -249,27 +260,26 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
   const [saving, setSaving] = useState(false);
   const adminAuth = authLevel==="admin";
 
-  // seleção mapa ↔ lista
   const [selNome, setSelNome] = useState(null);
 
   // Form de novo teste (inoperantes por quadrante)
   const [formDate, setFormDate] = useState(todayStrLocal());
   const [formResp, setFormResp] = useState(()=>{ try{return localStorage.getItem("iluminacao_ultimo_nome")||"";}catch{return"";} });
-  const [formCounts, setFormCounts] = useState({}); // {quadId: string inoperantes}
+  const [formCounts, setFormCounts] = useState({});
   const [formObs, setFormObs] = useState("");
   const [formErr, setFormErr] = useState(null);
 
-  // Config (gerencial): mapa + grade + quadrantes
+  // Config (gerencial)
   const [cfgUrl, setCfgUrl] = useState("");
   const [cfgCols, setCfgCols] = useState("");
   const [cfgRows, setCfgRows] = useState("");
   const [cfgQuads, setCfgQuads] = useState([]);
   const [cfgErr, setCfgErr] = useState(null);
+  const [confirmLimpar, setConfirmLimpar] = useState(0); // 0 | 1 | 2 (dupla confirmação)
 
-  // Levantamento (líder/admin): totais por quadrante
-  const [survTotais, setSurvTotais] = useState({}); // {quadId: string}
+  // Levantamento (equipe/admin): totais por quadrante — EDITÁVEL, sem excluir
+  const [survTotais, setSurvTotais] = useState({});
 
-  // Visualização/exclusão de um teste
   const [viewTest, setViewTest] = useState(null);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -281,13 +291,12 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
   const totalPontos = (data.quadrantes||[]).reduce((a,q)=>a+(Number(q.total)||0),0);
   const semLevantamento = totalPontos===0 && (data.quadrantes||[]).length>0;
 
-  // status por nome de quadrante (último teste), para o mapa e a lista
   const ultimoPorNome = {};
   (ultimo?.quads||[]).forEach(q=>{ if(q.nome) ultimoPorNome[q.nome]=q; });
 
   const abrirForm = () => {
     const counts = {};
-    (data.quadrantes||[]).forEach(q=>{ counts[q.id]="0"; }); // caso comum: nada inoperante
+    (data.quadrantes||[]).forEach(q=>{ counts[q.id]="0"; });
     setFormCounts(counts); setFormDate(todayStrLocal()); setFormObs(""); setFormErr(null);
     setScreen("form");
   };
@@ -327,23 +336,31 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     setCfgUrl(data.mapa?.url || `/mapas/${project.id}.jpg`);
     setCfgCols((data.mapa?.cols||[]).join(", "));
     setCfgRows((data.mapa?.rows||[]).join(", "));
-    setCfgQuads((data.quadrantes||[]).map(q=>({...q, total:String(q.total??"")})));
-    setCfgErr(null);
+    setCfgQuads((data.quadrantes||[]).map(q=>({
+      ...q, total:String(q.total??""),
+      ax:String(q.area?.x??""), ay:String(q.area?.y??""), aw:String(q.area?.w??""), ah:String(q.area?.h??""),
+    })));
+    setCfgErr(null); setConfirmLimpar(0);
     setScreen("config");
   };
-  // Gera/atualiza quadrantes a partir da grade, PRESERVANDO ids e totais
-  // dos quadrantes de mesmo nome (compatibilidade retroativa)
+  // Grade → cria/atualiza quadrantes E preenche a área de cada um pela célula
   const gerarDaGrade = () => {
     const cells = gradeCells({ cols:parsePcts(cfgCols), rows:parsePcts(cfgRows) });
     if(cells.length<=1){ setCfgErr("Defina ao menos uma divisória (ex: colunas 30, 68 · linhas 50)."); return; }
     setCfgQuads(prev=>cells.map(c=>{
       const ex = prev.find(q=>q.nome===c.nome);
-      return ex ? ex : { id:newId(), nome:c.nome, total:"" };
+      const area = { ax:String(Math.round(c.left*10)/10), ay:String(Math.round(c.top*10)/10), aw:String(Math.round(c.w*10)/10), ah:String(Math.round(c.h*10)/10) };
+      return ex ? { ...ex, ...area } : { id:newId(), nome:c.nome, total:"", ...area };
     }));
     setCfgErr(null);
   };
   const salvarConfig = async () => {
-    const limpo = cfgQuads.map(q=>({ id:q.id, nome:(q.nome||"").trim(), total:Number(q.total)||0 }));
+    const limpo = cfgQuads.map(q=>{
+      const area = (Number(q.aw)>0 && Number(q.ah)>0)
+        ? { x:Number(q.ax)||0, y:Number(q.ay)||0, w:Number(q.aw), h:Number(q.ah) }
+        : null;
+      return { id:q.id, nome:(q.nome||"").trim(), total:Number(q.total)||0, ...(area?{area}:{}) };
+    });
     if(limpo.length===0){ setCfgErr("Gere os quadrantes da grade ou adicione manualmente."); return; }
     if(limpo.some(q=>!q.nome)){ setCfgErr("Todo quadrante precisa de um nome."); return; }
     const mapa = cfgUrl.trim() ? { url:cfgUrl.trim(), cols:parsePcts(cfgCols), rows:parsePcts(cfgRows) } : null;
@@ -354,8 +371,24 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     setSaving(false);
     setScreen("list");
   };
+  // Limpar TUDO do projeto (gerencial, dupla confirmação): testes tombstonados,
+  // quadrantes zerados; o mapa (caminho + divisórias) é mantido
+  const limparTudo = async () => {
+    const idsTestes = (data.history||[]).map(t=>t.id);
+    const next = {
+      ...data,
+      quadrantes:[],
+      history:[],
+      deletedIds:[...(data.deletedIds||[]), ...idsTestes],
+    };
+    setSaving(true);
+    setData(next); setSelNome(null); setConfirmLimpar(0);
+    await saveIluminacao(project.id, next);
+    setSaving(false);
+    setScreen("list");
+  };
 
-  // ── Levantamento (líder/admin): totais por quadrante
+  // ── Levantamento (equipe/admin)
   const abrirSurvey = () => {
     const t = {};
     (data.quadrantes||[]).forEach(q=>{ t[q.id]=String(q.total??""); });
@@ -376,7 +409,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     const next = {
       ...data,
       history:(data.history||[]).filter(t=>t.id!==viewTest.id),
-      deletedIds:[...(data.deletedIds||[]), viewTest.id], // tombstone
+      deletedIds:[...(data.deletedIds||[]), viewTest.id],
     };
     setSaving(true);
     setData(next);
@@ -404,65 +437,100 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     </div>
   );
 
-  // ── TELA: configuração (gerencial): mapa + grade + quadrantes
+  // ── TELA: configuração (SÓ gerencial)
   if(screen==="config") return (
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
         <div style={S.card}>
-          <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:2}}>⚙️ Mapa e quadrantes</div>
-          <div style={{fontSize:11,...S.txt2}}>Suba a imagem do site em <b>public/mapas/{project.id}.jpg</b> no repositório. As divisórias são percentuais da imagem (ex: colunas <b>30, 68</b> e linhas <b>50</b> = grade 2×3: A1–A3, B1–B3). Testes antigos guardam a configuração da época.</div>
-        </div>
-        <div style={S.card}>
-          <label style={S.lbl}>Caminho da imagem do mapa</label>
+          <label style={S.lbl}>Imagem do mapa (public/mapas/)</label>
           <input value={cfgUrl} onChange={e=>setCfgUrl(e.target.value)} placeholder={`/mapas/${project.id}.jpg`} style={S.inp}/>
           <div style={{display:"flex",gap:8,marginTop:8}}>
             <div style={{flex:1}}>
-              <label style={S.lbl}>Divisórias verticais % (colunas)</label>
+              <label style={S.lbl}>Colunas %</label>
               <input value={cfgCols} onChange={e=>setCfgCols(e.target.value)} placeholder="30, 68" style={S.inp}/>
             </div>
             <div style={{flex:1}}>
-              <label style={S.lbl}>Divisórias horizontais % (linhas)</label>
+              <label style={S.lbl}>Linhas %</label>
               <input value={cfgRows} onChange={e=>setCfgRows(e.target.value)} placeholder="50" style={S.inp}/>
             </div>
           </div>
           <button onClick={gerarDaGrade} style={{...S.btnSec,fontSize:12,marginTop:10}}>🔲 Gerar quadrantes da grade</button>
+          <div style={{fontSize:10,...S.txt2,marginTop:8}}>Cada quadrante tem sua própria ÁREA no mapa (X, Y, Largura e Altura em % da imagem). A grade preenche as áreas automaticamente; para layouts irregulares, ajuste os números de cada quadrante olhando a prévia.</div>
         </div>
-        {/* Pré-visualização ao vivo */}
         {cfgUrl.trim() && (
-          <MapaQuadrantes mapa={{url:cfgUrl.trim(),cols:parsePcts(cfgCols),rows:parsePcts(cfgRows)}} selNome={null} onSelect={()=>{}} ultimoPorNome={{}} dark={dark}/>
+          <MapaQuadrantes
+            mapa={{url:cfgUrl.trim(),cols:parsePcts(cfgCols),rows:parsePcts(cfgRows)}}
+            quadrantes={cfgQuads.map(q=>({nome:q.nome,area:(Number(q.aw)>0&&Number(q.ah)>0)?{x:Number(q.ax)||0,y:Number(q.ay)||0,w:Number(q.aw),h:Number(q.ah)}:null}))}
+            selNome={null} onSelect={()=>{}} ultimoPorNome={{}} dark={dark}/>
         )}
-        {cfgQuads.map((q,i)=>(
-          <div key={q.id} style={{...S.card,display:"flex",gap:8,alignItems:"flex-end",padding:"10px 14px"}}>
-            <div style={{flex:1}}>
-              <label style={S.lbl}>Quadrante {String(i+1).padStart(2,"0")}</label>
-              <input value={q.nome} onChange={e=>{const v=e.target.value;setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,nome:v}:x));setCfgErr(null);}}
-                placeholder="Ex: A1" style={S.inp}/>
+        {cfgQuads.map(q=>(
+          <div key={q.id} style={{...S.card,padding:"10px 14px"}}>
+            <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+              <div style={{flex:1}}>
+                <label style={S.lbl}>Quadrante</label>
+                <input value={q.nome} onChange={e=>{const v=e.target.value;setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,nome:v}:x));setCfgErr(null);}}
+                  placeholder="Ex: A1" style={S.inp}/>
+              </div>
+              <div style={{width:80}}>
+                <label style={S.lbl}>Pontos</label>
+                <input value={q.total} onChange={e=>{const v=e.target.value.replace(/[^0-9]/g,"");setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,total:v}:x));}}
+                  inputMode="numeric" placeholder="—" style={{...S.inp,textAlign:"center"}}/>
+              </div>
+              <button onClick={()=>setCfgQuads(prev=>prev.filter(x=>x.id!==q.id))} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433",padding:"9px 10px"}}>🗑</button>
             </div>
-            <div style={{width:92}}>
-              <label style={S.lbl}>Pontos</label>
-              <input value={q.total} onChange={e=>{const v=e.target.value.replace(/[^0-9]/g,"");setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,total:v}:x));}}
-                inputMode="numeric" placeholder="—" style={{...S.inp,textAlign:"center"}}/>
+            <div style={{display:"flex",gap:6,marginTop:8}}>
+              {[["ax","X %"],["ay","Y %"],["aw","Larg %"],["ah","Alt %"]].map(([campo,rotulo])=>(
+                <div key={campo} style={{flex:1}}>
+                  <label style={S.lbl}>{rotulo}</label>
+                  <input value={q[campo]} inputMode="decimal"
+                    onChange={e=>{const v=e.target.value.replace(/[^0-9.]/g,"");setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,[campo]:v}:x));}}
+                    placeholder="—" style={{...S.inp,textAlign:"center",padding:"8px 6px",fontSize:12}}/>
+                </div>
+              ))}
             </div>
-            <button onClick={()=>setCfgQuads(prev=>prev.filter(x=>x.id!==q.id))} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433",padding:"9px 10px"}}>🗑</button>
           </div>
         ))}
-        <button onClick={()=>setCfgQuads(prev=>[...prev,{id:newId(),nome:"",total:""}])} style={{...S.btnSec,fontSize:13}}>➕ Adicionar quadrante manual</button>
+        <button onClick={()=>setCfgQuads(prev=>[...prev,{id:newId(),nome:"",total:"",ax:"",ay:"",aw:"",ah:""}])} style={{...S.btnSec,fontSize:13}}>➕ Adicionar quadrante manual</button>
         {cfgErr && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{cfgErr}</div>}
         <button onClick={salvarConfig} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar configuração"}</button>
         <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
+
+        {/* Zona de perigo — LIMPAR TUDO (gerencial, dupla confirmação) */}
+        <div style={{...S.card,border:"1px solid #ef444433",marginTop:6}}>
+          <div style={{fontSize:11,fontWeight:800,color:"#ef4444",marginBottom:6}}>ZONA DE PERIGO</div>
+          {confirmLimpar===0 && <button onClick={()=>setConfirmLimpar(1)} style={{...S.btnSec,fontSize:13,color:"#ef4444",borderColor:"#ef444433"}}>🧹 Limpar tudo deste projeto</button>}
+          {confirmLimpar===1 && (
+            <>
+              <div style={{fontSize:12,...S.txt,marginBottom:8}}>Apagar TODOS os quadrantes e TODOS os testes de iluminação do {project.id}? O mapa configurado é mantido.</div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setConfirmLimpar(0)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+                <button onClick={()=>setConfirmLimpar(2)} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>Continuar</button>
+              </div>
+            </>
+          )}
+          {confirmLimpar===2 && (
+            <>
+              <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginBottom:8}}>Última confirmação — essa ação não pode ser desfeita.</div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setConfirmLimpar(0)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+                <button onClick={limparTudo} disabled={saving} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>{saving?"Limpando…":"🧹 Apagar tudo"}</button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div></div>
   );
 
-  // ── TELA: levantamento de pontos (líder/admin)
+  // ── TELA: levantamento de pontos (equipe e admin — editar sim, excluir não)
   if(screen==="survey") return (
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
         <div style={S.card}>
-          <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:2}}>📋 Levantamento de pontos</div>
-          <div style={{fontSize:11,...S.txt2}}>Conte em campo quantos pontos de iluminação existem em cada quadrante do mapa e registre aqui. Esse total é a base dos testes semanais.</div>
+          <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:2}}>📋 Pontos de iluminação por quadrante</div>
+          <div style={{fontSize:11,...S.txt2}}>Conte em campo e registre. Se recontar e o número mudar, é só corrigir aqui.</div>
         </div>
         {(data.quadrantes||[]).map(q=>(
           <div key={q.id} style={{...S.card,display:"flex",alignItems:"center",gap:12,padding:"10px 14px"}}>
@@ -473,7 +541,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
             </div>
           </div>
         ))}
-        <button onClick={salvarSurvey} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar levantamento"}</button>
+        <button onClick={salvarSurvey} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar pontos"}</button>
         <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
       </div>
     </div></div>
@@ -579,103 +647,70 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     );
   }
 
-  // ── TELA: lista / home do módulo
+  // ── TELA: lista / home do módulo — LIMPA: mapa + lista de quadrantes
   const semQuadrantes = (data.quadrantes||[]).length===0;
-  const selQuad = selNome ? (ultimoPorNome[selNome] || (data.quadrantes||[]).find(q=>q.nome===selNome) || null) : null;
-  const selCfgQuad = selNome ? (data.quadrantes||[]).find(q=>q.nome===selNome) : null;
   return (
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
 
-        {/* Status da semana */}
-        <div style={{...S.card,display:"flex",justifyContent:"space-between",alignItems:"center",border:`1px solid ${semanaOk?"#22c55e33":"#f59e0b33"}`}}>
-          <div style={{fontSize:12,fontWeight:700,...S.txt}}>Teste desta semana</div>
-          <div style={{fontSize:12,fontWeight:800,color:semanaOk?"#22c55e":"#f59e0b"}}>{semanaOk?"✅ Realizado":"⏳ Pendente"}</div>
-        </div>
-
         {/* Mapa interativo */}
         {data.mapa?.url && !semQuadrantes && (
-          <>
-            <MapaQuadrantes mapa={data.mapa} selNome={selNome} onSelect={setSelNome} ultimoPorNome={ultimoPorNome} dark={dark}/>
-            {selNome && (
-              <div style={{...S.card,border:"1px solid #38bdf855"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:15,fontWeight:900,color:"#38bdf8"}}>Quadrante {selNome}</div>
-                  {ultimoPorNome[selNome] ? <StatusBadge status={statusFromPct(pctQuad(ultimoPorNome[selNome]))}/> : <span style={{fontSize:10,...S.txt2}}>sem teste</span>}
-                </div>
-                {(()=>{
-                  const q = ultimoPorNome[selNome];
-                  const totalCfg = Number(selCfgQuad?.total)||0;
-                  if(!q) return <div style={{fontSize:12,...S.txt2,marginTop:6}}>{totalCfg?`${totalCfg} pontos levantados · sem teste registrado ainda.`:"Sem levantamento de pontos ainda."}</div>;
-                  const inop = (Number(q.total)||0)-opsDe(q);
-                  const pct = pctQuad(q);
-                  return (
-                    <>
-                      <div style={{fontSize:12,...S.txt,marginTop:6}}>
-                        <b>{q.total}</b> pontos · <b style={{color:inop>0?"#ef4444":"#22c55e"}}>{inop} inoperante{inop===1?"":"s"}</b> · <b style={{color:STATUS_CFG[statusFromPct(pct)].color}}>{pct}% operante</b>
-                      </div>
-                      <div style={{marginTop:8}}><BarraPct pct={pct} dark={dark}/></div>
-                      <div style={{fontSize:10,...S.txt2,marginTop:6}}>Último teste: {fmtDate(ultimo?.date)}</div>
-                    </>
-                  );
-                })()}
+          <MapaQuadrantes mapa={data.mapa} quadrantes={data.quadrantes} selNome={selNome} onSelect={setSelNome} ultimoPorNome={ultimoPorNome} dark={dark}/>
+        )}
+
+        {/* Semana + resumo compactos */}
+        <div style={{display:"flex",gap:8}}>
+          <div style={{...S.card,flex:1,padding:"10px 12px",border:`1px solid ${semanaOk?"#22c55e33":"#f59e0b33"}`}}>
+            <div style={{fontSize:9,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>Semana</div>
+            <div style={{fontSize:13,fontWeight:800,color:semanaOk?"#22c55e":"#f59e0b"}}>{semanaOk?"✅ Feito":"⏳ Pendente"}</div>
+          </div>
+          {ultimo && (()=>{ const r=calcTeste(ultimo); return (
+            <div style={{...S.card,flex:1.6,padding:"10px 12px"}}>
+              <div style={{fontSize:9,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>Último · {fmtDate(ultimo.date)}</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                <div style={{fontSize:17,fontWeight:900,color:STATUS_CFG[statusFromPct(r.pct)].color}}>{r.pct}%</div>
+                <div style={{fontSize:10,...S.txt2}}>{r.inop} inop. de {r.tot}</div>
               </div>
-            )}
-          </>
-        )}
-
-        {/* Resumo do último teste */}
-        {ultimo ? (()=>{ const r=calcTeste(ultimo); return (
-          <div style={S.card}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:11,...S.txt2}}>Último teste · {fmtDate(ultimo.date)}</div>
-              <StatusBadge status={statusFromPct(r.pct)}/>
             </div>
-            <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:8}}>
-              <div style={{fontSize:28,fontWeight:900,color:STATUS_CFG[statusFromPct(r.pct)].color}}>{r.pct}%</div>
-              <div style={{fontSize:11,...S.txt2}}>{r.inop} inoperante{r.inop===1?"":"s"} de {r.tot} pontos</div>
-            </div>
-            <BarraPct pct={r.pct} dark={dark}/>
-          </div>
-        );})() : (
-          <div style={{...S.card,textAlign:"center"}}>
-            <div style={{fontSize:26,marginBottom:6}}>💡</div>
-            <div style={{fontSize:12,...S.txt2}}>Nenhum teste registrado ainda.</div>
-          </div>
-        )}
+          );})()}
+        </div>
 
-        {/* Quadrantes (lista sincronizada com o mapa) */}
-        {!semQuadrantes && (
-          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-            {(data.quadrantes||[]).map(q=>{
-              const uq = ultimoPorNome[q.nome];
-              const pct = uq ? pctQuad(uq) : null;
-              const cor = pct===null ? (dark?"#475569":"#94a3b8") : STATUS_CFG[statusFromPct(pct)].color;
-              const sel = selNome===q.nome;
-              return (
-                <button key={q.id} onClick={()=>setSelNome(sel?null:q.nome)}
-                  style={{background:sel?"#38bdf81a":(dark?"#060c18":"#fff"),border:`1.5px solid ${sel?"#38bdf8":cor+"55"}`,borderRadius:9,padding:"7px 11px",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-                  <span style={{fontSize:12,fontWeight:900,color:sel?"#38bdf8":cor}}>{q.nome}</span>
-                  <span style={{fontSize:10,...S.txt2}}>{pct===null?(Number(q.total)?`${q.total} pts`:"—"):`${pct}%`}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Lista de quadrantes: pontos, inoperantes, % — toca ↔ realça no mapa */}
+        {!semQuadrantes && (data.quadrantes||[]).map(q=>{
+          const uq = ultimoPorNome[q.nome];
+          const pct = uq ? pctQuad(uq) : null;
+          const inop = uq ? (Number(uq.total)||0)-opsDe(uq) : null;
+          const cor = pct===null ? (dark?"#475569":"#94a3b8") : STATUS_CFG[statusFromPct(pct)].color;
+          const sel = selNome===q.nome;
+          return (
+            <button key={q.id} onClick={()=>setSelNome(sel?null:q.nome)}
+              style={{...S.card,padding:"10px 14px",cursor:"pointer",textAlign:"left",width:"100%",display:"flex",alignItems:"center",gap:12,
+                border:`1.5px solid ${sel?"#38bdf8":(dark?"#0f172a":"#e2e8f0")}`, background: sel? (dark?"#071a26":"#eff9ff") : (dark?"#060c18":"#fff")}}>
+              <div style={{width:40,textAlign:"center",flexShrink:0,fontSize:15,fontWeight:900,color:sel?"#38bdf8":cor}}>{q.nome}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:700,...S.txt}}>{Number(q.total)?`${q.total} pontos`:"sem levantamento"}</div>
+                <div style={{fontSize:10,...S.txt2}}>{pct===null?"sem teste":`${inop} inoperante${inop===1?"":"s"} · ${pct}% operante`}</div>
+              </div>
+              {pct!==null
+                ? <div style={{width:74,flexShrink:0}}><BarraPct pct={pct} dark={dark}/></div>
+                : <span style={{fontSize:10,...S.txt2}}>—</span>}
+            </button>
+          );
+        })}
 
         {/* Ações */}
         {semQuadrantes ? (
           <div style={{...S.card,border:"1px solid #f59e0b33"}}>
             <div style={{fontSize:12,...S.txt,marginBottom:4,fontWeight:700}}>⚙️ Quadrantes ainda não configurados</div>
-            <div style={{fontSize:11,...S.txt2}}>{adminAuth?"Configure o mapa e a grade de quadrantes deste projeto.":"Peça ao gerencial para configurar os quadrantes deste projeto."}</div>
+            <div style={{fontSize:11,...S.txt2}}>{adminAuth?"Configure o mapa e os quadrantes deste projeto.":"Peça ao gerencial para configurar os quadrantes deste projeto."}</div>
           </div>
         ) : semLevantamento ? (
           <button onClick={abrirSurvey} style={{...S.btn,background:"linear-gradient(135deg,#0369a1,#0c4a6e)"}}>📋 Fazer levantamento de pontos</button>
         ) : (
           <>
             <button onClick={abrirForm} style={S.btn}>➕ Novo Teste de Iluminação</button>
-            <button onClick={abrirSurvey} style={{...S.btnSec,fontSize:13}}>📋 Levantamento de Pontos ({totalPontos} pontos)</button>
+            <button onClick={abrirSurvey} style={{...S.btnSec,fontSize:13}}>📋 Editar Pontos por Quadrante ({totalPontos})</button>
           </>
         )}
         {adminAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Mapa e Quadrantes</button>}
