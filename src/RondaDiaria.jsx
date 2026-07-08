@@ -1,14 +1,15 @@
 // ─────────────────────────────────────────────────────────────
-// RondaDiaria.jsx — Ronda Perimetral Diária (todos os projetos exceto P505)
-// • Turno automático pelo relógio: 06:00–17:59 Diurno · 18:00–05:59 Noturno
-//   (madrugada 00:00–05:59 pertence ao plantão NOTURNO do dia anterior)
-// • Líder puxado do cadastro Equipe (equipes/{projectId}), filtrado por
-//   cargo conforme o projeto + turno atual (Folguista/Perista nos dois)
-// • Rondas livres: início na hora do toque (editável); fim automático
-//   = início + 20 min, sem passar da hora cheia (13:45 → 13:59); editável
-// • Envio obrigatório no fechamento do turno — trava o plantão
-// • Espelha o formato atual dos registros: Ronda N, início/fim,
-//   Externa (sim/não) e observação livre (testes de zona, intervalo CCO…)
+// RondaDiaria.jsx — Ronda Perimetral Diária (v2)
+// Correções desta versão:
+// • Foco no teclado: campos renderizados inline (sem componente aninhado)
+//   — digitação contínua na observação e nos horários
+// • Fotos por ronda (até 2), com opção de câmera; comprimidas p/ ~640px
+// • Seleção de responsável: lista COMPLETA do cadastro Equipe do projeto,
+//   excluindo apenas cargos de CCO
+// • Armazenamento: 1 documento por plantão (rondas_plantoes/{id}) + índice
+//   leve por projeto (rondas/{projectId}) — fotos não estouram o limite
+//   de 1MB do Firestore. Compatível com plantões da versão anterior
+//   (embutidos no índice): continuam legíveis e migram ao serem tocados.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -33,21 +34,8 @@ const PROJECT_PINS = {
   P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
 };
 
-// ── Filtro de cargo dos responsáveis pela ronda, por projeto
-// (cada entrada: lista de tokens que o cargo precisa conter, sem acento)
-const CARGOS_RONDA = {
-  P607:  [["vigilante","ronda"],["vigilante","apoio"]],
-  P606:  [["vigilante","lider"]],
-  P311A: [["vigilante","lider"]],
-  P311B: [["vigilante","lider"]],
-  P601:  [["vspp","lider"]],
-  P602:  [["vspp","lider"]],
-  P604:  [["vspp","lider"]],
-  P605:  [["vspp","lider"]],
-  P260A: [["vspp","lider"]],
-  P260B: [["vspp","lider"]],
-  P260C: [["vspp","lider"]],
-};
+const MAX_FOTOS_RONDA = 2;
+const MAX_FOTOS_PLANTAO = 20; // segurança p/ o limite de 1MB do documento
 
 function norm(s){ return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); }
 
@@ -74,7 +62,6 @@ export function fimAuto(inicio){
   if(tot >= 60) return `${String(h).padStart(2,"0")}:59`;
   return `${String(h).padStart(2,"0")}:${String(tot).padStart(2,"0")}`;
 }
-// Slot anterior ao atual (para a pendência de envio)
 function slotAnterior(dataPlantao, turno){
   if(turno==="noturno") return { dataPlantao, turno:"diurno" };
   const d = new Date(dataPlantao+"T12:00:00"); d.setDate(d.getDate()-1);
@@ -88,8 +75,43 @@ const TURNO_UI = {
   noturno: { label:"Noturno", icon:"🌙", cor:"#818cf8", limite:"06:00" },
 };
 
-// ── Firestore: doc único por projeto + fallback localStorage + tombstone
-async function loadRondas(projectId){
+// ── Foto: comprime para ~640px JPEG antes de guardar
+function comprimirFoto(file){
+  return new Promise((resolve)=>{
+    try {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        try {
+          const MAX = 640;
+          let w = img.width, h = img.height;
+          const s = Math.min(1, MAX/Math.max(w,h));
+          w = Math.max(1, Math.round(w*s)); h = Math.max(1, Math.round(h*s));
+          const c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL("image/jpeg", 0.55));
+        } catch(e){ resolve(null); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    } catch(e){ resolve(null); }
+  });
+}
+
+// ── Firestore
+// Índice leve por projeto: rondas/{projectId} = { plantoes:[entrada leve], deletedIds }
+// Plantão completo (com fotos): rondas_plantoes/{plantaoId}
+// Compat: entradas antigas do índice podem trazer "rondas" embutidas.
+function entradaLeve(p){
+  return {
+    id:p.id, dataPlantao:p.dataPlantao, turno:p.turno, lider:p.lider||"",
+    nRondas:(p.rondas||[]).length, enviado:!!p.enviado, enviadoEm:p.enviadoEm||null,
+    criadoEm:p.criadoEm||null,
+  };
+}
+async function loadIndex(projectId){
   let data = null;
   try {
     const snap = await getDoc(doc(db,"rondas",projectId));
@@ -105,13 +127,31 @@ async function loadRondas(projectId){
   const del = new Set(data.deletedIds||[]);
   return { plantoes:(data.plantoes||[]).filter(p=>!del.has(p.id)), deletedIds:data.deletedIds||[] };
 }
-async function saveRondas(projectId, data){
-  const payload = { ...data, updatedAt:new Date().toISOString() };
-  try { await setDoc(doc(db,"rondas",projectId), payload); } catch(e){ console.error("Rondas save:", e); }
+async function loadPlantaoFull(entrada){
+  if(!entrada) return null;
+  if(entrada.rondas) return entrada; // formato antigo: já vem completo
+  let data = null;
+  try {
+    const snap = await getDoc(doc(db,"rondas_plantoes",entrada.id));
+    if(snap.exists()) data = snap.data();
+  } catch(e){}
+  if(!data){
+    try { const l = localStorage.getItem(`rondas_full_${entrada.id}`); if(l) data = JSON.parse(l); } catch(e){}
+  }
+  return data || { ...entrada, rondas:[] };
+}
+async function saveIndex(projectId, idx){
+  const payload = { ...idx, updatedAt:new Date().toISOString() };
+  try { await setDoc(doc(db,"rondas",projectId), payload); } catch(e){ console.error("Rondas index save:", e); }
   try { localStorage.setItem(`rondas_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
-async function loadLideres(projectId){
-  // Puxa do cadastro Equipe, filtrando cargo do projeto + ativos
+async function savePlantaoFull(p){
+  try { await setDoc(doc(db,"rondas_plantoes",p.id), p); } catch(e){ console.error("Plantao save:", e); }
+  try { localStorage.setItem(`rondas_full_${p.id}`, JSON.stringify(p)); } catch(e){}
+}
+
+// ── Colaboradores: lista completa do cadastro Equipe, exceto cargos de CCO
+async function loadColaboradores(projectId){
   let equipe = null;
   try {
     const snap = await getDoc(doc(db,"equipes",projectId));
@@ -120,16 +160,11 @@ async function loadLideres(projectId){
   if(!equipe){
     try { const l = localStorage.getItem(`equipe_${projectId}`); if(l) equipe = JSON.parse(l); } catch(e){}
   }
-  const colabs = (equipe?.colaboradores||[]).filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim());
-  const regras = CARGOS_RONDA[projectId] || [["lider"]];
-  const bate = (c)=>{
-    const cg = norm(c.cargo);
-    if(cg.includes("folg")) return true; // folguista sempre entra
-    return regras.some(tokens=>tokens.every(t=>cg.includes(t)));
-  };
-  let lista = colabs.filter(bate);
-  if(lista.length===0) lista = colabs; // fallback: cadastro sem os cargos esperados
-  return lista.map(c=>({ nome:c.nome, cargo:c.cargo||"", turno:c.turno||"" }));
+  return (equipe?.colaboradores||[])
+    .filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim())
+    .filter(c=>!norm(c.cargo).includes("cco"))
+    .sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)))
+    .map(c=>({ nome:c.nome, cargo:c.cargo||"" }));
 }
 
 function getStyles(dark) {
@@ -195,93 +230,137 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const S = getStyles(dark);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"home":"pin"); // pin | home | view
-  const [data, setData] = useState({ plantoes:[], deletedIds:[] });
-  const [lideres, setLideres] = useState([]);
+  const [idx, setIdx] = useState({ plantoes:[], deletedIds:[] });
+  const [atualFull, setAtualFull] = useState(null);
+  const [colabs, setColabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [viewPlantao, setViewPlantao] = useState(null);
+  const [viewFull, setViewFull] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
   const [confirmEnvio, setConfirmEnvio] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [envioErr, setEnvioErr] = useState(null);
   const adminAuth = authLevel==="admin";
 
-  const saveTimer = useRef(null);
-  const dataRef = useRef(data);
-  dataRef.current = data;
-
-  useEffect(()=>{
-    Promise.all([loadRondas(project.id), loadLideres(project.id)]).then(([d,l])=>{
-      setData(d); setLideres(l); setLoading(false);
-    });
-    return ()=>{ if(saveTimer.current){ clearTimeout(saveTimer.current); saveRondas(project.id, dataRef.current); } };
-  },[project.id]);
-
   const turno = turnoAtual();
   const dataP = dataPlantaoAtual();
   const tui = TURNO_UI[turno];
 
-  const atual = (data.plantoes||[]).find(p=>p.dataPlantao===dataP && p.turno===turno) || null;
-  const historico = [...(data.plantoes||[])].filter(p=>p!==atual)
+  const saveTimer = useRef(null);
+  const pendRef = useRef(null); // {full, idx} pendente de gravação
+
+  useEffect(()=>{
+    (async()=>{
+      const [i, c] = await Promise.all([loadIndex(project.id), loadColaboradores(project.id)]);
+      setIdx(i); setColabs(c);
+      const entrada = (i.plantoes||[]).find(p=>p.dataPlantao===dataP && p.turno===turno);
+      if(entrada){ setAtualFull(await loadPlantaoFull(entrada)); }
+      setLoading(false);
+    })();
+    return ()=>{
+      if(saveTimer.current){ clearTimeout(saveTimer.current); }
+      if(pendRef.current){ savePlantaoFull(pendRef.current.full); saveIndex(project.id, pendRef.current.idx); }
+    };
+  },[project.id]); // eslint-disable-line
+
+  const historico = (idx.plantoes||[]).filter(p=>!(p.dataPlantao===dataP && p.turno===turno))
     .sort((a,b)=>(b.dataPlantao||"").localeCompare(a.dataPlantao||"")||(a.turno==="noturno"?-1:1));
 
-  // Pendência do plantão anterior (só depois que o módulo já tem uso)
   const ant = slotAnterior(dataP, turno);
-  const plantaoAnt = (data.plantoes||[]).find(p=>p.dataPlantao===ant.dataPlantao && p.turno===ant.turno);
-  const pendenciaAnt = (data.plantoes||[]).length>0 && (!plantaoAnt || !plantaoAnt.enviado);
+  const plantaoAnt = (idx.plantoes||[]).find(p=>p.dataPlantao===ant.dataPlantao && p.turno===ant.turno);
+  const pendenciaAnt = (idx.plantoes||[]).length>0 && (!plantaoAnt || !plantaoAnt.enviado);
 
-  // Líderes do turno atual (folguista/perista aparecem sempre)
-  const lideresTurno = lideres.filter(l=>{
-    const t = norm(l.turno);
-    if(!t || t.includes("folg") || t.includes("peri")) return true;
-    return t === turno;
-  });
-  const listaLideres = lideresTurno.length>0 ? lideresTurno : lideres;
-
-  const persist = (next, imediato) => {
-    setData(next);
+  // grava plantão completo + índice (entrada leve), com debounce
+  const persist = (full, imediato) => {
+    const plantoes = (idx.plantoes||[]).some(p=>p.id===full.id)
+      ? (idx.plantoes||[]).map(p=>p.id===full.id?entradaLeve(full):p)
+      : [...(idx.plantoes||[]), entradaLeve(full)];
+    const novoIdx = { ...idx, plantoes };
+    setIdx(novoIdx); setAtualFull(full);
+    pendRef.current = { full, idx:novoIdx };
     if(saveTimer.current) clearTimeout(saveTimer.current);
-    if(imediato){ setSaving(true); saveRondas(project.id,next).then(()=>setSaving(false)); }
-    else saveTimer.current = setTimeout(()=>saveRondas(project.id,next), 1200);
+    const doSave = async () => {
+      pendRef.current = null;
+      setSaving(true);
+      await savePlantaoFull(full);
+      await saveIndex(project.id, novoIdx);
+      setSaving(false);
+    };
+    if(imediato) doSave();
+    else saveTimer.current = setTimeout(doSave, 1200);
   };
   const upsertAtual = (mut, imediato=true) => {
-    let plantoes = [...(data.plantoes||[])];
-    let p = plantoes.find(x=>x.dataPlantao===dataP && x.turno===turno);
-    if(!p){ p = { id:newId(), dataPlantao:dataP, turno, lider:"", rondas:[], enviado:false, criadoEm:new Date().toISOString() }; plantoes.push(p); }
-    const novo = mut({...p, rondas:[...(p.rondas||[])]});
-    plantoes = plantoes.map(x=>x.id===p.id?novo:x);
-    persist({ ...data, plantoes }, imediato);
+    let p = atualFull;
+    if(!p){ p = { id:newId(), projectId:project.id, dataPlantao:dataP, turno, lider:"", rondas:[], enviado:false, criadoEm:new Date().toISOString() }; }
+    persist(mut({ ...p, rondas:[...(p.rondas||[])] }), imediato);
     setEnvioErr(null);
   };
 
+  const totalFotos = (atualFull?.rondas||[]).reduce((a,r)=>a+((r.fotos||[]).length),0);
+
   const addRonda = () => {
     const ini = horaAgora();
-    upsertAtual(p=>({ ...p, rondas:[...p.rondas, { id:newId(), inicio:ini, fim:fimAuto(ini), externa:true, obs:"" }] }));
+    upsertAtual(p=>({ ...p, rondas:[...p.rondas, { id:newId(), inicio:ini, fim:fimAuto(ini), externa:true, obs:"", fotos:[] }] }));
   };
-  const editRonda = (rid, campo, valor) => {
+  const editRonda = (rid, campo, valor, imediato=false) => {
     upsertAtual(p=>({ ...p, rondas:p.rondas.map(r=>{
       if(r.id!==rid) return r;
       const nr = { ...r, [campo]:valor };
-      if(campo==="inicio") nr.fim = fimAuto(valor); // recalcula; o campo fim continua editável depois
+      if(campo==="inicio") nr.fim = fimAuto(valor);
       return nr;
-    })}), false);
+    })}), imediato);
   };
   const delRonda = (rid) => upsertAtual(p=>({ ...p, rondas:p.rondas.filter(r=>r.id!==rid) }));
   const setLider = (nome) => upsertAtual(p=>({ ...p, lider:nome }));
 
+  const addFoto = async (rid, file) => {
+    if(!file) return;
+    if(totalFotos >= MAX_FOTOS_PLANTAO){ setEnvioErr(`Limite de ${MAX_FOTOS_PLANTAO} fotos por plantão atingido.`); return; }
+    const b64 = await comprimirFoto(file);
+    if(!b64){ setEnvioErr("Não consegui processar essa foto."); return; }
+    upsertAtual(p=>({ ...p, rondas:p.rondas.map(r=>{
+      if(r.id!==rid) return r;
+      const fotos = [...(r.fotos||[])];
+      if(fotos.length>=MAX_FOTOS_RONDA) return r;
+      return { ...r, fotos:[...fotos, b64] };
+    })}));
+  };
+  const delFoto = (rid, fi) => upsertAtual(p=>({ ...p, rondas:p.rondas.map(r=>r.id===rid?{...r,fotos:(r.fotos||[]).filter((_,j)=>j!==fi)}:r) }));
+
   const enviarTurno = () => {
-    if(!atual || !atual.lider){ setEnvioErr("Selecione o líder do turno antes de enviar."); setConfirmEnvio(false); return; }
-    const validas = (atual.rondas||[]).filter(r=>(r.inicio||"").trim());
+    if(!atualFull || !atualFull.lider){ setEnvioErr("Selecione o responsável pelo turno antes de enviar."); setConfirmEnvio(false); return; }
+    const validas = (atualFull.rondas||[]).filter(r=>(r.inicio||"").trim());
     if(validas.length===0){ setEnvioErr("Registre ao menos uma ronda antes de enviar."); setConfirmEnvio(false); return; }
     upsertAtual(p=>({ ...p, enviado:true, enviadoEm:new Date().toISOString() }));
     setConfirmEnvio(false);
   };
-  const reabrir = (pid) => {
-    const plantoes = (data.plantoes||[]).map(p=>p.id===pid?{...p,enviado:false,reabertoEm:new Date().toISOString()}:p);
-    persist({ ...data, plantoes }, true);
+  const reabrirAtual = () => upsertAtual(p=>({ ...p, enviado:false, reabertoEm:new Date().toISOString() }));
+  const reabrirView = async () => {
+    if(!viewFull) return;
+    const novo = { ...viewFull, enviado:false, reabertoEm:new Date().toISOString() };
+    setViewFull(novo);
+    const plantoes = (idx.plantoes||[]).map(p=>p.id===novo.id?{...entradaLeve(novo)}:p);
+    const novoIdx = { ...idx, plantoes };
+    setIdx(novoIdx);
+    setSaving(true);
+    if(!viewFull.__embutido) await savePlantaoFull(novo);
+    await saveIndex(project.id, viewFull.__embutido ? { ...novoIdx, plantoes:(idx.plantoes||[]).map(p=>p.id===novo.id?{...novo,__embutido:undefined}:p) } : novoIdx);
+    setSaving(false);
   };
-  const excluirPlantao = (pid) => {
-    persist({ ...data, plantoes:(data.plantoes||[]).filter(p=>p.id!==pid), deletedIds:[...(data.deletedIds||[]),pid] }, true);
-    setConfirmDel(false); setViewPlantao(null); setScreen("home");
+  const excluirPlantao = async (pid) => {
+    const novoIdx = { ...idx, plantoes:(idx.plantoes||[]).filter(p=>p.id!==pid), deletedIds:[...(idx.deletedIds||[]),pid] };
+    setIdx(novoIdx);
+    setSaving(true);
+    await saveIndex(project.id, novoIdx);
+    setSaving(false);
+    setConfirmDel(false); setViewFull(null); setScreen("home");
+  };
+  const abrirView = async (entrada) => {
+    setConfirmDel(false); setViewLoading(true); setScreen("view");
+    if(entrada.rondas){ setViewFull({ ...entrada, __embutido:true }); setViewLoading(false); return; }
+    const full = await loadPlantaoFull(entrada);
+    setViewFull({ ...full, enviado:entrada.enviado, lider:full.lider||entrada.lider });
+    setViewLoading(false);
   };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("home");onAuthGranted?.(l);}}/>;
@@ -294,7 +373,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
   const Header = (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px 10px"}}>
-      <button onClick={()=>{ if(screen==="home") onBack(); else { setViewPlantao(null); setConfirmDel(false); setScreen("home"); } }} style={S.backBtn} aria-label="Voltar">←</button>
+      <button onClick={()=>{ if(screen==="home") onBack(); else { setViewFull(null); setConfirmDel(false); setScreen("home"); } }} style={S.backBtn} aria-label="Voltar">←</button>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚶 Ronda Perimetral Diária</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
@@ -303,12 +382,14 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     </div>
   );
 
-  const RondaLinha = ({ r, i, travado }) => (
-    <div style={{...S.card,padding:"10px 14px"}}>
+  // Linha de ronda renderizada INLINE (função chamada, não componente) —
+  // preserva a identidade dos inputs e corrige a perda de foco a cada tecla
+  const renderRonda = (r, i, travado) => (
+    <div key={r.id} style={{...S.card,padding:"10px 14px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
         <div style={{fontSize:13,fontWeight:900,...S.txt}}>Ronda {i+1}</div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button disabled={travado} onClick={()=>!travado&&editRonda(r.id,"externa",!r.externa)}
+          <button disabled={travado} onClick={()=>!travado&&editRonda(r.id,"externa",!r.externa,true)}
             style={{...S.btnSm, color:r.externa?"#22c55e":(dark?"#64748b":"#475569"), borderColor:r.externa?"#22c55e44":undefined, opacity:travado?.6:1}}>
             {r.externa?"✓ Externa":"Externa?"}
           </button>
@@ -329,67 +410,93 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
         <input value={r.obs||""} disabled={travado} onChange={e=>editRonda(r.id,"obs",e.target.value)}
           placeholder="Observação (ex: teste de zonas, intervalo CCO)" style={{...S.inp,fontSize:12}}/>
       </div>
+      {/* Fotos da ronda */}
+      <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center",flexWrap:"wrap"}}>
+        {(r.fotos||[]).map((f,fi)=>(
+          <div key={fi} style={{position:"relative"}}>
+            <img src={f} alt={`Foto ${fi+1}`} style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}/>
+            {!travado && <button onClick={()=>delFoto(r.id,fi)}
+              style={{position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,fontSize:11,cursor:"pointer",lineHeight:"20px",padding:0}}>×</button>}
+          </div>
+        ))}
+        {!travado && (r.fotos||[]).length<MAX_FOTOS_RONDA && (
+          <label style={{...S.btnSm,padding:"9px 12px",fontSize:12,display:"inline-flex",alignItems:"center",gap:6}}>
+            📷 Foto
+            <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+              onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
+          </label>
+        )}
+      </div>
     </div>
   );
 
   // ── TELA: detalhe de plantão do histórico
-  if(screen==="view" && viewPlantao){
-    const p = viewPlantao;
-    const t = TURNO_UI[p.turno]||TURNO_UI.diurno;
+  if(screen==="view"){
+    const p = viewFull;
+    const t = p ? (TURNO_UI[p.turno]||TURNO_UI.diurno) : TURNO_UI.diurno;
     return (
       <div style={S.page}><div style={S.wrap}>
         {Header}
         <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
-          <div style={S.card}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:800,...S.txt}}>{t.icon} {t.label} · {fmtData(p.dataPlantao)}</div>
-                <div style={{fontSize:11,...S.txt2}}>Líder: {p.lider||"—"} · {(p.rondas||[]).length} ronda{(p.rondas||[]).length===1?"":"s"}</div>
+          {viewLoading || !p ? (
+            <div style={{...S.card,textAlign:"center",fontSize:12,...S.txt2}}>Carregando plantão…</div>
+          ) : (
+            <>
+              <div style={S.card}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:800,...S.txt}}>{t.icon} {t.label} · {fmtData(p.dataPlantao)}</div>
+                    <div style={{fontSize:11,...S.txt2}}>Responsável: {p.lider||"—"} · {(p.rondas||[]).length} ronda{(p.rondas||[]).length===1?"":"s"}</div>
+                  </div>
+                  <span style={{fontSize:10,fontWeight:800,padding:"3px 9px",borderRadius:6,
+                    color:p.enviado?"#22c55e":"#f59e0b", background:p.enviado?"#021a0d":"#1a1000",
+                    border:`1px solid ${p.enviado?"#22c55e33":"#f59e0b33"}`}}>{p.enviado?"✅ Enviado":"⏳ Pendente"}</span>
+                </div>
               </div>
-              <span style={{fontSize:10,fontWeight:800,padding:"3px 9px",borderRadius:6,
-                color:p.enviado?"#22c55e":"#f59e0b", background:p.enviado?"#021a0d":"#1a1000",
-                border:`1px solid ${p.enviado?"#22c55e33":"#f59e0b33"}`}}>{p.enviado?"✅ Enviado":"⏳ Pendente"}</span>
-            </div>
-          </div>
-          {(p.rondas||[]).map((r,i)=>(
-            <div key={r.id} style={{...S.card,padding:"10px 14px"}}>
-              <div style={{display:"flex",justifyContent:"space-between"}}>
-                <div style={{fontSize:12,fontWeight:800,...S.txt}}>Ronda {i+1}</div>
-                <div style={{fontSize:12,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"} {r.externa?"· Externa (sim)":""}</div>
-              </div>
-              {r.obs && <div style={{fontSize:11,...S.txt2,marginTop:4}}>{r.obs}</div>}
-            </div>
-          ))}
-          {adminAuth && p.enviado && <button onClick={()=>{reabrir(p.id); setViewPlantao({...p,enviado:false});}} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
-          {adminAuth && !confirmDel && <button onClick={()=>setConfirmDel(true)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir plantão</button>}
-          {adminAuth && confirmDel && (
-            <div style={{...S.card,border:"1px solid #ef444455"}}>
-              <div style={{fontSize:12,...S.txt,marginBottom:10}}>Excluir definitivamente o plantão {t.label.toLowerCase()} de {fmtData(p.dataPlantao)}?</div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>setConfirmDel(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-                <button onClick={()=>excluirPlantao(p.id)} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>Excluir</button>
-              </div>
-            </div>
+              {(p.rondas||[]).map((r,i)=>(
+                <div key={r.id} style={{...S.card,padding:"10px 14px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                    <div style={{fontSize:12,fontWeight:800,...S.txt}}>Ronda {i+1}</div>
+                    <div style={{fontSize:12,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"} {r.externa?"· Externa (sim)":""}</div>
+                  </div>
+                  {r.obs && <div style={{fontSize:11,...S.txt2,marginTop:4}}>{r.obs}</div>}
+                  {(r.fotos||[]).length>0 && (
+                    <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+                      {(r.fotos||[]).map((f,fi)=><img key={fi} src={f} alt={`Foto ${fi+1}`} style={{width:96,height:96,objectFit:"cover",borderRadius:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}/>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {adminAuth && p.enviado && <button onClick={reabrirView} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
+              {adminAuth && !confirmDel && <button onClick={()=>setConfirmDel(true)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir plantão</button>}
+              {adminAuth && confirmDel && (
+                <div style={{...S.card,border:"1px solid #ef444455"}}>
+                  <div style={{fontSize:12,...S.txt,marginBottom:10}}>Excluir definitivamente o plantão {t.label.toLowerCase()} de {fmtData(p.dataPlantao)}?</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>setConfirmDel(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+                    <button onClick={()=>excluirPlantao(p.id)} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>Excluir</button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-          <button onClick={()=>{setViewPlantao(null);setConfirmDel(false);setScreen("home");}} style={{...S.btnSec,fontSize:13}}>← Voltar</button>
+          <button onClick={()=>{setViewFull(null);setConfirmDel(false);setScreen("home");}} style={{...S.btnSec,fontSize:13}}>← Voltar</button>
         </div>
       </div></div>
     );
   }
 
   // ── TELA: home (plantão atual + histórico)
-  const travado = !!atual?.enviado;
-  const nRondas = (atual?.rondas||[]).length;
+  const travado = !!atualFull?.enviado;
+  const nRondas = (atualFull?.rondas||[]).length;
   return (
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
 
-        {/* Foto aérea do projeto (sem zonas) */}
         <img src={`/mapas/${project.id}-ronda.jpg`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
           onError={(e)=>{e.currentTarget.style.display="none";}}/>
 
-        {/* Pendência do plantão anterior */}
         {pendenciaAnt && (
           <div style={{...S.card,border:"1px solid #ef444455",background:dark?"#1a0202":"#fef2f2"}}>
             <div style={{fontSize:12,fontWeight:800,color:"#ef4444"}}>⚠️ Plantão anterior sem envio</div>
@@ -397,7 +504,6 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           </div>
         )}
 
-        {/* Plantão atual */}
         <div style={{...S.card,border:`1px solid ${tui.cor}44`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:15,fontWeight:900,color:tui.cor}}>{tui.icon} {tui.label} · {fmtData(dataP)}</div>
@@ -405,30 +511,28 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               ? <span style={{fontSize:10,fontWeight:800,color:"#22c55e",background:"#021a0d",border:"1px solid #22c55e33",padding:"3px 9px",borderRadius:6}}>✅ Enviado</span>
               : <span style={{fontSize:10,fontWeight:700,...S.txt2}}>envio até {tui.limite}</span>}
           </div>
-          {/* Líder do turno */}
           <div style={{marginTop:10}}>
-            <label style={S.lbl}>Líder responsável pelo registro</label>
-            {atual?.lider ? (
+            <label style={S.lbl}>Responsável pelo registro</label>
+            {atualFull?.lider ? (
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{flex:1,fontSize:14,fontWeight:800,...S.txt}}>{atual.lider}</div>
+                <div style={{flex:1,fontSize:14,fontWeight:800,...S.txt}}>{atualFull.lider}</div>
                 {!travado && <button onClick={()=>setLider("")} style={S.btnSm}>trocar</button>}
               </div>
             ) : (
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {listaLideres.map(l=>(
-                  <button key={l.nome} onClick={()=>setLider(l.nome)}
+                {colabs.map(c=>(
+                  <button key={c.nome} onClick={()=>setLider(c.nome)}
                     style={{...S.btnSm,padding:"8px 12px",fontSize:12,color:dark?"#e2e8f0":"#1e293b"}}>
-                    {l.nome}<span style={{marginLeft:6,fontSize:9,...S.txt2}}>{l.cargo}</span>
+                    {c.nome}<span style={{marginLeft:6,fontSize:9,...S.txt2}}>{c.cargo}</span>
                   </button>
                 ))}
-                {listaLideres.length===0 && <div style={{fontSize:11,...S.txt2}}>Nenhum colaborador no cadastro Equipe — cadastre a equipe primeiro.</div>}
+                {colabs.length===0 && <div style={{fontSize:11,...S.txt2}}>Nenhum colaborador no cadastro Equipe — cadastre a equipe primeiro.</div>}
               </div>
             )}
           </div>
         </div>
 
-        {/* Rondas do plantão */}
-        {(atual?.rondas||[]).map((r,i)=><RondaLinha key={r.id} r={r} i={i} travado={travado}/>)}
+        {(atualFull?.rondas||[]).map((r,i)=>renderRonda(r,i,travado))}
 
         {!travado && <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>}
 
@@ -445,20 +549,20 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             </div>
           </div>
         )}
-        {travado && adminAuth && <button onClick={()=>reabrir(atual.id)} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
+        {travado && adminAuth && <button onClick={reabrirAtual} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
         {saving && <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>salvando…</div>}
 
-        {/* Histórico */}
         {historico.length>0 && <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginTop:4}}>Plantões anteriores ({historico.length})</div>}
         {historico.map(p=>{
           const t = TURNO_UI[p.turno]||TURNO_UI.diurno;
+          const nr = p.rondas ? p.rondas.length : (p.nRondas||0);
           return (
-            <button key={p.id} onClick={()=>{setViewPlantao(p);setConfirmDel(false);setScreen("view");}}
+            <button key={p.id} onClick={()=>abrirView(p)}
               style={{...S.card,cursor:"pointer",textAlign:"left",width:"100%",display:"flex",alignItems:"center",gap:12}}>
               <span style={{fontSize:20}}>{t.icon}</span>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,...S.txt}}>{t.label} · {fmtData(p.dataPlantao)}</div>
-                <div style={{fontSize:10,...S.txt2}}>{(p.rondas||[]).length} ronda{(p.rondas||[]).length===1?"":"s"} · {p.lider||"—"}</div>
+                <div style={{fontSize:10,...S.txt2}}>{nr} ronda{nr===1?"":"s"} · {p.lider||"—"}</div>
               </div>
               <span style={{fontSize:10,fontWeight:800,padding:"3px 9px",borderRadius:6,
                 color:p.enviado?"#22c55e":"#ef4444", background:p.enviado?"#021a0d":"#1a0202",

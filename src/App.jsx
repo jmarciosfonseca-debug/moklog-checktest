@@ -3328,6 +3328,10 @@ export default function App(){
                         style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:jp.id==="P260A"?"auto":"1/-1"}}>🛡️ Equipamentos</button>
                       <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
                         style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
+                      <button onClick={()=>{setIluminacaoProject({id:jp.id,name:jp.name});setShowIluminacao(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#facc15",borderColor:"#facc1522",gridColumn:"1/-1"}}>💡 Teste de Iluminação</button>
+                      <button onClick={()=>{setRondaProject({id:jp.id,name:jp.name});setShowRonda(true);}}
+                        style={{...S.secBtn,fontSize:12,color:"#2dd4bf",borderColor:"#2dd4bf22",gridColumn:"1/-1"}}>🚶 Ronda Perimetral Diária</button>
 
                       {jp.id==="P260A"&&(
                         <button onClick={()=>{setHomeGroup(null);setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"home":"pin_gate");}}
