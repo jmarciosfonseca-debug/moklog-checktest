@@ -367,6 +367,31 @@ function getAllPendencies(stored) {
 
 const todayStr = () => new Date().toLocaleDateString("sv-SE");
 const isSunday = () => new Date().getDay() === 0; // domingo: dia do teste semanal — botão pisca
+function proximoDomingo(){
+  const d = new Date(); d.setHours(23,59,59,999);
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+  return d;
+}
+function ContagemProximoDomingo({ light }){
+  const [agora, setAgora] = useState(()=>Date.now());
+  useEffect(()=>{
+    const t = setInterval(()=>setAgora(Date.now()), 30000);
+    return ()=>clearInterval(t);
+  },[]);
+  const alvo = proximoDomingo();
+  const diff = Math.max(0, alvo.getTime() - agora);
+  const dias = Math.floor(diff/86400000);
+  const horas = Math.floor((diff%86400000)/3600000);
+  const minutos = Math.floor((diff%3600000)/60000);
+  const dataFmt = alvo.toLocaleDateString("pt-BR");
+  const cor = light ? "#bfdbfe" : "#94a3b8";
+  return (
+    <>
+      <div style={{fontSize:12,color:cor,marginTop:2,fontWeight:600}}>Próximo relatório: domingo, {dataFmt}</div>
+      <div style={{fontSize:11,color:cor,marginTop:1,fontWeight:700}}>⏳ {dias}d {horas}h {minutos}min</div>
+    </>
+  );
+}
 const fmtDate = (d) => { if(!d)return"\u2014"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
@@ -3109,7 +3134,8 @@ export default function App(){
               <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}>📋</span></div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
-                <div style={{fontSize:12,color:"#bfdbfe",marginTop:2,fontWeight:600}}>P260A · {new Date().toLocaleDateString("pt-BR")}</div>
+                <div style={{fontSize:11,color:"#bfdbfe",fontWeight:700}}>P260A</div>
+                <ContagemProximoDomingo light/>
               </div>
             </button>
             <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
@@ -3449,7 +3475,8 @@ export default function App(){
                     <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}>📋</span></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
-                      <div style={{fontSize:12,color:"#bfdbfe",marginTop:2,fontWeight:600}}>{project.id} · {new Date().toLocaleDateString("pt-BR")}</div>
+                      <div style={{fontSize:11,color:"#bfdbfe",fontWeight:700}}>{project.id}</div>
+                      <ContagemProximoDomingo light/>
                     </div>
                   </button>
                   <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
@@ -3468,7 +3495,19 @@ export default function App(){
                 </>
               ):(
                 <>
-                  <button onClick={()=>setScreen("pin_gate")} style={{...S.primaryBtn,fontSize:14}}>🔐 Acessar — {project.id}</button>
+                  <button onClick={()=>setScreen("pin_gate")} style={{position:"relative",background:"linear-gradient(160deg,#1e3a6e 0%,#0b1730 55%,#1e3a6e 100%)",border:"2px solid #7dd3fc",borderRadius:14,padding:"14px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,boxShadow:"0 0 0 1px rgba(125,211,252,.25), 0 0 22px rgba(56,189,248,.35), inset 0 1px 0 rgba(255,255,255,.15)"}}>
+                    <svg width="40" height="40" viewBox="0 0 100 100" style={{flexShrink:0,filter:"drop-shadow(0 0 6px rgba(56,189,248,.7))"}}>
+                      <path d="M50 8 L88 32 L82 78 Q50 96 18 78 L12 32 Z" fill="#0b1730" stroke="#7dd3fc" strokeWidth="2.5"/>
+                      <path d="M25 40 Q50 20 75 40 L68 46 Q50 32 32 46 Z" fill="#38bdf8"/>
+                      <circle cx="50" cy="52" r="16" fill="#082033" stroke="#38bdf8" strokeWidth="2"/>
+                      <circle cx="50" cy="52" r="8" fill="#38bdf8"/>
+                      <circle cx="50" cy="52" r="3.5" fill="#0b1730"/>
+                    </svg>
+                    <div style={{flex:1,minWidth:0,textAlign:"left"}}>
+                      <div style={{fontSize:15,fontWeight:900,color:"#e0f2fe",letterSpacing:.5,textTransform:"uppercase",lineHeight:1.25,textShadow:"0 0 8px rgba(56,189,248,.6)"}}>Entrar no Comando<br/>— {project.id}</div>
+                      <div style={{fontSize:9,fontWeight:700,color:"#7dd3fc",letterSpacing:1,marginTop:3,textTransform:"uppercase"}}>Vigilância Ativa / Protocolo Moked</div>
+                    </div>
+                  </button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:"linear-gradient(165deg,#22c55e11,#22c55e06)",border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#22c55e15",border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:"#22c55e44",fontSize:18}}>›</span></button>
