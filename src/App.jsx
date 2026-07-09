@@ -3104,9 +3104,15 @@ export default function App(){
             )}
 
             <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
-              style={{...S.primaryBtn,fontSize:17,fontWeight:900,letterSpacing:.3,width:"100%",padding:"18px 16px",textTransform:"uppercase",
-                animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>📋 Novo Relatório Semanal — P260A</button>
-            <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.6)}70%{box-shadow:0 0 0 12px rgba(29,78,216,0)}}`}</style>
+              style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
+                animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
+              <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}>📋</span></div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
+                <div style={{fontSize:12,color:"#bfdbfe",marginTop:2,fontWeight:600}}>P260A · {new Date().toLocaleDateString("pt-BR")}</div>
+              </div>
+            </button>
+            <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
             <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico de Relatórios Semanais</button>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -3438,9 +3444,15 @@ export default function App(){
               {checkAuth(project.id)?(
                 <>
                   <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
-                    style={{...S.primaryBtn,fontSize:17,fontWeight:900,letterSpacing:.3,padding:"18px 16px",textTransform:"uppercase",
-                      animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>📋 Novo Relatório Semanal — {project.id}</button>
-                  <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.6)}70%{box-shadow:0 0 0 12px rgba(29,78,216,0)}}`}</style>
+                    style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
+                      animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
+                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}>📋</span></div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
+                      <div style={{fontSize:12,color:"#bfdbfe",marginTop:2,fontWeight:600}}>{project.id} · {new Date().toLocaleDateString("pt-BR")}</div>
+                    </div>
+                  </button>
+                  <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
                   <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico de Relatórios Semanais</button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
