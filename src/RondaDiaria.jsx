@@ -225,6 +225,75 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   );
 }
 
+async function loadTodosPlantoes(projectId, idx){
+  const entradas = idx.plantoes||[];
+  const cheios = await Promise.all(entradas.map(e=>loadPlantaoFull(e)));
+  return cheios.filter(Boolean).sort((a,b)=>(a.dataPlantao||"").localeCompare(b.dataPlantao||"")||(a.turno==="noturno"?1:-1));
+}
+
+function gerarPdfConsolidado(project, plantoes){
+  const agora = new Date();
+  const totalRondas = plantoes.reduce((a,p)=>a+((p.rondas||[]).length),0);
+  const secoes = plantoes.map(p=>{
+    const t = TURNO_UI[p.turno]||TURNO_UI.diurno;
+    const linhas = (p.rondas||[]).map((r,i)=>`<tr>
+        <td>${i+1}</td>
+        <td>${r.inicio||"—"} – ${r.fim||"—"}</td>
+        <td>${r.externa?"Sim":"Não"}</td>
+        <td>${(r.obs||"").replace(/</g,"&lt;")}</td>
+      </tr>`).join("");
+    return `<div class="plantao">
+      <div class="plantao-head">
+        <div><b>${t.icon} ${t.label}</b> · ${fmtData(p.dataPlantao)} · Responsável: ${p.lider||"—"}</div>
+        <div class="badge ${p.enviado?"ok":"pend"}">${p.enviado?"Enviado":"Pendente"}</div>
+      </div>
+      <table><thead><tr><th>#</th><th>Horário</th><th>Externa</th><th>Observação</th></tr></thead>
+      <tbody>${linhas||'<tr><td colspan="4" style="text-align:center;color:#94a3b8">Sem rondas registradas</td></tr>'}</tbody></table>
+    </div>`;
+  }).join("");
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Ronda Consolidada ${project.id}</title>
+<style>
+  body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:20px;max-width:860px;margin:0 auto}
+  h1{font-size:19px;margin:0}
+  .sub{font-size:12px;color:#64748b;margin-top:2px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+  .kpi-val{font-size:22px;font-weight:900}
+  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
+  .plantao{margin-top:18px;page-break-inside:avoid}
+  .plantao-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
+  .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px}
+  .badge.ok{color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0}
+  .badge.pend{color:#d97706;background:#fffbeb;border:1px solid #fde68a}
+  table{width:100%;border-collapse:collapse;font-size:11px}
+  th{background:#1e293b;color:#fff;padding:6px 9px;text-align:left;font-size:10px}
+  td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
+  .footer{text-align:center;margin-top:20px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+</style></head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<h1>🚶 Ronda Perimetral Diária — Consolidado ${project.id}</h1>
+<div class="sub">${project.name||""} · Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val">${plantoes.length}</div><div class="kpi-lbl">Plantões</div></div>
+  <div class="kpi"><div class="kpi-val">${totalRondas}</div><div class="kpi-lbl">Rondas registradas</div></div>
+  <div class="kpi"><div class="kpi-val">${plantoes.filter(p=>p.enviado).length}</div><div class="kpi-lbl">Enviados</div></div>
+</div>
+${secoes}
+<div class="footer">MokLog CheckTest · Moked Consulting Security · Ronda Perimetral Diária ${project.id}</div>
+</body></html>`;
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ronda_consolidado_${project.id}_${agora.toLocaleDateString("sv-SE")}.html`;
+  a.click();
+}
+
 // ── App principal
 export default function RondaDiaria({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
@@ -240,6 +309,8 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const [confirmEnvio, setConfirmEnvio] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [envioErr, setEnvioErr] = useState(null);
+  const [openRondaId, setOpenRondaId] = useState(null); // accordion: só uma ronda aberta por vez
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const adminAuth = authLevel==="admin";
 
   const turno = turnoAtual();
@@ -300,7 +371,9 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
   const addRonda = () => {
     const ini = horaAgora();
-    upsertAtual(p=>({ ...p, rondas:[...p.rondas, { id:newId(), inicio:ini, fim:fimAuto(ini), externa:true, obs:"", fotos:[] }] }));
+    const rid = newId();
+    upsertAtual(p=>({ ...p, rondas:[...p.rondas, { id:rid, inicio:ini, fim:fimAuto(ini), externa:true, obs:"", fotos:[] }] }));
+    setOpenRondaId(rid); // colapsa a anterior, abre a nova
   };
   const editRonda = (rid, campo, valor, imediato=false) => {
     upsertAtual(p=>({ ...p, rondas:p.rondas.map(r=>{
@@ -363,6 +436,13 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     setViewLoading(false);
   };
 
+  const baixarPdfConsolidado = async () => {
+    setGerandoPdf(true);
+    const todos = await loadTodosPlantoes(project.id, idx);
+    gerarPdfConsolidado(project, todos);
+    setGerandoPdf(false);
+  };
+
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("home");onAuthGranted?.(l);}}/>;
 
   if(loading) return (
@@ -373,6 +453,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
   const Header = (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px 10px"}}>
+      <style>{`@keyframes mkPulseDot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.6);}50%{opacity:.7;box-shadow:0 0 0 5px rgba(34,197,94,0);}}`}</style>
       <button onClick={()=>{ if(screen==="home") onBack(); else { setViewFull(null); setConfirmDel(false); setScreen("home"); } }} style={S.backBtn} aria-label="Voltar">←</button>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚶 Ronda Perimetral Diária</div>
@@ -382,60 +463,81 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     </div>
   );
 
-  // Linha de ronda renderizada INLINE (função chamada, não componente) —
-  // preserva a identidade dos inputs e corrige a perda de foco a cada tecla
-  const renderRonda = (r, i, travado) => (
-    <div key={r.id} style={{...S.card,padding:"10px 14px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <div style={{fontSize:13,fontWeight:900,...S.txt}}>Ronda {i+1}</div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button disabled={travado} onClick={()=>!travado&&editRonda(r.id,"externa",!r.externa,true)}
-            style={{...S.btnSm, color:r.externa?"#22c55e":(dark?"#64748b":"#475569"), borderColor:r.externa?"#22c55e44":undefined, opacity:travado?.6:1}}>
-            {r.externa?"✓ Externa":"Externa?"}
-          </button>
-          {!travado && <button onClick={()=>delRonda(r.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>}
-        </div>
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <div style={{flex:1}}>
-          <label style={S.lbl}>Início</label>
-          <input type="time" value={r.inicio||""} disabled={travado} onChange={e=>editRonda(r.id,"inicio",e.target.value)} style={S.inp}/>
-        </div>
-        <div style={{flex:1}}>
-          <label style={S.lbl}>Fim (auto +20 min)</label>
-          <input type="time" value={r.fim||""} disabled={travado} onChange={e=>editRonda(r.id,"fim",e.target.value)} style={S.inp}/>
-        </div>
-      </div>
-      <div style={{marginTop:8}}>
-        <input value={r.obs||""} disabled={travado} onChange={e=>editRonda(r.id,"obs",e.target.value)}
-          placeholder="Observação (ex: teste de zonas, intervalo CCO)" style={{...S.inp,fontSize:12}}/>
-      </div>
-      {/* Fotos da ronda */}
-      <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center",flexWrap:"wrap"}}>
-        {(r.fotos||[]).map((f,fi)=>(
-          <div key={fi} style={{position:"relative"}}>
-            <img src={f} alt={`Foto ${fi+1}`} style={{width:64,height:64,objectFit:"cover",borderRadius:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}/>
-            {!travado && <button onClick={()=>delFoto(r.id,fi)}
-              style={{position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,fontSize:11,cursor:"pointer",lineHeight:"20px",padding:0}}>×</button>}
+  // Linha de ronda INLINE (accordion): colapsada mostra resumo + bolinha
+  // verde pulsando; expandida mostra os campos completos. Fecha sozinha
+  // quando outra é aberta (addRonda já troca o openRondaId).
+  const renderRonda = (r, i, travado) => {
+    const aberta = openRondaId===r.id;
+    const concluida = !!(r.inicio && r.fim);
+    return (
+      <div key={r.id} style={{...S.card,padding:aberta?"12px 14px":"10px 14px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}
+          onClick={()=>setOpenRondaId(aberta?null:r.id)}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            {concluida && (
+              <span style={{position:"relative",width:10,height:10,flexShrink:0}}>
+                <span style={{position:"absolute",inset:0,borderRadius:"50%",background:"#22c55e",animation:"mkPulseDot 1.6s ease-in-out infinite"}}/>
+              </span>
+            )}
+            <div style={{fontSize:16,fontWeight:900,...S.txt}}>Ronda {i+1}</div>
+            {!aberta && <div style={{fontSize:13,fontWeight:600,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"}</div>}
           </div>
-        ))}
-        {!travado && (r.fotos||[]).length<MAX_FOTOS_RONDA && (
-          <>
-            <label style={{...S.btnSm,padding:"9px 12px",fontSize:12,display:"inline-flex",alignItems:"center",gap:6}}>
-              📷 Câmera
-              <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
-                onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
-            </label>
-            <label style={{...S.btnSm,padding:"9px 12px",fontSize:12,display:"inline-flex",alignItems:"center",gap:6}}>
-              🖼️ Galeria
-              <input type="file" accept="image/*" style={{display:"none"}}
-                onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
-            </label>
-          </>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {!aberta && (r.fotos||[]).length>0 && <span style={{fontSize:12,...S.txt2}}>📷{(r.fotos||[]).length}</span>}
+            <span style={{...S.txt2,fontSize:14,transform:aberta?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
+          </div>
+        </div>
+        {aberta && (
+          <div style={{marginTop:12}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
+              <button disabled={travado} onClick={()=>!travado&&editRonda(r.id,"externa",!r.externa,true)}
+                style={{...S.btnSm, fontSize:13, padding:"7px 12px", color:r.externa?"#22c55e":(dark?"#64748b":"#475569"), borderColor:r.externa?"#22c55e44":undefined, opacity:travado?.6:1}}>
+                {r.externa?"✓ Externa":"Externa?"}
+              </button>
+              {!travado && <button onClick={()=>delRonda(r.id)} style={{...S.btnSm,fontSize:13,padding:"7px 12px",color:"#ef4444",borderColor:"#ef444433",marginLeft:6}}>🗑</button>}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{flex:1}}>
+                <label style={{...S.lbl,fontSize:11}}>Início</label>
+                <input type="time" value={r.inicio||""} disabled={travado} onChange={e=>editRonda(r.id,"inicio",e.target.value)} style={{...S.inp,fontSize:15,padding:"11px 12px"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={{...S.lbl,fontSize:11}}>Fim (auto +20 min)</label>
+                <input type="time" value={r.fim||""} disabled={travado} onChange={e=>editRonda(r.id,"fim",e.target.value)} style={{...S.inp,fontSize:15,padding:"11px 12px"}}/>
+              </div>
+            </div>
+            <div style={{marginTop:10}}>
+              <input value={r.obs||""} disabled={travado} onChange={e=>editRonda(r.id,"obs",e.target.value)}
+                placeholder="Observação (ex: teste de zonas, intervalo CCO)" style={{...S.inp,fontSize:14,padding:"11px 12px"}}/>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center",flexWrap:"wrap"}}>
+              {(r.fotos||[]).map((f,fi)=>(
+                <div key={fi} style={{position:"relative"}}>
+                  <img src={f} alt={`Foto ${fi+1}`} style={{width:68,height:68,objectFit:"cover",borderRadius:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}/>
+                  {!travado && <button onClick={()=>delFoto(r.id,fi)}
+                    style={{position:"absolute",top:-6,right:-6,background:"#ef4444",color:"#fff",border:"none",borderRadius:"50%",width:21,height:21,fontSize:12,cursor:"pointer",lineHeight:"21px",padding:0}}>×</button>}
+                </div>
+              ))}
+              {!travado && (r.fotos||[]).length<MAX_FOTOS_RONDA && (
+                <>
+                  <label style={{...S.btnSm,padding:"10px 13px",fontSize:13,display:"inline-flex",alignItems:"center",gap:6}}>
+                    📷 Câmera
+                    <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                      onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
+                  </label>
+                  <label style={{...S.btnSm,padding:"10px 13px",fontSize:13,display:"inline-flex",alignItems:"center",gap:6}}>
+                    🖼️ Galeria
+                    <input type="file" accept="image/*" style={{display:"none"}}
+                      onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── TELA: detalhe de plantão do histórico
   if(screen==="view"){
@@ -513,7 +615,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         <div style={{...S.card,border:`1px solid ${tui.cor}44`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontSize:15,fontWeight:900,color:tui.cor}}>{tui.icon} {tui.label} · {fmtData(dataP)}</div>
+            <div style={{fontSize:17,fontWeight:900,color:tui.cor}}>{tui.icon} {tui.label} · {fmtData(dataP)}</div>
             {travado
               ? <span style={{fontSize:10,fontWeight:800,color:"#22c55e",background:"#021a0d",border:"1px solid #22c55e33",padding:"3px 9px",borderRadius:6}}>✅ Enviado</span>
               : <span style={{fontSize:10,fontWeight:700,...S.txt2}}>envio até {tui.limite}</span>}
@@ -522,7 +624,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             <label style={S.lbl}>Responsável pelo registro</label>
             {atualFull?.lider ? (
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{flex:1,fontSize:14,fontWeight:800,...S.txt}}>{atualFull.lider}</div>
+                <div style={{flex:1,fontSize:16,fontWeight:800,...S.txt}}>{atualFull.lider}</div>
                 {!travado && <button onClick={()=>setLider("")} style={S.btnSm}>trocar</button>}
               </div>
             ) : (
@@ -558,6 +660,12 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
         )}
         {travado && adminAuth && <button onClick={reabrirAtual} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
         {saving && <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>salvando…</div>}
+
+        {adminAuth && (
+          <button onClick={baixarPdfConsolidado} disabled={gerandoPdf} style={{...S.btn,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",opacity:gerandoPdf?.7:1}}>
+            {gerandoPdf?"Gerando…":"📄 PDF Consolidado (gerencial)"}
+          </button>
+        )}
 
         {historico.length>0 && <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginTop:4}}>Plantões anteriores ({historico.length})</div>}
         {historico.map(p=>{
