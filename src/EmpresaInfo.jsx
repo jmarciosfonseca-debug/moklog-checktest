@@ -40,6 +40,21 @@ function daysSince(d) {
 }
 const VISITA_ALERTA_DIAS = 15;
 
+// ── Leitura somente-leitura dos registros de Manutenção da CCO (fonte
+// única). Empresas não duplica nada: só filtra estes registros pelo nome.
+async function loadManutencaoCCO(projectId){
+  try {
+    const snap = await getDoc(doc(db,"cco_manutencao",projectId));
+    if(snap.exists()) return snap.data().registros||[];
+  } catch(e){}
+  try {
+    const local = localStorage.getItem(`cco_manutencao_${projectId}`);
+    if(local) return JSON.parse(local)||[];
+  } catch(e){}
+  return [];
+}
+function normNome(s){ return String(s||"").trim().toLowerCase(); }
+
 async function loadInfo(projectId) {
   try {
     const snap = await getDoc(doc(db,"empresa_info",projectId));
@@ -433,138 +448,177 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
 // ── Seção Empresa de Manutenção
 // PROPS: + ccoMode (bool) — quando true, o histórico é somente-leitura e o
 //          lançamento é redirecionado à aba CCO → Manutenção (fonte única).
-function SecManutencao({ data, onSave, adminAuth, dark, ccoMode }) {
+function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
   const S = getStyles(dark);
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({...data});
-  const [showAdd, setShowAdd] = useState(false);
+  // Migração transparente: formato antigo {nome, visitas} -> {empresas:[...]}
+  const empresasIniciais = data?.empresas || (data?.nome ? [{ id:"legado", nome:data.nome, observacao:"", visitas:data.visitas||[] }] : []);
+  const [empresas, setEmpresas] = useState(empresasIniciais);
+  const [aberto, setAberto] = useState(false);
+  const [expandidoId, setExpandidoId] = useState(null);
+  const [editId, setEditId] = useState(null); // id em edição, ou "novo"
+  const [edNome, setEdNome] = useState("");
+  const [edObs, setEdObs] = useState("");
+  const [delId, setDelId] = useState(null);
+  // Visita manual (só para projetos SEM CCO — P260B/P260C)
+  const [showAdd, setShowAdd] = useState(null); // id da empresa recebendo nova visita
   const [novaVisita, setNovaVisita] = useState({ data:todayStr(), tecnico:"", resumo:"" });
 
-  const saveEdit = () => { onSave(form); setEditing(false); };
+  const persist = (novo) => { setEmpresas(novo); onSave({ empresas:novo }); };
 
-  const addVisita = () => {
+  const abrirEdicao = (emp) => {
+    setEditId(emp?emp.id:"novo");
+    setEdNome(emp?emp.nome:""); setEdObs(emp?(emp.observacao||""):"");
+    setDelId(null);
+  };
+  const gravarEdicao = () => {
+    const nome = edNome.trim();
+    if(!nome) return;
+    if(editId==="novo"){
+      persist([...empresas, { id:Date.now().toString()+Math.random().toString(36).slice(2,6), nome, observacao:edObs.trim(), visitas:[] }]);
+    } else {
+      persist(empresas.map(e=>e.id===editId?{...e,nome,observacao:edObs.trim()}:e));
+    }
+    setEditId(null);
+  };
+  const excluirEmpresa = (id) => { persist(empresas.filter(e=>e.id!==id)); setDelId(null); setExpandidoId(x=>x===id?null:x); };
+
+  const addVisita = (empId) => {
     if(!novaVisita.resumo.trim()) { alert("Informe o resumo"); return; }
-    const updated = { ...form, visitas: [{ id:Date.now().toString(), ...novaVisita }, ...(form.visitas||[])] };
-    setForm(updated); onSave(updated);
+    persist(empresas.map(e=>e.id===empId?{...e,visitas:[{id:Date.now().toString(),...novaVisita},...(e.visitas||[])]}:e));
     setNovaVisita({ data:todayStr(), tecnico:"", resumo:"" });
-    setShowAdd(false);
+    setShowAdd(null);
+  };
+  const removeVisita = (empId, vid) => {
+    persist(empresas.map(e=>e.id===empId?{...e,visitas:(e.visitas||[]).filter(v=>v.id!==vid)}:e));
   };
 
-  const removeVisita = (id) => {
-    const updated = { ...form, visitas: (form.visitas||[]).filter(v=>v.id!==id) };
-    setForm(updated); onSave(updated);
-  };
+  // Histórico ao vivo da CCO por empresa (sem duplicar dado — só filtra)
+  const historicoCCO = (nome) => (manutCCO||[]).filter(r=>normNome(r.empresa)===normNome(nome))
+    .sort((a,b)=>(b.data||"").localeCompare(a.data||""));
 
-  const [aberto, setAberto] = useState(false);
   return (
     <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
       <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
         <span style={{fontSize:22}}>🔧</span>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:15, fontWeight:800, color:"#f59e0b"}}>Empresa de Manutenção</div>
-          <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{form.nome||"Não cadastrada"}{(form.visitas||[]).length?` · ${(form.visitas||[]).length} visita(s)`:""}</div>
+          <div style={{fontSize:15, fontWeight:800, color:"#f59e0b"}}>Empresas de Manutenção</div>
+          <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{empresas.length?`${empresas.length} cadastrada${empresas.length===1?"":"s"}`:"Nenhuma cadastrada"}</div>
         </div>
-        {adminAuth && aberto && !editing && (
-          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:11, padding:"6px 12px", flexShrink:0}}>✏️ Editar</button>
-        )}
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
       <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
       <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
 
-      {editing ? (
-        <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
-          <div>
-            <label style={S.lbl}>Nome da Empresa</label>
-            <input value={form.nome||""} onChange={e=>setForm(f=>({...f,nome:e.target.value}))} placeholder="Nome da empresa..." style={S.inp}/>
-          </div>
-          <div style={{display:"flex", gap:8}}>
-            <button onClick={()=>setEditing(false)} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:13}}>✓ Salvar</button>
-          </div>
-        </div>
-      ) : (
-        <div style={S.card}>
-          <div style={S.lbl}>Empresa</div>
-          <div style={{fontSize:13, fontWeight:600, ...S.txt}}>{data.nome||"—"}</div>
+      {ccoMode && (
+        <div style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 12px"}}>
+          <div style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>ℹ️ Registro de visitas fica no CCO</div>
+          <div style={{fontSize:10,...S.txt2,marginTop:2}}>Use <strong>🚪 CCO → 🛠️ Manutenção</strong> para lançar uma visita. Aqui você cadastra as empresas e vê o histórico de cada uma automaticamente, puxado do CCO pelo nome — sem duplicar registro.</div>
         </div>
       )}
 
-      {/* Histórico */}
-      <div style={S.card}>
-        {/* Aviso de fonte única quando o projeto tem aba CCO */}
-        {ccoMode && (
-          <div style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>ℹ️ Manutenção agora fica no CCO</div>
-            <div style={{fontSize:10,...S.txt2,marginTop:2}}>Para registrar uma nova visita de manutenção, use a aba <strong>🚪 CCO → 🛠️ Manutenção</strong>. O histórico abaixo é mantido para consulta.</div>
-          </div>
-        )}
-        {/* Contador dias desde última visita manutenção */}
-        {(()=>{
-          const visitas = data.visitas||[];
-          const ultima = visitas.length ? visitas[0] : null;
-          const dias = ultima ? daysSince(ultima.data) : null;
-          if(!ultima) return (
-            <div style={{background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-              <div style={{fontSize:11,...S.txt2}}>Nenhuma visita registrada ainda</div>
+      {empresas.map(emp=>{
+        const cco = ccoMode ? historicoCCO(emp.nome) : [];
+        const visitas = ccoMode ? cco : (emp.visitas||[]);
+        const ultima = visitas[0]||null;
+        const dias = ultima ? daysSince(ultima.data) : null;
+        const expandido = expandidoId===emp.id;
+        if(editId===emp.id) return (
+          <div key={emp.id} style={{...S.card,display:"flex",flexDirection:"column",gap:10,border:"1px solid #f59e0b55"}}>
+            <div>
+              <label style={S.lbl}>Nome da empresa</label>
+              <input value={edNome} onChange={e=>setEdNome(e.target.value)} placeholder="Ex: FM Security" style={S.inp}/>
             </div>
-          );
-          return (
-            <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-              <div style={{fontSize:11,color:"#22c55e",fontWeight:700}}>🔧 Última visita há {dias} dia(s)</div>
-              <div style={{fontSize:10,color:"#64748b"}}>{fmtDate(ultima.data)}{ultima.tecnico?` · ${ultima.tecnico}`:""}</div>
+            <div>
+              <label style={S.lbl}>Observação (o que ela cuida)</label>
+              <textarea value={edObs} onChange={e=>setEdObs(e.target.value)} rows={2} placeholder="Ex: CFTV, automação de cancela, controle de acesso" style={{...S.inp,resize:"vertical",fontFamily:"inherit"}}/>
             </div>
-          );
-        })()}
-        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
-          <div style={{fontSize:12, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:11, ...S.txt2}}>({(data.visitas||[]).length})</span></div>
-          {!ccoMode && (
-            <button onClick={()=>setShowAdd(!showAdd)} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:10}}>+ Visita</button>
-          )}
-        </div>
-
-        {!ccoMode && showAdd && (
-          <div style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", marginBottom:10, border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8}}>
-              <div>
-                <label style={S.lbl}>Data</label>
-                <input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={S.inp}/>
-              </div>
-              <div>
-                <label style={S.lbl}>Técnico</label>
-                <input value={novaVisita.tecnico} onChange={e=>setNovaVisita(v=>({...v,tecnico:e.target.value}))} placeholder="Nome do técnico..." style={S.inp}/>
-              </div>
-            </div>
-            <div style={{marginBottom:8}}>
-              <label style={S.lbl}>Resumo do Serviço</label>
-              <textarea value={novaVisita.resumo} onChange={e=>setNovaVisita(v=>({...v,resumo:e.target.value}))} placeholder="O que foi feito..." style={{...S.inp,height:60,resize:"vertical",fontSize:12}}/>
-            </div>
-            <div style={{display:"flex", gap:8}}>
-              <button onClick={()=>setShowAdd(false)} style={{...S.btnSec, flex:1, fontSize:12}}>Cancelar</button>
-              <button onClick={addVisita} style={{...S.btn, flex:1, fontSize:12}}>✓ Adicionar</button>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+              <button onClick={gravarEdicao} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
             </div>
           </div>
-        )}
-
-        {(data.visitas||[]).length===0 && !showAdd && (
-          <div style={{textAlign:"center", padding:"14px 0", fontSize:12, ...S.txt2}}>Nenhuma visita registrada</div>
-        )}
-
-        <div style={{display:"flex", flexDirection:"column", gap:6}}>
-          {(data.visitas||[]).map(v=>(
-            <div key={v.id} style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
-              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4}}>
-                <div style={{display:"flex", gap:8, alignItems:"center"}}>
-                  <span style={{fontSize:11, color:"#f59e0b", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
-                  {v.tecnico && <span style={{fontSize:10, ...S.txt2}}>🔧 {v.tecnico}</span>}
-                </div>
-                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
+        );
+        return (
+          <div key={emp.id} style={S.card}>
+            <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setExpandidoId(expandido?null:emp.id)}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:14,fontWeight:800,...S.txt}}>{emp.nome}</div>
+                {emp.observacao && <div style={{fontSize:11,...S.txt2,marginTop:1}}>{emp.observacao}</div>}
               </div>
-              <div style={{fontSize:12, ...S.txt}}>{v.resumo}</div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:11,fontWeight:700,color:visitas.length?"#22c55e":(dark?"#475569":"#94a3b8")}}>{visitas.length} registro{visitas.length===1?"":"s"}</div>
+                {ultima && <div style={{fontSize:9,...S.txt2}}>há {dias} dia{dias===1?"":"s"}</div>}
+              </div>
+              <span style={{color:dark?"#475569":"#94a3b8",fontSize:12,transform:expandido?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
             </div>
-          ))}
+            {expandido && (
+              <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+                {adminAuth && (
+                  <div style={{display:"flex",gap:8,marginBottom:10}}>
+                    <button onClick={()=>abrirEdicao(emp)} style={{...S.btnSm,flex:1,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>✏️ Editar</button>
+                    {delId!==emp.id
+                      ? <button onClick={()=>setDelId(emp.id)} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11}}>🗑</button>
+                      : <button onClick={()=>excluirEmpresa(emp.id)} style={{...S.btnSm,color:"#fff",background:"#dc2626",fontSize:11}}>Confirmar exclusão</button>}
+                  </div>
+                )}
+                {!ccoMode && (
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <div style={{fontSize:11,fontWeight:700,...S.txt}}>📋 Histórico</div>
+                    <button onClick={()=>setShowAdd(showAdd===emp.id?null:emp.id)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}>+ Visita</button>
+                  </div>
+                )}
+                {!ccoMode && showAdd===emp.id && (
+                  <div style={{background:dark?"#020510":"#f8fafc",borderRadius:8,padding:"10px 12px",marginBottom:10,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                      <div><label style={S.lbl}>Data</label><input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={S.inp}/></div>
+                      <div><label style={S.lbl}>Técnico</label><input value={novaVisita.tecnico} onChange={e=>setNovaVisita(v=>({...v,tecnico:e.target.value}))} style={S.inp}/></div>
+                    </div>
+                    <label style={S.lbl}>Resumo</label>
+                    <textarea value={novaVisita.resumo} onChange={e=>setNovaVisita(v=>({...v,resumo:e.target.value}))} rows={2} style={{...S.inp,resize:"vertical",fontFamily:"inherit"}}/>
+                    <div style={{display:"flex",gap:8,marginTop:8}}>
+                      <button onClick={()=>setShowAdd(null)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
+                      <button onClick={()=>addVisita(emp.id)} style={{...S.btn,flex:1,fontSize:12}}>✓ Registrar</button>
+                    </div>
+                  </div>
+                )}
+                {visitas.length===0 && <div style={{fontSize:11,...S.txt2}}>Nenhum registro ainda.</div>}
+                {visitas.slice(0,10).map(v=>(
+                  <div key={v.id} style={{background:dark?"#020510":"#f8fafc",borderRadius:8,padding:"8px 12px",marginBottom:6,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{fontSize:11,fontWeight:700,...S.txt}}>{fmtDate(v.data)} {v.tecnico?`· ${v.tecnico}`:""}</div>
+                      {!ccoMode && <button onClick={()=>removeVisita(emp.id,v.id)} style={{...S.btnSm,color:"#ef4444",fontSize:9,padding:"3px 8px"}}>excluir</button>}
+                    </div>
+                    <div style={{fontSize:11,...S.txt2,marginTop:3}}>{v.resumo||v.servico||"—"}</div>
+                  </div>
+                ))}
+                {visitas.length>10 && <div style={{fontSize:10,...S.txt2,textAlign:"center",marginTop:4}}>+{visitas.length-10} registro(s) mais antigo(s)</div>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {empresas.length===0 && <div style={{fontSize:12,...S.txt2,textAlign:"center",padding:"8px 0"}}>Nenhuma empresa de manutenção cadastrada ainda.</div>}
+
+      {editId==="novo" ? (
+        <div style={{...S.card,display:"flex",flexDirection:"column",gap:10,border:"1px solid #f59e0b55"}}>
+          <div>
+            <label style={S.lbl}>Nome da empresa</label>
+            <input value={edNome} onChange={e=>setEdNome(e.target.value)} placeholder="Ex: Steel CGL" style={S.inp}/>
+          </div>
+          <div>
+            <label style={S.lbl}>Observação (o que ela cuida)</label>
+            <textarea value={edObs} onChange={e=>setEdObs(e.target.value)} rows={2} placeholder="Ex: cancelas e questões mecânicas" style={{...S.inp,resize:"vertical",fontFamily:"inherit"}}/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+            <button onClick={gravarEdicao} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+          </div>
         </div>
-      </div>
+      ) : adminAuth && (
+        <button onClick={()=>abrirEdicao(null)} style={S.addBtn}>➕ Nova Empresa</button>
+      )}
+
       </div>
       </div></div>
     </div>
@@ -648,11 +702,16 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"main":"pin");
   const [info, setInfo] = useState(null);
+  const [manutCCO, setManutCCO] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const adminAuth = authLevel === "admin";
   const ccoMode = temCCO(project.id); // projetos com CCO: visitas de supervisão ficam no CCO
+
+  useEffect(()=>{
+    if(ccoMode) loadManutencaoCCO(project.id).then(setManutCCO);
+  },[project.id, ccoMode]);
 
   useEffect(()=>{
     loadInfo(project.id).then(d=>{ setInfo(d); setLoading(false); });
@@ -727,7 +786,8 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
             onSave={(d)=>saveSection("manutencao",d)}
             adminAuth={adminAuth}
             dark={dark}
-            ccoMode={ccoMode}/>
+            ccoMode={ccoMode}
+            manutCCO={manutCCO}/>
 
           {/* ADM */}
           <SecADM
