@@ -55,6 +55,19 @@ async function loadManutencaoCCO(projectId){
 }
 function normNome(s){ return String(s||"").trim().toLowerCase(); }
 
+// ── Leitura somente-leitura das visitas de Supervisão da CCO
+async function loadSupervisaoCCO(projectId){
+  try {
+    const snap = await getDoc(doc(db,"cco_supervisao",projectId));
+    if(snap.exists()) return snap.data().registros||[];
+  } catch(e){}
+  try {
+    const local = localStorage.getItem(`cco_supervisao_${projectId}`);
+    if(local) return JSON.parse(local)||[];
+  } catch(e){}
+  return [];
+}
+
 async function loadInfo(projectId) {
   try {
     const snap = await getDoc(doc(db,"empresa_info",projectId));
@@ -248,13 +261,22 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 // ── Seção Empresa de Segurança
 // PROPS: + ccoMode (bool) — quando true, o histórico de visitas é somente-leitura
 //          e o lançamento é redirecionado à aba CCO → Supervisão (fonte única).
-function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
+function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({...data});
   const [showAddVisita, setShowAddVisita] = useState(false);
   const [novaVisita, setNovaVisita] = useState({ data:todayStr(), turno:"", resumo:"" });
   const [filtroTurno, setFiltroTurno] = useState("todos");
+
+  // Fonte única: em projetos com CCO, as visitas vêm ao vivo do registro de
+  // Supervisão da CCO (mesmo dado, sem cópia) — o tempo desde a última
+  // reinicia sozinho a cada novo registro lançado lá.
+  const visitasEfetivas = ccoMode
+    ? [...(supervCCO||[])]
+        .map(r=>({ id:r.id, data:r.data, turno:r.turno==="diurno"?"Diurno":r.turno==="noturno"?"Noturno":(r.turno||""), resumo:r.resumo||r.obs||"—", supervisor:r.supervisor||"" }))
+        .sort((a,b)=>(b.data||"").localeCompare(a.data||""))
+    : (data.visitas||[]);
 
   const saveEdit = () => {
     onSave(form);
@@ -281,42 +303,42 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
   return (
     <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
       <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
-        <span style={{fontSize:22}}>🏢</span>
+        <span style={{fontSize:24}}>🏢</span>
         <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:15, fontWeight:800, color:"#0ea5e9"}}>Empresa de Segurança</div>
-          <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{form.nome||"Não cadastrada"}{(form.visitas||[]).length?` · ${(form.visitas||[]).length} visita(s)`:""}</div>
-          {(()=>{const vs=data.visitas||[];const u=vs.length?vs[0]:null;const d=u?daysSince(u.data):null;
-            if(!u) return <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginTop:2}}>🔴 Nenhuma visita registrada</div>;
-            if(d>=VISITA_ALERTA_DIAS) return <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginTop:2}}>🔴 Visita em atraso — {d} dias</div>;
+          <div style={{fontSize:16, fontWeight:800, color:"#0ea5e9"}}>Empresa de Segurança</div>
+          <div style={{fontSize:13, marginTop:3, fontWeight:600, ...S.txt2}}>{form.nome||"Não cadastrada"}{visitasEfetivas.length?` · ${visitasEfetivas.length} visita(s)`:""}</div>
+          {(()=>{const u=visitasEfetivas.length?visitasEfetivas[0]:null;const d=u?daysSince(u.data):null;
+            if(!u) return <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginTop:3}}>🔴 Nenhuma visita registrada</div>;
+            if(d>=VISITA_ALERTA_DIAS) return <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginTop:3}}>🔴 Visita em atraso — {d} dias</div>;
             return null;})()}
         </div>
         {adminAuth && aberto && !editing && (
-          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:11, padding:"6px 12px", flexShrink:0}}>✏️ Editar</button>
+          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:12, padding:"7px 13px", flexShrink:0}}>✏️ Editar</button>
         )}
-        <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
+        <span style={{color:dark?"#475569":"#94a3b8",fontSize:15,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
       <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
-      <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:8}}>
+      <div style={{padding:"0 14px 14px",display:"flex",flexDirection:"column",gap:9}}>
 
       {editing ? (
         <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
           {[["Nome da Empresa","nome"],["Gerente Responsável","gerente"],["Supervisor","supervisor"]].map(([label,key])=>(
             <div key={key}>
               <label style={S.lbl}>{label}</label>
-              <input value={form[key]||""} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={label+"..."} style={S.inp}/>
+              <input value={form[key]||""} onChange={e=>setForm(f=>({...f,[key]:e.target.value}))} placeholder={label+"..."} style={{...S.inp,fontSize:14,padding:"11px 12px"}}/>
             </div>
           ))}
           <div style={{display:"flex", gap:8}}>
-            <button onClick={()=>setEditing(false)} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:13}}>✓ Salvar</button>
+            <button onClick={()=>setEditing(false)} style={{...S.btnSec, flex:1, fontSize:14}}>Cancelar</button>
+            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:14}}>✓ Salvar</button>
           </div>
         </div>
       ) : (
         <div style={S.card}>
           {[["Empresa", data.nome], ["Gerente", data.gerente], ["Supervisor", data.supervisor]].map(([label,val])=>(
-            <div key={label} style={{marginBottom:8}}>
-              <div style={S.lbl}>{label}</div>
-              <div style={{fontSize:13, fontWeight:600, ...S.txt}}>{val||"—"}</div>
+            <div key={label} style={{marginBottom:10}}>
+              <div style={{...S.lbl,fontSize:11}}>{label}</div>
+              <div style={{fontSize:15, fontWeight:700, ...S.txt}}>{val||"—"}</div>
             </div>
           ))}
         </div>
@@ -324,54 +346,50 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
 
       {/* Histórico Visitas */}
       <div style={{...S.card}}>
-        {/* Aviso de fonte única quando o projeto tem aba CCO */}
         {ccoMode && (
-          <div style={{background:dark?"#001a2e":"#e0f2fe",border:"1px solid #0ea5e933",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-            <div style={{fontSize:11,color:dark?"#7dd3fc":"#0369a1",fontWeight:700}}>ℹ️ Visitas de supervisão agora ficam no CCO</div>
-            <div style={{fontSize:10,...S.txt2,marginTop:2}}>Para registrar uma nova visita do supervisor, use a aba <strong>🚪 CCO → 👁️ Supervisão</strong>. O histórico abaixo é mantido para consulta.</div>
+          <div style={{background:dark?"#001a2e":"#e0f2fe",border:"1px solid #0ea5e933",borderRadius:8,padding:"9px 13px",marginBottom:9}}>
+            <div style={{fontSize:12,color:dark?"#7dd3fc":"#0369a1",fontWeight:700}}>ℹ️ Visitas de supervisão agora ficam no CCO</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:3}}>Registre em <strong>🚪 CCO → 👁️ Supervisão</strong> — o histórico aqui é atualizado automaticamente e a contagem de dias reinicia sozinha a cada nova visita.</div>
           </div>
         )}
-        {/* Contador dias desde última visita supervisor */}
         {(()=>{
-          const visitas = data.visitas||[];
-          const ultima = visitas.length ? visitas[0] : null;
+          const ultima = visitasEfetivas.length ? visitasEfetivas[0] : null;
           const dias = ultima ? daysSince(ultima.data) : null;
           const atrasado = dias !== null && dias >= VISITA_ALERTA_DIAS;
           const semVisita = !ultima;
           if(atrasado || semVisita) return (
-            <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:16}}>🔴</span>
+            <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"9px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:9}}>
+              <span style={{fontSize:18}}>🔴</span>
               <div>
-                <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>
+                <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>
                   {semVisita?"Nenhuma visita registrada":`Visita em atraso — ${dias} dias sem visita`}
                 </div>
-                <div style={{fontSize:10,color:"#64748b"}}>Frequência esperada: a cada {VISITA_ALERTA_DIAS} dias</div>
+                <div style={{fontSize:11,color:"#64748b"}}>Frequência esperada: a cada {VISITA_ALERTA_DIAS} dias</div>
               </div>
             </div>
           );
           return (
-            <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:8,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:16}}>✅</span>
+            <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:8,padding:"9px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:9}}>
+              <span style={{fontSize:18}}>✅</span>
               <div>
-                <div style={{fontSize:11,color:"#22c55e",fontWeight:700}}>Última visita há {dias} dia(s)</div>
-                <div style={{fontSize:10,color:"#64748b"}}>Próxima em até {VISITA_ALERTA_DIAS-dias} dia(s)</div>
+                <div style={{fontSize:12,color:"#22c55e",fontWeight:700}}>Última visita há {dias} dia(s)</div>
+                <div style={{fontSize:11,color:"#64748b"}}>Próxima em até {VISITA_ALERTA_DIAS-dias} dia(s)</div>
               </div>
             </div>
           );
         })()}
-        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10}}>
-          <div style={{fontSize:12, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:11, ...S.txt2}}>({(data.visitas||[]).length})</span></div>
-          {/* Em projetos com CCO, o lançamento é feito no CCO. Sem botão +Visita aqui. */}
+        <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:11}}>
+          <div style={{fontSize:13, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:12, ...S.txt2}}>({visitasEfetivas.length})</span></div>
           {!ccoMode && (
             <button onClick={()=>setShowAddVisita(!showAddVisita)}
-              style={{...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10}}>+ Visita</button>
+              style={{...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:11, padding:"6px 11px"}}>+ Visita</button>
           )}
         </div>
 
-        <div style={{display:"flex", gap:6, marginBottom:10}}>
+        <div style={{display:"flex", gap:7, marginBottom:11}}>
           {[["todos","Geral"],["Diurno","☀️ Diurno"],["Noturno","🌙 Noturno"]].map(([key,label])=>(
             <button key={key} onClick={()=>setFiltroTurno(key)}
-              style={{flex:1, padding:"6px", borderRadius:6, fontSize:11, fontWeight:700, cursor:"pointer",
+              style={{flex:1, padding:"8px", borderRadius:7, fontSize:12, fontWeight:700, cursor:"pointer",
                 border:`1px solid ${filtroTurno===key?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}`,
                 background:filtroTurno===key?"#0ea5e922":(dark?"#020510":"#fff"),
                 color:filtroTurno===key?"#0ea5e9":(dark?"#64748b":"#94a3b8")}}>
@@ -381,19 +399,19 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
         </div>
 
         {!ccoMode && showAddVisita && (
-          <div style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", marginBottom:10, border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8}}>
+          <div style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"11px 13px", marginBottom:11, border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:9}}>
               <div>
                 <label style={S.lbl}>Data</label>
-                <input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={S.inp}/>
+                <input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={{...S.inp,fontSize:14}}/>
               </div>
             </div>
-            <div style={{marginBottom:8}}>
+            <div style={{marginBottom:9}}>
               <label style={S.lbl}>Turno</label>
               <div style={{display:"flex", gap:8}}>
                 {[["Diurno","☀️"],["Noturno","🌙"]].map(([t,icon])=>(
                   <button key={t} onClick={()=>setNovaVisita(v=>({...v,turno:t}))}
-                    style={{flex:1, padding:"10px", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer",
+                    style={{flex:1, padding:"11px", borderRadius:8, fontSize:14, fontWeight:700, cursor:"pointer",
                       border:`1px solid ${novaVisita.turno===t?(t==="Diurno"?"#f59e0b":"#6366f1"):(dark?"#0f172a":"#e2e8f0")}`,
                       background:novaVisita.turno===t?(t==="Diurno"?"#f59e0b22":"#6366f122"):(dark?"#020510":"#fff"),
                       color:novaVisita.turno===t?(t==="Diurno"?"#f59e0b":"#818cf8"):(dark?"#64748b":"#94a3b8")}}>
@@ -402,39 +420,39 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
                 ))}
               </div>
             </div>
-            <div style={{marginBottom:8}}>
+            <div style={{marginBottom:9}}>
               <label style={S.lbl}>Resumo da Visita</label>
-              <textarea value={novaVisita.resumo} onChange={e=>setNovaVisita(v=>({...v,resumo:e.target.value}))} placeholder="Descreva o que foi tratado na visita..." style={{...S.inp,height:60,resize:"vertical",fontSize:12}}/>
+              <textarea value={novaVisita.resumo} onChange={e=>setNovaVisita(v=>({...v,resumo:e.target.value}))} placeholder="Descreva o que foi tratado na visita..." style={{...S.inp,height:64,resize:"vertical",fontSize:13}}/>
             </div>
             <div style={{display:"flex", gap:8}}>
-              <button onClick={()=>setShowAddVisita(false)} style={{...S.btnSec, flex:1, fontSize:12}}>Cancelar</button>
-              <button onClick={addVisita} style={{...S.btn, flex:1, fontSize:12}}>✓ Adicionar</button>
+              <button onClick={()=>setShowAddVisita(false)} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
+              <button onClick={addVisita} style={{...S.btn, flex:1, fontSize:13}}>✓ Adicionar</button>
             </div>
           </div>
         )}
 
-        {(data.visitas||[]).length===0 && !showAddVisita && (
-          <div style={{textAlign:"center", padding:"14px 0", fontSize:12, ...S.txt2}}>Nenhuma visita registrada</div>
+        {visitasEfetivas.length===0 && !showAddVisita && (
+          <div style={{textAlign:"center", padding:"16px 0", fontSize:13, ...S.txt2}}>Nenhuma visita registrada</div>
         )}
 
-        <div style={{display:"flex", flexDirection:"column", gap:6}}>
-          {(data.visitas||[]).filter(v=>filtroTurno==="todos"||v.turno===filtroTurno).map(v=>(
-            <div key={v.id} style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"10px 12px", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
-              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4}}>
-                <div style={{display:"flex", alignItems:"center", gap:8}}>
-                  <span style={{fontSize:11, color:"#0ea5e9", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
+        <div style={{display:"flex", flexDirection:"column", gap:7}}>
+          {visitasEfetivas.filter(v=>filtroTurno==="todos"||v.turno===filtroTurno).map(v=>(
+            <div key={v.id} style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"11px 13px", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
+              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:5}}>
+                <div style={{display:"flex", alignItems:"center", gap:9}}>
+                  <span style={{fontSize:12, color:"#0ea5e9", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
                   {v.turno && (
-                    <span style={{fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:5,
+                    <span style={{fontSize:11, fontWeight:700, padding:"3px 9px", borderRadius:5,
                       background:v.turno==="Diurno"?"#f59e0b22":"#6366f122",
                       color:v.turno==="Diurno"?"#f59e0b":"#818cf8"}}>
                       {v.turno==="Diurno"?"☀️":"🌙"} {v.turno}
                     </span>
                   )}
                 </div>
-                {/* Remoção de visita só fora do modo CCO (no CCO, gerencie pela aba Supervisão) */}
-                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer"}}>✕</button>}
+                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:15, cursor:"pointer"}}>✕</button>}
               </div>
-              <div style={{fontSize:12, ...S.txt}}>{v.resumo}</div>
+              {v.supervisor && <div style={{fontSize:12,fontWeight:700,...S.txt,marginBottom:2}}>{v.supervisor}</div>}
+              <div style={{fontSize:13, ...S.txt}}>{v.resumo}</div>
             </div>
           ))}
         </div>
@@ -444,6 +462,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode }) {
     </div>
   );
 }
+
 
 // ── Seção Empresa de Manutenção
 // PROPS: + ccoMode (bool) — quando true, o histórico é somente-leitura e o
@@ -703,6 +722,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"main":"pin");
   const [info, setInfo] = useState(null);
   const [manutCCO, setManutCCO] = useState([]);
+  const [supervCCO, setSupervCCO] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -710,7 +730,10 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
   const ccoMode = temCCO(project.id); // projetos com CCO: visitas de supervisão ficam no CCO
 
   useEffect(()=>{
-    if(ccoMode) loadManutencaoCCO(project.id).then(setManutCCO);
+    if(ccoMode){
+      loadManutencaoCCO(project.id).then(setManutCCO);
+      loadSupervisaoCCO(project.id).then(setSupervCCO);
+    }
   },[project.id, ccoMode]);
 
   useEffect(()=>{
@@ -778,7 +801,8 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
             onSave={(d)=>saveSection("seguranca",d)}
             adminAuth={adminAuth}
             dark={dark}
-            ccoMode={ccoMode}/>
+            ccoMode={ccoMode}
+            supervCCO={supervCCO}/>
 
           {/* Empresa Manutenção */}
           <SecManutencao
