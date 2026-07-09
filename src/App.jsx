@@ -366,6 +366,7 @@ function getAllPendencies(stored) {
 }
 
 const todayStr = () => new Date().toLocaleDateString("sv-SE");
+const isSunday = () => new Date().getDay() === 0; // domingo: dia do teste semanal — botão pisca
 const fmtDate = (d) => { if(!d)return"\u2014"; const[y,m,day]=d.split("-"); return`${day}/${m}/${y}`; };
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
@@ -2996,7 +2997,7 @@ export default function App(){
         <div style={{position:"fixed",bottom:16,right:16,background:"#1d4ed8",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>⟳ Sincronizando...</div>
       )}
       {syncStatus==="saved" && (
-        <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>✓ Salvo</div>
+        <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:isSunday()?"9px 18px":"7px 14px",fontSize:isSunday()?13:12,fontWeight:800,zIndex:999,boxShadow:isSunday()?"0 4px 18px rgba(21,128,61,.5)":"none"}}>{isSunday()?"✅ Teste Semanal Finalizado!":"✓ Salvo"}</div>
       )}
       {pendingSync && (
         <div style={{position:"fixed",bottom:16,left:16,right:16,maxWidth:420,margin:"0 auto",background:"#7c2d12",color:"#fff",borderRadius:12,padding:"12px 14px",zIndex:1000,display:"flex",alignItems:"center",gap:10,boxShadow:"0 6px 24px rgba(0,0,0,.45)"}}>
@@ -3103,9 +3104,10 @@ export default function App(){
             )}
 
             <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
-              style={{...S.primaryBtn,fontSize:14,width:"100%"}}>📋 Novo Relatório — P260A</button>
-
-            <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico</button>
+              style={{...S.primaryBtn,fontSize:17,fontWeight:900,letterSpacing:.3,width:"100%",padding:"18px 16px",textTransform:"uppercase",
+                animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>📋 Novo Relatório Semanal — P260A</button>
+            <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.6)}70%{box-shadow:0 0 0 12px rgba(29,78,216,0)}}`}</style>
+            <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico de Relatórios Semanais</button>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               <button onClick={()=>{setEquipeProject({id:"P260A",name:"Jatinox Unidade A"});setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
@@ -3435,8 +3437,11 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
               {checkAuth(project.id)?(
                 <>
-                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}} style={{...S.primaryBtn,fontSize:13}}>📋 Novo Relatório — {project.id}</button>
-                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico</button>
+                  <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
+                    style={{...S.primaryBtn,fontSize:17,fontWeight:900,letterSpacing:.3,padding:"18px 16px",textTransform:"uppercase",
+                      animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>📋 Novo Relatório Semanal — {project.id}</button>
+                  <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(29,78,216,.6)}70%{box-shadow:0 0 0 12px rgba(29,78,216,0)}}`}</style>
+                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico de Relatórios Semanais</button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:"linear-gradient(165deg,#22c55e11,#22c55e06)",border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#22c55e15",border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:"#22c55e44",fontSize:18}}>›</span></button>
