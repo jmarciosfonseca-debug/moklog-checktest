@@ -688,6 +688,10 @@ function CtmkBadge({ info, onToggle, size="normal" }) {
 function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
   const [customDate, setCustomDate] = useState(()=>new Date().toLocaleDateString("sv-SE"));
   const [countdown, setCountdown] = useState(10);
+  const [palavra, setPalavra] = useState("");
+  useEffect(()=>{
+    setPalavra("");
+  },[confirm]);
   useEffect(()=>{
     if(!confirm) return;
     setCountdown(10);
@@ -731,11 +735,18 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
             <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Deixe como hoje se a queda acabou de acontecer. Mude a data se já está sem imagem há mais tempo.</div>
           </div>
         )}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>
+            Digite <span style={{color:goingOffline?"#ef4444":"#22c55e"}}>CONFIRMAR</span> para prosseguir
+          </div>
+          <input value={palavra} onChange={e=>setPalavra(e.target.value)} placeholder="CONFIRMAR" autoCapitalize="characters"
+            style={{width:"100%",background:"#020510",border:"1px solid #1e293b",borderRadius:8,color:"#f1f5f9",padding:"10px 12px",fontSize:14,fontWeight:700,letterSpacing:1,textAlign:"center",boxSizing:"border-box"}}/>
+        </div>
         <div style={{display:"flex",gap:8}}>
           <button onClick={onCancel} style={{flex:1,background:"#0f172a",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
-          <button onClick={()=>{ if(countdown>0) return; onConfirm(goingOffline&&confirm.allowDateEdit?customDate:undefined); }}
-            disabled={countdown>0}
-            style={{flex:1,background:countdown>0?"#1e293b":(goingOffline?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)"),border:"none",color:countdown>0?"#475569":"#fff",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:countdown>0?"not-allowed":"pointer",opacity:countdown>0?.6:1}}>
+          <button onClick={()=>{ if(countdown>0||palavra.trim().toUpperCase()!=="CONFIRMAR") return; onConfirm(goingOffline&&confirm.allowDateEdit?customDate:undefined); }}
+            disabled={countdown>0||palavra.trim().toUpperCase()!=="CONFIRMAR"}
+            style={{flex:1,background:(countdown>0||palavra.trim().toUpperCase()!=="CONFIRMAR")?"#1e293b":(goingOffline?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)"),border:"none",color:(countdown>0||palavra.trim().toUpperCase()!=="CONFIRMAR")?"#475569":"#fff",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:(countdown>0||palavra.trim().toUpperCase()!=="CONFIRMAR")?"not-allowed":"pointer",opacity:(countdown>0||palavra.trim().toUpperCase()!=="CONFIRMAR")?.6:1}}>
             {countdown>0 ? `Aguarde ${countdown}s...` : "Confirmar"}
           </button>
         </div>
@@ -3101,7 +3112,7 @@ export default function App(){
               <button onClick={()=>{setAcessoCCOProject({id:"P260A",name:"Jatinox Unidade A"});setShowAcessoCCO(true);}} style={{background:"linear-gradient(165deg,#22c55e11,#22c55e06)",border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#22c55e15",border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:"#22c55e44",fontSize:18}}>›</span></button>
             </div>
 
-            <CtmkBadge info={ctmkData["P260A"]} onToggle={()=>requestCtmkToggle("P260A",false)} size="large"/>
+            <CtmkBadge info={ctmkData["P260A"]} onToggle={()=>requestCtmkToggle("P260A",hasGerencial())} size="large"/>
           </div>
         </div>
       </div>
@@ -3302,7 +3313,7 @@ export default function App(){
                       {jp.hasCaoGuarda&&<span style={{fontSize:11,color:"#22c55e",background:"#021a0d",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #22c55e22"}}>🐕 CÃO GUARDA</span>}
                     </div>
                   </div>
-                  <CtmkBadge info={ctmkData[jp.id]} onToggle={()=>requestCtmkToggle(jp.id,false)} size="small"/>
+                  <CtmkBadge info={ctmkData[jp.id]} onToggle={()=>requestCtmkToggle(jp.id,hasGerencial())} size="small"/>
                   <div style={{color:"#94a3b8",fontSize:18,flexShrink:0}}>{isSel?"▲":"▼"}</div>
                 </div>
                 {isSel&&(
@@ -3408,7 +3419,7 @@ export default function App(){
                       </div>:<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Sem registros ainda</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                      <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,false)}/>
+                      <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,hasGerencial())}/>
                       {isActive&&<span style={{fontSize:11,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
                     </div>
                   </div>
