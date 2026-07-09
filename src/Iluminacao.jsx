@@ -1,15 +1,20 @@
 // ─────────────────────────────────────────────────────────────
-// Iluminacao.jsx — Teste de Iluminação v3
-// • Tela da equipe LIMPA: mapa + lista de quadrantes (pontos, inoperantes,
-//   % operante). Nada de percentuais/grade na frente da operação.
-// • Quadrantes de ÁREA LIVRE: cada quadrante pode ter sua própria área
-//   {x,y,w,h} em % do mapa — cobre os desenhos irregulares (P601, P505,
-//   P311B, P604). A grade continua existindo para os simétricos e agora
-//   também gera as áreas automaticamente. Compatível com configs antigas.
-// • Selecionou A1 (no mapa ou na lista) → o A1 PULSA destacado no mapa.
-// • Permissões: equipe edita totais (levantamento) e registra testes;
-//   gerencial exclui quadrante/teste e pode LIMPAR TUDO do projeto.
-// • Registros v1 (campo "acesas") continuam válidos.
+// Iluminacao.jsx — Teste de Iluminação v4 (modelo simples)
+// Conceito espelhado no Teste Perimetral do P505, aplicado à iluminação:
+// • O mapa (JPEG com os quadrantes já desenhados) é mostrado como está —
+//   sem overlay, sem percentuais, sem X/Y/Largura/Altura.
+// • A equipe cria/edita os quadrantes visualmente: nome + quantos PONTOS
+//   identificou; depois informa os DEFICIENTES/apagados de cada um.
+// • Estado vivo, sem data: queimou um ponto amanhã → ✏️ Editar → corrige
+//   deficientes, exclui ou acrescenta ponto → 💾 Gravar.
+// • Painel: pontos por quadrante, deficientes por quadrante, total do
+//   condomínio e PERCENTUAL GERAL com barra.
+// • 📄 PDF exclusivo da iluminação (HTML p/ imprimir, padrão Perimetral).
+// • Permissões: equipe adiciona e edita; excluir quadrante e Limpar Tudo
+//   são exclusivos do gerencial (PIN 872101).
+// • Compatibilidade: docs v2/v3 continuam válidos — o histórico antigo é
+//   preservado no Firestore e os deficientes iniciais são migrados do
+//   último teste registrado.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -36,7 +41,6 @@ const PROJECT_PINS = {
 
 const PCT_OK = 95;
 const PCT_ATENCAO = 80;
-
 const STATUS_CFG = {
   normal:  { label:"Normal",  color:"#22c55e", bg:"#021a0d", border:"#22c55e33" },
   atencao: { label:"Atenção", color:"#f59e0b", bg:"#1a1000", border:"#f59e0b33" },
@@ -47,74 +51,31 @@ function statusFromPct(pct){
   if(pct>=PCT_ATENCAO) return "atencao";
   return "critico";
 }
-
-function fmtDate(d){
-  if(!d) return "—";
-  try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d||"—"; }
+function fmtDataHora(iso){
+  try { const d=new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); } catch { return "—"; }
 }
-function todayStrLocal(){ return new Date().toLocaleDateString("sv-SE"); }
 function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 
-function inicioSemana(){
-  const d = new Date(); d.setHours(0,0,0,0);
-  d.setDate(d.getDate() - d.getDay());
-  return d;
-}
-function testeNaSemana(history){
-  const ini = inicioSemana();
-  return (history||[]).some(t=>{ try { return new Date(t.date+"T12:00:00") >= ini; } catch { return false; } });
-}
-
-// ── Operantes de um quadrante de teste (compatível com v1 "acesas")
-function opsDe(q){
+// ── Números de um quadrante (deficientes null = ainda não informado)
+export function calcQuad(q){
   const total = Number(q?.total)||0;
-  if(q && q.inoperantes!=null) return Math.max(0, total - (Number(q.inoperantes)||0));
-  if(q && q.acesas!=null) return Number(q.acesas)||0;
-  return total;
+  const def = q?.deficientes==null ? null : Math.min(total, Number(q.deficientes)||0);
+  const ops = def==null ? total : total-def;
+  const pct = total ? Math.round((ops/total)*1000)/10 : 0;
+  return { total, def, ops, pct };
 }
-export function calcTeste(t){
-  const quads = t?.quads||[];
-  const tot  = quads.reduce((a,q)=>a+(Number(q.total)||0),0);
-  const ops  = quads.reduce((a,q)=>a+opsDe(q),0);
-  const inop = Math.max(0, tot-ops);
-  const pct  = tot ? Math.round((ops/tot)*1000)/10 : 0;
-  return { tot, ops, inop, pct };
-}
-function pctQuad(q){
-  const total = Number(q?.total)||0;
-  return total ? Math.round((opsDe(q)/total)*1000)/10 : 0;
+export function calcGeral(quadrantes){
+  const qs = (quadrantes||[]).map(calcQuad);
+  const total = qs.reduce((a,q)=>a+q.total,0);
+  const def = qs.reduce((a,q)=>a+(q.def||0),0);
+  const ops = total-def;
+  const pct = total ? Math.round((ops/total)*1000)/10 : 0;
+  return { total, def, ops, pct };
 }
 
-// ── Grade → células; usada quando os quadrantes não têm área própria
-export function gradeCells(mapa){
-  const norm = (arr)=>[...new Set((arr||[]).map(Number).filter(n=>n>0&&n<100))].sort((a,b)=>a-b);
-  const cols = [0,...norm(mapa?.cols),100];
-  const rows = [0,...norm(mapa?.rows),100];
-  const cells = [];
-  for(let r=0;r<rows.length-1;r++){
-    for(let c=0;c<cols.length-1;c++){
-      cells.push({
-        nome: String.fromCharCode(65+r)+(c+1),
-        left: cols[c], top: rows[r],
-        w: cols[c+1]-cols[c], h: rows[r+1]-rows[r],
-      });
-    }
-  }
-  return cells;
-}
-function parsePcts(str){
-  return String(str||"").split(/[,;\s]+/).map(s=>Number(s)).filter(n=>!isNaN(n)&&n>0&&n<100);
-}
-// Células a desenhar: áreas próprias dos quadrantes (se houver) ou grade
-export function cellsDoMapa(mapa, quadrantes){
-  const comArea = (quadrantes||[]).filter(q=>q.area && Number(q.area.w)>0 && Number(q.area.h)>0);
-  if(comArea.length>0){
-    return comArea.map(q=>({ nome:q.nome, left:Number(q.area.x)||0, top:Number(q.area.y)||0, w:Number(q.area.w), h:Number(q.area.h) }));
-  }
-  return gradeCells(mapa);
-}
-
-// ── Firestore: doc único por projeto, tombstone + fallback localStorage
+// ── Firestore: doc único por projeto + fallback localStorage
+// Migração transparente: se os quadrantes ainda não têm "deficientes" mas
+// existe histórico v2/v3, puxa os inoperantes do último teste (por nome).
 export async function loadIluminacao(projectId){
   let data = null;
   try {
@@ -128,19 +89,104 @@ export async function loadIluminacao(projectId){
     try { const l = localStorage.getItem(`iluminacao_${projectId}`); if(l) data = JSON.parse(l); } catch(e){}
   }
   data = data || {};
-  const del = new Set(data.deletedIds||[]);
+  let quadrantes = data.quadrantes||[];
+  const semDef = quadrantes.length>0 && quadrantes.every(q=>q.deficientes===undefined);
+  if(semDef && (data.history||[]).length>0){
+    const del = new Set(data.deletedIds||[]);
+    const hist = (data.history||[]).filter(t=>!del.has(t.id))
+      .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+    const ultimo = hist[0];
+    if(ultimo){
+      const porNome = {};
+      (ultimo.quads||[]).forEach(q=>{ if(q.nome) porNome[q.nome]=q; });
+      quadrantes = quadrantes.map(q=>{
+        const u = porNome[q.nome];
+        if(!u) return q;
+        const inop = u.inoperantes!=null ? Number(u.inoperantes)||0
+                   : (u.acesas!=null ? Math.max(0,(Number(u.total)||0)-(Number(u.acesas)||0)) : null);
+        return inop==null ? q : { ...q, deficientes:inop, atualizadoEm:ultimo.criadoEm||null };
+      });
+    }
+  }
   return {
     mapa: data.mapa||null,
-    quadrantes: data.quadrantes||[],
-    history: (data.history||[]).filter(t=>!del.has(t.id)),
+    quadrantes,
+    history: data.history||[],        // legado preservado (não exibido)
     deletedIds: data.deletedIds||[],
   };
 }
-
 async function saveIluminacao(projectId, data){
   const payload = { ...data, updatedAt: new Date().toISOString() };
   try { await setDoc(doc(db,"iluminacao",projectId), payload); } catch(e){ console.error("Iluminacao save:", e); }
   try { localStorage.setItem(`iluminacao_${projectId}`, JSON.stringify(payload)); } catch(e){}
+}
+
+// ── PDF (padrão Perimetral: HTML com botão de impressão, baixado via Blob)
+function gerarPdfIluminacao(project, data){
+  const g = calcGeral(data.quadrantes);
+  const gCor = STATUS_CFG[statusFromPct(g.pct)].color;
+  const agora = new Date();
+  const mapaAbs = data.mapa?.url ? (window.location.origin + data.mapa.url) : null;
+  const linhas = (data.quadrantes||[]).map(q=>{
+    const c = calcQuad(q);
+    const cor = STATUS_CFG[statusFromPct(c.pct)].color;
+    return `<tr>
+      <td style="font-weight:800">${q.nome}</td>
+      <td style="text-align:center">${c.total}</td>
+      <td style="text-align:center;font-weight:700;color:${c.def>0?"#ef4444":"#22c55e"}">${c.def==null?"—":c.def}</td>
+      <td style="text-align:center">${c.ops}</td>
+      <td style="width:34%">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:9px;border-radius:5px;background:#e2e8f0;overflow:hidden"><div style="height:100%;width:${c.pct}%;background:${cor}"></div></div>
+          <span style="font-weight:800;color:${cor};font-size:12px">${c.pct}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Iluminação ${project.id}</title>
+<style>
+  body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:20px;max-width:820px;margin:0 auto}
+  h1{font-size:19px;margin:0}
+  .sub{font-size:12px;color:#64748b;margin-top:2px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+  .kpi-val{font-size:24px;font-weight:900}
+  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+  th{background:#1e293b;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+  td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  .mapa img{width:100%;border-radius:8px;margin:12px 0;display:block}
+  .barraG{height:14px;border-radius:7px;background:#e2e8f0;overflow:hidden;margin-top:6px}
+  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+</style></head>
+<body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<h1>💡 Relatório de Iluminação — ${project.id}</h1>
+<div class="sub">${project.name||""} · Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
+${mapaAbs?`<div class="mapa"><img src="${mapaAbs}" alt="Mapa"/></div>`:""}
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val">${g.total}</div><div class="kpi-lbl">Pontos totais</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${g.def>0?"#ef4444":"#22c55e"}">${g.def}</div><div class="kpi-lbl">Deficientes</div></div>
+  <div class="kpi"><div class="kpi-val">${g.ops}</div><div class="kpi-lbl">Operantes</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${gCor}">${g.pct}%</div><div class="kpi-lbl">Geral</div></div>
+</div>
+<div class="barraG"><div style="height:100%;width:${g.pct}%;background:${gCor}"></div></div>
+<table style="margin-top:16px">
+  <thead><tr><th>Quadrante</th><th style="text-align:center">Pontos</th><th style="text-align:center">Deficientes</th><th style="text-align:center">Operantes</th><th>% Operante</th></tr></thead>
+  <tbody>${linhas}</tbody>
+</table>
+<div class="footer">MokLog CheckTest · Moked Consulting Security · Teste de Iluminação ${project.id}</div>
+</body></html>`;
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `iluminacao_${project.id}_${agora.toLocaleDateString("sv-SE")}.html`;
+  a.click();
 }
 
 function getStyles(dark) {
@@ -159,51 +205,11 @@ function getStyles(dark) {
   };
 }
 
-function StatusBadge({ status }) {
-  const cfg = STATUS_CFG[status] || STATUS_CFG.normal;
-  return <span style={{fontSize:10,fontWeight:700,color:cfg.color,background:cfg.bg,border:`1px solid ${cfg.border}`,padding:"2px 8px",borderRadius:5}}>{cfg.label}</span>;
-}
-
-function BarraPct({ pct, dark }) {
+function BarraPct({ pct, dark, alta }) {
   const cfg = STATUS_CFG[statusFromPct(pct)];
   return (
-    <div style={{height:8,borderRadius:4,background:dark?"#0f172a":"#e2e8f0",overflow:"hidden"}}>
-      <div style={{height:"100%",width:`${Math.min(100,Math.max(0,pct))}%`,background:cfg.color,borderRadius:4,transition:"width .35s ease"}}/>
-    </div>
-  );
-}
-
-// ── Mapa interativo: quadrantes de área livre (ou grade), com PULSO no selecionado
-function MapaQuadrantes({ mapa, quadrantes, selNome, onSelect, ultimoPorNome, dark }) {
-  const cells = cellsDoMapa(mapa, quadrantes);
-  if(!mapa?.url || cells.length===0) return null;
-  return (
-    <div style={{position:"relative", borderRadius:12, overflow:"hidden", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, lineHeight:0}}>
-      <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,.65);}50%{box-shadow:0 0 0 7px rgba(56,189,248,0);}}`}</style>
-      <img src={mapa.url} alt="Mapa do projeto" style={{width:"100%",display:"block"}}
-        onError={(e)=>{e.currentTarget.style.minHeight="180px";e.currentTarget.alt="Mapa não encontrado em "+mapa.url;}}/>
-      {cells.map(cell=>{
-        const q = ultimoPorNome[cell.nome];
-        const pct = q ? pctQuad(q) : null;
-        const cor = pct===null ? "#94a3b8" : STATUS_CFG[statusFromPct(pct)].color;
-        const sel = selNome===cell.nome;
-        return (
-          <div key={cell.nome} role="button" aria-label={`Quadrante ${cell.nome}`}
-            onClick={()=>onSelect(sel?null:cell.nome)}
-            style={{position:"absolute", left:`${cell.left}%`, top:`${cell.top}%`, width:`${cell.w}%`, height:`${cell.h}%`,
-              boxSizing:"border-box", cursor:"pointer", borderRadius:sel?6:0,
-              border: sel? "3px solid #38bdf8" : `1.5px solid ${cor}99`,
-              background: sel? "#38bdf82e" : `${cor}${pct===null?"10":"1f"}`,
-              animation: sel? "mkPulse 1.1s ease-in-out infinite" : "none",
-              zIndex: sel?2:1,
-              transition:"background .2s ease, border .2s ease"}}>
-            <span style={{position:"absolute", top:4, left:6, background:"rgba(2,6,16,.75)", color: sel?"#38bdf8":cor,
-              fontSize:11, fontWeight:900, padding:"2px 7px", borderRadius:5, lineHeight:"14px", letterSpacing:.5}}>
-              {cell.nome}{pct!==null && <span style={{marginLeft:5,fontWeight:700}}>{pct}%</span>}
-            </span>
-          </div>
-        );
-      })}
+    <div style={{height:alta?12:8,borderRadius:alta?6:4,background:dark?"#0f172a":"#e2e8f0",overflow:"hidden"}}>
+      <div style={{height:"100%",width:`${Math.min(100,Math.max(0,pct))}%`,background:cfg.color,borderRadius:alta?6:4,transition:"width .35s ease"}}/>
     </div>
   );
 }
@@ -254,171 +260,92 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 export default function Iluminacao({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
-  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | form | config | survey | view
+  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"main":"pin"); // pin | main | config
   const [data, setData] = useState({ mapa:null, quadrantes:[], history:[], deletedIds:[] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const adminAuth = authLevel==="admin";
 
-  const [selNome, setSelNome] = useState(null);
+  // Edição inline: id do quadrante em edição ("novo" para adicionar)
+  const [editId, setEditId] = useState(null);
+  const [edNome, setEdNome] = useState("");
+  const [edTotal, setEdTotal] = useState("");
+  const [edDef, setEdDef] = useState("");
+  const [edErr, setEdErr] = useState(null);
+  const [delId, setDelId] = useState(null); // confirmação de exclusão (admin)
 
-  // Form de novo teste (inoperantes por quadrante)
-  const [formDate, setFormDate] = useState(todayStrLocal());
-  const [formResp, setFormResp] = useState(()=>{ try{return localStorage.getItem("iluminacao_ultimo_nome")||"";}catch{return"";} });
-  const [formCounts, setFormCounts] = useState({});
-  const [formObs, setFormObs] = useState("");
-  const [formErr, setFormErr] = useState(null);
-
-  // Config (gerencial)
+  // Config (gerencial): caminho do mapa + zona de perigo
   const [cfgUrl, setCfgUrl] = useState("");
-  const [cfgCols, setCfgCols] = useState("");
-  const [cfgRows, setCfgRows] = useState("");
-  const [cfgQuads, setCfgQuads] = useState([]);
-  const [cfgErr, setCfgErr] = useState(null);
-  const [confirmLimpar, setConfirmLimpar] = useState(0); // 0 | 1 | 2 (dupla confirmação)
-
-  // Levantamento (equipe/admin): totais por quadrante — EDITÁVEL, sem excluir
-  const [survTotais, setSurvTotais] = useState({});
-
-  const [viewTest, setViewTest] = useState(null);
-  const [confirmDel, setConfirmDel] = useState(false);
+  const [confirmLimpar, setConfirmLimpar] = useState(0);
 
   useEffect(()=>{ loadIluminacao(project.id).then(d=>{ setData(d); setLoading(false); }); },[project.id]);
 
-  const history = [...(data.history||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.criadoEm||"").localeCompare(a.criadoEm||""));
-  const ultimo = history[0]||null;
-  const semanaOk = testeNaSemana(history);
-  const totalPontos = (data.quadrantes||[]).reduce((a,q)=>a+(Number(q.total)||0),0);
-  const semLevantamento = totalPontos===0 && (data.quadrantes||[]).length>0;
+  const g = calcGeral(data.quadrantes);
+  const temQuadrantes = (data.quadrantes||[]).length>0;
+  const faltamDef = (data.quadrantes||[]).filter(q=>Number(q.total)>0 && q.deficientes==null);
 
-  const ultimoPorNome = {};
-  (ultimo?.quads||[]).forEach(q=>{ if(q.nome) ultimoPorNome[q.nome]=q; });
-
-  const abrirForm = () => {
-    const counts = {};
-    (data.quadrantes||[]).forEach(q=>{ counts[q.id]="0"; });
-    setFormCounts(counts); setFormDate(todayStrLocal()); setFormObs(""); setFormErr(null);
-    setScreen("form");
-  };
-
-  const setCount = (qid, val, max) => {
-    let v = String(val).replace(/[^0-9]/g,"");
-    if(v!=="" && Number(v)>max) v = String(max);
-    setFormCounts(prev=>({...prev,[qid]:v}));
-    setFormErr(null);
-  };
-  const stepCount = (qid, delta, max) => {
-    setFormCounts(prev=>{
-      const cur = prev[qid]==="" ? 0 : Number(prev[qid]);
-      const next = Math.max(0, Math.min(max, cur+delta));
-      return {...prev,[qid]:String(next)};
-    });
-    setFormErr(null);
-  };
-
-  const salvarTeste = async () => {
-    if(!formResp.trim()){ setFormErr("Informe o responsável pelo teste."); return; }
-    const pendente = (data.quadrantes||[]).find(q=>formCounts[q.id]==="" || formCounts[q.id]==null);
-    if(pendente){ setFormErr(`Preencha os inoperantes do quadrante "${pendente.nome}".`); return; }
-    const quads = (data.quadrantes||[]).map(q=>({ id:q.id, nome:q.nome, total:Number(q.total)||0, inoperantes:Number(formCounts[q.id])||0 }));
-    const teste = { id:newId(), date:formDate, responsavel:formResp.trim(), quads, obs:formObs.trim(), criadoEm:new Date().toISOString() };
-    const next = { ...data, history:[...(data.history||[]), teste] };
+  const persist = async (next) => {
     setSaving(true);
     setData(next);
-    try { localStorage.setItem("iluminacao_ultimo_nome", formResp.trim()); } catch(e){}
     await saveIluminacao(project.id, next);
     setSaving(false);
-    setScreen("list");
   };
 
-  // ── Config (gerencial)
+  const abrirEdicao = (q) => {
+    setEditId(q? q.id : "novo");
+    setEdNome(q? q.nome : "");
+    setEdTotal(q? String(q.total??"") : "");
+    setEdDef(q? (q.deficientes==null?"0":String(q.deficientes)) : "0");
+    setEdErr(null); setDelId(null);
+  };
+  const gravarEdicao = async () => {
+    const nome = edNome.trim();
+    const total = Number(edTotal)||0;
+    const def = Math.min(total, Number(edDef)||0);
+    if(!nome){ setEdErr("Informe o nome do quadrante (ex: A1)."); return; }
+    if(total<=0){ setEdErr("Informe quantos pontos de iluminação existem no quadrante."); return; }
+    if((data.quadrantes||[]).some(q=>q.nome.trim().toLowerCase()===nome.toLowerCase() && q.id!==editId)){
+      setEdErr(`Já existe um quadrante chamado "${nome}".`); return;
+    }
+    const agora = new Date().toISOString();
+    let quadrantes;
+    if(editId==="novo"){
+      quadrantes = [...(data.quadrantes||[]), { id:newId(), nome, total, deficientes:def, atualizadoEm:agora }];
+    } else {
+      quadrantes = (data.quadrantes||[]).map(q=>q.id===editId?{...q, nome, total, deficientes:def, atualizadoEm:agora}:q);
+    }
+    await persist({ ...data, quadrantes });
+    setEditId(null);
+  };
+  const stepDef = (delta) => {
+    const total = Number(edTotal)||0;
+    const cur = Number(edDef)||0;
+    setEdDef(String(Math.max(0, Math.min(total, cur+delta))));
+    setEdErr(null);
+  };
+  const excluirQuadrante = async (qid) => {
+    await persist({ ...data, quadrantes:(data.quadrantes||[]).filter(q=>q.id!==qid) });
+    setDelId(null); setEditId(null);
+  };
+
   const abrirConfig = () => {
     setCfgUrl(data.mapa?.url || `/mapas/${project.id}.jpg`);
-    setCfgCols((data.mapa?.cols||[]).join(", "));
-    setCfgRows((data.mapa?.rows||[]).join(", "));
-    setCfgQuads((data.quadrantes||[]).map(q=>({
-      ...q, total:String(q.total??""),
-      ax:String(q.area?.x??""), ay:String(q.area?.y??""), aw:String(q.area?.w??""), ah:String(q.area?.h??""),
-    })));
-    setCfgErr(null); setConfirmLimpar(0);
+    setConfirmLimpar(0);
     setScreen("config");
   };
-  // Grade → cria/atualiza quadrantes E preenche a área de cada um pela célula
-  const gerarDaGrade = () => {
-    const cells = gradeCells({ cols:parsePcts(cfgCols), rows:parsePcts(cfgRows) });
-    if(cells.length<=1){ setCfgErr("Defina ao menos uma divisória (ex: colunas 30, 68 · linhas 50)."); return; }
-    setCfgQuads(prev=>cells.map(c=>{
-      const ex = prev.find(q=>q.nome===c.nome);
-      const area = { ax:String(Math.round(c.left*10)/10), ay:String(Math.round(c.top*10)/10), aw:String(Math.round(c.w*10)/10), ah:String(Math.round(c.h*10)/10) };
-      return ex ? { ...ex, ...area } : { id:newId(), nome:c.nome, total:"", ...area };
-    }));
-    setCfgErr(null);
-  };
   const salvarConfig = async () => {
-    const limpo = cfgQuads.map(q=>{
-      const area = (Number(q.aw)>0 && Number(q.ah)>0)
-        ? { x:Number(q.ax)||0, y:Number(q.ay)||0, w:Number(q.aw), h:Number(q.ah) }
-        : null;
-      return { id:q.id, nome:(q.nome||"").trim(), total:Number(q.total)||0, ...(area?{area}:{}) };
-    });
-    if(limpo.length===0){ setCfgErr("Gere os quadrantes da grade ou adicione manualmente."); return; }
-    if(limpo.some(q=>!q.nome)){ setCfgErr("Todo quadrante precisa de um nome."); return; }
-    const mapa = cfgUrl.trim() ? { url:cfgUrl.trim(), cols:parsePcts(cfgCols), rows:parsePcts(cfgRows) } : null;
-    const next = { ...data, mapa, quadrantes:limpo };
-    setSaving(true);
-    setData(next); setSelNome(null);
-    await saveIluminacao(project.id, next);
-    setSaving(false);
-    setScreen("list");
+    const mapa = cfgUrl.trim() ? { ...(data.mapa||{}), url:cfgUrl.trim() } : null;
+    await persist({ ...data, mapa });
+    setScreen("main");
   };
-  // Limpar TUDO do projeto (gerencial, dupla confirmação): testes tombstonados,
-  // quadrantes zerados; o mapa (caminho + divisórias) é mantido
   const limparTudo = async () => {
     const idsTestes = (data.history||[]).map(t=>t.id);
-    const next = {
-      ...data,
-      quadrantes:[],
-      history:[],
-      deletedIds:[...(data.deletedIds||[]), ...idsTestes],
-    };
-    setSaving(true);
-    setData(next); setSelNome(null); setConfirmLimpar(0);
-    await saveIluminacao(project.id, next);
-    setSaving(false);
-    setScreen("list");
+    await persist({ ...data, quadrantes:[], history:[], deletedIds:[...(data.deletedIds||[]), ...idsTestes] });
+    setConfirmLimpar(0);
+    setScreen("main");
   };
 
-  // ── Levantamento (equipe/admin)
-  const abrirSurvey = () => {
-    const t = {};
-    (data.quadrantes||[]).forEach(q=>{ t[q.id]=String(q.total??""); });
-    setSurvTotais(t);
-    setScreen("survey");
-  };
-  const salvarSurvey = async () => {
-    const next = { ...data, quadrantes:(data.quadrantes||[]).map(q=>({...q, total:Number(survTotais[q.id])||0})) };
-    setSaving(true);
-    setData(next);
-    await saveIluminacao(project.id, next);
-    setSaving(false);
-    setScreen("list");
-  };
-
-  const excluirTeste = async () => {
-    if(!viewTest) return;
-    const next = {
-      ...data,
-      history:(data.history||[]).filter(t=>t.id!==viewTest.id),
-      deletedIds:[...(data.deletedIds||[]), viewTest.id],
-    };
-    setSaving(true);
-    setData(next);
-    await saveIluminacao(project.id, next);
-    setSaving(false);
-    setConfirmDel(false); setViewTest(null); setScreen("list");
-  };
-
-  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
+  if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("main");onAuthGranted?.(l);}}/>;
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
@@ -428,7 +355,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
 
   const Header = (
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px 10px"}}>
-      <button onClick={()=>{ if(screen==="list") onBack(); else { setViewTest(null); setScreen("list"); } }} style={S.backBtn} aria-label="Voltar">←</button>
+      <button onClick={()=>{ if(screen==="main") onBack(); else setScreen("main"); }} style={S.backBtn} aria-label="Voltar">←</button>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:15,fontWeight:800,...S.txt}}>💡 Teste de Iluminação</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
@@ -443,66 +370,18 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
         <div style={S.card}>
-          <label style={S.lbl}>Imagem do mapa (public/mapas/)</label>
+          <label style={S.lbl}>Imagem do mapa (em public/mapas/)</label>
           <input value={cfgUrl} onChange={e=>setCfgUrl(e.target.value)} placeholder={`/mapas/${project.id}.jpg`} style={S.inp}/>
-          <div style={{display:"flex",gap:8,marginTop:8}}>
-            <div style={{flex:1}}>
-              <label style={S.lbl}>Colunas %</label>
-              <input value={cfgCols} onChange={e=>setCfgCols(e.target.value)} placeholder="30, 68" style={S.inp}/>
-            </div>
-            <div style={{flex:1}}>
-              <label style={S.lbl}>Linhas %</label>
-              <input value={cfgRows} onChange={e=>setCfgRows(e.target.value)} placeholder="50" style={S.inp}/>
-            </div>
-          </div>
-          <button onClick={gerarDaGrade} style={{...S.btnSec,fontSize:12,marginTop:10}}>🔲 Gerar quadrantes da grade</button>
-          <div style={{fontSize:10,...S.txt2,marginTop:8}}>Cada quadrante tem sua própria ÁREA no mapa (X, Y, Largura e Altura em % da imagem). A grade preenche as áreas automaticamente; para layouts irregulares, ajuste os números de cada quadrante olhando a prévia.</div>
+          <div style={{fontSize:10,...S.txt2,marginTop:6}}>Use a imagem com os quadrantes já desenhados — ela aparece como está para a equipe.</div>
         </div>
-        {cfgUrl.trim() && (
-          <MapaQuadrantes
-            mapa={{url:cfgUrl.trim(),cols:parsePcts(cfgCols),rows:parsePcts(cfgRows)}}
-            quadrantes={cfgQuads.map(q=>({nome:q.nome,area:(Number(q.aw)>0&&Number(q.ah)>0)?{x:Number(q.ax)||0,y:Number(q.ay)||0,w:Number(q.aw),h:Number(q.ah)}:null}))}
-            selNome={null} onSelect={()=>{}} ultimoPorNome={{}} dark={dark}/>
-        )}
-        {cfgQuads.map(q=>(
-          <div key={q.id} style={{...S.card,padding:"10px 14px"}}>
-            <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-              <div style={{flex:1}}>
-                <label style={S.lbl}>Quadrante</label>
-                <input value={q.nome} onChange={e=>{const v=e.target.value;setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,nome:v}:x));setCfgErr(null);}}
-                  placeholder="Ex: A1" style={S.inp}/>
-              </div>
-              <div style={{width:80}}>
-                <label style={S.lbl}>Pontos</label>
-                <input value={q.total} onChange={e=>{const v=e.target.value.replace(/[^0-9]/g,"");setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,total:v}:x));}}
-                  inputMode="numeric" placeholder="—" style={{...S.inp,textAlign:"center"}}/>
-              </div>
-              <button onClick={()=>setCfgQuads(prev=>prev.filter(x=>x.id!==q.id))} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433",padding:"9px 10px"}}>🗑</button>
-            </div>
-            <div style={{display:"flex",gap:6,marginTop:8}}>
-              {[["ax","X %"],["ay","Y %"],["aw","Larg %"],["ah","Alt %"]].map(([campo,rotulo])=>(
-                <div key={campo} style={{flex:1}}>
-                  <label style={S.lbl}>{rotulo}</label>
-                  <input value={q[campo]} inputMode="decimal"
-                    onChange={e=>{const v=e.target.value.replace(/[^0-9.]/g,"");setCfgQuads(prev=>prev.map(x=>x.id===q.id?{...x,[campo]:v}:x));}}
-                    placeholder="—" style={{...S.inp,textAlign:"center",padding:"8px 6px",fontSize:12}}/>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        <button onClick={()=>setCfgQuads(prev=>[...prev,{id:newId(),nome:"",total:"",ax:"",ay:"",aw:"",ah:""}])} style={{...S.btnSec,fontSize:13}}>➕ Adicionar quadrante manual</button>
-        {cfgErr && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{cfgErr}</div>}
-        <button onClick={salvarConfig} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar configuração"}</button>
-        <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-
-        {/* Zona de perigo — LIMPAR TUDO (gerencial, dupla confirmação) */}
+        <button onClick={salvarConfig} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar"}</button>
+        <button onClick={()=>setScreen("main")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
         <div style={{...S.card,border:"1px solid #ef444433",marginTop:6}}>
           <div style={{fontSize:11,fontWeight:800,color:"#ef4444",marginBottom:6}}>ZONA DE PERIGO</div>
           {confirmLimpar===0 && <button onClick={()=>setConfirmLimpar(1)} style={{...S.btnSec,fontSize:13,color:"#ef4444",borderColor:"#ef444433"}}>🧹 Limpar tudo deste projeto</button>}
           {confirmLimpar===1 && (
             <>
-              <div style={{fontSize:12,...S.txt,marginBottom:8}}>Apagar TODOS os quadrantes e TODOS os testes de iluminação do {project.id}? O mapa configurado é mantido.</div>
+              <div style={{fontSize:12,...S.txt,marginBottom:8}}>Apagar TODOS os quadrantes e pontos de iluminação do {project.id}? O mapa configurado é mantido.</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>setConfirmLimpar(0)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
                 <button onClick={()=>setConfirmLimpar(2)} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>Continuar</button>
@@ -523,214 +402,127 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     </div></div>
   );
 
-  // ── TELA: levantamento de pontos (equipe e admin — editar sim, excluir não)
-  if(screen==="survey") return (
-    <div style={S.page}><div style={S.wrap}>
-      {Header}
-      <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
-        <div style={S.card}>
-          <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:2}}>📋 Pontos de iluminação por quadrante</div>
-          <div style={{fontSize:11,...S.txt2}}>Conte em campo e registre. Se recontar e o número mudar, é só corrigir aqui.</div>
+  // ── Editor inline de quadrante (novo ou existente)
+  const Editor = (
+    <div style={{...S.card,border:"1px solid #ca8a0455"}}>
+      <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:10}}>{editId==="novo"?"➕ Novo quadrante":"✏️ Editar quadrante"}</div>
+      <div style={{display:"flex",gap:8}}>
+        <div style={{flex:1}}>
+          <label style={S.lbl}>Quadrante</label>
+          <input value={edNome} onChange={e=>{setEdNome(e.target.value);setEdErr(null);}} placeholder="Ex: A1" style={S.inp}/>
         </div>
-        {(data.quadrantes||[]).map(q=>(
-          <div key={q.id} style={{...S.card,display:"flex",alignItems:"center",gap:12,padding:"10px 14px"}}>
-            <div style={{flex:1,fontSize:14,fontWeight:800,...S.txt}}>{q.nome}</div>
-            <div style={{width:110}}>
-              <input value={survTotais[q.id]??""} onChange={e=>{const v=e.target.value.replace(/[^0-9]/g,"");setSurvTotais(prev=>({...prev,[q.id]:v}));}}
-                inputMode="numeric" placeholder="pontos" style={{...S.inp,textAlign:"center",fontSize:16,fontWeight:800}}/>
-            </div>
-          </div>
-        ))}
-        <button onClick={salvarSurvey} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar pontos"}</button>
-        <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
+        <div style={{width:110}}>
+          <label style={S.lbl}>Pontos</label>
+          <input value={edTotal} inputMode="numeric"
+            onChange={e=>{const v=e.target.value.replace(/[^0-9]/g,"");setEdTotal(v);setEdErr(null);}}
+            placeholder="0" style={{...S.inp,textAlign:"center",fontWeight:800}}/>
+        </div>
       </div>
-    </div></div>
+      <label style={{...S.lbl,marginTop:10}}>Deficientes / apagados</label>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <button onClick={()=>stepDef(-1)} style={{...S.btnSm,fontSize:18,padding:"6px 14px"}}>−</button>
+        <input value={edDef} inputMode="numeric"
+          onChange={e=>{let v=e.target.value.replace(/[^0-9]/g,"");const t=Number(edTotal)||0;if(v!==""&&Number(v)>t)v=String(t);setEdDef(v);setEdErr(null);}}
+          style={{...S.inp,textAlign:"center",fontSize:18,fontWeight:800}}/>
+        <button onClick={()=>stepDef(1)} style={{...S.btnSm,fontSize:18,padding:"6px 14px"}}>＋</button>
+      </div>
+      {(()=>{ const t=Number(edTotal)||0; const d=Number(edDef)||0; const pct=t?Math.round(((t-d)/t)*1000)/10:0;
+        return t>0 ? <div style={{marginTop:8}}><BarraPct pct={pct} dark={dark}/><div style={{fontSize:10,...S.txt2,marginTop:4,textAlign:"right",fontWeight:800,color:STATUS_CFG[statusFromPct(pct)].color}}>{pct}% operante</div></div> : null; })()}
+      {edErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginTop:8,textAlign:"center"}}>{edErr}</div>}
+      <div style={{display:"flex",gap:8,marginTop:10}}>
+        <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+        <button onClick={gravarEdicao} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Gravando…":"💾 Gravar"}</button>
+      </div>
+    </div>
   );
 
-  // ── TELA: novo teste (inoperantes por quadrante)
-  if(screen==="form") return (
-    <div style={S.page}><div style={S.wrap}>
-      {Header}
-      <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
-        <div style={{...S.card,display:"flex",gap:8}}>
-          <div style={{flex:1}}>
-            <label style={S.lbl}>Data</label>
-            <input type="date" value={formDate} onChange={e=>setFormDate(e.target.value)} style={S.inp}/>
-          </div>
-          <div style={{flex:1.4}}>
-            <label style={S.lbl}>Responsável</label>
-            <input value={formResp} onChange={e=>{setFormResp(e.target.value);setFormErr(null);}} placeholder="Nome" style={S.inp}/>
-          </div>
-        </div>
-        {(data.quadrantes||[]).map(q=>{
-          const max = Number(q.total)||0;
-          const val = formCounts[q.id]??"0";
-          const inop = val===""?0:Number(val);
-          const pct = max ? Math.round(((max-inop)/max)*1000)/10 : 0;
-          return (
-            <div key={q.id} style={S.card}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <div style={{fontSize:14,fontWeight:900,...S.txt}}>{q.nome} <span style={{fontSize:11,fontWeight:600,...S.txt2}}>· {max} pontos</span></div>
-                <div style={{fontSize:11,fontWeight:800,color:STATUS_CFG[statusFromPct(pct)].color}}>{pct}% operante</div>
-              </div>
-              <label style={S.lbl}>Inoperantes</label>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <button onClick={()=>stepCount(q.id,-1,max)} style={{...S.btnSm,fontSize:18,padding:"6px 14px"}}>−</button>
-                <input value={val} onChange={e=>setCount(q.id,e.target.value,max)} inputMode="numeric" placeholder={`0–${max}`}
-                  style={{...S.inp,textAlign:"center",fontSize:18,fontWeight:800}}/>
-                <button onClick={()=>stepCount(q.id,1,max)} style={{...S.btnSm,fontSize:18,padding:"6px 14px"}}>＋</button>
-              </div>
-              <div style={{marginTop:8}}><BarraPct pct={pct} dark={dark}/></div>
-            </div>
-          );
-        })}
-        <div style={S.card}>
-          <label style={S.lbl}>Observações (opcional)</label>
-          <textarea value={formObs} onChange={e=>setFormObs(e.target.value)} rows={2} placeholder="Ex: refletores da doca 3 queimados (B2)"
-            style={{...S.inp,resize:"vertical",fontFamily:"inherit"}}/>
-        </div>
-        {formErr && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{formErr}</div>}
-        <button onClick={salvarTeste} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Registrar teste"}</button>
-        <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-      </div>
-    </div></div>
-  );
-
-  // ── TELA: detalhe de um teste
-  if(screen==="view" && viewTest){
-    const r = calcTeste(viewTest);
-    return (
-      <div style={S.page}><div style={S.wrap}>
-        {Header}
-        <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
-          <div style={S.card}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:800,...S.txt}}>{fmtDate(viewTest.date)}</div>
-                <div style={{fontSize:11,...S.txt2}}>por {viewTest.responsavel||"—"}</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:22,fontWeight:900,color:STATUS_CFG[statusFromPct(r.pct)].color}}>{r.pct}%</div>
-                <StatusBadge status={statusFromPct(r.pct)}/>
-              </div>
-            </div>
-            <div style={{marginTop:10}}><BarraPct pct={r.pct} dark={dark}/></div>
-            <div style={{fontSize:11,...S.txt2,marginTop:6}}>{r.inop} inoperante{r.inop===1?"":"s"} de {r.tot} pontos · {r.ops} operantes</div>
-          </div>
-          {(viewTest.quads||[]).map(q=>{
-            const pct = pctQuad(q);
-            const inop = (Number(q.total)||0) - opsDe(q);
-            return (
-              <div key={q.id} style={S.card}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                  <div style={{fontSize:12,fontWeight:800,...S.txt}}>{q.nome}</div>
-                  <div style={{fontSize:11,...S.txt2}}>{inop} inop. / {q.total} · <span style={{fontWeight:800,color:STATUS_CFG[statusFromPct(pct)].color}}>{pct}%</span></div>
-                </div>
-                <BarraPct pct={pct} dark={dark}/>
-              </div>
-            );
-          })}
-          {viewTest.obs && <div style={S.card}><label style={S.lbl}>Observações</label><div style={{fontSize:12,...S.txt}}>{viewTest.obs}</div></div>}
-          {adminAuth && !confirmDel && <button onClick={()=>setConfirmDel(true)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir este teste</button>}
-          {adminAuth && confirmDel && (
-            <div style={{...S.card,border:"1px solid #ef444455"}}>
-              <div style={{fontSize:12,...S.txt,marginBottom:10}}>Excluir definitivamente o teste de {fmtDate(viewTest.date)}?</div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>setConfirmDel(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-                <button onClick={excluirTeste} disabled={saving} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>{saving?"Excluindo…":"Excluir"}</button>
-              </div>
-            </div>
-          )}
-          <button onClick={()=>{setConfirmDel(false);setViewTest(null);setScreen("list");}} style={{...S.btnSec,fontSize:13}}>← Voltar</button>
-        </div>
-      </div></div>
-    );
-  }
-
-  // ── TELA: lista / home do módulo — LIMPA: mapa + lista de quadrantes
-  const semQuadrantes = (data.quadrantes||[]).length===0;
+  // ── TELA principal — limpa: mapa, total geral, quadrantes, PDF
   return (
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
 
-        {/* Mapa interativo */}
-        {data.mapa?.url && !semQuadrantes && (
-          <MapaQuadrantes mapa={data.mapa} quadrantes={data.quadrantes} selNome={selNome} onSelect={setSelNome} ultimoPorNome={ultimoPorNome} dark={dark}/>
+        {/* Mapa como está (quadrantes já desenhados na imagem) */}
+        {data.mapa?.url && (
+          <img src={data.mapa.url} alt="Mapa do projeto"
+            style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
+            onError={(e)=>{e.currentTarget.style.display="none";}}/>
         )}
 
-        {/* Semana + resumo compactos */}
-        <div style={{display:"flex",gap:8}}>
-          <div style={{...S.card,flex:1,padding:"10px 12px",border:`1px solid ${semanaOk?"#22c55e33":"#f59e0b33"}`}}>
-            <div style={{fontSize:9,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>Semana</div>
-            <div style={{fontSize:13,fontWeight:800,color:semanaOk?"#22c55e":"#f59e0b"}}>{semanaOk?"✅ Feito":"⏳ Pendente"}</div>
-          </div>
-          {ultimo && (()=>{ const r=calcTeste(ultimo); return (
-            <div style={{...S.card,flex:1.6,padding:"10px 12px"}}>
-              <div style={{fontSize:9,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>Último · {fmtDate(ultimo.date)}</div>
-              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
-                <div style={{fontSize:17,fontWeight:900,color:STATUS_CFG[statusFromPct(r.pct)].color}}>{r.pct}%</div>
-                <div style={{fontSize:10,...S.txt2}}>{r.inop} inop. de {r.tot}</div>
-              </div>
+        {/* Painel geral do condomínio */}
+        {temQuadrantes && g.total>0 && (
+          <div style={{...S.card,border:`1px solid ${STATUS_CFG[statusFromPct(g.pct)].border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>Total do condomínio</div>
+              <div style={{fontSize:26,fontWeight:900,color:STATUS_CFG[statusFromPct(g.pct)].color}}>{g.pct}%</div>
             </div>
-          );})()}
-        </div>
+            <div style={{marginTop:6}}><BarraPct pct={g.pct} dark={dark} alta/></div>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:8,fontSize:11,...S.txt2}}>
+              <span><b style={{...S.txt}}>{g.total}</b> pontos</span>
+              <span style={{color:g.def>0?"#ef4444":"#22c55e",fontWeight:800}}>{g.def} deficiente{g.def===1?"":"s"}</span>
+              <span><b style={{...S.txt}}>{g.ops}</b> operantes</span>
+            </div>
+          </div>
+        )}
 
-        {/* Lista de quadrantes: pontos, inoperantes, % — toca ↔ realça no mapa */}
-        {!semQuadrantes && (data.quadrantes||[]).map(q=>{
-          const uq = ultimoPorNome[q.nome];
-          const pct = uq ? pctQuad(uq) : null;
-          const inop = uq ? (Number(uq.total)||0)-opsDe(uq) : null;
-          const cor = pct===null ? (dark?"#475569":"#94a3b8") : STATUS_CFG[statusFromPct(pct)].color;
-          const sel = selNome===q.nome;
+        {/* Guia do fluxo */}
+        {!temQuadrantes && (
+          <div style={{...S.card,border:"1px solid #f59e0b33"}}>
+            <div style={{fontSize:12,fontWeight:700,...S.txt,marginBottom:2}}>Comece pelo levantamento</div>
+            <div style={{fontSize:11,...S.txt2}}>Olhe o mapa acima e adicione cada quadrante com a quantidade de pontos de iluminação identificados.</div>
+          </div>
+        )}
+        {faltamDef.length>0 && (
+          <div style={{...S.card,border:"1px solid #f59e0b55",background:dark?"#1a1000":"#fffbeb"}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#f59e0b"}}>⚠️ Falta informar os deficientes</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:2}}>Agora informe quantos pontos estão deficientes/apagados em: {faltamDef.map(q=>q.nome).join(", ")}. Toque em ✏️ Editar no quadrante.</div>
+          </div>
+        )}
+
+        {/* Quadrantes */}
+        {(data.quadrantes||[]).map(q=>{
+          if(editId===q.id) return <div key={q.id}>{Editor}</div>;
+          const c = calcQuad(q);
+          const cor = STATUS_CFG[statusFromPct(c.pct)].color;
           return (
-            <button key={q.id} onClick={()=>setSelNome(sel?null:q.nome)}
-              style={{...S.card,padding:"10px 14px",cursor:"pointer",textAlign:"left",width:"100%",display:"flex",alignItems:"center",gap:12,
-                border:`1.5px solid ${sel?"#38bdf8":(dark?"#0f172a":"#e2e8f0")}`, background: sel? (dark?"#071a26":"#eff9ff") : (dark?"#060c18":"#fff")}}>
-              <div style={{width:40,textAlign:"center",flexShrink:0,fontSize:15,fontWeight:900,color:sel?"#38bdf8":cor}}>{q.nome}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:700,...S.txt}}>{Number(q.total)?`${q.total} pontos`:"sem levantamento"}</div>
-                <div style={{fontSize:10,...S.txt2}}>{pct===null?"sem teste":`${inop} inoperante${inop===1?"":"s"} · ${pct}% operante`}</div>
+            <div key={q.id} style={{...S.card,padding:"12px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:44,textAlign:"center",flexShrink:0,fontSize:17,fontWeight:900,color:c.def==null?(dark?"#64748b":"#94a3b8"):cor}}>{q.nome}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,...S.txt}}>
+                    {c.total} ponto{c.total===1?"":"s"} · {c.def==null
+                      ? <span style={{color:"#f59e0b",fontWeight:800}}>deficientes pendentes</span>
+                      : <span style={{color:c.def>0?"#ef4444":"#22c55e",fontWeight:800}}>{c.def} deficiente{c.def===1?"":"s"}</span>}
+                  </div>
+                  <div style={{fontSize:9,...S.txt2,marginTop:1}}>{q.atualizadoEm?`atualizado em ${fmtDataHora(q.atualizadoEm)}`:""}</div>
+                </div>
+                {c.def!=null && <div style={{width:64,flexShrink:0,textAlign:"right",fontSize:13,fontWeight:900,color:cor}}>{c.pct}%</div>}
               </div>
-              {pct!==null
-                ? <div style={{width:74,flexShrink:0}}><BarraPct pct={pct} dark={dark}/></div>
-                : <span style={{fontSize:10,...S.txt2}}>—</span>}
-            </button>
+              {c.def!=null && <div style={{marginTop:8}}><BarraPct pct={c.pct} dark={dark}/></div>}
+              <div style={{display:"flex",gap:8,marginTop:10}}>
+                <button onClick={()=>abrirEdicao(q)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:12}}>✏️ Editar</button>
+                {adminAuth && delId!==q.id && <button onClick={()=>setDelId(q.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433",padding:"8px 12px",fontSize:12}}>🗑</button>}
+              </div>
+              {adminAuth && delId===q.id && (
+                <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
+                  <div style={{flex:1,fontSize:11,color:"#ef4444",fontWeight:700}}>Excluir o quadrante {q.nome}?</div>
+                  <button onClick={()=>setDelId(null)} style={{...S.btnSm,fontSize:11}}>Não</button>
+                  <button onClick={()=>excluirQuadrante(q.id)} style={{...S.btnSm,color:"#fff",background:"#dc2626",borderColor:"#dc2626",fontSize:11}}>Sim, excluir</button>
+                </div>
+              )}
+            </div>
           );
         })}
 
         {/* Ações */}
-        {semQuadrantes ? (
-          <div style={{...S.card,border:"1px solid #f59e0b33"}}>
-            <div style={{fontSize:12,...S.txt,marginBottom:4,fontWeight:700}}>⚙️ Quadrantes ainda não configurados</div>
-            <div style={{fontSize:11,...S.txt2}}>{adminAuth?"Configure o mapa e os quadrantes deste projeto.":"Peça ao gerencial para configurar os quadrantes deste projeto."}</div>
-          </div>
-        ) : semLevantamento ? (
-          <button onClick={abrirSurvey} style={{...S.btn,background:"linear-gradient(135deg,#0369a1,#0c4a6e)"}}>📋 Fazer levantamento de pontos</button>
-        ) : (
-          <>
-            <button onClick={abrirForm} style={S.btn}>➕ Novo Teste de Iluminação</button>
-            <button onClick={abrirSurvey} style={{...S.btnSec,fontSize:13}}>📋 Editar Pontos por Quadrante ({totalPontos})</button>
-          </>
+        {editId==="novo" ? Editor : (
+          <button onClick={()=>abrirEdicao(null)} style={temQuadrantes?{...S.btnSec,fontSize:13}:S.btn}>➕ Adicionar quadrante</button>
         )}
-        {adminAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Mapa e Quadrantes</button>}
-
-        {/* Histórico */}
-        {history.length>0 && <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginTop:4}}>Histórico ({history.length})</div>}
-        {history.map(t=>{ const r=calcTeste(t); return (
-          <button key={t.id} onClick={()=>{setViewTest(t);setConfirmDel(false);setScreen("view");}}
-            style={{...S.card,cursor:"pointer",textAlign:"left",width:"100%",display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:52,textAlign:"center",flexShrink:0}}>
-              <div style={{fontSize:16,fontWeight:900,color:STATUS_CFG[statusFromPct(r.pct)].color}}>{r.pct}%</div>
-            </div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,...S.txt}}>{fmtDate(t.date)}</div>
-              <div style={{fontSize:10,...S.txt2}}>{r.inop} inop. de {r.tot} · {t.responsavel||"—"}</div>
-            </div>
-            <StatusBadge status={statusFromPct(r.pct)}/>
-            <span style={{...S.txt2,fontSize:16}}>›</span>
-          </button>
-        );})}
+        {adminAuth && temQuadrantes && g.total>0 && (
+          <button onClick={()=>gerarPdfIluminacao(project, data)} style={{...S.btn,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 Gerar PDF da Iluminação</button>
+        )}
+        {adminAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Mapa</button>}
+        {saving && <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>salvando…</div>}
       </div>
     </div></div>
   );

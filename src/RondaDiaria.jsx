@@ -420,11 +420,18 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           </div>
         ))}
         {!travado && (r.fotos||[]).length<MAX_FOTOS_RONDA && (
-          <label style={{...S.btnSm,padding:"9px 12px",fontSize:12,display:"inline-flex",alignItems:"center",gap:6}}>
-            📷 Foto
-            <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
-              onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
-          </label>
+          <>
+            <label style={{...S.btnSm,padding:"9px 12px",fontSize:12,display:"inline-flex",alignItems:"center",gap:6}}>
+              📷 Câmera
+              <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
+                onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
+            </label>
+            <label style={{...S.btnSm,padding:"9px 12px",fontSize:12,display:"inline-flex",alignItems:"center",gap:6}}>
+              🖼️ Galeria
+              <input type="file" accept="image/*" style={{display:"none"}}
+                onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
+            </label>
+          </>
         )}
       </div>
     </div>
