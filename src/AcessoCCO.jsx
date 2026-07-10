@@ -3,6 +3,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 import RondaVirtual from "./RondaVirtual"; // ◀ NOVO — aba de ronda virtual CFTV
 import TempoGravacao from "./TempoGravacao"; // ◀ aba CFTV Tempo de Gravação
+import BodycamSection from "./BodycamSection"; // ◀ NOVO — descarregamento de bodycam (P311A)
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -31,9 +32,10 @@ const COLLECTIONS = {
   supervisao: "cco_supervisao",
   manutencao: "cco_manutencao",
   ronda:      "cco_ronda",        // ◀ NOVO — coleção própria, não toca as legadas
+  bodycam:    "cco_bodycam",      // ◀ NOVO — descarregamento de bodycam (só P311A)
 };
 
-const TEMAS = [
+const TEMAS_BASE = [
   { key:"acesso",     label:"Acesso",     icon:"🚪", color:"#0ea5e9" },
   { key:"intervalo",  label:"Intervalo",  icon:"⏱️", color:"#22c55e" },
   { key:"supervisao", label:"Supervisão", icon:"👁️", color:"#a855f7" },
@@ -41,6 +43,12 @@ const TEMAS = [
   { key:"cftv",       label:"CFTV Gravação", icon:"📹", color:"#0ea5e9" },
   { key:"manutencao", label:"Manutenção", icon:"🛠️", color:"#f59e0b" },
 ];
+const TEMAS = TEMAS_BASE; // mantém compatibilidade com o resto do arquivo (TemaForm, dots etc.)
+// ◀ NOVO — Bodycam: só faz sentido no P311A (o P311B já é automático)
+function temasDoProjeto(projectId){
+  if(projectId==="P311A") return [...TEMAS_BASE, { key:"bodycam", label:"Bodycam", icon:"🎬", color:"#dc2626" }];
+  return TEMAS_BASE;
+}
 
 const STATUS_MANUT = [
   { key:"concluida", label:"Concluída", color:"#22c55e", bg:"#021a0d", icon:"✅" },
@@ -674,6 +682,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
   const isRonda = tema==="ronda"; // ◀ NOVO — a aba ronda tem fluxo próprio (não usa o CRUD genérico)
   const isCftv = tema==="cftv"; // ◀ aba CFTV Tempo de Gravação — fluxo próprio
+  const isBodycam = tema==="bodycam"; // ◀ NOVO — aba Bodycam (só P311A), fluxo próprio
 
   // Carrega dots de atividade de todas as abas (1x na entrada)
   useEffect(()=>{
@@ -683,14 +692,14 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
   // Recalcula o dot da aba atual em tempo real (registros/rascunho)
   useEffect(()=>{
-    if(screen==="pin" || isRonda || isCftv) return;
+    if(screen==="pin" || isRonda || isCftv || isBodycam) return;
     setDots(prev=>({...prev, [tema]: computeCrudDot(dados[tema]||[], hasDraft)}));
   },[dados, hasDraft, tema, screen]);
 
   // Carrega o tema atual ao entrar / trocar de aba
   useEffect(()=>{
     if(!project?.id || screen==="pin") return;
-    if(isRonda||isCftv){ setLoadingTema(false); setShowArquivados(false); return; } // ◀ ronda/cftv gerenciam o próprio load
+    if(isRonda||isCftv||isBodycam){ setLoadingTema(false); setShowArquivados(false); return; } // ◀ ronda/cftv/bodycam gerenciam o próprio load
     setLoadingTema(true);
     loadTema(tema, project.id).then(r=>{
       setDados(prev=>({...prev,[tema]:r||[]}));
@@ -705,7 +714,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
   // Autosave do rascunho enquanto preenche
   useEffect(()=>{
-    if(screen==="form" && project?.id && !isRonda && !isCftv) {
+    if(screen==="form" && project?.id && !isRonda && !isCftv && !isBodycam) {
       saveDraft(tema, project.id, form);
       setHasDraft(true);
     }
@@ -764,7 +773,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const TabBar = () => (
     <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"0 16px 12px"}}>
       <style>{`@keyframes ccoDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}`}</style>
-      {TEMAS.map(t=>{
+      {temasDoProjeto(project?.id).map(t=>{
         const sel = tema===t.key;
         const dot = dots[t.key];
         return (
@@ -794,7 +803,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   );
 
   // ── FORMULÁRIO (não se aplica à aba ronda)
-  if(screen==="form" && !isRonda) return (
+  if(screen==="form" && !isRonda && !isBodycam) return (
     <div style={S.page}>
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
@@ -854,6 +863,10 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
             <TempoGravacao
               project={project} dark={dark||true} S={S} adminAuth={adminAuth}
               loadEquipe={loadEquipe} db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
+          ) : isBodycam ? (
+            <BodycamSection
+              project={project} dark={dark||true} S={S} adminAuth={adminAuth}
+              db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
           ) : loadingTema ? (
             <div style={{textAlign:"center",padding:"40px 0"}}>
               <div style={{fontSize:28,marginBottom:8}}>{temaInfo.icon}</div>
