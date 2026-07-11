@@ -3206,7 +3206,7 @@ export default function App(){
           </div>
         )}
         <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:10,borderBottom:"1px solid #060c18",marginBottom:2}}>
-          <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={S.backBtn} aria-label={editingIdx!==null?"Cancelar edição":"Voltar ao início"}>← {editingIdx!==null?"Cancelar":"Inicio"}</button>
+          <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen(project?.id==="P260A"?"p260a_home":"home");}}} style={S.backBtn} aria-label={editingIdx!==null?"Cancelar edição":"Voltar ao início"}>← {editingIdx!==null?"Cancelar":"Inicio"}</button>
           <MoklogLogo size={32}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
@@ -3313,7 +3313,7 @@ export default function App(){
               style={{...S.primaryBtn,flex:2,fontSize:14,opacity:canFinalize?1:0.45,cursor:canFinalize?"pointer":"not-allowed"}}>
               {editingIdx!==null?"✓ Salvar Alterações":"✓ Finalizar e Gerar Relatório"}
             </button>
-            <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen("home");}}} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
+            <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen(project?.id==="P260A"?"p260a_home":"home");}}} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
         <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
@@ -3381,7 +3381,7 @@ export default function App(){
                       <button onClick={()=>{setRondaProject({id:jp.id,name:jp.name});setShowRonda(true);}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#0d948811,#0d948806)",border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#2dd4bf15",border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚶</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#2dd4bf"}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:"#2dd4bf44",fontSize:18}}>›</span></button>
 
                       {jp.id==="P260A"&&(
-                        <button onClick={()=>{setHomeGroup(null);setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"home":"pin_gate");}}
+                        <button onClick={()=>{setHomeGroup(null);setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"p260a_home":"pin_gate");}}
                           style={{...S.secBtn,fontSize:12,color:"#7c3aed",borderColor:"#7c3aed22",gridColumn:"1/-1"}}>📋 Checklist Semanal</button>
                       )}
                     </div>
