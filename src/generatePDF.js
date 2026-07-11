@@ -261,7 +261,7 @@ function buildHeader(theme, project, meta, weekLabel) {
 }
 
 // ── RELATÓRIO SEMANAL COMPLETO
-export function generatePDF(project, state, meta, photos, ctmkInfo) {
+export function generatePDF(project, state, meta, photos, ctmkInfo, inquilinosInfo) {
   if(!project||!state||!meta) return;
   const theme = getTheme(project.id);
   const weekLabel = getWeekLabel(meta.date);
@@ -582,6 +582,32 @@ ${pendencias.length?`
   <div class="section-title" style="color:#d97706;border-left-color:#d97706">Infraestrutura / Pendências (${pendencias.length})</div>
   ${pendRows}
 </div>`:""}
+
+${(()=>{
+  const unidades = inquilinosInfo||[];
+  if(unidades.length===0) return "";
+  const ocupadas = unidades.filter(u=>u.status==="ativo");
+  const vazias = unidades.filter(u=>u.status!=="ativo");
+  const linhas = unidades.map(u=>`<tr>
+      <td style="font-weight:700">${(u.tipo||"—")} ${(u.nome||"")}</td>
+      <td>${u.status==="ativo"?(u.inquilino||"—"):"—"}</td>
+      <td style="text-align:center">${u.status==="ativo"?`<span style="color:#15803d;font-weight:700">Ocupado</span>`:`<span style="color:#64748b">Vazio</span>`}</td>
+      <td>${u.opera24h?"24h":(u.horarioOperacao||"—")}</td>
+    </tr>`).join("");
+  return `
+<div class="section">
+  <div class="section-title" style="color:#0369a1;border-left-color:#0369a1">Inquilinos / Galpões — ${ocupadas.length} ocupado${ocupadas.length===1?"":"s"} · ${vazias.length} vazio${vazias.length===1?"":"s"} (${unidades.length} total)</div>
+  <table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:6px">
+    <thead><tr>
+      <th style="text-align:left;padding:5px 8px;background:#f1f5f9">Unidade</th>
+      <th style="text-align:left;padding:5px 8px;background:#f1f5f9">Inquilino</th>
+      <th style="text-align:center;padding:5px 8px;background:#f1f5f9;width:80px">Status</th>
+      <th style="text-align:left;padding:5px 8px;background:#f1f5f9;width:90px">Operação</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>
+</div>`;
+})()}
 
 <div style="margin-top:16px;padding-top:12px;border-top:2px solid #e2e8f0">
   <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64748b;font-weight:500">

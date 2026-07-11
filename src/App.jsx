@@ -173,6 +173,20 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
+// ── Puxa os inquilinos/galpões do projeto para anexar ao PDF do relatório
+// semanal (mesma fonte do módulo Inquilinos — sem duplicar cadastro)
+async function loadInquilinosParaPDF(projectId){
+  try {
+    const snap = await getDoc(doc(db,"inquilinos",projectId));
+    if(snap.exists()) return snap.data().unidades||[];
+  } catch(e){}
+  try {
+    const l = localStorage.getItem(`inquilinos_${projectId}`);
+    if(l) return (JSON.parse(l).unidades)||[];
+  } catch(e){}
+  return [];
+}
+
 async function saveToFirebase(projectId, history) {
   const result = await safeFirebaseSave(async () => {
     await setDoc(doc(db,"projects",projectId),{history,updatedAt:new Date().toISOString()});
@@ -1120,6 +1134,7 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
       <td style="font-weight:800">${r.id}<div style="font-weight:400;font-size:10px;color:#64748b">${r.name}</div></td>
       <td style="text-align:center"><span style="font-size:18px;font-weight:900;color:${scoreColor(r.score)}">${r.score}</span><span style="font-size:10px;color:#94a3b8">/100</span></td>
       <td style="text-align:center;color:#64748b">${r.base}%</td>
+      <td style="text-align:center">${r.ilumDeficientes>0?`<span style="color:#dc2626;font-weight:800">💡 ${r.ilumDeficientes}</span>`:(r.ilumTotal>0?'<span style="color:#15803d;font-weight:700">✓ 0</span>':'<span style="color:#cbd5e1">—</span>')}</td>
       <td style="font-size:10px;color:#64748b">${r.penalidades.length? r.penalidades.map(p=>`<div>−${p.val} · ${p.label}</div>`).join("") : '<span style="color:#15803d;font-weight:700">✓ Sem penalidades</span>'}</td>
     </tr>`).join("");
   const html = `<!DOCTYPE html>
@@ -1150,7 +1165,7 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
   </div>
 </div>
 <table>
-  <thead><tr><th style="width:44px;text-align:center">Pos.</th><th>Planta</th><th style="text-align:center;width:80px">Score 360</th><th style="text-align:center;width:70px">Checklist</th><th>Penalidades aplicadas</th></tr></thead>
+  <thead><tr><th style="width:44px;text-align:center">Pos.</th><th>Planta</th><th style="text-align:center;width:80px">Score 360</th><th style="text-align:center;width:70px">Checklist</th><th style="text-align:center;width:80px">💡 Iluminação</th><th>Penalidades aplicadas</th></tr></thead>
   <tbody>${rowsHtml}</tbody>
 </table>
 <div class="legend">
@@ -1181,15 +1196,22 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     try {
       const ids = Object.keys(PROJECTS);
       // Busca em paralelo os módulos que não estão em memória (KeyAccess, Bolsão, Perimetral, Ronda VSPP)
-      const [keySnaps, bolsaoSnaps, periSnaps, rondaSnap] = await Promise.all([
+      const [keySnaps, bolsaoSnaps, periSnaps, rondaSnap, ilumSnaps] = await Promise.all([
         Promise.all(ids.map(pid=>getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null))),
         Promise.all(["P311A","P311B"].map(pid=>getDoc(doc(db,"bolsao",pid)).catch(()=>null))),
         Promise.all(ids.map(pid=>getDoc(doc(db,"perimetral",pid)).catch(()=>null))),
         getDoc(doc(db,"ronda_vspp","P601")).catch(()=>null),
+        Promise.all(ids.map(pid=>getDoc(doc(db,"iluminacao",pid)).catch(()=>null))),
       ]);
       const keyAbertasBy = {}; ids.forEach((pid,i)=>{ const regs=keySnaps[i]?.exists()?(keySnaps[i].data().registros||[]):[]; keyAbertasBy[pid]=regs.filter(r=>!r.horaFim).length; });
       const bolsaoBy = {}; ["P311A","P311B"].forEach((pid,i)=>{ const placas=bolsaoSnaps[i]?.exists()?(bolsaoSnaps[i].data().placas||{}):{}; bolsaoBy[pid]=Object.values(placas).filter(p=>p.status==="critico").length; });
       const periBy = {}; ids.forEach((pid,i)=>{ const testes=periSnaps[i]?.exists()?(periSnaps[i].data().testes||[]):[]; if(!testes.length){periBy[pid]=0;return;} const ult=[...testes].sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0]; periBy[pid]=Object.values(ult.zonas||{}).filter(z=>(z?.status||"ok")!=="ok").length; });
+      const ilumBy = {}; ids.forEach((pid,i)=>{
+        const quads = ilumSnaps[i]?.exists()?(ilumSnaps[i].data().quadrantes||[]):[];
+        const total = quads.reduce((a,q)=>a+(Number(q.total)||0),0);
+        const def = quads.reduce((a,q)=>a+(Number(q.deficientes)||0),0);
+        ilumBy[pid] = { total, def };
+      });
       let rondaPct = null;
       if(rondaSnap?.exists()){ const regs=(rondaSnap.data().registros||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")); const ult=regs[0]; if(ult){ const slots=ult.slots||[]; const f=slots.filter(h=>ult.marcacoes?.[h]?.status==="feito").length; rondaPct = slots.length?Math.round((f/slots.length)*100):null; } }
       const rows = ids.map(pid=>{
@@ -1206,7 +1228,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           perimetralZonasRuins: periBy[pid]||0,
           rondaPct: pid==="P601"?rondaPct:null,
         });
-        return { id:pid, name:p.name, ...r, semChecklist: !last };
+        return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0 };
       }).sort((a,b)=>b.score-a.score);
       const media = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
       setV360({rows, media});
@@ -1343,7 +1365,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   <span style={{fontSize:16,minWidth:32,textAlign:"center"}}>{medal(i)}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{r.id} <span style={{fontWeight:400,color:"#94a3b8",fontSize:11}}>· {r.name}</span></div>
-                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}{r.ilumTotal>0&&<span style={{color:r.ilumDeficientes>0?"#ef4444":"#22c55e",fontWeight:700}}> · 💡 {r.ilumDeficientes} deficiente{r.ilumDeficientes===1?"":"s"}</span>}</div>
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:22,fontWeight:900,color:scoreColor(r.score)}}>{r.score}</div>
@@ -1466,13 +1488,18 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           );
         })}
         <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
-          <button onClick={()=>generatePDF(
-              viewReport.project||viewReport,
-              viewReport.report?.state||viewReport.state,
-              viewReport.report?.meta||viewReport.meta,
-              [],
-              ctmkInfoFor((viewReport.project||viewReport).id)
-            )}
+          <button onClick={async ()=>{
+              const proj = viewReport.project||viewReport;
+              const inquilinosInfo = await loadInquilinosParaPDF(proj.id);
+              generatePDF(
+                proj,
+                viewReport.report?.state||viewReport.state,
+                viewReport.report?.meta||viewReport.meta,
+                [],
+                ctmkInfoFor(proj.id),
+                inquilinosInfo
+              );
+            }}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
           {onEditReport&&<button onClick={()=>onEditReport(viewReport.project,viewReport.report,viewReport.idx)}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}>✏️ Editar</button>}
@@ -1543,7 +1570,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
-                    <button onClick={()=>generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id))} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
+                    <button onClick={async ()=>{ const inquilinosInfo = await loadInquilinosParaPDF(p.id); generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
                     <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
@@ -1903,7 +1930,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
           <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={()=>generatePDF(project,state,meta,photos,ctmkInfo)} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
+          <button onClick={async ()=>{ const inquilinosInfo = await loadInquilinosParaPDF(project.id); generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
           <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?"✓ Copiado!":"📋 Copiar Texto"}</button>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
