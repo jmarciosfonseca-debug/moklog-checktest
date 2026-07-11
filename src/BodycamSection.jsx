@@ -91,8 +91,8 @@ function gerarPdfBodycam(project, registros){
       <td>${fmtDataBR(r.dia)}</td>
       <td>${r.horario||"—"}${r.atrasado?' <span style="color:#b45309;font-weight:700">(pós 00:00)</span>':""}</td>
       <td>${r.porteiro||"—"}</td>
-      <td>${r.liderNome||"—"} (${r.qtdVideosLider??"—"} vídeos)</td>
-      <td>${r.tacticoNome||"—"} (${r.qtdVideosTatico??"—"} vídeos)</td>
+      <td>☀️ ${r.liderDiurno||"—"}<br/>🌙 ${r.liderNoturno||"—"}<br/><span style="color:#64748b">${r.qtdVideosLider??"—"} vídeos (24h)</span></td>
+      <td>☀️ ${r.tacticoDiurno||"—"}<br/>🌙 ${r.tacticoNoturno||"—"}<br/><span style="color:#64748b">${r.qtdVideosTatico??"—"} vídeos (24h)</span></td>
       <td style="color:${r.status==="falha"?"#dc2626":"#16a34a"};font-weight:800">${r.status==="falha"?"⚠️ Falha":"✅ OK"}</td>
       <td>${(r.obsFalha||"").replace(/</g,"&lt;")}</td>
     </tr>`;
@@ -149,8 +149,10 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   const [gerandoPdf, setGerandoPdf] = useState(false);
 
   const [porteiro, setPorteiro] = useState("");
-  const [liderNome, setLiderNome] = useState("");
-  const [tacticoNome, setTacticoNome] = useState("");
+  const [liderDiurno, setLiderDiurno] = useState("");
+  const [liderNoturno, setLiderNoturno] = useState("");
+  const [tacticoDiurno, setTacticoDiurno] = useState("");
+  const [tacticoNoturno, setTacticoNoturno] = useState("");
   const [qtdLider, setQtdLider] = useState("");
   const [qtdTatico, setQtdTatico] = useState("");
   const [status, setStatus] = useState("ok");
@@ -202,7 +204,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   const ordenados = [...registros].sort((a,b)=>(b.dia||"").localeCompare(a.dia||""));
 
   const abrirForm = () => {
-    setPorteiro(""); setLiderNome(""); setTacticoNome("");
+    setPorteiro(""); setLiderDiurno(""); setLiderNoturno(""); setTacticoDiurno(""); setTacticoNoturno("");
     setQtdLider(""); setQtdTatico(""); setStatus("ok"); setObsFalha(""); setFoto(null); setErro(null);
     setShowForm(true);
   };
@@ -215,14 +217,18 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
 
   const registrar = async () => {
     if(!porteiro.trim()){ setErro("Informe o nome do porteiro que está descarregando."); return; }
-    if(!liderNome.trim()){ setErro("Informe o nome do vigilante que usou a câmera do líder."); return; }
-    if(!tacticoNome.trim()){ setErro("Informe o nome do vigilante que usou a câmera do tático/ronda."); return; }
-    if(qtdLider===""||qtdTatico===""){ setErro("Informe a quantidade de vídeos das duas câmeras."); return; }
+    if(!liderDiurno.trim()){ setErro("Informe o nome do líder diurno (câmera do líder)."); return; }
+    if(!liderNoturno.trim()){ setErro("Informe o nome do líder noturno (câmera do líder)."); return; }
+    if(!tacticoDiurno.trim()){ setErro("Informe o nome do vigilante ronda/tático diurno."); return; }
+    if(!tacticoNoturno.trim()){ setErro("Informe o nome do vigilante ronda/tático noturno."); return; }
+    if(qtdLider===""||qtdTatico===""){ setErro("Informe a quantidade de vídeos das duas câmeras (período de 24h)."); return; }
     if(status==="falha" && !obsFalha.trim()){ setErro("Descreva a falha apresentada."); return; }
     const agoraSalvar = new Date();
     const registro = {
       id:newId(), dia:diaRef, tipo:"registro",
-      porteiro:porteiro.trim(), liderNome:liderNome.trim(), tacticoNome:tacticoNome.trim(),
+      porteiro:porteiro.trim(),
+      liderDiurno:liderDiurno.trim(), liderNoturno:liderNoturno.trim(),
+      tacticoDiurno:tacticoDiurno.trim(), tacticoNoturno:tacticoNoturno.trim(),
       qtdVideosLider:Number(qtdLider)||0, qtdVideosTatico:Number(qtdTatico)||0,
       horario:fmtHora(agoraSalvar), status, obsFalha:status==="falha"?obsFalha.trim():"",
       foto, atrasado, criadoEm:agoraSalvar.toISOString(),
@@ -260,16 +266,22 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
         <input value={porteiro} onChange={e=>{setPorteiro(e.target.value);setErro(null);}} placeholder="Nome completo" style={S.inp}/>
       </div>
       <div style={S.card}>
-        <label style={S.lbl}>Vigilante — câmera do Líder</label>
-        <input value={liderNome} onChange={e=>{setLiderNome(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:8}}/>
-        <label style={S.lbl}>Quantidade de vídeos</label>
-        <input value={qtdLider} inputMode="numeric" onChange={e=>{setQtdLider(e.target.value.replace(/[^0-9]/g,""));setErro(null);}} placeholder="Ex: 5" style={S.inp}/>
+        <div style={{fontSize:12,fontWeight:800,...S.txt,marginBottom:8}}>🎥 Câmera do Líder <span style={{fontWeight:600,...S.txt2}}>(cobre as 24h — os dois turnos)</span></div>
+        <label style={S.lbl}>☀️ Líder Diurno</label>
+        <input value={liderDiurno} onChange={e=>{setLiderDiurno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
+        <label style={S.lbl}>🌙 Líder Noturno</label>
+        <input value={liderNoturno} onChange={e=>{setLiderNoturno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
+        <label style={S.lbl}>Quantidade de vídeos (24h)</label>
+        <input value={qtdLider} inputMode="numeric" onChange={e=>{setQtdLider(e.target.value.replace(/[^0-9]/g,""));setErro(null);}} placeholder="Ex: 21" style={S.inp}/>
       </div>
       <div style={S.card}>
-        <label style={S.lbl}>Vigilante — câmera do Tático / Ronda</label>
-        <input value={tacticoNome} onChange={e=>{setTacticoNome(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:8}}/>
-        <label style={S.lbl}>Quantidade de vídeos</label>
-        <input value={qtdTatico} inputMode="numeric" onChange={e=>{setQtdTatico(e.target.value.replace(/[^0-9]/g,""));setErro(null);}} placeholder="Ex: 3" style={S.inp}/>
+        <div style={{fontSize:12,fontWeight:800,...S.txt,marginBottom:8}}>🎥 Câmera do Tático / Ronda <span style={{fontWeight:600,...S.txt2}}>(cobre as 24h — os dois turnos)</span></div>
+        <label style={S.lbl}>☀️ Vigilante Ronda Diurno</label>
+        <input value={tacticoDiurno} onChange={e=>{setTacticoDiurno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
+        <label style={S.lbl}>🌙 Vigilante Ronda Noturno</label>
+        <input value={tacticoNoturno} onChange={e=>{setTacticoNoturno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
+        <label style={S.lbl}>Quantidade de vídeos (24h)</label>
+        <input value={qtdTatico} inputMode="numeric" onChange={e=>{setQtdTatico(e.target.value.replace(/[^0-9]/g,""));setErro(null);}} placeholder="Ex: 8" style={S.inp}/>
       </div>
       <div style={S.card}>
         <label style={S.lbl}>Status do descarregamento</label>
@@ -340,9 +352,9 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
       {podeRegistrar && (
         <button onClick={abrirForm} style={S.btn}>▶ Registrar Descarregamento{atrasado?" (atrasado)":""}</button>
       )}
-      {registros.length>0 && (
+      {adminAuth && registros.length>0 && (
         <button onClick={baixarPdf} disabled={gerandoPdf} style={{...S.btnSec,fontSize:13,color:"#7c3aed",borderColor:"#7c3aed44"}}>
-          {gerandoPdf?"Gerando…":"📄 Gerar PDF"}
+          {gerandoPdf?"Gerando…":"📄 Gerar PDF (gerencial)"}
         </button>
       )}
 
@@ -364,7 +376,8 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
                 </div>
               </div>
               <div style={{fontSize:11,...S.txt2,marginTop:4}}>Porteiro: {r.porteiro}</div>
-              <div style={{fontSize:11,...S.txt2}}>Líder: {r.liderNome} ({r.qtdVideosLider} vídeos) · Ronda: {r.tacticoNome} ({r.qtdVideosTatico} vídeos)</div>
+              <div style={{fontSize:11,...S.txt2}}>🎥 Líder: ☀️ {r.liderDiurno||"—"} · 🌙 {r.liderNoturno||"—"} ({r.qtdVideosLider} vídeos)</div>
+              <div style={{fontSize:11,...S.txt2}}>🎥 Ronda: ☀️ {r.tacticoDiurno||"—"} · 🌙 {r.tacticoNoturno||"—"} ({r.qtdVideosTatico} vídeos)</div>
               {r.obsFalha && <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>{r.obsFalha}</div>}
               {r.foto && <img src={r.foto} alt="Foto" style={{width:80,height:80,objectFit:"cover",borderRadius:8,marginTop:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}/>}
             </>
