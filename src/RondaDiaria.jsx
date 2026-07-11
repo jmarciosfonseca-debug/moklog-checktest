@@ -145,12 +145,48 @@ async function saveIndex(projectId, idx){
   try { await setDoc(doc(db,"rondas",projectId), payload); } catch(e){ console.error("Rondas index save:", e); }
   try { localStorage.setItem(`rondas_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
+// ── Grava UMA entrada no índice sem sobrescrever o que outros dispositivos
+// já salvaram enquanto esta tela estava aberta: busca a versão mais atual
+// no servidor, funde a entrada (upsert por id) e só então salva de volta.
+// Evita o "sumiço" de plantões quando dois líderes/turnos usam ao mesmo
+// tempo (a versão antiga em memória de um não apaga a do outro).
+async function saveIndexEntry(projectId, entradaAtualizada, deletedIdExtra){
+  const fresco = await loadIndex(projectId);
+  let plantoes;
+  if(deletedIdExtra){
+    plantoes = fresco.plantoes.filter(p=>p.id!==deletedIdExtra);
+  } else {
+    const jaExiste = fresco.plantoes.some(p=>p.id===entradaAtualizada.id);
+    plantoes = jaExiste ? fresco.plantoes.map(p=>p.id===entradaAtualizada.id?entradaAtualizada:p) : [...fresco.plantoes, entradaAtualizada];
+  }
+  const deletedIds = deletedIdExtra ? [...new Set([...(fresco.deletedIds||[]), deletedIdExtra])] : (fresco.deletedIds||[]);
+  const novoIdx = { plantoes, deletedIds };
+  await saveIndex(projectId, novoIdx);
+  return novoIdx;
+}
 async function savePlantaoFull(p){
   try { await setDoc(doc(db,"rondas_plantoes",p.id), p); } catch(e){ console.error("Plantao save:", e); }
   try { localStorage.setItem(`rondas_full_${p.id}`, JSON.stringify(p)); } catch(e){}
 }
 
 // ── Colaboradores: lista completa do cadastro Equipe, exceto cargos de CCO
+// ── Cargos relevantes para a Ronda Diária, por projeto (evita listar Apoio,
+// CDA, Recepção etc. que não fazem ronda). Ajuste aqui se o cadastro do
+// projeto usar outros nomes de cargo.
+const CARGOS_RONDA = {
+  P607:  [["vigilante","ronda"],["vigilante","apoio"]],
+  P606:  [["vigilante","lider"]],
+  P311A: [["vigilante","lider"]],
+  P311B: [["vigilante","lider"]],
+  P601:  [["vspp","lider"]],
+  P602:  [["vspp","lider"]],
+  P604:  [["vspp","lider"]],
+  P605:  [["vspp","lider"]],
+  P260A: [["vspp","lider"]],
+  P260B: [["vspp","lider"]],
+  P260C: [["vspp","lider"]],
+};
+
 async function loadColaboradores(projectId){
   let equipe = null;
   try {
@@ -160,9 +196,20 @@ async function loadColaboradores(projectId){
   if(!equipe){
     try { const l = localStorage.getItem(`equipe_${projectId}`); if(l) equipe = JSON.parse(l); } catch(e){}
   }
-  return (equipe?.colaboradores||[])
+  const ativos = (equipe?.colaboradores||[])
     .filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim())
-    .filter(c=>!norm(c.cargo).includes("cco"))
+    .filter(c=>!norm(c.cargo).includes("cco")); // CCO nunca entra na ronda
+  const regras = CARGOS_RONDA[projectId];
+  let filtrados = ativos;
+  if(regras){
+    filtrados = ativos.filter(c=>{
+      const cg = norm(c.cargo);
+      if(cg.includes("folg")) return true; // folguista cobre qualquer cargo, sempre entra
+      return regras.some(tokens=>tokens.every(t=>cg.includes(t)));
+    });
+    if(filtrados.length===0) filtrados = ativos; // cadastro sem esses cargos: não trava a operação
+  }
+  return filtrados
     .sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)))
     .map(c=>({ nome:c.nome, cargo:c.cargo||"" }));
 }
@@ -330,7 +377,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     })();
     return ()=>{
       if(saveTimer.current){ clearTimeout(saveTimer.current); }
-      if(pendRef.current){ savePlantaoFull(pendRef.current.full); saveIndex(project.id, pendRef.current.idx); }
+      if(pendRef.current){ savePlantaoFull(pendRef.current.full); saveIndexEntry(project.id, entradaLeve(pendRef.current.full)); }
     };
   },[project.id]); // eslint-disable-line
 
@@ -341,20 +388,21 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const plantaoAnt = (idx.plantoes||[]).find(p=>p.dataPlantao===ant.dataPlantao && p.turno===ant.turno);
   const pendenciaAnt = (idx.plantoes||[]).length>0 && (!plantaoAnt || !plantaoAnt.enviado);
 
-  // grava plantão completo + índice (entrada leve), com debounce
+  // grava plantão completo + índice (entrada leve), com debounce e merge
+  // seguro contra sobrescrita de outro dispositivo/turno usando ao mesmo tempo
   const persist = (full, imediato) => {
     const plantoes = (idx.plantoes||[]).some(p=>p.id===full.id)
       ? (idx.plantoes||[]).map(p=>p.id===full.id?entradaLeve(full):p)
       : [...(idx.plantoes||[]), entradaLeve(full)];
-    const novoIdx = { ...idx, plantoes };
-    setIdx(novoIdx); setAtualFull(full);
-    pendRef.current = { full, idx:novoIdx };
+    setIdx({ ...idx, plantoes }); setAtualFull(full); // atualização otimista da tela
+    pendRef.current = { full };
     if(saveTimer.current) clearTimeout(saveTimer.current);
     const doSave = async () => {
       pendRef.current = null;
       setSaving(true);
       await savePlantaoFull(full);
-      await saveIndex(project.id, novoIdx);
+      const novoIdx = await saveIndexEntry(project.id, entradaLeve(full));
+      setIdx(novoIdx); // sincroniza com o que realmente ficou salvo (inclui o que outros gravaram)
       setSaving(false);
     };
     if(imediato) doSave();
@@ -412,19 +460,16 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     if(!viewFull) return;
     const novo = { ...viewFull, enviado:false, reabertoEm:new Date().toISOString() };
     setViewFull(novo);
-    const plantoes = (idx.plantoes||[]).map(p=>p.id===novo.id?{...entradaLeve(novo)}:p);
-    const novoIdx = { ...idx, plantoes };
-    setIdx(novoIdx);
     setSaving(true);
     if(!viewFull.__embutido) await savePlantaoFull(novo);
-    await saveIndex(project.id, viewFull.__embutido ? { ...novoIdx, plantoes:(idx.plantoes||[]).map(p=>p.id===novo.id?{...novo,__embutido:undefined}:p) } : novoIdx);
+    const novoIdx = await saveIndexEntry(project.id, entradaLeve(novo));
+    setIdx(novoIdx);
     setSaving(false);
   };
   const excluirPlantao = async (pid) => {
-    const novoIdx = { ...idx, plantoes:(idx.plantoes||[]).filter(p=>p.id!==pid), deletedIds:[...(idx.deletedIds||[]),pid] };
-    setIdx(novoIdx);
     setSaving(true);
-    await saveIndex(project.id, novoIdx);
+    const novoIdx = await saveIndexEntry(project.id, null, pid);
+    setIdx(novoIdx);
     setSaving(false);
     setConfirmDel(false); setViewFull(null); setScreen("home");
   };
@@ -643,7 +688,10 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         {(atualFull?.rondas||[]).map((r,i)=>renderRonda(r,i,travado))}
 
-        {!travado && <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>}
+        {!travado && (atualFull?.lider
+          ? <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>
+          : <div style={{...S.card,textAlign:"center",fontSize:12,...S.txt2,border:"1px solid #f59e0b44"}}>⚠️ Selecione o responsável acima antes de registrar a primeira ronda.</div>
+        )}
 
         {envioErr && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{envioErr}</div>}
         {!travado && nRondas>0 && !confirmEnvio && (
