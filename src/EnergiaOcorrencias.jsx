@@ -334,8 +334,16 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   const arquivar = async (id) => { await persist({ ...data, eventos:eventos.map(e=>e.id===id?{...e,arquivado:true}:e) }); };
   const excluirEvento = async (id) => { await persist({ ...data, eventos:eventos.filter(e=>e.id!==id) }); setConfirmDelId(null); };
 
-  const abrirConfig = () => { setCfgForm({...data.config}); setScreen("config"); };
-  const salvarConfig = async () => { await persist({ ...data, config:cfgForm }); setScreen("home"); };
+  const abrirConfig = () => { setCfgForm({...data.config}); setErro(null); setScreen("config"); };
+  const salvarConfig = async () => {
+    if(!cfgForm.concessionaria?.trim()){ setErro("Informe a concessionária."); return; }
+    if(!cfgForm.telefoneConcessionaria?.trim()){ setErro("Informe o telefone da concessionária."); return; }
+    if(!cfgForm.cnpj?.trim()){ setErro("Informe o CNPJ do condomínio."); return; }
+    if(!cfgForm.numeroInstalacao?.trim()){ setErro("Informe o número de instalação."); return; }
+    if(!cfgForm.endereco?.trim()){ setErro("Informe o endereço do condomínio."); return; }
+    await persist({ ...data, config:cfgForm });
+    setScreen("home");
+  };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("home");onAuthGranted?.(l);}}/>;
   if(loading) return <div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{...S.txt2,fontSize:13}}>Carregando…</div></div>;
@@ -356,18 +364,28 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
-        <div style={S.card}>
-          <label style={S.lbl}>Concessionária</label>
-          <input value={cfgForm.concessionaria||""} onChange={e=>setCfgForm(f=>({...f,concessionaria:e.target.value}))} placeholder="Ex: Enel" style={{...S.inp,marginBottom:10}}/>
-          <label style={S.lbl}>Telefone da Concessionária</label>
-          <input value={cfgForm.telefoneConcessionaria||""} onChange={e=>setCfgForm(f=>({...f,telefoneConcessionaria:e.target.value}))} placeholder="0800..." style={{...S.inp,marginBottom:10}}/>
-          <label style={S.lbl}>CNPJ do Condomínio</label>
-          <input value={cfgForm.cnpj||""} onChange={e=>setCfgForm(f=>({...f,cnpj:e.target.value}))} placeholder="00.000.000/0000-00" style={{...S.inp,marginBottom:10}}/>
-          <label style={S.lbl}>Número de Instalação</label>
-          <input value={cfgForm.numeroInstalacao||""} onChange={e=>setCfgForm(f=>({...f,numeroInstalacao:e.target.value}))} placeholder="Ex: 123456789" style={S.inp}/>
+        <div style={{...S.card,border:"1px solid #f59e0b44",background:dark?"#1a1000":"#fffbeb"}}>
+          <div style={{fontSize:12,fontWeight:800,color:"#f59e0b"}}>⚠️ Preenchimento único</div>
+          <div style={{fontSize:11,...S.txt2,marginTop:2}}>Esses dados ficam fixos pra sempre — a equipe registra as quedas sem precisar mexer aqui de novo. Só edite se algo mudar de verdade (ex: trocou de concessionária).</div>
         </div>
+        <div style={S.card}>
+          <label style={S.lbl}>Concessionária *</label>
+          <input value={cfgForm.concessionaria||""} onChange={e=>{setCfgForm(f=>({...f,concessionaria:e.target.value}));setErro(null);}} placeholder="Ex: Enel" style={{...S.inp,marginBottom:10}}/>
+          <label style={S.lbl}>Telefone da Concessionária *</label>
+          <input value={cfgForm.telefoneConcessionaria||""} onChange={e=>{setCfgForm(f=>({...f,telefoneConcessionaria:e.target.value}));setErro(null);}} placeholder="0800..." style={{...S.inp,marginBottom:10}}/>
+          <label style={S.lbl}>CNPJ do Condomínio *</label>
+          <input value={cfgForm.cnpj||""} onChange={e=>{setCfgForm(f=>({...f,cnpj:e.target.value}));setErro(null);}} placeholder="00.000.000/0000-00" style={{...S.inp,marginBottom:10}}/>
+          <label style={S.lbl}>Número de Instalação *</label>
+          <input value={cfgForm.numeroInstalacao||""} onChange={e=>{setCfgForm(f=>({...f,numeroInstalacao:e.target.value}));setErro(null);}} placeholder="Ex: 123456789" style={{...S.inp,marginBottom:10}}/>
+          <label style={S.lbl}>Endereço do Condomínio *</label>
+          <input value={cfgForm.endereco||""} onChange={e=>{setCfgForm(f=>({...f,endereco:e.target.value}));setErro(null);}} placeholder="Rua, número, bairro, cidade" style={{...S.inp,marginBottom:10}}/>
+          <label style={S.lbl}>Empresa de Manutenção (opcional)</label>
+          <input value={cfgForm.empresaManutencao||""} onChange={e=>setCfgForm(f=>({...f,empresaManutencao:e.target.value}))} placeholder="Ex: Álamo" style={S.inp}/>
+        </div>
+        {erro && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{erro}</div>}
         <button onClick={salvarConfig} disabled={saving} style={S.btn}>{saving?"Salvando…":"💾 Salvar"}</button>
         <button onClick={()=>setScreen("home")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
+
       </div>
     </div></div>
   );
@@ -462,6 +480,25 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
 
+        {data.config?.concessionaria ? (
+          <div style={{...S.card,padding:"12px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{fontSize:11,fontWeight:800,...S.txt2,textTransform:"uppercase",letterSpacing:.5}}>Dados fixos do condomínio</div>
+              {liderAuth && <button onClick={abrirConfig} style={{...S.btnSm,padding:"4px 9px",fontSize:10}}>✏️ Editar</button>}
+            </div>
+            <div style={{fontSize:13,fontWeight:700,...S.txt}}>{data.config.concessionaria} · {data.config.telefoneConcessionaria}</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:2}}>CNPJ {data.config.cnpj} · Instalação {data.config.numeroInstalacao}</div>
+            {data.config.endereco && <div style={{fontSize:11,...S.txt2,marginTop:2}}>📍 {data.config.endereco}</div>}
+            {data.config.empresaManutencao && <div style={{fontSize:11,...S.txt2,marginTop:2}}>🔧 Manutenção: {data.config.empresaManutencao}</div>}
+          </div>
+        ) : liderAuth && (
+          <div style={{...S.card,border:"1px solid #f59e0b55",background:dark?"#1a1000":"#fffbeb"}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#f59e0b"}}>⚠️ Cadastro pendente</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:2,marginBottom:8}}>Configure a concessionária uma única vez antes de registrar ocorrências.</div>
+            <button onClick={abrirConfig} style={{...S.btnSec,fontSize:12}}>⚙️ Configurar agora</button>
+          </div>
+        )}
+
         {aberto ? (
           <div style={{...S.card,border:"1px solid #ef444455",background:dark?"#1a0202":"#fef2f2"}}>
             <div style={{fontSize:13,fontWeight:900,color:"#ef4444"}}>⚡ Energia interrompida agora</div>
@@ -481,7 +518,6 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
           ? <button onClick={abrirConcluir} style={S.btn}>✅ Concluir — Voltou a energia</button>
           : <button onClick={registrarQueda} disabled={saving} style={S.btn}>⚡ Registrar Queda / Pico de Energia (agora)</button>}
 
-        {liderAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Concessionária{data.config?.concessionaria?" (já configurada)":""}</button>}
 
         {adminAuth && eventos.length>0 && (
           <div style={S.card}>
