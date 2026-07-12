@@ -211,12 +211,12 @@ function getStyles(dark){
     wrap:{width:"100%",maxWidth:480,display:"flex",flexDirection:"column"},
     card:{background:dark?"#060c18":"#fff",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:12,padding:"14px 16px"},
     btn:{background:"linear-gradient(135deg,#ef4444,#b91c1c)",color:"#fff",border:"none",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8},
-    btnSec:{background:dark?"#060c18":"#f8fafc",color:dark?"#cbd5e1":"#475569",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center"},
-    btnSm:{background:dark?"#020510":"#f8fafc",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,color:dark?"#cbd5e1":"#475569",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700},
+    btnSec:{background:dark?"#0f172a":"#f8fafc",color:dark?"#f1f5f9":"#475569",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:800,cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center"},
+    btnSm:{background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,color:dark?"#f1f5f9":"#475569",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:800},
     backBtn:{background:"transparent",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,color:dark?"#cbd5e1":"#64748b",borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:700},
     inp:{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`,borderRadius:7,color:dark?"#f8fafc":"#1e293b",padding:"10px 12px",fontSize:13,boxSizing:"border-box",outline:"none"},
-    lbl:{display:"block",fontSize:10,color:dark?"#94a3b8":"#64748b",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:.5},
-    txt:{color:dark?"#f8fafc":"#0f172a",fontWeight:600}, txt2:{color:dark?"#94a3b8":"#64748b",fontWeight:500},
+    lbl:{display:"block",fontSize:11,color:dark?"#cbd5e1":"#475569",fontWeight:800,marginBottom:5,textTransform:"uppercase",letterSpacing:.5},
+    txt:{color:dark?"#ffffff":"#0f172a",fontWeight:700}, txt2:{color:dark?"#cbd5e1":"#475569",fontWeight:600},
   };
 }
 
@@ -273,6 +273,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   const [saving,setSaving]=useState(false);
   const [agora,setAgora]=useState(Date.now());
   const adminAuth = authLevel==="admin";
+  const liderAuth = authLevel==="lider" || authLevel==="admin";
 
   const [cfgForm,setCfgForm]=useState({});
   const [form,setForm]=useState({});
@@ -295,8 +296,19 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     await persist({ ...data, eventos:[...eventos, ev] });
   };
 
+  const [editandoId, setEditandoId] = useState(null); // id do evento em edição (null = concluindo o aberto)
+  const [confirmDelId, setConfirmDelId] = useState(null);
+
   const abrirConcluir = () => {
+    setEditandoId(null);
     setForm({ protocolo:"", operador:"", gerador:"", obsGerador:"", manutencista:false, impactoOperacao:false, obsImpacto:"", inquilinoImpactado:false, inquilinosAfetados:"", obs:"", foto:null });
+    setErro(null); setScreen("concluir");
+  };
+  const abrirEdicao = (ev) => {
+    setEditandoId(ev.id);
+    setForm({ protocolo:ev.protocolo||"", operador:ev.operador||"", gerador:ev.gerador||"", obsGerador:ev.obsGerador||"",
+      manutencista:!!ev.manutencista, impactoOperacao:!!ev.impactoOperacao, obsImpacto:ev.obsImpacto||"",
+      inquilinoImpactado:!!ev.inquilinoImpactado, inquilinosAfetados:ev.inquilinosAfetados||"", obs:ev.obs||"", foto:ev.foto||null });
     setErro(null); setScreen("concluir");
   };
   const addFoto = async (file) => {
@@ -310,11 +322,17 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     if(form.gerador!=="sim" && !form.obsGerador.trim()){ setErro("Explique por que o gerador não foi acionado."); return; }
     if(form.impactoOperacao && !form.obsImpacto.trim()){ setErro("Descreva o impacto na operação."); return; }
     if(form.inquilinoImpactado && !form.inquilinosAfetados.trim()){ setErro("Informe qual(is) inquilino(s) foi(ram) impactado(s)."); return; }
-    const evFinal = { ...aberto, ...form, fimQueda:new Date().toISOString(), concluido:true };
-    await persist({ ...data, eventos:eventos.map(e=>e.id===aberto.id?evFinal:e) });
+    if(editandoId){
+      await persist({ ...data, eventos:eventos.map(e=>e.id===editandoId?{...e,...form}:e) });
+    } else {
+      const evFinal = { ...aberto, ...form, fimQueda:new Date().toISOString(), concluido:true };
+      await persist({ ...data, eventos:eventos.map(e=>e.id===aberto.id?evFinal:e) });
+    }
+    setEditandoId(null);
     setScreen("home");
   };
   const arquivar = async (id) => { await persist({ ...data, eventos:eventos.map(e=>e.id===id?{...e,arquivado:true}:e) }); };
+  const excluirEvento = async (id) => { await persist({ ...data, eventos:eventos.filter(e=>e.id!==id) }); setConfirmDelId(null); };
 
   const abrirConfig = () => { setCfgForm({...data.config}); setScreen("config"); };
   const salvarConfig = async () => { await persist({ ...data, config:cfgForm }); setScreen("home"); };
@@ -354,14 +372,18 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     </div></div>
   );
 
-  // ── Concluir (voltou a energia)
-  if(screen==="concluir" && aberto) return (
+  // ── Concluir (voltou a energia) ou Editar um evento existente
+  if(screen==="concluir" && (aberto || editandoId)) return (
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
         <div style={S.card}>
-          <div style={{fontSize:13,fontWeight:800,...S.txt}}>✅ Voltou a energia</div>
-          <div style={{fontSize:11,...S.txt2,marginTop:2}}>Queda iniciada em {fmtDataHora(aberto.inicioQueda)} · retorno registrado agora ({fmtHora(new Date().toISOString())})</div>
+          <div style={{fontSize:13,fontWeight:800,...S.txt}}>{editandoId?"✏️ Editando ocorrência":"✅ Voltou a energia"}</div>
+          {editandoId ? (
+            <div style={{fontSize:11,...S.txt2,marginTop:2}}>{(()=>{const ev=eventos.find(e=>e.id===editandoId);return ev?`Queda de ${fmtDataHora(ev.inicioQueda)} até ${fmtDataHora(ev.fimQueda)}`:"";})()}</div>
+          ) : (
+            <div style={{fontSize:11,...S.txt2,marginTop:2}}>Queda iniciada em {fmtDataHora(aberto.inicioQueda)} · retorno registrado agora ({fmtHora(new Date().toISOString())})</div>
+          )}
         </div>
         <div style={S.card}>
           <label style={S.lbl}>Operador</label>
@@ -370,15 +392,21 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
           <input value={form.protocolo} onChange={e=>setForm(f=>({...f,protocolo:e.target.value}))} placeholder="Nº do protocolo (opcional)" style={S.inp}/>
         </div>
         <div style={S.card}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <label style={S.lbl}>Gerador foi acionado?</label>
-            <div style={{display:"flex",gap:6}}>
-              <button onClick={()=>{setForm(f=>({...f,gerador:"sim"}));setErro(null);}} style={{...S.btnSm,color:form.gerador==="sim"?"#22c55e":undefined,borderColor:form.gerador==="sim"?"#22c55e44":undefined}}>Sim</button>
-              <button onClick={()=>{setForm(f=>({...f,gerador:"nao"}));setErro(null);}} style={{...S.btnSm,color:form.gerador==="nao"?"#ef4444":undefined,borderColor:form.gerador==="nao"?"#ef444444":undefined}}>Não</button>
-            </div>
+          <label style={S.lbl}>Gerador foi acionado?</label>
+          <div style={{display:"flex",gap:8,marginTop:8}}>
+            <button onClick={()=>{setForm(f=>({...f,gerador:"sim"}));setErro(null);}}
+              style={{flex:1,padding:"12px",borderRadius:9,fontWeight:900,fontSize:14,cursor:"pointer",
+                border:`2px solid ${form.gerador==="sim"?"#22c55e":(dark?"#1e293b":"#e2e8f0")}`,
+                background:form.gerador==="sim"?"#22c55e":(dark?"#0f172a":"#fff"),
+                color:form.gerador==="sim"?"#04140b":(dark?"#f1f5f9":"#475569")}}>✅ Sim</button>
+            <button onClick={()=>{setForm(f=>({...f,gerador:"nao"}));setErro(null);}}
+              style={{flex:1,padding:"12px",borderRadius:9,fontWeight:900,fontSize:14,cursor:"pointer",
+                border:`2px solid ${form.gerador==="nao"?"#ef4444":(dark?"#1e293b":"#e2e8f0")}`,
+                background:form.gerador==="nao"?"#ef4444":(dark?"#0f172a":"#fff"),
+                color:form.gerador==="nao"?"#2a0303":(dark?"#f1f5f9":"#475569")}}>❌ Não</button>
           </div>
           {form.gerador==="nao" && (
-            <input value={form.obsGerador} onChange={e=>{setForm(f=>({...f,obsGerador:e.target.value}));setErro(null);}} placeholder="Por que não acionou? Qual o impacto?" style={{...S.inp,marginTop:8,fontSize:13}}/>
+            <input value={form.obsGerador} onChange={e=>{setForm(f=>({...f,obsGerador:e.target.value}));setErro(null);}} placeholder="Por que não acionou? Qual o impacto?" style={{...S.inp,marginTop:10,fontSize:13}}/>
           )}
         </div>
         <div style={S.card}>
@@ -423,7 +451,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
         </div>
         {erro && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{erro}</div>}
         <button onClick={()=>setScreen("home")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-        <button onClick={concluir} disabled={saving} style={S.btn}>{saving?"Salvando…":"✓ Concluir Ocorrência"}</button>
+        <button onClick={concluir} disabled={saving} style={S.btn}>{saving?"Salvando…":(editandoId?"💾 Salvar Edição":"✓ Concluir Ocorrência")}</button>
       </div>
     </div></div>
   );
@@ -451,9 +479,9 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
 
         {aberto
           ? <button onClick={abrirConcluir} style={S.btn}>✅ Concluir — Voltou a energia</button>
-          : <button onClick={registrarQueda} disabled={saving} style={S.btn}>⚡ Registrar Queda de Energia (agora)</button>}
+          : <button onClick={registrarQueda} disabled={saving} style={S.btn}>⚡ Registrar Queda / Pico de Energia (agora)</button>}
 
-        {adminAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Concessionária</button>}
+        {liderAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Concessionária{data.config?.concessionaria?" (já configurada)":""}</button>}
 
         {adminAuth && eventos.length>0 && (
           <div style={S.card}>
@@ -474,10 +502,16 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
               <div style={{fontSize:11,...S.txt2}}>{duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))}</div>
             </div>
             <div style={{fontSize:11,...S.txt2,marginTop:2}}>{ev.turno} · Operador: {ev.operador} {ev.impactoOperacao&&<span style={{color:"#ef4444",fontWeight:700}}> · ⚠️ impactou operação</span>}</div>
-            <div style={{display:"flex",gap:8,marginTop:10}}>
+            <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
               <button onClick={()=>gerarPdfEvento(project,data.config,ev)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:11,color:"#7c3aed",borderColor:"#7c3aed44"}}>📄 PDF</button>
               <button onClick={()=>abrirWhatsApp(project,data.config,ev)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:11,color:"#22c55e",borderColor:"#22c55e44"}}>📲 WhatsApp</button>
               <button onClick={()=>arquivar(ev.id)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:11}}>📥 Arquivar</button>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              {liderAuth && <button onClick={()=>abrirEdicao(ev)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:11,color:"#f59e0b",borderColor:"#f59e0b44"}}>✏️ Editar</button>}
+              {adminAuth && (confirmDelId===ev.id
+                ? <button onClick={()=>excluirEvento(ev.id)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:11,color:"#fff",background:"#dc2626",borderColor:"#dc2626"}}>Confirmar exclusão</button>
+                : <button onClick={()=>setConfirmDelId(ev.id)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:11,color:"#ef4444",borderColor:"#ef444444"}}>🗑 Excluir</button>)}
             </div>
           </div>
         ))}
@@ -490,6 +524,13 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
               <div style={{fontSize:11,...S.txt2}}>{duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))}</div>
             </div>
             <div style={{fontSize:10,...S.txt2}}>{ev.turno} · {ev.operador}</div>
+            {adminAuth && (
+              <div style={{marginTop:8}}>
+                {confirmDelId===ev.id
+                  ? <button onClick={()=>excluirEvento(ev.id)} style={{...S.btnSm,width:"100%",padding:"7px",fontSize:11,color:"#fff",background:"#dc2626",borderColor:"#dc2626"}}>Confirmar exclusão</button>
+                  : <button onClick={()=>setConfirmDelId(ev.id)} style={{...S.btnSm,width:"100%",padding:"7px",fontSize:11,color:"#ef4444",borderColor:"#ef444444"}}>🗑 Excluir</button>}
+              </div>
+            )}
           </div>
         ))}
       </div>

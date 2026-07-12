@@ -1136,6 +1136,7 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
       <td style="text-align:center"><span style="font-size:18px;font-weight:900;color:${scoreColor(r.score)}">${r.score}</span><span style="font-size:10px;color:#94a3b8">/100</span></td>
       <td style="text-align:center;color:#64748b">${r.base}%</td>
       <td style="text-align:center">${r.ilumDeficientes>0?`<span style="color:#dc2626;font-weight:800">💡 ${r.ilumDeficientes}</span>`:(r.ilumTotal>0?'<span style="color:#15803d;font-weight:700">✓ 0</span>':'<span style="color:#cbd5e1">—</span>')}</td>
+      <td style="text-align:center">${r.energiaAberta?'<span style="color:#dc2626;font-weight:900">⚡ EM ABERTO</span>':(r.energiaQuedas7d>0?`<span style="color:#d97706;font-weight:800">⚡ ${r.energiaQuedas7d} (7d)</span>`:'<span style="color:#15803d;font-weight:700">✓ 0</span>')}</td>
       <td style="font-size:10px;color:#64748b">${r.penalidades.length? r.penalidades.map(p=>`<div>−${p.val} · ${p.label}</div>`).join("") : '<span style="color:#15803d;font-weight:700">✓ Sem penalidades</span>'}</td>
     </tr>`).join("");
   const html = `<!DOCTYPE html>
@@ -1166,7 +1167,7 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
   </div>
 </div>
 <table>
-  <thead><tr><th style="width:44px;text-align:center">Pos.</th><th>Planta</th><th style="text-align:center;width:80px">Score 360</th><th style="text-align:center;width:70px">Checklist</th><th style="text-align:center;width:80px">💡 Iluminação</th><th>Penalidades aplicadas</th></tr></thead>
+  <thead><tr><th style="width:44px;text-align:center">Pos.</th><th>Planta</th><th style="text-align:center;width:80px">Score 360</th><th style="text-align:center;width:70px">Checklist</th><th style="text-align:center;width:80px">💡 Iluminação</th><th style="text-align:center;width:90px">⚡ Energia</th><th>Penalidades aplicadas</th></tr></thead>
   <tbody>${rowsHtml}</tbody>
 </table>
 <div class="legend">
@@ -1197,12 +1198,13 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     try {
       const ids = Object.keys(PROJECTS);
       // Busca em paralelo os módulos que não estão em memória (KeyAccess, Bolsão, Perimetral, Ronda VSPP)
-      const [keySnaps, bolsaoSnaps, periSnaps, rondaSnap, ilumSnaps] = await Promise.all([
+      const [keySnaps, bolsaoSnaps, periSnaps, rondaSnap, ilumSnaps, energiaSnaps] = await Promise.all([
         Promise.all(ids.map(pid=>getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null))),
         Promise.all(["P311A","P311B"].map(pid=>getDoc(doc(db,"bolsao",pid)).catch(()=>null))),
         Promise.all(ids.map(pid=>getDoc(doc(db,"perimetral",pid)).catch(()=>null))),
         getDoc(doc(db,"ronda_vspp","P601")).catch(()=>null),
         Promise.all(ids.map(pid=>getDoc(doc(db,"iluminacao",pid)).catch(()=>null))),
+        Promise.all(ids.map(pid=>getDoc(doc(db,"energia_ocorrencias",pid)).catch(()=>null))),
       ]);
       const keyAbertasBy = {}; ids.forEach((pid,i)=>{ const regs=keySnaps[i]?.exists()?(keySnaps[i].data().registros||[]):[]; keyAbertasBy[pid]=regs.filter(r=>!r.horaFim).length; });
       const bolsaoBy = {}; ["P311A","P311B"].forEach((pid,i)=>{ const placas=bolsaoSnaps[i]?.exists()?(bolsaoSnaps[i].data().placas||{}):{}; bolsaoBy[pid]=Object.values(placas).filter(p=>p.status==="critico").length; });
@@ -1212,6 +1214,13 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         const total = quads.reduce((a,q)=>a+(Number(q.total)||0),0);
         const def = quads.reduce((a,q)=>a+(Number(q.deficientes)||0),0);
         ilumBy[pid] = { total, def };
+      });
+      const energiaBy = {}; ids.forEach((pid,i)=>{
+        const eventos = energiaSnaps[i]?.exists()?(energiaSnaps[i].data().eventos||[]):[];
+        const corte = Date.now()-7*86400000;
+        const doPeriodo = eventos.filter(e=>e.inicioQueda && new Date(e.inicioQueda).getTime()>=corte);
+        const aberto = eventos.some(e=>!e.concluido);
+        energiaBy[pid] = { quedas7d: doPeriodo.length, aberto };
       });
       let rondaPct = null;
       if(rondaSnap?.exists()){ const regs=(rondaSnap.data().registros||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")); const ult=regs[0]; if(ult){ const slots=ult.slots||[]; const f=slots.filter(h=>ult.marcacoes?.[h]?.status==="feito").length; rondaPct = slots.length?Math.round((f/slots.length)*100):null; } }
@@ -1229,7 +1238,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           perimetralZonasRuins: periBy[pid]||0,
           rondaPct: pid==="P601"?rondaPct:null,
         });
-        return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0 };
+        return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0, energiaQuedas7d: energiaBy[pid]?.quedas7d||0, energiaAberta: energiaBy[pid]?.aberto||false };
       }).sort((a,b)=>b.score-a.score);
       const media = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
       setV360({rows, media});
@@ -1366,7 +1375,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   <span style={{fontSize:16,minWidth:32,textAlign:"center"}}>{medal(i)}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{r.id} <span style={{fontWeight:400,color:"#94a3b8",fontSize:11}}>· {r.name}</span></div>
-                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}{r.ilumTotal>0&&<span style={{color:r.ilumDeficientes>0?"#ef4444":"#22c55e",fontWeight:700}}> · 💡 {r.ilumDeficientes} deficiente{r.ilumDeficientes===1?"":"s"}</span>}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}{r.ilumTotal>0&&<span style={{color:r.ilumDeficientes>0?"#ef4444":"#22c55e",fontWeight:700}}> · 💡 {r.ilumDeficientes} deficiente{r.ilumDeficientes===1?"":"s"}</span>}{(r.energiaAberta||r.energiaQuedas7d>0)&&<span style={{color:r.energiaAberta?"#ef4444":"#f59e0b",fontWeight:700}}> · ⚡ {r.energiaAberta?"em aberto":`${r.energiaQuedas7d} queda${r.energiaQuedas7d===1?"":"s"} (7d)`}</span>}</div>
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:22,fontWeight:900,color:scoreColor(r.score)}}>{r.score}</div>
