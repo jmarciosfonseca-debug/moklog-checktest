@@ -59,12 +59,26 @@ const CARGOS_PROJETO = {
 
 // Turnos por projeto — P601-P607 e P311A/B só Diurno/Noturno (12x36)
 const TURNOS_SEM_FOLGUISTA = ["P601","P602","P604","P605","P606","P607","P311A","P311B"];
-const TURNOS = ["Diurno","Noturno","Folguista","Perista"];
+const TURNOS = ["Diurno","Noturno","Folguista","Ferista"];
 function getTurnos(projectId) {
-  if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno","Perista"];
-  return ["Diurno","Noturno","Folguista","Perista"];
+  if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno","Ferista"];
+  return ["Diurno","Noturno","Folguista","Ferista"];
 }
 const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento"];
+// ── Cobertura temporária de liderança: quando um Apoio/outro cargo assume
+// a função de líder por um período (ex: férias do titular). Não substitui
+// o cargo cadastrado — só "promove" durante a janela de datas.
+function today0(){ const d=new Date(); d.setHours(0,0,0,0); return d; }
+function coberturaAtiva(colab){
+  if(!colab?.coberturaAtiva || !colab.coberturaInicio || !colab.coberturaFim) return false;
+  const hoje = today0();
+  const ini = new Date(colab.coberturaInicio+"T00:00:00");
+  const fim = new Date(colab.coberturaFim+"T23:59:59");
+  return hoje>=ini && hoje<=fim;
+}
+function cargoEfetivo(colab){
+  return coberturaAtiva(colab) ? "VSPP Líder (cobertura)" : colab.cargo;
+}
 const HIST_COLORS = {
   "Falta":             { color:"#ef4444", bg:"#1a0202", badge:"#fee2e2" },
   "FT":                { color:"#f59e0b", bg:"#1a1000", badge:"#fef3c7" },
@@ -78,7 +92,7 @@ const TURNO_CONFIG = {
   "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
   "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
   "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:"☀️🌙" },
-  "Perista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:"🔄" },
+  "Ferista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:"🔄" },
 };
 
 function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
@@ -452,14 +466,14 @@ function getStyles(dark) {
     wrap:    { width:"100%", maxWidth:480, padding:"0 0 40px", display:"flex", flexDirection:"column", gap:0 },
     card:    { background: dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"14px 16px" },
     btn:     { background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6 },
-    btnSec:  { background: dark?"#060c18":"#f8fafc", color: dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
-    btnSm:   { background: dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color: dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color: dark?"#334155":"#64748b", borderRadius:7, padding:"6px 10px", fontSize:11, cursor:"pointer", flexShrink:0 },
+    btnSec:  { background: dark?"#060c18":"#f8fafc", color: dark?"#cbd5e1":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background: dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color: dark?"#cbd5e1":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:700 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color: dark?"#cbd5e1":"#64748b", borderRadius:7, padding:"6px 10px", fontSize:11, cursor:"pointer", flexShrink:0, fontWeight:600 },
     inp:     { width:"100%", background: dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color: dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
-    lbl:     { display:"block", fontSize:10, color: dark?"#334155":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    lbl:     { display:"block", fontSize:10, color: dark?"#94a3b8":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
     headerBg:{ background: dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
-    txtPrimary:  { color: dark?"#f1f5f9":"#0f172a" },
-    txtSecondary:{ color: dark?"#475569":"#64748b" },
+    txtPrimary:  { color: dark?"#f8fafc":"#0f172a", fontWeight:600 },
+    txtSecondary:{ color: dark?"#94a3b8":"#64748b", fontWeight:500 },
   };
 }
 
@@ -523,6 +537,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
             <div style={{ flex:1 }}>
               <div style={{ fontSize:18, fontWeight:800, ...S.txtPrimary, lineHeight:1.2 }}>{colab.nome || "—"}</div>
               <div style={{ fontSize:12, color:"#94a3b8", marginTop:3 }}>{colab.cargo}</div>
+              {coberturaAtiva(colab) && <div style={{fontSize:10,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"2px 8px",borderRadius:6,display:"inline-block",marginTop:5}}>🔁 Cobrindo Líder até {fmtDate(colab.coberturaFim)}</div>}
               {colab.telefone && <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>📱 {colab.telefone}</div>}
               <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:tc.badge, background:tc.bg, border:`1px solid ${tc.border}`, padding:"3px 9px", borderRadius:6 }}>
@@ -715,6 +730,33 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
               <label style={S.lbl}>Telefone</label>
               <input value={form.telefone} onChange={e=>setF("telefone",e.target.value)} placeholder="(00) 00000-0000" style={S.inp}/>
             </div>
+          </div>
+
+          {/* Cobertura temporária de liderança */}
+          <div style={S.card}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:form.coberturaAtiva?10:0}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,...S.txtPrimary}}>🔁 Cobertura de Liderança</div>
+                <div style={{fontSize:10,...S.txtSecondary,marginTop:2}}>Assume a função de líder num período (ex: férias do titular), sem trocar o cargo cadastrado.</div>
+              </div>
+              <button onClick={()=>setF("coberturaAtiva",!form.coberturaAtiva)}
+                style={{width:44,height:26,borderRadius:13,border:"none",cursor:"pointer",flexShrink:0,marginLeft:10,
+                  background:form.coberturaAtiva?"#0ea5e9":(dark?"#1e293b":"#cbd5e1"),position:"relative",transition:"background .2s"}}>
+                <div style={{width:20,height:20,borderRadius:"50%",background:"#fff",position:"absolute",top:3,left:form.coberturaAtiva?21:3,transition:"left .2s"}}/>
+              </button>
+            </div>
+            {form.coberturaAtiva && (
+              <div style={{display:"flex",gap:8}}>
+                <div style={{flex:1}}>
+                  <label style={S.lbl}>De</label>
+                  <input type="date" value={form.coberturaInicio||""} onChange={e=>setF("coberturaInicio",e.target.value)} style={S.inp}/>
+                </div>
+                <div style={{flex:1}}>
+                  <label style={S.lbl}>Até</label>
+                  <input type="date" value={form.coberturaFim||""} onChange={e=>setF("coberturaFim",e.target.value)} style={S.inp}/>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Turno e Escala */}
@@ -1204,10 +1246,10 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, 
                         style={S.inp}/>
                     </div>
                     <div>
-                      <label style={S.lbl}>Cobertura (nome ou "Perista")</label>
+                      <label style={S.lbl}>Cobertura (nome ou "Ferista")</label>
                       <input value={item.cobertura}
                         onChange={e=>updateItem(item.colabId,{cobertura:e.target.value})}
-                        placeholder="Nome do coberturista ou Perista..."
+                        placeholder="Nome do coberturista ou Ferista..."
                         style={S.inp}/>
                     </div>
                     <div style={{display:"flex",gap:8}}>
@@ -1720,6 +1762,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
                             <div style={{ fontSize:11, ...S.txtSecondary, marginTop:1 }}>{c.cargo}</div>
+                            {coberturaAtiva(c) && <div style={{fontSize:9,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"1px 7px",borderRadius:5,display:"inline-block",marginTop:3}}>🔁 Cobrindo Líder até {fmtDate(c.coberturaFim)}</div>}
                             <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
                               {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background:"#001a2e", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
                               {c.telefone && <span style={{ fontSize:9, color:"#475569", padding:"1px 5px" }}>📱 {c.telefone}</span>}

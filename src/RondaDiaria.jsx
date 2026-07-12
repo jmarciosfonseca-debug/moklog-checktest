@@ -74,6 +74,7 @@ const TURNO_UI = {
   diurno:  { label:"Diurno",  icon:"☀️", cor:"#f59e0b", limite:"18:00" },
   noturno: { label:"Noturno", icon:"🌙", cor:"#818cf8", limite:"06:00" },
 };
+const VESTIARIO_ELIGIBLE = ["P601","P602","P604","P605","P606"]; // ronda de vestiário — só Golgi (exceto P607)
 
 // ── Foto: comprime para ~640px JPEG antes de guardar
 function comprimirFoto(file){
@@ -187,6 +188,14 @@ const CARGOS_RONDA = {
   P260C: [["vspp","lider"]],
 };
 
+function coberturaAtiva(colab){
+  if(!colab?.coberturaAtiva || !colab.coberturaInicio || !colab.coberturaFim) return false;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const ini = new Date(colab.coberturaInicio+"T00:00:00");
+  const fim = new Date(colab.coberturaFim+"T23:59:59");
+  return hoje>=ini && hoje<=fim;
+}
+
 async function loadColaboradores(projectId){
   let equipe = null;
   try {
@@ -205,13 +214,14 @@ async function loadColaboradores(projectId){
     filtrados = ativos.filter(c=>{
       const cg = norm(c.cargo);
       if(cg.includes("folg")) return true; // folguista cobre qualquer cargo, sempre entra
+      if(coberturaAtiva(c)) return true; // cobertura temporária de líder também entra
       return regras.some(tokens=>tokens.every(t=>cg.includes(t)));
     });
     if(filtrados.length===0) filtrados = ativos; // cadastro sem esses cargos: não trava a operação
   }
   return filtrados
     .sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)))
-    .map(c=>({ nome:c.nome, cargo:c.cargo||"" }));
+    .map(c=>({ nome:c.nome, cargo: coberturaAtiva(c) ? `${c.cargo} 🔁 cobertura líder` : (c.cargo||"") }));
 }
 
 function getStyles(dark) {
@@ -220,13 +230,13 @@ function getStyles(dark) {
     wrap:    { width:"100%", maxWidth:480, display:"flex", flexDirection:"column" },
     card:    { background:dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:12, padding:"14px 16px" },
     btn:     { background:"linear-gradient(135deg,#0d9488,#0f766e)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#64748b":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:600, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
-    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
-    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
+    btnSec:  { background:dark?"#060c18":"#f8fafc", color:dark?"#cbd5e1":"#475569", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", width:"100%", display:"flex", alignItems:"center", justifyContent:"center" },
+    btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#cbd5e1":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:700 },
+    backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#cbd5e1":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:700 },
     inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color:dark?"#e2e8f0":"#1e293b", padding:"9px 10px", fontSize:13, boxSizing:"border-box", outline:"none" },
-    lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
-    txt:     { color:dark?"#f1f5f9":"#0f172a" },
-    txt2:    { color:dark?"#475569":"#64748b" },
+    lbl:     { display:"block", fontSize:10, color:dark?"#94a3b8":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    txt:     { color:dark?"#f8fafc":"#0f172a", fontWeight:600 },
+    txt2:    { color:dark?"#94a3b8":"#64748b", fontWeight:500 },
   };
 }
 
@@ -294,6 +304,7 @@ function gerarPdfConsolidado(project, plantoes){
         <div><b>${t.icon} ${t.label}</b> · ${fmtData(p.dataPlantao)} · Responsável: ${p.lider||"—"}</div>
         <div class="badge ${p.enviado?"ok":"pend"}">${p.enviado?"Enviado":"Pendente"}</div>
       </div>
+      ${p.vestiario?.feito!=null?`<div style="font-size:11px;margin-bottom:6px;color:${p.vestiario.status==="anomalia"?"#dc2626":"#16a34a"}">🚿 Vestiário: ${p.vestiario.feito?(p.vestiario.status==="anomalia"?`⚠️ Anomalia — ${(p.vestiario.obs||"").replace(/</g,"&lt;")}`:"✅ OK"):"Não realizado"}</div>`:""}
       <table><thead><tr><th>#</th><th>Horário</th><th>Externa</th><th>Observação</th></tr></thead>
       <tbody>${linhas||'<tr><td colspan="4" style="text-align:center;color:#94a3b8">Sem rondas registradas</td></tr>'}</tbody></table>
     </div>`;
@@ -433,6 +444,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   };
   const delRonda = (rid) => upsertAtual(p=>({ ...p, rondas:p.rondas.filter(r=>r.id!==rid) }));
   const setLider = (nome) => upsertAtual(p=>({ ...p, lider:nome }));
+  const setVestiario = (campo,valor) => upsertAtual(p=>({ ...p, vestiario:{ feito:true, status:"ok", obs:"", ...(p.vestiario||{}), [campo]:valor } }), campo==="obs");
 
   const addFoto = async (rid, file) => {
     if(!file) return;
@@ -686,7 +698,40 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           </div>
         </div>
 
-        {(atualFull?.rondas||[]).map((r,i)=>renderRonda(r,i,travado))}
+        {VESTIARIO_ELIGIBLE.includes(project.id) && (()=>{
+          const v = atualFull?.vestiario || {};
+          return (
+            <div style={S.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <label style={S.lbl}>🚿 Ronda Vestiário</label>
+                <div style={{display:"flex",gap:6}}>
+                  <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",true)}
+                    style={{...S.btnSm,fontSize:12,padding:"7px 12px",color:v.feito?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:v.feito?"#22c55e44":undefined,opacity:travado?.6:1}}>Sim</button>
+                  <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",false)}
+                    style={{...S.btnSm,fontSize:12,padding:"7px 12px",color:v.feito===false?"#ef4444":(dark?"#cbd5e1":"#475569"),borderColor:v.feito===false?"#ef444444":undefined,opacity:travado?.6:1}}>Não</button>
+                </div>
+              </div>
+              {v.feito && (
+                <>
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button disabled={travado} onClick={()=>!travado&&setVestiario("status","ok")}
+                      style={{flex:1,padding:"10px",borderRadius:8,fontWeight:800,fontSize:13,cursor:travado?"default":"pointer",
+                        border:`1px solid ${v.status==="ok"?"#22c55e":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="ok"?"#22c55e22":(dark?"#020510":"#fff"),
+                        color:v.status==="ok"?"#22c55e":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>✅ OK</button>
+                    <button disabled={travado} onClick={()=>!travado&&setVestiario("status","anomalia")}
+                      style={{flex:1,padding:"10px",borderRadius:8,fontWeight:800,fontSize:13,cursor:travado?"default":"pointer",
+                        border:`1px solid ${v.status==="anomalia"?"#ef4444":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="anomalia"?"#ef444422":(dark?"#020510":"#fff"),
+                        color:v.status==="anomalia"?"#ef4444":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>⚠️ Anomalia</button>
+                  </div>
+                  {v.status==="anomalia" && (
+                    <input value={v.obs||""} disabled={travado} onChange={e=>setVestiario("obs",e.target.value)}
+                      placeholder="Descreva a anomalia..." style={{...S.inp,fontSize:13,marginTop:8}}/>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {!travado && (atualFull?.lider
           ? <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>
