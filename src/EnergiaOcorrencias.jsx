@@ -287,7 +287,11 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   const concluidosNaoArquivados = [...eventos].filter(e=>e.concluido&&!e.arquivado).sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
   const arquivados = [...eventos].filter(e=>e.arquivado).sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
   const ultimaConcluida = [...eventos].filter(e=>e.concluido).sort((a,b)=>(b.fimQueda||"").localeCompare(a.fimQueda||""))[0];
-  const diasSemQueda = ultimaConcluida?.fimQueda ? Math.floor((agora-new Date(ultimaConcluida.fimQueda).getTime())/86400000) : null;
+  // Base da contagem: fim da última queda concluída ou, se ainda não houve
+  // nenhuma, a data em que a concessionária foi configurada — assim o
+  // contador já começa a rodar em vez de ficar travado em "—".
+  const baseContagem = ultimaConcluida?.fimQueda || data.config?.monitorandoDesde || null;
+  const diasSemQueda = baseContagem ? Math.floor((agora-new Date(baseContagem).getTime())/86400000) : null;
 
   const persist = async (next) => { setSaving(true); setData(next); await saveEnergia(project.id,next); setSaving(false); };
 
@@ -341,7 +345,8 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     if(!cfgForm.cnpj?.trim()){ setErro("Informe o CNPJ do condomínio."); return; }
     if(!cfgForm.numeroInstalacao?.trim()){ setErro("Informe o número de instalação."); return; }
     if(!cfgForm.endereco?.trim()){ setErro("Informe o endereço do condomínio."); return; }
-    await persist({ ...data, config:cfgForm });
+    const cfgFinal = data.config?.monitorandoDesde ? cfgForm : { ...cfgForm, monitorandoDesde:new Date().toISOString() };
+    await persist({ ...data, config:cfgFinal });
     setScreen("home");
   };
 
@@ -510,7 +515,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             <div style={{fontSize:30,fontWeight:900,color:diasSemQueda==null?(dark?"#475569":"#94a3b8"):(diasSemQueda<3?"#f59e0b":"#22c55e"),marginTop:4}}>
               {diasSemQueda==null?"—":diasSemQueda}
             </div>
-            <div style={{fontSize:12,...S.txt2}}>{diasSemQueda==null?"Nenhuma queda registrada ainda":`dia${diasSemQueda===1?"":"s"} sem quedas de energia`}</div>
+            <div style={{fontSize:12,...S.txt2}}>{diasSemQueda==null?"Configure a concessionária para iniciar a contagem":`dia${diasSemQueda===1?"":"s"} sem quedas de energia${!ultimaConcluida?" · monitorando desde a configuração":""}`}</div>
           </div>
         )}
 
