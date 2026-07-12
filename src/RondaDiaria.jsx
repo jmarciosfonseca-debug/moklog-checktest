@@ -420,7 +420,11 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     else saveTimer.current = setTimeout(doSave, 1200);
   };
   const upsertAtual = (mut, imediato=true) => {
-    let p = atualFull;
+    // Encadeia a partir do último valor pendente (ainda não gravado), não do
+    // "atualFull" da renderização — evita perder ronda quando duas ações
+    // acontecem em sequência rápida (ex: marcar vestiário logo após
+    // registrar uma ronda) e a segunda sobrescreve a primeira.
+    let p = pendRef.current?.full || atualFull;
     if(!p){ p = { id:newId(), projectId:project.id, dataPlantao:dataP, turno, lider:"", rondas:[], enviado:false, criadoEm:new Date().toISOString() }; }
     persist(mut({ ...p, rondas:[...(p.rondas||[])] }), imediato);
     setEnvioErr(null);
@@ -700,24 +704,23 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         {VESTIARIO_ELIGIBLE.includes(project.id) && (()=>{
           const v = atualFull?.vestiario || {};
+          const marcado = !!v.feito;
           return (
             <div style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <label style={S.lbl}>🚿 Ronda Vestiário</label>
-                <div style={{display:"flex",gap:6}}>
-                  <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",true)}
-                    style={{...S.btnSm,fontSize:12,padding:"7px 12px",color:v.feito?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:v.feito?"#22c55e44":undefined,opacity:travado?.6:1}}>Sim</button>
-                  <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",false)}
-                    style={{...S.btnSm,fontSize:12,padding:"7px 12px",color:v.feito===false?"#ef4444":(dark?"#cbd5e1":"#475569"),borderColor:v.feito===false?"#ef444444":undefined,opacity:travado?.6:1}}>Não</button>
-                </div>
+                <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",!marcado)}
+                  style={{...S.btnSm,fontSize:12,padding:"7px 14px",color:marcado?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:marcado?"#22c55e44":undefined,opacity:travado?.6:1}}>
+                  {marcado?"✓ Feita":"Marcar como feita"}
+                </button>
               </div>
-              {v.feito && (
+              {marcado && (
                 <>
                   <div style={{display:"flex",gap:8,marginTop:10}}>
                     <button disabled={travado} onClick={()=>!travado&&setVestiario("status","ok")}
                       style={{flex:1,padding:"10px",borderRadius:8,fontWeight:800,fontSize:13,cursor:travado?"default":"pointer",
-                        border:`1px solid ${v.status==="ok"?"#22c55e":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="ok"?"#22c55e22":(dark?"#020510":"#fff"),
-                        color:v.status==="ok"?"#22c55e":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>✅ OK</button>
+                        border:`1px solid ${v.status==="ok"||!v.status?"#22c55e":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="ok"||!v.status?"#22c55e22":(dark?"#020510":"#fff"),
+                        color:v.status==="ok"||!v.status?"#22c55e":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>✅ OK</button>
                     <button disabled={travado} onClick={()=>!travado&&setVestiario("status","anomalia")}
                       style={{flex:1,padding:"10px",borderRadius:8,fontWeight:800,fontSize:13,cursor:travado?"default":"pointer",
                         border:`1px solid ${v.status==="anomalia"?"#ef4444":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="anomalia"?"#ef444422":(dark?"#020510":"#fff"),
@@ -732,6 +735,8 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             </div>
           );
         })()}
+
+        {(atualFull?.rondas||[]).map((r,i)=>renderRonda(r,i,travado))}
 
         {!travado && (atualFull?.lider
           ? <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>
