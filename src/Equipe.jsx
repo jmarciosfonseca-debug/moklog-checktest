@@ -526,7 +526,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
         <div style={{ background:`linear-gradient(160deg,${dark?"#0c1220":"#f8fafc"} 0%,${tc.bg} 100%)`, borderBottom:`1px solid ${tc.border}`, padding:"20px 16px 18px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-            {adminAuth && (
+            {(adminAuth||liderAuth) && (
               <button onClick={onEdit} style={{ ...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", marginLeft:"auto", padding:"6px 14px", fontSize:12 }}>
                 ✏️ Editar
               </button>
@@ -1585,7 +1585,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       dark={dark}
       onToggleTheme={toggleDark}/>
   );
-  if(screen==="edit"&&form&&adminAuth) return (
+  if(screen==="edit"&&form&&liderAuth) return (
     <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("view");setForm(null);}} saving={saving} isEdit={true} dark={dark}/>
   );
