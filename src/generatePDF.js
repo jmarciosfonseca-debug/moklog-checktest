@@ -261,7 +261,7 @@ function buildHeader(theme, project, meta, weekLabel) {
 }
 
 // ── RELATÓRIO SEMANAL COMPLETO
-export function generatePDF(project, state, meta, photos, ctmkInfo, inquilinosInfo) {
+export function generatePDF(project, state, meta, photos, ctmkInfo, inquilinosInfo, energiaInfo) {
   if(!project||!state||!meta) return;
   const theme = getTheme(project.id);
   const weekLabel = getWeekLabel(meta.date);
@@ -606,6 +606,16 @@ ${(()=>{
     </tr></thead>
     <tbody>${linhas}</tbody>
   </table>
+</div>`;
+})()}
+
+${(()=>{
+  if(!energiaInfo || energiaInfo.quedas===0) return "";
+  const h = Math.floor(energiaInfo.tempoTotalMs/3600000), m = Math.floor((energiaInfo.tempoTotalMs%3600000)/60000);
+  return `
+<div class="section">
+  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">⚡ Ocorrências de Energia — últimos 7 dias</div>
+  <div style="font-size:12px;color:#0f172a"><b>${energiaInfo.quedas}</b> queda${energiaInfo.quedas===1?"":"s"} de energia · <b>${h}h${m}m</b> de indisponibilidade total</div>
 </div>`;
 })()}
 
