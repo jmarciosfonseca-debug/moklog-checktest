@@ -369,6 +369,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const [envioErr, setEnvioErr] = useState(null);
   const [openRondaId, setOpenRondaId] = useState(null); // accordion: só uma ronda aberta por vez
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [liderDropOpen, setLiderDropOpen] = useState(false); // lista de responsáveis em cascata (fechada por padrão)
   const adminAuth = authLevel==="admin";
 
   const turno = turnoAtual();
@@ -686,17 +687,28 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             {atualFull?.lider ? (
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{flex:1,fontSize:16,fontWeight:800,...S.txt}}>{atualFull.lider}</div>
-                {!travado && <button onClick={()=>setLider("")} style={S.btnSm}>trocar</button>}
+                {!travado && <button onClick={()=>{setLider("");setLiderDropOpen(false);}} style={S.btnSm}>trocar</button>}
               </div>
             ) : (
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {colabs.map(c=>(
-                  <button key={c.nome} onClick={()=>setLider(c.nome)}
-                    style={{...S.btnSm,padding:"8px 12px",fontSize:12,color:dark?"#e2e8f0":"#1e293b"}}>
-                    {c.nome}<span style={{marginLeft:6,fontSize:9,...S.txt2}}>{c.cargo}</span>
-                  </button>
-                ))}
-                {colabs.length===0 && <div style={{fontSize:11,...S.txt2}}>Nenhum colaborador no cadastro Equipe — cadastre a equipe primeiro.</div>}
+              <div>
+                <button onClick={()=>setLiderDropOpen(o=>!o)}
+                  style={{...S.inp,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontSize:14,fontWeight:600,color:dark?"#94a3b8":"#64748b"}}>
+                  <span>Toque para selecionar…</span>
+                  <span style={{fontSize:11,transform:liderDropOpen?"rotate(180deg)":"none",transition:"transform .15s"}}>▾</span>
+                </button>
+                {liderDropOpen && (
+                  <div style={{marginTop:6,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:8,overflow:"hidden",maxHeight:260,overflowY:"auto"}}>
+                    {colabs.map((c,i)=>(
+                      <button key={c.nome} onClick={()=>{setLider(c.nome);setLiderDropOpen(false);}}
+                        style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"12px 14px",
+                          background:dark?"#020510":"#fff",border:"none",borderTop:i>0?`1px solid ${dark?"#0f172a":"#e2e8f0"}`:"none",
+                          cursor:"pointer",fontSize:14,fontWeight:700,color:dark?"#f8fafc":"#1e293b",textAlign:"left"}}>
+                        {c.nome}<span style={{fontSize:10,fontWeight:600,...S.txt2}}>{c.cargo}</span>
+                      </button>
+                    ))}
+                    {colabs.length===0 && <div style={{padding:"12px 14px",fontSize:11,...S.txt2}}>Nenhum colaborador no cadastro Equipe — cadastre a equipe primeiro.</div>}
+                  </div>
+                )}
               </div>
             )}
           </div>
