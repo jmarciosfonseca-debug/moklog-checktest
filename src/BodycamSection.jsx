@@ -159,6 +159,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   const [obsFalha, setObsFalha] = useState("");
   const [foto, setFoto] = useState(null);
   const [erro, setErro] = useState(null);
+  const [editandoId, setEditandoId] = useState(null); // id do registro em edição (null = novo)
 
   useEffect(()=>{
     let vivo = true;
@@ -204,8 +205,18 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   const ordenados = [...registros].sort((a,b)=>(b.dia||"").localeCompare(a.dia||""));
 
   const abrirForm = () => {
+    setEditandoId(null);
     setPorteiro(""); setLiderDiurno(""); setLiderNoturno(""); setTacticoDiurno(""); setTacticoNoturno("");
     setQtdLider(""); setQtdTatico(""); setStatus("ok"); setObsFalha(""); setFoto(null); setErro(null);
+    setShowForm(true);
+  };
+
+  const abrirEdicao = (r) => {
+    setEditandoId(r.id);
+    setPorteiro(r.porteiro||""); setLiderDiurno(r.liderDiurno||""); setLiderNoturno(r.liderNoturno||"");
+    setTacticoDiurno(r.tacticoDiurno||""); setTacticoNoturno(r.tacticoNoturno||"");
+    setQtdLider(String(r.qtdVideosLider??"")); setQtdTatico(String(r.qtdVideosTatico??""));
+    setStatus(r.status||"ok"); setObsFalha(r.obsFalha||""); setFoto(r.foto||null); setErro(null);
     setShowForm(true);
   };
 
@@ -223,21 +234,34 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
     if(!tacticoNoturno.trim()){ setErro("Informe o nome do vigilante ronda/tático noturno."); return; }
     if(qtdLider===""||qtdTatico===""){ setErro("Informe a quantidade de vídeos das duas câmeras (período de 24h)."); return; }
     if(status==="falha" && !obsFalha.trim()){ setErro("Descreva a falha apresentada."); return; }
-    const agoraSalvar = new Date();
-    const registro = {
-      id:newId(), dia:diaRef, tipo:"registro",
-      porteiro:porteiro.trim(),
-      liderDiurno:liderDiurno.trim(), liderNoturno:liderNoturno.trim(),
-      tacticoDiurno:tacticoDiurno.trim(), tacticoNoturno:tacticoNoturno.trim(),
-      qtdVideosLider:Number(qtdLider)||0, qtdVideosTatico:Number(qtdTatico)||0,
-      horario:fmtHora(agoraSalvar), status, obsFalha:status==="falha"?obsFalha.trim():"",
-      foto, atrasado, criadoEm:agoraSalvar.toISOString(),
-    };
-    const atualizados = [...registros, registro];
     setSaving(true);
-    setRegistros(atualizados);
-    await saveBodycam(db, doc, setDoc, project.id, atualizados);
+    if(editandoId){
+      const atualizados = registros.map(r=>r.id===editandoId?{
+        ...r,
+        porteiro:porteiro.trim(), liderDiurno:liderDiurno.trim(), liderNoturno:liderNoturno.trim(),
+        tacticoDiurno:tacticoDiurno.trim(), tacticoNoturno:tacticoNoturno.trim(),
+        qtdVideosLider:Number(qtdLider)||0, qtdVideosTatico:Number(qtdTatico)||0,
+        status, obsFalha:status==="falha"?obsFalha.trim():"", foto,
+      }:r);
+      setRegistros(atualizados);
+      await saveBodycam(db, doc, setDoc, project.id, atualizados);
+    } else {
+      const agoraSalvar = new Date();
+      const registro = {
+        id:newId(), dia:diaRef, tipo:"registro",
+        porteiro:porteiro.trim(),
+        liderDiurno:liderDiurno.trim(), liderNoturno:liderNoturno.trim(),
+        tacticoDiurno:tacticoDiurno.trim(), tacticoNoturno:tacticoNoturno.trim(),
+        qtdVideosLider:Number(qtdLider)||0, qtdVideosTatico:Number(qtdTatico)||0,
+        horario:fmtHora(agoraSalvar), status, obsFalha:status==="falha"?obsFalha.trim():"",
+        foto, atrasado, criadoEm:agoraSalvar.toISOString(),
+      };
+      const atualizados = [...registros, registro];
+      setRegistros(atualizados);
+      await saveBodycam(db, doc, setDoc, project.id, atualizados);
+    }
     setSaving(false);
+    setEditandoId(null);
     setShowForm(false);
   };
 
@@ -253,9 +277,13 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   if(showForm) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <div style={S.card}>
-        <div style={{fontSize:14,fontWeight:800,...S.txt,marginBottom:4}}>🎬 Descarregamento de Bodycam</div>
-        <div style={{fontSize:11,...S.txt2}}>Referente ao dia <b>{fmtDataBR(diaRef)}</b> · horário registrado automaticamente ({fmtHora(new Date())})</div>
-        {atrasado && (
+        <div style={{fontSize:14,fontWeight:800,...S.txt,marginBottom:4}}>{editandoId?"✏️ Editando registro":"🎬 Descarregamento de Bodycam"}</div>
+        {editandoId ? (
+          <div style={{fontSize:11,...S.txt2}}>Corrigindo o registro de <b>{fmtDataBR(registros.find(r=>r.id===editandoId)?.dia)}</b> — data e horário originais são mantidos.</div>
+        ) : (
+          <div style={{fontSize:11,...S.txt2}}>Referente ao dia <b>{fmtDataBR(diaRef)}</b> · horário registrado automaticamente ({fmtHora(new Date())})</div>
+        )}
+        {!editandoId && atrasado && (
           <div style={{marginTop:8,background:"#1a1000",border:"1px solid #f59e0b55",borderRadius:8,padding:"8px 12px"}}>
             <div style={{fontSize:12,color:"#f59e0b",fontWeight:800}}>⚠️ Descarregado pós 00:00 — em atraso</div>
           </div>
@@ -322,8 +350,8 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
       </div>
       {erro && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{erro}</div>}
       <div style={{display:"flex",gap:8}}>
-        <button onClick={()=>setShowForm(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-        <button onClick={registrar} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Salvando…":"✓ Registrar"}</button>
+        <button onClick={()=>{setEditandoId(null);setShowForm(false);}} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+        <button onClick={registrar} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Salvando…":(editandoId?"💾 Salvar Edição":"✓ Registrar")}</button>
       </div>
     </div>
   );
@@ -380,6 +408,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
               <div style={{fontSize:11,...S.txt2}}>🎥 Ronda: ☀️ {r.tacticoDiurno||"—"} · 🌙 {r.tacticoNoturno||"—"} ({r.qtdVideosTatico} vídeos)</div>
               {r.obsFalha && <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>{r.obsFalha}</div>}
               {r.foto && <img src={r.foto} alt="Foto" style={{width:80,height:80,objectFit:"cover",borderRadius:8,marginTop:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}/>}
+              {adminAuth && <button onClick={()=>abrirEdicao(r)} style={{...S.btnSm,marginTop:8,color:"#f59e0b",borderColor:"#f59e0b44"}}>✏️ Editar</button>}
             </>
           )}
         </div>
