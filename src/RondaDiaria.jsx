@@ -1,6 +1,14 @@
 // ─────────────────────────────────────────────────────────────
-// RondaDiaria.jsx — Ronda Perimetral Diária (v2)
-// Correções desta versão:
+// RondaDiaria.jsx — Ronda Perimetral Diária (v3)
+// Novidades desta versão:
+// • Equipe: regra única p/ todos os projetos — TODOS os cargos entram,
+//   exceto Porteiro, CDA e Vigilante CCO (central)
+// • Executante por ronda: quem registra (líder) pode ser diferente de
+//   quem executa — seletor em cada ronda, padrão = responsável do turno
+// • Teste Perimetral dentro do plantão (só Golgi P601–P607): 1 por
+//   plantão, zonas dinâmicas (➕ adiciona, numeração automática Z-01…),
+//   OK/Parcial/Inoperante + observação; entra no PDF consolidado
+// Correções da v2 (mantidas):
 // • Foco no teclado: campos renderizados inline (sem componente aninhado)
 //   — digitação contínua na observação e nos horários
 // • Fotos por ronda (até 2), com opção de câmera; comprimidas p/ ~640px
@@ -75,6 +83,13 @@ const TURNO_UI = {
   noturno: { label:"Noturno", icon:"🌙", cor:"#818cf8", limite:"06:00" },
 };
 const VESTIARIO_ELIGIBLE = ["P601","P602","P604","P605","P606"]; // ronda de vestiário — só Golgi (exceto P607)
+const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607"]; // teste perimetral dentro do plantão — todos os Golgi
+const nomeZona = (i)=>`Z-${String(i+1).padStart(2,"0")}`;
+const STATUS_ZONA = {
+  ok:         { label:"OK",         mark:"✓", cor:"#22c55e", corPdf:"#16a34a" },
+  parcial:    { label:"Parcial",    mark:"~", cor:"#f59e0b", corPdf:"#d97706" },
+  inoperante: { label:"Inoperante", mark:"✗", cor:"#ef4444", corPdf:"#dc2626" },
+};
 
 // ── Foto: comprime para ~640px JPEG antes de guardar
 function comprimirFoto(file){
@@ -170,23 +185,11 @@ async function savePlantaoFull(p){
   try { localStorage.setItem(`rondas_full_${p.id}`, JSON.stringify(p)); } catch(e){}
 }
 
-// ── Colaboradores: lista completa do cadastro Equipe, exceto cargos de CCO
-// ── Cargos relevantes para a Ronda Diária, por projeto (evita listar Apoio,
-// CDA, Recepção etc. que não fazem ronda). Ajuste aqui se o cadastro do
-// projeto usar outros nomes de cargo.
-const CARGOS_RONDA = {
-  P607:  [["vigilante","ronda"],["vigilante","apoio"]],
-  P606:  [["vigilante","lider"]],
-  P311A: [["vigilante","lider"]],
-  P311B: [["vigilante","lider"]],
-  P601:  [["vspp","lider"]],
-  P602:  [["vspp","lider"]],
-  P604:  [["vspp","lider"]],
-  P605:  [["vspp","lider"]],
-  P260A: [["vspp","lider"]],
-  P260B: [["vspp","lider"]],
-  P260C: [["vspp","lider"]],
-};
+// ── Colaboradores: lista completa do cadastro Equipe (regra única, todos
+// os projetos): entram TODOS os vigilantes disponíveis, EXCETO os cargos
+// Porteiro, CDA e Vigilante CCO/Central. Folguista e cobertura de líder
+// sempre entram.
+const CARGOS_EXCLUIDOS = ["porteiro","cda","cco","central"];
 
 function coberturaAtiva(colab){
   if(!colab?.coberturaAtiva || !colab.coberturaInicio || !colab.coberturaFim) return false;
@@ -206,19 +209,14 @@ async function loadColaboradores(projectId){
     try { const l = localStorage.getItem(`equipe_${projectId}`); if(l) equipe = JSON.parse(l); } catch(e){}
   }
   const ativos = (equipe?.colaboradores||[])
-    .filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim())
-    .filter(c=>!norm(c.cargo).includes("cco")); // CCO nunca entra na ronda
-  const regras = CARGOS_RONDA[projectId];
-  let filtrados = ativos;
-  if(regras){
-    filtrados = ativos.filter(c=>{
-      const cg = norm(c.cargo);
-      if(cg.includes("folg")) return true; // folguista cobre qualquer cargo, sempre entra
-      if(coberturaAtiva(c)) return true; // cobertura temporária de líder também entra
-      return regras.some(tokens=>tokens.every(t=>cg.includes(t)));
-    });
-    if(filtrados.length===0) filtrados = ativos; // cadastro sem esses cargos: não trava a operação
-  }
+    .filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim());
+  let filtrados = ativos.filter(c=>{
+    const cg = norm(c.cargo);
+    if(cg.includes("folg")) return true; // folguista cobre qualquer cargo, sempre entra
+    if(coberturaAtiva(c)) return true; // cobertura temporária de líder também entra
+    return !CARGOS_EXCLUIDOS.some(x=>cg.includes(x));
+  });
+  if(filtrados.length===0) filtrados = ativos; // cadastro só com cargos excluídos: não trava a operação
   return filtrados
     .sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)))
     .map(c=>({ nome:c.nome, cargo: coberturaAtiva(c) ? `${c.cargo} 🔁 cobertura líder` : (c.cargo||"") }));
@@ -296,17 +294,29 @@ function gerarPdfConsolidado(project, plantoes){
     const linhas = (p.rondas||[]).map((r,i)=>`<tr>
         <td>${i+1}</td>
         <td>${r.inicio||"—"} – ${r.fim||"—"}</td>
+        <td>${(r.executante||p.lider||"—").replace(/</g,"&lt;")}</td>
         <td>${r.externa?"Sim":"Não"}</td>
         <td>${(r.obs||"").replace(/</g,"&lt;")}</td>
       </tr>`).join("");
+    const per = p.perimetral;
+    const perHtml = per?.feito ? (()=>{
+      const zonas = per.zonas||[];
+      const marks = zonas.map((z,zi)=>{
+        const st = STATUS_ZONA[z.status]||STATUS_ZONA.ok;
+        return `<span style="color:${st.corPdf};font-weight:700">${nomeZona(zi)} ${st.mark}</span>`;
+      }).join(" · ");
+      const probs = zonas.map((z,zi)=>({z,zi})).filter(o=>{const s=o.z.status||"ok";return s!=="ok"&&o.z.obs;});
+      return `<div style="font-size:11px;margin-bottom:6px">🔒 Teste Perimetral: ${zonas.length?marks:"realizado (sem zonas detalhadas)"}${per.obs?`<br><span style="color:#64748b">Obs: ${String(per.obs).replace(/</g,"&lt;")}</span>`:""}${probs.map(o=>`<br><span style="color:${(STATUS_ZONA[o.z.status]||STATUS_ZONA.ok).corPdf}">${nomeZona(o.zi)}: ${String(o.z.obs).replace(/</g,"&lt;")}</span>`).join("")}</div>`;
+    })() : "";
     return `<div class="plantao">
       <div class="plantao-head">
         <div><b>${t.icon} ${t.label}</b> · ${fmtData(p.dataPlantao)} · Responsável: ${p.lider||"—"}</div>
         <div class="badge ${p.enviado?"ok":"pend"}">${p.enviado?"Enviado":"Pendente"}</div>
       </div>
       ${p.vestiario?.feito!=null?`<div style="font-size:11px;margin-bottom:6px;color:${p.vestiario.status==="anomalia"?"#dc2626":"#16a34a"}">🚿 Vestiário: ${p.vestiario.feito?(p.vestiario.status==="anomalia"?`⚠️ Anomalia — ${(p.vestiario.obs||"").replace(/</g,"&lt;")}`:"✅ OK"):"Não realizado"}</div>`:""}
-      <table><thead><tr><th>#</th><th>Horário</th><th>Externa</th><th>Observação</th></tr></thead>
-      <tbody>${linhas||'<tr><td colspan="4" style="text-align:center;color:#94a3b8">Sem rondas registradas</td></tr>'}</tbody></table>
+      ${perHtml}
+      <table><thead><tr><th>#</th><th>Horário</th><th>Executante</th><th>Externa</th><th>Observação</th></tr></thead>
+      <tbody>${linhas||'<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sem rondas registradas</td></tr>'}</tbody></table>
     </div>`;
   }).join("");
   const html = `<!DOCTYPE html>
@@ -436,7 +446,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const addRonda = () => {
     const ini = horaAgora();
     const rid = newId();
-    upsertAtual(p=>({ ...p, rondas:[...p.rondas, { id:rid, inicio:ini, fim:fimAuto(ini), externa:true, obs:"", fotos:[] }] }));
+    upsertAtual(p=>({ ...p, rondas:[...p.rondas, { id:rid, inicio:ini, fim:fimAuto(ini), externa:true, executante:(p.lider||""), obs:"", fotos:[] }] }));
     setOpenRondaId(rid); // colapsa a anterior, abre a nova
   };
   const editRonda = (rid, campo, valor, imediato=false) => {
@@ -450,6 +460,13 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const delRonda = (rid) => upsertAtual(p=>({ ...p, rondas:p.rondas.filter(r=>r.id!==rid) }));
   const setLider = (nome) => upsertAtual(p=>({ ...p, lider:nome }));
   const setVestiario = (campo,valor) => upsertAtual(p=>({ ...p, vestiario:{ feito:true, status:"ok", obs:"", ...(p.vestiario||{}), [campo]:valor } }), campo==="obs");
+
+  // ── Teste Perimetral do plantão (só Golgi) — zonas dinâmicas, 1 teste por plantão
+  const perBase = (p)=>({ feito:false, zonas:[], obs:"", ...(p.perimetral||{}) });
+  const setPerimetral = (campo,valor,imediato=true) => upsertAtual(p=>({ ...p, perimetral:{ ...perBase(p), [campo]:valor } }), imediato);
+  const addZonaPer = () => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, feito:true, zonas:[...(per.zonas||[]), { id:newId(), status:"ok", obs:"" }] } }; });
+  const editZonaPer = (zid,campo,valor,imediato=true) => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, zonas:(per.zonas||[]).map(z=>z.id===zid?{...z,[campo]:valor}:z) } }; }, imediato);
+  const delZonaPer = (zid) => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, zonas:(per.zonas||[]).filter(z=>z.id!==zid) } }; });
 
   const addFoto = async (rid, file) => {
     if(!file) return;
@@ -542,7 +559,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               </span>
             )}
             <div style={{fontSize:16,fontWeight:900,...S.txt}}>Ronda {i+1}</div>
-            {!aberta && <div style={{fontSize:13,fontWeight:600,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"}</div>}
+            {!aberta && <div style={{fontSize:13,fontWeight:600,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"}{r.executante?` · ${String(r.executante).split(" ")[0]}`:""}</div>}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
             {!aberta && (r.fotos||[]).length>0 && <span style={{fontSize:12,...S.txt2}}>📷{(r.fotos||[]).length}</span>}
@@ -557,6 +574,16 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                 {r.externa?"✓ Externa":"Externa?"}
               </button>
               {!travado && <button onClick={()=>delRonda(r.id)} style={{...S.btnSm,fontSize:13,padding:"7px 12px",color:"#ef4444",borderColor:"#ef444433",marginLeft:6}}>🗑</button>}
+            </div>
+            <div style={{marginBottom:10}}>
+              <label style={{...S.lbl,fontSize:11}}>👤 Executante da ronda</label>
+              <select value={r.executante||""} disabled={travado}
+                onChange={e=>editRonda(r.id,"executante",e.target.value,true)}
+                style={{...S.inp,fontSize:14,padding:"11px 12px",opacity:travado?.7:1}}>
+                <option value="">— selecionar —</option>
+                {r.executante && !colabs.some(c=>c.nome===r.executante) && <option value={r.executante}>{r.executante}</option>}
+                {colabs.map(c=><option key={c.nome} value={c.nome}>{c.nome}{c.cargo?` · ${c.cargo}`:""}</option>)}
+              </select>
             </div>
             <div style={{display:"flex",gap:8}}>
               <div style={{flex:1}}>
@@ -624,12 +651,36 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                     border:`1px solid ${p.enviado?"#22c55e33":"#f59e0b33"}`}}>{p.enviado?"✅ Enviado":"⏳ Pendente"}</span>
                 </div>
               </div>
+              {p.perimetral?.feito && (
+                <div style={S.card}>
+                  <div style={{fontSize:11,fontWeight:800,...S.txt,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>🔒 Teste Perimetral — realizado</div>
+                  {(p.perimetral.zonas||[]).length>0 ? (
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+                      {(p.perimetral.zonas||[]).map((z,zi)=>{
+                        const st = STATUS_ZONA[z.status]||STATUS_ZONA.ok;
+                        return (
+                          <div key={z.id||zi} style={{display:"flex",alignItems:"center",gap:6,fontSize:12}}>
+                            <span style={{width:8,height:8,borderRadius:"50%",background:st.cor,flexShrink:0}}/>
+                            <span style={{fontWeight:800,...S.txt}}>{nomeZona(zi)}</span>
+                            <span style={{color:st.cor,fontWeight:700,marginLeft:"auto"}}>{st.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : <div style={{fontSize:11,...S.txt2}}>Sem zonas detalhadas.</div>}
+                  {(p.perimetral.zonas||[]).map((z,zi)=>((z.status==="parcial"||z.status==="inoperante")&&z.obs)?(
+                    <div key={"o"+(z.id||zi)} style={{fontSize:11,...S.txt2,marginTop:6}}><span style={{fontWeight:800,color:(STATUS_ZONA[z.status]||STATUS_ZONA.ok).cor}}>{nomeZona(zi)}:</span> {z.obs}</div>
+                  ):null)}
+                  {p.perimetral.obs && <div style={{fontSize:11,...S.txt2,marginTop:6}}>Obs: {p.perimetral.obs}</div>}
+                </div>
+              )}
               {(p.rondas||[]).map((r,i)=>(
                 <div key={r.id} style={{...S.card,padding:"10px 14px"}}>
                   <div style={{display:"flex",justifyContent:"space-between"}}>
                     <div style={{fontSize:12,fontWeight:800,...S.txt}}>Ronda {i+1}</div>
                     <div style={{fontSize:12,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"} {r.externa?"· Externa (sim)":""}</div>
                   </div>
+                  {r.executante && <div style={{fontSize:11,...S.txt2,marginTop:2}}>👤 Executou: {r.executante}</div>}
                   {r.obs && <div style={{fontSize:11,...S.txt2,marginTop:4}}>{r.obs}</div>}
                   {(r.fotos||[]).length>0 && (
                     <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
@@ -743,6 +794,58 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                       placeholder="Descreva a anomalia..." style={{...S.inp,fontSize:13,marginTop:8}}/>
                   )}
                 </>
+              )}
+            </div>
+          );
+        })()}
+
+        {PERIMETRAL_ELIGIBLE.includes(project.id) && (()=>{
+          const per = atualFull?.perimetral || {};
+          const marcado = !!per.feito;
+          const zonas = per.zonas||[];
+          return (
+            <div style={S.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <label style={S.lbl}>🔒 Teste Perimetral</label>
+                <button disabled={travado} onClick={()=>!travado&&setPerimetral("feito",!marcado)}
+                  style={{...S.btnSm,fontSize:12,padding:"7px 14px",color:marcado?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:marcado?"#22c55e44":undefined,opacity:travado?.6:1}}>
+                  {marcado?"✓ Feito":"Marcar como feito"}
+                </button>
+              </div>
+              {marcado && (
+                <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+                  {zonas.map((z,zi)=>{
+                    const st = STATUS_ZONA[z.status]||STATUS_ZONA.ok;
+                    return (
+                      <div key={z.id} style={{border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"8px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{fontSize:13,fontWeight:900,...S.txt,minWidth:44}}>{nomeZona(zi)}</div>
+                          <div style={{display:"flex",gap:5,flex:1}}>
+                            {Object.entries(STATUS_ZONA).map(([k,cfg])=>(
+                              <button key={k} disabled={travado} onClick={()=>!travado&&editZonaPer(z.id,"status",k)}
+                                style={{flex:1,padding:"8px 4px",borderRadius:7,fontWeight:800,fontSize:11,cursor:travado?"default":"pointer",
+                                  border:`1px solid ${z.status===k||( !z.status&&k==="ok")?cfg.cor:(dark?"#0f172a":"#e2e8f0")}`,
+                                  background:z.status===k||(!z.status&&k==="ok")?cfg.cor+"22":(dark?"#020510":"#fff"),
+                                  color:z.status===k||(!z.status&&k==="ok")?cfg.cor:(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>
+                                {cfg.label}
+                              </button>
+                            ))}
+                          </div>
+                          {!travado && <button onClick={()=>delZonaPer(z.id)} style={{...S.btnSm,padding:"6px 9px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>}
+                        </div>
+                        {(z.status==="parcial"||z.status==="inoperante") && (
+                          <input value={z.obs||""} disabled={travado} onChange={e=>editZonaPer(z.id,"obs",e.target.value,false)}
+                            placeholder={`Observação da ${nomeZona(zi)}...`} style={{...S.inp,fontSize:13,marginTop:8}}/>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {!travado && (
+                    <button onClick={addZonaPer} style={{...S.btnSec,fontSize:13,padding:"11px 14px"}}>➕ Adicionar zona ({zonas.length===0?"Z-01":nomeZona(zonas.length)})</button>
+                  )}
+                  <input value={per.obs||""} disabled={travado} onChange={e=>setPerimetral("obs",e.target.value,false)}
+                    placeholder="Observação geral do teste (opcional)..." style={{...S.inp,fontSize:13}}/>
+                </div>
               )}
             </div>
           );
