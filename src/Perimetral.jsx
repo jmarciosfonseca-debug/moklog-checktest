@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
@@ -104,6 +104,31 @@ async function loadTestes(projectId) {
 async function saveTestes(projectId, testes) {
   try { await setDoc(doc(db,"perimetral",projectId),{testes,updatedAt:new Date().toISOString()}); } catch(e){ console.error(e); }
   try { localStorage.setItem(`perimetral_${projectId}`, JSON.stringify(testes)); } catch(e){}
+}
+
+function newRid(){ try { return crypto.randomUUID(); } catch { return "r-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
+
+// ── Grava UM teste sem sobrescrever o que outros dispositivos salvaram
+// enquanto esta tela estava aberta: busca a lista mais atual do servidor,
+// funde por id (upsert) e só então salva de volta. Mesmo padrão de merge
+// seguro usado na Ronda Diária — evita que a continuidade de ronda de um
+// celular apague a de outro no mesmo plantão.
+async function saveTesteMerge(projectId, testeAtualizado){
+  const frescos = await loadTestes(projectId);
+  const jaExiste = frescos.some(t=>t.id===testeAtualizado.id);
+  const novos = jaExiste
+    ? frescos.map(t=>t.id===testeAtualizado.id?testeAtualizado:t)
+    : [testeAtualizado, ...frescos];
+  await saveTestes(projectId, novos);
+  return novos;
+}
+
+// ── Exclui UM teste com o mesmo padrão merge-safe (parte da lista fresca)
+async function deleteTesteMerge(projectId, testeId){
+  const frescos = await loadTestes(projectId);
+  const novos = frescos.filter(t=>t.id!==testeId);
+  await saveTestes(projectId, novos);
+  return novos;
 }
 
 async function loadEquipe(projectId) {
@@ -319,6 +344,20 @@ ${pcfg.mapaB64?`<div class="section">
   </table>
 </div>
 
+${(teste.rondas||[]).length ? `
+<div class="section">
+  <div class="section-title">🚶 Continuidade da Ronda — ${(teste.rondas||[]).length} registro(s)</div>
+  <table>
+    <thead><tr><th>#</th><th>Hora</th><th>Executante</th><th>Observação</th></tr></thead>
+    <tbody>${(teste.rondas||[]).map((r,i)=>`<tr>
+      <td style="font-weight:700">${i+1}</td>
+      <td>${r.hora||"—"}</td>
+      <td>${String(r.executante||"—").replace(/</g,"&lt;")}</td>
+      <td style="font-size:11px;color:#64748b">${String(r.obs||"—").replace(/</g,"&lt;")}</td>
+    </tr>`).join("")}</tbody>
+  </table>
+</div>` : ""}
+
 ${statsRows ? `
 <div class="section">
   <div class="section-title">Taxa de Falha Histórica — ${teste.turno} (${historico.length} testes)</div>
@@ -427,7 +466,9 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg) {
   .map-wrap img{width:100%;height:240px;object-fit:cover;display:block;filter:brightness(.82)}
   .grid-2{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:start}
   .footer{text-align:center;margin-top:10px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
-  @media print{body{padding:6px}@page{margin:8mm;size:A4 landscape}.no-print{display:none}.section{margin-bottom:8px;padding:10px 12px}.kpis{margin-bottom:8px}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid}
+  @media print{body{padding:6px}@page{margin:8mm;size:A4 landscape}.no-print{display:none}.section{margin-bottom:8px;padding:10px 12px;page-break-inside:auto}.grid-2 .section{page-break-inside:avoid}.kpis{margin-bottom:8px}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
 </style></head>
 <body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
@@ -577,10 +618,50 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
   const adminAuth = authLevel==="admin";
 
+  const rondaTimer = useRef(null);
+  const rondaPend = useRef(null); // teste com ronda pendente de gravação (debounce)
+
   useEffect(()=>{
     loadTestes(project.id).then(t=>{ setTestes(t||[]); setLoading(false); });
     loadEquipe(project.id).then(e=>setEquipe(e||[]));
-  },[project.id]);
+    return ()=>{
+      if(rondaTimer.current) clearTimeout(rondaTimer.current);
+      if(rondaPend.current) saveTesteMerge(project.id, rondaPend.current); // não perde a última digitação
+    };
+  },[project.id]); // eslint-disable-line
+
+  // ── Continuidade da Ronda (registros livres ao longo do plantão, dentro do teste)
+  // Regra de equipe: todos os ativos, exceto Porteiro, CDA e CCO/Central.
+  const normP = (s)=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const colabsRonda = equipe
+    .filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim())
+    .filter(c=>{ const cg=normP(c.cargo); if(cg.includes("folg")) return true; return !["porteiro","cda","cco","central"].some(x=>cg.includes(x)); })
+    .sort((a,b)=>normP(a.nome).localeCompare(normP(b.nome)));
+
+  const persistViewTeste = (novo, imediato=false) => {
+    setViewTeste(novo);
+    setTestes(ts=>ts.some(t=>t.id===novo.id)?ts.map(t=>t.id===novo.id?novo:t):ts); // atualização otimista
+    rondaPend.current = novo;
+    if(rondaTimer.current) clearTimeout(rondaTimer.current);
+    const doSave = async ()=>{
+      rondaPend.current = null;
+      setSaving(true);
+      const novos = await saveTesteMerge(project.id, novo);
+      setTestes(novos);
+      setSaving(false);
+    };
+    if(imediato) doSave();
+    else rondaTimer.current = setTimeout(doSave, 1200);
+  };
+  const addRondaCont = () => {
+    if(!viewTeste) return;
+    const r = { id:newRid(), hora:nowTime(), executante:viewTeste.quemFez||"", obs:"", criadoEm:new Date().toISOString() };
+    persistViewTeste({ ...viewTeste, rondas:[...(viewTeste.rondas||[]), r] }, true);
+  };
+  const editRondaCont = (rid,campo,valor,imediato=true) =>
+    persistViewTeste({ ...viewTeste, rondas:(viewTeste.rondas||[]).map(r=>r.id===rid?{...r,[campo]:valor}:r) }, imediato);
+  const delRondaCont = (rid) =>
+    persistViewTeste({ ...viewTeste, rondas:(viewTeste.rondas||[]).filter(r=>r.id!==rid) }, true);
 
   // Get filtered colaboradores by turno
   const getColabsByTurno = (turno) => equipe.filter(c=>
@@ -599,9 +680,8 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
     setSaving(true);
     try {
       const novo = {...form, criadoEm:new Date().toISOString()};
-      const newList = [novo,...testes];
+      const newList = await saveTesteMerge(project.id, novo);
       setTestes(newList);
-      await saveTestes(project.id, newList);
       setScreen("list");
       setForm(null);
     } catch(e){ alert("Erro ao salvar"); }
@@ -610,9 +690,8 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
   const excluir = async (id) => {
     if(!window.confirm("Excluir este teste?")) return;
-    const newList = testes.filter(t=>t.id!==id);
+    const newList = await deleteTesteMerge(project.id, id);
     setTestes(newList);
-    await saveTestes(project.id, newList);
     setViewTeste(null); setScreen("list");
   };
 
@@ -712,6 +791,36 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                   <span style={{fontWeight:700,...S.txt}}>{z}:</span> {viewTeste.zonas[z].obs}
                 </div>
               ))}
+            </div>
+            {/* Continuidade da Ronda — registros livres ao longo do plantão */}
+            <div style={S.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:(viewTeste.rondas||[]).length>0?10:0}}>
+                <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>🚶 Continuidade da Ronda ({(viewTeste.rondas||[]).length})</div>
+                {saving && <span style={{fontSize:9,...S.txt2}}>salvando…</span>}
+              </div>
+              {(viewTeste.rondas||[]).map((r,i)=>(
+                <div key={r.id} style={{border:`1px solid ${(dark||true)?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/>
+                    <div style={{fontSize:12,fontWeight:800,...S.txt,minWidth:62}}>Ronda {i+1}</div>
+                    <input type="time" value={r.hora||""} onChange={e=>editRondaCont(r.id,"hora",e.target.value)}
+                      style={{...S.inp,flex:1,fontSize:14,padding:"9px 10px"}}/>
+                    {adminAuth && <button onClick={()=>delRondaCont(r.id)} style={{...S.btnSm,padding:"7px 9px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>}
+                  </div>
+                  <div style={{marginTop:8}}>
+                    <label style={{...S.lbl,fontSize:9}}>👤 Executante</label>
+                    <select value={r.executante||""} onChange={e=>editRondaCont(r.id,"executante",e.target.value)}
+                      style={{...S.inp,fontSize:13,padding:"9px 10px"}}>
+                      <option value="">— selecionar —</option>
+                      {r.executante && !colabsRonda.some(c=>c.nome===r.executante) && <option value={r.executante}>{r.executante}</option>}
+                      {colabsRonda.map(c=><option key={c.nome} value={c.nome}>{c.nome}{c.cargo?` · ${c.cargo}`:""}</option>)}
+                    </select>
+                  </div>
+                  <input value={r.obs||""} onChange={e=>editRondaCont(r.id,"obs",e.target.value,false)}
+                    placeholder="Observação (opcional)..." style={{...S.inp,fontSize:13,marginTop:8}}/>
+                </div>
+              ))}
+              <button onClick={addRondaCont} style={{...S.btnGreen,fontSize:13,marginTop:(viewTeste.rondas||[]).length>0?2:10}}>➕ Registrar ronda (agora)</button>
             </div>
             {adminAuth&&<button onClick={()=>excluir(viewTeste.id)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir</button>}
           </div>
