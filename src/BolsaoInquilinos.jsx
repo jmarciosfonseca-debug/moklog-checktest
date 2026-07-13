@@ -142,12 +142,20 @@ function gerarPdfBolsao(project, placas, checagens){
       <td>${fmtDateTime(p.ultimaVista)}</td>
     </tr>`;
   }).join("");
-  const linhasChecagens = [...checagens].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||"")).map(c=>`<tr>
+  const linhasChecagens = [...checagens].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||"")).map(c=>{
+    const fotosHtml = (c.fotos||[]).length ? `<tr>
+      <td colspan="4" style="padding:8px 9px;background:#f8fafc">
+        <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:5px">📷 Fotos do local (${(c.fotos||[]).length})</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${(c.fotos||[]).map((f,i)=>`<img src="${f}" alt="Foto ${i+1}" style="width:132px;height:132px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0"/>`).join("")}</div>
+      </td>
+    </tr>` : "";
+    return `<tr>
       <td>${fmtData(c.data)} ${c.hora||""}</td>
       <td>${c.lider||"—"}</td>
       <td>${c.tipo==="interno"?"Interno":"Externo"}</td>
       <td>${(c.itens||[]).map(i=>`${i.placa} (${i.inquilino||"—"})`).join(", ")}</td>
-    </tr>`).join("");
+    </tr>${fotosHtml}`;
+  }).join("");
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>Bolsão ${project.id}</title>
 <style>
@@ -160,7 +168,9 @@ function gerarPdfBolsao(project, placas, checagens){
   table{width:100%;border-collapse:collapse;font-size:11px} th{background:#1e293b;color:#fff;padding:6px 9px;text-align:left;font-size:10px}
   td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
   .footer{text-align:center;margin-top:18px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important}}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
 </style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
