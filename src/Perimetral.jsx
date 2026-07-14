@@ -215,7 +215,7 @@ function MapaPerimetral({ zonas, size="normal", pcfg }) {
 }
 
 // ── PDF individual de um teste (com mapa)
-function gerarPDFTeste(teste, allTestes, project, pcfg, incluirRondas=true) {
+function gerarPDFTeste(teste, allTestes, project, pcfg, incluirRondas=true, incluirPerim=true) {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const totalZonas = pcfg.zonas.length;
   const problemCount = pcfg.zonas.filter(z=>(teste.zonas[z]?.status||"ok")!=="ok").length;
@@ -313,7 +313,7 @@ function gerarPDFTeste(teste, allTestes, project, pcfg, incluirRondas=true) {
   </div>
 </div>
 
-<div class="kpis">
+${incluirPerim?`<div class="kpis">
   <div class="kpi"><div class="kpi-val" style="color:#22c55e">${totalZonas-problemCount}</div><div class="kpi-lbl">Zonas OK</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#ef4444">${problemCount}</div><div class="kpi-lbl">Com Problema</div></div>
   <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${totalZonas}</div><div class="kpi-lbl">Total Zonas</div></div>
@@ -375,6 +375,7 @@ ${statsRows ? `
     <tbody>${statsRows}</tbody>
   </table>
 </div>` : ""}
+`:""}
 
 <div class="footer">
   <div>MokLog CheckTest © Moked Consulting Security · ${project.id} — ${pcfg.clienteNome||project.name}</div>
@@ -392,7 +393,7 @@ ${statsRows ? `
 }
 
 // ── PDF CONSOLIDADO do período
-function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false) {
+function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true) {
   if(!testes?.length) return;
   const hoje = new Date().toLocaleDateString("pt-BR");
   const sorted = [...testes].sort((a,b)=>b.data.localeCompare(a.data));
@@ -504,6 +505,7 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false
   <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${sorted.length}</div><div class="kpi-lbl">Testes</div></div>
 </div>
 
+${incluirPerim?`
 <!-- MAPA + GRÁFICO LADO A LADO -->
 <div class="grid-2">
   ${pcfg.mapaB64?`<div class="section" style="margin-bottom:0">
@@ -547,6 +549,28 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false
   </table>
   <div style="margin-top:8px;font-size:10px;color:#64748b">✓ = OK &nbsp; ✗ = Inoperante &nbsp; ~ = Parcial</div>
 </div>
+`:""}
+
+${incluirRondas ? `
+<!-- CONTINUIDADE DA RONDA POR PLANTÃO -->
+<div class="section">
+  <div class="section-title">🚶 Rondas Adicionais — ${sorted.reduce((a,t)=>a+((t.rondas||[]).length),0)} registro(s)</div>
+  ${sorted.filter(t=>(t.rondas||[]).length).map(t=>`
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px">
+        ${fmtDate(t.data)} · ${t.turno} · ${String(t.quemFez||"—").replace(/</g,"&lt;")} — ${(t.rondas||[]).length} ronda(s)
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Hora</th><th>Executante</th><th>Observação</th></tr></thead>
+        <tbody>${(t.rondas||[]).map((r,i)=>`<tr>
+          <td style="font-weight:700">${i+1}</td>
+          <td>${r.hora||"—"}</td>
+          <td>${String(r.executante||"—").replace(/</g,"&lt;")}</td>
+          <td style="font-size:11px;color:#64748b">${String(r.obs||"—").replace(/</g,"&lt;")}</td>
+        </tr>`).join("")}</tbody>
+      </table>
+    </div>`).join("") || `<div style="font-size:12px;color:#94a3b8;text-align:center;padding:20px 0">Nenhuma ronda adicional registrada no período</div>`}
+</div>` : ""}
 
 <div class="footer">
   <div>MokLog CheckTest © Moked Consulting Security · ${project.id} — ${pcfg.clienteNome||project.name}</div>
@@ -623,6 +647,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
   const [filtroPeriodo, setFiltroPeriodo] = useState("7");
   const [showConsolidado, setShowConsolidado] = useState(false);
   const [modoSelecao, setModoSelecao] = useState(false);
+  const [pdfSel, setPdfSel] = useState(null); // {modo:"teste"|"consolidado", teste?, testes?, periodo?, perim:bool, rondas:bool}
   const [selecionados, setSelecionados] = useState([]);
 
   const adminAuth = authLevel==="admin";
@@ -746,11 +771,73 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
     </div>
   );
 
+  // ── Modal seletor de conteúdo do PDF (somente PIN gerencial)
+  const nRondasSel = pdfSel
+    ? (pdfSel.modo==="teste"
+        ? (pdfSel.teste?.rondas||[]).length
+        : (pdfSel.testes||[]).reduce((acc,t)=>acc+((t.rondas||[]).length),0))
+    : 0;
+  const podeGerar = !!pdfSel && (pdfSel.perim || (pdfSel.rondas && nRondasSel>0));
+  const PdfSelector = pdfSel ? (
+    <div onClick={()=>setPdfSel(null)}
+      style={{position:"fixed",inset:0,background:"#000000cc",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div onClick={e=>e.stopPropagation()}
+        style={{...S.card,width:"100%",maxWidth:380,padding:18,display:"flex",flexDirection:"column",gap:12}}>
+        <div>
+          <div style={{fontSize:15,fontWeight:800,...S.txt}}>📄 Conteúdo do relatório</div>
+          <div style={{fontSize:11,...S.txt2,marginTop:3}}>
+            {pdfSel.modo==="teste"
+              ? `${pdfSel.teste.turno} · ${fmtDate(pdfSel.teste.data)}`
+              : pdfSel.periodo}
+          </div>
+        </div>
+
+        {[
+          {k:"perim",  ic:"🔒", t:"Teste Perimetral", d:"Mapa com as zonas, status de cada zona e histórico de falhas", n:null, off:false},
+          {k:"rondas", ic:"🚶", t:"Rondas Adicionais", d:"Continuidade da ronda — registros de área ao longo do plantão", n:nRondasSel, off:nRondasSel===0},
+        ].map(o=>(
+          <button key={o.k} disabled={o.off}
+            onClick={()=>setPdfSel({...pdfSel,[o.k]:!pdfSel[o.k]})}
+            style={{textAlign:"left",padding:"12px 13px",borderRadius:10,cursor:o.off?"not-allowed":"pointer",
+              opacity:o.off?0.45:1,
+              background:pdfSel[o.k]?"#a855f715":(dark?"#0b1220":"#f8fafc"),
+              border:`1px solid ${pdfSel[o.k]?"#a855f7":(dark?"#1e293b":"#e2e8f0")}`}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:14}}>{pdfSel[o.k]?"\u2611":"\u2610"}</span>
+              <span style={{fontSize:13,fontWeight:700,...S.txt}}>{o.ic} {o.t}</span>
+              {o.n!==null && <span style={{marginLeft:"auto",fontSize:10,...S.txt2}}>{o.n} registro(s)</span>}
+            </div>
+            <div style={{fontSize:10,...S.txt2,marginTop:4,paddingLeft:22}}>
+              {o.off ? "Nenhuma ronda adicional registrada" : o.d}
+            </div>
+          </button>
+        ))}
+
+        <div style={{display:"flex",gap:8,marginTop:2}}>
+          <button onClick={()=>setPdfSel(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+          <button disabled={!podeGerar}
+            onClick={()=>{
+              const sel=pdfSel; setPdfSel(null);
+              if(sel.modo==="teste") gerarPDFTeste(sel.teste,testes,project,pcfg,sel.rondas,sel.perim);
+              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim);
+            }}
+            style={{...S.btnSm,flex:1,fontSize:13,padding:"11px 0",justifyContent:"center",
+              opacity:podeGerar?1:0.4,cursor:podeGerar?"pointer":"not-allowed",
+              color:"#a855f7",border:"1px solid #a855f744",background:"#a855f712"}}>
+            📄 Gerar PDF
+          </button>
+        </div>
+        {!podeGerar && <div style={{fontSize:10,color:"#f59e0b",textAlign:"center"}}>Marque ao menos uma seção.</div>}
+      </div>
+    </div>
+  ) : null;
+
   // ── VIEW teste individual
   if(screen==="view"&&viewTeste) {
     const probs = pcfg.zonas.filter(z=>(viewTeste.zonas[z]?.status||"ok")!=="ok").length;
     return (
       <div style={S.page}>
+        {PdfSelector}
         <div style={S.wrap}>
           <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -759,12 +846,10 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 <div style={{fontSize:15,fontWeight:800,...S.txt}}>{viewTeste.turno==="Diurno"?"☀️":"🌙"} {viewTeste.turno} · {fmtDate(viewTeste.data)}</div>
                 <div style={{fontSize:11,...S.txt2}}>{viewTeste.quemFez||"—"} · {viewTeste.hora}</div>
               </div>
-              <button onClick={()=>{
-                  const temRondas=(viewTeste.rondas||[]).length>0;
-                  const incluir = temRondas ? window.confirm(`Este teste tem ${(viewTeste.rondas||[]).length} ronda(s) registrada(s).\n\nOK = incluir as rondas do dia no relatório\nCancelar = apenas o teste perimetral`) : false;
-                  gerarPDFTeste(viewTeste,testes,project,pcfg,incluir);
-                }}
-                style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:11}}>📄 PDF</button>
+              {adminAuth && (
+                <button onClick={()=>setPdfSel({modo:"teste",teste:viewTeste,perim:true,rondas:(viewTeste.rondas||[]).length>0})}
+                  style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:11}}>📄 PDF</button>
+              )}
             </div>
           </div>
           <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
@@ -994,6 +1079,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
   return (
     <div style={S.page}>
+      {PdfSelector}
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -1048,8 +1134,8 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 ))}
               </div>
 
-              {/* PDF Consolidado */}
-              {/* Modo seleção */}
+              {/* PDF Consolidado — apenas PIN gerencial */}
+              {adminAuth && (
               <div style={{display:"flex",gap:6,alignItems:"center"}}>
                 <button onClick={()=>{
                   if(modoSelecao){
@@ -1060,9 +1146,8 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                         alert(`Atenção: ${selecionados.length} teste(s) selecionado(s), mas apenas ${testsSelected.length} foram encontrados para gerar o PDF. Cancelado por segurança — tente selecionar novamente. Se persistir, avise o suporte.`);
                         return;
                       }
-                      const totRondas = testsSelected.reduce((s,t)=>s+((t.rondas||[]).length),0);
-                      const incluir = totRondas>0 ? window.confirm(`Os testes selecionados somam ${totRondas} ronda(s) registrada(s).\n\nOK = incluir as rondas do dia no relatório\nCancelar = apenas os testes perimetrais`) : false;
-                      gerarPDFConsolidado(testsSelected, periodo, project, pcfg, incluir);
+                      const totRondas = testsSelected.reduce((acc,t)=>acc+((t.rondas||[]).length),0);
+                      setPdfSel({modo:"consolidado",testes:testsSelected,periodo,perim:true,rondas:totRondas>0});
                     }
                     setModoSelecao(false); setSelecionados([]);
                   } else {
@@ -1080,6 +1165,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                     style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11,padding:"8px 10px"}}>✕</button>
                 )}
               </div>
+              )}
               {modoSelecao && (
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   <button onClick={()=>setSelecionados(testesFiltrados.map(t=>t.id))}
