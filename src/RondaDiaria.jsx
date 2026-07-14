@@ -83,7 +83,9 @@ const TURNO_UI = {
   noturno: { label:"Noturno", icon:"🌙", cor:"#818cf8", limite:"06:00" },
 };
 const VESTIARIO_ELIGIBLE = ["P601","P602","P604","P605","P606"]; // ronda de vestiário — só Golgi (exceto P607)
-const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607"]; // teste perimetral dentro do plantão — todos os Golgi
+const PERIMETRAL_ELIGIBLE = ["P601","P604","P605","P606","P607"]; // teste perimetral simplificado no plantão — Golgi sem mapa próprio.
+// P602 (Golgi Mauá) usa o módulo Perimetral completo (mapa de 4 zonas + continuidade da ronda) — não entra aqui.
+// P505 idem. Conforme cada parque ganhar mapa próprio, remova-o desta lista.
 const nomeZona = (i)=>`Z-${String(i+1).padStart(2,"0")}`;
 const STATUS_ZONA = {
   ok:         { label:"OK",         mark:"✓", cor:"#22c55e", corPdf:"#16a34a" },
