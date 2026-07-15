@@ -470,6 +470,18 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
   // ── Teste Perimetral do plantão (só Golgi) — zonas dinâmicas, 1 teste por plantão
   const perBase = (p)=>({ feito:false, zonas:[], obs:"", ...(p.perimetral||{}) });
+  // Zonas FIXAS (não dinâmicas) para projetos com mapa: sempre 4 zonas prontas,
+  // gravadas por índice fixo (0→Zona 01 … 3→Zona 04), casando com as bolinhas do mapa.
+  const NUM_ZONAS_FIXAS = (ZONA_MAPA[project.id]||[]).length; // 4 no P602, 0 nos demais
+  const nomeZonaFixa = (i)=>`Zona 0${i+1}`;
+  const setZonaFixa = (idx,campo,valor,imediato=true) => upsertAtual(p=>{
+    const per = perBase(p);
+    const zs = [...(per.zonas||[])];
+    // garante que o array tenha ao menos idx+1 posições, cada uma com id estável
+    while(zs.length < NUM_ZONAS_FIXAS){ zs.push({ id:newId(), status:"ok", obs:"" }); }
+    zs[idx] = { ...zs[idx], [campo]:valor };
+    return { ...p, perimetral:{ ...per, feito:true, zonas:zs } };
+  }, imediato);
   const setPerimetral = (campo,valor,imediato=true) => upsertAtual(p=>({ ...p, perimetral:{ ...perBase(p), [campo]:valor } }), imediato);
   const addZonaPer = () => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, feito:true, zonas:[...(per.zonas||[]), { id:newId(), status:"ok", obs:"" }] } }; });
   const editZonaPer = (zid,campo,valor,imediato=true) => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, zonas:(per.zonas||[]).map(z=>z.id===zid?{...z,[campo]:valor}:z) } }; }, imediato);
@@ -851,7 +863,43 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                   {marcado?"✓ Feito":"Marcar como feito"}
                 </button>
               </div>
-              {marcado && (
+              {marcado && NUM_ZONAS_FIXAS>0 && (
+                <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+                  {Array.from({length:NUM_ZONAS_FIXAS}).map((_,zi)=>{
+                    const z = zonas[zi] || { status:"ok", obs:"" };
+                    const precisaObs = (z.status==="parcial"||z.status==="inoperante");
+                    return (
+                      <div key={zi} style={{border:`1px solid ${precisaObs?(STATUS_ZONA[z.status].cor+"66"):(dark?"#0f172a":"#e2e8f0")}`,borderRadius:8,padding:"9px 10px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{fontSize:13,fontWeight:900,...S.txt,minWidth:66}}>{nomeZonaFixa(zi)}</div>
+                          <div style={{display:"flex",gap:5,flex:1}}>
+                            {Object.entries(STATUS_ZONA).map(([k,cfg])=>{
+                              const sel = (z.status||"ok")===k;
+                              return (
+                                <button key={k} disabled={travado} onClick={()=>!travado&&setZonaFixa(zi,"status",k)}
+                                  style={{flex:1,padding:"9px 4px",borderRadius:7,fontWeight:800,fontSize:11,cursor:travado?"default":"pointer",
+                                    border:`1px solid ${sel?cfg.cor:(dark?"#0f172a":"#e2e8f0")}`,
+                                    background:sel?cfg.cor+"22":(dark?"#020510":"#fff"),
+                                    color:sel?cfg.cor:(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>
+                                  {cfg.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {precisaObs && (
+                          <input value={z.obs||""} disabled={travado} onChange={e=>setZonaFixa(zi,"obs",e.target.value,false)}
+                            placeholder={`Justifique a ${nomeZonaFixa(zi)} (ex: testado, perímetro não disparou)...`}
+                            style={{...S.inp,fontSize:13,marginTop:8,borderColor:STATUS_ZONA[z.status].cor+"55"}}/>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <input value={per.obs||""} disabled={travado} onChange={e=>setPerimetral("obs",e.target.value,false)}
+                    placeholder="Observação geral do teste (opcional)..." style={{...S.inp,fontSize:13}}/>
+                </div>
+              )}
+              {marcado && NUM_ZONAS_FIXAS===0 && (
                 <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
                   {zonas.map((z,zi)=>{
                     const st = STATUS_ZONA[z.status]||STATUS_ZONA.ok;
