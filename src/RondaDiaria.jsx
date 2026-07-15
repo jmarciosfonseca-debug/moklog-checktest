@@ -83,9 +83,14 @@ const TURNO_UI = {
   noturno: { label:"Noturno", icon:"🌙", cor:"#818cf8", limite:"06:00" },
 };
 const VESTIARIO_ELIGIBLE = ["P601","P602","P604","P605","P606"]; // ronda de vestiário — só Golgi (exceto P607)
-const PERIMETRAL_ELIGIBLE = ["P601","P604","P605","P606","P607"]; // teste perimetral simplificado no plantão — Golgi sem mapa próprio.
-// P602 (Golgi Mauá) usa o módulo Perimetral completo (mapa de 4 zonas + continuidade da ronda) — não entra aqui.
-// P505 idem. Conforme cada parque ganhar mapa próprio, remova-o desta lista.
+const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607"]; // teste perimetral dentro do plantão — todos os Golgi
+
+// Mapa perimetral sobreposto (bolinha por zona) — projetos com posições aqui
+// ganham as bolinhas coloridas sobre a foto aérea /mapas/{id}-ronda.jpg.
+// Posições em % (x=esq→dir, y=topo→base). Cada índice casa com a Nª zona do teste (Z-01 = 1º ponto).
+const ZONA_MAPA = {
+  P602: [ {x:57,y:92}, {x:8,y:57}, {x:29,y:13}, {x:84,y:33} ],
+};
 const nomeZona = (i)=>`Z-${String(i+1).padStart(2,"0")}`;
 const STATUS_ZONA = {
   ok:         { label:"OK",         mark:"✓", cor:"#22c55e", corPdf:"#16a34a" },
@@ -718,8 +723,40 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
 
-        <img src={`/mapas/${project.id}-ronda.jpg`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
-          onError={(e)=>{e.currentTarget.style.display="none";}}/>
+        {(()=>{
+          const pts = ZONA_MAPA[project.id];
+          const zonas = atualFull?.perimetral?.zonas || [];
+          return (
+            <div style={{position:"relative",width:"100%"}}>
+              <img src={`/mapas/${project.id}-ronda.jpg`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
+                onError={(e)=>{e.currentTarget.style.display="none";}}/>
+              {pts && pts.map((p,idx)=>{
+                const z = zonas[idx];
+                const st = z ? (STATUS_ZONA[z.status]||STATUS_ZONA.ok) : null;
+                const cor = st ? st.cor : "#64748b";
+                return (
+                  <div key={idx} title={`Zona 0${idx+1}${st?` — ${st.label}`:""}`}
+                    style={{position:"absolute",left:`${p.x}%`,top:`${p.y}%`,transform:"translate(-50%,-50%)",
+                      display:"flex",flexDirection:"column",alignItems:"center",gap:2,pointerEvents:"none"}}>
+                    <div style={{width:16,height:16,borderRadius:"50%",background:cor,
+                      border:"2px solid #fff",boxShadow:"0 1px 4px rgba(0,0,0,.5)"}}/>
+                    <span style={{fontSize:9,fontWeight:800,color:"#fff",textShadow:"0 1px 2px #000",lineHeight:1}}>{`0${idx+1}`}</span>
+                  </div>
+                );
+              })}
+              {pts && (
+                <div style={{position:"absolute",right:6,bottom:6,display:"flex",gap:8,background:"#000000aa",
+                  borderRadius:7,padding:"4px 8px",pointerEvents:"none"}}>
+                  {Object.values(STATUS_ZONA).map((c,i)=>(
+                    <span key={i} style={{display:"flex",alignItems:"center",gap:3,fontSize:9,fontWeight:700,color:"#fff"}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",background:c.cor}}/>{c.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {pendenciaAnt && (
           <div style={{...S.card,border:"1px solid #ef444455",background:dark?"#1a0202":"#fef2f2"}}>
