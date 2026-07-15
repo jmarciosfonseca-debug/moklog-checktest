@@ -142,6 +142,7 @@ function SafeBlock({ name, children }) {
 }
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
 const EMAILJS_TEMPLATE_ID = "template_dhncs7j";
@@ -173,6 +174,22 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+
+// Login anônimo: garante um "crachá" para o Firestore. Enquanto a regra for
+// `if true` isto é inofensivo; passa a ser exigido só quando a regra virar
+// `if request.auth != null`. Idempotente e à prova de falha (não trava o app).
+let _anonTried = false;
+function ensureAnonAuth(){
+  if(_anonTried) return;
+  _anonTried = true;
+  try {
+    if(!auth.currentUser){
+      signInAnonymously(auth).catch(e=>console.warn("[auth] login anônimo falhou:", e?.code||e));
+    }
+  } catch(e){ console.warn("[auth] indisponível:", e); }
+}
+ensureAnonAuth();
 
 // ── Puxa os inquilinos/galpões do projeto para anexar ao PDF do relatório
 // semanal (mesma fonte do módulo Inquilinos — sem duplicar cadastro)
@@ -2584,6 +2601,16 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
 
 export default function App(){
   const [screen,setScreen]=useState("home");
+  // ── Auth anônimo: acompanha se o crachá já chegou. NÃO bloqueia a UI
+  // (failsafe): se demorar/falhar, o app segue — a regra ainda é `if true`.
+  const [authReady,setAuthReady]=useState(false);
+  useEffect(()=>{
+    ensureAnonAuth();
+    const unsub = onAuthStateChanged(auth, (u)=>{ if(u) setAuthReady(true); });
+    // failsafe: libera após 4s mesmo sem confirmação, para nunca travar em campo
+    const t = setTimeout(()=>setAuthReady(true), 4000);
+    return ()=>{ unsub && unsub(); clearTimeout(t); };
+  },[]);
   const [editingIdx,setEditingIdx]=useState(null);
   const isOnline = useOnlineStatus();
   const [showAcesso,setShowAcesso]=useState(false);
