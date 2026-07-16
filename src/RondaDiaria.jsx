@@ -511,6 +511,34 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     setConfirmEnvio(false);
   };
   const reabrirAtual = () => upsertAtual(p=>({ ...p, enviado:false, reabertoEm:new Date().toISOString() }));
+
+  // Conclui o PLANTÃO ANTERIOR pendente (qualquer pessoa pode). Marca enviado
+  // para liberar o fluxo do plantão atual. Se o anterior nunca foi registrado,
+  // cria um registro mínimo já enviado.
+  const [concluindoAnt, setConcluindoAnt] = useState(false);
+  const concluirAnterior = async () => {
+    if(concluindoAnt) return;
+    setConcluindoAnt(true);
+    try {
+      let alvo = plantaoAnt;
+      if(!alvo){
+        alvo = { id:newId(), projectId:project.id, dataPlantao:ant.dataPlantao, turno:ant.turno,
+                 lider:"", rondas:[], criadoEm:new Date().toISOString() };
+      }
+      const concluido = { ...alvo, enviado:true, enviadoEm:new Date().toISOString(),
+                          concluidoPorTerceiro:true };
+      await savePlantaoFull(concluido);
+      const entrada = {
+        id:concluido.id, dataPlantao:concluido.dataPlantao, turno:concluido.turno,
+        lider:concluido.lider||"", nRondas:(concluido.rondas||[]).length,
+        enviado:true, enviadoEm:concluido.enviadoEm,
+      };
+      await saveIndexEntry(project.id, entrada, null);
+      const outros = (idx.plantoes||[]).filter(x=>x.id!==entrada.id);
+      setIdx({ ...idx, plantoes:[...outros, entrada] });
+    } catch(e){ console.error("concluirAnterior:", e); }
+    finally { setConcluindoAnt(false); }
+  };
   const reabrirView = async () => {
     if(!viewFull) return;
     const novo = { ...viewFull, enviado:false, reabertoEm:new Date().toISOString() };
@@ -775,7 +803,19 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
         {pendenciaAnt && (
           <div style={{...S.card,border:"1px solid #ef444455",background:dark?"#1a0202":"#fef2f2"}}>
             <div style={{fontSize:12,fontWeight:800,color:"#ef4444"}}>⚠️ Plantão anterior sem envio</div>
-            <div style={{fontSize:11,...S.txt2,marginTop:2}}>{TURNO_UI[ant.turno].icon} {TURNO_UI[ant.turno].label} de {fmtData(ant.dataPlantao)} {plantaoAnt?"não foi enviado.":"não foi registrado."}</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:2,marginBottom:10}}>{TURNO_UI[ant.turno].icon} {TURNO_UI[ant.turno].label} de {fmtData(ant.dataPlantao)} {plantaoAnt?"não foi enviado.":"não foi registrado."}</div>
+            <button
+              disabled={concluindoAnt}
+              onClick={()=>{
+                if(window.confirm(`Concluir o ${TURNO_UI[ant.turno].label} de ${fmtData(ant.dataPlantao)}?\n\nEle será marcado como ENVIADO para liberar o plantão atual.`)){
+                  concluirAnterior();
+                }
+              }}
+              style={{...S.btnSec, width:"100%", fontSize:13, fontWeight:800,
+                color:"#22c55e", borderColor:"#22c55e55",
+                opacity:concluindoAnt?0.6:1, cursor:concluindoAnt?"default":"pointer"}}>
+              {concluindoAnt ? "Concluindo..." : "✅ Concluir plantão anterior"}
+            </button>
           </div>
         )}
 
