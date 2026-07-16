@@ -74,3 +74,53 @@ export function DiasAberto({ dataProblem, data, prefixo = "", sufixo = "em abert
     </span>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// RECICLAGEM DE VIGILANTES
+// Ciclo de 2 anos desde a última reciclagem. Alerta 45 dias antes de vencer.
+// ─────────────────────────────────────────────────────────────
+
+export const RECICLAGEM_ANOS = 2;
+export const RECICLAGEM_ALERTA_DIAS = 45;
+
+// Retorna info da reciclagem a partir da data da última (string "YYYY-MM-DD").
+// { temData, vencimento(Date|null), diasRestantes(int), estado }
+// estado: "sem-data" | "ok" | "alerta" | "vencido"
+export function statusReciclagem(dataUltima) {
+  if (!dataUltima) return { temData: false, vencimento: null, diasRestantes: null, estado: "sem-data" };
+  let base;
+  try {
+    base = new Date(dataUltima + "T12:00:00");
+    if (Number.isNaN(base.getTime())) throw 0;
+  } catch {
+    return { temData: false, vencimento: null, diasRestantes: null, estado: "sem-data" };
+  }
+  const venc = new Date(base);
+  venc.setFullYear(venc.getFullYear() + RECICLAGEM_ANOS);
+  const diasRestantes = Math.floor((venc.getTime() - Date.now()) / 86400000);
+  let estado;
+  if (diasRestantes < 0) estado = "vencido";
+  else if (diasRestantes <= RECICLAGEM_ALERTA_DIAS) estado = "alerta";
+  else estado = "ok";
+  return { temData: true, vencimento: venc, diasRestantes, estado };
+}
+
+// true se o colaborador precisa "piscar" (alerta ou vencido).
+export function reciclagemPisca(dataUltima) {
+  const e = statusReciclagem(dataUltima).estado;
+  return e === "alerta" || e === "vencido";
+}
+
+// true se ALGUM colaborador da lista está em alerta/vencido (para o projeto piscar).
+export function equipeTemReciclagemPendente(colaboradores) {
+  return (colaboradores || []).some(c => reciclagemPisca(c && c.ultimaReciclagem));
+}
+
+// Rótulo curto para exibição.
+export function reciclagemLabel(dataUltima) {
+  const s = statusReciclagem(dataUltima);
+  if (s.estado === "sem-data") return "Reciclagem: sem data";
+  if (s.estado === "vencido") return `Reciclagem VENCIDA há ${Math.abs(s.diasRestantes)}d`;
+  if (s.estado === "alerta") return `Reciclagem vence em ${s.diasRestantes}d`;
+  return `Reciclagem em dia (${s.diasRestantes}d)`;
+}

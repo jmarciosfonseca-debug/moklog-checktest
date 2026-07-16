@@ -31,6 +31,7 @@ const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession } from "./session";
+import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
 
 const ADMIN_PIN = "872101";
 // Sem limite para desligados — ficam todos para consulta
@@ -1335,6 +1336,15 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
 export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted }) {
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | add | edit | view | addHist
+  // Keyframe do "piscar" de reciclagem — injeta uma vez no documento.
+  useEffect(()=>{
+    if(typeof document==="undefined") return;
+    if(document.getElementById("recPiscaKF")) return;
+    const st=document.createElement("style");
+    st.id="recPiscaKF";
+    st.textContent="@keyframes recPiscaAnim{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}50%{box-shadow:0 0 0 3px rgba(239,68,68,.45);}}";
+    document.head.appendChild(st);
+  },[]);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null); // null | "lider" | "admin"
   const [selColab, setSelColab] = useState(null);
   const [form, setForm] = useState(null);
@@ -1746,12 +1756,16 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                   )}
                   <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                     {colabsDoTurno.map(c=>{
+                      const recPisca = reciclagemPisca(c.ultimaReciclagem);
+                      const recEstado = statusReciclagem(c.ultimaReciclagem).estado;
                       const faltas = (c.historico||[]).filter(h=>h.tipo==="Falta").length;
                       const fts    = (c.historico||[]).filter(h=>h.tipo==="FT").length;
                       const mds    = (c.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
                       return (
                         <div key={c.id}
-                          style={{ display:"flex", alignItems:"center", gap:10, background: dark?"#060c18":"#ffffff", borderRadius:10, padding:"10px 12px", cursor:"pointer", border:`2px solid ${modoSel&&selPDF.includes(c.id)?"#7c3aed":tc.border}` }}
+                          style={{ display:"flex", alignItems:"center", gap:10, background: dark?"#060c18":"#ffffff", borderRadius:10, padding:"10px 12px", cursor:"pointer",
+                            border:`2px solid ${modoSel&&selPDF.includes(c.id)?"#7c3aed":recPisca?(recEstado==="vencido"?"#ef4444":"#f59e0b"):tc.border}`,
+                            animation: recPisca ? "recPiscaAnim 1.1s ease-in-out infinite" : "none" }}
                           onClick={()=>{ if(modoSel){ setSelPDF(prev=>prev.includes(c.id)?prev.filter(id=>id!==c.id):[...prev,c.id]); } else { setSelColab(c);setScreen("view"); } }}>
                           {modoSel&&(
                             <div style={{ width:22,height:22,borderRadius:5,border:`2px solid ${selPDF.includes(c.id)?"#7c3aed":"#1e293b"}`,background:selPDF.includes(c.id)?"#7c3aed22":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#a78bfa" }}>
@@ -1765,7 +1779,8 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                             {coberturaAtiva(c) && <div style={{fontSize:9,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"1px 7px",borderRadius:5,display:"inline-block",marginTop:3}}>🔁 Cobrindo Líder até {fmtDate(c.coberturaFim)}</div>}
                             <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
                               {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background:"#001a2e", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
-                              {c.telefone && <span style={{ fontSize:9, color:"#475569", padding:"1px 5px" }}>📱 {c.telefone}</span>}
+                              {c.telefone && <span style={{ fontSize:9, color:"#94a3b8", padding:"1px 5px" }}>📱 {c.telefone}</span>}
+                              {recPisca && <span style={{ fontSize:9, fontWeight:800, color:recEstado==="vencido"?"#ef4444":"#f59e0b", background:(recEstado==="vencido"?"#ef4444":"#f59e0b")+"22", padding:"1px 6px", borderRadius:4 }}>🔄 {reciclagemLabel(c.ultimaReciclagem)}</span>}
                             </div>
                           </div>
                           <div style={{ flexShrink:0, textAlign:"right" }}>

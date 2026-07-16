@@ -14,6 +14,7 @@ const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession } from "./session";
+import { daysSince, DiasAberto } from "./pendencias";
 
 const ADMIN_PIN = "872101";
 const PROJECT_PINS = {
@@ -39,10 +40,7 @@ function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
 }
-function daysSince(d) {
-  if(!d) return 0;
-  try { return Math.floor((Date.now()-new Date(d+"T12:00:00").getTime())/86400000); } catch { return 0; }
-}
+// daysSince agora vem de ./pendencias (fonte canônica de idade de pendências)
 
 async function loadEquip(projectId) {
   try {
@@ -75,10 +73,10 @@ function getStyles(dark) {
     btnSm:   { background:dark?"#020510":"#f8fafc", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#64748b":"#475569", borderRadius:6, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 },
     backBtn: { background:"transparent", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`, color:dark?"#94a3b8":"#64748b", borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 },
     inp:     { width:"100%", background:dark?"#020510":"#ffffff", border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`, borderRadius:7, color:dark?"#e2e8f0":"#1e293b", padding:"10px 12px", fontSize:13, boxSizing:"border-box", outline:"none" },
-    lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
+    lbl:     { display:"block", fontSize:10, color:dark?"#94a3b8":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
     hdrBg:   { background:dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
     txt:     { color:dark?"#f1f5f9":"#0f172a" },
-    txt2:    { color:dark?"#475569":"#64748b" },
+    txt2:    { color:dark?"#94a3b8":"#64748b" },
   };
 }
 
@@ -92,17 +90,7 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── Dias em aberto badge
-function DiasAberto({ dataProblem }) {
-  if(!dataProblem) return null;
-  const dias = daysSince(dataProblem);
-  const color = dias >= 7 ? "#ef4444" : dias >= 3 ? "#f59e0b" : "#64748b";
-  return (
-    <span style={{ fontSize:9, fontWeight:700, color, background:color+"22", padding:"2px 6px", borderRadius:4 }}>
-      {dias}d em aberto
-    </span>
-  );
-}
+// DiasAberto agora vem de ./pendencias (escala unificada: cinza ≤2 · amarelo 3–5 · vermelho 6+)
 
 // ── Status Selector + Justificativa
 function StatusSelector({ value, onChange, tipos, dark }) {
@@ -136,7 +124,7 @@ function StatusSelector({ value, onChange, tipos, dark }) {
           const isSel = value?.status === s;
           return (
             <button key={s} onClick={()=>handleSelect(s)}
-              style={{ background:isSel?cfg.bg:"transparent", border:`2px solid ${isSel?cfg.color:dark?"#0f172a":"#e2e8f0"}`, color:isSel?cfg.color:dark?"#475569":"#94a3b8", borderRadius:7, padding:"6px 12px", fontSize:11, cursor:"pointer", fontWeight:isSel?700:400 }}>
+              style={{ background:isSel?cfg.bg:"transparent", border:`2px solid ${isSel?cfg.color:dark?"#0f172a":"#e2e8f0"}`, color:isSel?cfg.color:dark?"#94a3b8":"#94a3b8", borderRadius:7, padding:"6px 12px", fontSize:11, cursor:"pointer", fontWeight:isSel?700:400 }}>
               {cfg.label}
             </button>
           );
@@ -411,7 +399,7 @@ function NovoItemForm({ tipo, project, onSave, onCancel, dark }) {
             <div style={{display:"flex",gap:6}}>
               {[".38",".380","Outro"].map(c=>(
                 <button key={c} onClick={()=>upd("calibre",c)}
-                  style={{...S.btnSm,flex:1,padding:"8px",color:f.calibre===c?"#0ea5e9":dark?"#475569":"#94a3b8",border:`1px solid ${f.calibre===c?"#0ea5e944":dark?"#0f172a":"#e2e8f0"}`,background:f.calibre===c?dark?"#001a2e":"#e0f2fe":"transparent"}}>
+                  style={{...S.btnSm,flex:1,padding:"8px",color:f.calibre===c?"#0ea5e9":dark?"#94a3b8":"#94a3b8",border:`1px solid ${f.calibre===c?"#0ea5e944":dark?"#0f172a":"#e2e8f0"}`,background:f.calibre===c?dark?"#001a2e":"#e0f2fe":"transparent"}}>
                   {c}
                 </button>
               ))}
@@ -494,7 +482,7 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
           </div>
         </div>
         {adminAuth&&aberto&&<button onClick={(e)=>{e.stopPropagation();setShowForm(true);}} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:11,padding:"6px 12px",flexShrink:0}}>+ Adicionar</button>}
-        <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
+        <span style={{color:dark?"#94a3b8":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
 
       <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
@@ -808,7 +796,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
             ].map(({label,val,color})=>(
               <div key={label} style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
                 <div style={{fontSize:22,fontWeight:900,color}}>{val}</div>
-                <div style={{fontSize:8,...S.txt2,fontWeight:700}}>{label}</div>
+                <div style={{fontSize:10,...S.txt2,fontWeight:700}}>{label}</div>
               </div>
             ))}
           </div>
