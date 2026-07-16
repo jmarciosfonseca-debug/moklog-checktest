@@ -801,7 +801,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
             </div>
             <div>
               <label style={S.lbl}>Última Reciclagem</label>
-              <input type="date" value={form.ultimaReciclagem} onChange={e=>setF("ultimaReciclagem",e.target.value)} style={S.inp}/>
+              <input type="date" min="2000-01-01" max="2100-12-31" value={form.ultimaReciclagem} onChange={e=>setF("ultimaReciclagem",e.target.value)} style={S.inp}/>
             </div>
           </div>
 

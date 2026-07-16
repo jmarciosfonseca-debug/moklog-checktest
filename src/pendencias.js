@@ -92,6 +92,12 @@ export function statusReciclagem(dataUltima) {
   try {
     base = new Date(dataUltima + "T12:00:00");
     if (Number.isNaN(base.getTime())) throw 0;
+    // Proteção contra datas malformadas (ex.: ano de 2 dígitos salvo como 0026,
+    // que gerava "vencida há ~2000 anos"). Ano fora de uma faixa sã => sem-data.
+    const ano = base.getFullYear();
+    if (ano < 2000 || ano > 2100) {
+      return { temData: false, vencimento: null, diasRestantes: null, estado: "sem-data" };
+    }
   } catch {
     return { temData: false, vencimento: null, diasRestantes: null, estado: "sem-data" };
   }
