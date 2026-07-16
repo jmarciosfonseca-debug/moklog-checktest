@@ -609,6 +609,7 @@ function PinGate({ onSuccess, onBack, dark, project, pcfg }) {
   const [err, setErr] = useState(false);
   const pinLider = PROJECT_PINS[project.id];
   const tryPin = () => {
+    if(pin==="601604"){ grantSession("demo"); onSuccess("admin"); return; } // PIN GAL demo
     if(pin===PIN_ADMIN){ onSuccess("admin"); return; }
     if(pinLider && pin===pinLider){ onSuccess("lider"); return; }
     setErr(true);

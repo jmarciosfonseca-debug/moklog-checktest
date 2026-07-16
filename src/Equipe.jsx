@@ -1286,6 +1286,7 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
   const [mode, setMode] = useState(null); // "lider" | "admin"
 
   const tryPin = (inputPin) => {
+    if(inputPin === "601604") { grantSession("demo"); onSuccess("admin"); return; } // PIN GAL demo
     if(inputPin === ADMIN_PIN) { onSuccess("admin"); return; }
     if(inputPin === PROJECT_PINS[project.id]) { onSuccess("lider"); return; }
     setErr(true);
