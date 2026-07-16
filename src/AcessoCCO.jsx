@@ -46,9 +46,17 @@ const TEMAS_BASE = [
 ];
 const TEMAS = TEMAS_BASE; // mantém compatibilidade com o resto do arquivo (TemaForm, dots etc.)
 // ◀ NOVO — Bodycam: só faz sentido no P311A (o P311B já é automático)
-function temasDoProjeto(projectId){
-  if(projectId==="P311A") return [...TEMAS_BASE, { key:"bodycam", label:"Bodycam", icon:"🎬", color:"#dc2626" }];
-  return TEMAS_BASE;
+function temasDoProjeto(projectId, abasPermitidas){
+  let base;
+  if(projectId==="P311A") base = [...TEMAS_BASE, { key:"bodycam", label:"Bodycam", icon:"🎬", color:"#dc2626" }];
+  else base = TEMAS_BASE;
+  // Filtro opcional: mostra apenas as abas cujas chaves estão em abasPermitidas.
+  // Sem filtro (null/undefined) => todas, comportamento original preservado.
+  if(Array.isArray(abasPermitidas) && abasPermitidas.length){
+    const set = new Set(abasPermitidas);
+    return base.filter(t=>set.has(t.key));
+  }
+  return base;
 }
 
 const STATUS_MANUT = [
@@ -660,10 +668,13 @@ function validarForm(tema, form) {
 // ════════════════════════════════════════════════════════════════════════
 // MÓDULO PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════
-export default function AcessoCCO({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
+export default function AcessoCCO({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted, abasPermitidas }) {
   const S = getStyles(dark||true);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
-  const [tema, setTema] = useState("acesso");
+  const [tema, setTema] = useState(()=>{
+    const permitidas = temasDoProjeto(project?.id, abasPermitidas);
+    return permitidas.length ? permitidas[0].key : "acesso";
+  });
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | form
   const [showArquivados, setShowArquivados] = useState(false);
 
@@ -775,7 +786,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const TabBar = () => (
     <div style={{display:"flex",flexWrap:"wrap",gap:6,padding:"0 16px 12px"}}>
       <style>{`@keyframes ccoDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}`}</style>
-      {temasDoProjeto(project?.id).map(t=>{
+      {temasDoProjeto(project?.id, abasPermitidas).map(t=>{
         const sel = tema===t.key;
         const dot = dots[t.key];
         return (
