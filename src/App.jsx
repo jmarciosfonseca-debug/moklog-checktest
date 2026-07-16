@@ -11,7 +11,7 @@ import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
-import { grantSession, getAccess, hasGerencial, touchSession } from "./session";
+import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin } from "./session";
 import CCO from "./CCO";
 import Iluminacao from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -141,7 +141,8 @@ function SafeBlock({ name, children }) {
   );
 }
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { setDoc } from "./fireGuard";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
@@ -149,6 +150,7 @@ const EMAILJS_TEMPLATE_ID = "template_dhncs7j";
 const EMAILJS_PUBLIC_KEY  = "qnGBgZu7xNKnavJb7";
 
 async function sendEmailJS(subject, message, fromName) {
+  if (isDemo()) { console.log("🎭 demo: e-mail não enviado"); return true; } // demo: simula envio
   try {
     await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
@@ -1074,7 +1076,7 @@ function ProjectPinGate({project, onSuccess, onBack}) {
   const [err, setErr] = useState(false);
   const correct = PROJECT_PINS[project.id];
   // PIN do projeto entra como líder; PIN master (gerencial) entra como admin em qualquer projeto
-  const try_ = () => { if(pin===correct) onSuccess("lider"); else if(pin===ADMIN_PIN) onSuccess("admin"); else setErr(true); };
+  const try_ = () => { const lv = checkPin(pin, { projectPin: correct, projectId: project?.id }); if(lv) onSuccess(lv==="lider"?"lider":lv==="demo"?"demo":"admin"); else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
@@ -1328,10 +1330,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(pin===ADMIN_PIN){grantSession("admin");setAuth(true);resetSess();}else setErr(true);}}}
+          onKeyDown={e=>{if(e.key==="Enter"){if(checkPin(pin,{})){setAuth(true);resetSess();}else setErr(true);}}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {err&&<div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(pin===ADMIN_PIN){grantSession("admin");setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
+        <button onClick={()=>{if(checkPin(pin,{})){setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
         <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}} aria-label="Voltar">← Voltar</button>
       </div>
     </div>
@@ -2230,7 +2232,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial para ver todos os projetos</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
             onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){if(equipPinInput==="872101"){grantSession("admin");setEquipPinAuth(true);}else setEquipPinErr(true);}}}
+            onKeyDown={e=>{if(e.key==="Enter"){if(checkPin(equipPinInput,{})){setEquipPinAuth(true);}else setEquipPinErr(true);}}}
             style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
           {equipPinErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
           <div style={{display:"flex",gap:8}}>
@@ -2238,7 +2240,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{if(equipPinInput==="872101"){grantSession("admin");setEquipPinAuth(true);}else setEquipPinErr(true);}}
+            <button onClick={()=>{if(checkPin(equipPinInput,{})){setEquipPinAuth(true);}else setEquipPinErr(true);}}
               style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
               Entrar
             </button>
@@ -2263,7 +2265,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial para ver os colaboradores</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
             onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
-            onKeyDown={e=>{ if(e.key==="Enter"){ if(pinInput==="872101"){grantSession("admin");setPinAuth(true);}else setPinErr(true); } }}
+            onKeyDown={e=>{ if(e.key==="Enter"){ if(checkPin(pinInput,{})){setPinAuth(true);}else setPinErr(true); } }}
             style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
           {pinErr && <div role="alert" style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
           <div style={{ display:"flex", gap:8 }}>
@@ -2271,7 +2273,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{ if(pinInput==="872101"){grantSession("admin");setPinAuth(true);}else setPinErr(true); }}
+            <button onClick={()=>{ if(checkPin(pinInput,{})){setPinAuth(true);}else setPinErr(true); }}
               style={{ flex:1, background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
               Entrar
             </button>
@@ -2595,6 +2597,20 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DemoBanner(){
+  if(!isDemo()) return null;
+  return (
+    <div style={{
+      position:"fixed", top:0, left:0, right:0, zIndex:9999,
+      background:"linear-gradient(90deg,#7c3aed,#a855f7)", color:"#fff",
+      textAlign:"center", fontSize:12, fontWeight:800, letterSpacing:.3,
+      padding:"7px 10px", boxShadow:"0 2px 8px rgba(0,0,0,.4)",
+    }}>
+      🎭 MODO DEMONSTRAÇÃO — nenhuma alteração será salva
     </div>
   );
 }
@@ -3253,7 +3269,7 @@ export default function App(){
           </div>
         </div>
       )}
-      <SyncBadge/>
+      <SyncBadge/><DemoBanner/>
       {firestoreDown && (
         <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:10}}>
           <span style={{fontSize:18}}>🚫</span>
@@ -3392,7 +3408,7 @@ export default function App(){
   // ── HOME — Jatinox subscreen
   if(homeGroup==="jatinox") return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
-      <SyncBadge/>
+      <SyncBadge/><DemoBanner/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
           <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
@@ -3477,7 +3493,7 @@ export default function App(){
     const color = groupColors[homeGroup];
     return (
       <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
-        <SyncBadge/>
+        <SyncBadge/><DemoBanner/>
         <div style={S.homeWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
             <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
@@ -3623,7 +3639,7 @@ export default function App(){
           <span style={{fontSize:12,color:"#fff",fontWeight:700}}>Servidor não está respondendo — o que for salvo agora pode ficar só neste aparelho. Avise o suporte técnico.</span>
         </div>
       )}
-      <SyncBadge/>
+      <SyncBadge/><DemoBanner/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
           <MoklogLogo size={52}/>
