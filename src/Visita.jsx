@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { setDoc } from "./fireGuard";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",

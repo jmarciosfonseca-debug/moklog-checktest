@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { setDoc } from "./fireGuard";
 import RondaVirtual from "./RondaVirtual"; // ◀ NOVO — aba de ronda virtual CFTV
 import TempoGravacao from "./TempoGravacao"; // ◀ aba CFTV Tempo de Gravação
 import BodycamSection from "./BodycamSection"; // ◀ NOVO — descarregamento de bodycam (P311A)

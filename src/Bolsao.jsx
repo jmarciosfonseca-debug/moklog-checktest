@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { setDoc } from "./fireGuard";
 import { SEED_P311B_JUN2026 } from "./BolsaoSeedP311B";
 
 const firebaseConfig = {
