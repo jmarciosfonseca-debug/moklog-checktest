@@ -86,7 +86,13 @@ function ehFimDeSemana(dataISO){ const w=diaDaSemana(dataISO); return w===0||w==
 // Regra de abertura do turno diurno:
 //  - P311A / P311B: SOMENTE domingo OU feriado (sábado comum não abre mais).
 //  - Demais projetos: sábado, domingo OU feriado (regra original, inalterada).
-function podeAbrirDiurno(dataISO, projectId){
+// Projetos onde FOLGUISTA pode abrir o diurno em qualquer dia (cobre folgas
+// nos dois turnos). Para os demais colaboradores, a regra de FDS/feriado vale.
+const DIURNO_LIVRE_FOLGUISTA = ["P260A"];
+
+function podeAbrirDiurno(dataISO, projectId, ehFolguista){
+  // Exceção: folguista em projeto liberado abre diurno qualquer dia.
+  if(ehFolguista && DIURNO_LIVRE_FOLGUISTA.includes(projectId)) return true;
   const feriado = ehFeriado(dataISO, PROJETO_UF[projectId]||"SP");
   if(temGradeEspecial(projectId)){
     return ehDomingo(dataISO) || feriado;
@@ -180,6 +186,12 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [tick, setTick] = useState(0); // força recálculo do relógio
   const [novoTipo, setNovoTipo] = useState("noturno");
   const [novoPlant, setNovoPlant] = useState("");
+  // Folguista selecionado? (libera diurno em qualquer dia nos projetos elegíveis)
+  const colabSel = equipe.find(c=>String(c.id)===String(novoPlant));
+  const selEhFolguista = !!colabSel && (
+    (colabSel.cargo||"").toLowerCase().includes("folg") ||
+    (colabSel.turno||"").toLowerCase().includes("folg")
+  );
   const [abrindo, setAbrindo] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erroSalvar, setErroSalvar] = useState(false);
@@ -242,7 +254,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       return;
     }
     // Trava de calendário: diurno só abre em dia válido (regra varia por projeto).
-    if(novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id)){
+    if(novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id, selEhFolguista)){
       const msg = temGradeEspecial(project.id)
         ? "O turno diurno só pode ser aberto no domingo ou em feriado.\nHoje não é um dia válido para ronda diurna neste projeto. O turno noturno está disponível todos os dias."
         : "O turno diurno só pode ser aberto em sábados, domingos e feriados.\nHoje não é um dia válido para ronda diurna neste projeto. O turno noturno está disponível todos os dias.";
@@ -369,12 +381,12 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
             {equipe.map(c=>(<option key={c.id} value={c.id}>{c.nome}{c.cargo?` — ${c.cargo}`:""}{c.turno?` · ${c.turno}`:""}</option>))}
           </select>
           {equipe.length===0 && <div style={{fontSize:11,color:"#ef4444",marginBottom:8}}>Nenhum colaborador em equipes/{"{projeto}"}. Cadastre a equipe primeiro.</div>}
-          {novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id) && (
+          {novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id, selEhFolguista) && (
             <div style={{fontSize:11,color:"#f59e0b",marginBottom:8,background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:7,padding:"7px 9px"}}>
               📅 Turno diurno indisponível hoje. {temGradeEspecial(project.id)?"Só abre no domingo ou em feriado.":"Só abre em sábados, domingos e feriados."} O turno noturno está disponível todos os dias.
             </div>
           )}
-          {(()=>{ const bloqueado = novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id);
+          {(()=>{ const bloqueado = novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id, selEhFolguista);
             return (
               <button onClick={abrirTurno} disabled={abrindo||bloqueado}
                 style={{...S.btn,opacity:(abrindo||bloqueado)?0.5:1,cursor:bloqueado?"not-allowed":"pointer"}}>
@@ -422,7 +434,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           <div style={{flex:1,minWidth:0}}>
             <TurnoCard turno={t} projectId={project.id} dark={dark} S={S} adminAuth={adminAuth} tick={tick}
               onUpd={updTurno} onArquivar={()=>arquivarTurno(t.id)} onDesarquivar={()=>desarquivarTurno(t.id)}
-              onExcluir={()=>{ if(window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
+              onExcluir={(jaConfirmado)=>{ if(jaConfirmado===true || window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
               onPDF={()=>gerarPDFRonda(project, t)}/>
           </div>
         </div>
@@ -469,6 +481,11 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquiv
                  + linhas.filter(l=>l.st==="feita_atrasada" && !(l.reg&&(l.reg.justificativa||"").trim())).length;
 
   // Conclui/arquiva o turno SOMENTE se todas as rondas não realizadas estiverem justificadas.
+  // Turno "vazio": nenhuma ronda foi registrada ainda. Nesse caso qualquer
+  // usuário pode CANCELAR (abertura por engano — ex.: turno/plantonista errado),
+  // sem precisar de PIN gerencial e sem exigir justificativas.
+  const turnoVazio = !Object.values(turno.rondas||{}).some(r=>r && (r.status || r.hora || r.obs));
+
   const tentarArquivar = () => {
     if(naoRealizadasSemJust>0){
       alert(`Favor justificar as rondas não realizadas.\n\nHá ${naoRealizadasSemJust} ronda(s) não executada(s) sem justificativa. Preencha o motivo antes de concluir e arquivar o turno.`);
@@ -543,6 +560,10 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquiv
             {!turno.arquivado
               ? <button onClick={tentarArquivar} style={{...S.btnSm,color:naoRealizadasSemJust>0?"#94a3b8":"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,opacity:naoRealizadasSemJust>0?0.6:1}}>📦 Concluir e arquivar</button>
               : <button onClick={onDesarquivar} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>↩ Desarquivar</button>}
+            {!turno.arquivado && turnoVazio && (
+              <button onClick={()=>{ if(window.confirm(`Cancelar este turno?\n\n${turno.plantonista?.nome||"—"} · ${RONDA_TURNOS[turno.tipo]?.label||turno.tipo}\n\nNenhuma ronda foi registrada. O turno será removido e você poderá abrir outro.`)) onExcluir(true); }}
+                style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44"}}>✕ Cancelar turno</button>
+            )}
             {adminAuth && <button onClick={onExcluir} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433"}}>🗑 Excluir</button>}
           </div>
         </div>
