@@ -635,6 +635,8 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                   <span style={{fontSize:10.5,fontWeight:700,padding:"4px 9px",borderRadius:999,letterSpacing:.4,flexShrink:0,
                     background:ev.turno==="Diurno"?"rgba(245,185,66,.12)":"rgba(139,124,246,.14)",
                     color:ev.turno==="Diurno"?COR.amber:COR.purple}}>{ev.turno}</span>
+                  <button title="Baixar relatório" onClick={(e)=>{e.stopPropagation();gerarPdfEvento(project,data.config,ev);}}
+                    style={{flexShrink:0,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,borderRadius:9,padding:"6px 9px",fontSize:14,cursor:"pointer",color:COR.purple}}>📄</button>
                 </div>
               );
             })}
