@@ -13,7 +13,7 @@
 //   • Múltiplos envolvidos, placa de carro/moto e selo de reincidência.
 //   • Fotos em galeria única com legenda (local + CFTV juntas).
 
-import { getNatureza, getSubtipo, sevLabel, RS_STATUS } from "./rsCatalogo";
+import { getNatureza, getSubtipo, sevLabel, RS_STATUS, FLAGS } from "./rsCatalogo";
 
 // ── Paleta Moked ──────────────────────────────────────────────
 const MOKED = {
@@ -176,8 +176,15 @@ function buildRSCard(project, registro) {
   if (evs[0]?.documento) push("Documento (CPF)", mascararDoc(evs[0].documento));
   if (registro?.telefoneEnvolvido) push("Telefone", mascararTelefone(registro.telefoneEnvolvido));
   push("Transportadora / Inquilino", registro?.transportadora || registro?.inquilino);
-  const placas = [registro?.placaCavalo, registro?.placaCarreta, registro?.placaVeiculo].filter(Boolean);
-  if (placas.length) push("Placa do Veículo", placas.join(" / "));
+  // Veículos: formato novo (veiculos[]) com tipo, ou legado (placas soltas).
+  const veics = (registro?.veiculos && registro.veiculos.length)
+    ? registro.veiculos.filter(v => v && v.placa)
+    : [registro?.placaCavalo, registro?.placaCarreta, registro?.placaVeiculo]
+        .filter(Boolean).map(p => ({ placa: p, tipo: "" }));
+  if (veics.length) {
+    const txt = veics.map(v => v.tipo ? `${v.placa} (${v.tipo})` : v.placa).join(" · ");
+    push("Veículo(s)", txt);
+  }
   push("Local do Evento", registro?.local);
 
   const infoHtml = info.map(([l, v]) =>
@@ -241,6 +248,18 @@ function buildRSCard(project, registro) {
     ${registro?.medidas ? `<div class="section-title">Medidas Imediatas Adotadas</div><div class="medidas">${esc(registro.medidas)}</div>` : ""}
 
     ${registro?.observacao ? `<div class="section-title">Observações de Inteligência / CFTV</div><div class="detalhe">${esc(registro.observacao)}</div>` : ""}
+
+    ${(() => {
+      const fl = Array.isArray(registro?.flags) ? registro.flags : [];
+      if (!fl.length) return "";
+      const descs = registro?.flagDescs || {};
+      const labelDe = (k) => (FLAGS.find(f => f.key === k)?.label) || k;
+      const linhas = fl.map(k => {
+        const d = (descs[k] || "").trim();
+        return `<div style="padding:4px 0;font-size:13px;color:#1e293b"><b>• ${esc(labelDe(k))}</b>${d ? ` — ${esc(d)}` : ""}</div>`;
+      }).join("");
+      return `<div class="section-title">Classificação Secundária</div><div class="detalhe">${linhas}</div>`;
+    })()}
 
     ${galeriaHtml}
   </div>`;

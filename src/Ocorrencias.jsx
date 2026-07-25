@@ -122,6 +122,7 @@ function emptyForm() {
     telefoneEnvolvido: "",
     transportadora: "",
     inquilino: "",
+    veiculos: [{ placa:"", tipo:"" }],
     placaCavalo: "",
     placaCarreta: "",
     placaVeiculo: "",
@@ -133,6 +134,7 @@ function emptyForm() {
     medidas: "",
     observacao: "",
     flags: [],              // array de keys de FLAGS
+    flagDescs: {},          // descrição opcional por flag marcada { key: texto }
     fotos: [],              // [{ origem:"local"|"cftv", legenda, dataUrl }]
     status: RS_STATUS.PENDENTE,
   };
@@ -197,8 +199,9 @@ function normNome(v){
 function normDoc(v){ return String(v||"").replace(/\D/g,""); }
 function normPlaca(v){ return String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
 function placasDe(o){
-  return [o&&o.placaCavalo, o&&o.placaCarreta, o&&o.placaVeiculo]
-    .map(normPlaca).filter(Boolean);
+  const legadas = [o&&o.placaCavalo, o&&o.placaCarreta, o&&o.placaVeiculo];
+  const novas = (o && Array.isArray(o.veiculos)) ? o.veiculos.map(v=>v&&v.placa) : [];
+  return [...legadas, ...novas].map(normPlaca).filter(Boolean);
 }
 // ── Envio por e-mail (Outlook web). Corpo em texto cru (uso interno). ──
 function corpoEmailRS(project, r){
@@ -259,6 +262,22 @@ function enviarRSOutlook(project, r){
   const body = encodeURIComponent(corpoEmailRS(project, r));
   const url = "https://outlook.office.com/mail/deeplink/compose?subject=" + subject + "&body=" + body;
   try { window.open(url, "_blank"); } catch(e){ alert("Nao foi possivel abrir o Outlook."); }
+}
+
+// ── Veículos: tipos + migração dos campos legados de placa ──
+const TIPOS_VEICULO = ["Moto","Automóvel","Van","Ônibus","Caminhão","Carreta"];
+function migrarVeiculos(o){
+  if(o && Array.isArray(o.veiculos) && o.veiculos.length) return o.veiculos;
+  const vs = [];
+  if(o){
+    if(o.placaCavalo)  vs.push({ placa:o.placaCavalo,  tipo:"Caminhão" });
+    if(o.placaCarreta) vs.push({ placa:o.placaCarreta, tipo:"Carreta" });
+    if(o.placaVeiculo) vs.push({ placa:o.placaVeiculo, tipo:"Automóvel" });
+  }
+  return vs.length ? vs : [{ placa:"", tipo:"" }];
+}
+function placasDeVeiculos(o){
+  return migrarVeiculos(o).map(v=>v&&v.placa).filter(Boolean);
 }
 
 function migrarEnvolvidos(o){
@@ -419,6 +438,14 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const [reincIgnorada, setReincIgnorada] = useState(false);
   const [temRascunho, setTemRascunho] = useState(false);
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
+  const addVeiculo = () => setForm(f=>({...f, veiculos:[...(f.veiculos||[]), { placa:"", tipo:"" }]}));
+  const removeVeiculo = (idx) => setForm(f=>{
+    const arr=(f.veiculos||[]).filter((_,i)=>i!==idx);
+    return {...f, veiculos: arr.length? arr : [{ placa:"", tipo:"" }]};
+  });
+  const setVeiculo = (idx,campo,val) => setForm(f=>({
+    ...f, veiculos:(f.veiculos||[]).map((v,i)=>i===idx?{...v,[campo]:val}:v)
+  }));
   const addEnvolvido = () => setForm(f=>({...f, envolvidos:[...(f.envolvidos||[]), { nome:"", documento:"" }]}));
   const removeEnvolvido = (idx) => setForm(f=>{
     const arr=(f.envolvidos||[]).filter((_,i)=>i!==idx);
@@ -456,7 +483,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const retomarRascunho = () => {
     try {
       const raw = localStorage.getItem(`rs_rascunho_${project.id}`);
-      if(raw){ const p=JSON.parse(raw); p.envolvidos=migrarEnvolvidos(p); setForm(p); setReincIgnorada(false); }
+      if(raw){ const p=JSON.parse(raw); p.envolvidos=migrarEnvolvidos(p); p.veiculos=migrarVeiculos(p); setForm(p); setReincIgnorada(false); }
     } catch(e){ alert("Rascunho corrompido; descarte e refaça."); }
   };
   const descartarRascunho = () => {
@@ -483,9 +510,25 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
 
   // Gera o rascunho assistido do detalhamento a partir do modelo do subtipo
   const gerarRascunho = () => {
-    if(!form.subtipo) { alert("Selecione o subtipo primeiro."); return; }
-    const texto = montarRascunho(form.subtipo, formParaCatalogo(form));
-    setF("detalhamento", texto || "");
+    // Abertura factual PADRAO: hora + motorista + placa + transportadora + inquilino.
+    // O lider continua a descricao a partir daqui.
+    const hora = horaDe(form.dataHora);
+    const placa = placasDeVeiculos(form).join("/");
+    let ab = "Informo que";
+    if(hora) ab += ", às " + hora + ",";
+    ab += " o motorista";
+    if(placa) ab += ", conduzindo o veículo de placa " + placa;
+    const compl = [];
+    if(form.transportadora) compl.push("da transportadora " + form.transportadora);
+    if(form.inquilino) compl.push("inquilino " + form.inquilino);
+    if(compl.length) ab += " " + (placa ? "" : "") + "(" + compl.join(", ") + ")";
+    ab += ", ";
+    // Preenche apenas a abertura; o cursor do lider continua a frase.
+    const atual = (form.detalhamento||"").trim();
+    if(atual && !atual.startsWith("Informo que")){
+      if(!window.confirm("Já há texto no detalhamento. Substituir pela abertura padrão?")) return;
+    }
+    setF("detalhamento", ab);
   };
 
   // Fotos: lê arquivos como dataURL e adiciona à galeria
@@ -505,6 +548,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const toggleFlag = (key) => setForm(f=>({
     ...f, flags: f.flags.includes(key) ? f.flags.filter(x=>x!==key) : [...f.flags, key]
   }));
+  const setFlagDesc = (key, val) => setForm(f=>({ ...f, flagDescs: { ...(f.flagDescs||{}), [key]: val } }));
 
   // Salvar novo registro (merge por id)
   const salvar = async () => {
@@ -514,9 +558,21 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     try {
       const envs = (form.envolvidos||[]).filter(e=>e && (e.nome||e.documento));
       const primeiro = envs[0] || { nome:"", documento:"" };
+      const vecs = (form.veiculos||[]).filter(v=>v && v.placa);
+      // Sincroniza campos legados de placa a partir dos veiculos (mantem PDF/reincidencia legados).
+      const vCaminhao = vecs.find(v=>v.tipo==="Caminhão");
+      const vCarreta  = vecs.find(v=>v.tipo==="Carreta");
+      const vLeve     = vecs.find(v=>["Moto","Automóvel","Van","Ônibus"].includes(v.tipo));
+      const legCavalo  = vCaminhao ? vCaminhao.placa : (!vLeve && vecs[0] ? vecs[0].placa : "");
+      const legCarreta = vCarreta ? vCarreta.placa : "";
+      const legVeiculo = vLeve ? vLeve.placa : "";
       const novo = {
         ...form,
         envolvidos: envs,
+        veiculos: vecs,
+        placaCavalo: legCavalo,
+        placaCarreta: legCarreta,
+        placaVeiculo: legVeiculo,
         nomeEnvolvido: primeiro.nome || "",
         documentoEnvolvido: primeiro.documento || "",
         id: form.id || `${project.id}-${Date.now()}`,
@@ -537,7 +593,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   };
 
   const abrirEdicaoTextos = (r) => {
-    setForm({ ...r, envolvidos: migrarEnvolvidos(r) });
+    setForm({ ...r, envolvidos: migrarEnvolvidos(r), veiculos: migrarVeiculos(r) });
     setScreen("editar");
   };
   const cancelarEdicao = () => { setForm(emptyForm()); setScreen("historico"); };
@@ -793,21 +849,33 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             )}
           </div>
 
-          {/* Transportadora / placas */}
+          {/* Transportadora / veiculos */}
           <div style={S.card}>
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
+            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10}}>
               <div><label style={S.lbl}>Transportadora</label>
                 <input value={form.transportadora} onChange={e=>setF("transportadora",e.target.value)} style={S.inp}/></div>
               <div><label style={S.lbl}>Inquilino</label>
                 <input value={form.inquilino} onChange={e=>setF("inquilino",e.target.value)} style={S.inp}/></div>
-              <div><label style={S.lbl}>Placa cavalo</label>
-                <input value={form.placaCavalo} onChange={e=>setF("placaCavalo",e.target.value.toUpperCase())} style={S.inp}/></div>
-              <div><label style={S.lbl}>Placa carreta</label>
-                <input value={form.placaCarreta} onChange={e=>setF("placaCarreta",e.target.value.toUpperCase())} style={S.inp}/></div>
-              <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Placa (carro / moto)</label>
-                <input placeholder="Para veículos sem carreta" value={form.placaVeiculo||""}
-                  onChange={e=>setF("placaVeiculo",e.target.value.toUpperCase())} style={S.inp}/></div>
             </div>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
+              <label style={{...S.lbl, marginBottom:0}}>Veículo(s)</label>
+              <button onClick={addVeiculo} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}>➕ Adicionar</button>
+            </div>
+            {(form.veiculos||[]).map((v,idx)=>(
+              <div key={idx} style={{display:"flex", gap:6, alignItems:"center", marginBottom:8}}>
+                <input placeholder="Placa" value={v.placa}
+                  onChange={e=>setVeiculo(idx,"placa",e.target.value.toUpperCase())}
+                  style={{...S.inp, flex:1}}/>
+                <select value={v.tipo} onChange={e=>setVeiculo(idx,"tipo",e.target.value)}
+                  style={{...S.inp, flex:1}}>
+                  <option value="">Tipo...</option>
+                  {TIPOS_VEICULO.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+                {form.veiculos.length>1 && (
+                  <button onClick={()=>removeVeiculo(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}>🗑</button>
+                )}
+              </div>
+            ))}
           </div>
 
           {/* Resumo */}
@@ -843,10 +911,18 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             <label style={S.lbl}>Classificação secundária</label>
             <div style={{display:"flex", flexDirection:"column", gap:6}}>
               {FLAGS.map(fl=>(
-                <label key={fl.key} style={{display:"flex", alignItems:"center", gap:8, fontSize:13, ...S.txt, cursor:"pointer"}}>
-                  <input type="checkbox" checked={form.flags.includes(fl.key)} onChange={()=>toggleFlag(fl.key)}/>
-                  {fl.label}
-                </label>
+                <div key={fl.key}>
+                  <label style={{display:"flex", alignItems:"center", gap:8, fontSize:13, ...S.txt, cursor:"pointer"}}>
+                    <input type="checkbox" checked={form.flags.includes(fl.key)} onChange={()=>toggleFlag(fl.key)}/>
+                    {fl.label}
+                  </label>
+                  {form.flags.includes(fl.key) && (
+                    <textarea rows={2} placeholder="Descreva (opcional)"
+                      value={(form.flagDescs||{})[fl.key] || ""}
+                      onChange={e=>setFlagDesc(fl.key, e.target.value)}
+                      style={{...S.inp, marginTop:6, marginBottom:4, resize:"vertical", fontSize:13}}/>
+                  )}
+                </div>
               ))}
             </div>
           </div>
