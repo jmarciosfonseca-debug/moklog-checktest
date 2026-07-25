@@ -204,36 +204,49 @@ function placasDe(o){
 function corpoEmailRS(project, r){
   const nat = getNatureza(r.natureza), sub = getSubtipo(r.subtipo);
   const sev = r.severidade || (sub && sub.sevPadrao) || "info";
+  const sevMap = { info:"INFORMATIVO / BAIXA", atencao:"ATENCAO / MEDIA", critico:"CRITICO / ALTA" };
+  const idtxt = r.id || ((project && project.id) || "RS");
   const L = [];
-  L.push("REGISTRO SITUACIONAL (RS)");
-  if(project && project.name) L.push(project.id + " - " + project.name);
+  L.push("MOKED SECURITY CONSULTING");
+  L.push("RELATORIO SITUACIONAL (RS)");
+  L.push("========================================");
+  if(project) L.push((project.id||"") + " - " + (project.name||""));
+  L.push("RS No: " + idtxt + "   |   Data: " + fmtDataHoraBR(r.dataHora || r.registradoEm));
+  L.push("Consultor: Jose Fonseca");
   L.push("");
+  L.push("CLASSIFICACAO");
   L.push("Natureza: " + ((nat && nat.label) || r.natureza || "-"));
-  L.push("Tipo: " + ((sub && sub.label) || r.subtipo || "-"));
-  L.push("Severidade: " + sevLabel(sev));
-  L.push("Data/hora: " + fmtDataHoraBR(r.dataHora || r.registradoEm));
+  L.push("Ocorrencia: " + ((sub && sub.label) || r.subtipo || "-"));
+  L.push("Severidade: " + (sevMap[sev] || sevLabel(sev)));
+  if(r.reincidente) L.push("** REINCIDENTE - vinculado a " + ((r.reincidenteDe||[]).length) + " RS anterior(es) **");
+  L.push("");
+  L.push("DADOS DA OCORRENCIA");
+  L.push("Data / Hora: " + fmtDataHoraBR(r.dataHora || r.registradoEm));
   if(r.horaFim) L.push("Normalizacao: " + r.horaFim);
-  if(r.local) L.push("Local: " + r.local);
-  if(r.lider) L.push("Lider: " + r.lider);
-  if(r.quemAvisou) L.push("Quem avisou: " + r.quemAvisou);
-  if(r.reincidente) L.push("** REINCIDENTE (" + ((r.reincidenteDe||[]).length) + " RS anterior(es)) **");
+  if(r.lider) L.push("Lider Operacional: " + r.lider);
+  if(r.quemAvisou) L.push("Origem do Alerta: " + r.quemAvisou);
+  if(r.quemAvisado) L.push("Comunicado a: " + r.quemAvisado);
   const evs = (r.envolvidos && r.envolvidos.length) ? r.envolvidos
     : (r.nomeEnvolvido || r.documentoEnvolvido ? [{nome:r.nomeEnvolvido, documento:r.documentoEnvolvido}] : []);
   if(evs.length){
-    L.push(""); L.push("Envolvido(s):");
-    evs.forEach((ev,i)=>{ const p=[]; if(ev.nome)p.push(ev.nome); if(ev.documento)p.push("doc "+ev.documento); if(p.length)L.push("  "+(i+1)+". "+p.join(" - ")); });
+    L.push("Envolvido(s):");
+    evs.forEach((ev,i)=>{ const p=[]; if(ev.nome)p.push(ev.nome); if(ev.documento)p.push("CPF/CNPJ "+ev.documento); if(p.length)L.push("   " + (i+1) + ". " + p.join(" - ")); });
   }
-  if(r.telefoneEnvolvido) L.push("Contato: " + r.telefoneEnvolvido);
+  if(r.telefoneEnvolvido) L.push("Telefone: " + r.telefoneEnvolvido);
+  if(r.transportadora || r.inquilino) L.push("Transportadora / Inquilino: " + (r.transportadora || r.inquilino));
   const placas = [r.placaCavalo, r.placaCarreta, r.placaVeiculo].filter(Boolean);
-  if(r.transportadora) L.push("Transportadora: " + r.transportadora);
-  if(placas.length) L.push("Placa(s): " + placas.join(" / "));
-  if(r.resumo){ L.push(""); L.push("Resumo: " + r.resumo); }
-  if(r.detalhamento){ L.push(""); L.push("Detalhamento:"); L.push(r.detalhamento); }
-  if(r.medidas){ L.push(""); L.push("Medidas tomadas:"); L.push(r.medidas); }
-  if(r.observacao){ L.push(""); L.push("Observacao: " + r.observacao); }
+  if(placas.length) L.push("Placa do Veiculo: " + placas.join(" / "));
+  if(r.local) L.push("Local do Evento: " + r.local);
+  if(r.resumo){ L.push(""); L.push("RESUMO DO EVENTO"); L.push(r.resumo); }
+  if(r.detalhamento){ L.push(""); L.push("DETALHAMENTO OPERACIONAL"); L.push(r.detalhamento); }
+  if(r.medidas){ L.push(""); L.push("MEDIDAS IMEDIATAS ADOTADAS"); L.push(r.medidas); }
+  if(r.observacao){ L.push(""); L.push("OBSERVACOES DE INTELIGENCIA / CFTV"); L.push(r.observacao); }
   const nFotos = (r.fotos||[]).length;
-  if(nFotos) L.push("\n" + nFotos + " foto(s) no registro - baixe o PDF e anexe se necessario.");
-  L.push(""); L.push("-- Gerado pelo MokLog CheckTest");
+  if(nFotos){ L.push(""); L.push(nFotos + " evidencia(s) fotografica(s) no registro - baixe o PDF e anexe a este e-mail."); }
+  L.push("");
+  L.push("----------------------------------------");
+  L.push("MOKED SECURITY CONSULTING - Documento de Uso Interno e Confidencial");
+  L.push("Gerado pelo MokLog CheckTest");
   return L.join("\n");
 }
 function assuntoEmailRS(project, r){
