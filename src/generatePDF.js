@@ -155,7 +155,7 @@ function getWeekLabel(dateStr) {
   } catch { return ""; }
 }
 
-function getTheme(projectId) {
+export function getTheme(projectId) {
   return THEMES[projectId] || THEMES["P601"];
 }
 
