@@ -385,14 +385,15 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
 function vetorCTMK(ctmk) {
   if (!ctmk?.ok || !ctmk.offline) return null;
   const dias = ctmk.dias;
-  let nivel = nivelPorDias(dias);
-  if (dias != null && dias > REGUA.preponderanteMinDias && nivel < NIVEIS.ELEVADO) nivel = NIVEIS.ELEVADO;
+  // CTMK é a central de câmera Moked. Offline = perda de cobertura de imagem =
+  // vetor CRÍTICO por definição (peso máximo, como pânico/perímetro), independente dos dias.
+  const nivel = NIVEIS.CRITICO;
   return {
-    chave: "ctmk", label: "CTMK — câmera de contexto", nivel, preponderante: true,
+    chave: "ctmk", label: "CTMK — central de câmera Moked", nivel, preponderante: true,
     piorDias: dias, qtd: 1,
     fonteCredito: "Monitor CTMK · painel",
     sinceTxt: ctmk.desde ? `off-line desde ${fmtDate(ctmk.desde)}` : null,
-    descricao: `Câmera de contexto <b>off-line ${dias != null ? `há ${dias} dias` : ""} sem imagem</b>. Ponto de intervenção prioritário do parque de CFTV.`,
+    descricao: `Central de câmera Moked (CTMK) <b>off-line ${dias != null ? `há ${dias} dias` : ""} sem imagem</b> — perda de cobertura de contexto. Vetor crítico de vigilância eletrônica.`,
     impactoCruzado: null, // preenchido no cruzamento (depende de ronda virtual)
     grupo: "ctmk",
   };
@@ -807,6 +808,16 @@ function gerarHTMLAnaliseRisco(ctx) {
   <div class="foot"><span>MokLog CheckTest · Documento situacional — uso interno / administração</span><span>${ref}</span></div>
 </div>
 
+<button class="btn-baixar" onclick="window.print()">📥 Baixar / Imprimir PDF</button>
+<style>
+  .btn-baixar{position:fixed;bottom:20px;right:20px;z-index:9999;background:linear-gradient(135deg,#1D9E75,#0F6E56);color:#fff;border:none;border-radius:30px;padding:14px 24px;font-size:15px;font-weight:800;font-family:'Inter',sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.28);cursor:pointer}
+  .btn-baixar:active{transform:scale(.96)}
+  @media print{.btn-baixar{display:none !important}}
+</style>
+<script>
+  // dica no topo pra mobile: no diálogo de impressão, escolher "Salvar como PDF"
+  document.title = "${ref} — ${esc(project.id)}";
+</script>
 </body></html>`;
 }
 
@@ -941,8 +952,18 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
 
   function abrirPDF(analise) {
     const html = gerarHTMLAnaliseRisco(analise);
-    const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); }
+    // Tenta abrir em nova aba; se o navegador bloquear (comum no mobile),
+    // cai para um blob URL, que funciona em celular e desktop.
+    try {
+      const w = window.open("", "_blank");
+      if (w && w.document) { w.document.write(html); w.document.close(); return; }
+    } catch (e) { /* fallback abaixo */ }
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.target = "_blank"; a.rel = "noopener";
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 4000);
   }
 
   // ── estilos inline (dark, padrão do app) ──
