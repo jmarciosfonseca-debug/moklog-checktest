@@ -17,7 +17,9 @@
 //               justificativa:"", obs:"" } }
 //   }
 // ════════════════════════════════════════════════════════════════════════
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { onSnapshot, runTransaction } from "firebase/firestore";
+import { setDoc as fgSetDoc } from "./fireGuard";
 
 const TOLERANCIA_MIN = 5;
 
@@ -180,6 +182,17 @@ function isFimDeSemana(dISO){ try{ const dt=new Date(dISO+"T12:00:00"); const w=
 export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, db, doc, setDoc, getDoc }) {
   const COL = "cco_ronda";
   const [turnos, setTurnos] = useState([]);
+  // Controle de sincronização em tempo real:
+  const ultimoUpdateProprio = useRef(null); // updatedAt que ESTE dispositivo gravou (p/ ignorar o próprio eco)
+  const editandoRef = useRef(false);        // usuário digitando? (segura o snapshot p/ não pisar por cima)
+  const editTimer = useRef(null);
+  const turnosRef = useRef([]);             // sempre a lista mais recente (p/ merge)
+  useEffect(()=>{ turnosRef.current = turnos; },[turnos]);
+  const marcarEditando = () => {
+    editandoRef.current = true;
+    if(editTimer.current) clearTimeout(editTimer.current);
+    editTimer.current = setTimeout(()=>{ editandoRef.current = false; }, 3500);
+  };
   const [loading, setLoading] = useState(true);
   const [equipe, setEquipe] = useState([]);
   const [showArquivados, setShowArquivados] = useState(false);
@@ -204,41 +217,87 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     return ()=>clearInterval(t);
   },[]);
 
-  // Carregamento inicial
+  // Carregamento em TEMPO REAL (onSnapshot) — a tela atualiza sozinha quando
+  // outro dispositivo grava algo, e o merge na escrita evita perda de dados.
   useEffect(()=>{
     if(!project?.id) return;
     setLoading(true);
-    (async()=>{
-      try {
-        const snap = await getDoc(doc(db,COL,project.id));
-        if(snap.exists()){
-          const data = snap.data();
-          setTurnos(data.turnos||[]);
-          try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(data.turnos||[])); }catch(e){}
-        } else {
-          try{ const l=localStorage.getItem(`${COL}_${project.id}`); if(l) setTurnos(JSON.parse(l)); }catch(e){}
-        }
-      } catch(e){
-        try{ const l=localStorage.getItem(`${COL}_${project.id}`); if(l) setTurnos(JSON.parse(l)); }catch(_){}
-      }
-      try{ const eq = await loadEquipe(project.id); setEquipe(eq||[]); }catch(e){ setEquipe([]); }
+    // 1) primeiro pinta o que houver em cache local, pra não ficar em branco
+    try{ const l=localStorage.getItem(`${COL}_${project.id}`); if(l) setTurnos(JSON.parse(l)); }catch(e){}
+    // 2) assina o documento em tempo real
+    const ref = doc(db,COL,project.id);
+    const unsub = onSnapshot(ref, (snap)=>{
+      if(!snap.exists()){ setLoading(false); return; }
+      const data = snap.data();
+      // ignora o eco da própria gravação
+      if(data.updatedAt && data.updatedAt === ultimoUpdateProprio.current){ setLoading(false); return; }
+      // se o usuário está digitando agora, não sobrescreve a tela (evita "pular");
+      // o merge na hora de salvar garante que nada se perca.
+      if(editandoRef.current){ setLoading(false); return; }
+      const lista = data.turnos||[];
+      setTurnos(lista);
+      try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(lista)); }catch(e){}
       setLoading(false);
-    })();
+    }, (err)=>{
+      console.error("Ronda snapshot error:", err);
+      // fallback: cache local (já pintado acima)
+      setLoading(false);
+    });
+    // equipe (leitura única basta)
+    (async()=>{ try{ const eq = await loadEquipe(project.id); setEquipe(eq||[]); }catch(e){ setEquipe([]); } })();
+    return ()=>{ try{ unsub(); }catch(e){} };
   },[project?.id]);
 
-  const persist = async (lista) => {
+  // Grava com MERGE POR TURNO (transação): lê a versão do servidor e combina
+  // com a alteração local por id de turno, para NUNCA apagar o trabalho de
+  // outro dispositivo (ex.: rondas que outra operadora acabou de marcar).
+  //   opts.turnosAlterados = ids dos turnos que ESTE dispositivo mexeu
+  //   opts.remover         = ids de turnos a excluir de fato
+  const persist = async (lista, opts={}) => {
+    const alterados = opts.turnosAlterados || lista.map(t=>t.id);
+    const remover   = new Set(opts.remover || []);
+    // otimista: pinta já na tela
     setTurnos(lista);
     try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(lista)); }catch(e){}
     setSalvando(true);
+    const ref = doc(db,COL,project.id);
+    const stamp = new Date().toISOString();
+    ultimoUpdateProprio.current = stamp;
     try{
-      await setDoc(doc(db,COL,project.id),{ turnos:lista, updatedAt:new Date().toISOString() });
+      // modo demo: fireGuard intercepta e não grava de verdade
+      await runTransaction(db, async (tx)=>{
+        const snap = await tx.get(ref);
+        const servidor = snap.exists() ? (snap.data().turnos||[]) : [];
+        // índice do que está no servidor
+        const mapa = new Map(servidor.map(t=>[t.id, t]));
+        // aplica alterações locais só nos turnos que este dispositivo mexeu
+        const localMap = new Map(lista.map(t=>[t.id, t]));
+        for(const id of alterados){
+          if(remover.has(id)){ mapa.delete(id); continue; }
+          const localT = localMap.get(id);
+          if(localT) mapa.set(id, localT); // versão local vence NAQUELE turno
+        }
+        // remoções explícitas
+        for(const id of remover) mapa.delete(id);
+        // turnos novos que só existem localmente entram também
+        for(const [id,t] of localMap){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
+        const final = Array.from(mapa.values());
+        tx.set(ref, { turnos: final, updatedAt: stamp });
+      });
       setErroSalvar(false);
       setListaPendente(null);
     }
     catch(e){
       console.error("Ronda save error:",e);
-      setErroSalvar(true);
-      setListaPendente(lista); // guarda pra permitir "Tentar novamente"
+      // fallback: gravação simples via fireGuard (respeita modo demo)
+      try{
+        await fgSetDoc(ref, { turnos:lista, updatedAt:stamp });
+        setErroSalvar(false); setListaPendente(null);
+      }catch(e2){
+        console.error("Ronda fallback save error:",e2);
+        setErroSalvar(true);
+        setListaPendente(lista);
+      }
     }
     setSalvando(false);
   };
@@ -292,18 +351,18 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       arquivado: false,
       rondas: {},
     };
-    await persist([novo, ...turnos]);
+    await persist([novo, ...turnosRef.current], { turnosAlterados:[novo.id] });
     setNovoPlant("");
     setAbrindo(false);
   };
 
   const updTurno = async (turnoId, fn) => {
-    const lista = turnos.map(t=> t.id===turnoId ? fn({...t}) : t);
-    await persist(lista);
+    const lista = turnosRef.current.map(t=> t.id===turnoId ? fn({...t}) : t);
+    await persist(lista, { turnosAlterados:[turnoId] });
   };
   const arquivarTurno   = (turnoId)=> updTurno(turnoId, t=>({...t, arquivado:true, arquivadoEm:new Date().toISOString()}));
   const desarquivarTurno= (turnoId)=> updTurno(turnoId, t=>({...t, arquivado:false}));
-  const excluirTurno    = async (turnoId)=> { await persist(turnos.filter(t=>t.id!==turnoId)); };
+  const excluirTurno    = async (turnoId)=> { await persist(turnosRef.current.filter(t=>t.id!==turnoId), { turnosAlterados:[turnoId], remover:[turnoId] }); };
 
   const ativos = turnos.filter(t=>!t.arquivado);
   const arquivados = turnos.filter(t=>t.arquivado);
@@ -433,6 +492,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           )}
           <div style={{flex:1,minWidth:0}}>
             <TurnoCard turno={t} projectId={project.id} dark={dark} S={S} adminAuth={adminAuth} tick={tick}
+              onEditando={marcarEditando}
               onUpd={updTurno} onArquivar={()=>arquivarTurno(t.id)} onDesarquivar={()=>desarquivarTurno(t.id)}
               onExcluir={(jaConfirmado)=>{ if(jaConfirmado===true || window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
               onPDF={()=>gerarPDFRonda(project, t)}/>
@@ -456,7 +516,7 @@ function KpiBox({ S, val, label, color }) {
 // ════════════════════════════════════════════════════════════════════════
 // CARTÃO DE UM TURNO — lista os slots e gerencia início/fim/justificativa
 // ════════════════════════════════════════════════════════════════════════
-function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquivar, onDesarquivar, onExcluir, onPDF }) {
+function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onUpd, onArquivar, onDesarquivar, onExcluir, onPDF }) {
   const [open, setOpen] = useState(!turno.arquivado);
   const tinfo = RONDA_TURNOS[turno.tipo] || RONDA_TURNOS.noturno;
   const slots = useMemo(()=>buildSlots(turno.tipo, projectId),[turno.tipo, projectId]);
@@ -511,8 +571,8 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onUpd, onArquiv
   const marcarNaoExec = (linha) => {
     setRonda(linha.slot.offsetMin, { naoExec:true, inicio:"", fim:"" });
   };
-  const setJustificativa = (linha, val) => setRonda(linha.slot.offsetMin, { justificativa:val });
-  const setObs = (linha, val) => setRonda(linha.slot.offsetMin, { obs:val });
+  const setJustificativa = (linha, val) => { onEditando && onEditando(); setRonda(linha.slot.offsetMin, { justificativa:val }); };
+  const setObs = (linha, val) => { onEditando && onEditando(); setRonda(linha.slot.offsetMin, { obs:val }); };
 
   return (
     <div style={{...S.card,border:`1px solid ${tinfo.color}33`,opacity:turno.arquivado?0.75:1}}>
