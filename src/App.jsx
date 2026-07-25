@@ -17,6 +17,7 @@ import Iluminacao from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
 import RondaDiaria from "./RondaDiaria";
+import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 
 // ── Hook de conectividade
@@ -1210,6 +1211,7 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
 function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
+  const [analiseRiscoPacote, setAnaliseRiscoPacote] = useState(null); // "golgi" | "mega" | "klog" | null
   const [v360Grupo, setV360Grupo] = useState("todos"); // todos | golgi | mega | klog — "todos" é uso interno Moked; PDF por cliente nunca mistura
   const V360_GRUPOS = { golgi:{label:"Golgi",ids:["P601","P602","P604","P605","P606","P607"]}, mega:{label:"Mega",ids:["P311A","P311B"]}, klog:{label:"Klog",ids:["P505"]} };
   const carregarVisao360 = async () => {
@@ -1338,6 +1340,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       </div>
     </div>
   );
+  if(analiseRiscoPacote) {
+    const elegiveis = {};
+    Object.keys(PROJECTS).forEach(id=>{ if(ANALISE_RISCO_ELIGIBLE.includes(id)) elegiveis[id]=PROJECTS[id]; });
+    return <AnaliseRisco projects={elegiveis} stored={stored} pacote={analiseRiscoPacote} onBack={()=>setAnaliseRiscoPacote(null)} />;
+  }
   if(v360) {
     const loadingV = v360==="loading";
     const allRows = loadingV?[]:(v360.rows||[]);
@@ -1647,11 +1654,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             <div style={{textAlign:"center"}}><div style={{fontSize:26,fontWeight:900,color:criticalAlerts.length>0?"#ef4444":"#22c55e"}}>{criticalAlerts.length}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>ALERTAS</div></div>
           </div>
         </div>}
-        <button onClick={carregarVisao360} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0f172a,#1e3a8a)",fontSize:13,marginBottom:8,border:"1px solid #1d4ed844"}}>🎯 Visão 360 — Saúde Consolidada</button>
+
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📊 Comparativo Interparques</div>
-          {getAvailableDates(GOLGI_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Golgi",ids:GOLGI_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:13}}>📊 Comparativo Golgi</button>}
-          {getAvailableDates(MEGA_IDS).length>0&&<button onClick={()=>{setSelWeeks(new Set());setGroupCompScreen({label:"Mega",ids:MEGA_IDS});}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#0ea5e9,#0369a1)",fontSize:13}}>📊 Comparativo Mega</button>}
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📋 Análise de Risco por Grupo</div>
+          <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Golgi</button>
+          <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Mega</button>
+          <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Klog</button>
         </div>}
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
