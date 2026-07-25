@@ -116,6 +116,7 @@ function emptyForm() {
     lider: "",
     quemAvisou: "",
     quemAvisado: "",
+    envolvidos: [{ nome:"", documento:"" }],
     nomeEnvolvido: "",
     documentoEnvolvido: "",
     telefoneEnvolvido: "",
@@ -123,6 +124,9 @@ function emptyForm() {
     inquilino: "",
     placaCavalo: "",
     placaCarreta: "",
+    placaVeiculo: "",
+    reincidente: false,
+    reincidenteDe: [],
     local: "",
     resumo: "",
     detalhamento: "",
@@ -185,6 +189,45 @@ function validarForm(form) {
 }
 
 // ── Firebase load/save COM MERGE por registro ─────────────────
+// ── Reincidência: normalização e busca por nome/documento/placa ──
+function normNome(v){
+  return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .toLowerCase().replace(/\s+/g," ").trim();
+}
+function normDoc(v){ return String(v||"").replace(/\D/g,""); }
+function normPlaca(v){ return String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
+function placasDe(o){
+  return [o&&o.placaCavalo, o&&o.placaCarreta, o&&o.placaVeiculo]
+    .map(normPlaca).filter(Boolean);
+}
+function migrarEnvolvidos(o){
+  if(o && Array.isArray(o.envolvidos) && o.envolvidos.length) return o.envolvidos;
+  if(o && (o.nomeEnvolvido || o.documentoEnvolvido))
+    return [{ nome:o.nomeEnvolvido||"", documento:o.documentoEnvolvido||"" }];
+  return [{ nome:"", documento:"" }];
+}
+function envolvidosNomes(o){ return migrarEnvolvidos(o).map(e=>e&&e.nome).filter(Boolean); }
+function envolvidosDocs(o){ return migrarEnvolvidos(o).map(e=>e&&e.documento).filter(Boolean); }
+
+function buscarReincidencias(registros, form){
+  const nomes = envolvidosNomes(form).map(normNome).filter(Boolean);
+  const docs  = envolvidosDocs(form).map(normDoc).filter(Boolean);
+  const placas = placasDe(form);
+  if(nomes.length===0 && docs.length===0 && placas.length===0) return [];
+  if(!form.natureza) return [];
+  return (registros||[]).filter(r=>{
+    if(!r || r.id===form.id) return false;
+    if(r.natureza !== form.natureza) return false;
+    const rn = envolvidosNomes(r).map(normNome).filter(Boolean);
+    const rd = envolvidosDocs(r).map(normDoc).filter(Boolean);
+    const casaNome  = nomes.length>0 && rn.some(n=>nomes.includes(n));
+    const casaDoc   = docs.length>0  && rd.some(d=>docs.includes(d));
+    const rp = placasDe(r);
+    const casaPlaca = placas.length>0 && rp.some(p=>placas.includes(p));
+    return casaNome || casaDoc || casaPlaca;
+  }).sort((a,b)=>String(b.dataHora||b.registradoEm||"").localeCompare(String(a.dataHora||a.registradoEm||"")));
+}
+
 async function loadRegistros(projectId) {
   try {
     const snap = await getDoc(doc(db, COLLECTION, projectId));
@@ -312,7 +355,17 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const [form, setForm] = useState(emptyForm());
   const [janela, setJanela] = useState(30); // janela da recorrência (dias)
   const [filtroStatus, setFiltroStatus] = useState("todos"); // todos | pendente | arquivado
+  const [reincIgnorada, setReincIgnorada] = useState(false);
+  const [temRascunho, setTemRascunho] = useState(false);
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
+  const addEnvolvido = () => setForm(f=>({...f, envolvidos:[...(f.envolvidos||[]), { nome:"", documento:"" }]}));
+  const removeEnvolvido = (idx) => setForm(f=>{
+    const arr=(f.envolvidos||[]).filter((_,i)=>i!==idx);
+    return {...f, envolvidos: arr.length? arr : [{ nome:"", documento:"" }]};
+  });
+  const setEnvolvido = (idx,campo,val) => setForm(f=>({
+    ...f, envolvidos:(f.envolvidos||[]).map((e,i)=>i===idx?{...e,[campo]:val}:e)
+  }));
 
   const adminAuth = authLevel==="admin";
 
@@ -325,6 +378,30 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       setLoading(false);
     });
   },[project?.id, screen==="pin"]);
+
+  // Detecta rascunho salvo (localStorage) ao entrar
+  useEffect(()=>{
+    if(!project?.id) return;
+    try { setTemRascunho(!!localStorage.getItem(`rs_rascunho_${project.id}`)); } catch(e){}
+  },[project?.id, screen]);
+
+  const salvarRascunho = () => {
+    try {
+      localStorage.setItem(`rs_rascunho_${project.id}`, JSON.stringify(form));
+      setTemRascunho(true);
+      alert("Rascunho salvo neste dispositivo. Ele NÃO é uma ocorrência registrada — retome e clique em Registrar para oficializar.");
+    } catch(e){ alert("Não foi possível salvar o rascunho neste dispositivo."); }
+  };
+  const retomarRascunho = () => {
+    try {
+      const raw = localStorage.getItem(`rs_rascunho_${project.id}`);
+      if(raw){ const p=JSON.parse(raw); p.envolvidos=migrarEnvolvidos(p); setForm(p); setReincIgnorada(false); }
+    } catch(e){ alert("Rascunho corrompido; descarte e refaça."); }
+  };
+  const descartarRascunho = () => {
+    try { localStorage.removeItem(`rs_rascunho_${project.id}`); } catch(e){}
+    setTemRascunho(false);
+  };
 
   const onPinOk = (level) => {
     setAuthLevel(level);
@@ -374,8 +451,13 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     if(erro) { alert(erro); return; }
     setSaving(true);
     try {
+      const envs = (form.envolvidos||[]).filter(e=>e && (e.nome||e.documento));
+      const primeiro = envs[0] || { nome:"", documento:"" };
       const novo = {
         ...form,
+        envolvidos: envs,
+        nomeEnvolvido: primeiro.nome || "",
+        documentoEnvolvido: primeiro.documento || "",
         id: form.id || `${project.id}-${Date.now()}`,
         seq: (registros.length + 1),
         status: form.status || RS_STATUS.PENDENTE,
@@ -386,6 +468,8 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       const fundida = await persistirRegistro(project.id, novo, registros);
       setRegistros(fundida);
       setForm(emptyForm());
+      setReincIgnorada(false);
+      descartarRascunho();
       setScreen("historico");
     } catch(e){ console.error(e); alert("Erro ao salvar. Verifique sua conexão."); }
     setSaving(false);
@@ -442,12 +526,80 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     );
   };
 
+  // Reincidências detectadas para o form atual (deriva a cada render; sem custo de Firestore)
+  const reincidencias = buscarReincidencias(registros, form);
+  const anexarReincidencia = () => {
+    setForm(f=>({
+      ...f,
+      reincidente: true,
+      reincidenteDe: reincidencias.map(r=>r.id),
+    }));
+    setReincIgnorada(true);
+  };
+
   const natSel = getNatureza(form.natureza);
   const subSel = getSubtipo(form.subtipo);
 
   // ── Tela: REGISTRAR ──
-  const TelaRegistrar = () => (
+  const telaRegistrar = (
     <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:12}}>
+      {/* Faixa: rascunho não finalizado */}
+      {temRascunho && (
+        <div style={{background:"#3b82f611", border:"1px solid #3b82f644", borderRadius:12,
+          padding:"10px 12px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap"}}>
+          <span style={{fontSize:13, color:"#93c5fd", flex:1, minWidth:160}}>📄 Há um rascunho não finalizado neste dispositivo.</span>
+          <button onClick={retomarRascunho} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>Retomar</button>
+          <button onClick={descartarRascunho} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433"}}>Descartar</button>
+        </div>
+      )}
+
+      {/* Aviso: reincidência detectada */}
+      {reincidencias.length>0 && !reincIgnorada && (
+        <div style={{background:"#f59e0b14", border:"1.5px solid #f59e0b55", borderRadius:12, padding:"12px 14px"}}>
+          <div style={{fontSize:14, fontWeight:800, color:"#f59e0b", marginBottom:6}}>
+            ⚠️ Possível reincidência — {reincidencias.length} RS anterior{reincidencias.length>1?"es":""} da mesma natureza
+          </div>
+          <div style={{fontSize:12, ...S.txt2, marginBottom:8}}>
+            Registro(s) anterior(es) com mesmo nome, documento ou placa:
+          </div>
+          <div style={{display:"flex", flexDirection:"column", gap:6, marginBottom:10}}>
+            {reincidencias.slice(0,5).map(r=>{
+              const sub = getSubtipo(r.subtipo);
+              return (
+                <div key={r.id} style={{fontSize:12, ...S.txt, background:dark?"#020510":"#f8fafc",
+                  borderRadius:8, padding:"7px 9px", display:"flex", gap:8, alignItems:"center"}}>
+                  <span style={{fontWeight:700}}>{String(r.dataHora||r.registradoEm||"").slice(0,10).split("-").reverse().join("/")}</span>
+                  <span style={{flex:1}}>{sub?.label || r.subtipo || "—"}</span>
+                  <span style={{fontSize:10, fontWeight:800, color:sevCor(r.severidade), whiteSpace:"nowrap"}}>{sevLabel(r.severidade)}</span>
+                </div>
+              );
+            })}
+            {reincidencias.length>5 && (
+              <div style={{fontSize:11, ...S.txt2}}>+ {reincidencias.length-5} outra(s)…</div>
+            )}
+          </div>
+          <div style={{display:"flex", gap:8}}>
+            <button onClick={anexarReincidencia}
+              style={{...S.btn, flex:2, background:"linear-gradient(135deg,#b45309,#92400e)"}}>
+              🔗 Anexar como reincidência
+            </button>
+            <button onClick={()=>setReincIgnorada(true)} style={{...S.btnSec, flex:1}}>Ignorar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Selo: reincidência já anexada */}
+      {form.reincidente && (
+        <div style={{background:"#dc262614", border:"1.5px solid #dc262655", borderRadius:12,
+          padding:"10px 12px", display:"flex", alignItems:"center", gap:8}}>
+          <span style={{fontSize:13, fontWeight:800, color:"#f87171", flex:1}}>
+            🔴 REINCIDENTE — vinculado a {(form.reincidenteDe||[]).length} RS anterior(es)
+          </span>
+          <button onClick={()=>setForm(f=>({...f, reincidente:false, reincidenteDe:[]}))}
+            style={{...S.btnSm, color:"#94a3b8"}}>Desfazer</button>
+        </div>
+      )}
+
       {/* Categoria */}
       <div style={S.card}>
         <label style={S.lbl}>Categoria</label>
@@ -525,18 +677,32 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             </div>
           </div>
 
-          {/* Envolvido + LGPD */}
+          {/* Envolvidos (lista, LGPD) */}
           <div style={S.card}>
-            <label style={S.lbl}>Envolvido (opcional)</label>
-            <input placeholder="Nome" value={form.nomeEnvolvido}
-              onChange={e=>setF("nomeEnvolvido",e.target.value)} style={{...S.inp, marginBottom:8}}/>
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
-              <input placeholder="Documento (CPF/CNPJ)" value={form.documentoEnvolvido}
-                onChange={e=>setF("documentoEnvolvido",e.target.value)} style={S.inp}/>
-              <input placeholder="Telefone" value={form.telefoneEnvolvido}
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
+              <label style={{...S.lbl, marginBottom:0}}>Envolvidos (opcional)</label>
+              <button onClick={addEnvolvido} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}>➕ Adicionar</button>
+            </div>
+            {(form.envolvidos||[]).map((ev,idx)=>(
+              <div key={idx} style={{marginBottom:8, paddingBottom:8,
+                borderBottom: idx<(form.envolvidos.length-1) ? `1px dashed ${dark?"#1e293b":"#e2e8f0"}` : "none"}}>
+                <div style={{display:"flex", gap:6, alignItems:"center", marginBottom:6}}>
+                  <span style={{fontSize:11, fontWeight:800, ...S.txt2, minWidth:18}}>{idx+1}º</span>
+                  <input placeholder="Nome" value={ev.nome}
+                    onChange={e=>setEnvolvido(idx,"nome",e.target.value)} style={{...S.inp, flex:1}}/>
+                  {form.envolvidos.length>1 && (
+                    <button onClick={()=>removeEnvolvido(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}>🗑</button>
+                  )}
+                </div>
+                <input placeholder="Documento (CPF/CNPJ)" value={ev.documento}
+                  onChange={e=>setEnvolvido(idx,"documento",e.target.value)} style={S.inp}/>
+              </div>
+            ))}
+            <div style={{display:"grid", gridTemplateColumns:"1fr", gap:8, marginTop:4}}>
+              <input placeholder="Telefone de contato (opcional)" value={form.telefoneEnvolvido}
                 onChange={e=>setF("telefoneEnvolvido",e.target.value)} style={S.inp}/>
             </div>
-            {!adminAuth && (form.documentoEnvolvido||form.telefoneEnvolvido) && (
+            {!adminAuth && ((form.envolvidos||[]).some(e=>e.documento)||form.telefoneEnvolvido) && (
               <div style={{marginTop:6, fontSize:11, color:"#f59e0b"}}>
                 🔒 Dado sensível: será mascarado na tela e no PDF (LGPD).
               </div>
@@ -554,6 +720,9 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
                 <input value={form.placaCavalo} onChange={e=>setF("placaCavalo",e.target.value.toUpperCase())} style={S.inp}/></div>
               <div><label style={S.lbl}>Placa carreta</label>
                 <input value={form.placaCarreta} onChange={e=>setF("placaCarreta",e.target.value.toUpperCase())} style={S.inp}/></div>
+              <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Placa (carro / moto)</label>
+                <input placeholder="Para veículos sem carreta" value={form.placaVeiculo||""}
+                  onChange={e=>setF("placaVeiculo",e.target.value.toUpperCase())} style={S.inp}/></div>
             </div>
           </div>
 
@@ -645,10 +814,11 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           </div>
 
           {/* Ações */}
-          <div style={{display:"flex", gap:8, marginBottom:20}}>
-            <button onClick={()=>setForm(emptyForm())} style={{...S.btnSec, flex:1}}>Limpar</button>
+          <div style={{display:"flex", gap:8, marginBottom:20, flexWrap:"wrap"}}>
+            <button onClick={()=>{setForm(emptyForm());setReincIgnorada(false);}} style={{...S.btnSec, flex:"1 1 90px"}}>Limpar</button>
+            <button onClick={salvarRascunho} style={{...S.btnSec, flex:"1 1 130px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 Salvar rascunho</button>
             <button onClick={salvar} disabled={saving}
-              style={{...S.btn, flex:2, opacity:saving?.6:1}}>
+              style={{...S.btn, flex:"2 1 180px", opacity:saving?.6:1}}>
               {saving ? "Salvando..." : "✓ Registrar ocorrência"}
             </button>
           </div>
@@ -663,7 +833,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     return (r.status||RS_STATUS.PENDENTE)===filtroStatus;
   });
 
-  const TelaHistorico = () => (
+  const telaHistorico = (
     <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:10}}>
       {/* Filtro + PDF pacote */}
       <div style={{display:"flex", gap:6, alignItems:"center"}}>
@@ -720,13 +890,22 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             </div>
 
             {/* Dados mascarados conforme acesso */}
-            {(r.documentoEnvolvido || r.telefoneEnvolvido || r.nomeEnvolvido) && (
-              <div style={{marginTop:8, fontSize:11, ...S.txt2, display:"flex", flexWrap:"wrap", gap:"2px 12px"}}>
-                {r.nomeEnvolvido && <span>👤 {r.nomeEnvolvido}</span>}
-                {r.documentoEnvolvido && <span>📄 {adminAuth ? r.documentoEnvolvido : mascararDoc(r.documentoEnvolvido)}</span>}
-                {r.telefoneEnvolvido && <span>📞 {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</span>}
-              </div>
-            )}
+            {(() => {
+              const evs = (r.envolvidos && r.envolvidos.length) ? r.envolvidos
+                : (r.nomeEnvolvido||r.documentoEnvolvido ? [{nome:r.nomeEnvolvido,documento:r.documentoEnvolvido}] : []);
+              if(evs.length===0 && !r.telefoneEnvolvido) return null;
+              return (
+                <div style={{display:"flex", flexWrap:"wrap", gap:"4px 12px", marginTop:6, fontSize:12, ...S.txt2}}>
+                  {evs.map((ev,i)=>(
+                    <span key={i} style={{display:"inline-flex", gap:6}}>
+                      {ev.nome && <span>👤 {ev.nome}</span>}
+                      {ev.documento && <span>📄 {adminAuth ? ev.documento : mascararDoc(ev.documento)}</span>}
+                    </span>
+                  ))}
+                  {r.telefoneEnvolvido && <span>📞 {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</span>}
+                </div>
+              );
+            })()}
 
             <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
               <button onClick={()=>gerarPdfRS(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
@@ -742,7 +921,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
 
   // ── Tela: RECORRÊNCIA ──
   const rankRec = analisarRecorrencia(registros, janela);
-  const TelaRecorrencia = () => (
+  const telaRecorrencia = (
     <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:10}}>
       <div style={{display:"flex", gap:6, alignItems:"center"}}>
         <span style={{fontSize:12, ...S.txt2}}>Janela:</span>
@@ -788,9 +967,9 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       <div style={S.wrap}>
         <Header/>
         <Tabs/>
-        {screen==="registrar"  && <TelaRegistrar/>}
-        {screen==="historico"  && <TelaHistorico/>}
-        {screen==="recorrencia"&& <TelaRecorrencia/>}
+        {screen==="registrar"  && telaRegistrar}
+        {screen==="historico"  && telaHistorico}
+        {screen==="recorrencia"&& telaRecorrencia}
       </div>
     </div>
   );
