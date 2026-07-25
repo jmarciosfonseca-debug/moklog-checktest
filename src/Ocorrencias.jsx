@@ -200,6 +200,54 @@ function placasDe(o){
   return [o&&o.placaCavalo, o&&o.placaCarreta, o&&o.placaVeiculo]
     .map(normPlaca).filter(Boolean);
 }
+// ── Envio por e-mail (Outlook web). Corpo em texto cru (uso interno). ──
+function corpoEmailRS(project, r){
+  const nat = getNatureza(r.natureza), sub = getSubtipo(r.subtipo);
+  const sev = r.severidade || (sub && sub.sevPadrao) || "info";
+  const L = [];
+  L.push("REGISTRO SITUACIONAL (RS)");
+  if(project && project.name) L.push(project.id + " - " + project.name);
+  L.push("");
+  L.push("Natureza: " + ((nat && nat.label) || r.natureza || "-"));
+  L.push("Tipo: " + ((sub && sub.label) || r.subtipo || "-"));
+  L.push("Severidade: " + sevLabel(sev));
+  L.push("Data/hora: " + fmtDataHoraBR(r.dataHora || r.registradoEm));
+  if(r.horaFim) L.push("Normalizacao: " + r.horaFim);
+  if(r.local) L.push("Local: " + r.local);
+  if(r.lider) L.push("Lider: " + r.lider);
+  if(r.quemAvisou) L.push("Quem avisou: " + r.quemAvisou);
+  if(r.reincidente) L.push("** REINCIDENTE (" + ((r.reincidenteDe||[]).length) + " RS anterior(es)) **");
+  const evs = (r.envolvidos && r.envolvidos.length) ? r.envolvidos
+    : (r.nomeEnvolvido || r.documentoEnvolvido ? [{nome:r.nomeEnvolvido, documento:r.documentoEnvolvido}] : []);
+  if(evs.length){
+    L.push(""); L.push("Envolvido(s):");
+    evs.forEach((ev,i)=>{ const p=[]; if(ev.nome)p.push(ev.nome); if(ev.documento)p.push("doc "+ev.documento); if(p.length)L.push("  "+(i+1)+". "+p.join(" - ")); });
+  }
+  if(r.telefoneEnvolvido) L.push("Contato: " + r.telefoneEnvolvido);
+  const placas = [r.placaCavalo, r.placaCarreta, r.placaVeiculo].filter(Boolean);
+  if(r.transportadora) L.push("Transportadora: " + r.transportadora);
+  if(placas.length) L.push("Placa(s): " + placas.join(" / "));
+  if(r.resumo){ L.push(""); L.push("Resumo: " + r.resumo); }
+  if(r.detalhamento){ L.push(""); L.push("Detalhamento:"); L.push(r.detalhamento); }
+  if(r.medidas){ L.push(""); L.push("Medidas tomadas:"); L.push(r.medidas); }
+  if(r.observacao){ L.push(""); L.push("Observacao: " + r.observacao); }
+  const nFotos = (r.fotos||[]).length;
+  if(nFotos) L.push("\n" + nFotos + " foto(s) no registro - baixe o PDF e anexe se necessario.");
+  L.push(""); L.push("-- Gerado pelo MokLog CheckTest");
+  return L.join("\n");
+}
+function assuntoEmailRS(project, r){
+  const sub = getSubtipo(r.subtipo);
+  const idtxt = r.id || ((project && project.id) || "RS");
+  return "RS " + idtxt + " - " + ((sub && sub.label) || r.subtipo || "Ocorrencia");
+}
+function enviarRSOutlook(project, r){
+  const subject = encodeURIComponent(assuntoEmailRS(project, r));
+  const body = encodeURIComponent(corpoEmailRS(project, r));
+  const url = "https://outlook.office.com/mail/deeplink/compose?subject=" + subject + "&body=" + body;
+  try { window.open(url, "_blank"); } catch(e){ alert("Nao foi possivel abrir o Outlook."); }
+}
+
 function migrarEnvolvidos(o){
   if(o && Array.isArray(o.envolvidos) && o.envolvidos.length) return o.envolvidos;
   if(o && (o.nomeEnvolvido || o.documentoEnvolvido))
@@ -459,7 +507,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         nomeEnvolvido: primeiro.nome || "",
         documentoEnvolvido: primeiro.documento || "",
         id: form.id || `${project.id}-${Date.now()}`,
-        seq: (registros.length + 1),
+        seq: form.seq != null ? form.seq : (registros.length + 1),
         status: form.status || RS_STATUS.PENDENTE,
         registradoEm: form.registradoEm || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -472,6 +520,29 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       descartarRascunho();
       setScreen("historico");
     } catch(e){ console.error(e); alert("Erro ao salvar. Verifique sua conexão."); }
+    setSaving(false);
+  };
+
+  const abrirEdicaoTextos = (r) => {
+    setForm({ ...r, envolvidos: migrarEnvolvidos(r) });
+    setScreen("editar");
+  };
+  const cancelarEdicao = () => { setForm(emptyForm()); setScreen("historico"); };
+  const salvarEdicaoTextos = async () => {
+    setSaving(true);
+    try {
+      const alvo = registros.find(x=>x.id===form.id);
+      if(!alvo){ alert("Registro não encontrado."); setSaving(false); return; }
+      const novo = { ...alvo,
+        resumo: form.resumo, detalhamento: form.detalhamento,
+        medidas: form.medidas, observacao: form.observacao,
+        updatedAt: new Date().toISOString(), editadoEm: new Date().toISOString(),
+      };
+      const fundida = await persistirRegistro(project.id, novo, registros);
+      setRegistros(fundida);
+      setForm(emptyForm());
+      setScreen("historico");
+    } catch(e){ console.error(e); alert("Erro ao salvar correções."); }
     setSaving(false);
   };
 
@@ -908,6 +979,8 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             })()}
 
             <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
+              <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
+              <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Enviar (Outlook)</button>
               <button onClick={()=>gerarPdfRS(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
               {st===RS_STATUS.PENDENTE
                 ? <button onClick={()=>mudarStatus(r.id, RS_STATUS.ARQUIVADO)} style={S.btnSm}>📥 Arquivar</button>
@@ -962,11 +1035,45 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     </div>
   );
 
+  const telaEditarTextos = (
+    <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:12}}>
+      <div style={{background:"#3b82f611", border:"1px solid #3b82f644", borderRadius:12, padding:"12px 14px"}}>
+        <div style={{fontSize:14, fontWeight:800, color:"#3b82f6"}}>✏️ Editar textos da RS</div>
+        <div style={{fontSize:12, ...S.txt2, marginTop:4}}>
+          Apenas os textos abaixo podem ser corrigidos. Dados da ocorrência (natureza, envolvidos, placas, data) ficam preservados.
+        </div>
+      </div>
+      <div style={S.card}>
+        <label style={S.lbl}>Resumo / título curto</label>
+        <input value={form.resumo} onChange={e=>setF("resumo",e.target.value)} style={S.inp}/>
+      </div>
+      <div style={S.card}>
+        <label style={S.lbl}>Detalhamento</label>
+        <textarea rows={5} value={form.detalhamento} onChange={e=>setF("detalhamento",e.target.value)} style={{...S.inp, resize:"vertical"}}/>
+      </div>
+      <div style={S.card}>
+        <label style={S.lbl}>Medidas tomadas</label>
+        <textarea rows={3} value={form.medidas} onChange={e=>setF("medidas",e.target.value)} style={{...S.inp, resize:"vertical"}}/>
+      </div>
+      <div style={S.card}>
+        <label style={S.lbl}>Observação</label>
+        <textarea rows={2} value={form.observacao} onChange={e=>setF("observacao",e.target.value)} style={{...S.inp, resize:"vertical"}}/>
+      </div>
+      <div style={{display:"flex", gap:8, marginBottom:20}}>
+        <button onClick={cancelarEdicao} style={{...S.btnSec, flex:1}}>Cancelar</button>
+        <button onClick={salvarEdicaoTextos} disabled={saving} style={{...S.btn, flex:2, opacity:saving?.6:1}}>
+          {saving ? "Salvando..." : "✓ Salvar correções"}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={S.page}>
       <div style={S.wrap}>
         <Header/>
         <Tabs/>
+        {screen==="editar"     && telaEditarTextos}
         {screen==="registrar"  && telaRegistrar}
         {screen==="historico"  && telaHistorico}
         {screen==="recorrencia"&& telaRecorrencia}
