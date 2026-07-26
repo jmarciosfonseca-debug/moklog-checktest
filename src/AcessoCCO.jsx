@@ -399,7 +399,7 @@ function KPI({ S, val, label, color }) {
 }
 
 // Cartão genérico de registro com expandir + arquivar/desarquivar + excluir
-function RegistroCard({ tema, r, dark, S, adminAuth, onArquivar, onDesarquivar, onExcluir }) {
+function RegistroCard({ tema, r, dark, S, adminAuth, onContinuar, onArquivar, onDesarquivar, onExcluir }) {
   const [open, setOpen] = useState(false);
   const dias = daysSince(r.data);
   const st = tema==="manutencao" ? (STATUS_MANUT.find(s=>s.key===r.status)||STATUS_MANUT[0]) : null;
@@ -427,7 +427,9 @@ function RegistroCard({ tema, r, dark, S, adminAuth, onArquivar, onDesarquivar, 
         </div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:700,...S.txt,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {titulo}{r.arquivado&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}>📦 Arquivado</span>}
+            {titulo}
+            {r.rascunho&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:700,marginLeft:6,background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b55",padding:"1px 6px",borderRadius:6}}>📝 Rascunho</span>}
+            {r.arquivado&&<span style={{fontSize:11,color:"#94a3b8",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}>📦 Arquivado</span>}
           </div>
           {sub&&<div style={{fontSize:11,...S.txt2}}>{sub}</div>}
           <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
@@ -468,6 +470,9 @@ function RegistroCard({ tema, r, dark, S, adminAuth, onArquivar, onDesarquivar, 
           )}
           {r.obs&&<div style={{fontSize:12,...S.txt2,marginBottom:8,lineHeight:1.5}}>{r.obs}</div>}
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {r.rascunho && onContinuar && (
+              <button onClick={onContinuar} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b66",fontWeight:700}}>✏️ Continuar rascunho</button>
+            )}
             {!r.arquivado
               ? <button onClick={onArquivar} style={{...S.btnSm,color:"#94a3b8",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`}}>📦 Arquivar</button>
               : <button onClick={onDesarquivar} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>↩ Desarquivar</button>}
@@ -725,13 +730,11 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     if(tema==="supervisao") loadEquipDanificados(project.id).then(setEquipDan);
   },[tema, project?.id, screen==="pin"]);
 
-  // Autosave do rascunho enquanto preenche
-  useEffect(()=>{
-    if(screen==="form" && project?.id && !isRonda && !isCftv && !isBodycam) {
-      saveDraft(tema, project.id, form);
-      setHasDraft(true);
-    }
-  },[form, screen, project?.id, tema]);
+  // Autosave LOCAL desativado: o rascunho agora é um registro real no Firestore
+  // (salvo pelo botão "Salvar Rascunho"), visível para toda a equipe. O autosave
+  // em localStorage criava um rascunho "fantasma" que só aparecia num aparelho.
+  // Mantido o efeito vazio para não alterar a ordem dos hooks.
+  useEffect(()=>{},[form, screen, project?.id, tema]);
 
   const setRegistros = (novaLista) => setDados(prev=>({...prev,[tema]:novaLista}));
 
@@ -745,15 +748,36 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   };
   const novoLimpo = () => { clearDraft(tema, project.id); setHasDraft(false); setForm(seedForm(emptyForm(tema))); setScreen("form"); };
   const continuarRascunho = () => { const d=loadDraft(tema,project.id); setForm(seedForm(d?.form||emptyForm(tema))); setScreen("form"); };
-  const salvarRascunho = () => { saveDraft(tema, project.id, form); setHasDraft(true); setScreen("list"); };
+  // Salvar rascunho AGORA grava no Firestore como registro real com rascunho:true.
+  // Assim ele aparece para toda a equipe (qualquer dispositivo) e pode ser
+  // continuado/arquivado/excluído por qualquer um — não fica preso no aparelho.
+  const salvarRascunho = async () => {
+    setSaving(true);
+    try {
+      const reg = {...form, rascunho:true, arquivado:false, registradoEm: form.registradoEm || new Date().toISOString(), updatedAt:new Date().toISOString()};
+      // funde por id: se já existia (rascunho sendo re-salvo), substitui; senão entra novo
+      const semEste = registros.filter(r=>r.id!==reg.id);
+      const newList = [reg, ...semEste];
+      setRegistros(newList);
+      await saveTema(tema, project.id, newList);
+      clearDraft(tema, project.id);   // limpa o rascunho local: a fonte da verdade agora é o Firestore
+      setHasDraft(false);
+      setForm(emptyForm(tema));
+      setScreen("list");
+    } catch(e){ console.error(e); alert("Erro ao salvar o rascunho. Verifique sua conexão."); }
+    setSaving(false);
+  };
 
   const salvar = async () => {
     const erro = validarForm(tema, form);
     if(erro) { alert(erro); return; }
     setSaving(true);
     try {
-      const novo = {...form, arquivado:false, registradoEm:new Date().toISOString()};
-      const newList = [novo, ...registros];
+      // Se este form já existe como rascunho no Firestore (mesmo id), PROMOVE:
+      // vira registro definitivo (rascunho:false) sem criar duplicata.
+      const novo = {...form, rascunho:false, arquivado:false, registradoEm: form.registradoEm || new Date().toISOString(), updatedAt:new Date().toISOString()};
+      const semEste = registros.filter(r=>r.id!==novo.id);
+      const newList = [novo, ...semEste];
       setRegistros(newList);
       await saveTema(tema, project.id, newList);
       clearDraft(tema, project.id);
@@ -776,6 +800,9 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     const newList = registros.filter(r=>r.id!==id);
     setRegistros(newList); await saveTema(tema, project.id, newList);
   };
+  // Reabre um RASCUNHO já salvo no Firestore (registro com rascunho:true) para
+  // continuar o preenchimento. Como é registro real, qualquer dispositivo abre.
+  const continuarRegistro = (r) => { setForm(seedForm({...emptyForm(tema), ...r})); setScreen("form"); };
 
   if(screen==="pin") return (
     <PinGate project={project||{}} dark={dark||true} onBack={onBack}
@@ -906,8 +933,8 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
               <div style={{display:"flex",gap:8}}>
                 <button onClick={novoLimpo} style={{...S.btn,flex:2}}>+ Registrar {temaInfo.label}</button>
-                <button onClick={()=>gerarPDFTema(tema, project, registros)} disabled={registros.length===0}
-                  style={{...S.btnSec,flex:1,color:"#a855f7",borderColor:"#a855f733",opacity:registros.length===0?0.5:1}}>📄 PDF</button>
+                <button onClick={()=>gerarPDFTema(tema, project, registros.filter(r=>!r.rascunho))} disabled={registros.filter(r=>!r.rascunho).length===0}
+                  style={{...S.btnSec,flex:1,color:"#a855f7",borderColor:"#a855f733",opacity:registros.filter(r=>!r.rascunho).length===0?0.5:1}}>📄 PDF</button>
               </div>
 
               {/* Toggle ativos / arquivados */}
@@ -926,12 +953,14 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
               {hoje.length>0 && (<>
                 <div style={{fontSize:11,color:temaInfo.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
                 {hoje.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
+                  onContinuar={()=>continuarRegistro(r)}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
                   onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
               </>)}
               {anteriores.length>0 && (<>
                 <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
                 {anteriores.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
+                  onContinuar={()=>continuarRegistro(r)}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
                   onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
               </>)}

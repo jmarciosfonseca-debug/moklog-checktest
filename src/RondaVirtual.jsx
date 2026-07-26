@@ -184,6 +184,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [turnos, setTurnos] = useState([]);
   // Controle de sincronização em tempo real:
   const ultimoUpdateProprio = useRef(null); // updatedAt que ESTE dispositivo gravou (p/ ignorar o próprio eco)
+  const stampsProprios = useRef(new Set()); // TODOS os stamps recentes deste dispositivo (varias gravacoes em sequencia)
   const editandoRef = useRef(false);        // usuário digitando? (segura o snapshot p/ não pisar por cima)
   const editTimer = useRef(null);
   const turnosRef = useRef([]);             // sempre a lista mais recente (p/ merge)
@@ -229,14 +230,35 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     const unsub = onSnapshot(ref, (snap)=>{
       if(!snap.exists()){ setLoading(false); return; }
       const data = snap.data();
-      // ignora o eco da própria gravação
-      if(data.updatedAt && data.updatedAt === ultimoUpdateProprio.current){ setLoading(false); return; }
+      // ignora o eco de QUALQUER gravação recente deste dispositivo (não só a última):
+      // duas ações em sequência (iniciar 18h, depois finalizar) geram dois stamps, e o
+      // eco atrasado do primeiro não pode reverter o segundo.
+      if(data.updatedAt && (data.updatedAt === ultimoUpdateProprio.current || stampsProprios.current.has(data.updatedAt))){ setLoading(false); return; }
       // se o usuário está digitando agora, não sobrescreve a tela (evita "pular");
       // o merge na hora de salvar garante que nada se perca.
       if(editandoRef.current){ setLoading(false); return; }
       const lista = data.turnos||[];
-      setTurnos(lista);
-      try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(lista)); }catch(e){}
+      // PROTEÇÃO ANTI-REVERSÃO: se o servidor manda um turno SEM inicio num slot que
+      // localmente já tem inicio (ronda começada aqui e ainda não ecoada), preserva o
+      // local. Evita o bug "voltei pra finalizar e o app pediu pra iniciar de novo".
+      const localMap = new Map((turnosRef.current||[]).map(t=>[t.id, t]));
+      const fundida = lista.map(t=>{
+        const loc = localMap.get(t.id);
+        if(!loc || !loc.rondas) return t;
+        const rondas = {...(t.rondas||{})};
+        let mudou = false;
+        for(const off of Object.keys(loc.rondas||{})){
+          const rl = loc.rondas[off]||{};
+          const rs = rondas[off]||{};
+          // local tem inicio e servidor ainda não → mantém o progresso local do slot
+          if(rl.inicio && !rs.inicio){ rondas[off] = {...rs, ...rl}; mudou = true; }
+          // local já fechou (fim) e servidor não → idem
+          else if(rl.fim && !rs.fim && rl.inicio){ rondas[off] = {...rs, ...rl}; mudou = true; }
+        }
+        return mudou ? {...t, rondas} : t;
+      });
+      setTurnos(fundida);
+      try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(fundida)); }catch(e){}
       setLoading(false);
     }, (err)=>{
       console.error("Ronda snapshot error:", err);
@@ -263,6 +285,12 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     const ref = doc(db,COL,project.id);
     const stamp = new Date().toISOString();
     ultimoUpdateProprio.current = stamp;
+    stampsProprios.current.add(stamp);
+    // mantém o set pequeno: guarda só os últimos ~20 stamps
+    if(stampsProprios.current.size > 20){
+      const arr = Array.from(stampsProprios.current);
+      stampsProprios.current = new Set(arr.slice(arr.length-20));
+    }
     try{
       // modo demo: fireGuard intercepta e não grava de verdade
       await runTransaction(db, async (tx)=>{
@@ -562,13 +590,16 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
   });
 
   const iniciar = (linha) => {
+    onEditando && onEditando(); // segura o snapshot por ~3.5s p/ o eco não reverter o "iniciar"
     const atrasada = linha.st==="atraso_aberto";
     setRonda(linha.slot.offsetMin, { inicio:nowHM(), atrasada, naoExec:false, fim:"", anomalia:false, justificativa:linha.reg?.justificativa||"" });
   };
   const fechar = (linha, anomalia) => {
+    onEditando && onEditando();
     setRonda(linha.slot.offsetMin, { fim:nowHM(), anomalia });
   };
   const marcarNaoExec = (linha) => {
+    onEditando && onEditando();
     setRonda(linha.slot.offsetMin, { naoExec:true, inicio:"", fim:"" });
   };
   const setJustificativa = (linha, val) => { onEditando && onEditando(); setRonda(linha.slot.offsetMin, { justificativa:val }); };

@@ -172,7 +172,7 @@ function obrigatorioSatisfeito(chave, form) {
     case "detalhamento": return !!(form.detalhamento||"").trim();
     case "medidas":      return !!(form.medidas||"").trim();
     case "local":        return !!(form.local||"").trim();
-    case "placaCavalo":  return !!(form.placaCavalo||"").trim();
+    case "placaCavalo":  return placasDeVeiculos(form).length>0 || !!(form.placaCavalo||"").trim();
     case "fotoLocal":    return (form.fotos||[]).some(f=>(f.origem||"local")==="local");
     default:             return !!(form[chave]||"").toString().trim();
   }
@@ -184,7 +184,7 @@ function validarForm(form) {
   const faltando = (sub?.obrigatorios||[]).filter(k=>!obrigatorioSatisfeito(k,form));
   if(faltando.length) {
     const nomes = { horaInicio:"horário de início", detalhamento:"detalhamento",
-      medidas:"medidas tomadas", local:"local", placaCavalo:"placa do cavalo",
+      medidas:"medidas tomadas", local:"local", placaCavalo:"placa do veículo",
       fotoLocal:"foto do local" };
     return "Preencha os campos obrigatórios: " + faltando.map(k=>nomes[k]||k).join(", ") + ".";
   }
@@ -493,17 +493,25 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   },[project?.id, screen]);
 
   const salvarRascunho = () => {
+    // As FOTOS (dataUrl base64) NAO entram no rascunho: elas estouram a cota do
+    // localStorage (~5MB) e causavam "Nao foi possivel salvar o rascunho", perdendo
+    // o que foi digitado. O rascunho guarda so os textos; as fotos sao reanexadas ao retomar.
+    const nFotos = (form.fotos||[]).length;
+    const paraSalvar = { ...form, fotos: [] };
+    const primeiraVez = !localStorage.getItem(`rs_rascunho_${project.id}`);
     try {
-      const primeiraVez = !localStorage.getItem(`rs_rascunho_${project.id}`);
-      localStorage.setItem(`rs_rascunho_${project.id}`, JSON.stringify(form));
-      setTemRascunho(true);
-      setRascunhoSalvoEm(new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
-      // So o primeiro salvamento explica o fluxo (bloqueante). Re-salvamentos apos alteracao
-      // sao silenciosos (feedback vem no botao), para nao travar quem salva varias vezes.
-      if(primeiraVez){
-        alert("Rascunho salvo neste dispositivo. Ele NÃO é uma ocorrência registrada — retome e clique em Concluir para oficializar. Você pode salvar de novo quantas vezes quiser depois de alterar.");
-      }
-    } catch(e){ alert("Não foi possível salvar o rascunho neste dispositivo."); }
+      localStorage.setItem(`rs_rascunho_${project.id}`, JSON.stringify(paraSalvar));
+    } catch(e){
+      // fallback: limpa e regrava (caso algum resquicio antigo com fotos ainda ocupe cota)
+      try { localStorage.removeItem(`rs_rascunho_${project.id}`); localStorage.setItem(`rs_rascunho_${project.id}`, JSON.stringify(paraSalvar)); }
+      catch(e2){ alert("Não foi possível salvar o rascunho (armazenamento cheio). Conclua a ocorrência direto ou remova alguma foto."); return; }
+    }
+    setTemRascunho(true);
+    setRascunhoSalvoEm(new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
+    // So o primeiro salvamento explica o fluxo (bloqueante). Re-salvamentos silenciosos.
+    if(primeiraVez){
+      alert("Rascunho salvo neste dispositivo (somente os textos)." + (nFotos ? " As " + nFotos + " foto(s) NÃO ficam no rascunho — reanexe ao retomar." : "") + " Ele NÃO é uma ocorrência registrada — retome e clique em Concluir para oficializar. Pode salvar quantas vezes quiser depois de alterar.");
+    }
   };
   const retomarRascunho = () => {
     try {
@@ -1133,7 +1141,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           </button>
         ))}
         <div style={{flex:1}}/>
-        {registrosFiltrados.length>0 && (
+        {adminAuth && registrosFiltrados.length>0 && (
           <button onClick={()=>gerarPdfPacoteRS(project, registrosFiltrados, { titulo:`Histórico (${filtroStatus})` })}
             style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF do pacote</button>
         )}
@@ -1202,7 +1210,9 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
               <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
               <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Enviar (Outlook)</button>
               <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}>💬 WhatsApp</button>
-              <button onClick={()=>{marcarVista(r);gerarPdfRS(project, r);}} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
+              {adminAuth && (
+                <button onClick={()=>{marcarVista(r);gerarPdfRS(project, r);}} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
+              )}
               {st===RS_STATUS.PENDENTE
                 ? <button onClick={()=>mudarStatus(r.id, RS_STATUS.ARQUIVADO)} style={S.btnSm}>📥 Arquivar</button>
                 : <button onClick={()=>mudarStatus(r.id, RS_STATUS.PENDENTE)} style={S.btnSm}>↩️ Reabrir</button>}
