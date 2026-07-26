@@ -201,7 +201,8 @@ function normDoc(v){ return String(v||"").replace(/\D/g,""); }
 function normPlaca(v){ return String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,""); }
 function placasDe(o){
   const legadas = [o&&o.placaCavalo, o&&o.placaCarreta, o&&o.placaVeiculo];
-  const novas = (o && Array.isArray(o.veiculos)) ? o.veiculos.map(v=>v&&v.placa) : [];
+  const novas = [];
+  if(o && Array.isArray(o.veiculos)) o.veiculos.forEach(v=>{ if(v){ novas.push(v.placa); novas.push(v.placaCavalo); } });
   return [...legadas, ...novas].map(normPlaca).filter(Boolean);
 }
 // ── Envio por e-mail (Outlook web). Corpo em texto cru (uso interno). ──
@@ -238,8 +239,12 @@ function corpoEmailRS(project, r){
   }
   if(r.telefoneEnvolvido) L.push("Telefone: " + r.telefoneEnvolvido);
   if(r.transportadora || r.inquilino) L.push("Transportadora / Inquilino: " + (r.transportadora || r.inquilino));
-  const placas = [r.placaCavalo, r.placaCarreta, r.placaVeiculo].filter(Boolean);
-  if(placas.length) L.push("Placa do Veiculo: " + placas.join(" / "));
+  if(r.placaCavalo && r.placaCarreta){
+    L.push("Placa do Veiculo: Cavalo " + r.placaCavalo + " / Carreta " + r.placaCarreta + (r.placaVeiculo ? " / " + r.placaVeiculo : ""));
+  } else {
+    const placas = [r.placaCavalo, r.placaCarreta, r.placaVeiculo].filter(Boolean);
+    if(placas.length) L.push("Placa do Veiculo: " + placas.join(" / "));
+  }
   if(r.local) L.push("Local do Evento: " + r.local);
   if(r.resumo){ L.push(""); L.push("RESUMO DO EVENTO"); L.push(r.resumo); }
   if(r.detalhamento){ L.push(""); L.push("DETALHAMENTO OPERACIONAL"); L.push(r.detalhamento); }
@@ -264,6 +269,12 @@ function enviarRSOutlook(project, r){
   const url = "https://outlook.office.com/mail/deeplink/compose?subject=" + subject + "&body=" + body;
   try { window.open(url, "_blank"); } catch(e){ alert("Nao foi possivel abrir o Outlook."); }
 }
+// ── Envio por WhatsApp (mesmo padrao do checklist de domingo: wa.me/?text=). Texto cru, uso interno. ──
+function enviarRSWhatsapp(project, r){
+  const body = encodeURIComponent(corpoEmailRS(project, r));
+  const url = "https://wa.me/?text=" + body;
+  try { window.open(url, "_blank"); } catch(e){ alert("Nao foi possivel abrir o WhatsApp."); }
+}
 
 // ── Veículos: tipos + migração dos campos legados de placa ──
 const TIPOS_VEICULO = ["Moto","Automóvel","Van","Ônibus","Caminhão","Carreta"];
@@ -271,14 +282,20 @@ function migrarVeiculos(o){
   if(o && Array.isArray(o.veiculos) && o.veiculos.length) return o.veiculos;
   const vs = [];
   if(o){
-    if(o.placaCavalo)  vs.push({ placa:o.placaCavalo,  tipo:"Caminhão" });
-    if(o.placaCarreta) vs.push({ placa:o.placaCarreta, tipo:"Carreta" });
+    if(o.placaCarreta){
+      // Carreta + cavalo do legado viram UMA linha (placa=carreta, placaCavalo=trator).
+      vs.push({ placa:o.placaCarreta, tipo:"Carreta", placaCavalo:o.placaCavalo||"" });
+    } else if(o.placaCavalo){
+      vs.push({ placa:o.placaCavalo, tipo:"Caminhão" });
+    }
     if(o.placaVeiculo) vs.push({ placa:o.placaVeiculo, tipo:"Automóvel" });
   }
   return vs.length ? vs : [{ placa:"", tipo:"" }];
 }
 function placasDeVeiculos(o){
-  return migrarVeiculos(o).map(v=>v&&v.placa).filter(Boolean);
+  const out = [];
+  migrarVeiculos(o).forEach(v=>{ if(v&&v.placa)out.push(v.placa); if(v&&v.placaCavalo)out.push(v.placaCavalo); });
+  return out;
 }
 
 function migrarEnvolvidos(o){
@@ -438,6 +455,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const [filtroStatus, setFiltroStatus] = useState("todos"); // todos | pendente | arquivado
   const [reincIgnorada, setReincIgnorada] = useState(false);
   const [temRascunho, setTemRascunho] = useState(false);
+  const [rascunhoSalvoEm, setRascunhoSalvoEm] = useState(null); // horario do ultimo salvamento de rascunho (feedback)
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
   const addVeiculo = () => setForm(f=>({...f, veiculos:[...(f.veiculos||[]), { placa:"", tipo:"" }]}));
   const removeVeiculo = (idx) => setForm(f=>{
@@ -476,9 +494,15 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
 
   const salvarRascunho = () => {
     try {
+      const primeiraVez = !localStorage.getItem(`rs_rascunho_${project.id}`);
       localStorage.setItem(`rs_rascunho_${project.id}`, JSON.stringify(form));
       setTemRascunho(true);
-      alert("Rascunho salvo neste dispositivo. Ele NÃO é uma ocorrência registrada — retome e clique em Registrar para oficializar.");
+      setRascunhoSalvoEm(new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
+      // So o primeiro salvamento explica o fluxo (bloqueante). Re-salvamentos apos alteracao
+      // sao silenciosos (feedback vem no botao), para nao travar quem salva varias vezes.
+      if(primeiraVez){
+        alert("Rascunho salvo neste dispositivo. Ele NÃO é uma ocorrência registrada — retome e clique em Concluir para oficializar. Você pode salvar de novo quantas vezes quiser depois de alterar.");
+      }
     } catch(e){ alert("Não foi possível salvar o rascunho neste dispositivo."); }
   };
   const retomarRascunho = () => {
@@ -501,6 +525,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const descartarRascunho = () => {
     try { localStorage.removeItem(`rs_rascunho_${project.id}`); } catch(e){}
     setTemRascunho(false);
+    setRascunhoSalvoEm(null);
   };
 
   const onPinOk = (level) => {
@@ -575,7 +600,9 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       const vCaminhao = vecs.find(v=>v.tipo==="Caminhão");
       const vCarreta  = vecs.find(v=>v.tipo==="Carreta");
       const vLeve     = vecs.find(v=>["Moto","Automóvel","Van","Ônibus"].includes(v.tipo));
-      const legCavalo  = vCaminhao ? vCaminhao.placa : (!vLeve && vecs[0] ? vecs[0].placa : "");
+      // Carreta traz a placa do cavalo (trator) em v.placaCavalo; se nao houver, cai para um Caminhao avulso.
+      const legCavalo  = (vCarreta && vCarreta.placaCavalo) ? vCarreta.placaCavalo
+                        : (vCaminhao ? vCaminhao.placa : (!vLeve && !vCarreta && vecs[0] ? vecs[0].placa : ""));
       const legCarreta = vCarreta ? vCarreta.placa : "";
       const legVeiculo = vLeve ? vLeve.placa : "";
       const novo = {
@@ -760,7 +787,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             {saving ? "Salvando..." : "✓ Concluir"}
           </button>
           <button onClick={salvarRascunho}
-            style={{...S.btnSec, flex:"1 1 120px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 Rascunho</button>
+            style={{...S.btnSec, flex:"1 1 120px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 {rascunhoSalvoEm ? `Salvo ${rascunhoSalvoEm}` : "Rascunho"}</button>
           <button onClick={excluirPreenchimento}
             style={{...S.btnSec, flex:"1 1 100px", color:"#ef4444", borderColor:"#ef444433"}}>🗑 Excluir</button>
         </div>
@@ -945,17 +972,24 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
               <button onClick={addVeiculo} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}>➕ Adicionar</button>
             </div>
             {(form.veiculos||[]).map((v,idx)=>(
-              <div key={idx} style={{display:"flex", gap:6, alignItems:"center", marginBottom:8}}>
-                <input placeholder="Placa" value={v.placa}
-                  onChange={e=>setVeiculo(idx,"placa",e.target.value.toUpperCase())}
-                  style={{...S.inp, flex:1}}/>
-                <select value={v.tipo} onChange={e=>setVeiculo(idx,"tipo",e.target.value)}
-                  style={{...S.inp, flex:1}}>
-                  <option value="">Tipo...</option>
-                  {TIPOS_VEICULO.map(t=><option key={t} value={t}>{t}</option>)}
-                </select>
-                {form.veiculos.length>1 && (
-                  <button onClick={()=>removeVeiculo(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}>🗑</button>
+              <div key={idx} style={{marginBottom:8}}>
+                <div style={{display:"flex", gap:6, alignItems:"center"}}>
+                  <input placeholder={v.tipo==="Carreta" ? "Placa da carreta" : "Placa"} value={v.placa}
+                    onChange={e=>setVeiculo(idx,"placa",e.target.value.toUpperCase())}
+                    style={{...S.inp, flex:1}}/>
+                  <select value={v.tipo} onChange={e=>setVeiculo(idx,"tipo",e.target.value)}
+                    style={{...S.inp, flex:1}}>
+                    <option value="">Tipo...</option>
+                    {TIPOS_VEICULO.map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                  {form.veiculos.length>1 && (
+                    <button onClick={()=>removeVeiculo(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}>🗑</button>
+                  )}
+                </div>
+                {v.tipo==="Carreta" && (
+                  <input placeholder="Placa do cavalo (trator)" value={v.placaCavalo||""}
+                    onChange={e=>setVeiculo(idx,"placaCavalo",e.target.value.toUpperCase())}
+                    style={{...S.inp, width:"100%", marginTop:6}}/>
                 )}
               </div>
             ))}
@@ -1167,6 +1201,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
               <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
               <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Enviar (Outlook)</button>
+              <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}>💬 WhatsApp</button>
               <button onClick={()=>{marcarVista(r);gerarPdfRS(project, r);}} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
               {st===RS_STATUS.PENDENTE
                 ? <button onClick={()=>mudarStatus(r.id, RS_STATUS.ARQUIVADO)} style={S.btnSm}>📥 Arquivar</button>
