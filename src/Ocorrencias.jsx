@@ -27,7 +27,7 @@ import { setDoc } from "./fireGuard";
 import { getAccess, grantSession } from "./session";
 import {
   NATUREZAS, SEVERIDADES, FLAGS, RS_STATUS,
-  getNatureza, getSubtipo, sevLabel, sevCor, montarRascunho,
+  getNatureza, getSubtipo, sevLabel, sevCor, montarRascunho, subtipoTemVeiculo,
 } from "./rsCatalogo";
 import { gerarPdfRS, gerarPdfPacoteRS } from "./rsPdf";
 
@@ -114,6 +114,7 @@ function emptyForm() {
     dataHora: `${hojeLocal()}T${agoraHoraLocal()}`,
     horaFim: "",            // "HH:mm" puro (opcional)
     lider: "",
+    assinatura: "",         // assinatura do responsável (auto = lider, editável)
     quemAvisou: "",
     quemAvisado: "",
     envolvidos: [{ nome:"", documento:"" }],
@@ -483,8 +484,19 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const retomarRascunho = () => {
     try {
       const raw = localStorage.getItem(`rs_rascunho_${project.id}`);
-      if(raw){ const p=JSON.parse(raw); p.envolvidos=migrarEnvolvidos(p); p.veiculos=migrarVeiculos(p); setForm(p); setReincIgnorada(false); }
-    } catch(e){ alert("Rascunho corrompido; descarte e refaça."); }
+      if(raw){
+        const p = JSON.parse(raw);
+        // Merge defensivo: garante todos os campos (rascunhos antigos podem faltar campos novos).
+        const completo = { ...emptyForm(), ...p };
+        completo.envolvidos = migrarEnvolvidos(p);
+        completo.veiculos   = migrarVeiculos(p);
+        if(!completo.flagDescs || typeof completo.flagDescs!=="object") completo.flagDescs = {};
+        if(!Array.isArray(completo.flags)) completo.flags = [];
+        setForm(completo);
+        setReincIgnorada(false);
+        setScreen("registrar");   // garante que volta para a tela de preenchimento
+      }
+    } catch(e){ console.error("retomar rascunho:", e); alert("Não foi possível retomar o rascunho. Ele pode estar corrompido — descarte e refaça."); }
   };
   const descartarRascunho = () => {
     try { localStorage.removeItem(`rs_rascunho_${project.id}`); } catch(e){}
@@ -570,6 +582,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         ...form,
         envolvidos: envs,
         veiculos: vecs,
+        assinatura: (form.assinatura && form.assinatura.trim()) ? form.assinatura.trim() : (form.lider || "").trim(),
         placaCavalo: legCavalo,
         placaCarreta: legCarreta,
         placaVeiculo: legVeiculo,
@@ -918,7 +931,8 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             )}
           </div>
 
-          {/* Transportadora / veiculos */}
+          {/* Transportadora / veiculos — só quando o subtipo envolve veículo */}
+          {subtipoTemVeiculo(form.natureza, form.subtipo) && (
           <div style={S.card}>
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10}}>
               <div><label style={S.lbl}>Transportadora</label>
@@ -946,6 +960,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
               </div>
             ))}
           </div>
+          )}
 
           {/* Resumo */}
           <div style={S.card}>
@@ -1040,6 +1055,17 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             <textarea rows={2} value={form.observacao}
               onChange={e=>setF("observacao",e.target.value)}
               style={{...S.inp, resize:"vertical", fontFamily:"inherit"}}/>
+          </div>
+
+          {/* Assinatura do responsável */}
+          <div style={S.card}>
+            <label style={S.lbl}>Assinatura do responsável</label>
+            <input placeholder="Nome de quem registra (assina a RS)"
+              value={form.assinatura || form.lider || ""}
+              onChange={e=>setF("assinatura", e.target.value)} style={S.inp}/>
+            <div style={{fontSize:11, ...S.txt2, marginTop:5}}>
+              Preenchido automaticamente com o Líder/Vigilante. Ajuste se quem assina for outra pessoa.
+            </div>
           </div>
 
           {/* Ações (rodapé) — espelham a barra sticky do topo */}
