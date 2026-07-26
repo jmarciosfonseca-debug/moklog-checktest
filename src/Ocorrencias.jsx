@@ -592,7 +592,19 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     setSaving(false);
   };
 
+  // Marca RS como vista pelo gerencial/admin (aditivo). RS antiga sem o campo conta como nao-vista.
+  const marcarVista = async (r) => {
+    if(!adminAuth) return;                 // so gerencial/admin marca
+    if(!r || r.vistaGerencial) return;     // ja vista: nada a fazer
+    const atualizado = { ...r, vistaGerencial:true, vistaEm:new Date().toISOString() };
+    const semAlvo = registros.filter(x=>x.id!==r.id);
+    try {
+      const fundida = await persistirRegistro(project.id, atualizado, semAlvo);
+      setRegistros(fundida);
+    } catch(e){ console.error("marcarVista error:", e); }
+  };
   const abrirEdicaoTextos = (r) => {
+    marcarVista(r);                        // abrir = dar baixa no alerta (gerencial)
     setForm({ ...r, envolvidos: migrarEnvolvidos(r), veiculos: migrarVeiculos(r) });
     setScreen("editar");
   };
@@ -677,12 +689,69 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     setReincIgnorada(true);
   };
 
+  // Detecta se o formulário começou a ser preenchido (para exibir a barra de ações).
+  const formPreenchido = !!(
+    form.natureza || form.subtipo || form.resumo || form.detalhamento || form.local ||
+    form.lider || form.transportadora || form.inquilino ||
+    (form.envolvidos||[]).some(e=>e.nome||e.documento) ||
+    (form.veiculos||[]).some(v=>v.placa) ||
+    (form.fotos||[]).length || (form.flags||[]).length
+  );
+  // Excluir durante preenchimento/edição.
+  const excluirPreenchimento = () => {
+    const emEdicao = !!form.id && registros.some(r=>r.id===form.id);
+    if(emEdicao){
+      if(!adminAuth){
+        alert("Exclusão de RS registrada requer PIN gerencial.");
+        return;
+      }
+      if(!window.confirm("Excluir DEFINITIVAMENTE esta RS registrada? Esta ação não pode ser desfeita.")) return;
+      excluirRegistro(form.id);
+      return;
+    }
+    if(!window.confirm("Descartar este preenchimento e limpar o formulário?")) return;
+    setForm(emptyForm());
+    setReincIgnorada(false);
+    descartarRascunho();
+  };
+  const excluirRegistro = async (id) => {
+    setSaving(true);
+    try {
+      const semAlvo = registros.filter(r=>r.id!==id);
+      try {
+        await setDoc(doc(db, COLLECTION, project.id), { registros:semAlvo, updatedAt:new Date().toISOString() });
+      } catch(e){ console.error("RS delete error:", e); }
+      try { localStorage.setItem(`${COLLECTION}_${project.id}`, JSON.stringify(semAlvo)); } catch(e){}
+      setRegistros(semAlvo);
+      setForm(emptyForm());
+      setScreen("historico");
+    } catch(e){ console.error(e); alert("Erro ao excluir."); }
+    setSaving(false);
+  };
+
   const natSel = getNatureza(form.natureza);
   const subSel = getSubtipo(form.subtipo);
 
   // ── Tela: REGISTRAR ──
   const telaRegistrar = (
     <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:12}}>
+      {/* Barra de ações sticky — aparece ao começar a preencher */}
+      {formPreenchido && (
+        <div style={{position:"sticky", top:62, zIndex:4,
+          background: dark ? "#020510" : "#f8fafc",
+          padding:"8px 0", marginBottom:4,
+          borderBottom:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,
+          display:"flex", gap:8, flexWrap:"wrap"}}>
+          <button onClick={salvar} disabled={saving}
+            style={{...S.btn, flex:"2 1 150px", opacity:saving?.6:1}}>
+            {saving ? "Salvando..." : "✓ Concluir"}
+          </button>
+          <button onClick={salvarRascunho}
+            style={{...S.btnSec, flex:"1 1 120px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 Rascunho</button>
+          <button onClick={excluirPreenchimento}
+            style={{...S.btnSec, flex:"1 1 100px", color:"#ef4444", borderColor:"#ef444433"}}>🗑 Excluir</button>
+        </div>
+      )}
       {/* Faixa: rascunho não finalizado */}
       {temRascunho && (
         <div style={{background:"#3b82f611", border:"1px solid #3b82f644", borderRadius:12,
@@ -973,13 +1042,12 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
               style={{...S.inp, resize:"vertical", fontFamily:"inherit"}}/>
           </div>
 
-          {/* Ações */}
+          {/* Ações (rodapé) — espelham a barra sticky do topo */}
           <div style={{display:"flex", gap:8, marginBottom:20, flexWrap:"wrap"}}>
-            <button onClick={()=>{setForm(emptyForm());setReincIgnorada(false);}} style={{...S.btnSec, flex:"1 1 90px"}}>Limpar</button>
             <button onClick={salvarRascunho} style={{...S.btnSec, flex:"1 1 130px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 Salvar rascunho</button>
             <button onClick={salvar} disabled={saving}
               style={{...S.btn, flex:"2 1 180px", opacity:saving?.6:1}}>
-              {saving ? "Salvando..." : "✓ Registrar ocorrência"}
+              {saving ? "Salvando..." : "✓ Concluir ocorrência"}
             </button>
           </div>
         </>
@@ -1046,6 +1114,9 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
                   color: st===RS_STATUS.ARQUIVADO ? "#64748b" : "#b45309"}}>
                   {st===RS_STATUS.ARQUIVADO ? "ARQUIVADO" : "PENDENTE"}
                 </span>
+                {!r.vistaGerencial && (
+                  <span style={{fontSize:9, fontWeight:800, padding:"2px 7px", borderRadius:5, background:"#B21E27", color:"#fff"}}>NOVA</span>
+                )}
               </div>
             </div>
 
@@ -1070,7 +1141,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
               <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
               <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Enviar (Outlook)</button>
-              <button onClick={()=>gerarPdfRS(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
+              <button onClick={()=>{marcarVista(r);gerarPdfRS(project, r);}} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
               {st===RS_STATUS.PENDENTE
                 ? <button onClick={()=>mudarStatus(r.id, RS_STATUS.ARQUIVADO)} style={S.btnSm}>📥 Arquivar</button>
                 : <button onClick={()=>mudarStatus(r.id, RS_STATUS.PENDENTE)} style={S.btnSm}>↩️ Reabrir</button>}
