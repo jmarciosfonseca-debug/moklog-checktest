@@ -3550,6 +3550,11 @@ export default function App(){
               <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{groupNames[homeGroup]}</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.join(" · ")}</div>
             </div>
+            {(()=>{const tp=groupProjects.reduce((a,pid)=>a+((rsCounts[pid]&&rsCounts[pid].naoVistas)||0),0);return tp>0?(
+              <div title="RS pendentes de visualização no grupo" style={{display:"flex",alignItems:"center",gap:6,background:"#B21E27",color:"#fff",borderRadius:8,padding:"5px 10px",fontWeight:800,fontSize:12,boxShadow:"0 2px 8px rgba(178,30,39,.4)"}}>
+                <span style={{fontSize:14}}>🛡️</span>Total RS Pendentes: {tp}
+              </div>
+            ):null;})()}
           </div>
 
           {draft&&groupProjects.includes(draft.projectId)&&(
@@ -3592,6 +3597,11 @@ export default function App(){
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
                       <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,hasGerencial())}/>
+                      {rsCounts[p.id]&&rsCounts[p.id].naoVistas>0&&(
+                        <div title="RS pendentes de visualização" style={{display:"flex",alignItems:"center",gap:5,background:"#B21E27",color:"#fff",borderRadius:6,padding:"2px 8px",fontWeight:800,fontSize:12,boxShadow:"0 2px 6px rgba(178,30,39,.4)"}}>
+                          <span style={{fontSize:13}}>🛡️</span>{rsCounts[p.id].naoVistas} RS
+                        </div>
+                      )}
                       {isActive&&<span style={{fontSize:11,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
                     </div>
                   </div>
