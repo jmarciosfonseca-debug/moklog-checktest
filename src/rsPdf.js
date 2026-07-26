@@ -96,7 +96,7 @@ function getCSS() {
     .meta-box{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px 16px;font-size:11.5px;color:rgba(255,255,255,.75);text-align:right;min-width:190px}
     .meta-box b{color:#fff}
     .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0}
-    .rs-card{background:#fff;border:1px solid ${MOKED.line};border-radius:12px;padding:22px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);page-break-inside:avoid}
+    .rs-card{background:#fff;border:1px solid ${MOKED.line};border-radius:12px;padding:18px 22px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
     .rs-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid ${MOKED.grayBg};padding-bottom:14px;margin-bottom:16px}
     .rs-kicker{font-size:12px;font-weight:900;color:${MOKED.red};letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
     .status-tag{display:inline-block;padding:3px 10px;border-radius:5px;font-size:10px;font-weight:800;letter-spacing:.3px}
@@ -104,7 +104,8 @@ function getCSS() {
     .rs-sub{font-size:13.5px;color:#475569;font-weight:600;margin-top:2px}
     .sev{display:inline-block;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:900;color:#fff;letter-spacing:.5px;white-space:nowrap}
     .reinc{margin-top:10px;background:#fff1f2;border:1.5px solid ${MOKED.red};border-radius:8px;padding:8px 12px;font-size:12px;font-weight:800;color:${MOKED.red}}
-    .section-title{font-size:11px;font-weight:900;color:${MOKED.ink};text-transform:uppercase;letter-spacing:1px;border-left:4px solid ${MOKED.red};padding-left:10px;margin:18px 0 10px}
+    .section-title{font-size:11px;font-weight:900;color:${MOKED.ink};text-transform:uppercase;letter-spacing:1px;border-left:4px solid ${MOKED.red};padding-left:10px;margin:18px 0 10px;break-after:avoid;page-break-after:avoid}
+    .detalhe,.medidas{break-inside:avoid;page-break-inside:avoid}
     .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px}
     .info-item label{font-size:9px;color:${MOKED.grayLbl};font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;letter-spacing:.6px}
     .info-item span{font-size:14px;font-weight:700;color:${MOKED.ink}}
@@ -112,7 +113,7 @@ function getCSS() {
     .medidas{background:#fdf2f2;border-left:4px solid ${MOKED.red};border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:#5b1418;white-space:pre-wrap;line-height:1.7}
     .galeria{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
     .foto{border:1px solid ${MOKED.line};border-radius:10px;overflow:hidden;background:#fff;page-break-inside:avoid}
-    .foto img{width:100%;height:190px;object-fit:cover;display:block;background:#e5e7eb}
+    .foto img{width:100%;height:150px;object-fit:cover;display:block;background:#e5e7eb}
     .foto .legenda{padding:9px 12px;font-size:11.5px;color:#475569;font-weight:600;border-top:1px solid ${MOKED.grayBg}}
     .foto .tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:5px;margin-right:7px;color:#fff}
     .footer{text-align:center;margin-top:16px;padding-top:12px;border-top:2px solid ${MOKED.line};font-size:11px;color:#64748b;font-weight:600}
@@ -262,6 +263,18 @@ function buildRSCard(project, registro) {
     })()}
 
     ${galeriaHtml}
+
+    ${(() => {
+      const assinante = (registro?.assinatura || registro?.lider || "").trim();
+      if (!assinante) return "";
+      return `<div style="margin-top:26px;padding-top:16px;border-top:1px dashed ${MOKED.line};display:flex;justify-content:flex-end">
+        <div style="text-align:center;min-width:240px">
+          <div style="border-top:1.5px solid ${MOKED.ink};margin-bottom:6px"></div>
+          <div style="font-size:13px;font-weight:800;color:${MOKED.ink}">${esc(assinante)}</div>
+          <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Responsável pelo registro</div>
+        </div>
+      </div>`;
+    })()}
   </div>`;
 }
 

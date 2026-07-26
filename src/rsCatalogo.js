@@ -587,11 +587,104 @@ export const NATUREZAS = [
       },
     ],
   },
+  {
+    key: "DISPOSITIVOS",
+    label: "Dispositivos de Segurança",
+    icon: "🔒",
+    cor: "#6d28d9",
+    subtipos: [
+      {
+        key: "DISP_CFTV",
+        label: "CFTV / câmeras (falha, perda de sinal, vandalismo)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, foi identificada a seguinte ocorrência no sistema de CFTV: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Fotografe o equipamento/monitor afetado e, se possível, a tela do sistema indicando a falha.",
+        ajuda: "Informe quais câmeras/DVR foram afetadas, se houve perda de gravação e o impacto na cobertura. Registre acionamento da manutenção.",
+      },
+      {
+        key: "DISP_ALARME_PERIMETRAL",
+        label: "Alarme perimetral (disparo, falha, setor inoperante)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, houve a seguinte ocorrência no alarme perimetral: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Registre o setor/painel afetado e a central de alarme, se acessível.",
+        ajuda: "Informe o setor/zona, se foi disparo real ou falso, e a ação tomada. Registre se a barreira ficou vulnerável.",
+      },
+      {
+        key: "DISP_INTERNET",
+        label: "Internet / rede / comunicação (queda, instabilidade)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, houve a seguinte ocorrência de internet/comunicação: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Registre o equipamento de rede/rack se relevante.",
+        ajuda: "Informe o que ficou sem comunicação (CFTV, acesso, telefonia), o tempo de indisponibilidade e o provedor acionado.",
+      },
+      {
+        key: "DISP_CATRACA_TORNIQUETE",
+        label: "Catraca / torniquete (travamento, falha, liberação indevida)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, houve a seguinte ocorrência em catraca/torniquete: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Fotografe o equipamento e o ponto de acesso afetado.",
+        ajuda: "Informe se travou, liberou indevidamente ou ficou inoperante, e como o acesso foi controlado no período.",
+      },
+      {
+        key: "DISP_BOLLARD_ECLUSA",
+        label: "Bollard / eclusa / cancela CCO (falha, travamento)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, houve a seguinte ocorrência em bollard/eclusa/cancela: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Fotografe o dispositivo e o ponto de bloqueio afetado.",
+        ajuda: "Informe qual dispositivo de bloqueio físico falhou (bollard, eclusa, cancela CCO), se ficou aberto/travado e o controle de acesso adotado.",
+      },
+      {
+        key: "DISP_GARRA_TIGRE",
+        label: "Garra de tigre / barreira física (dano, rompimento)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, foi constatado o seguinte na barreira física (garra de tigre): ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Fotografe o trecho danificado da barreira/garra de tigre.",
+        ajuda: "Informe o trecho afetado, se há vulnerabilidade no perímetro e a contenção provisória adotada.",
+      },
+      {
+        key: "DISP_CANCELA",
+        label: "Cancela de acesso (falha, quebra, travamento)",
+        sevPadrao: "atencao",
+        modelo: "Informo que, às {hora}, em {local}, houve a seguinte ocorrência na cancela de acesso: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Fotografe a cancela e o ponto de acesso.",
+        ajuda: "Informe se a cancela quebrou, travou aberta/fechada e como o fluxo foi controlado.",
+      },
+      {
+        key: "DISP_OUTRO",
+        label: "Outro dispositivo de segurança",
+        sevPadrao: "info",
+        modelo: "Informo que, às {hora}, em {local}, houve a seguinte ocorrência em dispositivo de segurança: ",
+        obrigatorios: ["local", "detalhamento", "horaInicio"],
+        fotos: "Fotografe o dispositivo afetado.",
+        ajuda: "Use para outros dispositivos de segurança. Descreva o equipamento, a falha e o impacto na proteção.",
+      },
+    ],
+  },
 ];
 
 // ── Helpers de consulta (usados pelo módulo; sem estado) ──────
 
 // Retorna a natureza pelo key, ou null.
+// Subtipos (fora de VEÍCULO) que ainda envolvem veículo/transportadora — ex.: furto de carga.
+export const SUBTIPOS_COM_VEICULO = [
+  "PES_FURTO",           // furto consumado (carga, cobre, etc.)
+  "PES_TENTATIVA_FURTO", // tentativa de furto / intrusão perimetral
+  "PES_ASSALTO",         // assalto/roubo com violência
+  "PES_INTRUSAO_PESSOA", // invasão/pessoa não autorizada (pode chegar de veículo)
+];
+// Decide se os campos de veículo/placa/transportadora devem aparecer para o subtipo.
+export function subtipoTemVeiculo(naturezaKey, subtipoKey) {
+  if (naturezaKey === "VEICULO") return true;
+  return SUBTIPOS_COM_VEICULO.includes(subtipoKey);
+}
+
 export function getNatureza(key) {
   return NATUREZAS.find((n) => n.key === key) || null;
 }

@@ -2650,27 +2650,29 @@ export default function App(){
   const [rsCounts,setRsCounts]=useState({}); // { pid: { total, naoVistas } }
   const [rsTotalGeral,setRsTotalGeral]=useState(0); // acumulado de TODAS as RS (visao gerencial)
   // Carrega contagens de RS de todos os projetos elegiveis (todos menos P260B).
+  const carregarRsCounts = React.useCallback(async ()=>{
+    try {
+      const ids = Object.keys(PROJECTS).filter(pid=>pid!=="P260B");
+      const snaps = await Promise.all(ids.map(pid=>getDoc(doc(db,"ocorrencias",pid)).catch(()=>null)));
+      const counts = {}; let geral = 0;
+      ids.forEach((pid,i)=>{
+        const regs = snaps[i]&&snaps[i].exists() ? (snaps[i].data().registros||[]) : [];
+        const total = regs.length;
+        const naoVistas = regs.filter(r=>!r.vistaGerencial).length;
+        counts[pid] = { total, naoVistas };
+        geral += total;
+      });
+      setRsCounts(counts);
+      setRsTotalGeral(geral);
+    } catch(e){ console.error("RS counts load error:", e); }
+  },[]);
   useEffect(()=>{
-    let vivo = true;
-    (async()=>{
-      try {
-        const ids = Object.keys(PROJECTS).filter(pid=>pid!=="P260B");
-        const snaps = await Promise.all(ids.map(pid=>getDoc(doc(db,"ocorrencias",pid)).catch(()=>null)));
-        if(!vivo) return;
-        const counts = {}; let geral = 0;
-        ids.forEach((pid,i)=>{
-          const regs = snaps[i]&&snaps[i].exists() ? (snaps[i].data().registros||[]) : [];
-          const total = regs.length;
-          const naoVistas = regs.filter(r=>!r.vistaGerencial).length;
-          counts[pid] = { total, naoVistas };
-          geral += total;
-        });
-        setRsCounts(counts);
-        setRsTotalGeral(geral);
-      } catch(e){ console.error("RS counts load error:", e); }
-    })();
-    return ()=>{ vivo = false; };
-  },[showOcorrencias]); // recarrega ao voltar do modulo RS
+    carregarRsCounts();
+    // Ao voltar do módulo RS, recarrega de novo após breve atraso (propagação do Firestore).
+    let t;
+    if(!showOcorrencias){ t = setTimeout(carregarRsCounts, 1200); }
+    return ()=>{ if(t) clearTimeout(t); };
+  },[showOcorrencias, carregarRsCounts]);
 
   const [showEmpresaInfo,setShowEmpresaInfo]=useState(false);
   const [empresaInfoProject,setEmpresaInfoProject]=useState(null);
