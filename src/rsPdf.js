@@ -85,7 +85,7 @@ function envolvidosDe(r) {
 function getCSS() {
   return `
     *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-    body{font-family:'Segoe UI',Arial,sans-serif;background:${MOKED.grayBg};color:${MOKED.ink};padding:24px;font-size:13px;line-height:1.55}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:${MOKED.grayBg};color:${MOKED.ink};padding:24px;font-size:14px;line-height:1.5}
     .header{background:${MOKED.black};border-radius:14px;margin-bottom:16px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,0.25);border-bottom:4px solid ${MOKED.red}}
     .header-top{padding:22px 26px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
     .brand-eyebrow{font-size:10px;color:${MOKED.red};text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;font-weight:800}
@@ -107,18 +107,49 @@ function getCSS() {
     .section-title{font-size:11px;font-weight:900;color:${MOKED.ink};text-transform:uppercase;letter-spacing:1px;border-left:4px solid ${MOKED.red};padding-left:10px;margin:18px 0 10px;break-after:avoid;page-break-after:avoid}
     .detalhe,.medidas{break-inside:avoid;page-break-inside:avoid}
     .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px}
-    .info-item label{font-size:9px;color:${MOKED.grayLbl};font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;letter-spacing:.6px}
-    .info-item span{font-size:14px;font-weight:700;color:${MOKED.ink}}
-    .detalhe{background:#fafafa;border:1px solid ${MOKED.line};border-radius:10px;padding:14px 16px;font-size:13.5px;color:#1e293b;line-height:1.6;white-space:pre-wrap}
-    .medidas{background:#fdf2f2;border-left:4px solid ${MOKED.red};border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:#5b1418;white-space:pre-wrap;line-height:1.7}
+    .info-item label{font-size:9.5px;color:${MOKED.grayLbl};font-weight:800;text-transform:uppercase;display:block;margin-bottom:3px;letter-spacing:.6px}
+    .info-item span{font-size:14.5px;font-weight:700;color:${MOKED.ink}}
+    .detalhe{background:#fafafa;border:1px solid ${MOKED.line};border-radius:10px;padding:14px 16px;font-size:14px;color:#1e293b;line-height:1.55;white-space:pre-wrap}
+    .medidas{background:#fdf2f2;border-left:4px solid ${MOKED.red};border-radius:0 8px 8px 0;padding:12px 16px;font-size:13.5px;color:#5b1418;white-space:pre-wrap;line-height:1.6}
     .galeria{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
     .foto{border:1px solid ${MOKED.line};border-radius:10px;overflow:hidden;background:#fff;page-break-inside:avoid}
     .foto img{width:100%;height:150px;object-fit:cover;display:block;background:#e5e7eb}
-    .foto .legenda{padding:9px 12px;font-size:11.5px;color:#475569;font-weight:600;border-top:1px solid ${MOKED.grayBg}}
+    .foto .legenda{padding:9px 12px;font-size:12px;color:#475569;font-weight:600;border-top:1px solid ${MOKED.grayBg}}
     .foto .tag{display:inline-block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:5px;margin-right:7px;color:#fff}
     .footer{text-align:center;margin-top:16px;padding-top:12px;border-top:2px solid ${MOKED.line};font-size:11px;color:#64748b;font-weight:600}
     .footer b{color:${MOKED.red}}
-    @media print{body{padding:10px;background:#fff}@page{margin:12mm}.no-print{display:none!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+    /* ═══ IMPRESSÃO COMPACTA ═══
+       Objetivo: mesmo conteúdo em menos páginas, sem apertar a leitura.
+       Ganha-se espaço cortando margens/paddings/sombras (que não ajudam no papel)
+       e reduzindo o espaçamento ENTRE blocos — a fonte continua legível (até um pouco maior). */
+    @media print{
+      body{padding:0;background:#fff;font-size:12.5px;line-height:1.4}
+      @page{margin:8mm}
+      .no-print{display:none!important}
+      *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+      /* header e cartão: menos respiro, sem sombra */
+      .header{margin-bottom:9px;box-shadow:none;border-radius:10px}
+      .header-top{padding:14px 18px}
+      .brand-title{font-size:22px;margin-bottom:3px}
+      .rs-card{padding:12px 16px;margin-bottom:8px;box-shadow:none;break-inside:avoid;page-break-inside:avoid}
+      .rs-top{padding-bottom:9px;margin-bottom:10px}
+      .rs-nat{font-size:18px}
+      /* títulos de seção: bem menos margem vertical (era o maior vilão do espaço em branco) */
+      .section-title{margin:9px 0 5px;font-size:11px}
+      /* grade de dados mais junta */
+      .info-grid{gap:7px 16px}
+      .info-item span{font-size:13.5px}
+      /* caixas de texto mais enxutas */
+      .detalhe{padding:9px 12px;font-size:13px;line-height:1.42;break-inside:avoid;page-break-inside:avoid}
+      .medidas{padding:9px 12px;font-size:12.5px;line-height:1.45}
+      /* fotos menores no papel: cabem lado a lado sem empurrar página */
+      .galeria{gap:8px}
+      .foto img{height:118px}
+      .foto .legenda{padding:6px 10px}
+      .footer{margin-top:9px;padding-top:8px}
+      /* cada RS do pacote começa em página nova só quando necessário */
+      .rs-card{break-inside:avoid}
+    }
   `;
 }
 
@@ -279,6 +310,21 @@ function buildRSCard(project, registro) {
 }
 
 // ── Empacota e baixa ──────────────────────────────────────────
+// Gera um "slug" limpo a partir do texto da ocorrência escolhida pelo líder,
+// para o nome do arquivo condizer com o cabeçalho (ex.: RS_P606_Colisao-entre-veiculos).
+function slugOcorrencia(txt){
+  return (txt||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"") // tira acentos
+    .replace(/[^a-zA-Z0-9]+/g,"-")                    // não-alfanumérico → hífen
+    .replace(/^-+|-+$/g,"")                            // apara hífens das pontas
+    .replace(/-{2,}/g,"-")                             // colapsa hífens repetidos
+    .slice(0,60) || "ocorrencia";                     // limite e fallback
+}
+// Título/nome legível da ocorrência (para <title> e nome do arquivo)
+function tituloOcorrencia(registro){
+  const sub = getSubtipo(registro?.subtipo);
+  return sub?.label || registro?.natureza || "Ocorrência";
+}
 function baixarHtml(html, nomeArquivo) {
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);
@@ -286,9 +332,12 @@ function baixarHtml(html, nomeArquivo) {
   a.href = url; a.download = nomeArquivo; a.click();
   URL.revokeObjectURL(url);
 }
-function envelope(project, subtitulo, corpoHtml, registroParaHeader) {
+function envelope(project, subtitulo, corpoHtml, registroParaHeader, tituloArquivo) {
+  // O <title> vira o nome padrão sugerido pelo navegador ao "Salvar como PDF".
+  // Por isso ele leva a ocorrência escolhida pelo líder (ex.: "RS P606 · Colisão entre veículos").
+  const tt = tituloArquivo || `RS — ${esc(project?.id || "")}`;
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
-<title>RS — ${esc(project?.id || "")}</title>
+<title>${esc(tt)}</title>
 <style>${getCSS()}</style></head><body>
 ${buildHeader(project, subtitulo, registroParaHeader)}
 <div class="no-print" style="text-align:center;margin-bottom:16px">
@@ -306,16 +355,20 @@ export function gerarPdfRS(project, registro) {
   if (!project || !registro) return;
   const sub = getSubtipo(registro?.subtipo);
   const subtitulo = sub?.label ? `Ocorrência: ${sub.label}` : "Ocorrência";
+  const nomeOcorr = tituloOcorrencia(registro);
+  const tituloArquivo = `RS ${project.id} · ${nomeOcorr}`;
   const corpo = buildRSCard(project, registro);
-  const html = envelope(project, subtitulo, corpo, registro);
-  baixarHtml(html, `RS_${project.id}_${idRS(project, registro)}.html`);
+  const html = envelope(project, subtitulo, corpo, registro, tituloArquivo);
+  // nome do arquivo condiz com a ocorrência escolhida em campo
+  baixarHtml(html, `RS_${project.id}_${slugOcorrencia(nomeOcorr)}.html`);
 }
 export function gerarPdfPacoteRS(project, registros, meta = {}) {
   if (!project || !Array.isArray(registros) || registros.length === 0) return;
   const n = registros.length;
   const subtitulo = meta.titulo || `Pacote de ${n} ocorrência${n > 1 ? "s" : ""}`;
   const corpo = registros.map(r => buildRSCard(project, r)).join("");
-  const html = envelope(project, subtitulo, corpo, null);
   const dataArq = new Date().toLocaleDateString("sv-SE");
+  const tituloArquivo = `RS ${project.id} · Pacote (${n}) · ${dataArq}`;
+  const html = envelope(project, subtitulo, corpo, null, tituloArquivo);
   baixarHtml(html, `RS_${project.id}_pacote_${dataArq}.html`);
 }

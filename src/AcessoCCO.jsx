@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
@@ -691,7 +691,13 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
   const [dots, setDots] = useState({});
   const [form, setForm] = useState(emptyForm("acesso"));
-  const setF = (k,v) => setForm(f=>({...f,[k]:v}));
+  // refs de autosave (declarados cedo p/ setF marcar "tocado")
+  const autosaveTimer = useRef(null);
+  const formTocado = useRef(false); // vira true quando o usuário mexe no form nesta sessão
+  const salvandoAuto = useRef(false);
+  const formRef = useRef(form); // sempre aponta para o form mais recente (p/ autosave na saída)
+  useEffect(()=>{ formRef.current = form; },[form]);
+  const setF = (k,v) => { formTocado.current = true; setForm(f=>({...f,[k]:v})); };
   const [equipe, setEquipe] = useState([]);
   const [equipDan, setEquipDan] = useState([]);
 
@@ -730,11 +736,53 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     if(tema==="supervisao") loadEquipDanificados(project.id).then(setEquipDan);
   },[tema, project?.id, screen==="pin"]);
 
-  // Autosave LOCAL desativado: o rascunho agora é um registro real no Firestore
-  // (salvo pelo botão "Salvar Rascunho"), visível para toda a equipe. O autosave
-  // em localStorage criava um rascunho "fantasma" que só aparecia num aparelho.
-  // Mantido o efeito vazio para não alterar a ordem dos hooks.
-  useEffect(()=>{},[form, screen, project?.id, tema]);
+  // ── AUTOSAVE automático do rascunho (compartilhado, no Firestore) ──
+  // Assim que a pessoa começa a preencher, o rascunho passa a se salvar sozinho
+  // (~3,5s após parar de digitar) como registro rascunho:true — visível para toda
+  // a equipe e continuável de qualquer aparelho. Não precisa clicar em nada.
+  // Debounce evita martelar o banco a cada tecla.
+  // detecta se o form tem conteúdo que justifique um rascunho (evita salvar vazio)
+  const formTemConteudo = (f) => {
+    if(!f) return false;
+    if(Array.isArray(f.colaboradores) && f.colaboradores.length>0) return true;
+    if(Array.isArray(f.equipamentos) && f.equipamentos.some(e=>e && e.acao)) return true;
+    const campos = ["nome","empresa","horaEntrada","observacao","obs","descricao","tipo","area","local","motivo","responsavel","supervisor","chegada","saida"];
+    return campos.some(k=>(f[k]||"").toString().trim().length>0);
+  };
+  const autosaveRascunho = async (fSnapshot) => {
+    if(salvandoAuto.current) return;
+    salvandoAuto.current = true;
+    try {
+      const atual = dados[tema] || [];
+      const reg = {...fSnapshot, rascunho:true, arquivado:false,
+        registradoEm: fSnapshot.registradoEm || new Date().toISOString(),
+        updatedAt:new Date().toISOString(), autosave:true};
+      const semEste = atual.filter(r=>r.id!==reg.id);
+      const newList = [reg, ...semEste];
+      setRegistros(newList);
+      await saveTema(tema, project.id, newList);
+    } catch(e){ console.error("autosave rascunho:", e); }
+    salvandoAuto.current = false;
+  };
+  useEffect(()=>{
+    if(screen!=="form" || isRonda || isCftv || isBodycam || !project?.id) return;
+    if(!formTocado.current) return;          // só depois que o usuário mexeu
+    if(!formTemConteudo(form)) return;       // não salva rascunho vazio
+    if(autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    const snap = form;
+    autosaveTimer.current = setTimeout(()=>{ autosaveRascunho(snap); }, 3500);
+    return ()=>{ if(autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+  },[form, screen, tema, project?.id]);
+  // Ao SAIR da tela de preenchimento, grava imediatamente o que houver (sem esperar debounce).
+  // Usa formRef p/ pegar o form mais recente; formTocado evita gravar após Concluir (que já zera a flag).
+  useEffect(()=>{
+    if(screen==="form") return; // só age quando DEIXA de estar no form
+    if(formTocado.current && !isRonda && !isCftv && !isBodycam && project?.id && formTemConteudo(formRef.current)){
+      autosaveRascunho(formRef.current);
+      formTocado.current=false;
+    }
+  // eslint-disable-next-line
+  },[screen]);
 
   const setRegistros = (novaLista) => setDados(prev=>({...prev,[tema]:novaLista}));
 
@@ -746,8 +794,8 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     }
     return base;
   };
-  const novoLimpo = () => { clearDraft(tema, project.id); setHasDraft(false); setForm(seedForm(emptyForm(tema))); setScreen("form"); };
-  const continuarRascunho = () => { const d=loadDraft(tema,project.id); setForm(seedForm(d?.form||emptyForm(tema))); setScreen("form"); };
+  const novoLimpo = () => { formTocado.current=false; clearDraft(tema, project.id); setHasDraft(false); setForm(seedForm(emptyForm(tema))); setScreen("form"); };
+  const continuarRascunho = () => { formTocado.current=false; const d=loadDraft(tema,project.id); setForm(seedForm(d?.form||emptyForm(tema))); setScreen("form"); };
   // Salvar rascunho AGORA grava no Firestore como registro real com rascunho:true.
   // Assim ele aparece para toda a equipe (qualquer dispositivo) e pode ser
   // continuado/arquivado/excluído por qualquer um — não fica preso no aparelho.
@@ -762,6 +810,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
       await saveTema(tema, project.id, newList);
       clearDraft(tema, project.id);   // limpa o rascunho local: a fonte da verdade agora é o Firestore
       setHasDraft(false);
+      formTocado.current=false; if(autosaveTimer.current) clearTimeout(autosaveTimer.current);
       setForm(emptyForm(tema));
       setScreen("list");
     } catch(e){ console.error(e); alert("Erro ao salvar o rascunho. Verifique sua conexão."); }
@@ -782,6 +831,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
       await saveTema(tema, project.id, newList);
       clearDraft(tema, project.id);
       setHasDraft(false);
+      formTocado.current=false; if(autosaveTimer.current) clearTimeout(autosaveTimer.current);
       setForm(emptyForm(tema));
       setScreen("list");
     } catch(e) { console.error(e); alert("Erro ao salvar. Verifique sua conexão."); }
@@ -802,7 +852,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   };
   // Reabre um RASCUNHO já salvo no Firestore (registro com rascunho:true) para
   // continuar o preenchimento. Como é registro real, qualquer dispositivo abre.
-  const continuarRegistro = (r) => { setForm(seedForm({...emptyForm(tema), ...r})); setScreen("form"); };
+  const continuarRegistro = (r) => { formTocado.current=false; setForm(seedForm({...emptyForm(tema), ...r})); setScreen("form"); };
 
   if(screen==="pin") return (
     <PinGate project={project||{}} dark={dark||true} onBack={onBack}

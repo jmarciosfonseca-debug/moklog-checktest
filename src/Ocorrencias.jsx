@@ -20,7 +20,7 @@
 //   • Datas locais com toLocaleDateString("sv-SE") — bug de UTC conhecido.
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
@@ -456,23 +456,28 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const [reincIgnorada, setReincIgnorada] = useState(false);
   const [temRascunho, setTemRascunho] = useState(false);
   const [rascunhoSalvoEm, setRascunhoSalvoEm] = useState(null); // horario do ultimo salvamento de rascunho (feedback)
-  const setF = (k,v) => setForm(f=>({...f,[k]:v}));
-  const addVeiculo = () => setForm(f=>({...f, veiculos:[...(f.veiculos||[]), { placa:"", tipo:"" }]}));
-  const removeVeiculo = (idx) => setForm(f=>{
+  // ── Autosave automático do rascunho (rede de segurança) ──
+  const rsTocado = useRef(false);        // vira true quando o usuário mexe no form
+  const rsAutosaveTimer = useRef(null);  // debounce
+  const rsFormRef = useRef(form);        // aponta sempre para o form mais recente
+  useEffect(()=>{ rsFormRef.current = form; },[form]);
+  const setF = (k,v) => { rsTocado.current = true; setForm(f=>({...f,[k]:v})); };
+  const addVeiculo = () => { rsTocado.current=true; setForm(f=>({...f, veiculos:[...(f.veiculos||[]), { placa:"", tipo:"" }]})); };
+  const removeVeiculo = (idx) => { rsTocado.current=true; setForm(f=>{
     const arr=(f.veiculos||[]).filter((_,i)=>i!==idx);
     return {...f, veiculos: arr.length? arr : [{ placa:"", tipo:"" }]};
-  });
-  const setVeiculo = (idx,campo,val) => setForm(f=>({
+  }); };
+  const setVeiculo = (idx,campo,val) => { rsTocado.current=true; setForm(f=>({
     ...f, veiculos:(f.veiculos||[]).map((v,i)=>i===idx?{...v,[campo]:val}:v)
-  }));
-  const addEnvolvido = () => setForm(f=>({...f, envolvidos:[...(f.envolvidos||[]), { nome:"", documento:"" }]}));
-  const removeEnvolvido = (idx) => setForm(f=>{
+  })); };
+  const addEnvolvido = () => { rsTocado.current=true; setForm(f=>({...f, envolvidos:[...(f.envolvidos||[]), { nome:"", documento:"" }]})); };
+  const removeEnvolvido = (idx) => { rsTocado.current=true; setForm(f=>{
     const arr=(f.envolvidos||[]).filter((_,i)=>i!==idx);
     return {...f, envolvidos: arr.length? arr : [{ nome:"", documento:"" }]};
-  });
-  const setEnvolvido = (idx,campo,val) => setForm(f=>({
+  }); };
+  const setEnvolvido = (idx,campo,val) => { rsTocado.current=true; setForm(f=>({
     ...f, envolvidos:(f.envolvidos||[]).map((e,i)=>i===idx?{...e,[campo]:val}:e)
-  }));
+  })); };
 
   const adminAuth = authLevel==="admin";
 
@@ -491,6 +496,36 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     if(!project?.id) return;
     try { setTemRascunho(!!localStorage.getItem(`rs_rascunho_${project.id}`)); } catch(e){}
   },[project?.id, screen]);
+
+  // ── AUTOSAVE do rascunho enquanto preenche (rede de segurança) ──
+  // ~3,5s depois que a pessoa para de digitar, o rascunho salva sozinho (só textos,
+  // sem foto p/ não estourar a cota). Não precisa clicar. Concluir continua exigindo
+  // tudo preenchido — isto aqui é só para nada se perder.
+  const rsFormTemConteudo = (f) => {
+    if(!f) return false;
+    if(f.natureza || f.subtipo) return true;
+    if(Array.isArray(f.envolvidos) && f.envolvidos.some(e=>e && (e.nome||e.documento))) return true;
+    if(Array.isArray(f.veiculos) && f.veiculos.some(v=>v && v.placa)) return true;
+    const campos = ["resumo","detalhamento","medidas","local","observacao","transportadora","inquilino"];
+    return campos.some(k=>(f[k]||"").toString().trim().length>0);
+  };
+  const rsAutosave = (fSnap) => {
+    try {
+      const paraSalvar = { ...fSnap, fotos: [] }; // nunca grava foto no rascunho
+      localStorage.setItem(`rs_rascunho_${project.id}`, JSON.stringify(paraSalvar));
+      setTemRascunho(true);
+      setRascunhoSalvoEm(new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));
+    } catch(e){ /* cota cheia: silencioso; o salvar manual avisa */ }
+  };
+  useEffect(()=>{
+    if(screen!=="registrar" || !project?.id) return;
+    if(!rsTocado.current) return;
+    if(!rsFormTemConteudo(form)) return;
+    if(rsAutosaveTimer.current) clearTimeout(rsAutosaveTimer.current);
+    const snap = form;
+    rsAutosaveTimer.current = setTimeout(()=>{ rsAutosave(snap); }, 3500);
+    return ()=>{ if(rsAutosaveTimer.current) clearTimeout(rsAutosaveTimer.current); };
+  },[form, screen, project?.id]);
 
   const salvarRascunho = () => {
     // As FOTOS (dataUrl base64) NAO entram no rascunho: elas estouram a cota do
@@ -534,6 +569,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     try { localStorage.removeItem(`rs_rascunho_${project.id}`); } catch(e){}
     setTemRascunho(false);
     setRascunhoSalvoEm(null);
+    rsTocado.current=false; if(rsAutosaveTimer.current) clearTimeout(rsAutosaveTimer.current);
   };
 
   const onPinOk = (level) => {
@@ -632,6 +668,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       };
       const fundida = await persistirRegistro(project.id, novo, registros);
       setRegistros(fundida);
+      rsTocado.current=false; if(rsAutosaveTimer.current) clearTimeout(rsAutosaveTimer.current);
       setForm(emptyForm());
       setReincIgnorada(false);
       descartarRascunho();
