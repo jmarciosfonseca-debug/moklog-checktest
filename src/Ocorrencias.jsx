@@ -693,6 +693,14 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     setForm({ ...r, envolvidos: migrarEnvolvidos(r), veiculos: migrarVeiculos(r) });
     setScreen("editar");
   };
+  // ── Visualização SÓ LEITURA da RS completa (sem gerar PDF, sem risco de editar) ──
+  const [rsVisto, setRsVisto] = useState(null); // registro em exibição na tela "ver"
+  const abrirVisualizacao = (r) => {
+    marcarVista(r);                        // abrir = dar baixa no alerta (gerencial)
+    setRsVisto({ ...r, envolvidos: migrarEnvolvidos(r), veiculos: migrarVeiculos(r) });
+    setScreen("ver");
+  };
+  const fecharVisualizacao = () => { setRsVisto(null); setScreen("historico"); };
   const cancelarEdicao = () => { setForm(emptyForm()); setScreen("historico"); };
   const salvarEdicaoTextos = async () => {
     setSaving(true);
@@ -1244,6 +1252,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             })()}
 
             <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
+              <button onClick={()=>abrirVisualizacao(r)} style={{...S.btnSm, color:"#8b5cf6", borderColor:"#8b5cf655", fontWeight:800}}>👁️ Ver</button>
               <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
               <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Enviar (Outlook)</button>
               <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}>💬 WhatsApp</button>
@@ -1336,11 +1345,133 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
     </div>
   );
 
+  // ── Tela: VER (somente leitura da RS completa) ──
+  const telaVer = (() => {
+    const r = rsVisto;
+    if(!r) return null;
+    const nat = getNatureza(r.natureza), sub = getSubtipo(r.subtipo);
+    const sev = r.severidade || sub?.severidade;
+    const st = r.status || RS_STATUS.PENDENTE;
+    const envs = (r.envolvidos && r.envolvidos.length) ? r.envolvidos
+      : (r.nomeEnvolvido||r.documentoEnvolvido ? [{nome:r.nomeEnvolvido,documento:r.documentoEnvolvido}] : []);
+    const vecs = (r.veiculos||[]).filter(v=>v && (v.placa||v.placaCavalo));
+    const placaTxt = vecs.map(v=>{
+      if(v.tipo==="Carreta" && v.placaCavalo) return `${v.placa} (Carreta) · ${v.placaCavalo} (Cavalo)`;
+      return v.placa + (v.tipo?` (${v.tipo})`:"");
+    }).join(" · ");
+    const flagsAtivas = (r.flags||[]).map(k=>{
+      const f = (FLAGS||[]).find(x=>x.key===k);
+      return { label: f?.label||k, desc: (r.flagDescs||{})[k]||"" };
+    });
+    const Bloco = ({titulo, children}) => (
+      <div style={{marginTop:12}}>
+        <div style={{fontSize:11, fontWeight:900, color:"#B21E27", textTransform:"uppercase", letterSpacing:.8,
+          borderLeft:"3px solid #B21E27", paddingLeft:8, marginBottom:6}}>{titulo}</div>
+        {children}
+      </div>
+    );
+    const Campo = ({rot, val}) => (val ? (
+      <div style={{marginBottom:8}}>
+        <div style={{fontSize:9.5, fontWeight:800, ...S.txt2, textTransform:"uppercase", letterSpacing:.5}}>{rot}</div>
+        <div style={{fontSize:14, fontWeight:700, ...S.txt, marginTop:1}}>{val}</div>
+      </div>
+    ) : null);
+    return (
+      <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:4, paddingBottom:24}}>
+        {/* Cabeçalho de leitura */}
+        <div style={{background:"#8b5cf611", border:"1px solid #8b5cf644", borderRadius:12, padding:"12px 14px",
+          display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:10, fontWeight:800, color:nat?.cor||"#8b5cf6", letterSpacing:.5}}>{nat?.icon} {nat?.label||r.natureza}</div>
+            <div style={{fontSize:17, fontWeight:800, ...S.txt, marginTop:3}}>{r.resumo || sub?.label || "Ocorrência"}</div>
+            <div style={{fontSize:11.5, ...S.txt2, marginTop:3}}>{sub?.label}</div>
+          </div>
+          <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4}}>
+            {sev && <span style={{fontSize:10, fontWeight:800, color:"#fff", background:sevCor(sev), padding:"3px 8px", borderRadius:6}}>{sevLabel(sev)}</span>}
+            <span style={{fontSize:9, fontWeight:800, padding:"2px 7px", borderRadius:5,
+              background: st===RS_STATUS.ARQUIVADO ? (dark?"#0f172a":"#f1f5f9") : "#fff8f0",
+              color: st===RS_STATUS.ARQUIVADO ? "#64748b" : "#b45309"}}>{st===RS_STATUS.ARQUIVADO?"ARQUIVADO":"PENDENTE"}</span>
+          </div>
+        </div>
+
+        <div style={S.card}>
+          <Bloco titulo="Dados da Ocorrência">
+            <Campo rot="Data / Hora" val={fmtDataHoraBR(r.dataHora || r.registradoEm)}/>
+            <Campo rot="Normalização" val={r.horaFim}/>
+            <Campo rot="Líder operacional" val={r.lider}/>
+            <Campo rot="Origem do alerta" val={r.quemAvisou}/>
+            <Campo rot="Comunicado a" val={r.quemAvisado}/>
+            <Campo rot="Transportadora / Inquilino" val={r.transportadora || r.inquilino}/>
+            {placaTxt && <Campo rot="Veículo(s)" val={placaTxt}/>}
+            <Campo rot="Local do evento" val={r.local}/>
+          </Bloco>
+
+          {envs.length>0 && (
+            <Bloco titulo="Envolvidos">
+              {envs.map((ev,i)=>(
+                <div key={i} style={{fontSize:13.5, ...S.txt, marginBottom:4, display:"flex", gap:8, flexWrap:"wrap"}}>
+                  <span style={{fontWeight:700}}>{i+1}º {ev.nome||"—"}</span>
+                  {ev.documento && <span style={{...S.txt2}}>📄 {adminAuth ? ev.documento : mascararDoc(ev.documento)}</span>}
+                </div>
+              ))}
+              {r.telefoneEnvolvido && <div style={{fontSize:13, ...S.txt2, marginTop:2}}>📞 {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</div>}
+            </Bloco>
+          )}
+
+          {r.resumo && <Bloco titulo="Resumo do Evento"><div style={{fontSize:14, fontWeight:700, ...S.txt}}>{r.resumo}</div></Bloco>}
+          {r.detalhamento && <Bloco titulo="Detalhamento Operacional"><div style={{fontSize:13.5, ...S.txt, whiteSpace:"pre-wrap", lineHeight:1.55}}>{r.detalhamento}</div></Bloco>}
+          {r.medidas && <Bloco titulo="Medidas Imediatas Adotadas"><div style={{fontSize:13.5, ...S.txt, whiteSpace:"pre-wrap", lineHeight:1.55}}>{r.medidas}</div></Bloco>}
+          {r.observacao && <Bloco titulo="Observações de Inteligência / CFTV"><div style={{fontSize:13.5, ...S.txt, whiteSpace:"pre-wrap", lineHeight:1.55}}>{r.observacao}</div></Bloco>}
+
+          {flagsAtivas.length>0 && (
+            <Bloco titulo="Classificação Secundária">
+              {flagsAtivas.map((f,i)=>(
+                <div key={i} style={{fontSize:13, ...S.txt, marginBottom:3}}>• {f.label}{f.desc?` — ${f.desc}`:""}</div>
+              ))}
+            </Bloco>
+          )}
+
+          {(r.fotos||[]).length>0 && (
+            <Bloco titulo={`Evidências Fotográficas (${r.fotos.length})`}>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8}}>
+                {r.fotos.map((ft,i)=>(
+                  <div key={i} style={{border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`, borderRadius:10, overflow:"hidden"}}>
+                    <img src={ft.dataUrl} alt="" style={{width:"100%", height:110, objectFit:"cover", display:"block"}}/>
+                    <div style={{padding:"5px 8px", fontSize:11, ...S.txt2}}>
+                      <b style={{color: (ft.origem==="cftv")?"#121212":"#B21E27"}}>{(ft.origem==="cftv")?"CFTV":"LOCAL"}</b> {ft.legenda||""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Bloco>
+          )}
+
+          {r.assinatura && (
+            <div style={{marginTop:16, textAlign:"right", borderTop:`1px solid ${dark?"#1e293b":"#e2e8f0"}`, paddingTop:8}}>
+              <div style={{fontSize:14, fontWeight:800, ...S.txt}}>{r.assinatura}</div>
+              <div style={{fontSize:10, ...S.txt2, textTransform:"uppercase", letterSpacing:.5}}>Responsável pelo registro</div>
+            </div>
+          )}
+        </div>
+
+        {/* Ações — mesma permissão do histórico (PDF só gerencial) */}
+        <div style={{display:"flex", gap:6, flexWrap:"wrap", marginTop:8}}>
+          <button onClick={fecharVisualizacao} style={{...S.btnSec, flex:"1 1 90px"}}>← Voltar</button>
+          <button onClick={()=>{ const rr=r; fecharVisualizacao(); abrirEdicaoTextos(rr); }} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
+          <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Outlook</button>
+          <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}>💬 WhatsApp</button>
+          {adminAuth && <button onClick={()=>gerarPdfRS(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>}
+        </div>
+      </div>
+    );
+  })();
+
   return (
     <div style={S.page}>
       <div style={S.wrap}>
         <Header/>
         <Tabs/>
+        {screen==="ver"        && telaVer}
         {screen==="editar"     && telaEditarTextos}
         {screen==="registrar"  && telaRegistrar}
         {screen==="historico"  && telaHistorico}
