@@ -142,6 +142,18 @@ function minutosDesdeInicio(tipo, dataInicio, agora=new Date()) {
   return Math.floor((agora.getTime() - ini.getTime())/60000);
 }
 
+// Uma ronda (slot) "tem conteúdo" se qualquer campo de trabalho foi preenchido.
+// Usado pela proteção anti-perda no snapshot e pela checagem de turno vazio.
+// Fonte única da verdade — evita divergência entre o que é gravado e o que é
+// considerado "preenchido".
+function rondaTemConteudo(r) {
+  if (!r || typeof r !== "object") return false;
+  return !!(r.inicio || r.fim || r.naoExec || r.anomalia ||
+            (r.justificativa && r.justificativa.trim && r.justificativa.trim()) ||
+            (r.obs && r.obs.trim && r.obs.trim()) ||
+            r.status || r.hora);
+}
+
 // Status de UM slot a partir do relógio (puro, testável).
 // registro = entrada salva em turnoObj.rondas[offset] (ou null)
 // Retorna: feita | feita_atrasada | naoexec | aguardando | aberto | atraso_aberto | bloqueado
@@ -247,13 +259,29 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
         if(!loc || !loc.rondas) return t;
         const rondas = {...(t.rondas||{})};
         let mudou = false;
+        // PROTEÇÃO ANTI-PERDA (reforçada): para CADA slot que localmente tem
+        // conteúdo real (qualquer campo — inicio, fim, naoExec, justificativa,
+        // obs, anomalia), garante que o eco do servidor NUNCA o esvazie.
+        // Merge campo-a-campo: o servidor só sobrescreve um campo se trouxer
+        // valor não-vazio; campos vazios no servidor mantêm o valor local.
+        // Corrige o bug "fiz 8 rondas e no envio apareceu 0".
         for(const off of Object.keys(loc.rondas||{})){
           const rl = loc.rondas[off]||{};
+          if(!rondaTemConteudo(rl)) continue; // slot local vazio: nada a proteger
           const rs = rondas[off]||{};
-          // local tem inicio e servidor ainda não → mantém o progresso local do slot
-          if(rl.inicio && !rs.inicio){ rondas[off] = {...rs, ...rl}; mudou = true; }
-          // local já fechou (fim) e servidor não → idem
-          else if(rl.fim && !rs.fim && rl.inicio){ rondas[off] = {...rs, ...rl}; mudou = true; }
+          // se o servidor NEM TEM o slot mas o local tem conteúdo, recupera inteiro
+          if(!rondas[off] || Object.keys(rs).length===0){ rondas[off] = {...rl}; mudou = true; continue; }
+          // combina campo-a-campo: servidor vazio + local cheio → mantém local
+          const merged = {...rs};
+          let mudouSlot = false;
+          for(const campo of Object.keys(rl)){
+            const vLocal = rl[campo];
+            const vServ  = rs[campo];
+            const servVazio  = vServ===undefined || vServ===null || vServ==="" || vServ===false;
+            const localCheio = !(vLocal===undefined || vLocal===null || vLocal==="" || vLocal===false);
+            if(servVazio && localCheio){ merged[campo] = vLocal; mudouSlot = true; }
+          }
+          if(mudouSlot){ rondas[off] = merged; mudou = true; }
         }
         return mudou ? {...t, rondas} : t;
       });
@@ -303,7 +331,33 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
         for(const id of alterados){
           if(remover.has(id)){ mapa.delete(id); continue; }
           const localT = localMap.get(id);
-          if(localT) mapa.set(id, localT); // versão local vence NAQUELE turno
+          if(!localT) continue;
+          // MERGE DE RONDAS COM O SERVIDOR (anti-perda no arquivamento):
+          // a versão local vence no turno, MAS as rondas são combinadas com as
+          // do servidor slot-a-slot, preservando o registro mais completo. Assim
+          // um arquivamento nunca zera rondas que já estavam no servidor (ex.:
+          // eco atrasado esvaziou o estado local logo antes de arquivar).
+          const servT = mapa.get(id);
+          if(servT && servT.rondas){
+            const rondasMescladas = {...(servT.rondas||{})};
+            const rondasLocais = localT.rondas||{};
+            for(const off of Object.keys(rondasLocais)){
+              const rl = rondasLocais[off]||{};
+              const rsv = rondasMescladas[off]||{};
+              if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue; // servidor mais completo
+              // combina campo-a-campo, valor não-vazio prevalece (local preenchido vence vazio do servidor)
+              const merged = {...rsv};
+              for(const campo of Object.keys(rl)){
+                const vLocal = rl[campo];
+                const localCheio = !(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false);
+                if(localCheio) merged[campo] = vLocal;
+              }
+              rondasMescladas[off] = merged;
+            }
+            mapa.set(id, {...localT, rondas: rondasMescladas});
+          } else {
+            mapa.set(id, localT); // servidor não tinha o turno: versão local inteira
+          }
         }
         // remoções explícitas
         for(const id of remover) mapa.delete(id);
@@ -572,7 +626,7 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
   // Turno "vazio": nenhuma ronda foi registrada ainda. Nesse caso qualquer
   // usuário pode CANCELAR (abertura por engano — ex.: turno/plantonista errado),
   // sem precisar de PIN gerencial e sem exigir justificativas.
-  const turnoVazio = !Object.values(turno.rondas||{}).some(r=>r && (r.status || r.hora || r.obs));
+  const turnoVazio = !Object.values(turno.rondas||{}).some(r=>rondaTemConteudo(r));
 
   const tentarArquivar = () => {
     if(naoRealizadasSemJust>0){
