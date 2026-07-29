@@ -370,13 +370,85 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       setListaPendente(null);
     }
     catch(e){
-      console.error("Ronda save error:",e);
-      // fallback: gravação simples via fireGuard (respeita modo demo)
+      console.error("Ronda save error (tentativa 1):",e);
+      // A transação falhou. NUNCA gravar a lista local crua por cima (isso
+      // apagaria rondas de outros dispositivos e slots revertidos por eco).
+      // Em vez disso: (1) tenta a transação de novo uma vez; (2) se falhar,
+      // faz um merge manual re-lendo o servidor, preservando tudo.
+      let ok = false;
+      // (1) retry único da transação
       try{
-        await fgSetDoc(ref, { turnos:lista, updatedAt:stamp });
-        setErroSalvar(false); setListaPendente(null);
-      }catch(e2){
-        console.error("Ronda fallback save error:",e2);
+        await runTransaction(db, async (tx)=>{
+          const snap = await tx.get(ref);
+          const servidor = snap.exists() ? (snap.data().turnos||[]) : [];
+          const mapa = new Map(servidor.map(t=>[t.id, t]));
+          const localMap2 = new Map(lista.map(t=>[t.id, t]));
+          for(const id of alterados){
+            if(remover.has(id)){ mapa.delete(id); continue; }
+            const localT = localMap2.get(id);
+            if(!localT) continue;
+            const servT = mapa.get(id);
+            if(servT && servT.rondas){
+              const rm = {...(servT.rondas||{})};
+              const rlo = localT.rondas||{};
+              for(const off of Object.keys(rlo)){
+                const rl = rlo[off]||{}, rsv = rm[off]||{};
+                if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue;
+                const merged = {...rsv};
+                for(const campo of Object.keys(rl)){
+                  const vLocal = rl[campo];
+                  if(!(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false)) merged[campo]=vLocal;
+                }
+                rm[off] = merged;
+              }
+              mapa.set(id, {...localT, rondas: rm});
+            } else { mapa.set(id, localT); }
+          }
+          for(const id of remover) mapa.delete(id);
+          for(const [id,t] of localMap2){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
+          tx.set(ref, { turnos: Array.from(mapa.values()), updatedAt: stamp });
+        });
+        ok = true;
+      }catch(eRetry){ console.error("Ronda save error (retry):",eRetry); }
+
+      // (2) merge manual não-destrutivo (lê servidor, combina, grava)
+      if(!ok){
+        try{
+          const snap = await getDoc(ref);
+          const servidor = snap.exists() ? (snap.data().turnos||[]) : [];
+          const mapa = new Map(servidor.map(t=>[t.id, t]));
+          const localMap2 = new Map(lista.map(t=>[t.id, t]));
+          for(const id of alterados){
+            if(remover.has(id)){ mapa.delete(id); continue; }
+            const localT = localMap2.get(id);
+            if(!localT) continue;
+            const servT = mapa.get(id);
+            if(servT && servT.rondas){
+              const rm = {...(servT.rondas||{})};
+              const rlo = localT.rondas||{};
+              for(const off of Object.keys(rlo)){
+                const rl = rlo[off]||{}, rsv = rm[off]||{};
+                if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue;
+                const merged = {...rsv};
+                for(const campo of Object.keys(rl)){
+                  const vLocal = rl[campo];
+                  if(!(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false)) merged[campo]=vLocal;
+                }
+                rm[off] = merged;
+              }
+              mapa.set(id, {...localT, rondas: rm});
+            } else { mapa.set(id, localT); }
+          }
+          for(const id of remover) mapa.delete(id);
+          for(const [id,t] of localMap2){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
+          await fgSetDoc(ref, { turnos: Array.from(mapa.values()), updatedAt: stamp });
+          ok = true;
+        }catch(eMerge){ console.error("Ronda merge fallback error:",eMerge); }
+      }
+
+      if(ok){ setErroSalvar(false); setListaPendente(null); }
+      else {
+        // não conseguiu gravar: mantém pendente e AVISA (não perde o trabalho local)
         setErroSalvar(true);
         setListaPendente(lista);
       }
