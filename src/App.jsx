@@ -3244,7 +3244,22 @@ export default function App(){
     setPhotos([]);setScreen("form");setActive(null);
   };
 
-  const continueDraft=()=>{setState(draft.state);setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);};
+  const continueDraft=()=>{
+    // MIGRAÇÃO: um rascunho salvo antes de uma atualização de checklist pode não
+    // ter as categorias novas. Mescla o draft com a estrutura atual do projeto,
+    // criando em branco qualquer categoria que falte (sem perder o que foi preenchido).
+    const migrado={...(draft.state||{})};
+    for(const cat of project.categories){
+      if(migrado[cat.id]===undefined||migrado[cat.id]===null){
+        if(cat.type==="items") migrado[cat.id]=(cat.itemLabels||[]).map(()=>({status:"ok",note:"",since:""}));
+        else if(cat.type==="single") migrado[cat.id]={status:"ok",note:"",since:""};
+        else if(cat.type==="count") migrado[cat.id]={total:cat.total,inoperative:[]};
+        else if(cat.type==="notes") migrado[cat.id]={items:[]};
+        else if(cat.type==="maintenance") migrado[cat.id]={visits:[]};
+      }
+    }
+    setState(migrado);setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);
+  };
   const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);};
   const deleteDraftOnly=()=>{clearDraft();setShowDraftPrompt(false);}; // exclui o rascunho e fica onde está
 
@@ -3576,7 +3591,18 @@ export default function App(){
 
         {state&&project.categories.map(cat=>{
           const isOpen=active===cat.id;
-          const sv=state[cat.id];
+          // BLINDAGEM: categoria nova (adicionada em atualização) pode não existir
+          // no estado carregado de um teste anterior. Cria o estado em branco na
+          // hora para a cascata sempre abrir e ser preenchível.
+          let sv=state[cat.id];
+          if(sv===undefined||sv===null){
+            if(cat.type==="items") sv=(cat.itemLabels||[]).map(()=>({status:"ok",note:"",since:""}));
+            else if(cat.type==="single") sv={status:"ok",note:"",since:""};
+            else if(cat.type==="count") sv={total:cat.total,inoperative:[]};
+            else if(cat.type==="notes") sv={items:[]};
+            else if(cat.type==="maintenance") sv={visits:[]};
+            else sv=[];
+          }
           let cp=100;
           if(cat.type==="single"){const st=sv?.status??(sv?.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
           else if(cat.type==="items"){const a=sv||[];const okN=a.filter(v=>(v.status??"ok")==="ok").length;const partN=a.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),a.length);}
