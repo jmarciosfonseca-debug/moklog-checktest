@@ -666,8 +666,10 @@ function buildFromLast(project, lastState) {
       st[cat.id]={status:prevSt, note:prev?.note||"", since:prevSt!=="ok"?prev?.since||todayStr():""};
     } else if(cat.type==="items"){
       const prev=lastState[cat.id]??cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
+      // normaliza para array (compat com estados antigos salvos como objeto)
+      const prevArr=Array.isArray(prev)?prev:Object.keys(prev).sort((a,b)=>(+a)-(+b)).map(k=>prev[k]);
       st[cat.id]=cat.itemLabels.map((_,i)=>{
-        const p=prev[i]??{status:"ok"};
+        const p=prevArr[i]??{status:"ok"};
         const pSt=p.status??(p.ok===false?"inop":"ok");
         return {status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
       });
@@ -3228,7 +3230,27 @@ export default function App(){
 
   const startEditReport=(proj,report,idx)=>{
     setProject(proj);
-    setState(JSON.parse(JSON.stringify(report.state)));
+    // MIGRAÇÃO: relatório salvo antes de uma atualização pode ter categorias ou
+    // itens a menos que o checklist atual (ex: nova zona perimetral, categoria
+    // dividida). Completa o que falta preservando tudo que já foi preenchido.
+    const raw=JSON.parse(JSON.stringify(report.state||{}));
+    const migrado={...raw};
+    for(const cat of proj.categories){
+      const cur=migrado[cat.id];
+      if(cur===undefined||cur===null){
+        if(cat.type==="items") migrado[cat.id]=(cat.itemLabels||[]).map(()=>({status:"ok",note:"",since:""}));
+        else if(cat.type==="single") migrado[cat.id]={status:"ok",note:"",since:""};
+        else if(cat.type==="count") migrado[cat.id]={total:cat.total,inoperative:[]};
+        else if(cat.type==="notes") migrado[cat.id]={items:[]};
+        else if(cat.type==="maintenance") migrado[cat.id]={visits:[]};
+      } else if(cat.type==="items" && cat.itemLabels){
+        // normaliza para array e completa itens faltantes (ex: Zona 05 nova)
+        let arr=Array.isArray(cur)?[...cur]:Object.keys(cur).sort((a,b)=>(+a)-(+b)).map(k=>cur[k]);
+        while(arr.length<cat.itemLabels.length) arr.push({status:"ok",note:"",since:""});
+        migrado[cat.id]=arr;
+      }
+    }
+    setState(migrado);
     setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:"",...report.meta,date:report.meta?.date||todayStr()});
     setPhotos([]);
     setEditingIdx(idx);
@@ -3602,6 +3624,11 @@ export default function App(){
             else if(cat.type==="notes") sv={items:[]};
             else if(cat.type==="maintenance") sv={visits:[]};
             else sv=[];
+          } else if(cat.type==="items" && Array.isArray(sv) && cat.itemLabels && sv.length<cat.itemLabels.length){
+            // categoria existente ganhou itens novos (ex: nova zona perimetral):
+            // completa os que faltam em branco, preservando os já preenchidos
+            sv=[...sv];
+            while(sv.length<cat.itemLabels.length) sv.push({status:"ok",note:"",since:""});
           }
           let cp=100;
           if(cat.type==="single"){const st=sv?.status??(sv?.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
