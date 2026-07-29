@@ -107,38 +107,45 @@ function podeAbrirDiurno(dataISO, projectId, ehFolguista){
 function buildSlots(tipo, projectId) {
   const slots = [];
   const especial = temGradeEspecial(projectId);
+  // P606 (Duque de Caxias): janela deslocada +1h — diurno 07→19, noturno 19→07.
+  const desloc = (projectId === "P606") ? 1 : 0;
   if (tipo === "noturno") {
-    for (let h = 18; h <= 22; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-18)*60 });
+    const iniN = 18 + desloc; // 18 normal, 19 no P606
+    for (let h = iniN; h <= 22; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-iniN)*60 });
     if (especial) {
       // 23:00 → 05:30 a cada 30min (apenas P311A / P311B)
-      let off = (23-18)*60, cur = 23*60, fim = (24+5)*60+30; // 05:30 do dia seguinte
+      let off = (23-iniN)*60, cur = 23*60, fim = (24+5)*60+30; // 05:30 do dia seguinte
       while (cur <= fim) {
         const hh = Math.floor((cur%1440)/60), mm = cur%60;
         slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
         cur += 30; off += 30;
       }
     } else {
-      // 23:00 → 05:00 a cada 1h (demais projetos)
-      let off = (23-18)*60, cur = 23*60, fim = (24+5)*60; // 05:00 do dia seguinte
+      // 23:00 → 05:00 (ou 06:00 no P606) a cada 1h
+      let off = (23-iniN)*60, cur = 23*60, fim = (24+5+desloc)*60; // 05:00 normal, 06:00 P606... ajustado p/ fechar 12h
       while (cur <= fim) {
         const hh = Math.floor((cur%1440)/60), mm = cur%60;
         slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
         cur += 60; off += 60;
       }
     }
-  } else { // diurno: 06:00 → 17:00 de 1h (igual para todos os projetos)
-    for (let h = 6; h <= 17; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-6)*60 });
+  } else { // diurno: 06:00 → 17:00 (ou 07:00 → 18:00 no P606) de 1h
+    const iniD = 6 + desloc, fimD = 17 + desloc;
+    for (let h = iniD; h <= fimD; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-iniD)*60 });
   }
   return slots;
 }
 
-function inicioTurnoHora(tipo){ return tipo==="noturno" ? 18 : 6; }
+function inicioTurnoHora(tipo, projectId){
+  const desloc = (projectId === "P606") ? 1 : 0;
+  return (tipo==="noturno" ? 18 : 6) + desloc;
+}
 
 // minutos decorridos desde o início do turno, considerando a data de início.
 // Trata a virada de meia-noite (turno noturno cruza para o dia seguinte).
-function minutosDesdeInicio(tipo, dataInicio, agora=new Date()) {
+function minutosDesdeInicio(tipo, dataInicio, agora=new Date(), projectId) {
   const [Y,M,D] = dataInicio.split("-").map(Number);
-  const ini = new Date(Y, M-1, D, inicioTurnoHora(tipo), 0, 0, 0);
+  const ini = new Date(Y, M-1, D, inicioTurnoHora(tipo, projectId), 0, 0, 0);
   return Math.floor((agora.getTime() - ini.getTime())/60000);
 }
 
@@ -674,7 +681,7 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
   const [open, setOpen] = useState(!turno.arquivado);
   const tinfo = RONDA_TURNOS[turno.tipo] || RONDA_TURNOS.noturno;
   const slots = useMemo(()=>buildSlots(turno.tipo, projectId),[turno.tipo, projectId]);
-  const agoraMin = minutosDesdeInicio(turno.tipo, turno.dataInicio); // recalculado a cada render (tick)
+  const agoraMin = minutosDesdeInicio(turno.tipo, turno.dataInicio, new Date(), projectId); // recalculado a cada render (tick)
   void tick;
 
   // Computa status de cada slot + estatísticas
@@ -874,7 +881,7 @@ export function gerarPDFRonda(project, turno) {
   const rows = slots.map((s,i)=>{
     const prox = slots[i+1] ? slots[i+1].offsetMin : null;
     const reg = turno.rondas?.[String(s.offsetMin)] || null;
-    const st = statusSlot(s, prox, minutosDesdeInicio(turno.tipo, turno.dataInicio), reg);
+    const st = statusSlot(s, prox, minutosDesdeInicio(turno.tipo, turno.dataInicio, new Date(), project.id), reg);
     const meta = STATUS_META[st] || STATUS_META.aguardando;
     const inicio = reg?.inicio || "--";
     const fim = reg?.fim || "--";
@@ -894,7 +901,7 @@ export function gerarPDFRonda(project, turno) {
   const naoexec = slots.filter((s,i)=>{
     const prox = slots[i+1] ? slots[i+1].offsetMin : null;
     const reg = turno.rondas?.[String(s.offsetMin)] || null;
-    const st = statusSlot(s, prox, minutosDesdeInicio(turno.tipo, turno.dataInicio), reg);
+    const st = statusSlot(s, prox, minutosDesdeInicio(turno.tipo, turno.dataInicio, new Date(), project.id), reg);
     return st==="naoexec"||st==="bloqueado";
   }).length;
 
@@ -984,7 +991,7 @@ export function gerarPDFConsolidadoRonda(project, turnosSelecionados) {
   turnos.forEach(t=>{
     const tinfo = RONDA_TURNOS[t.tipo] || RONDA_TURNOS.noturno;
     const slots = buildSlots(t.tipo, project.id);
-    const agoraMin = minutosDesdeInicio(t.tipo, t.dataInicio);
+    const agoraMin = minutosDesdeInicio(t.tipo, t.dataInicio, new Date(), project.id);
     const nome = t.plantonista?.nome || "—";
     if(!porColaborador[nome]) porColaborador[nome]={nome,turnos:0,atrasos:0,naoexec:0,semJust:0,comJust:0};
     porColaborador[nome].turnos++;
