@@ -141,6 +141,24 @@ function inicioTurnoHora(tipo, projectId){
   return (tipo==="noturno" ? 18 : 6) + desloc;
 }
 
+// Hora de ENCERRAMENTO da jornada de 12h (espelho de inicioTurnoHora).
+// Noturno: 06:00 (07:00 no P606). Diurno: 18:00 (19:00 no P606).
+// Usado para manter a janela do ÚLTIMO slot aberta até 1min antes do fim do
+// turno — a última ronda (~05h) e o botão "Concluir e arquivar" ficam
+// disponíveis até 05:59 (06:59 no P606), quando ainda é o turno da noite.
+function fimTurnoHora(tipo, projectId){
+  const desloc = (projectId === "P606") ? 1 : 0;
+  return (tipo==="noturno" ? 6 : 18) + desloc;
+}
+// Minutos, contados a partir do início do turno, do instante 1min antes do fim
+// da jornada (ex.: noturno normal = 18h→06h → 12h de janela → 05:59 = 719min).
+function limiteFinalTurnoMin(tipo, projectId){
+  const ini = inicioTurnoHora(tipo, projectId);
+  let fim = fimTurnoHora(tipo, projectId);
+  if (fim <= ini) fim += 24;                 // cruzou a meia-noite
+  return (fim - ini) * 60 - 1;               // 1 min antes do fim (ex.: 05:59)
+}
+
 // minutos decorridos desde o início do turno, considerando a data de início.
 // Trata a virada de meia-noite (turno noturno cruza para o dia seguinte).
 function minutosDesdeInicio(tipo, dataInicio, agora=new Date(), projectId) {
@@ -164,12 +182,22 @@ function rondaTemConteudo(r) {
 // Status de UM slot a partir do relógio (puro, testável).
 // registro = entrada salva em turnoObj.rondas[offset] (ou null)
 // Retorna: feita | feita_atrasada | naoexec | aguardando | aberto | atraso_aberto | bloqueado
-function statusSlot(slot, proximoOffset, agoraMin, registro) {
+// limiteFinalMin (opcional): quando informado, define o limite do ÚLTIMO slot
+// (proximoOffset == null). Serve para manter a última ronda noturna registrável
+// e a conclusão liberada até 1min antes do fim do turno (05:59 / 06:59 P606),
+// em vez de bloquear em ini+30. Default null = comportamento original intacto
+// (usado nos PDFs/consolidado, que avaliam turnos já encerrados).
+function statusSlot(slot, proximoOffset, agoraMin, registro, limiteFinalMin=null) {
   if (registro && registro.naoExec) return "naoexec";
   if (registro && registro.inicio)  return registro.atrasada ? "feita_atrasada" : "feita";
   const ini = slot.offsetMin;
   const fimTol = ini + TOLERANCIA_MIN;
-  const limite = (proximoOffset != null) ? proximoOffset : (ini + 30);
+  const limitePadrao = (proximoOffset != null) ? proximoOffset : (ini + 30);
+  // Último slot com limite estendido do turno: usa o maior entre o padrão e o
+  // fim do turno, para não bloquear a última ronda antes do encerramento.
+  const limite = (proximoOffset == null && limiteFinalMin != null)
+    ? Math.max(limitePadrao, limiteFinalMin)
+    : limitePadrao;
   if (agoraMin < ini)       return "aguardando";
   if (agoraMin <= fimTol)   return "aberto";          // iniciar no horário
   if (agoraMin < limite)    return "atraso_aberto";   // iniciar com atraso
@@ -684,11 +712,15 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
   const agoraMin = minutosDesdeInicio(turno.tipo, turno.dataInicio, new Date(), projectId); // recalculado a cada render (tick)
   void tick;
 
+  // Janela estendida do ÚLTIMO slot: no noturno, mantém a última ronda
+  // registrável e a conclusão liberada até 1min antes do fim do turno
+  // (05:59 normal / 06:59 no P606). No diurno permanece o comportamento padrão.
+  const limiteFinalMin = (turno.tipo==="noturno") ? limiteFinalTurnoMin(turno.tipo, projectId) : null;
   // Computa status de cada slot + estatísticas
   const linhas = slots.map((s,i)=>{
     const prox = slots[i+1] ? slots[i+1].offsetMin : null;
     const reg = turno.rondas?.[String(s.offsetMin)] || null;
-    const st = statusSlot(s, prox, agoraMin, reg);
+    const st = statusSlot(s, prox, agoraMin, reg, limiteFinalMin);
     return { slot:s, prox, reg, st };
   });
   const feitas = linhas.filter(l=>l.st==="feita"||l.st==="feita_atrasada").length;
