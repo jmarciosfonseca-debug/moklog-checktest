@@ -18,7 +18,7 @@
 //   }
 // ════════════════════════════════════════════════════════════════════════
 import { useState, useEffect, useMemo, useRef } from "react";
-import { onSnapshot, runTransaction } from "firebase/firestore";
+import { onSnapshot } from "firebase/firestore";
 import { setDoc as fgSetDoc } from "./fireGuard";
 
 const TOLERANCIA_MIN = 5;
@@ -354,139 +354,83 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       const arr = Array.from(stampsProprios.current);
       stampsProprios.current = new Set(arr.slice(arr.length-20));
     }
-    try{
-      // modo demo: fireGuard intercepta e não grava de verdade
-      await runTransaction(db, async (tx)=>{
-        const snap = await tx.get(ref);
-        const servidor = snap.exists() ? (snap.data().turnos||[]) : [];
-        // índice do que está no servidor
-        const mapa = new Map(servidor.map(t=>[t.id, t]));
-        // aplica alterações locais só nos turnos que este dispositivo mexeu
-        const localMap = new Map(lista.map(t=>[t.id, t]));
-        for(const id of alterados){
-          if(remover.has(id)){ mapa.delete(id); continue; }
-          const localT = localMap.get(id);
-          if(!localT) continue;
-          // MERGE DE RONDAS COM O SERVIDOR (anti-perda no arquivamento):
-          // a versão local vence no turno, MAS as rondas são combinadas com as
-          // do servidor slot-a-slot, preservando o registro mais completo. Assim
-          // um arquivamento nunca zera rondas que já estavam no servidor (ex.:
-          // eco atrasado esvaziou o estado local logo antes de arquivar).
-          const servT = mapa.get(id);
-          if(servT && servT.rondas){
-            const rondasMescladas = {...(servT.rondas||{})};
-            const rondasLocais = localT.rondas||{};
-            for(const off of Object.keys(rondasLocais)){
-              const rl = rondasLocais[off]||{};
-              const rsv = rondasMescladas[off]||{};
-              if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue; // servidor mais completo
-              // combina campo-a-campo, valor não-vazio prevalece (local preenchido vence vazio do servidor)
-              const merged = {...rsv};
-              for(const campo of Object.keys(rl)){
-                const vLocal = rl[campo];
-                const localCheio = !(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false);
-                if(localCheio) merged[campo] = vLocal;
-              }
-              rondasMescladas[off] = merged;
+    // ── FUNÇÃO DE MERGE NÃO-DESTRUTIVO (pura) ────────────────────────────
+    // Combina a lista local com o que está no servidor, preservando o registro
+    // mais completo slot-a-slot. Mesma inteligência anti-perda de antes, agora
+    // isolada para ser reaproveitada. NÃO usa runTransaction (ver abaixo).
+    const construirFinal = (servidor) => {
+      const mapa = new Map((servidor||[]).map(t=>[t.id, t]));
+      const localMap = new Map(lista.map(t=>[t.id, t]));
+      for(const id of alterados){
+        if(remover.has(id)){ mapa.delete(id); continue; }
+        const localT = localMap.get(id);
+        if(!localT) continue;
+        // MERGE DE RONDAS COM O SERVIDOR (anti-perda no arquivamento):
+        // a versão local vence no turno, MAS as rondas são combinadas com as do
+        // servidor slot-a-slot, preservando o registro mais completo. Assim um
+        // arquivamento nunca zera rondas que já estavam no servidor.
+        const servT = mapa.get(id);
+        if(servT && servT.rondas){
+          const rondasMescladas = {...(servT.rondas||{})};
+          const rondasLocais = localT.rondas||{};
+          for(const off of Object.keys(rondasLocais)){
+            const rl = rondasLocais[off]||{};
+            const rsv = rondasMescladas[off]||{};
+            if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue; // servidor mais completo
+            const merged = {...rsv};
+            for(const campo of Object.keys(rl)){
+              const vLocal = rl[campo];
+              const localCheio = !(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false);
+              if(localCheio) merged[campo] = vLocal;
             }
-            mapa.set(id, {...localT, rondas: rondasMescladas});
-          } else {
-            mapa.set(id, localT); // servidor não tinha o turno: versão local inteira
+            rondasMescladas[off] = merged;
           }
+          mapa.set(id, {...localT, rondas: rondasMescladas});
+        } else {
+          mapa.set(id, localT); // servidor não tinha o turno: versão local inteira
         }
-        // remoções explícitas
-        for(const id of remover) mapa.delete(id);
-        // turnos novos que só existem localmente entram também
-        for(const [id,t] of localMap){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
-        const final = Array.from(mapa.values());
-        tx.set(ref, { turnos: final, updatedAt: stamp });
-      });
-      setErroSalvar(false);
-      setListaPendente(null);
-    }
-    catch(e){
-      console.error("Ronda save error (tentativa 1):",e);
-      // A transação falhou. NUNCA gravar a lista local crua por cima (isso
-      // apagaria rondas de outros dispositivos e slots revertidos por eco).
-      // Em vez disso: (1) tenta a transação de novo uma vez; (2) se falhar,
-      // faz um merge manual re-lendo o servidor, preservando tudo.
-      let ok = false;
-      // (1) retry único da transação
-      try{
-        await runTransaction(db, async (tx)=>{
-          const snap = await tx.get(ref);
-          const servidor = snap.exists() ? (snap.data().turnos||[]) : [];
-          const mapa = new Map(servidor.map(t=>[t.id, t]));
-          const localMap2 = new Map(lista.map(t=>[t.id, t]));
-          for(const id of alterados){
-            if(remover.has(id)){ mapa.delete(id); continue; }
-            const localT = localMap2.get(id);
-            if(!localT) continue;
-            const servT = mapa.get(id);
-            if(servT && servT.rondas){
-              const rm = {...(servT.rondas||{})};
-              const rlo = localT.rondas||{};
-              for(const off of Object.keys(rlo)){
-                const rl = rlo[off]||{}, rsv = rm[off]||{};
-                if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue;
-                const merged = {...rsv};
-                for(const campo of Object.keys(rl)){
-                  const vLocal = rl[campo];
-                  if(!(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false)) merged[campo]=vLocal;
-                }
-                rm[off] = merged;
-              }
-              mapa.set(id, {...localT, rondas: rm});
-            } else { mapa.set(id, localT); }
-          }
-          for(const id of remover) mapa.delete(id);
-          for(const [id,t] of localMap2){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
-          tx.set(ref, { turnos: Array.from(mapa.values()), updatedAt: stamp });
-        });
-        ok = true;
-      }catch(eRetry){ console.error("Ronda save error (retry):",eRetry); }
+      }
+      for(const id of remover) mapa.delete(id);
+      for(const [id,t] of localMap){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
+      return Array.from(mapa.values());
+    };
 
-      // (2) merge manual não-destrutivo (lê servidor, combina, grava)
-      if(!ok){
+    // ── GRAVAÇÃO: re-ler servidor → mesclar → gravar via fireGuard ────────
+    // IMPORTANTE: usamos EXCLUSIVAMENTE getDoc + setDoc (fireGuard), os mesmos
+    // handles vindos do AcessoCCO por props — o mesmo caminho que o módulo
+    // Acesso usa e que grava sem falhas. NÃO usamos runTransaction: ela é
+    // importada direto do SDK e não casa com a instância `db` recebida por
+    // props, o que fazia TODA conclusão de turno falhar (bug de 25/07 em
+    // diante). O merge não-destrutivo acima cobre a concorrência entre
+    // dispositivos com folga para o padrão de uso (1 plantonista por turno).
+    let ok = false, ultimoErro = null;
+    for(let tentativa=1; tentativa<=2 && !ok; tentativa++){
+      try{
+        let servidor = [];
         try{
           const snap = await getDoc(ref);
-          const servidor = snap.exists() ? (snap.data().turnos||[]) : [];
-          const mapa = new Map(servidor.map(t=>[t.id, t]));
-          const localMap2 = new Map(lista.map(t=>[t.id, t]));
-          for(const id of alterados){
-            if(remover.has(id)){ mapa.delete(id); continue; }
-            const localT = localMap2.get(id);
-            if(!localT) continue;
-            const servT = mapa.get(id);
-            if(servT && servT.rondas){
-              const rm = {...(servT.rondas||{})};
-              const rlo = localT.rondas||{};
-              for(const off of Object.keys(rlo)){
-                const rl = rlo[off]||{}, rsv = rm[off]||{};
-                if(!rondaTemConteudo(rl) && rondaTemConteudo(rsv)) continue;
-                const merged = {...rsv};
-                for(const campo of Object.keys(rl)){
-                  const vLocal = rl[campo];
-                  if(!(vLocal===undefined||vLocal===null||vLocal===""||vLocal===false)) merged[campo]=vLocal;
-                }
-                rm[off] = merged;
-              }
-              mapa.set(id, {...localT, rondas: rm});
-            } else { mapa.set(id, localT); }
-          }
-          for(const id of remover) mapa.delete(id);
-          for(const [id,t] of localMap2){ if(!mapa.has(id) && !remover.has(id)) mapa.set(id, t); }
-          await fgSetDoc(ref, { turnos: Array.from(mapa.values()), updatedAt: stamp });
-          ok = true;
-        }catch(eMerge){ console.error("Ronda merge fallback error:",eMerge); }
+          servidor = (snap && snap.exists()) ? (snap.data().turnos||[]) : [];
+        }catch(eRead){
+          // se a leitura falhar, ainda tentamos gravar a partir do que temos
+          console.error("Ronda read-before-write falhou (tentativa "+tentativa+"):", eRead);
+          servidor = [];
+        }
+        const final = construirFinal(servidor);
+        await fgSetDoc(ref, { turnos: final, updatedAt: stamp });
+        ok = true;
+      }catch(e){
+        ultimoErro = e;
+        console.error("Ronda save error (tentativa "+tentativa+"):", e);
+        await new Promise(r=>setTimeout(r, 400)); // pequena espera antes do retry
       }
+    }
 
-      if(ok){ setErroSalvar(false); setListaPendente(null); }
-      else {
-        // não conseguiu gravar: mantém pendente e AVISA (não perde o trabalho local)
-        setErroSalvar(true);
-        setListaPendente(lista);
-      }
+    if(ok){ setErroSalvar(false); setListaPendente(null); }
+    else {
+      // não conseguiu gravar: mantém pendente e AVISA (não perde o trabalho local)
+      console.error("Ronda: falha definitiva ao salvar:", ultimoErro);
+      setErroSalvar(true);
+      setListaPendente(lista);
     }
     setSalvando(false);
   };
