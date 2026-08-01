@@ -291,9 +291,18 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       const localMap = new Map((turnosRef.current||[]).map(t=>[t.id, t]));
       const fundida = lista.map(t=>{
         const loc = localMap.get(t.id);
-        if(!loc || !loc.rondas) return t;
-        const rondas = {...(t.rondas||{})};
-        let mudou = false;
+        if(!loc) return t;
+        // PROTEÇÃO DE ARQUIVAMENTO (anti-reversão do eco): se LOCALMENTE o turno
+        // já está arquivado, o eco do servidor NUNCA pode desarquivá-lo na tela.
+        // Sem isso, um eco atrasado (gravação de outro dispositivo, ou o próprio
+        // eco não reconhecido por timing de stamp) reabria turnos recém-concluídos
+        // — era o bug "conclui/arquiva e não fica arquivado". arquivadoEm idem.
+        const baseArq = (loc.arquivado && !t.arquivado)
+          ? { ...t, arquivado:true, arquivadoEm: t.arquivadoEm || loc.arquivadoEm }
+          : t;
+        if(!loc.rondas) return baseArq;
+        const rondas = {...(baseArq.rondas||{})};
+        let mudou = (baseArq !== t); // já mudou se aplicamos a proteção de arquivamento
         // PROTEÇÃO ANTI-PERDA (reforçada): para CADA slot que localmente tem
         // conteúdo real (qualquer campo — inicio, fim, naoExec, justificativa,
         // obs, anomalia), garante que o eco do servidor NUNCA o esvazie.
@@ -318,7 +327,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           }
           if(mudouSlot){ rondas[off] = merged; mudou = true; }
         }
-        return mudou ? {...t, rondas} : t;
+        return mudou ? {...baseArq, rondas} : baseArq;
       });
       setTurnos(fundida);
       try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(fundida)); }catch(e){}
@@ -493,8 +502,8 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     const lista = turnosRef.current.map(t=> t.id===turnoId ? fn({...t}) : t);
     await persist(lista, { turnosAlterados:[turnoId] });
   };
-  const arquivarTurno   = (turnoId)=> updTurno(turnoId, t=>({...t, arquivado:true, arquivadoEm:new Date().toISOString()}));
-  const desarquivarTurno= (turnoId)=> updTurno(turnoId, t=>({...t, arquivado:false}));
+  const arquivarTurno   = (turnoId)=> { marcarEditando(); return updTurno(turnoId, t=>({...t, arquivado:true, arquivadoEm:new Date().toISOString()})); };
+  const desarquivarTurno= (turnoId)=> { marcarEditando(); return updTurno(turnoId, t=>({...t, arquivado:false, arquivadoEm:null})); };
   const excluirTurno    = async (turnoId)=> { await persist(turnosRef.current.filter(t=>t.id!==turnoId), { turnosAlterados:[turnoId], remover:[turnoId] }); };
 
   const ativos = turnos.filter(t=>!t.arquivado);
