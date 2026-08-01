@@ -507,7 +507,16 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const excluirTurno    = async (turnoId)=> { await persist(turnosRef.current.filter(t=>t.id!==turnoId), { turnosAlterados:[turnoId], remover:[turnoId] }); };
 
   const ativos = turnos.filter(t=>!t.arquivado);
-  const arquivados = turnos.filter(t=>t.arquivado);
+  // Arquivados em ordem CRONOLÓGICA DECRESCENTE (mais recente no topo).
+  // Ordena por dataInicio (data do turno); desempata pelo horário de
+  // arquivamento, para dois turnos do mesmo dia (diurno/noturno) ficarem
+  // estáveis. Comparação por string ISO "YYYY-MM-DD" já ordena corretamente.
+  const arquivados = turnos.filter(t=>t.arquivado).slice().sort((a,b)=>{
+    const da = a.dataInicio||"", db = b.dataInicio||"";
+    if(da !== db) return da < db ? 1 : -1;               // data desc
+    const aa = a.arquivadoEm||"", ab = b.arquivadoEm||"";
+    return aa < ab ? 1 : (aa > ab ? -1 : 0);             // arquivadoEm desc
+  });
   const visiveis = showArquivados ? arquivados : ativos;
   const jaTemAberto = ativos.length>0;
 
@@ -606,14 +615,31 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       </div>
 
       {showArquivados && arquivados.length>0 && (
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,background:dark?"#0c0a1a":"#faf5ff",border:"1px solid #a855f733",borderRadius:8,padding:"8px 10px"}}>
-          <span style={{fontSize:11,color:"#a855f7",fontWeight:700}}>☑ {selTurnos.size} turno{selTurnos.size===1?"":"s"} selecionado{selTurnos.size===1?"":"s"} p/ consolidado</span>
-          {selTurnos.size>=2 && (
-            <button onClick={()=>gerarPDFConsolidadoRonda(project, arquivados.filter(t=>selTurnos.has(t.id)))}
-              style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap"}}>
-              📊 Gerar Consolidado
-            </button>
-          )}
+        <div style={{background:dark?"#0c0a1a":"#faf5ff",border:"1px solid #a855f733",borderRadius:8,padding:"8px 10px",display:"flex",flexDirection:"column",gap:8}}>
+          {/* Atalhos de seleção rápida p/ o consolidado */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:10,color:"#a855f7",fontWeight:700,opacity:0.8}}>Selecionar:</span>
+            <button onClick={()=>setSelTurnos(new Set(arquivados.map(t=>t.id)))}
+              style={{...S.btnSm,padding:"4px 9px",fontSize:11,background:"#a855f71a",border:"1px solid #a855f744",color:"#a855f7",fontWeight:700}}>Todas</button>
+            {[7,15,30].map(n=>(
+              <button key={n} onClick={()=>setSelTurnos(new Set(arquivados.slice(0,n).map(t=>t.id)))}
+                style={{...S.btnSm,padding:"4px 9px",fontSize:11,background:"#a855f71a",border:"1px solid #a855f744",color:"#a855f7",fontWeight:700}}>Últimas {n}</button>
+            ))}
+            {selTurnos.size>0 && (
+              <button onClick={()=>setSelTurnos(new Set())}
+                style={{...S.btnSm,padding:"4px 9px",fontSize:11,background:"transparent",border:`1px solid ${dark?"#334155":"#cbd5e1"}`,color:"#94a3b8",fontWeight:700}}>Limpar</button>
+            )}
+          </div>
+          {/* Contador + gerar */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <span style={{fontSize:11,color:"#a855f7",fontWeight:700}}>☑ {selTurnos.size} turno{selTurnos.size===1?"":"s"} selecionado{selTurnos.size===1?"":"s"} p/ consolidado</span>
+            {selTurnos.size>=2 && (
+              <button onClick={()=>gerarPDFConsolidadoRonda(project, arquivados.filter(t=>selTurnos.has(t.id)))}
+                style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap"}}>
+                📊 Gerar Consolidado
+              </button>
+            )}
+          </div>
         </div>
       )}
 
