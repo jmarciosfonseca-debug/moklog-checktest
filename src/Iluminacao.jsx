@@ -57,18 +57,42 @@ function fmtDataHora(iso){
 }
 function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 
-// ── Teste quinzenal de iluminação — sempre aos domingos (mesma regra do CFTV)
+// ── Teste quinzenal de iluminação — sempre aos domingos às 21h ──────────
 // Âncora do 1º ciclo: 09/08/2026 (domingo). Ciclo = +14 dias (preserva domingo).
-// Trava: se a data calculada não cair no domingo, ajusta para o domingo à frente.
-const TQ_ANCORA = "2026-08-09";
+// Regra: o contador NÃO avança sozinho quando a data passa — ele trava no alvo
+// vigente (fica "pendente") até a equipe concluir o teste. Só então crava +14d.
+// Trava de domingo: se a data calculada não cair no domingo, ajusta para o
+// domingo à frente. Hora do teste: 21h (turno noturno).
+export const TQ_ANCORA = "2026-08-09";
+export const TQ_HORA = 21;
 function tqFmtDate(d){ if(!d) return "—"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 function tqTodayStr(){ return new Date().toLocaleDateString("sv-SE"); }
 function tqParseISO(iso){ return new Date(iso+"T12:00:00"); }
 function tqISO(d){ return d.toLocaleDateString("sv-SE"); }
 function tqAjustaDomingo(d){ const diff=(7-d.getDay())%7; if(diff!==0){ const nd=new Date(d); nd.setDate(nd.getDate()+diff); return nd; } return d; }
-function tqProximoAPartirDe(baseISO){ const b=tqParseISO(baseISO); b.setDate(b.getDate()+14); return tqISO(tqAjustaDomingo(b)); }
-function tqAlvoInicial(){ let alvo=tqParseISO(TQ_ANCORA); const hoje=new Date(); hoje.setHours(0,0,0,0); while(alvo<hoje){ alvo.setDate(alvo.getDate()+14); } return tqISO(tqAjustaDomingo(alvo)); }
-function tqDiasRestantes(alvoISO){ const alvo=tqParseISO(alvoISO); alvo.setHours(0,0,0,0); const hoje=new Date(); hoje.setHours(0,0,0,0); return Math.round((alvo-hoje)/86400000); }
+export function tqProximoAPartirDe(baseISO){ const b=tqParseISO(baseISO); b.setDate(b.getDate()+14); return tqISO(tqAjustaDomingo(b)); }
+// Alvo vigente quando ainda não há registro: o primeiro domingo do ciclo (âncora
+// ou seguinte) que ainda não passou do horário de teste. NÃO pula ciclos sozinho.
+export function tqAlvoVigente(tq){
+  if(tq && tq.alvo) return tq.alvo;
+  // sem registro: parte da âncora e avança de 14 em 14 só até alcançar "hoje",
+  // mas para no primeiro alvo cujo horário-limite (21h) ainda não passou.
+  let alvo = tqParseISO(TQ_ANCORA);
+  const agora = new Date();
+  while(true){
+    const limite = new Date(alvo); limite.setHours(TQ_HORA,0,0,0);
+    if(agora < limite) break;                 // ainda não chegou no teste deste ciclo
+    const prox = new Date(alvo); prox.setDate(prox.getDate()+14);
+    // se o próximo ciclo ainda é futuro mas este já passou, este vira "pendente":
+    const proxLimite = new Date(prox); proxLimite.setHours(TQ_HORA,0,0,0);
+    if(agora < proxLimite){ /* mantém alvo atual como pendente */ break; }
+    alvo = prox;
+  }
+  return tqISO(tqAjustaDomingo(alvo));
+}
+// Alvo como timestamp no horário do teste (21h de domingo).
+export function tqAlvoTimestamp(alvoISO){ const d=tqParseISO(alvoISO); d.setHours(TQ_HORA,0,0,0); return d.getTime(); }
+function tqDiasRestantes(alvoISO){ const alvo=tqParseISO(alvoISO); alvo.setHours(TQ_HORA,0,0,0); const agora=Date.now(); return Math.max(0, Math.round((alvo.getTime()-agora)/86400000)); }
 
 // ── Números de um quadrante (deficientes null = ainda não informado)
 export function calcQuad(q){
@@ -316,8 +340,11 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     const assinatura = (tqAssinatura||"").trim();
     if(!assinatura){ alert("Informe quem realizou/assina o teste."); return; }
     const hojeISO = tqTodayStr();
+    // Próximo alvo é calculado a partir do ALVO VIGENTE (não de hoje), para manter
+    // o ciclo ancorado nos domingos mesmo se a conclusão ocorrer com atraso.
+    const alvoVigente = tqAlvoVigente(data.testeQuinzenal);
     const novoTq = {
-      alvo: tqProximoAPartirDe(hojeISO),
+      alvo: tqProximoAPartirDe(alvoVigente),
       ultimoRegistro: { data: hojeISO, assinadoPor: assinatura, ts: new Date().toISOString() },
     };
     setTqAssinando(false);
@@ -476,26 +503,27 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
 
-        {/* Teste Quinzenal de Iluminação — sempre aos domingos */}
+        {/* Conclusão do Teste Quinzenal — o contador regressivo fica na tela inicial.
+            Aqui a equipe conclui/assina o teste, o que reinicia o ciclo (+14 dias). */}
         {(() => {
           const tq = data.testeQuinzenal;
-          const alvo = (tq && tq.alvo) ? tq.alvo : tqAlvoInicial();
+          const alvo = tqAlvoVigente(tq);
+          const agora = Date.now();
+          const limite = tqAlvoTimestamp(alvo);
+          const pendente = agora >= limite; // passou das 21h do domingo-alvo e ainda não concluiu
           const dias = tqDiasRestantes(alvo);
-          const vencido = dias < 0;
-          const hoje0 = dias === 0;
-          const cor = vencido ? "#ef4444" : hoje0 ? "#f59e0b" : dias<=2 ? "#f59e0b" : "#22c55e";
-          const bg = vencido ? "#ef444415" : hoje0 ? "#f59e0b15" : (dark?"#060c18":"#f8fafc");
-          const txtDias = vencido ? `Atrasado ${Math.abs(dias)}d` : hoje0 ? "É hoje!" : `Faltam ${dias}d`;
+          const cor = pendente ? "#ef4444" : dias<=2 ? "#f59e0b" : "#22c55e";
+          const bg = pendente ? "#ef444415" : (dark?"#060c18":"#f8fafc");
           const ultimo = tq && tq.ultimoRegistro;
           return (
             <div style={{...S.card, border:`1px solid ${cor}44`, background:bg, display:"flex", flexDirection:"column", gap:8}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
                 <div>
                   <div style={{fontSize:12, fontWeight:800, ...S.txt}}>💡 Teste Quinzenal de Iluminação</div>
-                  <div style={{fontSize:11, ...S.txt2, marginTop:2}}>Próximo: <strong>domingo, {tqFmtDate(alvo)}</strong></div>
+                  <div style={{fontSize:11, ...S.txt2, marginTop:2}}>Alvo: <strong>domingo, {tqFmtDate(alvo)} · 21h</strong></div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:16, fontWeight:900, color:cor}}>{txtDias}</div>
+                  <div style={{fontSize:13, fontWeight:900, color:cor}}>{pendente ? "⚠️ Pendente" : `Faltam ${dias}d`}</div>
                 </div>
               </div>
               {ultimo && (
@@ -506,14 +534,14 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
               {!tqAssinando ? (
                 <button onClick={()=>setTqAssinando(true)}
                   style={{...S.btnSm, color:cor, borderColor:`${cor}66`, fontWeight:700, padding:"9px 14px", fontSize:12}}>
-                  ✓ Registrar teste realizado
+                  ✓ Concluir teste realizado
                 </button>
               ) : (
                 <div style={{display:"flex", flexDirection:"column", gap:8}}>
                   <input value={tqAssinatura} onChange={e=>setTqAssinatura(e.target.value)} placeholder="Nome de quem assina..." style={S.inp}/>
                   <div style={{display:"flex", gap:8}}>
                     <button onClick={()=>{setTqAssinando(false); setTqAssinatura("");}} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-                    <button onClick={registrarTesteQuinzenal} disabled={saving} style={{...S.btn, flex:1, fontSize:13, opacity:saving?.6:1}}>{saving?"Salvando…":"✓ Assinar e zerar"}</button>
+                    <button onClick={registrarTesteQuinzenal} disabled={saving} style={{...S.btn, flex:1, fontSize:13, opacity:saving?.6:1}}>{saving?"Salvando…":"✓ Assinar e concluir"}</button>
                   </div>
                 </div>
               )}
