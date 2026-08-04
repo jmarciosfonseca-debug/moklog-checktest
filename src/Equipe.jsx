@@ -1380,6 +1380,21 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setSaving(false);
   };
 
+  // Perfil de Segurança do projeto (aditivo — modula a Análise de Risco).
+  // Gravado em equipes/{pid}.perfilSeguranca sem tocar em colaboradores/desligados.
+  const perfilSeg = equipeData.perfilSeguranca || { tipoEquipe:"", armada:"", ccoDedicada:"" };
+  const savePerfilSeg = async (patch) => {
+    const novoPerfil = { ...perfilSeg, ...patch, atualizadoEm: new Date().toISOString() };
+    const newData = { ...equipeData, perfilSeguranca: novoPerfil };
+    setEquipeData(newData);
+    try {
+      await saveEquipe(project.id, newData);
+    } catch(err) {
+      console.error("Erro ao salvar perfil de segurança:", err);
+      alert("Erro ao salvar perfil de segurança. Verifique a conexão.");
+    }
+  };
+
   const setF = (k,v) => setForm(f=>({...f,[k]:v}));
 
   const saveColab = async () => {
@@ -1712,6 +1727,93 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
               + Cadastrar Colaborador
             </button>
           )}
+
+          {/* Perfil de Segurança do projeto — edição admin-only, modula a Análise de Risco */}
+          {(() => {
+            const TIPOS = [
+              { v:"vspp",       lbl:"VSPP" },
+              { v:"vigilantes", lbl:"Vigilantes" },
+              { v:"mista",      lbl:"Mista (VSPP + Vigilantes)" },
+            ];
+            const rotuloTipo = (v) => (TIPOS.find(t=>t.v===v)?.lbl) || "Não definido";
+            const rotuloSN = (v) => v==="sim" ? "Sim" : v==="nao" ? "Não" : "Não definido";
+            const corSN = (v) => v==="sim" ? "#22c55e" : v==="nao" ? "#f59e0b" : (dark?"#475569":"#94a3b8");
+            const Pill = ({ativo, onClick, children, cor}) => (
+              <button onClick={onClick}
+                style={{
+                  flex:1, padding:"8px 6px", borderRadius:8, cursor:"pointer",
+                  fontSize:12, fontWeight:700, transition:"all .15s",
+                  border: ativo ? `1px solid ${cor||"#1d4ed8"}` : `1px solid ${dark?"#0f172a":"#e2e8f0"}`,
+                  background: ativo ? (cor?`${cor}22`:"#1d4ed822") : (dark?"#020510":"#f8fafc"),
+                  color: ativo ? (cor||"#3b82f6") : (dark?"#64748b":"#94a3b8"),
+                }}>
+                {children}
+              </button>
+            );
+            return (
+              <div style={{ ...S.card, display:"flex", flexDirection:"column", gap:12 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color: dark?"#f8fafc":"#0f172a" }}>
+                    🛡️ Perfil de Segurança
+                  </div>
+                  {!adminAuth && (
+                    <span style={{ fontSize:9, color: dark?"#475569":"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>
+                      Somente leitura
+                    </span>
+                  )}
+                </div>
+
+                {adminAuth ? (
+                  <>
+                    <div>
+                      <label style={S.lbl}>Tipo de Equipe</label>
+                      <div style={{ display:"flex", gap:6 }}>
+                        {TIPOS.map(t=>(
+                          <Pill key={t.v} ativo={perfilSeg.tipoEquipe===t.v}
+                            onClick={()=>savePerfilSeg({ tipoEquipe: perfilSeg.tipoEquipe===t.v?"":t.v })}>
+                            {t.lbl}
+                          </Pill>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={S.lbl}>Equipe Armada</label>
+                      <div style={{ display:"flex", gap:6 }}>
+                        <Pill ativo={perfilSeg.armada==="sim"} cor="#22c55e"
+                          onClick={()=>savePerfilSeg({ armada: perfilSeg.armada==="sim"?"":"sim" })}>Sim</Pill>
+                        <Pill ativo={perfilSeg.armada==="nao"} cor="#f59e0b"
+                          onClick={()=>savePerfilSeg({ armada: perfilSeg.armada==="nao"?"":"nao" })}>Não</Pill>
+                      </div>
+                    </div>
+                    <div>
+                      <label style={S.lbl}>CCO Dedicada</label>
+                      <div style={{ display:"flex", gap:6 }}>
+                        <Pill ativo={perfilSeg.ccoDedicada==="sim"} cor="#22c55e"
+                          onClick={()=>savePerfilSeg({ ccoDedicada: perfilSeg.ccoDedicada==="sim"?"":"sim" })}>Sim</Pill>
+                        <Pill ativo={perfilSeg.ccoDedicada==="nao"} cor="#f59e0b"
+                          onClick={()=>savePerfilSeg({ ccoDedicada: perfilSeg.ccoDedicada==="nao"?"":"nao" })}>Não</Pill>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                    <div>
+                      <div style={S.lbl}>Tipo</div>
+                      <div style={{ fontSize:12, fontWeight:700, color: dark?"#cbd5e1":"#475569" }}>{rotuloTipo(perfilSeg.tipoEquipe)}</div>
+                    </div>
+                    <div>
+                      <div style={S.lbl}>Armada</div>
+                      <div style={{ fontSize:12, fontWeight:700, color: corSN(perfilSeg.armada) }}>{rotuloSN(perfilSeg.armada)}</div>
+                    </div>
+                    <div>
+                      <div style={S.lbl}>CCO Dedicada</div>
+                      <div style={{ fontSize:12, fontWeight:700, color: corSN(perfilSeg.ccoDedicada) }}>{rotuloSN(perfilSeg.ccoDedicada)}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Resumo por turno */}
           {turnosComEquipe.length > 0 && (
