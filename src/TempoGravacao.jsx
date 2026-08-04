@@ -6,6 +6,39 @@ function todayStr(){ return new Date().toLocaleDateString("sv-SE"); }
 function fmtDate(d){ if(!d) return "—"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 function fmtDateTime(ts){ if(!ts) return "—"; try{ const d=new Date(ts); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); }catch{ return ts; } }
 
+// ── Teste quinzenal de gravação — sempre aos domingos ──────────────────
+// Âncora do 1º ciclo: 09/08/2026 (domingo). Cada ciclo = +14 dias (preserva
+// o domingo). Trava de segurança: se a data calculada não for domingo, ajusta
+// para o domingo mais próximo (à frente).
+const TQ_ANCORA = "2026-08-09"; // domingo
+function tqParseISO(iso){ return new Date(iso+"T12:00:00"); }
+function tqISO(d){ return d.toLocaleDateString("sv-SE"); }
+function tqAjustaDomingo(d){
+  // getDay(): 0 = domingo. Empurra para o próximo domingo se necessário.
+  const diff = (7 - d.getDay()) % 7;
+  if(diff!==0){ const nd = new Date(d); nd.setDate(nd.getDate()+diff); return nd; }
+  return d;
+}
+function tqProximoAPartirDe(baseISO){
+  // soma 14 dias à base e garante domingo
+  const b = tqParseISO(baseISO);
+  b.setDate(b.getDate()+14);
+  return tqISO(tqAjustaDomingo(b));
+}
+// Retorna o próximo domingo-alvo vigente considerando a âncora, caso ainda
+// não exista registro. Avança em blocos de 14 dias até ficar >= hoje.
+function tqAlvoInicial(){
+  let alvo = tqParseISO(TQ_ANCORA);
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  while(alvo < hoje){ alvo.setDate(alvo.getDate()+14); }
+  return tqISO(tqAjustaDomingo(alvo));
+}
+function tqDiasRestantes(alvoISO){
+  const alvo = tqParseISO(alvoISO); alvo.setHours(0,0,0,0);
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return Math.round((alvo - hoje)/86400000);
+}
+
 function gerarPDFGravacao(project, cameras) {
   const hoje = new Date().toLocaleDateString("pt-BR");
   const sorted = [...cameras].sort((a,b)=>(a.diasGravacao||0)-(b.diasGravacao||0));
@@ -92,12 +125,19 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
   const [editCamNome, setEditCamNome] = useState("");
   const [editCamEspec, setEditCamEspec] = useState("");
   const [filtro, setFiltro] = useState("todos"); // todos | alerta | ok
+  const [tq, setTq] = useState(null); // { alvo, ultimoRegistro:{data,assinadoPor,ts} }
+  const [tqAssinando, setTqAssinando] = useState(false);
+  const [tqAssinatura, setTqAssinatura] = useState("");
 
   useEffect(()=>{
     (async()=>{
       try{
         const snap = await getDoc(doc(db,COL,project.id));
-        if(snap.exists()) setCameras(snap.data().cameras||[]);
+        if(snap.exists()){
+          const d = snap.data();
+          setCameras(d.cameras||[]);
+          setTq(d.testeQuinzenal||null);
+        }
       }catch(e){}
       try{
         const eq = await loadEquipe(project.id);
@@ -107,10 +147,29 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
     })();
   },[project.id]);
 
-  const salvar = async (lista) => {
+  const salvar = async (lista, tqOverride) => {
     setSaving(true);
     setCameras(lista);
-    try{ await setDoc(doc(db,COL,project.id),{ cameras:lista, updatedAt:new Date().toISOString() }); }catch(e){ console.error(e); }
+    const tqAtual = tqOverride!==undefined ? tqOverride : tq;
+    try{ await setDoc(doc(db,COL,project.id),{ cameras:lista, testeQuinzenal:tqAtual||null, updatedAt:new Date().toISOString() }); }catch(e){ console.error(e); }
+    setSaving(false);
+  };
+
+  // Registra o teste quinzenal feito hoje: assina, zera o ciclo e crava o
+  // próximo domingo (+14 dias). Liberado para equipe (acesso normal) e gerencial.
+  const registrarTesteQuinzenal = async () => {
+    const assinatura = (tqAssinatura||"").trim();
+    if(!assinatura){ alert("Informe quem realizou/assina o teste."); return; }
+    const hojeISO = todayStr();
+    const novoTq = {
+      alvo: tqProximoAPartirDe(hojeISO),
+      ultimoRegistro: { data: hojeISO, assinadoPor: assinatura, ts: new Date().toISOString() },
+    };
+    setTq(novoTq);
+    setTqAssinando(false);
+    setTqAssinatura("");
+    setSaving(true);
+    try{ await setDoc(doc(db,COL,project.id),{ cameras, testeQuinzenal:novoTq, updatedAt:new Date().toISOString() }); }catch(e){ console.error(e); }
     setSaving(false);
   };
 
@@ -175,6 +234,57 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
           <div style={{fontSize:10,...S.txt2,fontWeight:700}}>SEM CHECK</div>
         </div>
       </div>
+
+      {/* Teste Quinzenal de Gravação — sempre aos domingos */}
+      {(() => {
+        const alvo = (tq && tq.alvo) ? tq.alvo : tqAlvoInicial();
+        const dias = tqDiasRestantes(alvo);
+        const vencido = dias < 0;
+        const hoje0 = dias === 0;
+        const cor = vencido ? "#ef4444" : hoje0 ? "#f59e0b" : dias<=2 ? "#f59e0b" : "#22c55e";
+        const bg = vencido ? "#ef444415" : hoje0 ? "#f59e0b15" : (dark?"#060c18":"#f8fafc");
+        const txtDias = vencido ? `Atrasado ${Math.abs(dias)}d` : hoje0 ? "É hoje!" : `Faltam ${dias}d`;
+        const ultimo = tq && tq.ultimoRegistro;
+        return (
+          <div style={{...S.card, border:`1px solid ${cor}44`, background:bg, display:"flex", flexDirection:"column", gap:8}}>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
+              <div>
+                <div style={{fontSize:12, fontWeight:800, color:dark?"#f8fafc":"#0f172a"}}>📹 Teste Quinzenal de Gravação</div>
+                <div style={{fontSize:11, ...S.txt2, marginTop:2}}>Próximo: <strong>domingo, {fmtDate(alvo)}</strong></div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:16, fontWeight:900, color:cor}}>{txtDias}</div>
+              </div>
+            </div>
+            {ultimo && (
+              <div style={{fontSize:10, ...S.txt2}}>
+                Último: {fmtDate(ultimo.data)} · assinado por <strong>{ultimo.assinadoPor}</strong>
+              </div>
+            )}
+            {!tqAssinando ? (
+              <button onClick={()=>setTqAssinando(true)}
+                style={{...S.btnSm, color:cor, borderColor:`${cor}66`, fontWeight:700, padding:"9px 14px", fontSize:12}}>
+                ✓ Registrar teste realizado
+              </button>
+            ) : (
+              <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                {equipe.length>0 ? (
+                  <select value={tqAssinatura} onChange={e=>setTqAssinatura(e.target.value)} style={S.inp}>
+                    <option value="">Quem realizou/assina o teste...</option>
+                    {equipe.map(c=><option key={c.id||c.nome} value={c.nome}>{c.nome} · {c.cargo||""}</option>)}
+                  </select>
+                ) : (
+                  <input value={tqAssinatura} onChange={e=>setTqAssinatura(e.target.value)} placeholder="Nome de quem assina..." style={S.inp}/>
+                )}
+                <div style={{display:"flex", gap:8}}>
+                  <button onClick={()=>{setTqAssinando(false); setTqAssinatura("");}} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
+                  <button onClick={registrarTesteQuinzenal} style={{...S.btn, flex:1, fontSize:13}}>✓ Assinar e zerar</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Ações */}
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -288,7 +398,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
               </div>
             )}
 
-            {adminAuth&&!isEditing&&!isEditingCam&&(
+            {!isEditing&&!isEditingCam&&(
               <div style={{marginTop:6,display:"flex",justifyContent:"flex-end"}}>
                 <button onClick={()=>removeCamera(cam.id)} style={{background:"transparent",border:"none",color:"#ef444466",fontSize:11,cursor:"pointer",padding:"4px 8px"}}>🗑 Remover</button>
               </div>
