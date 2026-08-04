@@ -57,6 +57,19 @@ function fmtDataHora(iso){
 }
 function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 
+// ── Teste quinzenal de iluminação — sempre aos domingos (mesma regra do CFTV)
+// Âncora do 1º ciclo: 09/08/2026 (domingo). Ciclo = +14 dias (preserva domingo).
+// Trava: se a data calculada não cair no domingo, ajusta para o domingo à frente.
+const TQ_ANCORA = "2026-08-09";
+function tqFmtDate(d){ if(!d) return "—"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
+function tqTodayStr(){ return new Date().toLocaleDateString("sv-SE"); }
+function tqParseISO(iso){ return new Date(iso+"T12:00:00"); }
+function tqISO(d){ return d.toLocaleDateString("sv-SE"); }
+function tqAjustaDomingo(d){ const diff=(7-d.getDay())%7; if(diff!==0){ const nd=new Date(d); nd.setDate(nd.getDate()+diff); return nd; } return d; }
+function tqProximoAPartirDe(baseISO){ const b=tqParseISO(baseISO); b.setDate(b.getDate()+14); return tqISO(tqAjustaDomingo(b)); }
+function tqAlvoInicial(){ let alvo=tqParseISO(TQ_ANCORA); const hoje=new Date(); hoje.setHours(0,0,0,0); while(alvo<hoje){ alvo.setDate(alvo.getDate()+14); } return tqISO(tqAjustaDomingo(alvo)); }
+function tqDiasRestantes(alvoISO){ const alvo=tqParseISO(alvoISO); alvo.setHours(0,0,0,0); const hoje=new Date(); hoje.setHours(0,0,0,0); return Math.round((alvo-hoje)/86400000); }
+
 // ── Números de um quadrante (deficientes null = ainda não informado)
 export function calcQuad(q){
   const total = Number(q?.total)||0;
@@ -114,6 +127,7 @@ export async function loadIluminacao(projectId){
     quadrantes,
     history: data.history||[],        // legado preservado (não exibido)
     deletedIds: data.deletedIds||[],
+    testeQuinzenal: data.testeQuinzenal||null,
   };
 }
 async function saveIluminacao(projectId, data){
@@ -263,10 +277,14 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
   const S = getStyles(dark);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"main":"pin"); // pin | main | config
-  const [data, setData] = useState({ mapa:null, quadrantes:[], history:[], deletedIds:[] });
+  const [data, setData] = useState({ mapa:null, quadrantes:[], history:[], deletedIds:[], testeQuinzenal:null });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const adminAuth = authLevel==="admin";
+
+  // Teste quinzenal de iluminação (sempre aos domingos) — equipe e gerencial registram
+  const [tqAssinando, setTqAssinando] = useState(false);
+  const [tqAssinatura, setTqAssinatura] = useState("");
 
   // Edição inline: id do quadrante em edição ("novo" para adicionar)
   const [editId, setEditId] = useState(null);
@@ -291,6 +309,20 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     setData(next);
     await saveIluminacao(project.id, next);
     setSaving(false);
+  };
+
+  // Registra o teste quinzenal feito hoje: assina, zera e crava o próximo domingo.
+  const registrarTesteQuinzenal = async () => {
+    const assinatura = (tqAssinatura||"").trim();
+    if(!assinatura){ alert("Informe quem realizou/assina o teste."); return; }
+    const hojeISO = tqTodayStr();
+    const novoTq = {
+      alvo: tqProximoAPartirDe(hojeISO),
+      ultimoRegistro: { data: hojeISO, assinadoPor: assinatura, ts: new Date().toISOString() },
+    };
+    setTqAssinando(false);
+    setTqAssinatura("");
+    await persist({ ...data, testeQuinzenal: novoTq });
   };
 
   const abrirEdicao = (q) => {
@@ -443,6 +475,51 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     <div style={S.page}><div style={S.wrap}>
       {Header}
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
+
+        {/* Teste Quinzenal de Iluminação — sempre aos domingos */}
+        {(() => {
+          const tq = data.testeQuinzenal;
+          const alvo = (tq && tq.alvo) ? tq.alvo : tqAlvoInicial();
+          const dias = tqDiasRestantes(alvo);
+          const vencido = dias < 0;
+          const hoje0 = dias === 0;
+          const cor = vencido ? "#ef4444" : hoje0 ? "#f59e0b" : dias<=2 ? "#f59e0b" : "#22c55e";
+          const bg = vencido ? "#ef444415" : hoje0 ? "#f59e0b15" : (dark?"#060c18":"#f8fafc");
+          const txtDias = vencido ? `Atrasado ${Math.abs(dias)}d` : hoje0 ? "É hoje!" : `Faltam ${dias}d`;
+          const ultimo = tq && tq.ultimoRegistro;
+          return (
+            <div style={{...S.card, border:`1px solid ${cor}44`, background:bg, display:"flex", flexDirection:"column", gap:8}}>
+              <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
+                <div>
+                  <div style={{fontSize:12, fontWeight:800, ...S.txt}}>💡 Teste Quinzenal de Iluminação</div>
+                  <div style={{fontSize:11, ...S.txt2, marginTop:2}}>Próximo: <strong>domingo, {tqFmtDate(alvo)}</strong></div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:16, fontWeight:900, color:cor}}>{txtDias}</div>
+                </div>
+              </div>
+              {ultimo && (
+                <div style={{fontSize:10, ...S.txt2}}>
+                  Último: {tqFmtDate(ultimo.data)} · assinado por <strong>{ultimo.assinadoPor}</strong>
+                </div>
+              )}
+              {!tqAssinando ? (
+                <button onClick={()=>setTqAssinando(true)}
+                  style={{...S.btnSm, color:cor, borderColor:`${cor}66`, fontWeight:700, padding:"9px 14px", fontSize:12}}>
+                  ✓ Registrar teste realizado
+                </button>
+              ) : (
+                <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                  <input value={tqAssinatura} onChange={e=>setTqAssinatura(e.target.value)} placeholder="Nome de quem assina..." style={S.inp}/>
+                  <div style={{display:"flex", gap:8}}>
+                    <button onClick={()=>{setTqAssinando(false); setTqAssinatura("");}} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
+                    <button onClick={registrarTesteQuinzenal} disabled={saving} style={{...S.btn, flex:1, fontSize:13, opacity:saving?.6:1}}>{saving?"Salvando…":"✓ Assinar e zerar"}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Mapa como está (quadrantes já desenhados na imagem) */}
         {data.mapa?.url && (
