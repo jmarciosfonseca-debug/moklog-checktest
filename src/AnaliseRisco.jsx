@@ -10,7 +10,7 @@
 //        Golgi P601/602/604-607     → rondas_plantoes (plantao.perimetral.zonas)
 //        Klog P505                  → perimetral/{pid} (testes[].zonas)
 //        Mega P311A/B               → sem perimetral
-//   5. Ronda Virtual                → ronda_vspp/{pid} (registros[].slots/marcacoes)
+//   5. Ronda Virtual                → cco_ronda/{pid} (registros[] arquivados; rondas{off})
 //   6. Energia                      → energia_ocorrencias/{pid} (eventos[])
 //   7. Equipe                       → equipes/{pid} (colaboradores[])
 //
@@ -264,23 +264,80 @@ async function coletarPerimetralColecao(pid) {
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler perimetral" }; }
 }
 
-// ── FONTE 5: Ronda Virtual (ronda_vspp) ──────────────────────
+// ── FONTE 5: Ronda Virtual (cco_ronda) ───────────────────────
+// A Ronda Virtual é feita dentro do módulo CCO (AcessoCCO → RondaVirtual) e
+// grava em cco_ronda/{pid} como registros[], cada turno com:
+//   { id, tipo:"noturno"|"diurno", dataInicio, plantonista:{...},
+//     arquivado, arquivadoEm, rondas:{ "<offsetMin>": { inicio, atrasada, naoExec } } }
+// Regra (Marcio, 05/08/2026): agregar TODOS os turnos ARQUIVADOS (ciclos
+// completos) do período; ignora o turno em aberto para não penalizar rondas
+// que ainda vão ocorrer. previstas = buildSlotsRV(tipo,pid).length; feitas =
+// slots com rondas[off].inicio; naoexec = rondas[off].naoExec.
+
+// Cópia self-contained do buildSlots do RondaVirtual.jsx (não importa cruzado).
+const RV_GRADE_ESPECIAL = ["P311A", "P311B"];
+function buildSlotsRV(tipo, projectId) {
+  const slots = [];
+  const especial = RV_GRADE_ESPECIAL.includes(projectId);
+  const desloc = (projectId === "P606") ? 1 : 0;
+  if (tipo === "noturno") {
+    const iniN = 18 + desloc;
+    for (let h = iniN; h <= 22; h++) slots.push({ offsetMin: (h - iniN) * 60 });
+    if (especial) {
+      let off = (23 - iniN) * 60, cur = 23 * 60, fim = (24 + 5) * 60 + 30;
+      while (cur <= fim) { slots.push({ offsetMin: off }); cur += 30; off += 30; }
+    } else {
+      let off = (23 - iniN) * 60, cur = 23 * 60, fim = (24 + 5 + desloc) * 60;
+      while (cur <= fim) { slots.push({ offsetMin: off }); cur += 60; off += 60; }
+    }
+  } else {
+    const iniD = 6 + desloc, fimD = 17 + desloc;
+    for (let h = iniD; h <= fimD; h++) slots.push({ offsetMin: (h - iniD) * 60 });
+  }
+  return slots;
+}
+
 async function coletarRondaVirtual(pid) {
   try {
-    const snap = await getDoc(doc(db, "ronda_vspp", pid));
+    const snap = await getDoc(doc(db, "cco_ronda", pid));
     if (!snap.exists()) return { ok: false, temDado: false, motivo: "sem dados de ronda virtual" };
-    const regs = (snap.data().registros || []).slice().sort((a, b) => (b.data || "").localeCompare(a.data || ""));
+    const regs = snap.data().registros || [];
     if (!regs.length) return { ok: false, temDado: false, motivo: "sem registros de ronda virtual" };
-    const ult = regs[0];
-    const slots = ult.slots || [];
-    const feitos = slots.filter((h) => ult.marcacoes?.[h]?.status === "feito").length;
-    const pct = slots.length ? Math.round((feitos / slots.length) * 100) : null;
-    // desvios por colaborador (slots não feitos sem justificativa)
-    const semJustif = slots.filter((h) => {
-      const m = ult.marcacoes?.[h];
-      return m && m.status !== "feito" && !m.justificativa;
-    }).length;
-    return { ok: true, temDado: true, previstas: slots.length, feitas: feitos, pct, semJustif, data: fmtDate(ult.data) };
+
+    // Só ciclos completos (turnos arquivados). Turno em aberto não conta.
+    const arquivados = regs.filter((t) => t && t.arquivado);
+    if (!arquivados.length) {
+      return { ok: false, temDado: false, motivo: "sem turnos de ronda concluídos (arquivados) no período" };
+    }
+
+    let previstas = 0, feitas = 0, naoexec = 0, semJustif = 0;
+    for (const t of arquivados) {
+      const slots = buildSlotsRV(t.tipo, pid);
+      const rondas = t.rondas || {};
+      for (const s of slots) {
+        previstas += 1;
+        const reg = rondas[String(s.offsetMin)];
+        if (reg && reg.inicio) {
+          feitas += 1;
+          if (reg.atrasada && !(reg.justificativa || "").trim()) semJustif += 1;
+        } else if (reg && reg.naoExec) {
+          naoexec += 1;
+          if (!(reg.justificativa || "").trim()) semJustif += 1;
+        }
+      }
+    }
+
+    const pct = previstas ? Math.round((feitas / previstas) * 100) : null;
+    // data do turno arquivado mais recente (dataInicio; tolera legado .data)
+    const ordenados = arquivados
+      .slice()
+      .sort((a, b) => (b.dataInicio || b.data || "").localeCompare(a.dataInicio || a.data || ""));
+    const dataUlt = fmtDate(ordenados[0]?.dataInicio || ordenados[0]?.data);
+
+    return {
+      ok: true, temDado: true, fonte: "cco_ronda",
+      turnos: arquivados.length, previstas, feitas, naoexec, semJustif, pct, data: dataUlt,
+    };
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler ronda virtual" }; }
 }
 
@@ -904,7 +961,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   if (dados.ctmk?.ok) fontesUsadas.push({ titulo: "Monitor CTMK (painel)", detalhe: dados.ctmk.offline ? `Off-line há ${dados.ctmk.dias} dias` : "Online" });
   if (dados.ilum?.ok) fontesUsadas.push({ titulo: "Relatório de Iluminação", detalhe: `${dados.ilum.total} pontos · ${dados.ilum.pct}% operante` });
   if (dados.peri?.ok) fontesUsadas.push({ titulo: "Ronda Perimetral", detalhe: dados.peri.fonte === "rondas" ? `${dados.peri.plantoes} plantões · ${dados.peri.pctOk}% OK` : `${dados.peri.pctOk}% OK · ${dados.peri.dataUlt}` });
-  if (dados.rondaVirtual?.ok) fontesUsadas.push({ titulo: "Ronda Virtual (CFTV)", detalhe: `${dados.rondaVirtual.previstas} previstas · ${dados.rondaVirtual.pct}% execução` });
+  if (dados.rondaVirtual?.ok) fontesUsadas.push({ titulo: "Ronda Virtual (CFTV)", detalhe: `${dados.rondaVirtual.turnos} turnos · ${dados.rondaVirtual.feitas}/${dados.rondaVirtual.previstas} rondas · ${dados.rondaVirtual.pct}% execução` });
   if (dados.energia?.ok) fontesUsadas.push({ titulo: "Ocorrências de Energia", detalhe: `${dados.energia.quedas} queda(s) em 30 dias${dados.energia.aberto ? " · evento aberto" : ""}` });
   if (dados.equipe?.ok) fontesUsadas.push({ titulo: "Mapa de Equipe", detalhe: `${dados.equipe.total} colaboradores` });
 
