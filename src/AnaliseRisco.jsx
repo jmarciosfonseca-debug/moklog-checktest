@@ -301,7 +301,7 @@ async function coletarRondaVirtual(pid) {
   try {
     const snap = await getDoc(doc(db, "cco_ronda", pid));
     if (!snap.exists()) return { ok: false, temDado: false, motivo: "sem dados de ronda virtual" };
-    const regs = snap.data().registros || [];
+    const regs = snap.data().turnos || [];  // ◀ o RondaVirtual grava o array como .turnos (não .registros)
     if (!regs.length) return { ok: false, temDado: false, motivo: "sem registros de ronda virtual" };
 
     // Só ciclos completos (turnos arquivados). Turno em aberto não conta.
@@ -391,8 +391,31 @@ async function coletarEquipe(pid) {
         }
       }
     });
-    return { ok: true, temDado: true, total: colabs.length, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta };
+    // Perfil de Segurança consolidado em equipes/{pid}.perfilSeguranca
+    // (Equipe.jsx): { tipoEquipe:"vspp"|"vigilantes"|"mista", armada:"sim"|"nao"|"", ccoDedicada:"sim"|"nao"|"" }
+    const perfilSeguranca = snap.data().perfilSeguranca || { tipoEquipe:"", armada:"", ccoDedicada:"" };
+    return { ok: true, temDado: true, total: colabs.length, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca };
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler equipe" }; }
+}
+
+// ── MODULADOR DE EQUIPE (perfilSeguranca) ────────────────────
+// Regra B (Marcio, 05/08/2026): a COMBINAÇÃO decide 1 degrau, não a soma.
+//   Perfil FORTE  (armada=sim E ccoDedicada=sim E tipo∈{vspp,mista})  → -1 nível
+//   Perfil FRÁGIL (armada=nao E ccoDedicada=nao)                       → +1 nível
+//   Qualquer combinação intermediária                                 →  0 (neutro)
+// Retorna { delta:-1|0|1, motivo, forte, fragil }. Perfil não preenchido = neutro.
+function calcularModuladorEquipe(perfil) {
+  const p = perfil || {};
+  const armadaSim = p.armada === "sim";
+  const armadaNao = p.armada === "nao";
+  const ccoSim    = p.ccoDedicada === "sim";
+  const ccoNao    = p.ccoDedicada === "nao";
+  const tipoForte = p.tipoEquipe === "vspp" || p.tipoEquipe === "mista";
+  const forte  = armadaSim && ccoSim && tipoForte;
+  const fragil = armadaNao && ccoNao;
+  if (forte)  return { delta: -1, forte: true,  fragil: false, motivo: "equipe armada com CCO dedicada" };
+  if (fragil) return { delta:  1, forte: false, fragil: true,  motivo: "equipe desarmada sem CCO dedicada" };
+  return { delta: 0, forte: false, fragil: false, motivo: "perfil de equipe intermediário/incompleto" };
 }
 
 // -- Logo MOKED (base64) --
@@ -558,7 +581,7 @@ function aplicarCruzamentos(vetores, dados) {
 }
 
 // Consolidação do risco geral.
-function consolidarRiscoGeral(vetores) {
+function consolidarRiscoGeral(vetores, modulador) {
   const criticos = vetores.filter((v) => v.nivel === NIVEIS.CRITICO);
   const prepCriticos = criticos.filter((v) => v.preponderante);
   let label = "BAIXO", cor = MOKED.baixo;
@@ -567,7 +590,41 @@ function consolidarRiscoGeral(vetores) {
   else if (criticos.length >= 3) { label = "MÉDIO-ALTO"; cor = MOKED.elevado; }
   else if (prepCriticos.length >= 1 || criticos.length >= 1) { label = "MÉDIO"; cor = MOKED.elevado; }
   else if (temAcimaModerado) { label = "MODERADO"; cor = MOKED.elevado; }
-  return { label, cor, criticos: criticos.length, prepCriticos: prepCriticos.length };
+
+  // ── MODULADOR DE EQUIPE (perfilSeguranca) — Regra B, com PISO ──────────
+  // Ordem consolidada: BAIXO(0) < MODERADO(1) < MÉDIO(1) < MÉDIO-ALTO(2)
+  //                    < ELEVADO(2) < ALTO(3). Trabalhamos por índice.
+  const ORDEM  = ["BAIXO", "MODERADO", "MÉDIO", "MÉDIO-ALTO", "ELEVADO", "ALTO"];
+  const CORDEM = { "BAIXO": MOKED.baixo, "MODERADO": MOKED.elevado, "MÉDIO": MOKED.elevado,
+                   "MÉDIO-ALTO": MOKED.elevado, "ELEVADO": MOKED.elevado, "ALTO": MOKED.critico };
+  const delta = modulador ? (modulador.delta || 0) : 0;
+  let moduladoAplicado = null;
+  if (delta !== 0) {
+    let idx = ORDEM.indexOf(label); if (idx < 0) idx = 0;
+    let novoIdx = Math.max(0, Math.min(ORDEM.length - 1, idx + delta));
+
+    // PISO INVIOLÁVEL: o modulador NUNCA rebaixa um quadro que tem vetor
+    // crítico preponderante (pânico fixo/Bloqueador, via-única sem redundância,
+    // perímetro totalmente desconfigurado) OU qualquer crítico. Mínimo = MÉDIO.
+    if (delta < 0) {
+      const pisoMedio = (prepCriticos.length >= 1 || criticos.length >= 1);
+      if (pisoMedio) {
+        const idxMedio = ORDEM.indexOf("MÉDIO");
+        if (novoIdx < idxMedio) novoIdx = idxMedio;
+      }
+    }
+    if (novoIdx !== idx) {
+      const antigo = label;
+      label = ORDEM[novoIdx];
+      cor = CORDEM[label] || cor;
+      moduladoAplicado = { de: antigo, para: label, delta, motivo: modulador.motivo };
+    } else {
+      // aplicável mas travado pelo piso (ou já no extremo)
+      moduladoAplicado = { de: label, para: label, delta, motivo: modulador.motivo, travadoPeloPiso: delta < 0 };
+    }
+  }
+
+  return { label, cor, criticos: criticos.length, prepCriticos: prepCriticos.length, modulador: moduladoAplicado };
 }
 
 // Recomendações automáticas (dos vetores >= elevado).
@@ -810,6 +867,15 @@ function gerarHTMLAnaliseRisco(ctx) {
         <div class="drow d-pos"><span class="dt">POSITIVO</span><span>${ts?.ok ? `Dos ${ts.total} pontos verificados, ${ts.okItens} operam normalmente (${ts.pct}% de saúde).` : "Base operacional consolidada no período."}</span></div>
         ${destElev ? `<div class="drow d-att"><span class="dt">ATENÇÃO</span><span>${esc(destElev)}.</span></div>` : ""}
         ${destCrit ? `<div class="drow d-cri"><span class="dt">CRÍTICO</span><span>${esc(destCrit)}.</span></div>` : ""}
+        ${geral.modulador && geral.modulador.delta < 0 && geral.modulador.de !== geral.modulador.para
+          ? `<div class="drow d-pos"><span class="dt">EQUIPE</span><span>Classificação ajustada de <b>${esc(geral.modulador.de)}</b> para <b>${esc(geral.modulador.para)}</b> em razão do perfil operacional (${esc(geral.modulador.motivo)}), que reforça a capacidade de resposta.</span></div>`
+          : ""}
+        ${geral.modulador && geral.modulador.delta < 0 && geral.modulador.travadoPeloPiso
+          ? `<div class="drow d-att"><span class="dt">EQUIPE</span><span>O perfil operacional (${esc(geral.modulador.motivo)}) mitiga o risco, mas <b>não rebaixa</b> a classificação: há vetor crítico preponderante que se mantém como piso.</span></div>`
+          : ""}
+        ${geral.modulador && geral.modulador.delta > 0 && geral.modulador.de !== geral.modulador.para
+          ? `<div class="drow d-att"><span class="dt">EQUIPE</span><span>Classificação elevada de <b>${esc(geral.modulador.de)}</b> para <b>${esc(geral.modulador.para)}</b> em razão do perfil operacional (${esc(geral.modulador.motivo)}), que reduz a capacidade de resposta.</span></div>`
+          : ""}
       </div>
     </div>
   </div>
@@ -952,7 +1018,9 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual });
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
-  const geral = consolidarRiscoGeral(vetores);
+  // Modulador de equipe (perfilSeguranca) — age no consolidado (regra B, c/ piso).
+  const moduladorEquipe = dados.equipe?.ok ? calcularModuladorEquipe(dados.equipe.perfilSeguranca) : null;
+  const geral = consolidarRiscoGeral(vetores, moduladorEquipe);
   const recomendacoes = gerarRecomendacoes(vetores);
 
   // base documental — só fontes que trouxeram dado
@@ -963,7 +1031,17 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   if (dados.peri?.ok) fontesUsadas.push({ titulo: "Ronda Perimetral", detalhe: dados.peri.fonte === "rondas" ? `${dados.peri.plantoes} plantões · ${dados.peri.pctOk}% OK` : `${dados.peri.pctOk}% OK · ${dados.peri.dataUlt}` });
   if (dados.rondaVirtual?.ok) fontesUsadas.push({ titulo: "Ronda Virtual (CFTV)", detalhe: `${dados.rondaVirtual.turnos} turnos · ${dados.rondaVirtual.feitas}/${dados.rondaVirtual.previstas} rondas · ${dados.rondaVirtual.pct}% execução` });
   if (dados.energia?.ok) fontesUsadas.push({ titulo: "Ocorrências de Energia", detalhe: `${dados.energia.quedas} queda(s) em 30 dias${dados.energia.aberto ? " · evento aberto" : ""}` });
-  if (dados.equipe?.ok) fontesUsadas.push({ titulo: "Mapa de Equipe", detalhe: `${dados.equipe.total} colaboradores` });
+  if (dados.equipe?.ok) {
+    const ps = dados.equipe.perfilSeguranca || {};
+    const rotTipo = { vspp:"VSPP", vigilantes:"Vigilantes", mista:"Mista" }[ps.tipoEquipe] || null;
+    const rotSN = (v) => v === "sim" ? "sim" : v === "nao" ? "não" : null;
+    const perfilPartes = [];
+    if (rotTipo) perfilPartes.push(rotTipo);
+    if (rotSN(ps.armada)) perfilPartes.push(`armada: ${rotSN(ps.armada)}`);
+    if (rotSN(ps.ccoDedicada)) perfilPartes.push(`CCO dedicada: ${rotSN(ps.ccoDedicada)}`);
+    const perfilTxt = perfilPartes.length ? ` · ${perfilPartes.join(" · ")}` : "";
+    fontesUsadas.push({ titulo: "Mapa de Equipe", detalhe: `${dados.equipe.total} colaboradores${perfilTxt}` });
+  }
 
   return {
     project, pacoteLabel, vetores, geral, recomendacoes, fontesUsadas,
