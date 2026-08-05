@@ -273,7 +273,7 @@ function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
 }
 
 // ── Gerar PDF de Mapa de Equipe
-function gerarMapaEquipePDF(project, colaboradores, titulo) {
+function gerarMapaEquipePDF(project, colaboradores, titulo, perfilSeg) {
   const seg = SEG_LOGOS[project.id] || { empresa:"Moked Consulting Security", logo:"" };
   const hoje = new Date().toLocaleDateString("pt-BR");
   const fmtD = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
@@ -395,6 +395,26 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
       ${semTurno.map(renderColab).join("")}
     </div>` : "";
 
+  // Faixa do Perfil de Segurança (só aparece se ao menos um campo estiver preenchido).
+  const _ps = perfilSeg || {};
+  const _rotTipo = { vspp:"VSPP", vigilantes:"Vigilantes", mista:"Mista (VSPP + Vigilantes)" }[_ps.tipoEquipe] || null;
+  const _snCor = (v) => v === "sim" ? "#16a34a" : v === "nao" ? "#dc2626" : "#94a3b8";
+  const _snTxt = (v) => v === "sim" ? "SIM" : v === "nao" ? "NÃO" : "—";
+  const _chip = (label, valorHTML) =>
+    `<div style="display:flex;align-items:center;gap:6px;">
+       <span style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">${label}</span>
+       <span style="font-size:12px;font-weight:800;">${valorHTML}</span>
+     </div>`;
+  const _temPerfil = _rotTipo || _ps.armada || _ps.ccoDedicada;
+  const perfilSegHTML = _temPerfil
+    ? `<div style="background:#fff;border:1px solid #e2e8f0;border-left:4px solid #B21E27;border-radius:8px;padding:12px 20px;margin-bottom:20px;display:flex;align-items:center;gap:28px;flex-wrap:wrap;">
+         <span style="font-size:12px;font-weight:900;color:#B21E27;text-transform:uppercase;letter-spacing:.5px;">🛡️ Perfil de Segurança</span>
+         ${_chip("Tipo de Equipe", `<span style="color:#0f172a;">${_rotTipo || "—"}</span>`)}
+         ${_chip("Equipe Armada", `<span style="color:${_snCor(_ps.armada)};">${_snTxt(_ps.armada)}</span>`)}
+         ${_chip("CCO Dedicada", `<span style="color:${_snCor(_ps.ccoDedicada)};">${_snTxt(_ps.ccoDedicada)}</span>`)}
+       </div>`
+    : "";
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -435,11 +455,14 @@ function gerarMapaEquipePDF(project, colaboradores, titulo) {
 </div>
 
 <!-- Info linha -->
-<div style="background:#1e293b;color:#fff;border-radius:8px;padding:10px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;font-size:12px;">
+<div style="background:#1e293b;color:#fff;border-radius:8px;padding:10px 20px;margin-bottom:${perfilSegHTML?"10px":"20px"};display:flex;align-items:center;justify-content:space-between;font-size:12px;">
   <span>📋 Projeto: <strong>${project.id}</strong></span>
   <span>👥 Total: <strong>${colaboradores.length} colaborador(es)</strong></span>
   <span>📅 Emitido em: <strong>${hoje}</strong></span>
 </div>
+
+<!-- Perfil de Segurança -->
+${perfilSegHTML}
 
 <!-- Colaboradores -->
 ${turnoSections}
@@ -1698,7 +1721,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                         : selPDF.length===ativos.length
                         ? `Equipe Completa — ${project.id}`
                         : `Seleção — ${project.id}`;
-                      gerarMapaEquipePDF(project, cols, titulo);
+                      gerarMapaEquipePDF(project, cols, titulo, perfilSeg);
                     }}
                       style={{ ...S.btnSm, fontSize:10, color:"#fff", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", border:"none", padding:"5px 14px", fontWeight:700 }}>
                       📄 Gerar PDF ({selPDF.length})
