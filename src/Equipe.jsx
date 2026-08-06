@@ -273,7 +273,7 @@ function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
 }
 
 // ── Gerar PDF de Mapa de Equipe
-function gerarMapaEquipePDF(project, colaboradores, titulo, perfilSeg) {
+function gerarMapaEquipePDF(project, colaboradores, titulo, perfilSeg, desligadosIncluir) {
   const seg = SEG_LOGOS[project.id] || { empresa:"Moked Consulting Security", logo:"" };
   const hoje = new Date().toLocaleDateString("pt-BR");
   const fmtD = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
@@ -395,6 +395,25 @@ function gerarMapaEquipePDF(project, colaboradores, titulo, perfilSeg) {
       ${semTurno.map(renderColab).join("")}
     </div>` : "";
 
+  // Seção de DESLIGADOS (opcional — só quando o gestor liga o toggle no PDF).
+  const _desl = Array.isArray(desligadosIncluir) ? desligadosIncluir : [];
+  const desligadosSection = _desl.length>0 ? `
+    <div style="margin-bottom:20px;page-break-before:auto;">
+      <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:8px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">🔴</span>
+        <span style="font-size:14px;font-weight:800;color:#b91c1c;">Desligados</span>
+        <span style="font-size:12px;color:#64748b;margin-left:4px;">${_desl.length} colaborador(es)</span>
+      </div>
+      ${_desl.map(c=>{
+        const cardHtml = renderColab(c);
+        const tipo = c.tipoDesligamento || "Desligamento";
+        const dataD = fmtD(c.desligadoEm);
+        const motivo = c.motivoDesligamento ? ` · ${c.motivoDesligamento}` : "";
+        const faixa = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:11px;color:#b91c1c;font-weight:700;">🔴 ${tipo} em ${dataD}${motivo}</div>`;
+        return `<div style="opacity:.92;">${faixa}${cardHtml}</div>`;
+      }).join("")}
+    </div>` : "";
+
   // Faixa do Perfil de Segurança (só aparece se ao menos um campo estiver preenchido).
   const _ps = perfilSeg || {};
   const _rotTipo = { vspp:"VSPP", vigilantes:"Vigilantes", mista:"Mista (VSPP + Vigilantes)" }[_ps.tipoEquipe] || null;
@@ -457,7 +476,7 @@ function gerarMapaEquipePDF(project, colaboradores, titulo, perfilSeg) {
 <!-- Info linha -->
 <div style="background:#1e293b;color:#fff;border-radius:8px;padding:10px 20px;margin-bottom:${perfilSegHTML?"10px":"20px"};display:flex;align-items:center;justify-content:space-between;font-size:12px;">
   <span>📋 Projeto: <strong>${project.id}</strong></span>
-  <span>👥 Total: <strong>${colaboradores.length} colaborador(es)</strong></span>
+  <span>👥 Total: <strong>${colaboradores.length} ativo(s)${_desl.length?` + ${_desl.length} desligado(s)`:""}</strong></span>
   <span>📅 Emitido em: <strong>${hoje}</strong></span>
 </div>
 
@@ -467,6 +486,7 @@ ${perfilSegHTML}
 <!-- Colaboradores -->
 ${turnoSections}
 ${semTurnoSection}
+${desligadosSection}
 
 <!-- Rodapé -->
 <div style="border-top:1px solid #e2e8f0;margin-top:20px;padding-top:12px;text-align:center;font-size:10px;color:#94a3b8;">
@@ -1376,6 +1396,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [histForm, setHistForm] = useState({ tipo:"Falta", data:todayStr(), detalhe:"" });
   const [showDesligados, setShowDesligados] = useState(false);
   const [selPDF, setSelPDF] = useState([]); // ids selecionados para PDF
+  const [pdfComDesligados, setPdfComDesligados] = useState(false); // incluir desligados no PDF
   const [modoSel, setModoSel] = useState(false); // modo seleção PDF
   const [editHistItem, setEditHistItem] = useState(null); // item do histórico em edição
   const [saving, setSaving] = useState(false);
@@ -1721,10 +1742,18 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                         : selPDF.length===ativos.length
                         ? `Equipe Completa — ${project.id}`
                         : `Seleção — ${project.id}`;
-                      gerarMapaEquipePDF(project, cols, titulo, perfilSeg);
+                      gerarMapaEquipePDF(project, cols, titulo, perfilSeg, pdfComDesligados ? desligados : []);
                     }}
                       style={{ ...S.btnSm, fontSize:10, color:"#fff", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", border:"none", padding:"5px 14px", fontWeight:700 }}>
-                      📄 Gerar PDF ({selPDF.length})
+                      📄 Gerar PDF ({selPDF.length}{pdfComDesligados&&desligados.length?` +${desligados.length}`:""})
+                    </button>
+                  )}
+                  {desligados.length>0&&(
+                    <button onClick={()=>setPdfComDesligados(v=>!v)}
+                      style={{ ...S.btnSm, fontSize:10, color: pdfComDesligados?"#fff":"#dc2626",
+                        background: pdfComDesligados?"#dc2626":"transparent",
+                        border:`1px solid ${pdfComDesligados?"#dc2626":"#dc262644"}`, padding:"4px 10px", fontWeight:700 }}>
+                      {pdfComDesligados?"☑":"☐"} Incluir desligados ({desligados.length})
                     </button>
                   )}
                 </div>
