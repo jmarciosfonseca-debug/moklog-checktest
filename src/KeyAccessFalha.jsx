@@ -32,6 +32,23 @@ import { grantSession, hasGerencial } from "./session";
 const ADMIN_PIN = "872101";
 const COL = "keyaccess_falhas";
 
+// Brasão Moked (mesmo do Mapa de Equipe) — usado no cabeçalho do PDF.
+const MOKED_LOGO_SVG = `<svg class="logo" width="54" height="54" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="kbg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2a2a2a"/><stop offset="100%" stop-color="#111"/></radialGradient>
+    <linearGradient id="kmetal" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#d0d0d0"/><stop offset="40%" stop-color="#888"/><stop offset="100%" stop-color="#555"/></linearGradient>
+    <linearGradient id="kred" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#cc2222"/><stop offset="50%" stop-color="#991111"/><stop offset="100%" stop-color="#7a0e0e"/></linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="14" fill="url(#kbg)"/>
+  <circle cx="50" cy="50" r="38" fill="none" stroke="url(#kmetal)" stroke-width="7"/>
+  <circle cx="50" cy="50" r="26" fill="none" stroke="url(#kred)" stroke-width="8"/>
+  <circle cx="50" cy="50" r="7" fill="#111"/>
+  <rect x="47.5" y="8" width="5" height="18" rx="2" fill="url(#kred)"/>
+  <rect x="47.5" y="74" width="5" height="18" rx="2" fill="url(#kred)"/>
+  <rect x="8" y="47.5" width="18" height="5" rx="2" fill="url(#kmetal)"/>
+  <rect x="74" y="47.5" width="18" height="5" rx="2" fill="url(#kmetal)"/>
+</svg>`;
+
 // Apenas estes 8 projetos usam KeyAccess (P260A/B/C e P505 não usam).
 export const PROJETOS_KA = [
   { id:"P601",  name:"Golgi Cajamar" },
@@ -656,7 +673,7 @@ function RelatoriosKA({ dark, S, onBack }){
           </button>
 
           {gerado && (
-            <button onClick={()=>gerarPDFRelatorioKA({modo,projsSel,dadosPorProjeto,dataIni,dataFim,impactoFiltro})}
+            <button onClick={async ()=>{ await gerarPDFRelatorioKA({modo,projsSel,dadosPorProjeto,dataIni,dataFim,impactoFiltro}); }}
               style={{...S.btnSec,color:"#a855f7",borderColor:"#a855f733"}}>📄 Exportar PDF</button>
           )}
 
@@ -721,7 +738,28 @@ function RelatoriosKA({ dark, S, onBack }){
 }
 
 // ── PDF do relatório (modelo "Consolidado Executivo", funciona também pra unitário)
-function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim, impactoFiltro }){
+// ── CRUZAMENTO GLOBAL: um dia é GERAL só quando TODOS os 8 parques KeyAccess
+// registraram falha naquela MESMA DATA (o KeyAccess é plataforma central; se o
+// núcleo cai, cai pra todos). Sem janela de hora — basta a data bater em todos.
+// Se faltar um parque naquele dia, todas as falhas do dia são LOCAIS.
+// O cruzamento é SEMPRE sobre os 8 parques, independente da seleção do relatório.
+function calcularDatasGerais(dadosTodos8) {
+  const ids = PROJETOS_KA.map(p => p.id);
+  const datasPorParque = {};              // { data: Set(pids) }
+  ids.forEach(pid => {
+    (dadosTodos8[pid] || []).forEach(r => {
+      if (!r.data) return;
+      (datasPorParque[r.data] = datasPorParque[r.data] || new Set()).add(pid);
+    });
+  });
+  const datasGerais = new Set();
+  Object.keys(datasPorParque).forEach(data => {
+    if (datasPorParque[data].size >= ids.length) datasGerais.add(data); // TODOS os 8
+  });
+  return datasGerais;
+}
+
+async function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim, impactoFiltro }){
   const filtrar = (lista) => lista.filter(r=>{
     if(dataIni && r.data < dataIni) return false;
     if(dataFim && r.data > dataFim) return false;
@@ -732,37 +770,95 @@ function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim
   const periodoIni = dataIni ? fmtDate(dataIni) : "início dos registros";
   const periodoFim = dataFim ? fmtDate(dataFim) : hoje;
 
-  // Monta os dados de cada projeto uma única vez (lista filtrada, intervalos, minutos totais).
+  // Carrega os 8 parques (mesmo os não selecionados) só para o cruzamento global.
+  // Reaproveita o que já está em memória; busca o restante via loadFalhas.
+  const dadosTodos8 = { ...dadosPorProjeto };
+  for(const p of PROJETOS_KA){
+    if(!dadosTodos8[p.id]) dadosTodos8[p.id] = await loadFalhas(p.id);
+  }
+  const datasGerais = calcularDatasGerais(dadosTodos8);
+  const isGeral = (r)=> datasGerais.has(r.data);
+
+  // Monta os dados de cada projeto selecionado (lista filtrada, intervalos, minutos, contagem local/geral).
   const dadosProjetos = projsSel.map(pid=>{
     const proj = PROJETOS_KA.find(p=>p.id===pid);
-    const listaCompleta = dadosPorProjeto[pid]||[];
+    const listaCompleta = dadosTodos8[pid]||[];
     const lista = filtrar(listaCompleta).sort((a,b)=>(a.data+getHoraInicio(a)).localeCompare(b.data+getHoraInicio(b)));
     const comIntervalos = calcIntervalos(lista);
     const minutosTotais = lista.reduce((acc,r)=> acc + (calcMinutosFalha(getHoraInicio(r), r.horaFim)||0), 0);
-    const temPendente = lista.some(r=>!r.horaFim); // sem hora de retorno = ainda em aberto
+    const temPendente = lista.some(r=>!r.horaFim);
     const diasAtual = calcDiasSemFalha(listaCompleta);
-    return { pid, proj, lista, comIntervalos, minutosTotais, temPendente, diasAtual };
+    const nGerais = lista.filter(isGeral).length;
+    const nLocais = lista.length - nGerais;
+    const ultimaData = listaCompleta.map(r=>r.data).filter(Boolean).sort().slice(-1)[0] || null;
+    const afetouInquilino = lista.some(r=>getImpactos(r).includes("inquilino"));
+    return { pid, proj, lista, comIntervalos, minutosTotais, temPendente, diasAtual, nGerais, nLocais, ultimaData, afetouInquilino };
   });
 
-  // KPIs consolidados gerais
+  // KPIs consolidados
   const totalOcorrencias = dadosProjetos.reduce((a,d)=>a+d.lista.length,0);
   const tempoTotalImpactado = dadosProjetos.reduce((a,d)=>a+d.minutosTotais,0);
   const parquesAfetados = dadosProjetos.filter(d=>d.lista.length>0).length;
   const algumPendente = dadosProjetos.some(d=>d.temPendente);
+  const totalGerais = dadosProjetos.reduce((a,d)=>a+d.nGerais,0);
+  const totalLocais = dadosProjetos.reduce((a,d)=>a+d.nLocais,0);
 
-  // Tabela comparativa de impacto por projeto
+  // Eventos GERAIS do sistema, no período visível: datas gerais que caem dentro do filtro.
+  const datasGeraisVisiveis = Array.from(datasGerais).filter(data=>{
+    if(dataIni && data < dataIni) return false;
+    if(dataFim && data > dataFim) return false;
+    return true;
+  }).sort();
+  const blocoGeralHTML = datasGeraisVisiveis.length ? `
+    <div class="sysbox">
+      <div class="sysbox-h">🌐 Falhas Gerais do Sistema KeyAccess (${datasGeraisVisiveis.length})</div>
+      <p class="sysbox-p">Nas datas abaixo, <b>todos os ${PROJETOS_KA.length} parques atendidos pelo KeyAccess registraram falha simultaneamente</b>. Isso caracteriza uma indisponibilidade da plataforma central (não um problema isolado de um parque), impactando toda a operação ao mesmo tempo.</p>
+      <ul class="sysbox-list">
+        ${datasGeraisVisiveis.map(data=>{
+          const parquesNoDia = PROJETOS_KA.filter(p=>(dadosTodos8[p.id]||[]).some(r=>r.data===data)).map(p=>p.id);
+          return `<li><b>${fmtDate(data)}</b> — falha simultânea em ${parquesNoDia.length} parques (${parquesNoDia.join(", ")})</li>`;
+        }).join("")}
+      </ul>
+    </div>` : "";
+
+  // Tabela comparativa de impacto por projeto (agora com local/geral).
   const linhasComparacao = dadosProjetos.map(d=>`
     <tr>
       <td><strong>${d.pid}</strong></td>
       <td>${d.proj?.name||""}</td>
-      <td style="color:${d.minutosTotais>0?"#dc2626":"#16a34a"};font-weight:700">${d.minutosTotais>0?d.minutosTotais+" minutos":"Sem impacto no período"}</td>
+      <td style="text-align:center">${d.lista.length}</td>
+      <td style="text-align:center;color:#b45309;font-weight:700">${d.nLocais}</td>
+      <td style="text-align:center;color:#B21E27;font-weight:700">${d.nGerais}</td>
+      <td style="color:${d.minutosTotais>0?"#B21E27":"#16a34a"};font-weight:700">${d.minutosTotais>0?d.minutosTotais+" min":"Sem impacto"}</td>
+      <td style="text-align:center;font-weight:700;color:${d.diasAtual!=null&&d.diasAtual>=7?"#16a34a":"#b45309"}">${d.diasAtual!=null?d.diasAtual:"—"}</td>
     </tr>`).join("");
 
-  const corImpacto = (imp)=> imp==="entrada" ? "#3b82f6" : imp==="saida" ? "#ef4444" : "#a855f7";
+  const corImpacto = (imp)=> imp==="entrada" ? "#2563eb" : imp==="saida" ? "#B21E27" : "#7c3aed";
 
-  // Blocos individuais por projeto
+  // Blocos individuais por projeto (com narrativa + selos local/geral).
   const blocos = dadosProjetos.map(d=>{
+    // Narrativa executiva do parque.
+    let narrativa;
+    if(!d.lista.length){
+      narrativa = `No período de ${periodoIni} a ${periodoFim}, <b>${d.pid} — ${d.proj?.name||""}</b> não registrou nenhuma falha do sistema KeyAccess.`;
+    } else {
+      const partes = [];
+      partes.push(`No período de ${periodoIni} a ${periodoFim}, <b>${d.pid} — ${d.proj?.name||""}</b> registrou <b>${d.lista.length} ocorrência(s)</b>`);
+      const compo = [];
+      if(d.nLocais) compo.push(`${d.nLocais} local(is)`);
+      if(d.nGerais) compo.push(`${d.nGerais} geral(is) do sistema`);
+      if(compo.length) partes.push(` (${compo.join(" e ")})`);
+      if(d.minutosTotais>0) partes.push(`, com impacto operacional acumulado de <b>${d.minutosTotais} minutos</b>`);
+      partes.push(`.`);
+      if(d.afetouInquilino) partes.push(` Ao menos uma ocorrência afetou o fluxo de inquilinos.`);
+      if(d.diasAtual!=null && d.ultimaData){
+        partes.push(` Desde a última ocorrência em <b>${fmtDate(d.ultimaData)}</b>, o parque está há <b>${d.diasAtual} dia(s) sem registro de falha</b>.`);
+      }
+      narrativa = partes.join("");
+    }
+
     const rows = d.comIntervalos.map(r=>{
+      const geral = isGeral(r);
       const tiposR = getTipos(r);
       const tagsTxt = tiposR.length
         ? tiposR.map(tk=>{ const tag=TAGS_FALHA.find(t=>t.key===tk)||TAG_OUTRO; return tk==="outro"?(r.tipoCustom||"Outro"):tag.label; }).join("; ")
@@ -774,86 +870,129 @@ function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, dataFim
         : (r.obs ? r.obs : "Não informado");
       const respTxt = getResponsavelTexto(r);
       const impactosBadges = getImpactos(r).length
-        ? getImpactos(r).map(imp=>`<span style="display:inline-block;background:${corImpacto(imp)};color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;margin:1px 2px 1px 0;white-space:nowrap;">${imp==="entrada"?"ENTRADA":imp==="saida"?"SAÍDA":"INQUILINO"}</span>`).join("")
+        ? getImpactos(r).map(imp=>`<span class="imp" style="background:${corImpacto(imp)}">${imp==="entrada"?"ENTRADA":imp==="saida"?"SAÍDA":"INQUILINO"}</span>`).join("")
         : "<span style='color:#94a3b8'>--</span>";
-      return `<tr>
-        <td style="white-space:nowrap"><strong>${fmtDate(r.data)}</strong><br>${horaIni}</td>
+      const selo = geral
+        ? `<span class="selo selo-g">🌐 GERAL</span>`
+        : `<span class="selo selo-l">📍 LOCAL</span>`;
+      return `<tr class="${geral?"row-geral":""}">
+        <td style="white-space:nowrap"><strong>${fmtDate(r.data)}</strong><br><span style="color:#64748b">${horaIni||"--"}</span></td>
+        <td>${selo}</td>
         <td>${tagsTxt}</td>
         <td>${impactosBadges}</td>
         <td>${r.registradoPor?.nome||"Não informado"}</td>
         <td style="font-size:10px">${[respTxt,tratativa].filter(Boolean).join(" — ")}</td>
       </tr>`;
     }).join("");
+
     return `<div class="card">
       <div class="card-title">
         <span>${d.pid} — ${d.proj?.name||""}</span>
-        <span class="badge-dias">${d.diasAtual!=null?d.diasAtual+" dia(s) sem falhas atualmente":"Sem registros"}</span>
+        <span class="badge-dias">${d.diasAtual!=null?d.diasAtual+" dia(s) sem falha":"Sem registros"}</span>
       </div>
-      <table><thead><tr><th>Data / Hora Início</th><th>Tipo de Falha</th><th>Impacto</th><th>Registrado por</th><th>Observação / Tratativa</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Nenhuma falha no período selecionado</td></tr>'}</tbody></table>
+      <p class="narr">${narrativa}</p>
+      ${d.lista.length?`<table><thead><tr><th>Data / Hora</th><th>Classif.</th><th>Tipo de Falha</th><th>Impacto</th><th>Registrado por</th><th>Observação / Tratativa</th></tr></thead>
+      <tbody>${rows}</tbody></table>`:""}
     </div>`;
   }).join("");
 
   const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><title>KeyAccess Falha — Relatório ${hoje}</title>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Análise KeyAccess — ${hoje}</title>
 <style>
-  @page { size:A4; margin:18mm 14mm; }
+  @page { size:A4; margin:16mm 13mm; }
   @page { @bottom-right { content:"Página " counter(page); font-size:9px; color:#94a3b8; } }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1e293b;font-size:12px;padding:20px}
-  .brand{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
-  .title{font-size:21px;font-weight:800;color:#1e293b;margin-bottom:6px}
-  .meta{font-size:11.5px;color:#475569;margin-bottom:18px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;page-break-inside:avoid}
-  .kpi{border:1px solid #e2e8f0;border-radius:10px;padding:12px 8px;text-align:center}
-  .kpi .lbl{font-size:8.5px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px}
-  .kpi .val{font-size:21px;font-weight:800;color:#1e293b}
-  .kpi.danger .val{color:#dc2626}
-  .kpi.ok .val{color:#16a34a;font-size:16px}
-  .comparativo{border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:22px;page-break-inside:avoid}
-  .comparativo h2{font-size:13px;color:#334155;margin-bottom:10px;text-transform:uppercase;letter-spacing:.3px}
-  .card{border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:16px;page-break-inside:avoid}
-  .card-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13.5px;font-weight:800;color:#1e293b;border-bottom:2px solid #dc2626;padding-bottom:8px;margin-bottom:10px}
-  .badge-dias{font-size:9.5px;color:#64748b;font-weight:600;white-space:nowrap}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#121212;font-size:12px;padding:18px}
+  .hdr{display:flex;align-items:center;gap:16px;border-bottom:3px solid #B21E27;padding-bottom:14px;margin-bottom:16px}
+  .hdr .logo{width:54px;height:54px;flex:none}
+  .hdr .brand{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.7px}
+  .hdr .title{font-size:20px;font-weight:900;color:#121212;line-height:1.15;margin-top:2px}
+  .hdr .sub{font-size:12px;color:#B21E27;font-weight:700;margin-top:2px}
+  .meta{font-size:11px;color:#475569;margin-bottom:16px}
+  .explica{background:#faf7f7;border:1px solid #e7d9d9;border-left:4px solid #B21E27;border-radius:8px;padding:13px 16px;margin-bottom:18px;page-break-inside:avoid}
+  .explica h3{font-size:12px;color:#B21E27;text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px}
+  .explica p{font-size:10.8px;line-height:1.6;color:#3a3a3a;margin-bottom:5px}
+  .explica b{color:#121212}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:18px;page-break-inside:avoid}
+  .kpi{border:1px solid #e2e8f0;border-radius:9px;padding:11px 6px;text-align:center}
+  .kpi .lbl{font-size:8px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-bottom:5px}
+  .kpi .val{font-size:19px;font-weight:900;color:#121212}
+  .kpi.danger .val{color:#B21E27}
+  .kpi.warn .val{color:#b45309}
+  .kpi.ok .val{color:#16a34a;font-size:14px}
+  .sysbox{background:#fff5f5;border:1.5px solid #B21E27;border-radius:9px;padding:14px 16px;margin-bottom:20px;page-break-inside:avoid}
+  .sysbox-h{font-size:13px;font-weight:900;color:#B21E27;margin-bottom:8px}
+  .sysbox-p{font-size:10.8px;line-height:1.6;color:#3a3a3a;margin-bottom:8px}
+  .sysbox-list{list-style:none;font-size:11px;color:#121212}
+  .sysbox-list li{padding:4px 0;border-bottom:1px dashed #e7d9d9}
+  .sysbox-list li:last-child{border-bottom:none}
+  .comparativo{border:1px solid #e2e8f0;border-radius:9px;padding:15px;margin-bottom:22px;page-break-inside:avoid}
+  .comparativo h2{font-size:12.5px;color:#334155;margin-bottom:10px;text-transform:uppercase;letter-spacing:.3px}
+  .card{border:1px solid #e2e8f0;border-radius:9px;padding:14px;margin-bottom:16px;page-break-inside:avoid}
+  .card-title{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:14px;font-weight:900;color:#121212;border-bottom:2px solid #B21E27;padding-bottom:8px;margin-bottom:9px}
+  .badge-dias{font-size:9.5px;color:#64748b;font-weight:700;white-space:nowrap}
+  .narr{font-size:11px;line-height:1.6;color:#3a3a3a;margin-bottom:11px;background:#f8fafc;border-radius:7px;padding:9px 12px}
+  .narr b{color:#121212}
   table{width:100%;border-collapse:collapse;font-size:10.5px}
-  th{background:#1e293b;color:#fff;padding:7px 8px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.2px}
+  th{background:#121212;color:#fff;padding:7px 8px;text-align:left;font-size:8.5px;text-transform:uppercase;letter-spacing:.2px}
   td{padding:7px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}
   tr:nth-child(even) td{background:#f8fafc}
+  tr.row-geral td{background:#fff5f5}
+  .selo{display:inline-block;font-size:8.5px;font-weight:800;padding:2px 7px;border-radius:12px;white-space:nowrap}
+  .selo-g{background:#B21E27;color:#fff}
+  .selo-l{background:#fef3c7;color:#b45309;border:1px solid #fcd9a1}
+  .imp{display:inline-block;color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;margin:1px 2px 1px 0;white-space:nowrap}
   .footer{text-align:center;margin-top:20px;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  .no-print{text-align:center;margin-bottom:18px}
+  .no-print{text-align:center;margin-bottom:16px}
   @media print{.no-print{display:none}body{padding:0}}
 </style></head>
 <body>
 <div class="no-print">
-  <button onclick="window.print()" style="background:#dc2626;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+  <button onclick="window.print()" style="background:#B21E27;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
 
-<div class="brand">Moked Consulting Security</div>
-<div class="title">🚨 KeyAccess Falha — Relatório ${modo==="unitario"?"Unitário":"Consolidado Executivo"}</div>
-<div class="meta">Período de Auditoria: ${periodoIni} até ${periodoFim} | Gerado em: ${hoje}</div>
+<div class="hdr">
+  ${MOKED_LOGO_SVG}
+  <div>
+    <div class="brand">Moked Consulting Security</div>
+    <div class="title">Análise KeyAccess</div>
+    <div class="sub">Relatório ${modo==="unitario"?"Individual":"Consolidado"} de Falhas de Acesso</div>
+  </div>
+</div>
+<div class="meta">Período de auditoria: <b>${periodoIni}</b> até <b>${periodoFim}</b> &nbsp;|&nbsp; Gerado em: ${hoje} &nbsp;|&nbsp; Parques no relatório: ${dadosProjetos.length}</div>
+
+<div class="explica">
+  <h3>Como ler este relatório</h3>
+  <p><b>📍 Falha LOCAL</b> — ocorrência registrada em um único parque (ou em parte deles). Afeta apenas aquela unidade e pode ter causa local: manutenção, obra, queda de internet do parque, energia, etc. Zera o contador de "dias sem falha" somente daquele parque.</p>
+  <p><b>🌐 Falha GERAL do sistema</b> — ocorrência registrada por <b>todos os ${PROJETOS_KA.length} parques atendidos pelo KeyAccess na mesma data</b>. Como o KeyAccess é uma plataforma central (nuvem), quando o núcleo fica indisponível a falha atinge toda a operação simultaneamente. Este é o indicador de indisponibilidade da plataforma.</p>
+  <p style="margin-top:7px">É por isso que os <b>"dias sem falha" variam entre os parques</b>: uma falha local afeta apenas o contador de uma unidade, enquanto os demais seguem contando normalmente. Quanto maior o número de dias, melhor a estabilidade daquele parque.</p>
+</div>
 
 <div class="kpis">
   <div class="kpi danger"><div class="lbl">Total de Ocorrências</div><div class="val">${totalOcorrencias}</div></div>
-  <div class="kpi danger"><div class="lbl">Tempo Total Impactado</div><div class="val">${tempoTotalImpactado} min</div></div>
-  <div class="kpi"><div class="lbl">Parques Afetados</div><div class="val">${parquesAfetados} / ${dadosProjetos.length}</div></div>
-  <div class="kpi ${algumPendente?"danger":"ok"}"><div class="lbl">Status Atual Geral</div><div class="val">${algumPendente?"Pendente":"100% Online"}</div></div>
+  <div class="kpi warn"><div class="lbl">Falhas Locais</div><div class="val">${totalLocais}</div></div>
+  <div class="kpi danger"><div class="lbl">Falhas Gerais</div><div class="val">${totalGerais}</div></div>
+  <div class="kpi danger"><div class="lbl">Tempo Impactado</div><div class="val">${tempoTotalImpactado}<span style="font-size:11px"> min</span></div></div>
+  <div class="kpi ${algumPendente?"danger":"ok"}"><div class="lbl">Status Atual</div><div class="val">${algumPendente?"Pendente":"100% Online"}</div></div>
 </div>
 
+${blocoGeralHTML}
+
 <div class="comparativo">
-  <h2>Métricas de Impacto de Inoperabilidade por Projeto</h2>
-  <table><thead><tr><th>Código do Projeto</th><th>Planta Operacional</th><th>Tempo Total Impactado</th></tr></thead>
+  <h2>Métricas de Inoperabilidade por Parque</h2>
+  <table><thead><tr><th>Projeto</th><th>Planta Operacional</th><th style="text-align:center">Ocorr.</th><th style="text-align:center">Locais</th><th style="text-align:center">Gerais</th><th>Tempo Impactado</th><th style="text-align:center">Dias s/ Falha</th></tr></thead>
   <tbody>${linhasComparacao}</tbody></table>
 </div>
 
 ${blocos}
 
-<div class="footer">MokLog CheckTest © Moked Consulting Security · Relatório Técnico ${modo==="unitario"?"Individual":"Consolidado"}</div>
+<div class="footer">MokLog CheckTest © Moked Consulting Security · Análise Técnica de Falhas KeyAccess · Classificação Local/Geral por cruzamento dos ${PROJETOS_KA.length} parques</div>
 </body></html>`;
 
   const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href=url; a.download=`keyaccess_falha_${modo}_${hoje.replace(/\//g,"-")}.html`; a.click();
+  a.href=url; a.download=`analise_keyaccess_${modo}_${hoje.replace(/\//g,"-")}.html`; a.click();
   URL.revokeObjectURL(url);
 }
 
