@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // auth.js — Sessão gerencial assinada pelo servidor (BACKEND ONLY)
 //
-// Decisão (Marcio): usar o PIN gerencial atual (872101) como está,
+// Decisão (Marcio): usar o PIN gerencial atual do app como está,
 // porém validado no SERVIDOR e nunca no bundle. Fluxo:
 //
 //   1. Frontend chama POST /api/ai/session com { pin }.
