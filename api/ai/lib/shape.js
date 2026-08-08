@@ -92,6 +92,27 @@ const ERROR_TABLE = {
 };
 
 // Extrai um nome de código canônico do erro, sem confiar em texto livre.
+// Normaliza um candidato a código: minúsculas, remove namespace conhecido
+// (ex.: "firestore/permission-denied" → "permission-denied"), troca "_" por "-".
+// NÃO interpreta texto livre — apenas formata um token de código.
+function normalizeCodeToken(raw) {
+  if (raw == null) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  // Só aceita tokens curtos e seguros (evita frases/mensagens).
+  if (s.length > 40) return null;
+  if (!/^[A-Za-z0-9_/.\-]+$/.test(s)) return null;
+  s = s.toLowerCase();
+  // Remove SOMENTE namespaces conhecidos antes da barra (não qualquer prefixo).
+  const KNOWN_NS = ["firestore/", "grpc/", "google/", "admin/", "app/", "auth/"];
+  for (const ns of KNOWN_NS) {
+    if (s.startsWith(ns)) { s = s.slice(ns.length); break; }
+  }
+  // Normaliza separadores.
+  s = s.replace(/_/g, "-");
+  return s;
+}
+
 function extractCode(e) {
   if (!e || typeof e !== "object") return null;
 
@@ -99,16 +120,27 @@ function extractCode(e) {
   if (typeof e.code === "number" && GRPC_CODE_NAMES[e.code]) {
     return GRPC_CODE_NAMES[e.code];
   }
-  // 2) code string exatamente igual a um código canônico conhecido.
+  // 2) code string: numérica ("7"), canônica, com namespace, ou MAIÚSCULA/underscore.
   if (typeof e.code === "string") {
-    const c = e.code.toLowerCase();
-    if (ERROR_TABLE[c]) return c;
-    if (GRPC_CODE_NAMES[e.code]) return GRPC_CODE_NAMES[e.code]; // "7" etc.
+    // string numérica pura → mapa gRPC
+    if (/^\d+$/.test(e.code.trim())) {
+      const n = parseInt(e.code.trim(), 10);
+      if (GRPC_CODE_NAMES[n]) return GRPC_CODE_NAMES[n];
+    }
+    const tok = normalizeCodeToken(e.code);
+    if (tok && ERROR_TABLE[tok]) return tok;
   }
-  // 3) status textual (algumas libs usam e.status).
+  // 3) status textual (algumas libs usam e.status): número, string numérica ou token.
+  if (typeof e.status === "number" && GRPC_CODE_NAMES[e.status]) {
+    return GRPC_CODE_NAMES[e.status];
+  }
   if (typeof e.status === "string") {
-    const s = e.status.toLowerCase().replace(/_/g, "-");
-    if (ERROR_TABLE[s]) return s;
+    if (/^\d+$/.test(e.status.trim())) {
+      const n = parseInt(e.status.trim(), 10);
+      if (GRPC_CODE_NAMES[n]) return GRPC_CODE_NAMES[n];
+    }
+    const tok = normalizeCodeToken(e.status);
+    if (tok && ERROR_TABLE[tok]) return tok;
   }
   return null;
 }
@@ -124,8 +156,40 @@ function classifyError(e, stage = null) {
   return { errorCode: "QUERY_FAILED", retryable: false, message: "Falha ao consultar o banco.", stage: stage || null };
 }
 
-// failFrom — atalho: classifica o erro e monta o envelope fail() já com
-// stage (e partial, se aplicável) preservados.
+// isGlobalConfigError — erro que NÃO adianta continuar tentando outros PIDs
+// (credencial/autenticação/config). Nesses casos abortamos a varredura.
+// Pontuais (unavailable, deadline, aborted, internal, not-found, etc.) NÃO
+// são globais: seguimos para o próximo PID.
+function isGlobalConfigError(classified) {
+  if (!classified) return false;
+  return classified.errorCode === "PERMISSION_DENIED"
+      || classified.errorCode === "UNAUTHENTICATED";
+}
+
+// isPreviewEnv — verdadeiro SOMENTE no ambiente Preview da Vercel.
+// Em Production, Development ou unknown retorna false. Usado para garantir
+// que o log de debug efêmero jamais rode em produção, mesmo se promovido.
+function isPreviewEnv() {
+  return process.env.VERCEL_ENV === "preview";
+}
+
+// safeDebugFields — extrai APENAS metadados seguros de um erro, para log
+// server-side efêmero no Preview. Nunca message, nunca stack, nunca dados.
+// Só tipos/códigos curtos e os NOMES das propriedades.
+function safeDebugFields(e) {
+  const out = {};
+  if (!e || typeof e !== "object") { out.typeofError = typeof e; return out; }
+  out.typeofCode = typeof e.code;
+  if ((typeof e.code === "string" && e.code.length <= 40 && /^[A-Za-z0-9_/.\-]+$/.test(e.code)) || typeof e.code === "number") {
+    out.code = e.code;
+  }
+  if (typeof e.name === "string" && e.name.length <= 60 && /^[A-Za-z0-9_/.\-]+$/.test(e.name)) out.name = e.name;
+  if ((typeof e.status === "string" && e.status.length <= 40 && /^[A-Za-z0-9_/.\-]+$/.test(e.status)) || typeof e.status === "number") {
+    out.status = e.status;
+  }
+  try { out.keys = Object.keys(e).slice(0, 20); } catch (_) { /* ignore */ }
+  return out;
+}
 function failFrom(e, stage = null, extraMeta = null) {
   const c = classifyError(e, stage);
   const meta = { stage: c.stage };
@@ -206,6 +270,7 @@ function applyLimit(list, limit, hardMax = 200) {
 module.exports = {
   PROJECT_IDS, PROJECT_NAMES, SEVERITY_ORDER,
   ok, fail, failFrom, classifyError, stableToolKey,
+  isGlobalConfigError, safeDebugFields, isPreviewEnv,
   record, sortBySeverityThenAge,
   validateProjectId, resolveTargets, applyLimit,
 };
