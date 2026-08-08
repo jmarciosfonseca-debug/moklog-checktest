@@ -14,7 +14,7 @@ const { get_keyaccess_failures } = require("./keyAccess");
 const { get_weekly_report_items } = require("./weeklyReports");
 const { get_staffing_and_vacation_gaps } = require("./staffing");
 const { get_project_status, get_operational_overview } = require("./overview");
-const { fail } = require("../lib/shape");
+const { fail, failFrom } = require("../lib/shape");
 
 const HANDLERS = {
   get_operational_overview,
@@ -116,7 +116,9 @@ async function runTool(name, args) {
     const parsed = typeof args === "string" ? JSON.parse(args || "{}") : (args || {});
     return await handler(parsed);
   } catch (e) {
-    return fail("QUERY_FAILED", "Falha ao executar a ferramenta.", true);
+    // Classifica o erro real (permissão/credencial/indisponível/etc.) e
+    // preserva o stage (nome da ferramenta) no envelope. Nunca QUERY_FAILED cego.
+    return failFrom(e, name);
   }
 }
 

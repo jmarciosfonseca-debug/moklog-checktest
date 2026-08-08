@@ -13,7 +13,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo } = require("../lib/time");
 const {
-  ok, fail, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
+  ok, fail, failFrom, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
 // Duração em minutos a partir de "HH:MM" início/fim (mesmo dia; cruza meia-noite).
@@ -46,7 +46,7 @@ async function get_keyaccess_failures(args = {}) {
     try {
       snap = await db.collection("keyaccess_falhas").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar KeyAccess.", true);
+      return failFrom(e, "get_keyaccess_failures");
     }
     if (!snap.exists) continue;
     const data = snap.data() || {};

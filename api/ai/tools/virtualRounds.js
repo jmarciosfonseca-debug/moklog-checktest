@@ -16,7 +16,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo } = require("../lib/time");
 const {
-  ok, fail, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
+  ok, fail, failFrom, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
 // Projetos com grade especial de 30min (P311A / P311B).
@@ -91,7 +91,7 @@ async function get_virtual_round_nonconformities(args = {}) {
     try {
       snap = await db.collection("cco_ronda").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar rondas virtuais.", true);
+      return failFrom(e, "get_virtual_round_nonconformities");
     }
     if (!snap.exists) continue;
     const data = snap.data() || {};

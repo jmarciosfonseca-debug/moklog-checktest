@@ -17,6 +17,7 @@ const {
 } = require("./lib/openai");
 const { TOOL_SCHEMAS, runTool } = require("./tools/index");
 const { SYSTEM_PROMPT } = require("./lib/systemPrompt");
+const { stableToolKey, classifyError } = require("./lib/shape");
 
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY_MESSAGES = 20;
@@ -98,6 +99,11 @@ module.exports = async function handler(req, res) {
   let toolCallCount = 0;
   const cap = maxToolCalls();
 
+  // Deduplicação por pergunta: a MESMA ferramenta com os MESMOS argumentos
+  // (chaves ordenadas recursivamente) não é executada de novo — evita o
+  // loop de repetições. Chamada duplicada devolve DUPLICATE_TOOL_CALL.
+  const seenToolKeys = new Set();
+
   try {
     for (let step = 0; step < cap + 1; step++) {
       const { outputText, toolCalls, raw } = await callModel({ input, tools });
@@ -127,6 +133,20 @@ module.exports = async function handler(req, res) {
           input.push(toolResultItem(call.id, { ok: false, errorCode: "LIMIT", message: "Limite de consultas atingido." }));
           continue;
         }
+
+        // Deduplicação: mesma ferramenta + mesmos argumentos nesta pergunta.
+        const key = stableToolKey(call.name, call.arguments);
+        if (seenToolKeys.has(key)) {
+          input.push(toolResultItem(call.id, {
+            ok: false,
+            errorCode: "DUPLICATE_TOOL_CALL",
+            message: "Esta consulta já foi feita nesta pergunta com os mesmos parâmetros. Use o resultado anterior.",
+            retryable: false,
+          }));
+          continue;
+        }
+        seenToolKeys.add(key);
+
         toolCallCount += 1;
         const result = await runTool(call.name, call.arguments);
         toolsUsed.push(call.name);
@@ -144,7 +164,17 @@ module.exports = async function handler(req, res) {
       requestId,
     });
   } catch (e) {
-    logEvent({ requestId, sid, event: "error", message: String(e && e.message).slice(0, 200), tools: toolsUsed });
-    return res.status(500).json({ ok: false, errorCode: "QUERY_FAILED", message: "Erro ao processar a pergunta.", retryable: true });
+    // Log sanitizado: NUNCA a mensagem bruta do erro. Só metadata permitida.
+    const c = classifyError(e, "chat");
+    logEvent({
+      requestId,
+      sid,
+      event: "error",
+      errorCode: c.errorCode,
+      stage: c.stage,
+      retryable: c.retryable,
+      tools: toolsUsed,
+    });
+    return res.status(500).json({ ok: false, errorCode: c.errorCode, message: c.message, retryable: c.retryable });
   }
 };

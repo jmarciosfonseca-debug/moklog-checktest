@@ -12,7 +12,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo, durationMinutes, humanDuration } = require("../lib/time");
 const {
-  ok, fail, record, sortBySeverityThenAge,
+  ok, fail, failFrom, record, sortBySeverityThenAge,
   validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
@@ -35,7 +35,7 @@ async function get_ctmk_status(args = {}) {
     try {
       snap = await db.collection("ctmk").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar CTMK.", true);
+      return failFrom(e, "get_ctmk_status");
     }
     if (!snap.exists) {
       warnings.push(`${pid}: sem registro de CTMK.`);

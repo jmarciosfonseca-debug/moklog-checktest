@@ -17,7 +17,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo } = require("../lib/time");
 const {
-  ok, fail, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
+  ok, fail, failFrom, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
 // Elegíveis a perimetral (auditado: PERIMETRAL_ELIGIBLE no App.jsx).
@@ -40,7 +40,7 @@ async function get_perimeter_round_gaps(args = {}) {
     try {
       snap = await db.collection("perimetral").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar perimetral.", true);
+      return failFrom(e, "get_perimeter_round_gaps");
     }
     if (!snap.exists) { warnings.push(`${pid}: sem registros de teste perimetral.`); continue; }
     const data = snap.data() || {};

@@ -17,7 +17,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo, ageDays } = require("../lib/time");
 const {
-  ok, fail, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
+  ok, fail, failFrom, classifyError, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
 const DANIFICADO = new Set(["inop", "critico", "parcial", "baixo"]);
@@ -35,13 +35,26 @@ async function get_weekly_report_items(args = {}) {
   const records = [];
   const warnings = [];
 
+  // Controle de resultado parcial (ponto 5): uma leitura que falha NÃO
+  // derruba o resumo inteiro; registramos o projeto que falhou e seguimos.
+  const attemptedProjects = [];
+  const successfulProjects = [];
+  const failedProjects = [];
+  let firstError = null; // guarda o 1º erro classificado (para o caso "todos falharam")
+
   for (const pid of targets) {
+    attemptedProjects.push(pid);
     let snap;
     try {
       snap = await db.collection("equipamentos").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar equipamentos.", true);
+      const c = classifyError(e, "get_weekly_report_items");
+      if (!firstError) firstError = c;
+      failedProjects.push(pid);
+      warnings.push(`${pid}: falha na consulta de equipamentos (${c.errorCode}).`);
+      continue;
     }
+    successfulProjects.push(pid);
     if (!snap.exists) continue;
     const data = snap.data() || {};
 
@@ -98,18 +111,35 @@ async function get_weekly_report_items(args = {}) {
   });
   const { rows, truncated } = applyLimit(records, args.limit, 150);
 
-  return ok({
+  // Regra de resultado (ponto 5):
+  // - alguma leitura funcionou + houve falhas  → ok:true, partial:true
+  // - todas as leituras funcionaram            → ok:true, partial:false
+  // - leituras ok mas documentos inexistentes  → ok:true, partial:false, lista vazia
+  // - TODAS as leituras falharam               → ok:false (erro real do 1º)
+  if (successfulProjects.length === 0 && failedProjects.length > 0) {
+    const c = firstError || { errorCode: "QUERY_FAILED", message: "Falha ao consultar equipamentos.", retryable: false, stage: "get_weekly_report_items" };
+    return fail(c.errorCode, c.message, c.retryable, { stage: c.stage, partial: false });
+  }
+
+  const partial = failedProjects.length > 0;
+
+  const envelope = ok({
     filters: { projectId: v.id, status: statusFilter, olderThanDays },
     summary: {
       total: records.length,
       inop: records.filter(r => r.status === "inop").length,
       parcial: records.filter(r => r.status === "parcial").length,
       acima30dias: records.filter(r => r.occurredAt && ageDays(Date.parse(r.occurredAt), now) >= 30).length,
+      attemptedProjects: attemptedProjects.length,
+      successfulProjects: successfulProjects.length,
+      failedProjects: failedProjects.slice(),
     },
     records: rows,
     dataQualityWarnings: warnings,
     truncated,
   });
+  envelope.partial = partial;
+  return envelope;
 }
 
 module.exports = { get_weekly_report_items };

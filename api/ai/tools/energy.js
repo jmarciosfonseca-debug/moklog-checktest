@@ -14,7 +14,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo, durationMinutes, humanDuration } = require("../lib/time");
 const {
-  ok, fail, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
+  ok, fail, failFrom, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
 async function get_recent_energy_events(args = {}) {
@@ -35,7 +35,7 @@ async function get_recent_energy_events(args = {}) {
     try {
       snap = await db.collection("energia_ocorrencias").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar energia.", true);
+      return failFrom(e, "get_recent_energy_events");
     }
     if (!snap.exists) continue;
     const data = snap.data() || {};

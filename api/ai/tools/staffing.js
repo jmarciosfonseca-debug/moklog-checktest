@@ -17,7 +17,7 @@
 const { getDb } = require("../lib/firebaseAdmin");
 const { toMillis, toIsoSaoPaulo } = require("../lib/time");
 const {
-  ok, fail, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
+  ok, fail, failFrom, record, validateProjectId, resolveTargets, applyLimit, PROJECT_NAMES,
 } = require("../lib/shape");
 
 // Campos que NUNCA devem sair (defesa em profundidade).
@@ -45,7 +45,7 @@ async function get_staffing_and_vacation_gaps(args = {}) {
     try {
       snap = await db.collection("equipes").doc(pid).get();
     } catch (e) {
-      return fail("QUERY_FAILED", "Falha ao consultar equipes.", true);
+      return failFrom(e, "get_staffing_and_vacation_gaps");
     }
     if (!snap.exists) continue;
     const data = snap.data() || {};
