@@ -348,9 +348,9 @@ function reset() { data = {}; throwFor = {}; readCount = 0; readPids = []; }
     const logs = await runCapturingWarn(undefined, setupUnknownErr);
     assert.ok(!logs.some(l => l.includes("[ctmk-debug]")));
   });
-  await test("Preview + erro CONHECIDO → NÃO loga debug (só QUERY_FAILED loga)", async () => {
+  await test("Preview + erro CONHECIDO → LOGA debug (diagnóstico registra qualquer erro em Preview)", async () => {
     const logs = await runCapturingWarn("preview", setupKnownErr);
-    assert.ok(!logs.some(l => l.includes("[ctmk-debug]")));
+    assert.ok(logs.some(l => l.includes("[ctmk-debug]")));
   });
 
   // ── safeDebugFields sanitiza error.name (ponto 2) ───────────

@@ -26,10 +26,26 @@ async function get_ctmk_status(args = {}) {
   }
 
   const targets = resolveTargets(v.id);
-  const db = getDb();
   const now = Date.now();
   const records = [];
   const warnings = [];
+
+  // getDb() pode lançar na inicialização do Admin SDK (ex.: variável de
+  // ambiente ausente/malformada). Isso acontece ANTES do loop, então
+  // tratamos aqui — senão o erro sobe sem passar pelo diagnóstico da ferramenta.
+  let db;
+  try {
+    db = getDb();
+  } catch (e) {
+    const c = classifyError(e, "get_ctmk_status:init");
+    if (isPreviewEnv()) {
+      try {
+        // eslint-disable-next-line no-console
+        console.warn("[ctmk-debug]", JSON.stringify({ tool: "get_ctmk_status", phase: "getDb", ...safeDebugFields(e) }));
+      } catch (_) { /* ignore */ }
+    }
+    return fail(c.errorCode, c.message, c.retryable, { stage: c.stage, partial: false });
+  }
 
   // Controle de varredura resiliente: uma falha pontual em um PID NÃO derruba
   // a consulta inteira. Só abortamos em erro global (config/auth).
@@ -51,13 +67,13 @@ async function get_ctmk_status(args = {}) {
       // Warning sanitizado (só PID + errorCode) — nunca mensagem bruta.
       warnings.push(`${pid}: falha na leitura de CTMK (${c.errorCode}).`);
 
-      // Debug efêmero server-side — SOMENTE no Preview da Vercel. Nunca em
-      // Production/Development/unknown. Só metadados seguros; nunca vai ao
-      // navegador nem à OpenAI. Remover após diagnóstico.
-      if (c.errorCode === "QUERY_FAILED" && isPreviewEnv()) {
+      // Debug efêmero server-side — SOMENTE no Preview. Durante o diagnóstico,
+      // registra QUALQUER erro (não só QUERY_FAILED) para revelar o código
+      // técnico real. Só metadados seguros; nunca vai ao navegador nem à OpenAI.
+      if (isPreviewEnv()) {
         try {
           // eslint-disable-next-line no-console
-          console.warn("[ctmk-debug]", JSON.stringify({ tool: "get_ctmk_status", projectId: pid, ...safeDebugFields(e) }));
+          console.warn("[ctmk-debug]", JSON.stringify({ tool: "get_ctmk_status", phase: "get", projectId: pid, errorCode: c.errorCode, ...safeDebugFields(e) }));
         } catch (_) { /* ignore */ }
       }
 
