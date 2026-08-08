@@ -65,6 +65,7 @@ function blankReg(){
     condutor: "",
     socorrista1: "",
     socorrista2: "",
+    paciente: "",
     vitimaRemovida: "Sim",
     acompanhante: "Não",
     observacao: "",
@@ -85,6 +86,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   const [form, setForm] = useState(blankReg());
   const [editandoId, setEditandoId] = useState(null);
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
 
   useEffect(()=>{
     let vivo = true;
@@ -291,6 +293,11 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
             </Campo>
           </div>
 
+          {/* Paciente / Vítima */}
+          <Campo S={S} label="Paciente / Vítima">
+            <input value={form.paciente} onChange={e=>setF({ paciente:e.target.value })} placeholder="Nome do paciente/vítima (se mais de um, separe por vírgula)" style={S.input}/>
+          </Campo>
+
           {/* Vítima removida + Acompanhante */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             <Campo S={S} label="Vítima Removida?">
@@ -326,10 +333,16 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
             </div>
             {fotos.length < MAX_FOTOS && (
               <>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple onChange={e=>{ addFotos(e.target.files); e.target.value=""; }} style={{ display:"none" }}/>
-                <button onClick={()=>fileRef.current && fileRef.current.click()} style={{ ...S.btnSec, width:"100%" }}>
-                  📷 Adicionar foto (câmera ou galeria)
-                </button>
+                <input ref={fileRef} type="file" accept="image/*" multiple onChange={e=>{ addFotos(e.target.files); e.target.value=""; }} style={{ display:"none" }}/>
+                <input ref={cameraRef} type="file" accept="image/*" capture="environment" multiple onChange={e=>{ addFotos(e.target.files); e.target.value=""; }} style={{ display:"none" }}/>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                  <button onClick={()=>fileRef.current && fileRef.current.click()} style={{ ...S.btnSec, width:"100%" }}>
+                    🖼️ Galeria
+                  </button>
+                  <button onClick={()=>cameraRef.current && cameraRef.current.click()} style={{ ...S.btnSec, width:"100%" }}>
+                    📷 Câmera
+                  </button>
+                </div>
               </>
             )}
           </Campo>
@@ -387,6 +400,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
                       {reg.gravidade ? ` · ` : ""}
                       {reg.gravidade && <span style={{ color:cor, fontWeight:800 }}>{reg.gravidade}</span>}
                     </div>
+                    {reg.paciente && reg.paciente.trim() && <div style={{ fontSize:12, ...S.txt2, marginTop:2 }}>🧍 {reg.paciente}</div>}
                     {(reg.fotos?.length>0) && <div style={{ fontSize:11, ...S.txt2, marginTop:3 }}>📷 {reg.fotos.length} foto(s)</div>}
                   </div>
                   <span style={{ fontSize:9, fontWeight:800, color:"#fff", background:cor, borderRadius:5, padding:"3px 8px", whiteSpace:"nowrap" }}>{reg.gravidade || "—"}</span>
