@@ -689,12 +689,13 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
                       {liderAuth && !adminAuth && !h.editadoPor && (
                         <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
                       )}
-                      {/* Gerencial: editar sempre + excluir */}
+                      {/* Gerencial: editar sempre */}
                       {adminAuth && (
-                        <>
-                          <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
-                          <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}>✕</button>
-                        </>
+                        <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
+                      )}
+                      {/* Excluir: gerencial e líder */}
+                      {(adminAuth || liderAuth) && (
+                        <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}>✕</button>
                       )}
                     </div>
                   </div>
@@ -1549,7 +1550,8 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   };
 
   const removeHist = async (colabId, histId) => {
-    if(!adminAuth) return;
+    if(!adminAuth && !liderAuth) return;
+    if(!window.confirm("Excluir este registro do histórico? Esta ação não pode ser desfeita.")) return;
     const newColabs = equipeData.colaboradores.map(c=>{
       if(c.id!==colabId) return c;
       return {...c, historico:(c.historico||[]).filter(h=>h.id!==histId)};

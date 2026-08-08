@@ -45,6 +45,20 @@ function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.
 function pad2(n){ return String(n).padStart(2,"0"); }
 function fmtDataHora(iso){ if(!iso) return "—"; try { const d=new Date(iso); return d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); } catch { return "—"; } }
 function fmtHora(iso){ if(!iso) return "—"; try { return new Date(iso).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); } catch { return "—"; } }
+// Hora "HH:MM" no fuso local a partir de um ISO (para pré-preencher inputs type=time)
+function isoParaHoraLocal(iso){ try{ const d=iso?new Date(iso):new Date(); const h=String(d.getHours()).padStart(2,"0"); const m=String(d.getMinutes()).padStart(2,"0"); return `${h}:${m}`; }catch{ return ""; } }
+// Combina a DATA de um ISO base (ou hoje) com uma hora "HH:MM" digitada, gerando
+// novo ISO no fuso local — evita o bug de UTC de toISOString().split.
+function horaLocalParaIso(horaHHMM, isoBase){
+  try{
+    if(!horaHHMM) return isoBase || new Date().toISOString();
+    const base = isoBase ? new Date(isoBase) : new Date();
+    const [h,m] = horaHHMM.split(":").map(n=>parseInt(n,10));
+    if(Number.isNaN(h)||Number.isNaN(m)) return isoBase || new Date().toISOString();
+    base.setHours(h, m, 0, 0);
+    return base.toISOString();
+  }catch{ return isoBase || new Date().toISOString(); }
+}
 function fmtDiaMes(iso){ if(!iso) return {d:"—",m:""}; try { const d=new Date(iso); return { d: pad2(d.getDate()), m: d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","") }; } catch { return {d:"—",m:""}; } }
 function turnoAgora(){ const h=new Date().getHours(); return (h>=6&&h<18) ? "Diurno" : "Noturno"; }
 function duracaoFmt(msIni, msFim){
@@ -327,6 +341,9 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   const [editandoId,setEditandoId]=useState(null);
   const [viewId,setViewId]=useState(null);
   const [confirmDelId,setConfirmDelId]=useState(null);
+  const [modoRegistro,setModoRegistro]=useState(false); // mostra card de hora antes de registrar a queda
+  const [horaQueda,setHoraQueda]=useState("");          // "HH:MM" da queda (registro/edição)
+  const [horaRetorno,setHoraRetorno]=useState("");      // "HH:MM" do retorno (conclusão/edição)
 
   useEffect(()=>{ loadEnergia(project.id).then(d=>{setData(d);setLoading(false);}); },[project.id]);
   useEffect(()=>{ const t=setInterval(()=>setAgora(Date.now()),15000); return ()=>clearInterval(t); },[]);
@@ -341,19 +358,25 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
 
   const persist = async (next) => { setSaving(true); setData(next); await saveEnergia(project.id,next); setSaving(false); };
 
+  const abrirRegistro = () => { setHoraQueda(isoParaHoraLocal(null)); setModoRegistro(true); };
   const registrarQueda = async () => {
-    const ev = { id:newId(), inicioQueda:new Date().toISOString(), turno:turnoAgora(), concluido:false, arquivado:false, criadoEm:new Date().toISOString() };
+    const inicioIso = horaLocalParaIso(horaQueda, null);
+    const ev = { id:newId(), inicioQueda:inicioIso, turno:turnoAgora(), concluido:false, arquivado:false, criadoEm:new Date().toISOString() };
     await persist({ ...data, eventos:[...eventos, ev] });
+    setModoRegistro(false);
     setToastMsg("Queda registrada — em aberto ⏳");
   };
 
   const abrirConcluir = () => {
     setEditandoId(null);
+    setHoraRetorno(isoParaHoraLocal(null));
     setForm({ protocolo:"", operador:"", gerador:"", obsGerador:"", manutencista:false, impactoOperacao:false, obsImpacto:"", inquilinoImpactado:false, inquilinosAfetados:"", obs:"", foto:null });
     setErro(null); setScreen("concluir");
   };
   const abrirEdicao = (ev) => {
     setEditandoId(ev.id);
+    setHoraQueda(isoParaHoraLocal(ev.inicioQueda));
+    setHoraRetorno(ev.fimQueda ? isoParaHoraLocal(ev.fimQueda) : "");
     setForm({ protocolo:ev.protocolo||"", operador:ev.operador||"", gerador:ev.gerador||"", obsGerador:ev.obsGerador||"",
       manutencista:!!ev.manutencista, impactoOperacao:!!ev.impactoOperacao, obsImpacto:ev.obsImpacto||"",
       inquilinoImpactado:!!ev.inquilinoImpactado, inquilinosAfetados:ev.inquilinosAfetados||"", obs:ev.obs||"", foto:ev.foto||null });
@@ -371,10 +394,20 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     if(form.impactoOperacao && !form.obsImpacto.trim()){ setErro("Descreva o impacto na operação."); return; }
     if(form.inquilinoImpactado && !form.inquilinosAfetados.trim()){ setErro("Informe qual(is) inquilino(s) foi(ram) impactado(s)."); return; }
     if(editandoId){
-      await persist({ ...data, eventos:eventos.map(e=>e.id===editandoId?{...e,...form}:e) });
+      const evAntigo = eventos.find(e=>e.id===editandoId) || {};
+      const novoInicio = horaLocalParaIso(horaQueda, evAntigo.inicioQueda);
+      const novoFim = evAntigo.fimQueda!==undefined && evAntigo.fimQueda!==null && horaRetorno
+        ? horaLocalParaIso(horaRetorno, evAntigo.fimQueda)
+        : (horaRetorno ? horaLocalParaIso(horaRetorno, evAntigo.inicioQueda) : evAntigo.fimQueda);
+      await persist({ ...data, eventos:eventos.map(e=>e.id===editandoId?{...e,...form,inicioQueda:novoInicio,fimQueda:novoFim}:e) });
       setToastMsg("Alterações salvas ✅");
     } else {
-      const evFinal = { ...aberto, ...form, fimQueda:new Date().toISOString(), concluido:true };
+      let fimIso = horaLocalParaIso(horaRetorno, aberto.inicioQueda);
+      // Virada de dia: se o retorno ficou antes do início, é no dia seguinte.
+      if(new Date(fimIso).getTime() < new Date(aberto.inicioQueda).getTime()){
+        fimIso = new Date(new Date(fimIso).getTime() + 86400000).toISOString();
+      }
+      const evFinal = { ...aberto, ...form, fimQueda:fimIso, concluido:true };
       await persist({ ...data, eventos:eventos.map(e=>e.id===aberto.id?evFinal:e) });
       setToastMsg("Ocorrência concluída ✅");
     }
@@ -423,6 +456,18 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
           ) : (
             <div style={{fontSize:12,...S.txt2,marginTop:2}}>Queda iniciada em {fmtDataHora(aberto.inicioQueda)} · retorno registrado agora ({fmtHora(new Date().toISOString())})</div>
           )}
+          <div style={{display:"grid",gridTemplateColumns:editandoId?"1fr 1fr":"1fr",gap:10,marginTop:12}}>
+            {editandoId && (
+              <div>
+                <label style={S.lbl}>Hora da queda</label>
+                <input type="time" value={horaQueda} onChange={e=>setHoraQueda(e.target.value)} style={{...S.inp,marginTop:6}}/>
+              </div>
+            )}
+            <div>
+              <label style={S.lbl}>Hora do retorno</label>
+              <input type="time" value={horaRetorno} onChange={e=>setHoraRetorno(e.target.value)} style={{...S.inp,marginTop:6}}/>
+            </div>
+          </div>
         </div>
         <div style={S.card}>
           <label style={S.lbl}>Operador</label>
@@ -605,7 +650,19 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
               </div>
               <div style={{fontSize:12,...S.txt2}}>{diasSemQueda==null?"Configure a concessionária para iniciar a contagem":`dia${diasSemQueda===1?"":"s"} sem quedas de energia${!ultimaConcluida?" · desde a configuração":""}`}</div>
             </div>
-            <button onClick={registrarQueda} disabled={saving} style={S.btn}>➕ Registrar falta de energia</button>
+            {modoRegistro ? (
+              <div style={{...S.card}}>
+                <label style={S.lbl}>Que horas a energia caiu?</label>
+                <input type="time" value={horaQueda} onChange={e=>setHoraQueda(e.target.value)} style={{...S.inp,marginTop:8}}/>
+                <div style={{fontSize:11.5,...S.txt2,marginTop:6}}>Já vem preenchido com o horário atual. Ajuste se a queda foi antes.</div>
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={()=>setModoRegistro(false)} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
+                  <button onClick={registrarQueda} disabled={saving} style={S.btn}>{saving?"Salvando…":"✓ Confirmar queda"}</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={abrirRegistro} disabled={saving} style={S.btn}>➕ Registrar falta de energia</button>
+            )}
           </>
         )}
 
