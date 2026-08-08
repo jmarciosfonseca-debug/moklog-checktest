@@ -35,7 +35,11 @@ function maxToolCalls() {
 }
 
 function logEvent(ev) {
-  try { console.log(JSON.stringify({ svc: "ai_chat", ...ev })); } catch (e) { /* noop */ }
+  // vercelEnv é um valor curto e conhecido (production/preview/development) —
+  // seguro para log e útil para diagnosticar por que o debug efêmero (que só
+  // roda em Preview) dispara ou não.
+  const vercelEnv = typeof process.env.VERCEL_ENV === "string" && process.env.VERCEL_ENV.length <= 20 ? process.env.VERCEL_ENV : "unknown";
+  try { console.log(JSON.stringify({ svc: "ai_chat", vercelEnv, ...ev })); } catch (e) { /* noop */ }
 }
 
 // Converte uma mensagem simples {role, content} em item da Responses API.
@@ -96,6 +100,7 @@ module.exports = async function handler(req, res) {
 
   const tools = toResponsesTools(TOOL_SCHEMAS);
   const toolsUsed = [];
+  const toolOutcomes = []; // metadados sanitizados por chamada: {tool, ok, errorCode, stage, partial}
   let toolCallCount = 0;
   const cap = maxToolCalls();
 
@@ -110,7 +115,7 @@ module.exports = async function handler(req, res) {
 
       if (!toolCalls || toolCalls.length === 0) {
         const durationMs = Date.now() - t0;
-        logEvent({ requestId, sid, event: "completed", model: model(), tools: toolsUsed, toolCalls: toolCallCount, durationMs });
+        logEvent({ requestId, sid, event: "completed", model: model(), tools: toolsUsed, toolOutcomes, toolCalls: toolCallCount, durationMs });
         return res.status(200).json({
           ok: true,
           answer: outputText || "",
@@ -150,12 +155,21 @@ module.exports = async function handler(req, res) {
         toolCallCount += 1;
         const result = await runTool(call.name, call.arguments);
         toolsUsed.push(call.name);
+        // Metadados sanitizados do resultado (nunca dados/mensagem): ajudam a
+        // diagnosticar QUAL ferramenta falhou e com QUAL código, no log completed.
+        toolOutcomes.push({
+          tool: call.name,
+          ok: result && result.ok === true,
+          errorCode: result && result.errorCode ? result.errorCode : undefined,
+          stage: result && result.stage ? result.stage : undefined,
+          partial: result && result.partial === true ? true : undefined,
+        });
         input.push(toolResultItem(call.id, result));
       }
     }
 
     const durationMs = Date.now() - t0;
-    logEvent({ requestId, sid, event: "tool_loop_exhausted", tools: toolsUsed, toolCalls: toolCallCount, durationMs });
+    logEvent({ requestId, sid, event: "tool_loop_exhausted", tools: toolsUsed, toolOutcomes, toolCalls: toolCallCount, durationMs });
     return res.status(200).json({
       ok: true,
       answer: "Consultei os dados, mas atingi o limite de consultas por pergunta antes de concluir. Refaça a pergunta de forma mais específica (ex.: um projeto ou um período).",

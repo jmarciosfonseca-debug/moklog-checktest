@@ -167,8 +167,8 @@ function isGlobalConfigError(classified) {
 }
 
 // isPreviewEnv — verdadeiro SOMENTE no ambiente Preview da Vercel.
-// Em Production, Development ou unknown retorna false. Usado para garantir
-// que o log de debug efêmero jamais rode em produção, mesmo se promovido.
+// Em Production, Development ou unknown retorna false. Garante que o log de
+// debug efêmero jamais rode em produção.
 function isPreviewEnv() {
   return process.env.VERCEL_ENV === "preview";
 }
