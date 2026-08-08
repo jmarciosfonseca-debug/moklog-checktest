@@ -14,6 +14,7 @@ import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin } from "./session";
+import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -1504,6 +1505,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     } catch(e) { return undefined; }
   };
   const [pin,setPin]=useState(""); const [auth,setAuth]=useState(()=>hasGerencial()); const [err,setErr]=useState(false);
+  const [iaOpen,setIaOpen]=useState(false);
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
   const [pendScreen,setPendScreen]=useState(false);
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
@@ -1899,6 +1901,8 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       </div>
       {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
       {ctmkConfirm&&<CtmkConfirmModal confirm={ctmkConfirm} project={{id:ctmkConfirm.pid}} onCancel={()=>setCtmkConfirm(null)} onConfirm={(date)=>{onToggleCtmk(ctmkConfirm.pid,date);setCtmkConfirm(null);}}/>}
+      <BotaoIA onClick={()=>setIaOpen(true)}/>
+      <AssistenteIA open={iaOpen} onClose={()=>setIaOpen(false)}/>
     </div>
   );
 }
