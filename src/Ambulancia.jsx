@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { setDoc } from "./fireGuard";
+import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { setDoc, deleteDoc } from "./fireGuard";
 import { gerarPdfAmbulancia } from "./ambulanciaPdf";
 
 const firebaseConfig = {
@@ -74,6 +74,26 @@ function blankReg(){
   };
 }
 
+// ── Rascunho local (localStorage), por projeto ──────────────────
+// Guarda os campos de TEXTO do formulário para o líder não perder o que
+// digitou. As FOTOS não vão para o localStorage (evita estourar a cota) —
+// elas são reanexadas ao recuperar. Regra: strip photos before localStorage.
+function draftKey(pid){ return `amb_rascunho_${pid}`; }
+function salvarRascunhoLocal(pid, form){
+  try{
+    const { fotos, ...semFotos } = form || {};
+    localStorage.setItem(draftKey(pid), JSON.stringify({ ...semFotos, _rascunhoEm: new Date().toISOString() }));
+    return true;
+  }catch(e){ return false; }
+}
+function lerRascunhoLocal(pid){
+  try{ const s = localStorage.getItem(draftKey(pid)); return s ? JSON.parse(s) : null; }
+  catch(e){ return null; }
+}
+function limparRascunhoLocal(pid){
+  try{ localStorage.removeItem(draftKey(pid)); }catch(e){ /* noop */ }
+}
+
 export default function Ambulancia({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }){
   const S = getStyles(dark);
   const adminAuth = sharedAuth === "admin" || sharedAuth === "gerencial";
@@ -92,8 +112,28 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
     let vivo = true;
     (async ()=>{
       try{
+        // Formato ANTIGO: documento único com array registros[]
+        let antigos = [];
         const snap = await getDoc(doc(db, COL, project.id));
-        if(vivo && snap.exists()) setRegistros(snap.data().registros || []);
+        if(snap.exists()) antigos = (snap.data().registros || []).map(r => ({ ...r, _novo:false }));
+
+        // Formato NOVO: um documento por registro na subcoleção registros/
+        let novos = [];
+        try{
+          const subSnap = await getDocs(collection(db, COL, project.id, "registros"));
+          novos = subSnap.docs.map(d => ({ ...d.data(), id: d.id, _novo:true }));
+        }catch(e){ /* subcoleção pode não existir ainda */ }
+
+        // Junta os dois, remove duplicados por id (novo tem prioridade) e ordena
+        const mapa = new Map();
+        for(const r of antigos) mapa.set(r.id, r);
+        for(const r of novos) mapa.set(r.id, r); // novo sobrescreve antigo de mesmo id
+        const lista = [...mapa.values()].sort((a,b)=>{
+          const ka = (b.data||"") + (b.criadoEm||"");
+          const kb = (a.data||"") + (a.criadoEm||"");
+          return ka.localeCompare(kb);
+        });
+        if(vivo) setRegistros(lista);
       }catch(e){ console.warn("load ambulancia:", e); }
       // puxa lista de inquilinos cadastrados para o dropdown
       try{
@@ -109,18 +149,60 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
     return ()=>{ vivo=false; };
   },[project.id]);
 
-  const persist = async (lista) => {
+  // Grava UM registro no seu próprio documento (subcoleção registros/).
+  // Assim cada ocorrência tem seu próprio limite de 1MB — nunca estoura por
+  // acúmulo. Atualiza a lista local sem depender de reescrever tudo.
+  const salvarRegistro = async (reg) => {
     setSaving(true);
-    setRegistros(lista);
-    try{ await setDoc(doc(db, COL, project.id), { registros: lista, updatedAt: new Date().toISOString() }); }
-    catch(e){ console.error(e); alert("Erro ao salvar. Verifique a conexão e tente de novo."); }
-    setSaving(false);
+    const registro = { ...reg, _novo:true };
+    // Atualiza a UI otimisticamente
+    setRegistros(prev => {
+      const outros = prev.filter(r => r.id !== registro.id);
+      return [registro, ...outros].sort((a,b)=>((b.data||"")+(b.criadoEm||"")).localeCompare((a.data||"")+(a.criadoEm||"")));
+    });
+    try{
+      // Grava apenas ESTE registro no seu documento próprio
+      const { _novo, ...limpo } = registro;
+      await setDoc(doc(db, COL, project.id, "registros", registro.id), { ...limpo, updatedAt: new Date().toISOString() });
+      return true;
+    }catch(e){
+      console.error(e);
+      alert("Erro ao salvar. Verifique a conexão e tente de novo.");
+      // Reverte a UI: remove o registro que não foi salvo
+      setRegistros(prev => prev.filter(r => r.id !== registro.id));
+      return false;
+    }finally{
+      setSaving(false);
+    }
   };
 
   const abrirNovo = () => {
+    // Se houver rascunho salvo, oferece recuperar (sem as fotos, que não
+    // são guardadas no localStorage).
+    const rasc = lerRascunhoLocal(project.id);
+    if(rasc && (rasc.inquilino || rasc.paciente || rasc.observacao)){
+      const quando = rasc._rascunhoEm ? new Date(rasc._rascunhoEm).toLocaleString("pt-BR") : "";
+      if(window.confirm(`Há um rascunho não enviado${quando ? ` de ${quando}` : ""}.\n\nDeseja recuperá-lo? (As fotos precisarão ser anexadas de novo.)`)){
+        const { _rascunhoEm, ...campos } = rasc;
+        setForm({ ...blankReg(), ...campos, fotos: [] });
+        setEditandoId(null);
+        setScreen("form");
+        return;
+      }
+      // Não quis recuperar → descarta o rascunho
+      limparRascunhoLocal(project.id);
+    }
     setForm(blankReg());
     setEditandoId(null);
     setScreen("form");
+  };
+
+  // Salvar rascunho manualmente (botão no formulário)
+  const salvarRascunho = () => {
+    const ok = salvarRascunhoLocal(project.id, form);
+    alert(ok
+      ? "📝 Rascunho salvo neste aparelho. Você pode continuar depois pelo botão Novo Registro.\n\n(As fotos não ficam no rascunho — anexe ao finalizar.)"
+      : "Não foi possível salvar o rascunho neste aparelho.");
   };
 
   const abrirEdicao = (reg) => {
@@ -135,6 +217,18 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   };
 
   const setF = (patch) => setForm(f => ({ ...f, ...patch }));
+
+  // Auto-salva rascunho (só texto) enquanto o líder preenche um registro NOVO.
+  // Não roda na edição de registro já salvo (gerencial).
+  useEffect(()=>{
+    if(screen !== "form" || editandoId) return;
+    const t = setTimeout(()=>{
+      if(form.inquilino || form.paciente || form.observacao){
+        salvarRascunhoLocal(project.id, form);
+      }
+    }, 800);
+    return ()=>clearTimeout(t);
+  }, [form, screen, editandoId, project.id]);
 
   const addFotos = async (files) => {
     const arr = Array.from(files || []);
@@ -173,13 +267,11 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
     if(!limpo.criadoEm) limpo.criadoEm = new Date().toISOString();
     delete limpo.inquilinoOutro;
 
-    let lista;
-    if(editandoId){
-      lista = registros.map(r => r.id === editandoId ? limpo : r);
-    }else{
-      lista = [limpo, ...registros];
-    }
-    await persist(lista);
+    // Grava só este registro (documento próprio). Só navega se persistiu —
+    // evita o efeito "aparece salvo e some" quando a gravação falha.
+    const ok = await salvarRegistro(limpo);
+    if(!ok) return; // permanece no formulário para o líder tentar de novo
+    limparRascunhoLocal(project.id); // salvou de verdade → descarta rascunho
     setScreen("list");
     setForm(blankReg());
     setEditandoId(null);
@@ -188,7 +280,23 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   const excluir = async (reg) => {
     if(!adminAuth){ alert("A exclusão é exclusiva da gerência."); return; }
     if(!window.confirm(`Excluir o registro de ${reg.inquilino} (${fmtData(reg.data)})? Esta ação não pode ser desfeita.`)) return;
-    await persist(registros.filter(r => r.id !== reg.id));
+    setSaving(true);
+    try{
+      if(reg._novo){
+        // Formato novo: apaga o documento próprio na subcoleção
+        await deleteDoc(doc(db, COL, project.id, "registros", reg.id));
+      }else{
+        // Formato antigo: reescreve o documento único sem este registro
+        const restantesAntigos = registros.filter(r => !r._novo && r.id !== reg.id).map(({_novo, ...r})=>r);
+        await setDoc(doc(db, COL, project.id), { registros: restantesAntigos, updatedAt: new Date().toISOString() });
+      }
+      setRegistros(prev => prev.filter(r => r.id !== reg.id));
+    }catch(e){
+      console.error(e);
+      alert("Erro ao excluir. Tente novamente.");
+    }finally{
+      setSaving(false);
+    }
   };
 
   const gerarPDF = (reg) => gerarPdfAmbulancia(project, reg);
@@ -353,6 +461,11 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           </Campo>
 
           {/* Ações */}
+          {!editandoId && (
+            <button onClick={salvarRascunho} style={{ ...S.btnSec, width:"100%", marginTop:6, marginBottom:0 }}>
+              📝 Salvar rascunho (continuar depois)
+            </button>
+          )}
           <div style={{ display:"flex", gap:10, marginTop:6 }}>
             <button onClick={()=>{ setScreen("list"); setForm(blankReg()); setEditandoId(null); }} style={{ ...S.btnSec, flex:1 }}>Cancelar</button>
             <button onClick={salvar} disabled={saving} style={{ ...S.btnPrimary, flex:2, opacity:saving?.6:1 }}>{saving ? "Salvando…" : (editandoId ? "✓ Salvar alterações" : "✓ Salvar registro")}</button>
