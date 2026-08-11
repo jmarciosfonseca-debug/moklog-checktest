@@ -29,6 +29,9 @@
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { classificarVetor, consolidarSite, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
+import { coletarSinistros, moduladorSinistro } from "./Sinistros";
+import { coletarRegional, moduladorRegional } from "./regionalConfig";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -120,6 +123,14 @@ function coletarTesteSemanal(project, stored) {
   const state = last.state || {};
   const pend = [];
   let totalItens = 0, okItens = 0;
+  const catAgg = {};  // catLabel -> { catLabel, total, inop, piorDias, itemLabel }
+  const pid = project.id;
+  const agg = (catLabel, total, inop, dias, itemLabel) => {
+    if (!catAgg[catLabel]) catAgg[catLabel] = { catLabel, total: 0, inop: 0, piorDias: null, itemLabel: null };
+    const a = catAgg[catLabel];
+    a.total += total; a.inop += inop;
+    if (dias != null && (a.piorDias == null || dias > a.piorDias)) { a.piorDias = dias; a.itemLabel = itemLabel || a.itemLabel; }
+  };
   for (const cat of (project.categories || [])) {
     const s = state[cat.id];
     if (s == null) continue;
@@ -127,26 +138,28 @@ function coletarTesteSemanal(project, stored) {
     if (cat.type === "single") {
       totalItens++;
       const st = s.status ?? (s.ok === false ? "inop" : "ok");
-      if (st === "ok") okItens++;
-      else pend.push(mkPend(cat.label, "", s, st, prep));
+      if (st === "ok") { okItens++; agg(cat.label, 1, 0, null, null); }
+      else { const p = mkPend(cat.label, "", s, st, prep); pend.push(p); agg(cat.label, 1, 1, p.dias, ""); }
     } else if (cat.type === "items") {
       const arr = Array.isArray(s) ? s : [];
       arr.forEach((v, i) => {
         totalItens++;
         const st = v?.status ?? (v?.ok === false ? "inop" : "ok");
-        if (st === "ok") okItens++;
-        else pend.push(mkPend(cat.label, cat.itemLabels?.[i] || `Item ${i + 1}`, v, st, prep));
+        const lbl = cat.itemLabels?.[i] || `Item ${i + 1}`;
+        if (st === "ok") { okItens++; agg(cat.label, 1, 0, null, null); }
+        else { const p = mkPend(cat.label, lbl, v, st, prep); pend.push(p); agg(cat.label, 1, 1, p.dias, lbl); }
       });
     } else if (cat.type === "count") {
       const inop = Array.isArray(s.inoperative) ? s.inoperative : [];
       const tot = Number(s.total) || 0;
       totalItens += tot; okItens += Math.max(0, tot - inop.length);
-      inop.forEach((it) => pend.push(mkPend(cat.label, it.id || "?", it, "inop", prep)));
+      agg(cat.label, tot, inop.length, null, null);
+      inop.forEach((it) => { const p = mkPend(cat.label, it.id || "?", it, "inop", prep); pend.push(p); agg(cat.label, 0, 0, p.dias, it.id || "?"); });
     }
   }
   const pct = totalItens ? Math.round((okItens / totalItens) * 100) : null;
   return {
-    ok: true, temDado: true, pend, total: totalItens, okItens, pct,
+    ok: true, temDado: true, pend, total: totalItens, okItens, pct, catAgg, pid,
     data: fmtDate(last.meta?.date), dataRaw: last.meta?.date || null,
     lider: last.meta?.lider || last.meta?.liderName || null,
   };
@@ -430,35 +443,43 @@ const MOKED_LOGO = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAQDA
 // Monta vetores a partir do Teste Semanal (agrupando por ponto físico).
 function vetoresDoTesteSemanal(ts, dataUlt) {
   if (!ts?.ok || !ts.pend?.length) return [];
-  const porGrupo = {};
+  // v2 (motor riscoConfig): nível por CATEGORIA via classificarVetor.
+  // Cada vetor guarda nivelMoked e nivelCliente (Moked = Cliente + 1, feito
+  // no consolidarSite; aqui guardamos o nível-base e o flag incluir/soMoked).
+  const porCat = {};
   for (const p of ts.pend) {
-    const chave = p.pontoFisico ? `ponto:${p.pontoFisico}` : `cat:${p.catLabel}`;
-    const label = p.pontoFisico ? `Acesso ${p.pontoFisico}` : p.catLabel;
-    if (!porGrupo[chave]) porGrupo[chave] = { chave, label, itens: [], preponderante: p.preponderante };
-    porGrupo[chave].itens.push(p);
-    if (p.preponderante) porGrupo[chave].preponderante = true;
+    const chave = `cat:${p.catLabel}`;
+    if (!porCat[chave]) porCat[chave] = { catLabel: p.catLabel, itens: [], preponderante: p.preponderante };
+    porCat[chave].itens.push(p);
+    if (p.preponderante) porCat[chave].preponderante = true;
   }
-  return Object.values(porGrupo).map((g) => {
-    let nivel = NIVEIS.BAIXO, piorDias = null, piorItem = null;
-    for (const it of g.itens) {
-      const n = nivelPorDias(it.dias);
-      if (n > nivel) nivel = n;
-      if (it.dias != null && (piorDias == null || it.dias > piorDias)) { piorDias = it.dias; piorItem = it; }
-    }
-    if (g.preponderante && piorDias != null && piorDias > REGUA.preponderanteMinDias && nivel < NIVEIS.ELEVADO) nivel = NIVEIS.ELEVADO;
-    const it = piorItem || g.itens[0];
+  const out = [];
+  for (const g of Object.values(porCat)) {
+    const aggc = (ts.catAgg && ts.catAgg[g.catLabel]) || { total: g.itens.length, inop: g.itens.length, piorDias: null };
+    let piorDias = aggc.piorDias, piorItem = null;
+    for (const it of g.itens) if (it.dias != null && (piorDias == null || it.dias >= piorDias)) { piorDias = it.dias; piorItem = it; }
+    if (!piorItem) piorItem = g.itens[0];
+
+    const rc = classificarVetor({
+      pid: ts.pid, labelCategoria: g.catLabel, labelItem: piorItem?.itemLabel || "",
+      inop: aggc.inop, total: aggc.total, dias: piorDias, escopo: "moked",
+    });
+    if (rc.incluir === false && rc.nivel <= RC_NIVEL.SEMDADOS) continue; // fora do score
+
+    const it = piorItem;
     const outros = g.itens.length > 1 ? ` (+${g.itens.length - 1} ponto${g.itens.length - 1 > 1 ? "s" : ""} do mesmo conjunto)` : "";
+    const propTxt = aggc.total ? ` — ${aggc.inop} de ${aggc.total}` : "";
     const sinceTxt = it?.since ? `inoperante desde ${fmtDate(it.since)}` : null;
-    return {
-      chave: g.chave, label: g.label, nivel, preponderante: g.preponderante,
-      piorDias, qtd: g.itens.length,
-      fonteCredito: `Teste Semanal · ${dataUlt}`,
-      sinceTxt,
-      descricao: `${it?.itemLabel ? `<b>${it.itemLabel}</b>` : "Conjunto"} ${(it?.status || "inoperante").toLowerCase()} ${piorDias != null ? `há ${piorDias} dias` : "recentemente"}${outros}.`,
-      note: it?.note || "",
-      grupo: "teste",
-    };
-  });
+    out.push({
+      chave: `cat:${g.catLabel}`, label: g.catLabel,
+      nivel: rc.nivel, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
+      preponderante: g.preponderante, piorDias, qtd: g.itens.length,
+      fonteCredito: `Teste Semanal · ${dataUlt}`, sinceTxt,
+      descricao: `${it?.itemLabel ? `<b>${it.itemLabel}</b>` : "Conjunto"} ${(it?.status || "inoperante").toLowerCase()} ${piorDias != null ? `há ${piorDias} dias` : "recentemente"}${outros}${propTxt}. <i>${rc.motivo || ""}</i>`,
+      note: it?.note || "", grupo: "teste",
+    });
+  }
+  return out;
 }
 
 // Vetor CTMK (fonte painel).
@@ -1000,6 +1021,8 @@ async function coletarFontes(project, stored, marcadas) {
     dados.equipe = r;
     if (!r.ok) faltantes.push({ key: "equipe", label: "Mapa de Equipe", motivo: r.motivo });
   }
+  { const r = await coletarSinistros(project.id); dados.sinistros = r; }
+  { dados.regional = coletarRegional(project.id); }
   return { dados, faltantes };
 }
 
@@ -1018,9 +1041,40 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual });
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
-  // Modulador de equipe (perfilSeguranca) — age no consolidado (regra B, c/ piso).
+  // ── CONSOLIDAÇÃO v2 (motor riscoConfig) — dois escopos ──
+  // Cada vetor do teste já traz nivel (base moked) e incluirCliente.
+  // Recompomos no formato que consolidarSite espera.
+  const vetoresRC = vetores.map((v) => ({
+    nivel: v.nivel, incluir: v.incluirCliente !== false, trava: !!v.trava, motivo: v.label,
+  }));
+  const consCliente = consolidarSite(vetoresRC, "cliente");
+  const consMoked = consolidarSite(vetoresRC, "moked");
+
+  // Moduladores (equipe + sinistro + regional) — somados como delta.
   const moduladorEquipe = dados.equipe?.ok ? calcularModuladorEquipe(dados.equipe.perfilSeguranca) : null;
-  const geral = consolidarRiscoGeral(vetores, moduladorEquipe);
+  const modSin = moduladorSinistro(dados.sinistros, vetores);
+  const modReg = moduladorRegional(dados.regional, vetores);
+  const deltaTot = (moduladorEquipe?.delta || 0) + (modSin?.delta || 0) + (modReg?.delta || 0);
+  const motivosMod = [moduladorEquipe?.motivo, modSin?.motivo, modReg?.motivo].filter(Boolean).join(" · ");
+
+  // Aplica delta aos dois consolidados (limitado aos tetos de cada escopo).
+  const aplicaDelta = (cons, tetoMax) => {
+    let n = Math.max(RC_NIVEL.BAIXO, Math.min(tetoMax, (cons.nivel || 1) + deltaTot));
+    return { ...cons, nivelAjustado: n, labelAjustado: RC_LABEL[n], delta: deltaTot, motivoMod: motivosMod };
+  };
+  const geralCliente = aplicaDelta(consCliente, RC_NIVEL.CRITICO);
+  const geralMoked = aplicaDelta(consMoked, RC_NIVEL.CRITICO_II);
+
+  // `geral` compatível com o template atual do PDF (usa o escopo MOKED por padrão).
+  const nCriticos = vetores.filter((v) => v.nivel >= RC_NIVEL.CRITICO).length;
+  const CORES = { 5: MOKED.critico, 4: MOKED.critico, 3: MOKED.elevado, 2: MOKED.moderado, 1: MOKED.baixo, 0: MOKED.cinza };
+  const geral = {
+    label: geralMoked.labelAjustado, cor: CORES[geralMoked.nivelAjustado] || MOKED.elevado,
+    criticos: nCriticos, prepCriticos: 0,
+    nivelMoked: geralMoked.nivelAjustado, nivelCliente: geralCliente.nivelAjustado,
+    labelMoked: geralMoked.labelAjustado, labelCliente: geralCliente.labelAjustado,
+    modulador: motivosMod ? { delta: deltaTot, motivo: motivosMod, de: null, para: null } : null,
+  };
   const recomendacoes = gerarRecomendacoes(vetores);
 
   // base documental — só fontes que trouxeram dado
@@ -1042,9 +1096,14 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     const perfilTxt = perfilPartes.length ? ` · ${perfilPartes.join(" · ")}` : "";
     fontesUsadas.push({ titulo: "Mapa de Equipe", detalhe: `${dados.equipe.total} colaboradores${perfilTxt}` });
   }
+  if (dados.sinistros?.ok) fontesUsadas.push({ titulo: "Histórico de Sinistros", detalhe: dados.sinistros.houve ? "Sinistro registrado" : "Sem sinistro recente" });
+  if (dados.regional?.ok) {
+    fontesUsadas.push({ titulo: "Diagnóstico Regional", detalhe: `${dados.regional.codigo} · ${(dados.regional.quadrantes||[]).map(q=>q.grau).join("/")}` });
+  }
 
   return {
-    project, pacoteLabel, vetores, geral, recomendacoes, fontesUsadas,
+    project, pacoteLabel, vetores, geral, geralCliente, geralMoked, recomendacoes, fontesUsadas,
+    sinistros: dados.sinistros, regional: dados.regional,
     ts: dados.ts, ctmk: dados.ctmk, ilum: dados.ilum, rondaVirtual: dados.rondaVirtual, equipe: dados.equipe,
     contextos,
   };

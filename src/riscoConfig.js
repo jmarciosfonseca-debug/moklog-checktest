@@ -40,8 +40,8 @@
 // ─────────────────────────────────────────────────────────────
 
 // ── Níveis canônicos ─────────────────────────────────────────
-export const NIVEL = { CRITICO: 4, ELEVADO: 3, MODERADO: 2, BAIXO: 1, SEMDADOS: 0 };
-export const NIVEL_LABEL = { 4: "CRÍTICO", 3: "ELEVADO", 2: "MODERADO", 1: "BAIXO", 0: "SEM DADOS" };
+export const NIVEL = { CRITICO_II: 5, CRITICO: 4, ELEVADO: 3, MODERADO: 2, BAIXO: 1, SEMDADOS: 0 };
+export const NIVEL_LABEL = { 5: "CRÍTICO II", 4: "CRÍTICO", 3: "ELEVADO", 2: "MODERADO", 1: "BAIXO", 0: "SEM DADOS" };
 export const NIVEL_ORDEM = (n) => n; // já é ordinal
 
 // ── Classes de ativo (peso + teto) ───────────────────────────
@@ -50,6 +50,7 @@ export const CLASSE = {
   TATICO:     { nome: "Tático",     peso: 7,  teto: NIVEL.ELEVADO },
   AUTOMACAO:  { nome: "Automação",  peso: 4,  teto: NIVEL.MODERADO },
   ILUMINACAO: { nome: "Iluminação", peso: 2,  teto: NIVEL.MODERADO },
+  BAIXO:      { nome: "Baixo",      peso: 1,  teto: NIVEL.BAIXO },
   PERIFERICO: { nome: "Periférico", peso: 0.5, teto: NIVEL.BAIXO },
 };
 
@@ -101,6 +102,61 @@ export function fatorCoberturaCFTV(pctCego) {
 }
 
 // ═════════════════════════════════════════════════════════════
+// ESCALAS POR CONTAGEM (decididas com Marcio em 10/08/2026)
+// Sobrepõem a fórmula PVT nos casos abaixo.
+// ═════════════════════════════════════════════════════════════
+
+// CFTV por CONTAGEM de câmeras inoperantes (não por % cego):
+//   1-2 → BAIXO · 3 → MODERADO · 4+ → CRÍTICO. Pior câmera >5d sobe +1.
+export function nivelCFTVContagem(qtdInop, piorDias) {
+  let nivel;
+  if (qtdInop <= 0) nivel = NIVEL.BAIXO;
+  else if (qtdInop <= 2) nivel = NIVEL.BAIXO;
+  else if (qtdInop === 3) nivel = NIVEL.MODERADO;
+  else nivel = NIVEL.CRITICO;
+  if (piorDias != null && piorDias > 5 && nivel < NIVEL.CRITICO) nivel = Math.min(NIVEL.CRITICO, nivel + 1);
+  return nivel;
+}
+
+// Cancela AS (Alta Segurança) — escala GLOBAL por contagem:
+//   1-2 → ELEVADO · 3+ → CRÍTICO.
+export const CANCELA_AS_MATCH = ["cancela as", "cancelas as", "alta seguranca"];
+export function nivelCancelaAS(qtdInop) {
+  const q = Math.max(0, qtdInop || 0);
+  if (q <= 0) return NIVEL.BAIXO;
+  if (q <= 2) return NIVEL.ELEVADO;
+  return NIVEL.CRITICO;
+}
+
+// Override de cancelas POR PROJETO (escala varia por parque).
+export const CANCELA_CONFIG = {
+  P601:  { match: ["cancela adm", "cancelas adm"], modo: "fixo", nivel: NIVEL.BAIXO },
+  P604:  { match: ["cancela adm", "cancelas adm"], modo: "fora" },
+  P311A: { match: ["cancela de acesso", "cancelas de acesso", "cancela"], modo: "escala",
+           escala: { 1: NIVEL.BAIXO, 2: NIVEL.MODERADO, 3: NIVEL.ELEVADO, 4: NIVEL.CRITICO, 5: NIVEL.CRITICO } },
+  P311B: { match: ["cancela de acesso", "cancelas de acesso", "cancela"], modo: "escala",
+           escala: { 1: NIVEL.BAIXO, 2: NIVEL.MODERADO, 3: NIVEL.CRITICO, 4: NIVEL.CRITICO } },
+  P606:  { match: ["cancela"], modo: "fora" },
+};
+export function overrideCancela(pid, catLabel, qtdInop) {
+  const cfg = CANCELA_CONFIG[pid];
+  if (!cfg) return null;
+  const n = norm(catLabel);
+  if (!cfg.match.some((m) => n.includes(m))) return null;
+  if (cfg.modo === "fora") return { fora: true };
+  if (cfg.modo === "fixo") return { nivel: cfg.nivel };
+  if (cfg.modo === "escala") {
+    const q = Math.max(0, qtdInop || 0);
+    if (q <= 0) return { nivel: NIVEL.BAIXO };
+    const chaves = Object.keys(cfg.escala).map(Number).sort((a,b)=>a-b);
+    let nivel = cfg.escala[chaves[0]];
+    for (const k of chaves) if (q >= k) nivel = cfg.escala[k];
+    return { nivel };
+  }
+  return null;
+}
+
+// ═════════════════════════════════════════════════════════════
 // MAPA DE PESOS POR NOME-BASE
 // Mapeamento por substring do nome do item/categoria (case/acento
 // tolerante). Ordem importa: itens mais específicos primeiro.
@@ -130,7 +186,7 @@ export const MAPA_NOMEBASE = [
   // ── Pânico: distinguir fixo vs móvel (item interno decide) ──
   // IMPORTANTE: exige "panico" ou "botao" — NÃO casar "telefone fixo" etc.
   { match: ["panico fixo", "botao de panico fixo", "botao fixo", "panico ztrax"], classe: "BLOQUEADOR", flags: { panicoFixo: true, trava: true } },
-  { match: ["panico movel", "panico móvel", "panico mov"], classe: "AUTOMACAO", flags: { panicoMovel: true, peso: 4 } },
+  { match: ["panico movel", "panico móvel", "panico mov"], classe: "TATICO", flags: { panicoMovel: true } }, // HOJE(10/08): móvel teto ELEVADO
   { match: ["botoes de panico", "botao de panico", "panico"], classe: "BLOQUEADOR", flags: { panicoFixo: true, trava: true } }, // pânico genérico em categoria própria = fixo (conservador p/ trava)
 
   // ── Perímetro (regra especial) ──
@@ -145,10 +201,10 @@ export const MAPA_NOMEBASE = [
   { match: ["cancela alta seg", "cancela veicular", "cancela inclusa", "cancela baia", "cancela"], classe: "BLOQUEADOR", flags: { conjunto: true } },
 
   // ── CTMK / monitoramento central ──
-  { match: ["ctmk", "central de monitor"], classe: "BLOQUEADOR", flags: { trava: true } },
+  { match: ["ctmk", "central de monitor"], classe: "TATICO", flags: {} }, // HOJE(10/08): CTMK tático, sem trava
 
   // ── Incêndio (pontua, sem trava) ──
-  { match: ["alarme de incendio", "incendio", "sdai", "repetidora"], classe: "TATICO", flags: { semTrava: true } },
+  { match: ["alarme de incendio", "incendio", "sdai", "repetidora"], classe: "BAIXO", flags: { semTrava: true } }, // HOJE(10/08): incêndio nunca sobe
 
   // ── CFTV (régua própria) ──
   { match: ["cftv", "camera"], classe: "TATICO", flags: { cftv: true } },
@@ -165,10 +221,10 @@ export const MAPA_NOMEBASE = [
 
   // ── Automação de acesso (teto MODERADO) ──
   { match: ["qr"], classe: "AUTOMACAO", flags: {} }, // QR genérico
-  { match: ["semaforo", "pictograma", "farol"], classe: "AUTOMACAO", flags: {} },
-  { match: ["sensor anti", "anti-esmag", "antiesmag"], classe: "AUTOMACAO", flags: {} },
+  { match: ["semaforo", "pictograma", "farol", "giroflex"], classe: "BAIXO", flags: {} }, // HOJE(10/08)
+  { match: ["sensor anti", "anti-esmag", "antiesmag"], classe: "BAIXO", flags: {} }, // HOJE(10/08)
   { match: ["totem", "token", "totem token"], classe: "AUTOMACAO", flags: {} },
-  { match: ["botoeira"], classe: "AUTOMACAO", flags: {} },
+  { match: ["botoeira", "mesa controladora", "mesa controle", "joystick"], classe: "BAIXO", flags: {} }, // HOJE(10/08)
   { match: ["torniquete", "catraca"], classe: "AUTOMACAO", flags: {} }, // pedestre
   { match: ["portao", "portoes", "porta cco", "motor portao"], classe: "AUTOMACAO", flags: {} },
 
@@ -180,7 +236,8 @@ export const MAPA_NOMEBASE = [
   { match: ["monitor", "cpu", "computador"], classe: "PERIFERICO", flags: { soMoked: true } },
   { match: ["ar-condicionado", "ar condicionado", "ar-cond"], classe: "PERIFERICO", flags: { soMoked: true } },
   { match: ["nobreak", "no-break", "transformador"], classe: "PERIFERICO", flags: { soMoked: true } },
-  { match: ["internet", "telefone", "interfone", "intercomunicador", "radio ht", "bodycam", "lanterna", "smartphone", "tablet"], classe: "PERIFERICO", flags: { soMoked: true } },
+  { match: ["internet", "telefone", "nobreak cco"], classe: "TATICO", flags: {} }, // HOJE(10/08): infra crítica operacional → ELEVADO
+  { match: ["interfone", "intercomunicador", "radio ht", "bodycam", "lanterna", "smartphone", "tablet"], classe: "PERIFERICO", flags: { soMoked: true } },
   { match: ["guarita"], classe: "PERIFERICO", flags: { soMoked: true } },
 
   // ── Capacitação / brigada (só MOKED, não é equipamento) ──
@@ -237,6 +294,29 @@ export function rotuloPorPVT(pvt) {
 // ═════════════════════════════════════════════════════════════
 export function classificarVetor(v) {
   const escopo = v.escopo || "moked";
+
+  // ── OVERRIDE DE CANCELA POR PROJETO (10/08) — antes da PVT ──
+  const ov = overrideCancela(v.pid, v.labelCategoria || v.labelItem, v.inop);
+  if (ov) {
+    if (ov.fora) return { classe: "Fora do score", classeKey: "PERIFERICO", peso: 0,
+      incluir: false, trava: false, tag: "fora do score", motivo: "cancela administrativa (fora do escopo)",
+      nivel: NIVEL.SEMDADOS, label: "—", pvt: 0, via: "override" };
+    return { classe: "Cancela", classeKey: "BLOQUEADOR", peso: 10, incluir: true, trava: false,
+      tag: "override", motivo: "escala de cancela do projeto", nivel: ov.nivel,
+      label: NIVEL_LABEL[ov.nivel], pvt: 0, via: "override" };
+  }
+
+  // ── ESCALA GLOBAL CANCELA AS (10/08) — antes da PVT ──
+  {
+    const nlbl = norm(v.labelCategoria || v.labelItem);
+    if (CANCELA_AS_MATCH.some((m) => nlbl.includes(m))) {
+      const nivel = nivelCancelaAS(v.inop);
+      return { classe: "Cancela AS", classeKey: "BLOQUEADOR", peso: 10, incluir: true,
+        trava: false, tag: "cancela-as", motivo: `${v.inop} cancela(s) AS inoperante(s)`,
+        nivel, label: NIVEL_LABEL[nivel], pvt: 0, via: "escala-as" };
+    }
+  }
+
   const regra = resolverRegra(v.labelItem, v.labelCategoria);
   const flags = regra.flags || {};
   const classeKey = regra.classe;
@@ -251,20 +331,26 @@ export function classificarVetor(v) {
     via: regra.via,
   };
 
-  // ── PERÍMETRO (regra especial) ──
+  // ── PERÍMETRO (regra especial — escala por Nº DE ZONAS, 10/08) ──
   if (flags.perimetro) {
     if (v.emObra && !v.inop) {
       return { ...base, nivel: NIVEL.BAIXO, label: "observação", tag: "em implantação",
                pvt: 0, motivo: "zona em fase de instalação" };
     }
-    // totalmente desconfigurado + >30d → CRÍTICO + trava
+    const zonas = Math.max(0, v.inop || 0);
+    // totalmente desconfigurado + >30d → CRÍTICO + trava (mantido do repo)
     if (v.estadoTotal && (v.dias || 0) > 30) {
       return { ...base, nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO],
                pvt: 999, trava: true, motivo: "perímetro totalmente desconfigurado há mais de 30 dias" };
     }
-    // desconfig recente OU zona(s) isolada(s) → ELEVADO, sem trava
-    return { ...base, nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO],
-             pvt: 0, motivo: "zona perimetral inoperante" };
+    // 1 zona = ELEVADO · 2+ zonas = CRÍTICO (decisão 10/08)
+    let nivel = NIVEL.BAIXO;
+    if (zonas === 1) nivel = NIVEL.ELEVADO;
+    else if (zonas >= 2) nivel = NIVEL.CRITICO;
+    // tempo pode subir 1 zona isolada a CRÍTICO se muito antiga (>90d)
+    if (zonas === 1 && (v.dias || 0) > 90) nivel = NIVEL.CRITICO;
+    return { ...base, nivel, label: NIVEL_LABEL[nivel],
+             pvt: 0, motivo: `${zonas} zona(s) perimetral(is) inoperante(s)` };
   }
 
   // ── PARADOX (condicional a total desconfiguração) ──
@@ -273,13 +359,11 @@ export function classificarVetor(v) {
              pvt: 0, motivo: "Paradox parcial/OK — tem redundância" };
   }
 
-  // ── CFTV (régua própria) ──
+  // ── CFTV (régua própria: CONTAGEM — decidido 10/08) ──
   if (flags.cftv) {
-    const pctCego = v.total ? (v.inop / v.total) * 100 : 0;
-    const pvt = 7 * fatorCoberturaCFTV(pctCego) * multTemporalLeve(v.dias);
-    let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
-    return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt),
-             motivo: `${v.inop} de ${v.total} câmeras (${pctCego.toFixed(1)}% cego)` };
+    const nivel = nivelCFTVContagem(v.inop, v.dias);
+    return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: 0,
+             motivo: `${v.inop} câmera(s) inoperante(s)${v.dias != null ? ` (pior ${v.dias}d)` : ""}` };
   }
 
   // ── CONJUNTO (proporção domina) ──
@@ -327,8 +411,14 @@ export function consolidarSite(vetoresClassificados, escopo = "moked") {
     nivel = incl.reduce((m, v) => Math.max(m, v.nivel || 0), NIVEL.BAIXO);
     motivo = "pior vetor de segurança do período";
   }
-  // teto do escopo cliente
-  if (escopo === "cliente" && nivel > NIVEL.ELEVADO) nivel = NIVEL.ELEVADO;
+  // ── ESCOPO (10/08): Moked = Cliente + 1 nível (alerta antecipado) ──
+  // Cliente: teto CRÍTICO (nível 4). Moked: desloca +1, topo CRÍTICO II (5).
+  if (escopo === "cliente") {
+    if (nivel > NIVEL.CRITICO) nivel = NIVEL.CRITICO;
+  } else {
+    // moked: sobe um degrau acima do que o cliente veria, teto CRÍTICO II
+    nivel = Math.min(NIVEL.CRITICO_II, nivel + 1);
+  }
   return { nivel, label: NIVEL_LABEL[nivel], motivo, temTrava };
 }
 
