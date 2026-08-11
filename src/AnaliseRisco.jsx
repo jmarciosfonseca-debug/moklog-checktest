@@ -237,20 +237,37 @@ async function coletarPerimetralRondas(pid) {
     const comPeri = plantoes.filter((p) => p.perimetral?.feito && (p.perimetral.zonas || []).length);
     if (!comPeri.length) return { ok: false, temDado: false, motivo: "nenhum teste perimetral com zonas no período" };
     // agrega por zona
+    // Identidade estável = campo de nome legível, ou o id (UUID) apenas como CHAVE
+    // interna de agrupamento (nunca exibida). O rótulo mostrado ao cliente segue a
+    // mesma convenção do Relatório de Ronda: ordem fixa Z-01..Z-0n. Se houver nome
+    // legível real no dado, ele tem prioridade sobre o rótulo derivado da ordem.
     const zonaStats = {};
+    const nomeLegivel = (z) => z.nome || z.zona || z.label || null; // sem z.id
     let totalAcion = 0, okAcion = 0;
     comPeri.forEach((p) => {
-      (p.perimetral.zonas || []).forEach((z) => {
-        const nome = z.nome || z.zona || z.label || z.id || "Zona";
+      (p.perimetral.zonas || []).forEach((z, i) => {
+        const chave = z.id || nomeLegivel(z) || `pos_${i}`; // agrupamento interno
         const st = (z.status || "ok").toLowerCase();
-        if (!zonaStats[nome]) zonaStats[nome] = { nome, total: 0, ruins: 0 };
-        zonaStats[nome].total++;
+        if (!zonaStats[chave]) {
+          zonaStats[chave] = { chave, ordem: i, nomeReal: nomeLegivel(z), total: 0, ruins: 0 };
+        }
+        // preserva a menor ordem observada (posição de cadastro) para rotular
+        if (i < zonaStats[chave].ordem) zonaStats[chave].ordem = i;
+        if (!zonaStats[chave].nomeReal) zonaStats[chave].nomeReal = nomeLegivel(z);
+        zonaStats[chave].total++;
         totalAcion++;
         if (st === "ok") okAcion++;
-        else zonaStats[nome].ruins++;
+        else zonaStats[chave].ruins++;
       });
     });
-    const zonas = Object.values(zonaStats).map((z) => ({ ...z, pctFalha: z.total ? Math.round((z.ruins / z.total) * 100) : 0 }));
+    const zonas = Object.values(zonaStats)
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((z, idx) => ({
+        ...z,
+        // nome exibido: nome real do dado, senão Z-01..Z-0n pela ordem de cadastro
+        nome: z.nomeReal || `Z-${String(idx + 1).padStart(2, "0")}`,
+        pctFalha: z.total ? Math.round((z.ruins / z.total) * 100) : 0,
+      }));
     const piorZona = zonas.filter((z) => z.ruins > 0).sort((a, b) => b.pctFalha - a.pctFalha)[0] || null;
     const pctOk = totalAcion ? Math.round((okAcion / totalAcion) * 100) : null;
     const totalRondas = plantoes.reduce((a, p) => a + ((p.rondas || []).length), 0);
@@ -707,9 +724,14 @@ function gerarHTMLAnaliseRisco(ctx) {
   // marcador do limiar crítico (90 dias) na régua
   const limiarPct = Math.min(100, Math.round((90 / maxDias) * 100));
 
-  // medidor de risco
-  const escalaOrder = ["BAIXO", "MÉDIO", "ELEVADO", "CRÍTICO"];
-  const geralIdx = { "BAIXO": 0, "MODERADO": 1, "MÉDIO": 1, "MÉDIO-ALTO": 2, "ELEVADO": 2, "ALTO": 3 }[geral.label] ?? 1;
+  // medidor de risco — mapeado pelo NÍVEL NUMÉRICO real (não pela string),
+  // para o ponteiro sempre bater com o RISCO GERAL exibido. Escala v2:
+  //   BAIXO(1)→0 · MODERADO(2)→1(MÉDIO) · ELEVADO(3)→2 · CRÍTICO(4)/CRÍTICO II(5)→3
+  const nivelGeral = geral.nivelMoked ?? 1; // 1..5
+  const geralIdx = nivelGeral >= 4 ? 3 : nivelGeral >= 3 ? 2 : nivelGeral >= 2 ? 1 : 0;
+  // no bloco de topo, exibe "CRÍTICO II" quando o nível real for 5
+  const rotuloTopo = nivelGeral >= 5 ? "CRÍTICO II" : "CRÍTICO";
+  const escalaOrder = ["BAIXO", "MÉDIO", "ELEVADO", rotuloTopo];
   const escalaHTML = escalaOrder.map((lb, i) => `<div class="s${i + 1}${i === geralIdx ? " on" : ""}">${lb}</div>`).join("");
   const markerLeft = (geralIdx * 25 + 12.5).toFixed(2);
 
@@ -879,7 +901,7 @@ function gerarHTMLAnaliseRisco(ctx) {
       ${timelineRows ? `<div class="sec" style="margin-top:20px">
         <div class="sec-h"><span class="sec-n">▸</span><span class="sec-t" style="font-size:12.5px">Tempo de exposição — pendências críticas</span></div>
         <div class="tl">${timelineRows}</div>
-        <div class="tl-axis"><span>0 dias</span><span>limiar crítico · 90 dias</span><span>${maxDias} dias</span></div>
+        <div class="tl-axis"><span>0 dias</span><span>tempo de exposição (fator secundário)</span><span>${maxDias} dias</span></div>
       </div>` : ""}
       <div class="panorama"><b>Panorama.</b> ${geral.label === "BAIXO"
         ? "As fontes selecionadas não revelam vetores de risco relevantes no período — operação dentro dos parâmetros."
@@ -942,7 +964,7 @@ function gerarHTMLAnaliseRisco(ctx) {
     </div>
     <div class="metod">
       <div class="mt">Como esta análise foi construída</div>
-      Documento gerado automaticamente pelo <b>MokLog CheckTest</b> a partir dos dados operacionais já inseridos no aplicativo. Cada dado exibe sua <b>fonte de origem</b> e, onde há relação entre sistemas, o <b>impacto cruzado</b> é apontado. Cada vetor é classificado pelo tempo em aberto: acima de <b>90 dias → CRÍTICO</b>; entre <b>30 e 90 → ELEVADO</b>; entre <b>10 e 29 → MODERADO</b>. Vetores preponderantes (pânico, perímetro, câmeras/CFTV) sobem a ELEVADO mínimo acima de 10 dias. Apontamentos de infraestrutura têm natureza consultiva e não substituem laudo técnico dos fornecedores.
+      Documento gerado automaticamente pelo <b>MokLog CheckTest</b> a partir dos dados operacionais já inseridos no aplicativo. Cada dado exibe sua <b>fonte de origem</b> e, onde há relação entre sistemas, o <b>impacto cruzado</b> é apontado. A classificação de risco combina <b>criticidade do item</b> com a <b>proporção de falha</b>, não apenas o tempo em aberto. Cada item tem um <b>teto de risco</b> conforme sua classe: itens <b>bloqueadores</b> (pânico fixo, cancela de alta segurança, perímetro totalmente desconfigurado) podem chegar a <b>CRÍTICO</b>; itens <b>táticos</b> (telefonia, internet, nobreak, CTMK, pânico móvel) chegam a <b>ELEVADO</b>; itens de <b>automação/iluminação</b> a <b>MODERADO</b>; e <b>periféricos</b> permanecem em <b>BAIXO</b>. O <b>CFTV</b> é avaliado por <b>contagem de câmeras inoperantes</b> (1–2 BAIXO · 3 MODERADO · 4+ CRÍTICO); o <b>perímetro</b>, por <b>número de zonas comprometidas</b> (1 zona ELEVADO · 2+ zonas CRÍTICO). O <b>alarme de incêndio (SDAI)</b> registra ocorrência mas não eleva o risco geral. Este é o documento de <b>supervisão interna Moked</b>, cujo teto de alerta alcança <b>CRÍTICO II</b>; a análise entregue ao cliente enquadra o mesmo cenário no teto <b>ELEVADO</b>. Apontamentos de infraestrutura têm natureza consultiva e não substituem laudo técnico dos fornecedores.
     </div>
     <div class="assina">
       Documento produzido pela <b>Moked Consulting Security</b> no exercício de supervisão operacional do projeto ${esc(project.id)}, com base em ${nFontes} relatório(s) operacional(is) do período.
@@ -1144,6 +1166,74 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
     abrirPDF(analise);
   }
 
+  // ── Etapa (d): geração COMPLETA com fusão do Diagnóstico Regional (B1-a) ──
+  // Fluxo (2 toques, fidelidade máxima, iPhone/Safari-safe):
+  //  1) abre o relatório fiel (window.print) para o usuário SALVAR como PDF;
+  //  2) o usuário re-seleciona o PDF salvo; o app funde com public/regional/{PID}.pdf
+  //     via pdf-lib (import dinâmico) e baixa UM único arquivo final.
+  const [fusaoAguardando, setFusaoAguardando] = useState(null); // { analise, regional }
+  const [fusaoErro, setFusaoErro] = useState("");
+  const [fusaoBusy, setFusaoBusy] = useState(false);
+
+  async function gerarCompleto() {
+    if (!selProjeto) return;
+    setFusaoErro("");
+    setEstado("coletando");
+    const { dados, faltantes: falt } = await coletarFontes(selProjeto, stored, marcadas);
+    const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
+    setAnalisePronta(analise);
+    setEstado("pronto");
+    const reg = dados.regional;
+    if (!reg || !reg.ok || !reg.pdfPath) {
+      // sem regional cadastrado: cai para o relatório simples e avisa.
+      setFusaoErro("Este projeto não possui Diagnóstico Regional cadastrado; gerado apenas o relatório operacional.");
+      abrirPDF(analise);
+      return;
+    }
+    // Toque 1: abre o relatório fiel para salvar como PDF.
+    abrirPDF(analise);
+    // Arma o toque 2 (seleção + fusão).
+    setFusaoAguardando({ analise, regional: reg });
+  }
+
+  async function fundirComRegional(file) {
+    if (!fusaoAguardando) return;
+    const { regional } = fusaoAguardando;
+    setFusaoBusy(true);
+    setFusaoErro("");
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      // 1) relatório salvo pelo usuário
+      const relBytes = new Uint8Array(await file.arrayBuffer());
+      const relDoc = await PDFDocument.load(relBytes);
+      // 2) regional em public/regional/{PID}.pdf
+      const resp = await fetch(regional.pdfPath);
+      if (!resp.ok) throw new Error("não foi possível carregar o Diagnóstico Regional em " + regional.pdfPath);
+      const regBytes = new Uint8Array(await resp.arrayBuffer());
+      const regDoc = await PDFDocument.load(regBytes);
+      // 3) fusão: relatório primeiro, regional em anexo
+      const out = await PDFDocument.create();
+      const relPages = await out.copyPages(relDoc, relDoc.getPageIndices());
+      relPages.forEach((pg) => out.addPage(pg));
+      const regPages = await out.copyPages(regDoc, regDoc.getPageIndices());
+      regPages.forEach((pg) => out.addPage(pg));
+      const finalBytes = await out.save();
+      const codigo = (regional.codigo || "Regional").replace(/[^\w-]/g, "_");
+      const nome = `${selProjeto.id}_Analise_de_Risco_Completa_${codigo}.pdf`;
+      const blob = new Blob([finalBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = nome;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 4000);
+      setFusaoAguardando(null);
+    } catch (e) {
+      setFusaoErro("Falha na fusão: " + (e && e.message ? e.message : "erro desconhecido") + ". Você ainda tem o relatório e o regional separados.");
+    } finally {
+      setFusaoBusy(false);
+    }
+  }
+
   function abrirPDF(analise) {
     const html = gerarHTMLAnaliseRisco(analise);
     // Tenta abrir em nova aba; se o navegador bloquear (comum no mobile),
@@ -1251,6 +1341,43 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
           </button>
           {estado === "pronto" && (
             <button style={{ ...S.smallBtn, marginTop: 8, width: "100%" }} onClick={() => abrirPDF(analisePronta)}>Reabrir PDF</button>
+          )}
+
+          <button
+            style={{ ...S.btn, marginTop: 10, background: "linear-gradient(135deg,#B21E27,#7a1319)", ...((!algumaMarcada || estado === "coletando") ? S.btnOff : {}) }}
+            disabled={!algumaMarcada || estado === "coletando"}
+            onClick={() => gerarCompleto()}
+          >
+            📄 Gerar Completo (com Regional)
+          </button>
+
+          {fusaoAguardando && (
+            <div style={{ ...S.aviso, background: "#0a1420", border: "1px solid #1D9E7566" }}>
+              <div style={{ ...S.avisoT, color: "#5eead4" }}>Passo 2 de 2 — anexar o Diagnóstico Regional</div>
+              <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.5, marginBottom: 10 }}>
+                O relatório foi aberto para você <b>salvar como PDF</b>. Depois de salvar, selecione o arquivo abaixo — o app vai fundi-lo com o Diagnóstico Regional {fusaoAguardando.regional.codigo || ""} num único PDF.
+              </div>
+              <input
+                type="file"
+                accept="application/pdf"
+                disabled={fusaoBusy}
+                onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) fundirComRegional(f); }}
+                style={{ width: "100%", color: "#e2e8f0", fontSize: 12 }}
+              />
+              {fusaoBusy && <div style={{ fontSize: 12, color: "#5eead4", marginTop: 8 }}>Fundindo…</div>}
+              <button
+                style={{ ...S.smallBtn, marginTop: 10, width: "100%" }}
+                onClick={() => { setFusaoAguardando(null); setFusaoErro(""); }}
+              >
+                Cancelar fusão
+              </button>
+            </div>
+          )}
+
+          {fusaoErro && (
+            <div style={{ ...S.aviso, marginTop: 10 }}>
+              <div style={S.avisoItem}>{fusaoErro}</div>
+            </div>
           )}
         </div>
       )}
