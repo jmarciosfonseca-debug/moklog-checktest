@@ -490,6 +490,7 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
     out.push({
       chave: `cat:${g.catLabel}`, label: g.catLabel,
       nivel: rc.nivel, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
+      bloqueadorCaido: !!rc.bloqueadorCaido, // v3: contagem de bloqueadores
       preponderante: g.preponderante, piorDias, qtd: g.itens.length,
       fonteCredito: `Teste Semanal · ${dataUlt}`, sinceTxt,
       descricao: `${it?.itemLabel ? `<b>${it.itemLabel}</b>` : "Conjunto"} ${(it?.status || "inoperante").toLowerCase()} ${piorDias != null ? `há ${piorDias} dias` : "recentemente"}${outros}${propTxt}. <i>${rc.motivo || ""}</i>`,
@@ -503,11 +504,12 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
 function vetorCTMK(ctmk) {
   if (!ctmk?.ok || !ctmk.offline) return null;
   const dias = ctmk.dias;
-  // CTMK é a central de câmera Moked. Offline = perda de cobertura de imagem =
-  // vetor CRÍTICO por definição (peso máximo, como pânico/perímetro), independente dos dias.
-  const nivel = NIVEIS.CRITICO;
+  // v3: CTMK é TÁTICO (teto ELEVADO), não bloqueador. Offline = perda de
+  // cobertura de imagem = vetor ELEVADO; não estoura o site sozinho.
+  const nivel = NIVEIS.ELEVADO;
   return {
     chave: "ctmk", label: "CTMK — central de câmera Moked", nivel, preponderante: true,
+    bloqueadorCaido: false,
     piorDias: dias, qtd: 1,
     fonteCredito: "Monitor CTMK · painel",
     sinceTxt: ctmk.desde ? `off-line desde ${fmtDate(ctmk.desde)}` : null,
@@ -543,15 +545,16 @@ function vetorIluminacao(ilum) {
 function vetorPerimetral(peri) {
   if (!peri?.ok || !peri.piorZona) return null;
   const z = peri.piorZona;
-  let nivel = NIVEIS.MODERADO;
-  if (z.pctFalha >= 50) nivel = NIVEIS.ELEVADO;
-  // preponderante > 10d não se aplica (sem dias); mantém pela gravidade
+  // v3: perímetro é BLOQUEADOR. Zona perimetral em falha satura em ELEVADO
+  // no vetor; a subida a CRÍTICO só vem da contagem (2+ bloqueadores).
+  let nivel = NIVEIS.ELEVADO;
+  const bloqueadorCaido = true;
   const base = peri.fonte === "rondas"
     ? `Teste perimetral com <b>${peri.pctOk}% de acionamentos OK</b> em ${peri.plantoes} plantões; falhas concentradas na <b>${z.nome}</b> (${z.pctFalha}% de falha).`
     : `Teste perimetral (${peri.dataUlt}) com <b>${peri.pctOk}% OK</b>; <b>${z.nome}</b> com falha registrada.`;
   return {
     chave: "perimetral", label: `Perímetro eletrônico — ${z.nome}`, nivel, preponderante: true,
-    piorDias: null, qtd: 1,
+    bloqueadorCaido, piorDias: null, qtd: 1,
     fonteCredito: "Ronda Perimetral",
     sinceTxt: null,
     descricao: base,
@@ -581,7 +584,12 @@ function vetorEnergia(en) {
 }
 
 // Vetor Equipe (brigada/reciclagem).
+// v3 (11/08): capacitação de brigada NÃO pondera e NÃO entra no documento
+// ("vigilante não é bombeiro"). Mantido como no-op para não quebrar chamadas.
 function vetorEquipe(eq) {
+  return null;
+  // ── código legado desativado (brigada fora do score/documento) ──
+  // eslint-disable-next-line no-unreachable
   if (!eq?.ok) return null;
   if (!eq.brigadaNaoAplicada && !eq.reciclagemVencida) return null;
   let nivel = NIVEIS.MODERADO;
@@ -727,11 +735,9 @@ function gerarHTMLAnaliseRisco(ctx) {
   // medidor de risco — mapeado pelo NÍVEL NUMÉRICO real (não pela string),
   // para o ponteiro sempre bater com o RISCO GERAL exibido. Escala v2:
   //   BAIXO(1)→0 · MODERADO(2)→1(MÉDIO) · ELEVADO(3)→2 · CRÍTICO(4)/CRÍTICO II(5)→3
-  const nivelGeral = geral.nivelMoked ?? 1; // 1..5
+  const nivelGeral = geral.nivel ?? geral.nivelMoked ?? 1; // 1..4 (v3)
   const geralIdx = nivelGeral >= 4 ? 3 : nivelGeral >= 3 ? 2 : nivelGeral >= 2 ? 1 : 0;
-  // no bloco de topo, exibe "CRÍTICO II" quando o nível real for 5
-  const rotuloTopo = nivelGeral >= 5 ? "CRÍTICO II" : "CRÍTICO";
-  const escalaOrder = ["BAIXO", "MÉDIO", "ELEVADO", rotuloTopo];
+  const escalaOrder = ["BAIXO", "MÉDIO", "ELEVADO", "CRÍTICO"];
   const escalaHTML = escalaOrder.map((lb, i) => `<div class="s${i + 1}${i === geralIdx ? " on" : ""}">${lb}</div>`).join("");
   const markerLeft = (geralIdx * 25 + 12.5).toFixed(2);
 
@@ -889,7 +895,7 @@ function gerarHTMLAnaliseRisco(ctx) {
       <div class="sec-h"><span class="sec-n">—</span><span class="sec-t">Resumo Executivo</span></div>
       <p class="lead">Este relatório apresenta a <b>fotografia real da operação de segurança</b> do condomínio ${esc(project.id)} — ${esc(project.name)} (grupo ${esc(pacoteLabel)}), consolidada a partir de <b>${nFontes} relatório(s) operacional(is)</b> gerado(s) pelo sistema MokLog CheckTest. Cada indicador é rastreável à sua fonte de origem, permitindo à administração uma visão integrada e auditável.</p>
       <div class="kpis">
-        <div class="kpi risco"><div class="kl">Risco Geral</div><div class="kv">${esc(geral.label)}</div><div class="ks">${geral.criticos} vetor(es) crítico(s)</div></div>
+        <div class="kpi risco"><div class="kl">Risco Geral</div><div class="kv">${esc(geral.label)}</div><div class="ks">${geral.alerta && geral.nBloqueadores === 1 ? "1 bloqueador de segurança caído — sob alerta" : geral.nBloqueadores >= 2 ? `${geral.nBloqueadores} bloqueadores simultâneos` : geral.nBloqueadores === 0 ? "sem bloqueador de segurança caído" : `${geral.nBloqueadores} vetor(es) bloqueador(es)`}</div></div>
         <div class="kpi"><div class="kl">Saúde equip.</div><div class="kv">${saudePct}<span class="kvu">${ts?.pct != null ? "%" : ""}</span></div><div class="ks">${ts?.ok ? "Teste Semanal" : "sem dado"}</div></div>
         <div class="kpi"><div class="kl">Iluminação</div><div class="kv">${ilumPct != null ? ilumPct : "—"}<span class="kvu">${ilumPct != null ? "%" : ""}</span></div><div class="ks">${ilum?.ok ? `${ilum.total - ilum.def} de ${ilum.total} pontos` : "não incluída"}</div></div>
         <div class="kpi"><div class="kl">Efetivo</div><div class="kv">${efetivo != null ? efetivo : "—"}</div><div class="ks">${efetivo != null ? "colaboradores" : "não incluído"}</div></div>
@@ -905,7 +911,14 @@ function gerarHTMLAnaliseRisco(ctx) {
       </div>` : ""}
       <div class="panorama"><b>Panorama.</b> ${geral.label === "BAIXO"
         ? "As fontes selecionadas não revelam vetores de risco relevantes no período — operação dentro dos parâmetros."
-        : `O quadro consolidado classifica o risco como <b>${esc(geral.label)}</b>.${nCrit ? ` Há ${nCrit} vetor(es) em nível crítico` : ""}${nElev ? ` e ${nElev} em nível elevado` : ""}, detalhados a seguir por vetor de segurança, com a fonte de cada apontamento.`}</div>
+        : (() => {
+            const partes = [];
+            if (geral.nBloqueadores >= 2) partes.push(`${geral.nBloqueadores} vetores bloqueadores caídos simultaneamente`);
+            else if (geral.nBloqueadores === 1) partes.push(`1 vetor bloqueador de segurança caído (sob alerta)`);
+            if (nElev) partes.push(`${nElev} vetor(es) em nível elevado`);
+            const detalhe = partes.length ? ` ${partes.join(", ")}` : "";
+            return `O quadro consolidado classifica o risco geral como <b>${esc(geral.label)}</b>${geral.alerta && geral.nBloqueadores === 1 ? ", com <b>selo de alerta</b> por bloqueador isolado" : ""}.${detalhe ? ` Fatores:${detalhe}.` : ""} Cada apontamento é detalhado a seguir por vetor, com a fonte de origem.`;
+          })()}</div>
       <div class="dest">
         <div class="drow d-pos"><span class="dt">POSITIVO</span><span>${ts?.ok ? `Dos ${ts.total} pontos verificados, ${ts.okItens} operam normalmente (${ts.pct}% de saúde).` : "Base operacional consolidada no período."}</span></div>
         ${destElev ? `<div class="drow d-att"><span class="dt">ATENÇÃO</span><span>${esc(destElev)}.</span></div>` : ""}
@@ -956,7 +969,7 @@ function gerarHTMLAnaliseRisco(ctx) {
       <div class="sec-h"><span class="sec-n">03</span><span class="sec-t">Matriz de Risco por Vetor</span></div>
       <table><thead><tr><th style="width:26%">Vetor</th><th>Situação atual</th><th class="c" style="width:9%">Prob.</th><th class="c" style="width:10%">Impacto</th><th class="c" style="width:13%">Risco</th></tr></thead>
       <tbody>${matrizLinhas || `<tr><td colspan="5" style="text-align:center;color:${MOKED.cinza}">Sem vetores de risco no período.</td></tr>`}</tbody></table>
-      <div class="crit-note">Critério: o risco de cada vetor resulta do cruzamento entre probabilidade de materialização e impacto sobre a segurança patrimonial. A presença de vetores críticos, sobretudo preponderantes (pânico, perímetro, câmeras/CFTV), eleva a classificação geral consolidada.</div>
+      <div class="crit-note">Critério: o risco de cada vetor resulta do cruzamento entre probabilidade de materialização e impacto sobre a segurança patrimonial. A classificação geral consolidada segue a contagem de vetores <b>bloqueadores</b> caídos (perímetro, pânico fixo, cancela de alta segurança): 1 bloqueador → ELEVADO sob alerta; 2 ou mais simultâneos → CRÍTICO.</div>
     </div>
     <div class="sec">
       <div class="sec-h"><span class="sec-n">04</span><span class="sec-t">Recomendações Prioritárias</span></div>
@@ -964,7 +977,7 @@ function gerarHTMLAnaliseRisco(ctx) {
     </div>
     <div class="metod">
       <div class="mt">Como esta análise foi construída</div>
-      Documento gerado automaticamente pelo <b>MokLog CheckTest</b> a partir dos dados operacionais já inseridos no aplicativo. Cada dado exibe sua <b>fonte de origem</b> e, onde há relação entre sistemas, o <b>impacto cruzado</b> é apontado. A classificação de risco combina <b>criticidade do item</b> com a <b>proporção de falha</b>, não apenas o tempo em aberto. Cada item tem um <b>teto de risco</b> conforme sua classe: itens <b>bloqueadores</b> (pânico fixo, cancela de alta segurança, perímetro totalmente desconfigurado) podem chegar a <b>CRÍTICO</b>; itens <b>táticos</b> (telefonia, internet, nobreak, CTMK, pânico móvel) chegam a <b>ELEVADO</b>; itens de <b>automação/iluminação</b> a <b>MODERADO</b>; e <b>periféricos</b> permanecem em <b>BAIXO</b>. O <b>CFTV</b> é avaliado por <b>contagem de câmeras inoperantes</b> (1–2 BAIXO · 3 MODERADO · 4+ CRÍTICO); o <b>perímetro</b>, por <b>número de zonas comprometidas</b> (1 zona ELEVADO · 2+ zonas CRÍTICO). O <b>alarme de incêndio (SDAI)</b> registra ocorrência mas não eleva o risco geral. Este é o documento de <b>supervisão interna Moked</b>, cujo teto de alerta alcança <b>CRÍTICO II</b>; a análise entregue ao cliente enquadra o mesmo cenário no teto <b>ELEVADO</b>. Apontamentos de infraestrutura têm natureza consultiva e não substituem laudo técnico dos fornecedores.
+      Documento gerado automaticamente pelo <b>MokLog CheckTest</b> a partir dos dados operacionais já inseridos no aplicativo. Cada dado exibe sua <b>fonte de origem</b> e, onde há relação entre sistemas, o <b>impacto cruzado</b> é apontado. A classificação combina <b>criticidade do item</b> com a <b>proporção de falha</b>, não apenas o tempo em aberto. Cada item tem um <b>teto de risco</b> conforme sua classe: itens <b>bloqueadores</b> (pânico fixo, cancela de alta segurança, perímetro) são os que definem o risco geral; itens <b>táticos</b> (telefonia, internet, nobreak, CTMK, pânico móvel) chegam a <b>ELEVADO</b>; <b>automação/iluminação</b> a <b>MODERADO</b>; e <b>periféricos</b> permanecem em <b>BAIXO</b>. A consolidação do site segue a <b>contagem de bloqueadores caídos</b>: <b>1 bloqueador</b> classifica o site como <b>ELEVADO sob alerta</b> (vetor grave isolado); <b>2 ou mais bloqueadores simultâneos</b> configuram <b>CRÍTICO</b> (colapso amplo). O <b>CFTV</b> é avaliado por contagem de câmeras inoperantes e o <b>perímetro</b>, gradualmente, pela fração de zonas comprometidas. O <b>alarme de incêndio (SDAI)</b> registra ocorrência mas não eleva o risco geral. O <b>entorno regional</b> é fator contextual agravante e pode elevar a classificação até <b>ELEVADO</b>, mas não configura CRÍTICO sozinho. Apontamentos de infraestrutura têm natureza consultiva e não substituem laudo técnico dos fornecedores.
     </div>
     <div class="assina">
       Documento produzido pela <b>Moked Consulting Security</b> no exercício de supervisão operacional do projeto ${esc(project.id)}, com base em ${nFontes} relatório(s) operacional(is) do período.
@@ -1063,39 +1076,65 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual });
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
-  // ── CONSOLIDAÇÃO v2 (motor riscoConfig) — dois escopos ──
-  // Cada vetor do teste já traz nivel (base moked) e incluirCliente.
-  // Recompomos no formato que consolidarSite espera.
-  const vetoresRC = vetores.map((v) => ({
-    nivel: v.nivel, incluir: v.incluirCliente !== false, trava: !!v.trava, motivo: v.label,
-  }));
-  const consCliente = consolidarSite(vetoresRC, "cliente");
-  const consMoked = consolidarSite(vetoresRC, "moked");
+  // ── CONSOLIDAÇÃO v3 (11/08) — DOCUMENTO ÚNICO, por CONTAGEM de bloqueadores ──
+  // Doutrina: 0 bloq → pior vetor (teto ELEVADO) · 1 bloq → ELEVADO + alerta ·
+  // ≥2 bloq → CRÍTICO. Sem dualidade cliente/Moked. Sem CRÍTICO II.
+  //
+  // DEDUP DE PERÍMETRO: o mesmo perímetro físico aparece em DOIS cards
+  // (Alarme Perimetral do Teste Semanal + Perímetro eletrônico da Ronda).
+  // Sem dedup, contaria como 2 bloqueadores e viraria CRÍTICO falso. Aqui,
+  // toda a família "perímetro" conta como UM ÚNICO bloqueador.
+  const ehPerimetro = (v) => v.grupo === "perimetral" || v.chave === "perimetral"
+    || /perimetr|perímetr/i.test(v.label || "");
+  let perimetroBloqJaContado = false;
+  const vetoresRC = vetores.map((v) => {
+    let bloq = !!v.bloqueadorCaido;
+    if (bloq && ehPerimetro(v)) {
+      if (perimetroBloqJaContado) bloq = false; // colapsa duplicatas de perímetro
+      else perimetroBloqJaContado = true;
+    }
+    return {
+      nivel: v.nivel,
+      incluir: v.incluirCliente !== false,
+      bloqueadorCaido: bloq,
+      motivo: v.label,
+    };
+  });
+  const cons = consolidarSite(vetoresRC);
 
-  // Moduladores (equipe + sinistro + regional) — somados como delta.
-  const moduladorEquipe = dados.equipe?.ok ? calcularModuladorEquipe(dados.equipe.perfilSeguranca) : null;
+  // Moduladores (sinistro + regional) — somados como delta CONTEXTUAL.
+  // Equipe/capacitação NÃO pondera na v3 (fora do score).
   const modSin = moduladorSinistro(dados.sinistros, vetores);
   const modReg = moduladorRegional(dados.regional, vetores);
-  const deltaTot = (moduladorEquipe?.delta || 0) + (modSin?.delta || 0) + (modReg?.delta || 0);
-  const motivosMod = [moduladorEquipe?.motivo, modSin?.motivo, modReg?.motivo].filter(Boolean).join(" · ");
+  const deltaTot = (modSin?.delta || 0) + (modReg?.delta || 0);
+  const motivosMod = [modSin?.motivo, modReg?.motivo].filter(Boolean).join(" · ");
 
-  // Aplica delta aos dois consolidados (limitado aos tetos de cada escopo).
-  const aplicaDelta = (cons, tetoMax) => {
-    let n = Math.max(RC_NIVEL.BAIXO, Math.min(tetoMax, (cons.nivel || 1) + deltaTot));
-    return { ...cons, nivelAjustado: n, labelAjustado: RC_LABEL[n], delta: deltaTot, motivoMod: motivosMod };
-  };
-  const geralCliente = aplicaDelta(consCliente, RC_NIVEL.CRITICO);
-  const geralMoked = aplicaDelta(consMoked, RC_NIVEL.CRITICO_II);
+  // OPÇÃO B (decidida 11/08): moduladores/território sobem no máximo até
+  // ELEVADO. NUNCA cruzam para CRÍTICO sozinhos — CRÍTICO só com 2+ bloqueadores.
+  // Se a consolidação já é CRÍTICA (2+ bloq), o delta não rebaixa.
+  const nivelBase = cons.nivel || RC_NIVEL.BAIXO;
+  let nivelAjustado = nivelBase;
+  if (deltaTot !== 0) {
+    if (nivelBase >= RC_NIVEL.CRITICO) {
+      nivelAjustado = RC_NIVEL.CRITICO; // já crítico por bloqueadores; delta não mexe
+    } else {
+      const tetoDelta = RC_NIVEL.ELEVADO; // território não cruza para CRÍTICO
+      nivelAjustado = Math.max(RC_NIVEL.BAIXO, Math.min(tetoDelta, nivelBase + deltaTot));
+    }
+  }
+  const labelAjustado = RC_LABEL[nivelAjustado];
 
-  // `geral` compatível com o template atual do PDF (usa o escopo MOKED por padrão).
-  const nCriticos = vetores.filter((v) => v.nivel >= RC_NIVEL.CRITICO).length;
-  const CORES = { 5: MOKED.critico, 4: MOKED.critico, 3: MOKED.elevado, 2: MOKED.moderado, 1: MOKED.baixo, 0: MOKED.cinza };
+  const nBloq = cons.nBloqueadores || 0;
+  const CORES = { 4: MOKED.critico, 3: MOKED.elevado, 2: MOKED.moderado, 1: MOKED.baixo, 0: MOKED.cinza };
   const geral = {
-    label: geralMoked.labelAjustado, cor: CORES[geralMoked.nivelAjustado] || MOKED.elevado,
-    criticos: nCriticos, prepCriticos: 0,
-    nivelMoked: geralMoked.nivelAjustado, nivelCliente: geralCliente.nivelAjustado,
-    labelMoked: geralMoked.labelAjustado, labelCliente: geralCliente.labelAjustado,
-    modulador: motivosMod ? { delta: deltaTot, motivo: motivosMod, de: null, para: null } : null,
+    label: labelAjustado, cor: CORES[nivelAjustado] || MOKED.elevado,
+    criticos: nBloq, prepCriticos: 0,
+    nBloqueadores: nBloq, alerta: !!cons.alerta,
+    // compat: campos antigos preservados p/ o template (agora nível único)
+    nivelMoked: nivelAjustado, nivelCliente: nivelAjustado,
+    labelMoked: labelAjustado, labelCliente: labelAjustado,
+    nivel: nivelAjustado,
+    modulador: motivosMod ? { delta: deltaTot, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
   };
   const recomendacoes = gerarRecomendacoes(vetores);
 
@@ -1124,7 +1163,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   }
 
   return {
-    project, pacoteLabel, vetores, geral, geralCliente, geralMoked, recomendacoes, fontesUsadas,
+    project, pacoteLabel, vetores, geral, geralCliente: geral, geralMoked: geral, recomendacoes, fontesUsadas,
     sinistros: dados.sinistros, regional: dados.regional,
     ts: dados.ts, ctmk: dados.ctmk, ilum: dados.ilum, rondaVirtual: dados.rondaVirtual, equipe: dados.equipe,
     contextos,
