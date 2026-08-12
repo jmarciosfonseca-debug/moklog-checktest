@@ -1,47 +1,53 @@
 // ─────────────────────────────────────────────────────────────
 // riscoConfig.js — Motor de classificação de risco (MokLog CheckTest)
-// Régua v2, fechada com Marcio em 27/07/2026.
+// Régua v3 — DOUTRINA MOKED, fechada com Marcio em 11/08/2026.
 //
 // PRINCÍPIOS (invioláveis):
-//  • Aditivo: este arquivo é NOVO e não altera nada existente. Só é
-//    importado por AnaliseRisco.jsx para substituir `nivelPorDias`.
+//  • Aditivo/retrocompatível: mesma API pública (classificarVetor,
+//    consolidarSite). Importado por AnaliseRisco.jsx.
 //  • Mapeamento por NOME-BASE do item, NUNCA por regex/prefixo numérico.
-//  • Fallback de item não mapeado = Automação (peso 4) — nunca crítico
-//    nem periférico por engano.
+//  • Fallback de item não mapeado = Automação (peso 4).
 //
-// FÓRMULA:
+// ─── MUDANÇAS DA v3 (o que muda em relação à v2) ───
+//  • ESCALA DE 4 NÍVEIS. CRÍTICO II ELIMINADO. Crítico é crítico.
+//  • ACABOU a dualidade Cliente/Moked. UM documento só (escopo unificado).
+//  • CONSOLIDAÇÃO POR CONTAGEM DE BLOQUEADORES (não por "pior vetor"):
+//      – 0 bloqueador caído .......... BAIXO/MODERADO (pior vetor menor)
+//      – 1 bloqueador caído .......... ELEVADO + SELO DE ALERTA (teto do
+//                                      "vetor isolado", ainda que grave)
+//      – ≥2 bloqueadores caídos ...... CRÍTICO (colapso amplo simultâneo)
+//    → P607 (perímetro bloqueador + CFTV secundário) = ELEVADO sob alerta.
+//  • CAPACITAÇÃO/BRIGADA não pondera (fora do score E fora do documento).
+//  • Perímetro: ponderação GRADUAL por FRAÇÃO de zonas inop/total.
+//  • Tempo de casa / estabilidade = FORÇA (tratado na apresentação).
+//
+// FÓRMULA (por vetor, inalterada):
 //   PVT = Peso × MultTemporal × FatorVolume/Proporção
-//   → rótulo bruto por cortes de PVT
-//   → REBAIXA para o TETO da classe do ativo (peso define o teto).
+//   → rótulo bruto por cortes de PVT → REBAIXA para o TETO da classe.
 //
 // TETO POR CLASSE:
-//   Bloqueador(10) → CRÍTICO   (única classe que pode ser crítico)
-//   Tático(7)      → ELEVADO   (rompe só em colapso: CFTV 30%+, etc.)
+//   Bloqueador(10) → CRÍTICO   (só bloqueador conta como "bloqueador caído")
+//   Tático(7)      → ELEVADO
 //   Automação(4)   → MODERADO
-//   Iluminação(2)  → MODERADO  (fora do motor de proporção)
+//   Iluminação(2)  → MODERADO
 //   Periférico(0.5)→ BAIXO
 //
-// CONJUNTOS (proporção domina, tempo leve): cancela, CFTV, bollard.
-//   fração inop/total é o fator principal — 1 de 5 não escala; maioria
-//   fora escala. CFTV tem régua própria de % cego.
-//
-// PERÍMETRO (regra especial, fora da proporção):
-//   • zona isolada inoperante → ELEVADO (não trava)
-//   • TOTALMENTE desconfigurado E > 30 dias → CRÍTICO + TRAVA do site
-//   • zona "em obra/instalação" → observação "em implantação" (fora do score)
+// PERÍMETRO (regra especial, gradual por fração de zonas):
+//   • fração inop/total define quanto sobe; 1 zona isolada → ELEVADO.
+//   • bloqueador → conta para a contagem de bloqueadores na consolidação.
+//   • zona "em obra/instalação" → observação "em implantação" (fora do score).
 //
 // PÂNICO:
-//   • móvel → peso 4 (teto MODERADO, sem trava; coberto pelo fixo)
-//   • fixo  → Bloqueador 10 + trava
-//
-// DOIS ESCOPOS:
-//   • CLIENTE → só vetores de segurança; teto ELEVADO no consolidado
-//   • MOKED   → tudo (periférico, capacitação, Paradox…); chega a CRÍTICO
+//   • móvel → coberto pelo fixo (teto ELEVADO, sem trava)
+//   • fixo  → Bloqueador 10
 // ─────────────────────────────────────────────────────────────
 
 // ── Níveis canônicos ─────────────────────────────────────────
-export const NIVEL = { CRITICO_II: 5, CRITICO: 4, ELEVADO: 3, MODERADO: 2, BAIXO: 1, SEMDADOS: 0 };
-export const NIVEL_LABEL = { 5: "CRÍTICO II", 4: "CRÍTICO", 3: "ELEVADO", 2: "MODERADO", 1: "BAIXO", 0: "SEM DADOS" };
+// Escala de 4 níveis (CRÍTICO II eliminado na v3). CRITICO_II mantido como
+// alias de CRITICO só para não quebrar imports antigos — nunca é atingido.
+export const NIVEL = { CRITICO: 4, ELEVADO: 3, MODERADO: 2, BAIXO: 1, SEMDADOS: 0 };
+NIVEL.CRITICO_II = NIVEL.CRITICO; // alias de retrocompatibilidade
+export const NIVEL_LABEL = { 4: "CRÍTICO", 3: "ELEVADO", 2: "MODERADO", 1: "BAIXO", 0: "SEM DADOS" };
 export const NIVEL_ORDEM = (n) => n; // já é ordinal
 
 // ── Classes de ativo (peso + teto) ───────────────────────────
@@ -240,8 +246,10 @@ export const MAPA_NOMEBASE = [
   { match: ["interfone", "intercomunicador", "radio ht", "bodycam", "lanterna", "smartphone", "tablet"], classe: "PERIFERICO", flags: { soMoked: true } },
   { match: ["guarita"], classe: "PERIFERICO", flags: { soMoked: true } },
 
-  // ── Capacitação / brigada (só MOKED, não é equipamento) ──
-  { match: ["brigada", "capacitacao", "reciclagem", "efetivo"], classe: "PERIFERICO", flags: { soMoked: true, naoEquipamento: true } },
+  // ── Capacitação / brigada — v3: FORA do score E fora do documento ──
+  // "Vigilante não é bombeiro": não é premissa do serviço, não pondera.
+  // Marcado forceExcluir para nunca entrar na consolidação nem no doc.
+  { match: ["brigada", "capacitacao", "reciclagem", "efetivo"], classe: "PERIFERICO", flags: { forceExcluir: true, naoEquipamento: true } },
 ];
 
 // ── Resolve nome-base → regra (item interno manda) ───────────
@@ -303,7 +311,8 @@ export function classificarVetor(v) {
       nivel: NIVEL.SEMDADOS, label: "—", pvt: 0, via: "override" };
     return { classe: "Cancela", classeKey: "BLOQUEADOR", peso: 10, incluir: true, trava: false,
       tag: "override", motivo: "escala de cancela do projeto", nivel: ov.nivel,
-      label: NIVEL_LABEL[ov.nivel], pvt: 0, via: "override" };
+      label: NIVEL_LABEL[ov.nivel], pvt: 0, via: "override",
+      bloqueadorCaido: ov.nivel >= NIVEL.ELEVADO };
   }
 
   // ── ESCALA GLOBAL CANCELA AS (10/08) — antes da PVT ──
@@ -313,7 +322,8 @@ export function classificarVetor(v) {
       const nivel = nivelCancelaAS(v.inop);
       return { classe: "Cancela AS", classeKey: "BLOQUEADOR", peso: 10, incluir: true,
         trava: false, tag: "cancela-as", motivo: `${v.inop} cancela(s) AS inoperante(s)`,
-        nivel, label: NIVEL_LABEL[nivel], pvt: 0, via: "escala-as" };
+        nivel, label: NIVEL_LABEL[nivel], pvt: 0, via: "escala-as",
+        bloqueadorCaido: nivel >= NIVEL.ELEVADO };
     }
   }
 
@@ -322,35 +332,47 @@ export function classificarVetor(v) {
   const classeKey = regra.classe;
   const peso = (flags.peso != null) ? flags.peso : CLASSE[classeKey].peso;
 
-  // filtro de escopo: itens soMoked não entram no relatório do cliente
-  const incluir = !(escopo === "cliente" && flags.soMoked);
+  // v3: documento único (sem dualidade cliente/moked). Só forceExcluir
+  // remove um vetor do score/documento (ex: capacitação de brigada).
+  const incluir = !flags.forceExcluir;
 
   const base = {
     classe: CLASSE[classeKey].nome, classeKey, peso,
     incluir, trava: false, tag: null, motivo: "",
-    via: regra.via,
+    via: regra.via, bloqueadorCaido: false,
   };
 
-  // ── PERÍMETRO (regra especial — escala por Nº DE ZONAS, 10/08) ──
+  // ── PERÍMETRO (regra especial v3 — GRADUAL por FRAÇÃO de zonas) ──
+  // Doutrina v3: perímetro caído é UM bloqueador. O vetor satura em
+  // ELEVADO; a subida a CRÍTICO acontece na CONSOLIDAÇÃO por contagem
+  // de bloqueadores (≥2 bloqueadores simultâneos). A fração inop/total
+  // modula a intensidade e o texto, mas não estoura o teto do vetor.
   if (flags.perimetro) {
     if (v.emObra && !v.inop) {
       return { ...base, nivel: NIVEL.BAIXO, label: "observação", tag: "em implantação",
-               pvt: 0, motivo: "zona em fase de instalação" };
+               pvt: 0, motivo: "zona em fase de instalação", bloqueadorCaido: false };
     }
     const zonas = Math.max(0, v.inop || 0);
-    // totalmente desconfigurado + >30d → CRÍTICO + trava (mantido do repo)
-    if (v.estadoTotal && (v.dias || 0) > 30) {
-      return { ...base, nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO],
-               pvt: 999, trava: true, motivo: "perímetro totalmente desconfigurado há mais de 30 dias" };
+    const total = Math.max(zonas, v.total || 0);
+    const frac = total > 0 ? zonas / total : (zonas > 0 ? 1 : 0);
+    if (zonas <= 0) {
+      return { ...base, nivel: NIVEL.BAIXO, label: NIVEL_LABEL[NIVEL.BAIXO],
+               pvt: 0, motivo: "perímetro operante", bloqueadorCaido: false };
     }
-    // 1 zona = ELEVADO · 2+ zonas = CRÍTICO (decisão 10/08)
-    let nivel = NIVEL.BAIXO;
-    if (zonas === 1) nivel = NIVEL.ELEVADO;
-    else if (zonas >= 2) nivel = NIVEL.CRITICO;
-    // tempo pode subir 1 zona isolada a CRÍTICO se muito antiga (>90d)
-    if (zonas === 1 && (v.dias || 0) > 90) nivel = NIVEL.CRITICO;
-    return { ...base, nivel, label: NIVEL_LABEL[nivel],
-             pvt: 0, motivo: `${zonas} zona(s) perimetral(is) inoperante(s)` };
+    // Ponderação GRADUAL: consertar 1 de 4 melhora um pouco mas não zera;
+    // consertar tudo derruba o risco ("fecha as portas").
+    //   fração ≤ 25% .... ELEVADO (borda baixa)      — 1 de 4
+    //   fração ≤ 50% .... ELEVADO                      — 2 de 4
+    //   fração ≤ 75% .... ELEVADO (borda alta)         — 3 de 4
+    //   fração  > 75% .... ELEVADO (saturado; CRÍTICO vem da consolidação)
+    // O vetor perímetro nunca ultrapassa ELEVADO sozinho.
+    let nivel = NIVEL.ELEVADO;
+    if (frac <= 0.10 && zonas === 0) nivel = NIVEL.BAIXO; // guarda defensiva
+    const pct = Math.round(frac * 100);
+    return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: 0,
+             bloqueadorCaido: true,
+             fracao: frac, tag: "bloqueador",
+             motivo: `${zonas} de ${total} zona(s) perimetral(is) inoperante(s) (${pct}%)` };
   }
 
   // ── PARADOX (condicional a total desconfiguração) ──
@@ -372,6 +394,7 @@ export function classificarVetor(v) {
     let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
     const f = v.total ? Math.round((v.inop / v.total) * 100) : 0;
     return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt),
+             bloqueadorCaido: peso >= 10 && nivel >= NIVEL.ELEVADO,
              motivo: `${v.inop} de ${v.total} (${f}% do conjunto)` };
   }
 
@@ -387,39 +410,58 @@ export function classificarVetor(v) {
   const nItens = v.inop && v.inop > 1 ? v.inop : 1;
   const pvt = peso * multTemporal(v.dias) * fatorVolume(nItens);
   let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
-  const trava = !!(flags.trava && (v.dias || 0) >= 10);
-  return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt), trava,
+  // v3: sem trava direta de site; o antigo flag 'trava' apenas MARCA
+  // bloqueador caído (a subida a CRÍTICO é por contagem na consolidação).
+  const ehBloqueadorCaido = peso >= 10 && nivel >= NIVEL.ELEVADO;
+  return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt), trava: false,
+           bloqueadorCaido: ehBloqueadorCaido,
            motivo: flags.panicoMovel ? "pânico móvel (coberto pelo fixo)" : (regra.via === "fallback" ? "item não mapeado (fallback Automação)" : "") };
 }
 
 // ═════════════════════════════════════════════════════════════
-// CONSOLIDAÇÃO DO SITE
-// - se algum vetor tem trava → CRÍTICO
-// - senão, pega o pior nível dos vetores incluídos
-// - escopo cliente: teto ELEVADO no consolidado
+// CONSOLIDAÇÃO DO SITE — DOUTRINA v3 (por CONTAGEM de bloqueadores)
+//
+//   nBloq = nº de vetores BLOQUEADORES efetivamente caídos (≥ ELEVADO)
+//     • nBloq >= 2 ......... CRÍTICO   (colapso amplo simultâneo)
+//     • nBloq == 1 ......... ELEVADO + SELO DE ALERTA (vetor isolado grave)
+//     • nBloq == 0 ......... pior nível dos vetores restantes
+//                            (nunca passa de ELEVADO sem bloqueador caído)
+//
+// O parâmetro `escopo` é ignorado (mantido na assinatura só p/ retrocompat).
+// Não há mais teto por escopo nem deslocamento +1. Documento único.
 // ═════════════════════════════════════════════════════════════
 export function consolidarSite(vetoresClassificados, escopo = "moked") {
   const incl = vetoresClassificados.filter(v => v.incluir);
-  const temTrava = incl.some(v => v.trava);
-  let nivel;
-  let motivo;
-  if (temTrava) {
+  const bloqueadores = incl.filter(v => v.bloqueadorCaido);
+  const nBloq = bloqueadores.length;
+
+  let nivel, motivo, alerta = false;
+
+  if (nBloq >= 2) {
     nivel = NIVEL.CRITICO;
-    const g = incl.find(v => v.trava);
-    motivo = g ? g.motivo : "trava de segurança acionada";
+    const nomes = bloqueadores.map(b => b.classe || b.tag).filter(Boolean);
+    motivo = `${nBloq} bloqueadores simultâneos caídos${nomes.length ? ` (${nomes.join(", ")})` : ""}`;
+    alerta = true;
+  } else if (nBloq === 1) {
+    nivel = NIVEL.ELEVADO;
+    motivo = bloqueadores[0].motivo || "1 bloqueador de segurança caído";
+    alerta = true; // selo de alerta destacado no topo
   } else {
+    // nenhum bloqueador caído: pior vetor restante, teto ELEVADO
     nivel = incl.reduce((m, v) => Math.max(m, v.nivel || 0), NIVEL.BAIXO);
+    if (nivel > NIVEL.ELEVADO) nivel = NIVEL.ELEVADO; // sem bloqueador não vai a CRÍTICO
     motivo = "pior vetor de segurança do período";
   }
-  // ── ESCOPO (10/08): Moked = Cliente + 1 nível (alerta antecipado) ──
-  // Cliente: teto CRÍTICO (nível 4). Moked: desloca +1, topo CRÍTICO II (5).
-  if (escopo === "cliente") {
-    if (nivel > NIVEL.CRITICO) nivel = NIVEL.CRITICO;
-  } else {
-    // moked: sobe um degrau acima do que o cliente veria, teto CRÍTICO II
-    nivel = Math.min(NIVEL.CRITICO_II, nivel + 1);
-  }
-  return { nivel, label: NIVEL_LABEL[nivel], motivo, temTrava };
+
+  return {
+    nivel,
+    label: NIVEL_LABEL[nivel],
+    motivo,
+    alerta,                 // NOVO: liga o selo de alerta no documento
+    nBloqueadores: nBloq,   // NOVO: transparência para a "calculadora"
+    bloqueadores,           // NOVO: lista dos vetores bloqueadores caídos
+    temTrava: false,        // retrocompat: trava eliminada na v3
+  };
 }
 
 // ── util ──
