@@ -29,6 +29,7 @@
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { setDoc } from "./fireGuard"; // escrita guardada (demo-safe) p/ contador AR
 import { classificarVetor, consolidarSite, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
 import { coletarRegional, moduladorRegional } from "./regionalConfig";
@@ -43,6 +44,52 @@ const firebaseConfig = {
 };
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+
+// ─────────────────────────────────────────────────────────────
+// NÚMERO SEQUENCIAL DA ANÁLISE DE RISCO — MK-{proj}-AR-{NNNN}
+// Contador B (decidido 11/08): número FIXO por projeto/análise.
+//   • 1ª geração do projeto → assume o próximo número global e GRAVA.
+//   • Gerações seguintes → REUSAM o mesmo número (não queima novo).
+// Persistência aditiva/retrocompatível, SEM runTransaction:
+//   contadores/{pid}      { arSeq, arRef, criadoEm }
+//   contadores/_arGlobal  { seq }   ← sequência global única entre projetos
+// Escrita via fireGuard (demo GAL não grava). Falha de rede → fallback local
+// determinístico pelo número do projeto (nunca quebra a geração do PDF).
+// ─────────────────────────────────────────────────────────────
+function numeroProjeto(pid) {
+  return (pid || "").replace(/\D/g, "") || "000";
+}
+function formatarRefAR(pid, seq) {
+  const nnnn = String(seq).padStart(4, "0");
+  return `MK-${numeroProjeto(pid)}-AR-${nnnn}`;
+}
+async function obterRefSequencial(pid) {
+  const projNum = numeroProjeto(pid);
+  try {
+    // 1) já existe número fixo para este projeto? → reutiliza (contador B)
+    const cSnap = await getDoc(doc(db, "contadores", pid));
+    if (cSnap.exists()) {
+      const d = cSnap.data() || {};
+      if (d.arRef) return d.arRef;
+      if (d.arSeq != null) return formatarRefAR(pid, d.arSeq);
+    }
+    // 2) primeira geração: pega próximo da sequência GLOBAL e grava tudo.
+    const gRef = doc(db, "contadores", "_arGlobal");
+    const gSnap = await getDoc(gRef);
+    const atual = gSnap.exists() ? (gSnap.data().seq || 0) : 0;
+    const proximo = atual + 1;
+    const ref = formatarRefAR(pid, proximo);
+    // grava a sequência global (merge) e o número fixo do projeto (merge).
+    await setDoc(gRef, { seq: proximo }, { merge: true });
+    await setDoc(doc(db, "contadores", pid), {
+      arSeq: proximo, arRef: ref, criadoEm: new Date().toLocaleDateString("sv-SE"),
+    }, { merge: true });
+    return ref;
+  } catch (e) {
+    // fallback determinístico: nunca impede a geração do documento.
+    return formatarRefAR(pid, 1);
+  }
+}
 
 // Projetos elegíveis (Jatinox P260A/B/C fora) e pacotes de cliente.
 export const ANALISE_RISCO_ELIGIBLE = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505"];
@@ -708,7 +755,9 @@ function gerarHTMLAnaliseRisco(ctx) {
     project, pacoteLabel, vetores, geral, recomendacoes, fontesUsadas,
     ts, ctmk, ilum, rondaVirtual, contextos,
   } = ctx;
-  const ref = `MK-${project.id.replace(/\D/g, "") || "000"}-SIT-01`;
+  // Nº do documento: usa o sequencial fixo (ctx.ref) quando resolvido;
+  // fallback ao formato antigo se por algum motivo não vier injetado.
+  const ref = ctx.ref || `MK-${project.id.replace(/\D/g, "") || "000"}-AR-0001`;
   const hoje = hojeBR();
   const nCrit = vetores.filter((v) => v.nivel === NIVEIS.CRITICO).length;
   const nElev = vetores.filter((v) => v.nivel === NIVEIS.ELEVADO).length;
@@ -1200,6 +1249,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
       return;
     }
     const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
+    analise.ref = await obterRefSequencial(selProjeto.id); // Nº AR fixo (contador B)
     setAnalisePronta(analise);
     setEstado("pronto");
     abrirPDF(analise);
@@ -1220,6 +1270,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
     setEstado("coletando");
     const { dados, faltantes: falt } = await coletarFontes(selProjeto, stored, marcadas);
     const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
+    analise.ref = await obterRefSequencial(selProjeto.id); // Nº AR fixo (contador B)
     setAnalisePronta(analise);
     setEstado("pronto");
     const reg = dados.regional;
