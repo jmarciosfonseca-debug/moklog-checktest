@@ -450,8 +450,13 @@ async function coletarEquipe(pid) {
   try {
     const snap = await getDoc(doc(db, "equipes", pid));
     if (!snap.exists()) return { ok: false, temDado: false, motivo: "sem equipe cadastrada" };
-    const colabs = (snap.data().colaboradores || []).filter((c) => (c.status || "ativo") !== "desligado");
+    const todos = (snap.data().colaboradores || []);
+    const colabs = todos.filter((c) => (c.status || "ativo") !== "desligado");
+    const desligados = todos.filter((c) => (c.status || "ativo") === "desligado").length;
     if (!colabs.length) return { ok: false, temDado: false, motivo: "sem colaboradores ativos" };
+    // Turnover = desligados / (ativos + desligados). Base = quadro total do período.
+    const baseQuadro = colabs.length + desligados;
+    const turnoverPct = baseQuadro > 0 ? Math.round((desligados / baseQuadro) * 100) : 0;
     let brigadaNaoAplicada = 0, reciclagemVencida = 0, reciclagemAlerta = 0;
     colabs.forEach((c) => {
       const temBrigada = (c.historico || []).some((h) =>
@@ -471,7 +476,7 @@ async function coletarEquipe(pid) {
     // Perfil de Segurança consolidado em equipes/{pid}.perfilSeguranca
     // (Equipe.jsx): { tipoEquipe:"vspp"|"vigilantes"|"mista", armada:"sim"|"nao"|"", ccoDedicada:"sim"|"nao"|"" }
     const perfilSeguranca = snap.data().perfilSeguranca || { tipoEquipe:"", armada:"", ccoDedicada:"" };
-    return { ok: true, temDado: true, total: colabs.length, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca };
+    return { ok: true, temDado: true, total: colabs.length, desligados, turnoverPct, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca };
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler equipe" }; }
 }
 
@@ -834,8 +839,17 @@ function gerarHTMLAnaliseRisco(ctx) {
     : `<div class="vuln"><div class="top"><div class="nome">Sem vetores em ação necessária</div></div><div class="dado">Nenhum vetor bloqueador ou elevado apurado no período.</div></div>`;
 
   // ── "A conta completa" — todos os vetores incluídos, transparente ──
+  // Perímetro aparece em 2 cards (alarme + ronda) mas é UM bloqueador físico:
+  // o 2º card é marcado como "mesmo vetor" para não sugerir 2 bloqueadores.
+  let contaPerimUsado = false;
   const contribTag = (v) => {
-    if (v.bloqueadorCaido) return '<span class="pz p-crit">bloqueador &#9650;&#9650;</span>';
+    if (v.bloqueadorCaido) {
+      if (ehPerim(v)) {
+        if (contaPerimUsado) return '<span class="pz p-mesmo">mesmo vetor &#8226;</span>';
+        contaPerimUsado = true;
+      }
+      return '<span class="pz p-crit">bloqueador &#9650;&#9650;</span>';
+    }
     if (v.nivel >= NIVEIS.ELEVADO) return '<span class="pz p-elev">soma &#9650;</span>';
     if (v.nivel === NIVEIS.MODERADO) return '<span class="pz p-mod">soma &#183;</span>';
     return '<span class="pz p-nul">registra</span>';
@@ -854,23 +868,34 @@ function gerarHTMLAnaliseRisco(ctx) {
       : `resulta em <em>${esc(labelGeral)}</em>`;
 
   // ── Diagnóstico territorial (seção nativa, mapa embutido) ──
+  // Campos reais do regionalConfig: quadrantes[{lado,regiao,grau,vetores[{desc}]}], protecao[].
   let territHTML = "";
   if (regional?.ok && (regional.quadrantes?.length || regional.temDado)) {
+    const acentuaGrau = (g) => {
+      const G = (g || "").toString().toUpperCase();
+      return G === "GRAVISSIMO" ? "GRAVÍSSIMO" : G === "CRITICO" ? "CRÍTICO" : G;
+    };
     const quads = (regional.quadrantes || []);
     const qCardHTML = quads.map((q) => {
-      const grau = (q.grau || "").toString();
-      const norteSul = /norte/i.test(q.nome || q.lado || "") ? "norte" : "sul";
-      const itens = (q.itens || q.ameacas || []).map((i) => `<li>${esc(i)}</li>`).join("")
-        || `<li>${esc(q.descricao || "Vetores de risco documentados na região.")}</li>`;
+      const grau = acentuaGrau(q.grau);
+      const norteSul = /norte/i.test(q.lado || "") ? "norte" : "sul";
+      const lista = (q.vetores || []).map((v) => `<li>${esc(v.desc || v.natureza || "")}</li>`).join("")
+        || `<li>Vetores de risco documentados na região.</li>`;
+      const reg = q.regiao ? `<div class="qsub">${esc(q.regiao)}</div>` : "";
       return `<div class="qcard ${norteSul}">
-        <div class="qh"><span class="qn">${esc(q.nome || q.lado || "Quadrante")}</span><span class="qg">${esc(grau)}</span></div>
-        <ul>${itens}</ul>
+        <div class="qh"><span class="qn">${esc(q.lado || "Quadrante")}</span><span class="qg">${esc(grau)}</span></div>
+        ${reg}
+        <ul>${lista}</ul>
       </div>`;
     }).join("");
-    const cap = `Figura — Marco Zero do ${esc(project.id)} sobre a região do projeto. ${regional.codigo ? "Diagnóstico " + esc(regional.codigo) + ", versão completa em anexo." : ""}`;
-    const parecerImg = regional.parecerImagem || regional.parecer
-      || `O projeto localiza-se em região cujo entorno concentra fatores de risco documentados por levantamentos oficiais e auditáveis junto às secretarias de segurança pública competentes.`;
-    const fontesTerr = regional.fontes || `SSP / SINESP / secretarias estaduais de segurança pública`;
+    // Fatores protetivos (pronta-resposta) — números reais.
+    const prot = (regional.protecao || []).filter((p) => p.tipo === "pm" || p.tipo === "hospital");
+    const protHTML = prot.length
+      ? `<div class="prot"><div class="ph">Pronta-resposta no entorno</div><div class="pgrid">${prot.map((p) => `<div class="pit"><b>${esc(p.orgao)}</b><span>${p.distanciaKm} km · ~${p.tempoMin} min</span></div>`).join("")}</div></div>`
+      : "";
+    const cap = `Figura — Marco Zero do ${esc(project.id)} sobre a região do projeto.${regional.codigo ? " Diagnóstico " + esc(regional.codigo) + ", versão completa em anexo." : ""}`;
+    const parecerImg = `O projeto localiza-se ${regional.municipioUF ? "em <b>" + esc(regional.municipioUF) + "</b>, " : ""}numa região cujo entorno concentra fatores de risco <b>documentados e auditáveis</b> junto às secretarias estaduais de segurança pública. O diagnóstico distingue dois quadrantes limítrofes de gravidade distinta, detalhados abaixo.`;
+    const fontesTerr = `SSP-DF · SSP-GO · SINESP/MJSP · secretarias estaduais de segurança pública`;
     territHTML = `
     <div class="bloco">
       <div class="eyebrow">Diagnóstico territorial — por que a falha importa aqui</div>
@@ -878,28 +903,40 @@ function gerarHTMLAnaliseRisco(ctx) {
       <div class="mapa-cap">${cap}</div>
       <div class="mapa-parecer">${parecerImg}</div>
       <div class="quad">${qCardHTML}</div>
+      ${protHTML}
       <div class="fontes"><div class="fh">Fontes oficiais · auditável</div>${fontesTerr}</div>
       <div class="parecer-t">O perímetro existe justamente para conter os vetores deste território. Com ele inoperante, a ameaça documentada deixa de encontrar resistência eletrônica — e é por isso que este vetor recebe alerta prioritário.</div>
     </div>`;
   }
 
-  // ── Pontos fortes (números reais) ──
+  // ── Pontos fortes (números reais do coletor) ──
   const rv = rondaVirtual;
   const fcards = [];
   if (rv?.ok) fcards.push({ n: `${rv.pct}%`, l: "Ronda virtual executada", s: `${rv.feitas} de ${rv.previstas} rondas · ${rv.turnos} turnos` });
   if (ts?.ok) fcards.push({ n: `${ts.pct}%`, l: "Saúde dos equipamentos", s: `${ts.okItens} de ${ts.total} pontos operantes` });
   if (equipe?.ok) {
-    const ps = equipe.perfilSeguranca || {};
-    const tv = ps.turnover != null ? `~${ps.turnover}%` : (equipe.total ? `${equipe.total}` : "—");
-    const media = ps.tempoMedioCasa != null ? `média ${ps.tempoMedioCasa} anos de casa` : `${equipe.total} ativos`;
-    fcards.push({ n: tv, l: "Turnover · equipe estável", s: `${equipe.total} ativos · ${media}` });
+    const psx = equipe.perfilSeguranca || {};
+    const armadaX = psx.armada === "sim";
+    const ccoX = psx.ccoDedicada === "sim";
+    const compl = [armadaX ? "armada" : null, ccoX ? "CCO 24h" : null].filter(Boolean).join(" · ") || "efetivo ativo";
+    // Turnover real, derivado dos desligados do período.
+    if (equipe.turnoverPct != null && equipe.desligados != null) {
+      const desl = equipe.desligados;
+      fcards.push({
+        n: `${equipe.turnoverPct}%`,
+        l: "Turnover no período",
+        s: `${desl} deslig. em ${equipe.total + desl} · ${equipe.total} ativos · ${compl}`,
+      });
+    } else {
+      fcards.push({ n: `${equipe.total}`, l: "Efetivo ativo", s: compl });
+    }
   }
   const forcaGrid = fcards.map((f) => `<div class="fcard"><div class="fn">${esc(f.n)}</div><div class="fl">${esc(f.l)}</div><div class="fs">${esc(f.s)}</div></div>`).join("");
 
   const ps = equipe?.perfilSeguranca || {};
   const armada = ps.armada === "sim";
   const cco = ps.ccoDedicada === "sim";
-  const forcaTxt = `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} uma <b>equipe experiente</b>. Experiência e permanência sustentam uma vigilância eficaz. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b>, ` : ""}com a maioria dos sistemas operando normalmente. Essa solidez torna a correção dos vetores acima <b>rápida e viável</b>: falta restaurar as barreiras eletrônicas.`;
+  const forcaTxt = `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} cobertura consistente. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b> e a ` : "A "}maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde de equipamentos)` : ""}. Essa solidez torna a correção dos vetores acima <b>rápida e viável</b>: falta restaurar as barreiras eletrônicas.`;
 
   // ── Introdução dinâmica ──
   const saudePct = ts?.pct != null ? ts.pct : null;
@@ -968,11 +1005,11 @@ function gerarHTMLAnaliseRisco(ctx) {
   .alerta .ai{font-size:15px;flex:0 0 auto;line-height:1.3}
   .alerta .at{font-size:12.5px;color:var(--grafite)}
   .alerta .at b{color:var(--moked)}
-  .regua{display:flex;border-radius:4px;overflow:hidden;border:1px solid var(--linha);margin-top:6px}
+  .regua{display:flex;border-radius:4px;overflow:hidden;border:1px solid var(--linha);margin-top:14px}
   .regua div{flex:1;text-align:center;padding:11px 4px;font-size:11px;font-weight:600;letter-spacing:.07em;color:#fff;position:relative}
   .r1{background:#7d97a6}.r2{background:#c9a24e}.r3{background:#c17d16}.r4{background:var(--moked)}
   .regua div.off{opacity:.26;filter:saturate(.5)}
-  .regua div .pin{position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--tinta)}
+  .regua div .pin{position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:13px;color:var(--tinta);line-height:1}
   .regualeg{display:flex;justify-content:space-between;font-size:10px;color:var(--cinza);margin-top:6px}
   .vuln{border:1px solid var(--linha);border-radius:4px;background:#fff;overflow:hidden;margin-bottom:12px}
   .vuln .top{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;gap:12px}
@@ -992,7 +1029,7 @@ function gerarHTMLAnaliseRisco(ctx) {
   .it b{font-weight:600}.it span{display:block;font-size:11px;color:var(--cinza);margin-top:1px}
   .sit{color:var(--grafite)}
   .pz{text-align:right;white-space:nowrap;font-weight:600;font-size:11.5px}
-  .p-crit{color:var(--moked)}.p-elev{color:var(--ambar)}.p-mod{color:var(--grafite)}.p-nul{color:var(--cinza);font-weight:500}
+  .p-crit{color:var(--moked)}.p-elev{color:var(--ambar)}.p-mod{color:var(--grafite)}.p-nul{color:var(--cinza);font-weight:500}.p-mesmo{color:var(--cinza);font-weight:500;font-style:italic}
   .soma{background:var(--tinta);color:#fff;border-radius:3px;margin-top:3px;display:flex;justify-content:space-between;align-items:center;padding:14px 20px}
   .soma .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#9fb0c2;font-weight:600}
   .soma .r{font-family:'Fraunces';font-weight:700;font-size:19px}.soma .r em{color:#ffcf8a;font-style:normal}
@@ -1009,6 +1046,13 @@ function gerarHTMLAnaliseRisco(ctx) {
   .qcard .qg{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:20px}
   .qcard.norte .qg{background:#faf0d8;color:#a9761b}.qcard.sul .qg{background:#fbe9ea;color:var(--moked)}
   .qcard ul{list-style:none;font-size:11.5px;color:var(--grafite)}
+  .qcard .qsub{font-size:10.5px;color:var(--cinza);margin-bottom:7px;font-style:italic}
+  .prot{margin-top:12px;border:1px solid var(--linha);border-radius:4px;padding:12px 16px;background:#fff}
+  .prot .ph{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite);margin-bottom:8px}
+  .prot .pgrid{display:flex;flex-wrap:wrap;gap:8px}
+  .prot .pit{flex:1;min-width:150px;font-size:11px;color:var(--grafite)}
+  .prot .pit b{display:block;color:var(--tinta);font-weight:600}
+  .prot .pit span{color:var(--cinza)}
   .qcard li{padding-left:14px;position:relative;margin-bottom:3px}
   .qcard li::before{content:"•";position:absolute;left:0;color:var(--cinza)}
   .fontes{margin-top:14px;font-size:11px;color:var(--grafite);background:var(--verde-cl);border:1px solid #cfe0d8;border-radius:4px;padding:12px 16px}
@@ -1034,7 +1078,24 @@ function gerarHTMLAnaliseRisco(ctx) {
   .rodape{padding:16px 42px;font-size:9.5px;color:var(--cinza);border-top:1px solid var(--linha);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--papel2)}
   .rodape b{color:var(--grafite)}
   @media(max-width:640px){.cab,.corpo,.rodape{padding-left:22px;padding-right:22px}.veredito{flex-direction:column;gap:16px;align-items:flex-start}.veredito .txt{border-left:none;border-top:1px solid var(--linha);padding-left:0;padding-top:15px}.cab{flex-direction:column}.cab .cod{text-align:left}}
-  @media print{body{background:#fff;padding:0}.folha{margin:0;box-shadow:none;max-width:none}@page{margin:12mm}}
+  @media print{
+    body{background:#fff;padding:0}
+    .folha{margin:0;box-shadow:none;max-width:none}
+    @page{margin:12mm}
+    /* Impede corte de blocos no meio — regra: aplicar em blocos pequenos/médios,
+       NUNCA no container .folha/.corpo (senão força página em branco). */
+    .veredito,.alerta,.regua,.vuln,.soma,.consultor,.assina,
+    .qcard,.prot,.fontes,.parecer-t,.fcard,.mapa,.mapa-cap,.pergunta,.eyebrow{
+      break-inside:avoid;page-break-inside:avoid;
+    }
+    /* Mantém o rótulo da seção junto do conteúdo seguinte. */
+    .eyebrow{break-after:avoid;page-break-after:avoid}
+    /* A imagem do mapa e a barra territorial não devem quebrar. */
+    .quad{break-inside:avoid;page-break-inside:avoid}
+    /* linhas da tabela não partem no meio */
+    tr,thead{break-inside:avoid;page-break-inside:avoid}
+    thead{display:table-header-group}
+  }
 </style></head><body>
 <div class="folha">
   <div class="cab">
