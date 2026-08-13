@@ -450,11 +450,14 @@ async function coletarEquipe(pid) {
   try {
     const snap = await getDoc(doc(db, "equipes", pid));
     if (!snap.exists()) return { ok: false, temDado: false, motivo: "sem equipe cadastrada" };
-    const todos = (snap.data().colaboradores || []);
+    const data = snap.data() || {};
+    const todos = (data.colaboradores || []);
+    // Ativos ficam em `colaboradores`; desligados ficam num array SEPARADO
+    // `desligados` (Equipe.jsx move o colaborador ao desligar). Contamos dali.
     const colabs = todos.filter((c) => (c.status || "ativo") !== "desligado");
-    const desligados = todos.filter((c) => (c.status || "ativo") === "desligado").length;
+    const desligados = Array.isArray(data.desligados) ? data.desligados.length : 0;
     if (!colabs.length) return { ok: false, temDado: false, motivo: "sem colaboradores ativos" };
-    // Turnover = desligados / (ativos + desligados). Base = quadro total do período.
+    // Turnover = desligados / (ativos + desligados) no quadro do período.
     const baseQuadro = colabs.length + desligados;
     const turnoverPct = baseQuadro > 0 ? Math.round((desligados / baseQuadro) * 100) : 0;
     let brigadaNaoAplicada = 0, reciclagemVencida = 0, reciclagemAlerta = 0;
@@ -475,7 +478,7 @@ async function coletarEquipe(pid) {
     });
     // Perfil de Segurança consolidado em equipes/{pid}.perfilSeguranca
     // (Equipe.jsx): { tipoEquipe:"vspp"|"vigilantes"|"mista", armada:"sim"|"nao"|"", ccoDedicada:"sim"|"nao"|"" }
-    const perfilSeguranca = snap.data().perfilSeguranca || { tipoEquipe:"", armada:"", ccoDedicada:"" };
+    const perfilSeguranca = data.perfilSeguranca || { tipoEquipe:"", armada:"", ccoDedicada:"" };
     return { ok: true, temDado: true, total: colabs.length, desligados, turnoverPct, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca };
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler equipe" }; }
 }
@@ -1005,11 +1008,12 @@ function gerarHTMLAnaliseRisco(ctx) {
   .alerta .ai{font-size:15px;flex:0 0 auto;line-height:1.3}
   .alerta .at{font-size:12.5px;color:var(--grafite)}
   .alerta .at b{color:var(--moked)}
-  .regua{display:flex;border-radius:4px;overflow:hidden;border:1px solid var(--linha);margin-top:14px}
+  .regua{display:flex;border-radius:4px;border:1px solid var(--linha);margin-top:18px}
   .regua div{flex:1;text-align:center;padding:11px 4px;font-size:11px;font-weight:600;letter-spacing:.07em;color:#fff;position:relative}
+  .regua div:first-child{border-radius:4px 0 0 4px}.regua div:last-child{border-radius:0 4px 4px 0}
   .r1{background:#7d97a6}.r2{background:#c9a24e}.r3{background:#c17d16}.r4{background:var(--moked)}
   .regua div.off{opacity:.26;filter:saturate(.5)}
-  .regua div .pin{position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:13px;color:var(--tinta);line-height:1}
+  .regua div .pin{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:13px;color:var(--tinta);line-height:1}
   .regualeg{display:flex;justify-content:space-between;font-size:10px;color:var(--cinza);margin-top:6px}
   .vuln{border:1px solid var(--linha);border-radius:4px;background:#fff;overflow:hidden;margin-bottom:12px}
   .vuln .top{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;gap:12px}
@@ -1038,8 +1042,9 @@ function gerarHTMLAnaliseRisco(ctx) {
   .mapa-parecer{font-size:12.5px;color:var(--grafite);line-height:1.55;margin-top:12px}
   .mapa-parecer b{color:var(--tinta)}
   .mapa-cap{font-size:10.5px;color:var(--cinza);font-style:italic;margin-top:7px;line-height:1.5}
-  .quad{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
-  .qcard{flex:1;min-width:230px;border:1px solid var(--linha);border-radius:4px;padding:14px 16px;background:#fff}
+  .quad{margin-top:14px;font-size:0}
+  .qcard{display:inline-block;vertical-align:top;width:calc(50% - 6px);border:1px solid var(--linha);border-radius:4px;padding:14px 16px;background:#fff;font-size:12px}
+  .qcard:first-child{margin-right:10px}
   .qcard .qh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   .qcard .qh .qn{font-weight:700;font-size:12px;letter-spacing:.04em}
   .qcard.norte .qh .qn{color:#a9761b}.qcard.sul .qh .qn{color:var(--moked)}
@@ -1091,7 +1096,8 @@ function gerarHTMLAnaliseRisco(ctx) {
     /* Mantém o rótulo da seção junto do conteúdo seguinte. */
     .eyebrow{break-after:avoid;page-break-after:avoid}
     /* A imagem do mapa e a barra territorial não devem quebrar. */
-    .quad{break-inside:avoid;page-break-inside:avoid}
+    /* quadrantes: cada card não quebra; o container pode quebrar entre eles. */
+    .qcard{break-inside:avoid;page-break-inside:avoid}
     /* linhas da tabela não partem no meio */
     tr,thead{break-inside:avoid;page-break-inside:avoid}
     thead{display:table-header-group}
