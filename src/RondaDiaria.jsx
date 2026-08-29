@@ -185,8 +185,11 @@ async function loadPlantaoFull(entrada){
 }
 async function saveIndex(projectId, idx){
   const payload = { ...idx, updatedAt:new Date().toISOString() };
-  try { await setDoc(doc(db,"rondas",projectId), payload); } catch(e){ console.error("Rondas index save:", e); }
+  let remotoOk = false;
+  try { await setDoc(doc(db,"rondas",projectId), payload); remotoOk = true; }
+  catch(e){ console.error("Rondas index save:", e); remotoOk = false; }
   try { localStorage.setItem(`rondas_${projectId}`, JSON.stringify(payload)); } catch(e){}
+  return remotoOk;
 }
 // ── Grava UMA entrada no índice sem sobrescrever o que outros dispositivos
 // já salvaram enquanto esta tela estava aberta: busca a versão mais atual
@@ -204,12 +207,15 @@ async function saveIndexEntry(projectId, entradaAtualizada, deletedIdExtra){
   }
   const deletedIds = deletedIdExtra ? [...new Set([...(fresco.deletedIds||[]), deletedIdExtra])] : (fresco.deletedIds||[]);
   const novoIdx = { plantoes, deletedIds };
-  await saveIndex(projectId, novoIdx);
-  return novoIdx;
+  const remotoOk = await saveIndex(projectId, novoIdx);
+  return { novoIdx, remotoOk };
 }
 async function savePlantaoFull(p){
-  try { await setDoc(doc(db,"rondas_plantoes",p.id), p); } catch(e){ console.error("Plantao save:", e); }
+  let remotoOk = false;
+  try { await setDoc(doc(db,"rondas_plantoes",p.id), p); remotoOk = true; }
+  catch(e){ console.error("Plantao save:", e); remotoOk = false; }
   try { localStorage.setItem(`rondas_full_${p.id}`, JSON.stringify(p)); } catch(e){}
+  return remotoOk;
 }
 
 // ── Colaboradores: lista completa do cadastro Equipe (regra única, todos
@@ -477,6 +483,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const [colabs, setColabs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pendenteSync, setPendenteSync] = useState(false); // Bug 3: dado só no aparelho
   const [viewFull, setViewFull] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [confirmEnvio, setConfirmEnvio] = useState(false);
@@ -527,9 +534,12 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     const doSave = async () => {
       pendRef.current = null;
       setSaving(true);
-      await savePlantaoFull(full);
-      const novoIdx = await saveIndexEntry(project.id, entradaLeve(full));
+      const okFull = await savePlantaoFull(full);
+      const { novoIdx, remotoOk } = await saveIndexEntry(project.id, entradaLeve(full));
       setIdx(novoIdx); // sincroniza com o que realmente ficou salvo (inclui o que outros gravaram)
+      // Bug 3 (28/08): se a gravação REMOTA falhou (sem sinal/erro), o dado ficou
+      // só no aparelho. Sinaliza para a UI avisar o vigilante — não finge sucesso.
+      setPendenteSync(!(okFull && remotoOk));
       setSaving(false);
     };
     if(imediato) doSave();
@@ -668,13 +678,13 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     setViewFull(novo);
     setSaving(true);
     if(!viewFull.__embutido) await savePlantaoFull(novo);
-    const novoIdx = await saveIndexEntry(project.id, entradaLeve(novo));
+    const { novoIdx } = await saveIndexEntry(project.id, entradaLeve(novo));
     setIdx(novoIdx);
     setSaving(false);
   };
   const excluirPlantao = async (pid) => {
     setSaving(true);
-    const novoIdx = await saveIndexEntry(project.id, null, pid);
+    const { novoIdx } = await saveIndexEntry(project.id, null, pid);
     setIdx(novoIdx);
     setSaving(false);
     setConfirmDel(false); setViewFull(null); setScreen("home");
@@ -1129,6 +1139,11 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
         )}
         {travado && adminAuth && <button onClick={reabrirAtual} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
         {saving && <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>salvando…</div>}
+        {!saving && pendenteSync && (
+          <div role="alert" style={{fontSize:11,fontWeight:800,color:"#f59e0b",textAlign:"center",background:"#f59e0b18",border:"1px solid #f59e0b55",borderRadius:8,padding:"7px 10px",margin:"4px 0"}}>
+            ⚠️ Salvo apenas neste aparelho — sem conexão com o servidor. Verifique a internet; será reenviado ao salvar novamente com sinal.
+          </div>
+        )}
 
         {adminAuth && (
           <>
