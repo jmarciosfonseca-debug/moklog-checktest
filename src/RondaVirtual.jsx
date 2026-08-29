@@ -181,7 +181,7 @@ function rondaTemConteudo(r) {
 
 // Status de UM slot a partir do relógio (puro, testável).
 // registro = entrada salva em turnoObj.rondas[offset] (ou null)
-// Retorna: feita | feita_atrasada | naoexec | aguardando | aberto | atraso_aberto | bloqueado
+// Retorna: feita | feita_atrasada | em_andamento | naoexec | aguardando | aberto | atraso_aberto | bloqueado
 // limiteFinalMin (opcional): quando informado, define o limite do ÚLTIMO slot
 // (proximoOffset == null). Serve para manter a última ronda noturna registrável
 // e a conclusão liberada até 1min antes do fim do turno (05:59 / 06:59 P606),
@@ -189,6 +189,9 @@ function rondaTemConteudo(r) {
 // (usado nos PDFs/consolidado, que avaliam turnos já encerrados).
 function statusSlot(slot, proximoOffset, agoraMin, registro, limiteFinalMin=null) {
   if (registro && registro.naoExec) return "naoexec";
+  // AUD-008: início SEM fim = ronda em andamento (não é "feita" ainda).
+  // Só vira "feita"/"feita_atrasada" quando o fim é registrado.
+  if (registro && registro.inicio && !registro.fim) return "em_andamento";
   if (registro && registro.inicio)  return registro.atrasada ? "feita_atrasada" : "feita";
   const ini = slot.offsetMin;
   const fimTol = ini + TOLERANCIA_MIN;
@@ -207,6 +210,7 @@ function statusSlot(slot, proximoOffset, agoraMin, registro, limiteFinalMin=null
 const STATUS_META = {
   feita:          { label:"No horário",     color:"#22c55e", bg:"#021a0d", icon:"✅" },
   feita_atrasada: { label:"Feita c/ atraso",color:"#f59e0b", bg:"#1a1000", icon:"⏱️" },
+  em_andamento:   { label:"Em andamento",   color:"#38bdf8", bg:"#04141f", icon:"⏳" },
   naoexec:        { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:"❌" },
   aguardando:     { label:"Aguardando",     color:"#64748b", bg:"transparent", icon:"🕓" },
   aberto:         { label:"Iniciar agora",  color:"#22c55e", bg:"#021a0d", icon:"▶" },
@@ -839,6 +843,7 @@ function SlotRow({ linha, dark, S, disabled, onIniciar, onFecharSem, onFecharCom
   const precisaJust = st==="bloqueado" || st==="naoexec" || st==="feita_atrasada" || (st==="atraso_aberto");
   const borderC = (st==="naoexec"||st==="bloqueado") ? "#ef4444"
                 : (st==="feita_atrasada"||st==="atraso_aberto") ? "#f59e0b"
+                : (st==="em_andamento") ? "#38bdf8"
                 : (st==="feita") ? "#22c55e"
                 : (st==="aberto") ? "#22c55e" : (dark?"#0f172a":"#e2e8f0");
 
@@ -931,7 +936,9 @@ export function gerarPDFRonda(project, turno) {
     </tr>`;
   }).join("");
 
-  const feitas = slots.filter((s,i)=>{ const reg=turno.rondas?.[String(s.offsetMin)]; return reg&&reg.inicio; }).length;
+  // AUD-008: uma ronda só é REALIZADA quando tem início E fim. Início sem fim = "em andamento".
+  const feitas = slots.filter((s,i)=>{ const reg=turno.rondas?.[String(s.offsetMin)]; return reg&&reg.inicio&&reg.fim; }).length;
+  const emAndamento = slots.filter((s,i)=>{ const reg=turno.rondas?.[String(s.offsetMin)]; return reg&&reg.inicio&&!reg.fim; }).length;
   const naoexec = slots.filter((s,i)=>{
     const prox = slots[i+1] ? slots[i+1].offsetMin : null;
     const reg = turno.rondas?.[String(s.offsetMin)] || null;
@@ -985,6 +992,7 @@ export function gerarPDFRonda(project, turno) {
 <div class="kpi">
   <div class="kpibox"><div class="n">${slots.length}</div><div class="l">RONDAS PREVISTAS</div></div>
   <div class="kpibox"><div class="n">${feitas}</div><div class="l">REALIZADAS</div></div>
+  ${emAndamento>0?`<div class="kpibox"><div class="n" style="color:#f59e0b">${emAndamento}</div><div class="l">EM ANDAMENTO</div></div>`:""}
   <div class="kpibox"><div class="n">${naoexec}</div><div class="l">NÃO EXECUTADAS</div></div>
 </div>
 <div class="card">
@@ -1035,7 +1043,7 @@ export function gerarPDFConsolidadoRonda(project, turnosSelecionados) {
       const prox = slots[i+1] ? slots[i+1].offsetMin : null;
       const reg = t.rondas?.[String(s.offsetMin)] || null;
       const st = statusSlot(s, prox, agoraMin, reg);
-      if(reg && reg.inicio) realizadasTurno++;
+      if(reg && reg.inicio && reg.fim) realizadasTurno++; // AUD-008: só conta ronda concluída (início E fim)
       const just = (reg?.justificativa||"").trim();
       if(st==="feita_atrasada"){
         totalAtrasos++; porColaborador[nome].atrasos++;
