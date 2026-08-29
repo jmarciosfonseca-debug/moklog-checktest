@@ -563,6 +563,24 @@ function resolveStatus(obj) {
   return "ok";
 }
 
+// AUD-010: FONTE ÚNICA para a idade de um CTMK off-line. Antes o cálculo era
+// duplicado em 4 lugares com regras diferentes (uns permitiam "0 dias", outro
+// forçava mínimo 1), então a mesma central aparecia como "0 dias" numa tela e
+// "1 dia" em outra. Aqui: < 24h mostra horas; a partir daí, dias.
+// Retorna { ms, horas, dias, label } ou null quando não está offline.
+function ctmkOfflineIdade(offlineSince) {
+  if(!offlineSince) return null;
+  const ms = Date.now() - new Date(offlineSince).getTime();
+  if(isNaN(ms) || ms < 0) return { ms:0, horas:0, dias:0, label:"há poucos minutos" };
+  const horas = Math.floor(ms/3600000);
+  const dias = Math.floor(ms/86400000);
+  let label;
+  if(horas < 1) label = "há poucos minutos";
+  else if(horas < 24) label = `há ${horas} ${horas===1?"hora":"horas"}`;
+  else label = `há ${dias} ${dias===1?"dia":"dias"}`;
+  return { ms, horas, dias, label };
+}
+
 function getProjectScore(project, history) {
   if(!history || history.length === 0) return null;
   const last6 = history.slice(-6);
@@ -971,7 +989,7 @@ function HealthRing({ pct, size=56 }) {
 function CtmkBadge({ info, onToggle, size="normal" }) {
   const status = info?.status || "online";
   const isOff = status === "offline";
-  const days = isOff && info?.offlineSince ? Math.floor((Date.now()-new Date(info.offlineSince).getTime())/86400000) : null;
+  const idade = isOff && info?.offlineSince ? ctmkOfflineIdade(info.offlineSince) : null;
   const small = size==="small";
   return (
     <div onClick={(e)=>{ e.stopPropagation(); onToggle(); }}
@@ -986,8 +1004,8 @@ function CtmkBadge({ info, onToggle, size="normal" }) {
           {isOff?"📵":"📷"}
         </span>
       </div>
-      {isOff && days!==null && (
-        <span style={{fontSize:small?9:10,fontWeight:700,color:"#ef4444"}}>{days} {days===1?"dia":"dias"} off-line</span>
+      {isOff && idade && (
+        <span style={{fontSize:small?9:10,fontWeight:700,color:"#ef4444"}}>off-line {idade.label}</span>
       )}
     </div>
   );
@@ -1009,7 +1027,7 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
   if(!confirm) return null;
   const goingOffline = confirm.status!=="offline"; // status atual antes do toque
   const label = project?.id || confirm.pid;
-  const diasOff = confirm.status==="offline"&&confirm.offlineSince ? Math.max(0,Math.floor((Date.now()-new Date(confirm.offlineSince).getTime())/86400000)) : 0;
+  const idadeOff = confirm.status==="offline" ? ctmkOfflineIdade(confirm.offlineSince) : null;
   return (
     <div onClick={onCancel} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:16}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#060c18",border:`1px solid ${goingOffline?"#ef444444":"#22c55e44"}`,borderRadius:14,padding:"20px 18px",maxWidth:360,width:"100%"}}>
@@ -1020,7 +1038,7 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
         <div style={{fontSize:12,color:"#94a3b8",textAlign:"center",lineHeight:1.5,marginBottom:8}}>
           {goingOffline
             ? "Isso vai marcar a central de monitoramento remoto como sem imagem e começar a contar os dias offline."
-            : `Isso vai zerar o contador de dias offline${diasOff>0?` (${diasOff} dias)`:""} e guardar o período anterior no histórico.`}
+            : `Isso vai zerar o contador de tempo offline${idadeOff?` (off-line ${idadeOff.label})`:""} e guardar o período anterior no histórico.`}
         </div>
 
         <div style={{background:goingOffline?"#1a020233":"#021a0d33",border:`1px solid ${goingOffline?"#ef444433":"#22c55e33"}`,borderRadius:8,padding:"10px 12px",marginBottom:14,textAlign:"center"}}>
@@ -1030,7 +1048,7 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
           <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4}}>
             {goingOffline
               ? "Confirme apenas se realmente verificou que as imagens estão indisponíveis na central de monitoramento."
-              : `Confirme apenas se realmente verificou que as imagens estão funcionando normalmente.${diasOff>0?` O registro de ${diasOff} dia(s) offline será arquivado.`:""}`}
+              : `Confirme apenas se realmente verificou que as imagens estão funcionando normalmente.${idadeOff?` O registro (off-line ${idadeOff.label}) será arquivado.`:""}`}
           </div>
         </div>
 
@@ -1497,7 +1515,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         const last=hist[hist.length-1];
         const base = last ? computeHealth(p,last.state).pct : 0;
         const c = ctmkData[pid];
-        const ctmkDias = c?.status==="offline"&&c.offlineSince ? Math.max(1,Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000)) : 0;
+        const ctmkIdade = c?.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
+        // Penalidade de score permanece em DIAS (regra de negócio -2/dia). Mínimo 1
+        // quando offline (mesma regra de antes): estar offline já conta como 1 dia.
+        const ctmkDias = ctmkIdade ? Math.max(1, ctmkIdade.dias) : 0;
         const r = computeScore360(base, {
           ctmkDias,
           keyAbertas: keyAbertasBy[pid]||0,
@@ -1514,8 +1535,9 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   const ctmkInfoFor = (pid) => {
     try {
       const c = ctmkData[pid]; if(!c) return undefined;
-      const days = c.status==="offline" && c.offlineSince ? Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000) : null;
-      return { status: c.status, days };
+      const idade = c.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
+      // days permanece número (consumido pelo generatePDF); label é o texto padronizado.
+      return { status: c.status, days: idade ? idade.dias : null, offlineLabel: idade ? idade.label : null };
     } catch(e) { return undefined; }
   };
   const [pin,setPin]=useState(""); const [auth,setAuth]=useState(()=>hasGerencial()); const [err,setErr]=useState(false);
@@ -2174,8 +2196,8 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
   const ctmkInfo = (()=>{
     try {
       const c = ctmkData[project.id]; if(!c) return undefined;
-      const days = c.status==="offline" && c.offlineSince ? Math.floor((Date.now()-new Date(c.offlineSince).getTime())/86400000) : null;
-      return { status: c.status, days };
+      const idade = c.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
+      return { status: c.status, days: idade ? idade.dias : null, offlineLabel: idade ? idade.label : null };
     } catch(e) { return undefined; }
   })();
   const [copied,setCopied]=useState(false);
