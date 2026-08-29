@@ -581,6 +581,19 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     return { ...p, perimetral:{ ...per, feito:true, zonas:zs } };
   }, imediato);
   const setPerimetral = (campo,valor,imediato=true) => upsertAtual(p=>({ ...p, perimetral:{ ...perBase(p), [campo]:valor } }), imediato);
+  // Opção B (28/08): ao MARCAR "Feito", materializa as zonas fixas SEM status
+  // pré-selecionado (status:null) — o vigilante é OBRIGADO a confirmar cada zona.
+  // Isso elimina o bug do "OK visual" que gravava zonas:[]. Ao DESMARCAR, mantém
+  // o que já foi tocado (não apaga trabalho).
+  const marcarPerimetralFeito = (novoFeito) => upsertAtual(p=>{
+    const per = perBase(p);
+    if(!novoFeito) return { ...p, perimetral:{ ...per, feito:false } };
+    let zs = [...(per.zonas||[])];
+    if(NUM_ZONAS_FIXAS>0){
+      while(zs.length < NUM_ZONAS_FIXAS){ zs.push({ id:newId(), status:null, obs:"" }); }
+    }
+    return { ...p, perimetral:{ ...per, feito:true, zonas:zs } };
+  });
   const addZonaPer = () => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, feito:true, zonas:[...(per.zonas||[]), { id:newId(), status:"ok", obs:"" }] } }; });
   const editZonaPer = (zid,campo,valor,imediato=true) => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, zonas:(per.zonas||[]).map(z=>z.id===zid?{...z,[campo]:valor}:z) } }; }, imediato);
   const delZonaPer = (zid) => upsertAtual(p=>{ const per=perBase(p); return { ...p, perimetral:{ ...per, zonas:(per.zonas||[]).filter(z=>z.id!==zid) } }; });
@@ -603,6 +616,20 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     if(!atualFull || !atualFull.lider){ setEnvioErr("Selecione o responsável pelo turno antes de enviar."); setConfirmEnvio(false); return; }
     const validas = (atualFull.rondas||[]).filter(r=>(r.inicio||"").trim());
     if(validas.length===0){ setEnvioErr("Registre ao menos uma ronda antes de enviar."); setConfirmEnvio(false); return; }
+    // Opção B (28/08): se o Teste Perimetral foi marcado como feito, TODAS as
+    // zonas precisam ter status confirmado (OK/Parcial/Inoperante). Bloqueia o
+    // "OK visual" que gravava zonas vazias e sumia do consolidado.
+    const per = atualFull.perimetral;
+    if(per && per.feito){
+      const zs = per.zonas||[];
+      const esperado = NUM_ZONAS_FIXAS>0 ? NUM_ZONAS_FIXAS : zs.length;
+      const semStatus = zs.filter(z=>!z || !z.status).length;
+      const faltando = Math.max(0, esperado - zs.length) + semStatus;
+      if(esperado>0 && faltando>0){
+        setEnvioErr(`Confirme o status de todas as ${esperado} zonas do Teste Perimetral (${faltando} pendente(s)) — toque em OK, Parcial ou Inoperante em cada uma.`);
+        setConfirmEnvio(false); return;
+      }
+    }
     upsertAtual(p=>({ ...p, enviado:true, enviadoEm:new Date().toISOString() }));
     setConfirmEnvio(false);
   };
@@ -999,7 +1026,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             <div style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <label style={S.lbl}>🔒 Teste Perimetral</label>
-                <button disabled={travado} onClick={()=>!travado&&setPerimetral("feito",!marcado)}
+                <button disabled={travado} onClick={()=>!travado&&marcarPerimetralFeito(!marcado)}
                   style={{...S.btnSm,fontSize:12,padding:"7px 14px",color:marcado?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:marcado?"#22c55e44":undefined,opacity:travado?.6:1}}>
                   {marcado?"✓ Feito":"Marcar como feito"}
                 </button>
@@ -1007,15 +1034,16 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               {marcado && NUM_ZONAS_FIXAS>0 && (
                 <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
                   {Array.from({length:NUM_ZONAS_FIXAS}).map((_,zi)=>{
-                    const z = zonas[zi] || { status:"ok", obs:"" };
+                    const z = zonas[zi] || { status:null, obs:"" };
+                    const semStatus = !z.status; // ainda não confirmada pelo vigilante
                     const precisaObs = (z.status==="parcial"||z.status==="inoperante");
                     return (
-                      <div key={zi} style={{border:`1px solid ${precisaObs?(STATUS_ZONA[z.status].cor+"66"):(dark?"#0f172a":"#e2e8f0")}`,borderRadius:8,padding:"9px 10px"}}>
+                      <div key={zi} style={{border:`1px solid ${semStatus?"#f59e0b88":(precisaObs?(STATUS_ZONA[z.status].cor+"66"):(dark?"#0f172a":"#e2e8f0"))}`,borderRadius:8,padding:"9px 10px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
                           <div style={{fontSize:13,fontWeight:900,...S.txt,minWidth:66}}>{nomeZonaFixa(zi)}</div>
                           <div style={{display:"flex",gap:5,flex:1}}>
                             {Object.entries(STATUS_ZONA).map(([k,cfg])=>{
-                              const sel = (z.status||"ok")===k;
+                              const sel = z.status===k;
                               return (
                                 <button key={k} disabled={travado} onClick={()=>!travado&&setZonaFixa(zi,"status",k)}
                                   style={{flex:1,padding:"9px 4px",borderRadius:7,fontWeight:800,fontSize:11,cursor:travado?"default":"pointer",
