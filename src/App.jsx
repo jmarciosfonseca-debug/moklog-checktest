@@ -3020,8 +3020,10 @@ export default function App(){
         });
         setStored(merged);
         try{ localStorage.setItem("seccheck_v4",JSON.stringify(merged)); }catch(e){}
-        // Reenvia automaticamente ao servidor qualquer relatório que só existia neste aparelho
-        for(const r of resyncs){ try{ await saveToFirebase(r.pid, r.history); }catch(e){} }
+        // AUD-002: NÃO reenviar automaticamente por "lista local maior" (ressuscitava dado
+        // apagado a partir de cache antigo). Se houver relatório que só existe neste aparelho,
+        // sinaliza pendência para o usuário reenviar de forma explícita (fila pendingSync).
+        if(resyncs.length > 0){ setPendingSync({projectId: resyncs[0].pid, history: resyncs[0].history}); }
       }
       setLoaded(true);
     }).catch(()=>setLoaded(true));
@@ -3066,8 +3068,12 @@ export default function App(){
             }
             const up={...prev,[pid]:{...snap.data(), history: mergedHist}};
             try{ localStorage.setItem("seccheck_v4",JSON.stringify(up)); }catch(e){}
+            // AUD-002: o listener é SOMENTE LEITURA. Nunca grava de volta automaticamente.
+            // Se este aparelho tiver relatório(s) que o servidor não tem, apenas sinaliza
+            // pendência para reenvio EXPLÍCITO pelo usuário (fila pendingSync), em vez de
+            // usar "lista local maior" como critério de gravação (que ressuscitava dado apagado).
             if(mergedHist.length > serverHist.length){
-              saveToFirebase(pid, mergedHist).catch(()=>{});
+              setPendingSync(cur => cur ? cur : {projectId: pid, history: mergedHist});
             }
             return up;
           });
