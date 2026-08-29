@@ -103,7 +103,7 @@ function getStyles(dark) {
 
 function emptyRegistro() {
   return {
-    id: Date.now().toString()+Math.random().toString(36).substring(2,5),
+    id: crypto.randomUUID(),
     data: todayStr(),
     turno: "Diurno",
     intervalos: {

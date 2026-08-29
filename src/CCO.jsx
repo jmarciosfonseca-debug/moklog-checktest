@@ -40,7 +40,7 @@ const TURNOS = [
   { key:"noturno", label:"Noturno", color:"#818cf8", bg:"#0a0a2e", icon:"🌙" },
 ];
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); } // AUD-005: data de negócio no fuso local (America/Sao_Paulo), não UTC
 function nowTime() {
   const n = new Date();
   return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
@@ -278,7 +278,7 @@ function ManutencaoSection({ project, dark, adminAuth, onBack, onToggleTheme }) 
   const [hasDraft, setHasDraft] = useState(false);
 
   const emptyForm = () => ({
-    id: Date.now().toString()+Math.random().toString(36).substring(2,6),
+    id: crypto.randomUUID(),
     data: todayStr(),
     empresa:"",
     tecnico:"",
@@ -497,7 +497,7 @@ function IntervaloSection({ project, dark, adminAuth, onBack, onToggleTheme }) {
   const [hasDraft, setHasDraft] = useState(false);
 
   const emptyForm = () => ({
-    id: Date.now().toString()+Math.random().toString(36).substring(2,6),
+    id: crypto.randomUUID(),
     data: todayStr(),
     nome:"",
     cargo:"",
@@ -711,7 +711,7 @@ function SupervisaoSection({ project, dark, adminAuth, onBack, onToggleTheme }) 
   const [hasDraft, setHasDraft] = useState(false);
 
   const emptyForm = () => ({
-    id: Date.now().toString()+Math.random().toString(36).substring(2,6),
+    id: crypto.randomUUID(),
     data: todayStr(),
     supervisor:"",
     turno:"diurno",

@@ -34,7 +34,7 @@ function addDays(d, n) {
   try {
     const dt = new Date(d+"T12:00:00");
     dt.setDate(dt.getDate()+n);
-    return dt.toISOString().split("T")[0];
+    return dt.toLocaleDateString("sv-SE"); // AUD-005: fecha em fuso local (ancorado em meio-dia), não UTC
   } catch { return d; }
 }
 
@@ -370,7 +370,7 @@ export default function Visita({ project, onBack, dark, onToggleTheme, sharedAut
       ].filter(i=>i.status && i.status!=="ok");
 
       const equipPendentes = allItems.map(i=>({
-        id: i.id||Math.random().toString(36).substring(2,8),
+        id: i.id||crypto.randomUUID(),
         nome: `${i.categoria} — ${i.identificacao||""}`,
         status: i.status,
         diasAberto: i.dataProblem ? daysSince(i.dataProblem) : 0,
@@ -412,7 +412,7 @@ export default function Visita({ project, onBack, dark, onToggleTheme, sharedAut
     if(!formColab.colaboradorNome) { alert("Selecione o colaborador"); return; }
     if(!formColab.descricao) { alert("Descreva a pendência"); return; }
     const tipo = PEND_TIPOS.find(t=>t.key===formColab.tipo);
-    const entry = { ...formColab, id:Date.now().toString(), tipoIcon:tipo?.icon||"📝", tipoLabel:tipo?.label||formColab.tipo, resolvido:false, criadoEm:new Date().toISOString() };
+    const entry = { ...formColab, id:crypto.randomUUID(), tipoIcon:tipo?.icon||"📝", tipoLabel:tipo?.label||formColab.tipo, resolvido:false, criadoEm:new Date().toISOString() };
     const updated = {...visita, colaboradores:[...(visita.colaboradores||[]), entry]};
     saveCurrentVisita(updated);
     setShowAddColab(false);
@@ -422,7 +422,7 @@ export default function Visita({ project, onBack, dark, onToggleTheme, sharedAut
   const addContatoAdm = () => {
     if(!formAdm.resumo) { alert("Descreva o contato"); return; }
     const tipo = ADM_TIPOS.find(t=>t.key===formAdm.tipo);
-    const entry = { ...formAdm, id:Date.now().toString(), tipoIcon:tipo?.icon||"📝", tipoLabel:tipo?.label||formAdm.tipo, resolvido:false, criadoEm:new Date().toISOString() };
+    const entry = { ...formAdm, id:crypto.randomUUID(), tipoIcon:tipo?.icon||"📝", tipoLabel:tipo?.label||formAdm.tipo, resolvido:false, criadoEm:new Date().toISOString() };
     const updated = {...visita, administracao:[...(visita.administracao||[]), entry]};
     saveCurrentVisita(updated);
     setShowAddAdm(false);

@@ -14,7 +14,7 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); } // AUD-005: data de negócio no fuso local (America/Sao_Paulo), não UTC
 function nowTime() {
   const n = new Date();
   return `${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}`;
@@ -314,7 +314,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
   const [viewReg, setViewReg] = useState(null);
 
   const emptyForm = () => ({
-    id: Date.now().toString() + Math.random().toString(36).substring(2,6),
+    id: crypto.randomUUID(),
     data: todayStr(),
     transportadora:"", placa:"", motorista:"",
     estacionou:"", chamado:"", entradaPatio:"", saidaPatio:"",

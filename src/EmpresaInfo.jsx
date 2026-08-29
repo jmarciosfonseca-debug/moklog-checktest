@@ -30,7 +30,7 @@ const PROJECT_PINS = {
 const PROJETOS_COM_CCO = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505","P260A"];
 function temCCO(pid){ return PROJETOS_COM_CCO.includes(pid); }
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+function todayStr() { return new Date().toLocaleDateString("sv-SE"); } // AUD-005: data de negócio no fuso local (America/Sao_Paulo), não UTC
 function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
@@ -207,7 +207,7 @@ function gerarPDFEmpresa(project, info, dark) {
   const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href=url; a.download=`info_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+  a.href=url; a.download=`info_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`;
   a.click(); URL.revokeObjectURL(url);
 }
 
@@ -288,7 +288,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
   const addVisita = () => {
     if(!novaVisita.turno) { alert("Selecione o turno (Diurno ou Noturno)"); return; }
     if(!novaVisita.resumo.trim()) { alert("Informe o resumo da visita"); return; }
-    const updated = { ...form, visitas: [{ id:Date.now().toString(), ...novaVisita }, ...(form.visitas||[])] };
+    const updated = { ...form, visitas: [{ id:crypto.randomUUID(), ...novaVisita }, ...(form.visitas||[])] };
     setForm(updated);
     onSave(updated);
     setNovaVisita({ data:todayStr(), turno:"", resumo:"" });
@@ -495,7 +495,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
     const nome = edNome.trim();
     if(!nome) return;
     if(editId==="novo"){
-      persist([...empresas, { id:Date.now().toString()+Math.random().toString(36).slice(2,6), nome, observacao:edObs.trim(), visitas:[] }]);
+      persist([...empresas, { id:crypto.randomUUID(), nome, observacao:edObs.trim(), visitas:[] }]);
     } else {
       persist(empresas.map(e=>e.id===editId?{...e,nome,observacao:edObs.trim()}:e));
     }
@@ -505,7 +505,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
 
   const addVisita = (empId) => {
     if(!novaVisita.resumo.trim()) { alert("Informe o resumo"); return; }
-    persist(empresas.map(e=>e.id===empId?{...e,visitas:[{id:Date.now().toString(),...novaVisita},...(e.visitas||[])]}:e));
+    persist(empresas.map(e=>e.id===empId?{...e,visitas:[{id:crypto.randomUUID(),...novaVisita},...(e.visitas||[])]}:e));
     setNovaVisita({ data:todayStr(), tecnico:"", resumo:"" });
     setShowAdd(null);
   };

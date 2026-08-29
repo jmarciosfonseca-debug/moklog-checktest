@@ -440,7 +440,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
     if(tipos.includes("outro")&&!tipoCustom.trim()){ alert("Descreva a falha."); return; }
     try{ localStorage.setItem(`ka_last_user_${project.id}`, JSON.stringify(registradoPor)); }catch(e){}
     onSalvo({
-      id: Date.now().toString()+Math.random().toString(36).substring(2,5),
+      id: crypto.randomUUID(),
       data, horaInicio, horaFim, tipos, tipoCustom: tipos.includes("outro")?tipoCustom.trim():"",
       impacto: impactos,
       vigilanteRonda: vigilanteRonda ? {id:vigilanteRonda.id, nome:vigilanteRonda.nome} : null,

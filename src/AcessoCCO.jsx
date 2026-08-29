@@ -488,7 +488,7 @@ function RegistroCard({ tema, r, dark, S, adminAuth, onContinuar, onArquivar, on
 // FORMULÁRIOS POR TEMA
 // ════════════════════════════════════════════════════════════════════════
 function emptyForm(tema) {
-  const base = { id: Date.now().toString()+Math.random().toString(36).substring(2,6), data: todayStr(), arquivado:false, obs:"", registradoEm:new Date().toISOString() };
+  const base = { id: crypto.randomUUID(), data: todayStr(), arquivado:false, obs:"", registradoEm:new Date().toISOString() };
   if(tema==="acesso")     return { ...base, nome:"", empresa:"", horaEntrada:nowTime() };
   if(tema==="intervalo")  return { ...base, turno:"diurno", colaboradores:[] }; // colaboradores:[{id,nome,cargo,intervalos:{cafe1:{saida,retorno},...}}]
   if(tema==="supervisao") return { ...base, supervisor:"", turno:"diurno", chegada:nowTime(), saida:"", resumo:"", equipamentos:[] }; // equipamentos:[{...,acao:"trocado"|"aberto"}]
