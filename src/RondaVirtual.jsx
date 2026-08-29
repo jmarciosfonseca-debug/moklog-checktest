@@ -451,8 +451,31 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     // Evita múltiplas rondas abertas simultaneamente por pessoas diferentes.
     const turnoAbertoExistente = turnos.find(t=>!t.arquivado);
     if(turnoAbertoExistente){
-      alert(`Já existe um turno de ronda em aberto neste projeto.\n\nPlantonista: ${turnoAbertoExistente.plantonista?.nome||"—"} · ${RONDA_TURNOS[turnoAbertoExistente.tipo]?.label||turnoAbertoExistente.tipo}\n\nConclua e arquive esse turno antes de abrir um novo.`);
-      return;
+      // Correção 28/08 (turnos órfãos): se o turno em aberto é de um DIA ANTERIOR,
+      // ele foi abandonado (app fechou/sem sinal e nunca foi concluído). Em vez de
+      // travar o CCO indefinidamente, oferecemos concluí-lo e arquivá-lo em 1 toque.
+      const dataAberto = (turnoAbertoExistente.dataInicio||"").slice(0,10);
+      const ehDeHoje = dataAberto === hojeISO().slice(0,10);
+      const nomeP = turnoAbertoExistente.plantonista?.nome || "—";
+      const tipoP = RONDA_TURNOS[turnoAbertoExistente.tipo]?.label || turnoAbertoExistente.tipo;
+      if(!ehDeHoje){
+        const concluir = window.confirm(
+          `Existe um turno ANTIGO em aberto, provavelmente não concluído:\n\n`+
+          `Plantonista: ${nomeP} · ${tipoP}\n`+
+          `Data: ${dataAberto ? fmtDataBR(dataAberto) : "—"}\n\n`+
+          `Deseja CONCLUIR e ARQUIVAR esse turno antigo agora para liberar a abertura do novo?`
+        );
+        if(concluir){
+          await updTurno(turnoAbertoExistente.id, t=>({...t, arquivado:true, arquivadoEm:new Date().toISOString(), concluidoAuto:true}));
+          // segue o fluxo normal de abertura abaixo (não retorna).
+        } else {
+          return;
+        }
+      } else {
+        // turno em aberto é de HOJE: mantém a trava (evita duplicidade real no mesmo dia).
+        alert(`Já existe um turno de ronda em aberto neste projeto.\n\nPlantonista: ${nomeP} · ${tipoP}\n\nConclua e arquive esse turno antes de abrir um novo.`);
+        return;
+      }
     }
     // Trava de calendário: diurno só abre em dia válido (regra varia por projeto).
     if(novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id, selEhFolguista)){
