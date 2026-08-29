@@ -548,6 +548,21 @@ function daysSince(dateStr) {
   } catch { return null; }
 }
 
+// AUD-007: FONTE ÚNICA DA VERDADE para o status de um item/registro.
+// Doutrina: o campo `status` MANDA quando presente e não-vazio; `ok` é apenas
+// fallback legado quando `status` está ausente OU vazio ("").
+// O operador `??` antigo tratava "" como valor válido, deixando itens marcados
+// inoperantes serem contados como OK. Aqui "" é normalizado para ausente.
+// Retorna sempre um de: "ok" | "partial" | "inop".
+function resolveStatus(obj) {
+  if(!obj || typeof obj !== "object") return "ok";
+  const raw = (obj.status ?? "").toString().trim().toLowerCase();
+  if(raw === "ok" || raw === "partial" || raw === "inop") return raw;
+  // status ausente/vazio/desconhecido: usa o campo legado `ok`
+  if(obj.ok === false) return "inop";
+  return "ok";
+}
+
 function getProjectScore(project, history) {
   if(!history || history.length === 0) return null;
   const last6 = history.slice(-6);
@@ -576,14 +591,14 @@ function getAllPendencies(stored) {
     for(const cat of project.categories) {
       const s = last.state[cat.id]; if(!s) continue;
       if(cat.type === "single") {
-        const st = s.status ?? (s.ok === false ? "inop" : "ok");
+        const st = resolveStatus(s);
         if(st !== "ok") {
           const days = daysSince(s.since);
           result.push({project, cat: cat.label, item: "\u2014", status: st, since: s.since, days, note: s.note});
         }
       } else if(cat.type === "items") {
         s.forEach((v, i) => {
-          const st = v.status ?? (v.ok === false ? "inop" : "ok");
+          const st = resolveStatus(v);
           if(st !== "ok") {
             const days = daysSince(v.since);
             result.push({project, cat: cat.label, item: cat.itemLabels[i], status: st, since: v.since, days, note: v.note});
@@ -697,7 +712,7 @@ function buildFromLast(project, lastState) {
   for(const cat of project.categories){
     if(cat.type==="single"){
       const prev=lastState[cat.id];
-      const prevSt=prev?.status??(prev?.ok===false?"inop":"ok");
+      const prevSt=resolveStatus(prev);
       st[cat.id]={status:prevSt, note:prev?.note||"", since:prevSt!=="ok"?prev?.since||todayStr():""};
     } else if(cat.type==="items"){
       const prev=lastState[cat.id]??cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
@@ -705,7 +720,7 @@ function buildFromLast(project, lastState) {
       const prevArr=Array.isArray(prev)?prev:Object.keys(prev).sort((a,b)=>(+a)-(+b)).map(k=>prev[k]);
       st[cat.id]=cat.itemLabels.map((_,i)=>{
         const p=prevArr[i]??{status:"ok"};
-        const pSt=p.status??(p.ok===false?"inop":"ok");
+        const pSt=resolveStatus(p);
         return {status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
       });
     } else if(cat.type==="count"){
@@ -752,13 +767,13 @@ function computeHealth(project, state) {
     const s=state[cat.id]; if(!s) continue;
     if(cat.type==="single"){
       total++;
-      const st=s.status??(s.ok===false?"inop":"ok");
+      const st=resolveStatus(s);
       if(st==="ok") okCount++; else if(st==="partial"){okCount+=0.5;partial++;} else inop++;
     } else if(cat.type==="items"){
       const arr=Array.isArray(s)?s:[];
       total+=arr.length;
       arr.forEach(v=>{
-        const st=v?.status??(v?.ok===false?"inop":"ok");
+        const st=resolveStatus(v);
         if(st==="ok") okCount++; else if(st==="partial"){okCount+=0.5;partial++;} else inop++;
       });
     } else if(cat.type==="count"){
@@ -775,11 +790,11 @@ function analyzeRecurrence(project, history) {
     for(const cat of project.categories){
       const s=r.state[cat.id]; if(!s) continue;
       if(cat.type==="single"){
-        const st=s.status??(s.ok===false?"inop":"ok");
+        const st=resolveStatus(s);
         if(st!=="ok"){ const key=`${cat.id}_0`; recurrence[key]=(recurrence[key]||0)+1; }
       } else if(cat.type==="items"){
         s.forEach((v,i)=>{
-          const st=v.status??(v.ok===false?"inop":"ok");
+          const st=resolveStatus(v);
           if(st!=="ok"){ const key=`${cat.id}_${i}`; recurrence[key]=(recurrence[key]||0)+1; }
         });
       } else if(cat.type==="count"){
@@ -822,10 +837,10 @@ function getConsecutiveInopWeeks(project, history, catId, itemIdx) {
     let isInop = false;
     if(typeof itemIdx === "number" && Array.isArray(s)){
       const v=s[itemIdx]; if(!v) break;
-      const st=v.status??(v.ok===false?"inop":"ok");
+      const st=resolveStatus(v);
       isInop = st!=="ok";
     } else if(catId && !Array.isArray(s)){
-      const st=s.status??(s.ok===false?"inop":"ok");
+      const st=resolveStatus(s);
       isInop = st!=="ok";
     }
     if(isInop) count++; else break;
@@ -863,7 +878,7 @@ function generateReportText(project, state, meta, photos) {
       continue;
     }
     L.push(`\n${cat.label}`);
-    const stLabel=(st,ok)=>{const s2=st??(ok===false?"inop":"ok");return s2==="ok"?"OK":s2==="partial"?"PARCIAL":"INOPERANTE";};
+    const stLabel=(st,ok)=>{const s2=resolveStatus({status:st,ok});return s2==="ok"?"OK":s2==="partial"?"PARCIAL":"INOPERANTE";};
     if(cat.type==="single") L.push(`  ${stLabel(s.status,s.ok)}${s.status!=="ok"&&s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`- ${s.note}`:""}`);
     else if(cat.type==="items") s.forEach((v,i)=>L.push(`  ${cat.itemLabels[i]}: ${stLabel(v.status,v.ok)}${v.status!=="ok"&&v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`- ${v.note}`:""}`));
     else if(cat.type==="count"){
@@ -1122,7 +1137,7 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
 }
 
 function SingleCat({cat, value, onChange, photos, setPhotos, recurrence}){
-  const st = value?.status??(value?.ok===false?"inop":"ok");
+  const st = resolveStatus(value);
   const recKey = `${cat.id}_0`;
   const badge = recurrence ? getRecurrenceBadge(recurrence[recKey]||0) : null;
   return(
@@ -1728,7 +1743,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         {viewReport.project.categories.map(cat=>{
           const sv=viewReport.report.state[cat.id]; if(!sv) return null;
           let cp=100;
-          if(cat.type==="single"){const st=sv.status??(sv.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
+          if(cat.type==="single"){const st=resolveStatus(sv);cp=st==="ok"?100:st==="partial"?50:0;}
           else if(cat.type==="items"){const okN=sv.filter(v=>(v.status??"ok")==="ok").length;const partN=sv.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),sv.length);}
           else if(cat.type==="count"){const t=sv.total??cat.total;cp=calcPct(t-(sv.inoperative?.length??0),t);}
           const dotColor=cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444";
@@ -1867,7 +1882,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   const avgPct=valid.length?Math.round(valid.reduce((a,b)=>a+b.pct,0)/valid.length):null;
   const totalInopAll=valid.reduce((a,b)=>a+b.inopN,0);
   const criticalAlerts=[];
-  allProjects.forEach(p=>{const hist=stored[p.id]?.history??[];if(!hist.length)return;for(const cat of p.categories){if(cat.type==="items"){const lastState=hist[hist.length-1].state[cat.id];if(!lastState)continue;lastState.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok"){const wks=getConsecutiveInopWeeks(p,hist,cat.id,i);if(wks>=2)criticalAlerts.push({project:p.id,label:`${cat.label} — ${cat.itemLabels[i]}`,weeks:wks});}});}}});
+  allProjects.forEach(p=>{const hist=stored[p.id]?.history??[];if(!hist.length)return;for(const cat of p.categories){if(cat.type==="items"){const lastState=hist[hist.length-1].state[cat.id];if(!lastState)continue;lastState.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok"){const wks=getConsecutiveInopWeeks(p,hist,cat.id,i);if(wks>=2)criticalAlerts.push({project:p.id,label:`${cat.label} — ${cat.itemLabels[i]}`,weeks:wks});}});}}});
   criticalAlerts.sort((a,b)=>b.weeks-a.weeks);
   return(
     <div style={S.page} onClick={resetSess}>
@@ -2073,7 +2088,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
           const sv=repState[cat.id]; if(!sv) return null;
           const itemLabels=Array.isArray(cat.itemLabels)?cat.itemLabels:[];
           let cp=100;
-          if(cat.type==="single"){const st=sv.status??(sv.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
+          if(cat.type==="single"){const st=resolveStatus(sv);cp=st==="ok"?100:st==="partial"?50:0;}
           else if(cat.type==="items"){const arr=Array.isArray(sv)?sv:[];const okN=arr.filter(v=>(v?.status??"ok")==="ok").length;const partN=arr.filter(v=>v?.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),arr.length||1);}
           else if(cat.type==="count"){const t=sv.total??cat.total??0;cp=calcPct(t-(sv.inoperative?.length??0),t||1);}
           const dotColor=cp===100?"#22c55e":cp>=50?"#f59e0b":"#ef4444";
@@ -2171,7 +2186,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
   const handleWhatsApp=()=>{
     const h=computeHealth(project,state);
     const waIssues=[];
-    for(const cat of project.categories){const s=state[cat.id];if(!s)continue;if(cat.type==="single"){const st=s.status??(s.ok===false?"inop":"ok");if(st!=="ok")waIssues.push(`• ${cat.label}: ${st==="partial"?"Parcial":"Inop"}`);}else if(cat.type==="items"){s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok")waIssues.push(`• ${cat.itemLabels[i]}: ${st==="partial"?"Parcial":"Inop"}`);});}else if(cat.type==="count"){const inopN=s.inoperative?.length??0;if(inopN>0)waIssues.push(`• ${cat.label}: ${inopN} inop`);}}
+    for(const cat of project.categories){const s=state[cat.id];if(!s)continue;if(cat.type==="single"){const st=resolveStatus(s);if(st!=="ok")waIssues.push(`• ${cat.label}: ${st==="partial"?"Parcial":"Inop"}`);}else if(cat.type==="items"){s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok")waIssues.push(`• ${cat.itemLabels[i]}: ${st==="partial"?"Parcial":"Inop"}`);});}else if(cat.type==="count"){const inopN=s.inoperative?.length??0;if(inopN>0)waIssues.push(`• ${cat.label}: ${inopN} inop`);}}
     const inopText=waIssues.length>0?`\n\n*Itens com problema:*\n${waIssues.slice(0,10).join("\n")}${waIssues.length>10?`\n...+${waIssues.length-10} mais`:""}`:"\n\n✅ Todos os itens operando normalmente.";
     const msg=encodeURIComponent(`*[${project.id}] MokLog CheckTest – ${fmtDate(meta.date)}*\n📍 ${project.name}\n📊 Saúde: *${h.pct}%* | ✅ ${h.ok} OK | ⚠️ ${h.partial} Parcial | 🔴 ${h.inop} Inop\n👤 Líder: ${meta.leader||"—"} · CCO: ${meta.cco||"—"}\n✍️ Assinatura: ${meta.signature||"—"}`+inopText+`\n\n🔗 https://moklog-checktest.vercel.app\n_MokLog CheckTest © Moked Security_`);
     window.open(`https://wa.me/?text=${msg}`,"_blank");
@@ -2180,7 +2195,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
     setSending(true);
     const h=computeHealth(project,state);
     const issues=[];
-    for(const cat of project.categories){const s=state[cat.id];if(!s)continue;if(cat.type==="single"){const st=s.status??(s.ok===false?"inop":"ok");if(st!=="ok")issues.push(`  • ${cat.label}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`- ${s.note}`:""}`);}else if(cat.type==="items"){s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok")issues.push(`  • ${cat.label} / ${cat.itemLabels[i]}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`- ${v.note}`:""}`);});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push(`  • ${cat.label} [${it.id||"?"}]${it.since?` desde ${fmtDate(it.since)}`:""} ${it.note?`- ${it.note}`:""}`));}}
+    for(const cat of project.categories){const s=state[cat.id];if(!s)continue;if(cat.type==="single"){const st=resolveStatus(s);if(st!=="ok")issues.push(`  • ${cat.label}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`- ${s.note}`:""}`);}else if(cat.type==="items"){s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok")issues.push(`  • ${cat.label} / ${cat.itemLabels[i]}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`- ${v.note}`:""}`);});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push(`  • ${cat.label} [${it.id||"?"}]${it.since?` desde ${fmtDate(it.since)}`:""} ${it.note?`- ${it.note}`:""}`));}}
     const msg=[`================================================`,"  MOKLOG CHECKTEST - RELATORIO DE TESTE SEMANAL","================================================",`Projeto  : ${project.id} - ${project.name}`,`Data     : ${fmtDate(meta.date)}`,`Lider    : ${meta.leader||"--"}`,`CCO      : ${meta.cco||"--"}`,`Assinatura: ${meta.signature||"--"}`,`Saude: ${h.pct}% | OK: ${h.ok} | Parcial: ${h.partial} | Inop: ${h.inop}`,issues.length>0?`\nProblemas:\n${issues.join("\n")}`:"Todos OK","\nhttps://moklog-checktest.vercel.app","================================================"].join("\n");
     const success=await sendEmailJS(subject,msg,`MokLog CheckTest – ${project.id}`);
     setSending(false);
@@ -2252,7 +2267,7 @@ function ViewScreen({projectId, token, stored}) {
   if(!last) return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>📭</div><div style={{fontSize:16,color:"#f1f5f9"}}>Sem relatorios disponíveis ainda.</div></div></div>);
   const h = computeHealth(project, last.state);
   const issues = [];
-  for(const cat of project.categories){const s=last.state[cat.id];if(!s)continue;if(cat.type==="single"){const st=s.status??(s.ok===false?"inop":"ok");if(st!=="ok")issues.push({cat:cat.label,item:"—",status:st,since:s.since,note:s.note});}else if(cat.type==="items"){s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok")issues.push({cat:cat.label,item:cat.itemLabels[i],status:st,since:v.since,note:v.note});});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push({cat:cat.label,item:it.id||"?",status:"inop",since:it.since,note:it.note}));}}
+  for(const cat of project.categories){const s=last.state[cat.id];if(!s)continue;if(cat.type==="single"){const st=resolveStatus(s);if(st!=="ok")issues.push({cat:cat.label,item:"—",status:st,since:s.since,note:s.note});}else if(cat.type==="items"){s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok")issues.push({cat:cat.label,item:cat.itemLabels[i],status:st,since:v.since,note:v.note});});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push({cat:cat.label,item:it.id||"?",status:"inop",since:it.since,note:it.note}));}}
   return(
     <div style={S.page}>
       <div style={S.formWrap}>
@@ -3378,10 +3393,10 @@ export default function App(){
       for(const cat of project.categories){
         const s=state[cat.id]; if(!s) continue;
         if(cat.type==="single"){
-          const st=s.status??(s.ok===false?"inop":"ok");
+          const st=resolveStatus(s);
           if(st!=="ok"&&isBadNote(s.note)) missing.push(`Corrija a descrição de "${cat.label}" — não pode ser só "inoperante" ou "parcial"`);
         } else if(cat.type==="items"){
-          s.forEach((v,i)=>{const st=v.status??(v.ok===false?"inop":"ok");if(st!=="ok"&&isBadNote(v.note)) missing.push(`Corrija a descrição de "${cat.itemLabels[i]}" (${cat.label}) — não pode ser só "inoperante" ou "parcial"`);});
+          s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok"&&isBadNote(v.note)) missing.push(`Corrija a descrição de "${cat.itemLabels[i]}" (${cat.label}) — não pode ser só "inoperante" ou "parcial"`);});
         } else if(cat.type==="count"){
           (s.inoperative??[]).forEach(it=>{if(isBadNote(it.note)) missing.push(`Corrija a descrição do item "${it.id||"sem ID"}" (${cat.label}) — não pode ser só "inoperante" ou "parcial"`);});
         }
@@ -3704,7 +3719,7 @@ export default function App(){
             while(sv.length<cat.itemLabels.length) sv.push({status:"ok",note:"",since:""});
           }
           let cp=100;
-          if(cat.type==="single"){const st=sv?.status??(sv?.ok===false?"inop":"ok");cp=st==="ok"?100:st==="partial"?50:0;}
+          if(cat.type==="single"){const st=resolveStatus(sv);cp=st==="ok"?100:st==="partial"?50:0;}
           else if(cat.type==="items"){const a=sv||[];const okN=a.filter(v=>(v.status??"ok")==="ok").length;const partN=a.filter(v=>v.status==="partial").length;cp=calcPct(okN+(partN*0.5|0),a.length);}
           else if(cat.type==="count"){const t=sv?.total??cat.total;cp=calcPct(t-(sv?.inoperative?.length??0),t);}
           else cp=100;
