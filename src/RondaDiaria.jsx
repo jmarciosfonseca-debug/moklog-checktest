@@ -325,7 +325,9 @@ function montarSecaoPerimetral(project, plantoes){
   const nZonas = pts.length;
   if(!nZonas) return "";
   // Só plantões com teste perimetral feito e zonas preenchidas entram nos KPIs.
-  const testes = plantoes.filter(p=>p.perimetral?.feito && (p.perimetral.zonas||[]).length);
+  const testes = plantoes.filter(p=>p.perimetral?.feito && (p.perimetral.zonas||[]).length)
+    .slice()
+    .sort((a,b)=>(b.dataPlantao||"").localeCompare(a.dataPlantao||"")||(a.turno==="noturno"?-1:1)); // mais recente primeiro
   // agregação por índice de zona
   const porZona = Array.from({length:nZonas}).map(()=>({ok:0,parcial:0,inop:0,total:0}));
   let acionOk=0, falhas=0, totalAcion=0;
@@ -374,7 +376,7 @@ function montarSecaoPerimetral(project, plantoes){
     return `<tr><td>${fmtData(p.dataPlantao)}</td><td>${t.icon} ${t.label}</td><td>${(p.lider||"—").replace(/</g,"&lt;")}</td>${cels}</tr>`;
   }).join("");
   const thZonas=Array.from({length:nZonas}).map((_,zi)=>`<th style="text-align:center">Z${String(zi+1).padStart(2,"0")}</th>`).join("");
-  const mapaImg = MAPA_PDF[project.id] ? `<div style="position:relative;width:100%;border-radius:8px;overflow:hidden"><img src="${MAPA_PDF[project.id]}" style="width:100%;display:block"/>${markers}</div>` : "";
+  const mapaImg = MAPA_PDF[project.id] ? `<div style="text-align:center"><div style="position:relative;display:inline-block;max-width:100%;border-radius:8px;overflow:hidden"><img src="${MAPA_PDF[project.id]}" style="max-height:290px;max-width:100%;width:auto;height:auto;display:block"/>${markers}</div></div>` : "";
 
   return `<div style="page-break-inside:avoid;margin-bottom:20px">
     <h2 style="font-size:15px;margin:0 0 10px">🔒 Teste Perimetral — ${project.name||project.id}</h2>
