@@ -2975,6 +2975,7 @@ export default function App(){
   const [showConfirmModal,setShowConfirmModal]=useState(false);
   const [showMonthlyPrompt,setShowMonthlyPrompt]=useState(false);
   const [draft,setDraft]=useState(null);
+  const [avisoFotosRascunho,setAvisoFotosRascunho]=useState(0); // Bug 4: nº de fotos a reanexar
   const [showDraftPrompt,setShowDraftPrompt]=useState(false);
   const [viewParams,setViewParams]=useState(null);
   const [notifGranted,setNotifGranted]=useState(false);
@@ -3166,12 +3167,13 @@ export default function App(){
       const untouched = state===initialFormRef.current.state && meta===initialFormRef.current.meta && photos.length===0;
       if(untouched) return; // form aberto mas intocado — não cria rascunho
       try {
-        const d={projectId:project.id,state,meta,photoCount:photos.length,savedAt:Date.now()};
+        const d={projectId:project.id,state,meta,photoCount:photos.length,savedAt:Date.now(),
+          formInicioReal: formTimerRef.current || Date.now()}; // Bug 5: preserva início real do preenchimento
         localStorage.setItem("moklog_draft",JSON.stringify(d));
         setDraft({...d,photos});
       } catch(err) {
         try {
-          const d={projectId:project.id,savedAt:Date.now()};
+          const d={projectId:project.id,savedAt:Date.now(),formInicioReal: formTimerRef.current || Date.now()};
           localStorage.setItem("moklog_draft",JSON.stringify(d));
         } catch(e) {}
       }
@@ -3329,8 +3331,17 @@ export default function App(){
       }
     }
     setState(migrado);setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);
+    // Bug 5 (28/08): reconstrói o cronômetro a partir do início REAL do
+    // preenchimento (não reinicia). Fallback: savedAt, senão agora.
+    formTimerRef.current = draft.formInicioReal || draft.savedAt || Date.now();
+    setFormElapsed(Math.floor((Date.now()-formTimerRef.current)/1000));
+    // Bug 4 (decisão B): fotos NÃO são salvas no rascunho (evita estourar cota).
+    // Se o rascunho tinha fotos e elas não vieram, avisa para reanexar.
+    if((draft.photoCount||0) > 0 && (!draft.photos || draft.photos.length===0)){
+      setAvisoFotosRascunho(draft.photoCount);
+    }
   };
-  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);};
+  const discardDraft=()=>{clearDraft();setShowDraftPrompt(false);setAvisoFotosRascunho(0);const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);};
   const deleteDraftOnly=()=>{clearDraft();setShowDraftPrompt(false);}; // exclui o rascunho e fica onde está
 
   // Required fields validation
@@ -3625,6 +3636,13 @@ export default function App(){
           {health.partial>0&&<span style={{fontSize:11,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}>⚠️ {health.partial} Parcial</span>}
           {health.inop>0&&<span style={{fontSize:11,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}>🔴 {health.inop} Inop</span>}
         </div>}
+        {avisoFotosRascunho>0&&(
+          <div role="alert" style={{fontSize:12,fontWeight:700,color:"#f59e0b",background:"#f59e0b18",border:"1px solid #f59e0b55",borderRadius:10,padding:"9px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:15}}>⚠️</span>
+            <span style={{flex:1}}>Este rascunho tinha {avisoFotosRascunho} foto{avisoFotosRascunho===1?"":"s"}. As fotos não ficam salvas no rascunho — <b>reanexe antes de enviar</b>.</span>
+            <button onClick={()=>setAvisoFotosRascunho(0)} style={{background:"none",border:"none",color:"#f59e0b",fontSize:16,fontWeight:900,cursor:"pointer",padding:"0 4px"}}>×</button>
+          </div>
+        )}
         {editingIdx===null&&formTimerRef.current&&(
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"8px 12px",background:"linear-gradient(165deg,#0f172a,#060c18)",border:"1px solid #1d4ed844",borderRadius:10,marginBottom:8}}>
             <span style={{fontSize:14}}>⏱️</span>
