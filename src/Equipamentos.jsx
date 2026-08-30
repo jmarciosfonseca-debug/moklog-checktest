@@ -43,6 +43,30 @@ function fmtDate(d) {
 }
 // daysSince agora vem de ./pendencias (fonte canônica de idade de pendências)
 
+// ── Checagem semanal de Equipamentos — sempre aos domingos às 23:59 ──────
+// Espelha a doutrina do Teste Quinzenal de Iluminação: o contador NÃO avança
+// sozinho quando a data passa — trava no alvo vigente ("pendente") até a
+// equipe concluir a checagem dentro do módulo. Só então crava o próximo
+// domingo (+7 dias). Ciclo semanal, hora-limite 23:59 (fim do domingo).
+const CHK_HORA = 23, CHK_MIN = 59;
+// Parse de "YYYY-MM-DD" em data local (evita bug de fuso do toISOString).
+function chkParseISO(iso){ const [y,m,d] = String(iso).split("-").map(Number); return new Date(y, (m||1)-1, d||1); }
+// Serializa data local -> "YYYY-MM-DD" (sv-SE = ISO local, sem UTC).
+function chkISO(d){ return d.toLocaleDateString("sv-SE"); }
+// Ajusta uma data para o domingo (>=) mais próximo à frente.
+function chkAjustaDomingo(d){ const diff=(7-d.getDay())%7; if(diff!==0){ const nd=new Date(d); nd.setDate(nd.getDate()+diff); return nd; } return d; }
+// Próximo alvo a partir de uma base ISO: +7 dias, travado no domingo.
+function chkProximoAPartirDe(baseISO){ const b=chkParseISO(baseISO); b.setDate(b.getDate()+7); return chkISO(chkAjustaDomingo(b)); }
+// Alvo vigente. Se já há registro, usa o alvo salvo. Se não há (primeiro
+// ciclo do projeto), o alvo é o próximo domingo a partir de hoje.
+function chkAlvoVigente(chk){
+  if(chk && chk.alvo) return chk.alvo;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return chkISO(chkAjustaDomingo(hoje));
+}
+// Alvo como timestamp no horário-limite (23:59 do domingo-alvo).
+function chkAlvoTimestamp(alvoISO){ const d=chkParseISO(alvoISO); d.setHours(CHK_HORA,CHK_MIN,0,0); return d.getTime(); }
+
 async function loadEquip(projectId) {
   try {
     const snap = await getDoc(doc(db,"equipamentos",projectId));
@@ -730,6 +754,79 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
 }
 
 // ── App principal
+// Contador regressivo da checagem semanal — mostrado no bloco Equipamentos da
+// home. Lê checagemSemanal de equipamentos/{pid} (lazy, sem travar a home).
+// Trava no alvo às 23:59 do domingo e NÃO avança sozinho: fica "pendente" até
+// a equipe concluir a checagem no módulo. Formato Xd Xh Xmin (igual semanal).
+export function ContadorEquipamentos({ projectId }){
+  const [chk, setChk] = useState(undefined); // undefined = carregando; null = sem registro
+  const [agora, setAgora] = useState(()=>Date.now());
+  useEffect(()=>{
+    let vivo = true;
+    loadEquip(projectId).then(d=>{ if(vivo) setChk(d?.checagemSemanal||null); }).catch(()=>{ if(vivo) setChk(null); });
+    return ()=>{ vivo=false; };
+  },[projectId]);
+  useEffect(()=>{
+    const t = setInterval(()=>setAgora(Date.now()), 30000);
+    return ()=>clearInterval(t);
+  },[]);
+  if(chk===undefined) return null; // ainda carregando — não pisca
+  const alvo = chkAlvoVigente(chk);
+  const limite = chkAlvoTimestamp(alvo);
+  const diff = limite - agora;
+  if(diff <= 0){
+    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}>⚠️ Checagem pendente — concluir</div>;
+  }
+  const dias = Math.floor(diff/86400000);
+  const horas = Math.floor((diff%86400000)/3600000);
+  const minutos = Math.floor((diff%3600000)/60000);
+  return <div style={{fontSize:10,color:"#f43f5e",marginTop:3,fontWeight:700}}>⏳ {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)}</div>;
+}
+
+// Modal de conclusão da checagem semanal de equipamentos.
+function ModalChecagem({ dark, resumo, onConfirm, onCancel }){
+  const [corrigidos, setCorrigidos] = useState(null); // true/false
+  const [emAberto, setEmAberto] = useState(null);      // true/false
+  const [assinatura, setAssinatura] = useState("");
+  const podeConfirmar = corrigidos!==null && emAberto!==null && assinatura.trim().length>=3;
+  const cardBg = dark?"#0b1220":"#fff";
+  const txt = dark?"#e2e8f0":"#0f172a";
+  const txt2 = dark?"#94a3b8":"#64748b";
+  const Opt = ({ativo,cor,onClick,children})=>(
+    <button onClick={onClick} style={{flex:1,background:ativo?cor:"transparent",border:`1px solid ${ativo?cor:(dark?"#1e293b":"#cbd5e1")}`,color:ativo?"#fff":txt2,borderRadius:8,padding:"9px",fontSize:12,fontWeight:700,cursor:"pointer"}}>{children}</button>
+  );
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}}>
+      <div style={{background:cardBg,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:420,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
+        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>✓ Concluir checagem semanal</div>
+        <div style={{fontSize:12,color:txt2,marginBottom:14}}>Confirme a verificação dos equipamentos. Situação atual: <strong style={{color:txt}}>{resumo.inop} inop/crítico · {resumo.parcial} parcial · {resumo.total} itens</strong>.</div>
+
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Algum item foi corrigido/substituído nesta semana?</div>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <Opt ativo={corrigidos===true} cor="#16a34a" onClick={()=>setCorrigidos(true)}>Sim</Opt>
+          <Opt ativo={corrigidos===false} cor="#64748b" onClick={()=>setCorrigidos(false)}>Não</Opt>
+        </div>
+
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Ainda há itens em aberto (quebrados)?</div>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <Opt ativo={emAberto===true} cor="#dc2626" onClick={()=>setEmAberto(true)}>Sim</Opt>
+          <Opt ativo={emAberto===false} cor="#16a34a" onClick={()=>setEmAberto(false)}>Não</Opt>
+        </div>
+
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Responsável pela checagem</div>
+        <input value={assinatura} onChange={e=>setAssinatura(e.target.value)} placeholder="Nome de quem verificou"
+          style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px 11px",fontSize:13,color:txt,marginBottom:16,boxSizing:"border-box"}}/>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+          <button disabled={!podeConfirmar} onClick={()=>podeConfirmar&&onConfirm({corrigidos,emAberto,assinatura:assinatura.trim()})}
+            style={{flex:1,background:podeConfirmar?"linear-gradient(135deg,#16a34a,#15803d)":"#1e293b",border:"none",color:podeConfirmar?"#fff":"#475569",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:podeConfirmar?"pointer":"not-allowed",opacity:podeConfirmar?1:.6}}>Concluir checagem</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Equipamentos({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
   const S = getStyles(dark);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
@@ -737,6 +834,9 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showChecagem, setShowChecagem] = useState(false);
+  const [agoraChk, setAgoraChk] = useState(()=>Date.now());
+  useEffect(()=>{ const t=setInterval(()=>setAgoraChk(Date.now()),30000); return ()=>clearInterval(t); },[]);
 
   const adminAuth = authLevel==="admin";
   const liderAuth = authLevel==="lider" || authLevel==="admin";
@@ -751,6 +851,23 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
     setData(updated);
     await saveEquip(project.id, updated);
     setSaving(false);
+  };
+
+  // Conclui a checagem semanal: registra assinatura/resultado e crava o próximo
+  // domingo. Aditivo — só grava o campo checagemSemanal, sem tocar no inventário.
+  const concluirChecagem = async ({corrigidos,emAberto,assinatura}) => {
+    setSaving(true);
+    const alvoVigente = chkAlvoVigente(data.checagemSemanal);
+    const novoChk = {
+      alvo: chkProximoAPartirDe(alvoVigente),
+      ultimaChecagem: todayStr(),
+      ultimoResultado: { corrigidos:!!corrigidos, emAberto:!!emAberto, por:assinatura, em:new Date().toISOString() }
+    };
+    const updated = {...data, checagemSemanal: novoChk};
+    setData(updated);
+    await saveEquip(project.id, updated);
+    setSaving(false);
+    setShowChecagem(false);
   };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("main");onAuthGranted?.(l);}}/>;
@@ -819,6 +936,44 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
             </div>
           )}
 
+          {/* Painel de checagem semanal */}
+          {(()=>{
+            const chk = data.checagemSemanal||null;
+            const alvo = chkAlvoVigente(chk);
+            const limite = chkAlvoTimestamp(alvo);
+            const diff = limite - agoraChk;
+            const pendente = diff <= 0;
+            const dias = Math.floor(Math.max(0,diff)/86400000);
+            const horas = Math.floor((Math.max(0,diff)%86400000)/3600000);
+            const minutos = Math.floor((Math.max(0,diff)%3600000)/60000);
+            const cor = pendente ? "#ef4444" : "#f43f5e";
+            const bg  = pendente ? "#1a0202" : (dark?"#16060a":"#fff1f2");
+            return (
+              <div style={{background:bg,border:`1px solid ${cor}44`,borderRadius:12,padding:"12px 14px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:180}}>
+                    <div style={{fontSize:13,fontWeight:800,color:cor}}>🗓️ Checagem semanal de equipamentos</div>
+                    {pendente ? (
+                      <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginTop:3}}>⚠️ Pendente — verifique os itens e conclua a checagem.</div>
+                    ) : (
+                      <div style={{fontSize:11,...S.txt2,fontWeight:600,marginTop:3}}>⏳ {dias}d {horas}h {minutos}min · próximo domingo {fmtDate(alvo)} · 23:59</div>
+                    )}
+                    {chk?.ultimaChecagem && (
+                      <div style={{fontSize:10,...S.txt2,marginTop:3}}>
+                        Última: {fmtDate(chk.ultimaChecagem)}{chk.ultimoResultado?.por?` · por ${chk.ultimoResultado.por}`:""}
+                        {chk.ultimoResultado ? ` · ${chk.ultimoResultado.emAberto?"itens em aberto":"nada em aberto"}` : ""}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={()=>setShowChecagem(true)}
+                    style={{background:pendente?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)",border:"none",color:"#fff",borderRadius:8,padding:"9px 16px",fontSize:12,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    ✓ Concluir checagem
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Seções */}
           <SecaoItens titulo="Smartphones" icon="📱" tipo="smartphones"
             items={data.smartphones||[]} project={project}
@@ -861,6 +1016,15 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
             onUpdate={v=>saveSection("moto",v)} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}/>
         </div>
       </div>
+
+      {showChecagem && (
+        <ModalChecagem
+          dark={dark}
+          resumo={{inop, parcial, total:allItems.length}}
+          onConfirm={concluirChecagem}
+          onCancel={()=>setShowChecagem(false)}
+        />
+      )}
     </div>
   );
 }
