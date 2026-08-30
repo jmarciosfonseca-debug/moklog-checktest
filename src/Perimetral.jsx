@@ -294,6 +294,10 @@ function gerarPDFTeste(teste, allTestes, project, pcfg, incluirRondas=true, incl
   .map-wrap{position:relative;width:100%;border-radius:8px;overflow:hidden}
   .map-wrap img{width:100%;display:block;filter:brightness(.82)}
   .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid}
+  .section{page-break-inside:auto}
+  table,p,div{orphans:3;widows:3}
   @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
 </style></head>
 <body>
@@ -479,7 +483,9 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false
   .footer{text-align:center;margin-top:10px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
   thead{display:table-header-group}
   tr{page-break-inside:avoid}
-  @media print{body{padding:6px}@page{margin:8mm;size:A4 landscape}.no-print{display:none}.section{margin-bottom:8px;padding:10px 12px;page-break-inside:auto}.grid-2 .section{page-break-inside:avoid}.kpis{margin-bottom:8px}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+  .grid-2{page-break-inside:avoid;page-break-after:avoid}
+  table,p,div{orphans:3;widows:3}
+  @media print{body{padding:6px}@page{margin:8mm;size:A4 landscape}.no-print{display:none}.section{margin-bottom:8px;padding:10px 12px;page-break-inside:auto}.grid-2{page-break-inside:avoid}.grid-2 .section{page-break-inside:avoid}.kpis{margin-bottom:8px;page-break-inside:avoid}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
 </style></head>
 <body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">

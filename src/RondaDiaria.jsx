@@ -378,7 +378,8 @@ function montarSecaoPerimetral(project, plantoes){
   const thZonas=Array.from({length:nZonas}).map((_,zi)=>`<th style="text-align:center">Z${String(zi+1).padStart(2,"0")}</th>`).join("");
   const mapaImg = MAPA_PDF[project.id] ? `<div style="text-align:center"><div style="position:relative;display:inline-block;max-width:100%;border-radius:8px;overflow:hidden"><img src="${MAPA_PDF[project.id]}" style="max-height:290px;max-width:100%;width:auto;height:auto;display:block"/>${markers}</div></div>` : "";
 
-  return `<div style="page-break-inside:avoid;margin-bottom:20px">
+  return `<div style="margin-bottom:20px">
+    <div class="perim-head">
     <h2 style="font-size:15px;margin:0 0 10px">🔒 Teste Perimetral — ${project.name||project.id}</h2>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi"><div class="kpi-val" style="color:#16a34a">${taxaOk}%</div><div class="kpi-lbl">Taxa OK</div></div>
@@ -389,6 +390,7 @@ function montarSecaoPerimetral(project, plantoes){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div>${mapaImg}</div>
       <div><table style="font-size:11px">${barras}</table></div>
+    </div>
     </div>
     ${testes.length?`<table><thead><tr><th>Data</th><th>Turno</th><th>Responsável</th>${thZonas}</tr></thead><tbody>${linhasTeste}</tbody></table>
     <div style="font-size:10px;color:#64748b;margin-top:6px">✓ = OK · ~ = Parcial · ✗ = Inoperante</div>`:'<div style="font-size:12px;color:#94a3b8;text-align:center;padding:14px">Nenhum teste perimetral com zonas detalhadas no período.</div>'}
@@ -441,7 +443,8 @@ function gerarPdfConsolidado(project, plantoes, modo="ambos"){
   .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
   .kpi-val{font-size:22px;font-weight:900}
   .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-  .plantao{margin-top:18px;page-break-inside:avoid}
+  .plantao{margin-top:18px;page-break-inside:auto}
+  .plantao-head{page-break-inside:avoid;page-break-after:avoid}
   .plantao-head{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px}
   .badge{font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px}
   .badge.ok{color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0}
@@ -450,7 +453,11 @@ function gerarPdfConsolidado(project, plantoes, modo="ambos"){
   th{background:#1e293b;color:#fff;padding:6px 9px;text-align:left;font-size:10px}
   td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
   .footer{text-align:center;margin-top:20px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+  thead{display:table-header-group}
+  tr{page-break-inside:avoid}
+  .perim-head{page-break-inside:avoid;page-break-after:avoid}
+  table,p,div{orphans:3;widows:3}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}.plantao{page-break-inside:auto}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
 </style></head>
 <body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
