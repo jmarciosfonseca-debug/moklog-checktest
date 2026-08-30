@@ -331,7 +331,7 @@ const PROJECTS = {
       {id:"semaforos",label:"22 - SEM\u00c1FOROS",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
       {id:"sensores",label:"23 - SENSORES ANTI-ESMAGAMENTO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
       {id:"telefone",label:"24 - TELEFONE CCO",type:"items",itemLabels:["CCO"]},
-      {id:"torniquetes",label:"25 - TORNIQUETES / QR CODE",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},
+      {id:"torniquetes",label:"25 - TORNIQUETES / QR CODE",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02","Entrada 03","Sa\u00edda 03","Entrada 04","Sa\u00edda 04"]},
       {id:"totem_mot",label:"26 - TOTEM MOTORISTA",type:"items",itemLabels:["Totem 01"]},
       {id:"totem_vis",label:"27 - TOTEM VISITANTES",type:"items",itemLabels:["Totem 01"]},
       {id:"manutencao",label:"28 - VISITA DE MANUTEN\u00c7\u00c3O",type:"maintenance"},
