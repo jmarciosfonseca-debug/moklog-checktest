@@ -299,8 +299,8 @@ function gerarPDFTeste(teste, allTestes, project, pcfg, incluirRondas=true, incl
   .info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
   .info-item label{font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;display:block;margin-bottom:2px}
   .info-item span{font-size:13px;font-weight:700}
-  .map-wrap{position:relative;width:100%;border-radius:8px;overflow:hidden}
-  .map-wrap img{width:100%;display:block;filter:brightness(.82)}
+  .map-wrap{position:relative;width:100%;max-width:400px;margin:0 auto;border-radius:8px;overflow:hidden}
+  .map-wrap img{width:100%;height:auto;display:block;filter:brightness(.82)}
   .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
   thead{display:table-header-group}
   tr{page-break-inside:avoid}
@@ -342,7 +342,7 @@ ${incluirPerim?`<div class="kpis">
 </div>
 
 <!-- MAPA PERIMETRAL -->
-${pcfg.mapaB64?`<div class="section">
+${pcfg.mapaB64?`<div class="section" style="page-break-inside:avoid">
   <div class="section-title">Mapa Perimetral</div>
   <div class="map-wrap">
     <img src="data:image/jpeg;base64,${pcfg.mapaB64}" alt="Mapa ${project.id}"/>
@@ -945,8 +945,11 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
   // ── FORMULÁRIO
   if(screen==="form"&&form) {
-    const colabs = equipe.filter(c=>c.status==="ativo"&&(c.turno===form.turno||c.cargo?.toLowerCase().includes("líder")||c.cargo?.toLowerCase().includes("lider")));
-    const ccos = equipe.filter(c=>c.status==="ativo"&&(c.cargo?.toLowerCase().includes("cco")||c.cargo?.toLowerCase().includes("central")||c.turno===form.turno));
+    const colabs = colabsRonda; // todos os vigilantes ativos (exceto porteiro/CDA/CCO), ordenados por nome
+    const ccos = equipe
+      .filter(c=>(c.status||"ativo")==="ativo" && (c.nome||"").trim())
+      .filter(c=>{ const cg=normP(c.cargo); return ["porteiro","cco","central","cda"].some(x=>cg.includes(x)); })
+      .sort((a,b)=>normP(a.nome).localeCompare(normP(b.nome)));
     return (
       <div style={S.page}>
         <div style={S.wrap}>
@@ -999,7 +1002,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 <label style={S.lbl}>Realizou o Teste *</label>
                 {colabs.length>0?(
                   <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                    {colabs.slice(0,6).map(c=>(
+                    {colabs.map(c=>(
                       <button key={c.id} onClick={()=>setForm(f=>({...f,quemFez:c.nome,quemFezId:c.id}))}
                         style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,background:form.quemFezId===c.id?dark?"#001a2e":"#e0f2fe":"transparent",border:`1px solid ${form.quemFezId===c.id?"#0ea5e944":dark?"#0f172a":"#e2e8f0"}`,cursor:"pointer",textAlign:"left"}}>
                         <div style={{width:30,height:30,borderRadius:8,overflow:"hidden",flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
@@ -1026,7 +1029,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 <label style={S.lbl}>Acompanhou na Central</label>
                 {ccos.length>0?(
                   <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                    {ccos.slice(0,4).map(c=>(
+                    {ccos.map(c=>(
                       <button key={c.id} onClick={()=>setForm(f=>({...f,centralAcompanhou:c.nome,centralId:c.id}))}
                         style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",borderRadius:8,background:form.centralId===c.id?dark?"#021a0d":"#dcfce7":"transparent",border:`1px solid ${form.centralId===c.id?"#22c55e44":dark?"#0f172a":"#e2e8f0"}`,cursor:"pointer",textAlign:"left"}}>
                         <div style={{width:28,height:28,borderRadius:7,overflow:"hidden",flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
