@@ -99,7 +99,8 @@ function horaLocalParaIso(horaHHMM, isoBase){
 function fmtDiaMes(iso){ if(!iso) return {d:"—",m:""}; try { const d=new Date(iso); return { d: pad2(d.getDate()), m: d.toLocaleDateString("pt-BR",{month:"short"}).replace(".","") }; } catch { return {d:"—",m:""}; } }
 function turnoAgora(){ const h=new Date().getHours(); return (h>=6&&h<18) ? "Diurno" : "Noturno"; }
 function duracaoFmt(msIni, msFim){
-  const diff = Math.max(0, msFim-msIni);
+  const toMs = (x)=> x==null ? Date.now() : (typeof x==="number" ? x : (x instanceof Date ? x.getTime() : new Date(x).getTime()));
+  const diff = Math.max(0, toMs(msFim)-toMs(msIni));
   const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000);
   return `${h}h ${pad2(m)}min`;
 }
@@ -558,7 +559,7 @@ function DieselFluxo({ aberto, agora, dark, fornSel, setFornSel, onContato, onEn
             <div style={{background:dark?"#1a1000":"#fffbeb",border:`1px solid ${dark?"#7a5c1a":"#fde68a"}`,borderRadius:10,padding:10,marginTop:8,textAlign:"center"}}>
               <div style={{fontSize:9.5,color:COR.amber,textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>⏱️ Tempo de resposta (contato → chegada)</div>
               <div style={{fontSize:22,fontWeight:900,color:COR.amber,fontVariantNumeric:"tabular-nums"}}>
-                {dieselFmtDur(d.contatoEfetuadoEm, passo2Feito?new Date(d.entregaChegouEm).getTime():agora.getTime())}
+                {dieselFmtDur(d.contatoEfetuadoEm, passo2Feito?new Date(d.entregaChegouEm).getTime():agora)}
               </div>
             </div>
             {passo2Feito ? (
