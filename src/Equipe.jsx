@@ -615,9 +615,10 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
 
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
           {/* Banner afastamento indeterminado */}
-          {colab.afastamentoAberto && (()=>{
+          {(colab.afastamentoAberto || (colab.historico||[]).some(h=>h.emAberto)) && (()=>{
             // Busca robusta: aceita o registro pelo id do afastamentoAberto mesmo
-            // que o campo emAberto tenha sido perdido/gravado diferente.
+            // que o campo emAberto tenha sido perdido/gravado diferente, e também
+            // detecta afastamentos legados que só têm emAberto sem afastamentoAberto.
             const entry=(colab.historico||[]).find(h=>h.id===colab.afastamentoAberto)
                      || (colab.historico||[]).find(h=>h.emAberto);
             if(!entry) {
@@ -650,13 +651,16 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
                   <button onClick={()=>{
                     const retorno=todayStr();
                     const totalDias=Math.floor((new Date(retorno+"T12:00:00").getTime()-new Date(entry.data+"T12:00:00").getTime())/86400000);
-                    const newHist=(colab.historico||[]).map(h=>h.id===entry.id?{
-                      ...h,
-                      emAberto:false,
-                      dataRetorno:retorno,
-                      diasAfastado:totalDias,
-                      label:`Afastamento encerrado — ${totalDias} dia(s) · ${fmtDate(entry.data)} a ${fmtDate(retorno)}`
-                    }:h);
+                    // Encerra o registro-alvo E qualquer outro que tenha ficado
+                    // preso como emAberto (dados legados), para não sobrar resquício.
+                    const newHist=(colab.historico||[]).map(h=>{
+                      if(h.id===entry.id) return {
+                        ...h, emAberto:false, dataRetorno:retorno, diasAfastado:totalDias,
+                        label:`Afastamento encerrado — ${totalDias} dia(s) · ${fmtDate(entry.data)} a ${fmtDate(retorno)}`
+                      };
+                      if(h.emAberto) return {...h, emAberto:false, dataRetorno:retorno};
+                      return h;
+                    });
                     const newColab={...colab,historico:newHist,afastamentoAberto:null};
                     const newColabs=equipeData.colaboradores.map(c=>c.id===colab.id?newColab:c);
                     setSelColab(newColab);
