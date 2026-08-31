@@ -554,7 +554,7 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 }
 
 // ── Tela de ficha completa
-function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, dark }) {
+function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -629,12 +629,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
               return(
                 <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:4}}>
                   <div style={{fontSize:11,color:"#94a3b8"}}>Afastamento marcado como aberto, mas sem registro correspondente.</div>
-                  <button onClick={()=>{
-                    const newColab={...colab,afastamentoAberto:null};
-                    const newColabs=equipeData.colaboradores.map(c=>c.id===colab.id?newColab:c);
-                    setSelColab(newColab);
-                    save({...equipeData,colaboradores:newColabs});
-                  }} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
+                  <button onClick={()=>onEncerrarAfast&&onEncerrarAfast(null)} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
                     ✓ Encerrar
                   </button>
                 </div>
@@ -648,24 +643,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
                   <div style={{fontSize:11,color:"#94a3b8"}}>Desde {fmtDate(entry.data)} · {dias} dia(s) em aberto</div>
                 </div>
                 {adminAuth&&(
-                  <button onClick={()=>{
-                    const retorno=todayStr();
-                    const totalDias=Math.floor((new Date(retorno+"T12:00:00").getTime()-new Date(entry.data+"T12:00:00").getTime())/86400000);
-                    // Encerra o registro-alvo E qualquer outro que tenha ficado
-                    // preso como emAberto (dados legados), para não sobrar resquício.
-                    const newHist=(colab.historico||[]).map(h=>{
-                      if(h.id===entry.id) return {
-                        ...h, emAberto:false, dataRetorno:retorno, diasAfastado:totalDias,
-                        label:`Afastamento encerrado — ${totalDias} dia(s) · ${fmtDate(entry.data)} a ${fmtDate(retorno)}`
-                      };
-                      if(h.emAberto) return {...h, emAberto:false, dataRetorno:retorno};
-                      return h;
-                    });
-                    const newColab={...colab,historico:newHist,afastamentoAberto:null};
-                    const newColabs=equipeData.colaboradores.map(c=>c.id===colab.id?newColab:c);
-                    setSelColab(newColab);
-                    save({...equipeData,colaboradores:newColabs});
-                  }} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
+                  <button onClick={()=>onEncerrarAfast&&onEncerrarAfast(entry)} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
                     ✓ Encerrar
                   </button>
                 )}
@@ -901,6 +879,44 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
 }
 
 // ── Tela adicionar histórico (líder ou admin)
+// ── Modal: encerrar afastamento informando a data real de retorno
+function EncerrarAfastModal({ colab, entry, dark, onConfirm, onCancel }) {
+  const S = getStyles(dark);
+  const [dataRetorno, setDataRetorno] = useState(todayStr());
+  const inicio = entry?.data;
+  // Prévia de dias contabilizados
+  let previa = null;
+  if(inicio && dataRetorno){
+    const p = (d)=>{ const s=String(d); if(/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s.slice(0,10)+"T12:00:00"); const b=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if(b) return new Date(`${b[3]}-${b[2]}-${b[1]}T12:00:00`); const x=new Date(s); return isNaN(x)?null:x; };
+    const i=p(inicio), f=p(dataRetorno);
+    if(i&&f) previa = Math.max(1, Math.floor((f.getTime()-i.getTime())/86400000)+1);
+  }
+  const valido = !!dataRetorno;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
+      <div style={{background:dark?"#0b1220":"#fff",borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:400,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
+        <div style={{fontSize:16,fontWeight:800,...S.txtPrimary,marginBottom:4}}>✓ Encerrar afastamento</div>
+        <div style={{fontSize:12,...S.txtSecondary,marginBottom:14}}>
+          {colab?.nome}{inicio?` · afastado desde ${fmtDate(inicio)}`:""}
+        </div>
+        <label style={S.lbl}>Data real de retorno</label>
+        <input type="date" value={dataRetorno} onChange={e=>setDataRetorno(e.target.value)}
+          style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px 11px",fontSize:14,...S.txtPrimary,marginBottom:12,boxSizing:"border-box"}}/>
+        {previa!=null && (
+          <div style={{fontSize:12,color:"#f59e0b",fontWeight:700,marginBottom:14}}>
+            Será contabilizado como {previa} dia(s) de falta no histórico.
+          </div>
+        )}
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,...S.txtSecondary,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+          <button disabled={!valido} onClick={()=>valido&&onConfirm(dataRetorno)}
+            style={{flex:1,background:valido?"linear-gradient(135deg,#16a34a,#15803d)":"#1e293b",border:"none",color:valido?"#fff":"#475569",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:valido?"pointer":"not-allowed"}}>Encerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, onCancel, dark }) {
   const S = getStyles(dark);
   const hc = HIST_COLORS[histForm.tipo] || HIST_COLORS["Medida Disciplinar"];
@@ -1433,6 +1449,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [pdfComDesligados, setPdfComDesligados] = useState(false); // incluir desligados no PDF
   const [modoSel, setModoSel] = useState(false); // modo seleção PDF
   const [editHistItem, setEditHistItem] = useState(null); // item do histórico em edição
+  const [encerrarModal, setEncerrarModal] = useState(null); // {entry} quando encerrando afastamento
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [darkLocal, setDarkLocal] = useState(true);
@@ -1583,6 +1600,44 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setScreen("view");
   };
 
+  // Encerra afastamento com data real de retorno informada pelo gerencial.
+  // Robusto: parseia data em qualquer formato (ISO, ISO+T, dd/mm/yyyy) e
+  // contabiliza o período como dias de falta. Limpa todos os emAberto presos.
+  const encerrarAfastamento = async (colabId, entryId, dataRetorno) => {
+    const parseData = (d) => {
+      if(!d) return null;
+      const s = String(d);
+      if(/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s.slice(0,10)+"T12:00:00");
+      const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if(br) return new Date(`${br[3]}-${br[2]}-${br[1]}T12:00:00`);
+      const dt = new Date(s); return isNaN(dt)?null:dt;
+    };
+    const c0 = equipeData.colaboradores.find(c=>c.id===colabId);
+    if(!c0) return;
+    const entry = (c0.historico||[]).find(h=>h.id===entryId) || (c0.historico||[]).find(h=>h.emAberto);
+    const ini = entry ? parseData(entry.data) : null;
+    const fim = parseData(dataRetorno) || new Date();
+    const totalDias = ini ? Math.max(1, Math.floor((fim.getTime()-ini.getTime())/86400000)+1) : null;
+    const retornoISO = fim.toLocaleDateString("sv-SE");
+    const newColabs = equipeData.colaboradores.map(c=>{
+      if(c.id!==colabId) return c;
+      const newHist = (c.historico||[]).map(h=>{
+        if(entry && h.id===entry.id) return {
+          ...h, emAberto:false, dataRetorno:retornoISO, diasAfastado:totalDias,
+          diasFalta: totalDias!=null ? totalDias : h.diasFalta,
+          label:`Afastamento — ${totalDias!=null?totalDias+" dia(s) · ":""}${fmtDate(h.data)} a ${fmtDate(retornoISO)}`
+        };
+        if(h.emAberto) return {...h, emAberto:false, dataRetorno:retornoISO};
+        return h;
+      });
+      return {...c, historico:newHist, afastamentoAberto:null};
+    });
+    const updated = {...equipeData, colaboradores:newColabs};
+    await save(updated);
+    setSelColab(newColabs.find(c=>c.id===colabId));
+    setEncerrarModal(null);
+  };
+
   const removeHist = async (colabId, histId) => {
     if(!adminAuth && !liderAuth) return;
     // Medida Disciplinar (advertência/suspensão) só o gerencial pode excluir.
@@ -1713,13 +1768,25 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   if(screen==="view"&&selColab) {
     const colab = equipeData.colaboradores.find(c=>c.id===selColab.id) || selColab;
     return (
+      <>
       <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
         onEditHist={(colabId, item)=>{setEditHistItem(item);setScreen("editHist");}}
         onDesligar={desligarColab}
-        onRemoveHist={removeHist}/>
+        onRemoveHist={removeHist}
+        onEncerrarAfast={(entry)=>setEncerrarModal({entry})}/>
+      {encerrarModal && (
+        <EncerrarAfastModal
+          colab={colab}
+          entry={encerrarModal.entry}
+          dark={dark}
+          onCancel={()=>setEncerrarModal(null)}
+          onConfirm={(dataRetorno)=>encerrarAfastamento(colab.id, encerrarModal.entry?.id, dataRetorno)}
+        />
+      )}
+      </>
     );
   }
 
