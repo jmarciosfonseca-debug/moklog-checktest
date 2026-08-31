@@ -103,6 +103,57 @@ function fmtDate(d) {
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
 }
 
+// ── Checagem de equipe no fim de semana ──────────────────────────────────
+// Janela abre sábado 00:00 e fecha domingo 23:59. Cada líder de plantão
+// assina a checagem da SUA equipe. Nº de check-ins depende da escala
+// predominante do projeto: 12x36 → 4 (sáb-dia, sáb-noite, dom-dia, dom-noite);
+// 4x2 (P505/Jatinox) → 3 (líder pode estar de folga). Espelha a doutrina dos
+// demais contadores: trava no alvo e não avança sozinho até concluir.
+const CHK_EQUIPE_4X2 = ["P505","P260A","P260B","P260C"]; // 3 check-ins
+function chkEqParseISO(iso){ const [y,m,d]=String(iso).split("-").map(Number); return new Date(y,(m||1)-1,d||1); }
+function chkEqISO(d){ return d.toLocaleDateString("sv-SE"); }
+// Sábado (>=) mais próximo à frente de uma data.
+function chkEqProxSabado(d){ const diff=(6-d.getDay()+7)%7; const nd=new Date(d); nd.setDate(nd.getDate()+diff); return nd; }
+// Nº de check-ins exigidos conforme a escala predominante do projeto.
+function chkEqNumCheckins(projectId, colaboradores){
+  if(CHK_EQUIPE_4X2.includes(projectId)) return 3;
+  // Se a maioria dos ativos é 4x2, também usa 3.
+  const ativos=(colaboradores||[]).filter(c=>(c.status||"ativo")==="ativo");
+  const n4x2=ativos.filter(c=>String(c.escala||"").includes("4x2")).length;
+  if(ativos.length>0 && n4x2/ativos.length>=0.5) return 3;
+  return 4;
+}
+// Slots nomeados (para 12x36). Para 4x2 usamos rótulos genéricos.
+const CHK_EQ_SLOTS_12x36 = [
+  { id:"sab_diurno",  label:"Sábado · Diurno",  turno:"Diurno"  },
+  { id:"sab_noturno", label:"Sábado · Noturno", turno:"Noturno" },
+  { id:"dom_diurno",  label:"Domingo · Diurno",  turno:"Diurno"  },
+  { id:"dom_noturno", label:"Domingo · Noturno", turno:"Noturno" },
+];
+const CHK_EQ_SLOTS_4x2 = [
+  { id:"check_1", label:"Check-in 1", turno:null },
+  { id:"check_2", label:"Check-in 2", turno:null },
+  { id:"check_3", label:"Check-in 3", turno:null },
+];
+function chkEqSlots(numCheckins){ return numCheckins===3 ? CHK_EQ_SLOTS_4x2 : CHK_EQ_SLOTS_12x36; }
+// Alvo vigente = sábado da semana corrente (ou próximo). Janela cobre sáb+dom.
+function chkEqAlvoVigente(chk){
+  if(chk && chk.alvo) return chk.alvo;
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  // Se hoje é sáb/dom, o alvo é o sábado desta semana; senão o próximo sábado.
+  const dia=hoje.getDay();
+  let base;
+  if(dia===6) base=hoje;                        // sábado
+  else if(dia===0){ base=new Date(hoje); base.setDate(base.getDate()-1); } // domingo → sábado
+  else base=chkEqProxSabado(hoje);
+  return chkEqISO(base);
+}
+// Fim da janela = domingo 23:59 (sábado-alvo + 1 dia).
+function chkEqFimTimestamp(alvoSabISO){ const d=chkEqParseISO(alvoSabISO); d.setDate(d.getDate()+1); d.setHours(23,59,0,0); return d.getTime(); }
+// Próximo alvo após concluir: sábado seguinte (+7 dias).
+function chkEqProximo(alvoSabISO){ const d=chkEqParseISO(alvoSabISO); d.setDate(d.getDate()+7); return chkEqISO(d); }
+
+
 async function loadEquipe(projectId) {
   // Always try Firebase first (source of truth)
   try {
@@ -562,6 +613,48 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
   const mds     = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
   const ferias  = (colab.historico||[]).filter(h=>h.tipo==="Férias").length;
   const treinos = (colab.historico||[]).filter(h=>h.tipo==="Treinamento").length;
+
+  // ── Métricas derivadas ────────────────────────────────────────────────
+  const parseDataFicha = (d) => {
+    if(!d) return null;
+    const s = String(d);
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s.slice(0,10)+"T12:00:00");
+    const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    if(br) return new Date(`${br[3]}-${br[2]}-${br[1]}T12:00:00`);
+    const dt = new Date(s); return isNaN(dt)?null:dt;
+  };
+  const hojeF = new Date();
+  // Dias afastados acumulados (soma diasFalta/diasAfastado de registros de Falta)
+  const diasAfastadosTotal = (colab.historico||[])
+    .filter(h=>h.tipo==="Falta")
+    .reduce((acc,h)=> acc + (Number(h.diasAfastado)||Number(h.diasFalta)||0), 0);
+  // Faltas nos últimos 30 dias (absenteísmo recorrente)
+  const faltas30 = (colab.historico||[]).filter(h=>{
+    if(h.tipo!=="Falta") return false;
+    const d = parseDataFicha(h.data); if(!d) return false;
+    return (hojeF.getTime()-d.getTime())/86400000 <= 30;
+  }).length;
+  const absenteismoAlto = faltas30 >= 3;
+  // Tempo de casa / no posto (a partir de dataContratacao)
+  const contrat = parseDataFicha(colab.dataContratacao);
+  let tempoCasa = null;
+  if(contrat){
+    const meses = Math.max(0, Math.floor((hojeF.getTime()-contrat.getTime())/(86400000*30.44)));
+    const anos = Math.floor(meses/12); const resto = meses%12;
+    tempoCasa = anos>0 ? `${anos}a ${resto}m` : `${resto}m`;
+  }
+  // Vencimento de reciclagem (recicla a cada 24 meses — norma vigilante)
+  const recic = parseDataFicha(colab.ultimaReciclagem);
+  let recicInfo = null;
+  if(recic){
+    const venc = new Date(recic); venc.setMonth(venc.getMonth()+24);
+    const diasParaVencer = Math.floor((venc.getTime()-hojeF.getTime())/86400000);
+    recicInfo = {
+      venc, diasParaVencer,
+      estado: diasParaVencer<0 ? "vencida" : diasParaVencer<=60 ? "vencendo" : "ok"
+    };
+  }
+
   const tc = TURNO_CONFIG[colab.turno] || TURNO_CONFIG["Diurno"];
   const canAddHist = adminAuth || liderAuth;
 
@@ -614,6 +707,42 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
         </div>
 
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+          {/* Métricas derivadas: tempo de casa e dias afastados */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <div style={{ ...S.card, padding:"10px 12px" }}>
+              <div style={{ fontSize:9, color:"#64748b", fontWeight:700, textTransform:"uppercase" }}>Tempo no Posto</div>
+              <div style={{ fontSize:15, fontWeight:800, ...S.txtPrimary, marginTop:2 }}>{tempoCasa || "—"}</div>
+              {colab.dataContratacao && <div style={{ fontSize:9, color:"#64748b", marginTop:1 }}>desde {fmtDate(colab.dataContratacao)}</div>}
+            </div>
+            <div style={{ ...S.card, padding:"10px 12px" }}>
+              <div style={{ fontSize:9, color:"#64748b", fontWeight:700, textTransform:"uppercase" }}>Dias Afastado (total)</div>
+              <div style={{ fontSize:15, fontWeight:800, color:diasAfastadosTotal>0?"#ef4444":"#22c55e", marginTop:2 }}>{diasAfastadosTotal} dia(s)</div>
+              <div style={{ fontSize:9, color:"#64748b", marginTop:1 }}>{faltas30} falta(s) em 30 dias</div>
+            </div>
+          </div>
+
+          {/* Alerta: absenteísmo recorrente */}
+          {absenteismoAlto && (
+            <div style={{ background:"#1a0202", border:"1px solid #ef444455", borderRadius:10, padding:"9px 13px" }}>
+              <div style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}>⚠️ Absenteísmo recorrente</div>
+              <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>{faltas30} faltas nos últimos 30 dias — atenção para padrão de ausência.</div>
+            </div>
+          )}
+
+          {/* Alerta: reciclagem vencida/vencendo */}
+          {recicInfo && recicInfo.estado!=="ok" && (
+            <div style={{ background:recicInfo.estado==="vencida"?"#1a0202":"#1a1000", border:`1px solid ${recicInfo.estado==="vencida"?"#ef444455":"#f59e0b55"}`, borderRadius:10, padding:"9px 13px" }}>
+              <div style={{ fontSize:12, color:recicInfo.estado==="vencida"?"#ef4444":"#f59e0b", fontWeight:700 }}>
+                {recicInfo.estado==="vencida"?"🔴 Reciclagem vencida":"🟡 Reciclagem vencendo"}
+              </div>
+              <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>
+                {recicInfo.estado==="vencida"
+                  ? `Venceu em ${fmtDate(recicInfo.venc.toLocaleDateString("sv-SE"))} (${Math.abs(recicInfo.diasParaVencer)} dias atrás).`
+                  : `Vence em ${fmtDate(recicInfo.venc.toLocaleDateString("sv-SE"))} — faltam ${recicInfo.diasParaVencer} dias.`}
+              </div>
+            </div>
+          )}
+
           {/* Banner afastamento indeterminado */}
           {(colab.afastamentoAberto || (colab.historico||[]).some(h=>h.emAberto)) && (()=>{
             // Busca robusta: aceita o registro pelo id do afastamentoAberto mesmo
@@ -879,6 +1008,86 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
 }
 
 // ── Tela adicionar histórico (líder ou admin)
+// ── Modal: checagem de equipe do fim de semana (um líder assina seu plantão)
+function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel }) {
+  const S = getStyles(dark);
+  const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
+  const slots = chkEqSlots(num);
+  const chk = equipeData.checagemEquipe || null;
+  const alvo = chkEqAlvoVigente(chk);
+  const feitos = (chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins : [];
+  const feitosIds = feitos.map(c=>c.slotId);
+  // Líderes ativos do projeto para o seletor de assinatura.
+  const lideres = (equipeData.colaboradores||[])
+    .filter(c=>(c.status||"ativo")==="ativo" && /l[íi]der/i.test(c.cargo||""))
+    .map(c=>c.nome);
+
+  const [slotId, setSlotId] = useState(slots.find(s=>!feitosIds.includes(s.id))?.id || slots[0].id);
+  const [lider, setLider] = useState("");
+  const [statusEquipe, setStatusEquipe] = useState("sem_alteracoes"); // sem_alteracoes | com_faltas
+  const [nota, setNota] = useState("");
+
+  const slotAtual = slots.find(s=>s.id===slotId);
+  const jaFeito = feitosIds.includes(slotId);
+  const podeConfirmar = !!slotId && lider.trim().length>=3;
+  const cardBg = dark?"#0b1220":"#fff", txt=dark?"#e2e8f0":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
+      <div style={{background:cardBg,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:430,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:2}}>🗓️ Checar minha equipe</div>
+        <div style={{fontSize:12,color:txt2,marginBottom:14}}>Cada líder confirma o status do seu plantão. {feitos.length}/{num} já feitos neste fim de semana.</div>
+
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Qual plantão você está checando?</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
+          {slots.map(s=>{
+            const done=feitosIds.includes(s.id);
+            const sel=slotId===s.id;
+            return (
+              <button key={s.id} onClick={()=>setSlotId(s.id)}
+                style={{flex:"1 1 45%",background:sel?"#0ea5e9":done?(dark?"#052e16":"#dcfce7"):"transparent",border:`1px solid ${sel?"#0ea5e9":done?"#22c55e55":(dark?"#1e293b":"#cbd5e1")}`,color:sel?"#fff":done?"#22c55e":txt2,borderRadius:8,padding:"9px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                {done?"✓ ":""}{s.label}
+              </button>
+            );
+          })}
+        </div>
+        {jaFeito && <div style={{fontSize:10,color:"#f59e0b",marginBottom:12,marginTop:-6}}>Este plantão já foi checado — confirmar substitui o registro anterior.</div>}
+
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Status da equipe</div>
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <button onClick={()=>setStatusEquipe("sem_alteracoes")} style={{flex:1,background:statusEquipe==="sem_alteracoes"?"#16a34a":"transparent",border:`1px solid ${statusEquipe==="sem_alteracoes"?"#16a34a":(dark?"#1e293b":"#cbd5e1")}`,color:statusEquipe==="sem_alteracoes"?"#fff":txt2,borderRadius:8,padding:"9px",fontSize:12,fontWeight:700,cursor:"pointer"}}>Sem alterações</button>
+          <button onClick={()=>setStatusEquipe("com_faltas")} style={{flex:1,background:statusEquipe==="com_faltas"?"#dc2626":"transparent",border:`1px solid ${statusEquipe==="com_faltas"?"#dc2626":(dark?"#1e293b":"#cbd5e1")}`,color:statusEquipe==="com_faltas"?"#fff":txt2,borderRadius:8,padding:"9px",fontSize:12,fontWeight:700,cursor:"pointer"}}>Há faltas/ocorrências</button>
+        </div>
+
+        {statusEquipe==="com_faltas" && (
+          <>
+            <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Observação (opcional)</div>
+            <input value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ex.: 1 falta no posto 3, substituído por FT"
+              style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px 11px",fontSize:13,color:txt,marginBottom:14,boxSizing:"border-box"}}/>
+          </>
+        )}
+
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Líder responsável (assinatura)</div>
+        {lideres.length>0 && (
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+            {lideres.map(n=>(
+              <button key={n} onClick={()=>setLider(n)} style={{background:lider===n?"#0ea5e9":"transparent",border:`1px solid ${lider===n?"#0ea5e9":(dark?"#1e293b":"#cbd5e1")}`,color:lider===n?"#fff":txt2,borderRadius:7,padding:"6px 10px",fontSize:11,fontWeight:600,cursor:"pointer"}}>{n}</button>
+            ))}
+          </div>
+        )}
+        <input value={lider} onChange={e=>setLider(e.target.value)} placeholder="Ou digite o nome do líder"
+          style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px 11px",fontSize:13,color:txt,marginBottom:16,boxSizing:"border-box"}}/>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+          <button disabled={!podeConfirmar} onClick={()=>podeConfirmar&&onConfirm({slotId,slotLabel:slotAtual?.label||slotId,lider:lider.trim(),statusEquipe,nota})}
+            style={{flex:1,background:podeConfirmar?"linear-gradient(135deg,#16a34a,#15803d)":"#1e293b",border:"none",color:podeConfirmar?"#fff":"#475569",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:podeConfirmar?"pointer":"not-allowed"}}>Assinar checagem</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal: encerrar afastamento informando a data real de retorno
 function EncerrarAfastModal({ colab, entry, dark, onConfirm, onCancel }) {
   const S = getStyles(dark);
@@ -1428,6 +1637,40 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
 }
 
 // ── App principal
+// Contador da checagem de equipe do fim de semana — mostrado na home no bloco
+// Equipe. Lê checagemEquipe de equipes/{pid}. Só aparece durante a janela
+// (sáb+dom) ou quando há pendência; fora disso fica discreto.
+export function ContadorEquipe({ projectId }){
+  const [chk, setChk] = useState(undefined);
+  const [colabs, setColabs] = useState([]);
+  const [agora, setAgora] = useState(()=>Date.now());
+  useEffect(()=>{
+    let vivo=true;
+    loadEquipe(projectId).then(d=>{ if(vivo){ setChk(d?.checagemEquipe||null); setColabs(d?.colaboradores||[]); } }).catch(()=>{ if(vivo) setChk(null); });
+    return ()=>{ vivo=false; };
+  },[projectId]);
+  useEffect(()=>{ const t=setInterval(()=>setAgora(Date.now()),30000); return ()=>clearInterval(t); },[]);
+  if(chk===undefined) return null;
+  const alvo=chkEqAlvoVigente(chk);
+  const fim=chkEqFimTimestamp(alvo);
+  const num=chkEqNumCheckins(projectId, colabs);
+  const feitos=(chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins.length : 0;
+  const completo=feitos>=num;
+  const hoje=new Date(); const dia=hoje.getDay();
+  const janelaAberta = dia===6 || dia===0; // sáb ou dom
+  const diff=fim-agora;
+  // Fora da janela e sem pendência: não polui a home.
+  if(!janelaAberta && (completo || diff<0)) return null;
+  if(completo){
+    return <div style={{fontSize:10,color:"#22c55e",marginTop:3,fontWeight:700}}>✓ Checagem da equipe concluída ({feitos}/{num})</div>;
+  }
+  if(diff<=0){
+    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}>⚠️ Checagem de equipe pendente ({feitos}/{num})</div>;
+  }
+  const d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000), m=Math.floor((diff%3600000)/60000);
+  return <div style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}>🗓️ Checagem equipe: {feitos}/{num} · fecha dom 23:59 ({d>0?`${d}d `:""}{h}h {m}min)</div>;
+}
+
 export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted }) {
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | add | edit | view | addHist
@@ -1450,6 +1693,9 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [modoSel, setModoSel] = useState(false); // modo seleção PDF
   const [editHistItem, setEditHistItem] = useState(null); // item do histórico em edição
   const [encerrarModal, setEncerrarModal] = useState(null); // {entry} quando encerrando afastamento
+  const [checagemModal, setChecagemModal] = useState(false); // modal de checagem de equipe (fim de semana)
+  const [agoraChkEq, setAgoraChkEq] = useState(()=>Date.now());
+  useEffect(()=>{ const t=setInterval(()=>setAgoraChkEq(Date.now()),30000); return ()=>clearInterval(t); },[]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [darkLocal, setDarkLocal] = useState(true);
@@ -1600,7 +1846,27 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setScreen("view");
   };
 
-  // Encerra afastamento com data real de retorno informada pelo gerencial.
+  // Registra um check-in de líder na checagem de equipe do fim de semana.
+  // Aditivo: grava só o campo checagemEquipe em equipes/{pid}. Se o alvo
+  // (sábado) mudou desde o último ciclo, reinicia os check-ins.
+  const registrarCheckinEquipe = async ({ slotId, slotLabel, lider, statusEquipe, nota }) => {
+    const alvo = chkEqAlvoVigente(equipeData.checagemEquipe);
+    const atual = (equipeData.checagemEquipe && equipeData.checagemEquipe.alvo===alvo)
+      ? equipeData.checagemEquipe
+      : { alvo, checkins:[] };
+    // Não duplica o mesmo slot: se já existe, substitui.
+    const semSlot = (atual.checkins||[]).filter(c=>c.slotId!==slotId);
+    const novoCheckin = { slotId, slotLabel, lider, statusEquipe, nota:nota||"", em:new Date().toISOString() };
+    const novoChk = { ...atual, checkins:[...semSlot, novoCheckin] };
+    const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
+    if(novoChk.checkins.length>=num){
+      novoChk.concluidoEm = new Date().toISOString();
+      novoChk.proximoAlvo = chkEqProximo(alvo);
+    }
+    const updated = { ...equipeData, checagemEquipe: novoChk };
+    await save(updated);
+    setChecagemModal(false);
+  };
   // Robusto: parseia data em qualquer formato (ISO, ISO+T, dd/mm/yyyy) e
   // contabiliza o período como dias de falta. Limpa todos os emAberto presos.
   const encerrarAfastamento = async (colabId, entryId, dataRetorno) => {
@@ -1881,6 +2147,53 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
             </div>
           ) : null}
 
+          {/* Painel de checagem de equipe (fim de semana) */}
+          {liderAuth && (()=>{
+            const chk = equipeData.checagemEquipe || null;
+            const alvo = chkEqAlvoVigente(chk);
+            const fim = chkEqFimTimestamp(alvo);
+            const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
+            const feitos = (chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins : [];
+            const completo = feitos.length>=num;
+            const dia = new Date().getDay();
+            const janelaAberta = dia===6 || dia===0;
+            const diff = fim - agoraChkEq;
+            const pendente = diff<=0 && !completo;
+            // Fora da janela e já concluído: mostra estado discreto.
+            const cor = completo ? "#22c55e" : pendente ? "#ef4444" : "#f59e0b";
+            const bg  = completo ? (dark?"#021a0d":"#f0fdf4") : pendente ? "#1a0202" : (dark?"#1a1000":"#fffbeb");
+            const d=Math.floor(Math.max(0,diff)/86400000), h=Math.floor((Math.max(0,diff)%86400000)/3600000), m=Math.floor((Math.max(0,diff)%3600000)/60000);
+            return (
+              <div style={{ background:bg, border:`1px solid ${cor}44`, borderRadius:10, padding:"11px 14px" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap" }}>
+                  <div style={{ flex:1, minWidth:180 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:cor }}>🗓️ Checagem de equipe — fim de semana</div>
+                    {completo ? (
+                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>✓ Concluída ({feitos.length}/{num}) · reabre no próximo sábado</div>
+                    ) : pendente ? (
+                      <div style={{ fontSize:11, color:"#f87171", fontWeight:600, marginTop:2 }}>⚠️ Pendente ({feitos.length}/{num}) — cada líder deve checar seu plantão.</div>
+                    ) : (
+                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>
+                        {feitos.length}/{num} check-ins · {janelaAberta?`fecha domingo 23:59 (${d>0?d+"d ":""}${h}h ${m}min)`:`abre sábado`}
+                      </div>
+                    )}
+                    {feitos.length>0 && (
+                      <div style={{ fontSize:9, color:"#64748b", marginTop:3 }}>
+                        {feitos.map(c=>`${c.slotLabel}: ${c.lider}`).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                  {!completo && (
+                    <button onClick={()=>setChecagemModal(true)}
+                      style={{ background:pendente?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px 16px", fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>
+                      ✓ Checar minha equipe
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Botão cadastrar — líder ou admin */}
           {liderAuth && (
             <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,"Diurno"));setScreen("add");}}
@@ -2144,6 +2457,15 @@ Esta ação não pode ser desfeita.`))
           </div>
         </div>
       </div>
+      {checagemModal && (
+        <ChecagemEquipeModal
+          project={project}
+          equipeData={equipeData}
+          dark={dark}
+          onConfirm={registrarCheckinEquipe}
+          onCancel={()=>setChecagemModal(false)}
+        />
+      )}
     </div>
   );
 }
