@@ -616,8 +616,29 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
           {/* Banner afastamento indeterminado */}
           {colab.afastamentoAberto && (()=>{
-            const entry=(colab.historico||[]).find(h=>h.id===colab.afastamentoAberto&&h.emAberto);
-            if(!entry) return null;
+            // Busca robusta: aceita o registro pelo id do afastamentoAberto mesmo
+            // que o campo emAberto tenha sido perdido/gravado diferente.
+            const entry=(colab.historico||[]).find(h=>h.id===colab.afastamentoAberto)
+                     || (colab.historico||[]).find(h=>h.emAberto);
+            if(!entry) {
+              // Registro órfão: afastamentoAberto aponta para algo que não existe
+              // mais. Oferece limpar o estado preso, para o colaborador não ficar
+              // eternamente "afastado".
+              if(!adminAuth) return null;
+              return(
+                <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:4}}>
+                  <div style={{fontSize:11,color:"#94a3b8"}}>Afastamento marcado como aberto, mas sem registro correspondente.</div>
+                  <button onClick={()=>{
+                    const newColab={...colab,afastamentoAberto:null};
+                    const newColabs=equipeData.colaboradores.map(c=>c.id===colab.id?newColab:c);
+                    setSelColab(newColab);
+                    save({...equipeData,colaboradores:newColabs});
+                  }} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
+                    ✓ Encerrar
+                  </button>
+                </div>
+              );
+            }
             const dias=Math.floor((Date.now()-new Date(entry.data+"T12:00:00").getTime())/86400000);
             return(
               <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:4}}>
@@ -627,7 +648,15 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
                 </div>
                 {adminAuth&&(
                   <button onClick={()=>{
-                    const newHist=(colab.historico||[]).map(h=>h.id===entry.id?{...h,emAberto:false,dataRetorno:todayStr()}:h);
+                    const retorno=todayStr();
+                    const totalDias=Math.floor((new Date(retorno+"T12:00:00").getTime()-new Date(entry.data+"T12:00:00").getTime())/86400000);
+                    const newHist=(colab.historico||[]).map(h=>h.id===entry.id?{
+                      ...h,
+                      emAberto:false,
+                      dataRetorno:retorno,
+                      diasAfastado:totalDias,
+                      label:`Afastamento encerrado — ${totalDias} dia(s) · ${fmtDate(entry.data)} a ${fmtDate(retorno)}`
+                    }:h);
                     const newColab={...colab,historico:newHist,afastamentoAberto:null};
                     const newColabs=equipeData.colaboradores.map(c=>c.id===colab.id?newColab:c);
                     setSelColab(newColab);
@@ -693,8 +722,8 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
                       {adminAuth && (
                         <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
                       )}
-                      {/* Excluir: gerencial e líder */}
-                      {(adminAuth || liderAuth) && (
+                      {/* Excluir: gerencial sempre; líder exceto Medida Disciplinar */}
+                      {(adminAuth || (liderAuth && h.tipo!=="Medida Disciplinar")) && (
                         <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}>✕</button>
                       )}
                     </div>
@@ -868,7 +897,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
 }
 
 // ── Tela adicionar histórico (líder ou admin)
-function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dark }) {
+function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, onCancel, dark }) {
   const S = getStyles(dark);
   const hc = HIST_COLORS[histForm.tipo] || HIST_COLORS["Medida Disciplinar"];
 
@@ -889,7 +918,7 @@ function AddHistScreen({ colabNome, histForm, setHistForm, onSave, onCancel, dar
             <div style={{ fontSize:12, fontWeight:700, ...S.txtPrimary, marginBottom:12 }}>Tipo de Registro</div>
             {/* Row 1: Falta, FT, Medida */}
             <div style={{ display:"flex", gap:6, marginBottom:6 }}>
-              {["Falta","FT","Medida Disciplinar"].map(tipo=>{
+              {["Falta","FT","Medida Disciplinar"].filter(t=>t!=="Medida Disciplinar"||adminAuth).map(tipo=>{
                 const tc = HIST_COLORS[tipo];
                 const isSel = histForm.tipo===tipo;
                 return (
@@ -1521,6 +1550,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   const addHistorico = async () => {
     if(!histForm.data) { alert("Informe a data"); return; }
+    if(histForm.tipo==="Medida Disciplinar" && !adminAuth) { alert("Apenas o perfil gerencial pode registrar Medida Disciplinar."); return; }
     if(histForm.tipo==="Medida Disciplinar" && !histForm.detalhe) { alert("Especifique o tipo de medida"); return; }
     if(histForm.tipo==="Falta" && histForm.subtipo==="Período" && !histForm.dataFim) { alert("Informe a data fim"); return; }
     // Enrich falta entry
@@ -1551,6 +1581,12 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   const removeHist = async (colabId, histId) => {
     if(!adminAuth && !liderAuth) return;
+    // Medida Disciplinar (advertência/suspensão) só o gerencial pode excluir.
+    const alvo = (equipeData.colaboradores.find(c=>c.id===colabId)?.historico||[]).find(h=>h.id===histId);
+    if(alvo?.tipo==="Medida Disciplinar" && !adminAuth){
+      alert("Apenas o perfil gerencial pode excluir uma Medida Disciplinar.");
+      return;
+    }
     if(!window.confirm("Excluir este registro do histórico? Esta ação não pode ser desfeita.")) return;
     const newColabs = equipeData.colaboradores.map(c=>{
       if(c.id!==colabId) return c;
@@ -1665,7 +1701,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   // ── Adicionar histórico (líder ou admin)
   if(screen==="addHist"&&selColab) return (
-    <AddHistScreen colabNome={selColab.nome} histForm={histForm} setHistForm={setHistForm}
+    <AddHistScreen colabNome={selColab.nome} adminAuth={adminAuth} histForm={histForm} setHistForm={setHistForm}
       onSave={addHistorico} onCancel={()=>setScreen("view")} dark={dark}/>
   );
 
