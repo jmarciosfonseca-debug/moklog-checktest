@@ -110,6 +110,20 @@ function fmtDate(d) {
 // 4x2 (P505/Jatinox) → 3 (líder pode estar de folga). Espelha a doutrina dos
 // demais contadores: trava no alvo e não avança sozinho até concluir.
 const CHK_EQUIPE_4X2 = ["P505","P260A","P260B","P260C"]; // 3 check-ins
+
+// ── Montagem de equipes por líder ────────────────────────────────────────
+// Disponível em projetos 12x36, exceto P260A/B/C e P505 (que são 4x2).
+const EQUIPES_EXCLUIDOS = ["P505","P260A","P260B","P260C"];
+function montarEquipesDisponivel(projectId, colaboradores){
+  if(EQUIPES_EXCLUIDOS.includes(projectId)) return false;
+  // Confirma escala 12x36 predominante.
+  const ativos = (colaboradores||[]).filter(c=>(c.status||"ativo")==="ativo");
+  if(ativos.length===0) return true; // por padrão libera para os não-excluídos
+  const n1236 = ativos.filter(c=>String(c.escala||"12x36").includes("12x36")).length;
+  return n1236/ativos.length >= 0.5;
+}
+// Detecta se um colaborador é líder pelo cargo.
+function ehLider(c){ return /l[íi]der/i.test(c?.cargo||""); }
 function chkEqParseISO(iso){ const [y,m,d]=String(iso).split("-").map(Number); return new Date(y,(m||1)-1,d||1); }
 function chkEqISO(d){ return d.toLocaleDateString("sv-SE"); }
 // Sábado (>=) mais próximo à frente de uma data.
@@ -1089,6 +1103,55 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
 }
 
 // ── Modal: encerrar afastamento informando a data real de retorno
+// ── Modal: montar a equipe de um líder (selecionar membros) ──────────────
+function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, onClose }){
+  const S = getStyles(dark);
+  const ativos = colaboradores.filter(c=>(c.status||"ativo")==="ativo" && !ehLider(c));
+  // Mostra membros do mesmo turno primeiro, mas permite qualquer um.
+  const ordenados = [...ativos].sort((a,b)=>{
+    const am = a.equipeLiderId===lider.id ? 0 : 1;
+    const bm = b.equipeLiderId===lider.id ? 0 : 1;
+    if(am!==bm) return am-bm;
+    return (a.nome||"").localeCompare(b.nome||"");
+  });
+  const meus = ativos.filter(c=>c.equipeLiderId===lider.id).length;
+  const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b", card=dark?"#0b1220":"#fff";
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
+      <div style={{background:card,borderRadius:14,padding:"18px 16px",width:"100%",maxWidth:440,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,maxHeight:"88vh",display:"flex",flexDirection:"column"}}>
+        <div style={{fontSize:16,fontWeight:800,color:txt}}>🛡️ Equipe de {lider.nome}</div>
+        <div style={{fontSize:11.5,color:txt2,marginBottom:12}}>{lider.cargo} · {lider.turno} · {meus} membro(s) vinculado(s)</div>
+        <div style={{fontSize:10.5,color:txt2,marginBottom:8}}>Toque para vincular/desvincular. Um membro em outra equipe será movido para esta.</div>
+        <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+          {ordenados.map(c=>{
+            const meu = c.equipeLiderId===lider.id;
+            const outra = c.equipeLiderId && c.equipeLiderId!==lider.id;
+            const nomeOutroLider = outra ? (colaboradores.find(x=>x.id===c.equipeLiderId)?.nome||"outro líder") : null;
+            return (
+              <div key={c.id} onClick={()=>onToggle(lider.id, c.id)}
+                style={{display:"flex",alignItems:"center",gap:9,padding:"8px 10px",borderRadius:9,cursor:"pointer",
+                  background: meu ? "#0ea5e915" : "transparent",
+                  border:`1px solid ${meu ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}`}}>
+                <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`2px solid ${meu?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`,background:meu?"#0ea5e9":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{meu?"✓":""}</div>
+                <Avatar foto={c.foto} size={30} border={dark?"#232b4a":"#e2e8f0"}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12.5,fontWeight:600,color:txt}}>{c.nome}</div>
+                  <div style={{fontSize:10,color:txt2}}>{c.cargo} · {c.turno}</div>
+                </div>
+                {outra && <span style={{fontSize:9,color:"#f59e0b",fontWeight:700,flexShrink:0}}>⚠️ {nomeOutroLider}</span>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          {meus>0 && <button onClick={()=>onDesfazer(lider.id)} style={{background:"transparent",border:"1px solid #ef444455",color:"#ef4444",borderRadius:8,padding:"11px 14px",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>Desfazer</button>}
+          <button onClick={onClose} style={{flex:1,background:"linear-gradient(135deg,#0ea5e9,#0284c7)",border:"none",color:"#fff",borderRadius:8,padding:"11px",fontSize:13,fontWeight:800,cursor:"pointer"}}>Concluir</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EncerrarAfastModal({ colab, entry, dark, onConfirm, onCancel }) {
   const S = getStyles(dark);
   const [dataRetorno, setDataRetorno] = useState(todayStr());
@@ -1694,6 +1757,8 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [editHistItem, setEditHistItem] = useState(null); // item do histórico em edição
   const [encerrarModal, setEncerrarModal] = useState(null); // {entry} quando encerrando afastamento
   const [checagemModal, setChecagemModal] = useState(false); // modal de checagem de equipe (fim de semana)
+  const [visaoEquipes, setVisaoEquipes] = useState(false); // alterna lista por turno x por equipe montada
+  const [montarLiderId, setMontarLiderId] = useState(null); // líder cuja equipe está sendo montada
   const [agoraChkEq, setAgoraChkEq] = useState(()=>Date.now());
   useEffect(()=>{ const t=setInterval(()=>setAgoraChkEq(Date.now()),30000); return ()=>clearInterval(t); },[]);
   const [saving, setSaving] = useState(false);
@@ -1902,6 +1967,25 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     await save(updated);
     setSelColab(newColabs.find(c=>c.id===colabId));
     setEncerrarModal(null);
+  };
+
+  // ── Montagem de equipes: vincula/desvincula membros a um líder.
+  // Regra: um membro pertence a uma equipe só; ao ser puxado para uma,
+  // sai automaticamente da anterior (o equipeLiderId é sobrescrito).
+  const toggleMembroEquipe = async (liderId, membroId) => {
+    const novos = equipeData.colaboradores.map(c=>{
+      if(c.id!==membroId) return c;
+      const atual = c.equipeLiderId || null;
+      return { ...c, equipeLiderId: atual===liderId ? null : liderId };
+    });
+    await save({ ...equipeData, colaboradores:novos });
+  };
+  // Desfaz uma equipe inteira (remove o vínculo de todos os membros do líder).
+  const desfazerEquipe = async (liderId) => {
+    if(!window.confirm("Desfazer esta equipe? Os membros ficarão sem equipe.")) return;
+    const novos = equipeData.colaboradores.map(c=> c.equipeLiderId===liderId ? {...c, equipeLiderId:null} : c);
+    await save({ ...equipeData, colaboradores:novos });
+    setMontarLiderId(null);
   };
 
   const removeHist = async (colabId, histId) => {
@@ -2306,8 +2390,90 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
             </div>
           )}
 
-          {/* Cards por turno */}
-          {getTurnos(project.id).map(turno=>{
+          {/* Alternância de visão: por turno x por equipe montada */}
+          {montarEquipesDisponivel(project.id, equipeData.colaboradores) && (
+            <div style={{ display:"flex", gap:6 }}>
+              <button onClick={()=>setVisaoEquipes(false)}
+                style={{ flex:1, padding:"9px", borderRadius:9, fontSize:12, fontWeight:700, cursor:"pointer",
+                  background: !visaoEquipes ? "#0ea5e9" : "transparent", color: !visaoEquipes ? "#fff" : "#64748b",
+                  border:`1px solid ${!visaoEquipes ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}` }}>
+                👥 Por turno
+              </button>
+              <button onClick={()=>setVisaoEquipes(true)}
+                style={{ flex:1, padding:"9px", borderRadius:9, fontSize:12, fontWeight:700, cursor:"pointer",
+                  background: visaoEquipes ? "#0ea5e9" : "transparent", color: visaoEquipes ? "#fff" : "#64748b",
+                  border:`1px solid ${visaoEquipes ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}` }}>
+                🛡️ Por equipe (plantões)
+              </button>
+            </div>
+          )}
+
+          {/* VISÃO POR EQUIPE MONTADA */}
+          {visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (()=>{
+            const lideres = ativos.filter(ehLider).sort((a,b)=>(a.turno||"").localeCompare(b.turno||""));
+            const semEquipe = ativos.filter(c=>!ehLider(c) && !c.equipeLiderId);
+            const turnos = [...new Set(lideres.map(l=>l.turno))];
+            return (
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {turnos.map(turno=>{
+                  const tc = TURNO_CONFIG[turno] || TURNO_CONFIG["Diurno"];
+                  const lideresTurno = lideres.filter(l=>l.turno===turno);
+                  return (
+                    <div key={turno}>
+                      <div style={{ fontSize:12, fontWeight:700, color:tc.badge, marginBottom:8, letterSpacing:.5 }}>{tc.icon} {turno.toUpperCase()}</div>
+                      {lideresTurno.map(lider=>{
+                        const membros = ativos.filter(c=>c.equipeLiderId===lider.id);
+                        return (
+                          <div key={lider.id} style={{ border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, borderRadius:12, padding:10, marginBottom:10, background:dark?"#0a1120":"#fff" }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:9, padding:8, background:dark?"#0d1f2e":"#f0f9ff", borderRadius:8, border:"1px solid #0ea5e933" }}>
+                              <Avatar foto={lider.foto} size={34} border="#0ea5e9"/>
+                              <div style={{ flex:1, minWidth:0 }}>
+                                <div style={{ fontSize:13.5, fontWeight:700, ...S.txtPrimary }}>{lider.nome}</div>
+                                <div style={{ fontSize:10, color:"#0ea5e9" }}>{lider.cargo}</div>
+                              </div>
+                              {liderAuth && (
+                                <button onClick={()=>setMontarLiderId(lider.id)}
+                                  style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 10px" }}>
+                                  {membros.length?"✏️ Editar":"➕ Montar"}
+                                </button>
+                              )}
+                            </div>
+                            {membros.length===0 ? (
+                              <div style={{ fontSize:11, color:"#64748b", padding:"8px 0 2px 20px" }}>Sem membros vinculados</div>
+                            ) : membros.map(m=>(
+                              <div key={m.id} onClick={()=>{setSelColab(m);setScreen("view");}}
+                                style={{ display:"flex", alignItems:"center", gap:9, padding:"7px 8px 7px 20px", marginTop:4, position:"relative", cursor:"pointer" }}>
+                                <div style={{ position:"absolute", left:8, top:0, bottom:"50%", width:2, background:dark?"#232b4a":"#cbd5e1" }}/>
+                                <div style={{ position:"absolute", left:8, top:"50%", width:9, height:2, background:dark?"#232b4a":"#cbd5e1" }}/>
+                                <Avatar foto={m.foto} size={28} border={dark?"#232b4a":"#e2e8f0"}/>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:12.5, fontWeight:600, ...S.txtPrimary }}>{m.nome}</div>
+                                  <div style={{ fontSize:9.5, color:"#94a3b8" }}>{m.cargo}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+                {semEquipe.length>0 && (
+                  <div style={{ opacity:.75, fontSize:11, color:"#94a3b8", padding:10, border:`1px dashed ${dark?"#232b4a":"#cbd5e1"}`, borderRadius:8 }}>
+                    👥 Sem equipe ({semEquipe.length}): {semEquipe.map(c=>c.nome).join(", ")}
+                  </div>
+                )}
+                {lideres.length===0 && (
+                  <div style={{ fontSize:12, color:"#64748b", textAlign:"center", padding:16 }}>
+                    Nenhum líder cadastrado. Cadastre colaboradores com cargo de líder para montar as equipes.
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Cards por turno (visão padrão) */}
+          {!visaoEquipes && getTurnos(project.id).map(turno=>{
             const tc = TURNO_CONFIG[turno];
             const colabsDoTurno = ativos.filter(c=>c.turno===turno);
             if(colabsDoTurno.length===0 && !adminAuth) return null;
@@ -2466,6 +2632,20 @@ Esta ação não pode ser desfeita.`))
           onCancel={()=>setChecagemModal(false)}
         />
       )}
+      {montarLiderId && (()=>{
+        const lider = equipeData.colaboradores.find(c=>c.id===montarLiderId);
+        if(!lider) return null;
+        return (
+          <MontarEquipeModal
+            lider={lider}
+            colaboradores={equipeData.colaboradores}
+            dark={dark}
+            onToggle={toggleMembroEquipe}
+            onDesfazer={desfazerEquipe}
+            onClose={()=>setMontarLiderId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
