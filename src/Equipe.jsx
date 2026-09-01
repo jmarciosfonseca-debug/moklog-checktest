@@ -130,15 +130,17 @@ function ehLider(c){ return /l[íi]der/i.test(c?.cargo||""); }
 // com validade (colete balístico, documentos).
 const UNIFORME_CATALOGO = [
   { cat:"👕 Uniforme", itens:[
-    { nome:"Sapato / Coturno", gravaMarca:true, sugMarca:"Macboot" },
-    { nome:"Calça", gravaMarca:true },
-    { nome:"Camisa / Camisão", gravaMarca:true },
-    { nome:"Jaqueta / Terno", gravaMarca:true },
+    { nome:"Sapato / Coturno", gravaMarca:true, sugMarca:"Macboot", pedeTamanho:true },
+    { nome:"Calça", gravaMarca:true, pedeTamanho:true },
+    { nome:"Camisa / Camisão", gravaMarca:true, pedeTamanho:true },
+    { nome:"Jaqueta / Terno", gravaMarca:true, pedeTamanho:true },
+    { nome:"Boné" },
   ]},
   { cat:"🛡️ Material Tático", itens:[
     { nome:"Cinturão" }, { nome:"Coldre" }, { nome:"Pochete" },
     { nome:"Capa Balística", validade:true }, { nome:"Porta Jetloader" },
-    { nome:"Porta Carregador" }, { nome:"Fone Lapela" }, { nome:"Tonfa" }, { nome:"Colete" },
+    { nome:"Porta Carregador" }, { nome:"Porta Algema" }, { nome:"Fone Lapela" },
+    { nome:"Tonfa" }, { nome:"Colete" },
   ]},
   { cat:"📄 Documento", itens:[
     { nome:"CNV", validade:true }, { nome:"Crachá" },
@@ -658,19 +660,46 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 
 // ── Tela de ficha completa
 // ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
-function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onConfirmar }){
+function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onConfirmar, onSalvarLista }){
   const S = getStyles(dark);
   const [aberto, setAberto] = useState(false);
-  const [form, setForm] = useState(null); // {item, marca, tamanho, motivo} quando solicitando
-  const [histItem, setHistItem] = useState(null); // item cujo histórico está aberto
-  const unf = colab.uniforme || { itens:{}, solicitacoes:[] };
+  const [modoMontar, setModoMontar] = useState(false); // Fase 1: montar lista
+  const [rascunho, setRascunho] = useState({});          // {nome:{usa,tamanho,marca}} durante montagem
+  const [modoSelMulti, setModoSelMulti] = useState(false);
+  const [selItens, setSelItens] = useState([]);          // nomes selecionados p/ envio múltiplo
+  const [solicForm, setSolicForm] = useState(null);      // {item, tamanho, marca, motivo} solicitação única
+  const [histItem, setHistItem] = useState(null);
+
+  const unf = colab.uniforme || { itens:{}, solicitacoes:[], listaMontada:false };
   const pendentes = (unf.solicitacoes||[]).filter(s=>s.status==="pendente");
   const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
 
-  const catInfo = (nomeItem)=>{
-    for(const g of UNIFORME_CATALOGO){ const it=g.itens.find(i=>i.nome===nomeItem); if(it) return it; }
-    return {};
+  const itemInfo = (nome)=>{ for(const g of UNIFORME_CATALOGO){ const it=g.itens.find(i=>i.nome===nome); if(it) return it; } return {}; };
+  // Itens que o colaborador USA (lista montada).
+  const itensUsados = [];
+  for(const g of UNIFORME_CATALOGO){ for(const it of g.itens){ if(unf.itens?.[it.nome]?.usa) itensUsados.push({...it, cat:g.cat, dados:unf.itens[it.nome]}); } }
+
+  // ── Inicia montagem: carrega rascunho a partir do estado atual.
+  const iniciarMontagem = ()=>{
+    const r={};
+    for(const g of UNIFORME_CATALOGO){ for(const it of g.itens){ const d=unf.itens?.[it.nome]; r[it.nome]={ usa:!!d?.usa, tamanho:d?.tamanho||"", marca:d?.marca||"" }; } }
+    setRascunho(r); setModoMontar(true);
   };
+  const concluirMontagem = async ()=>{ await onSalvarLista(colab.id, rascunho); setModoMontar(false); };
+
+  const toggleSelMulti = (nome)=> setSelItens(s=> s.includes(nome) ? s.filter(x=>x!==nome) : [...s, nome]);
+
+  const enviarWhatsMulti = ()=>{
+    const linhas = ["*SOLICITAÇÃO DE UNIFORME / MATERIAL* 📦", `*Unidade:* ${projectNome||"—"}`, `*Colaborador:* ${colab.nome||"—"}`, "*Itens:*"];
+    selItens.forEach(nome=>{ const d=unf.itens?.[nome]; linhas.push(`• ${nome}${d?.tamanho?` (tam ${d.tamanho})`:""}${d?.marca?` — ${d.marca}`:""}`); });
+    linhas.push(`*Data:* ${new Date().toLocaleDateString("pt-BR")}`);
+    // Registra cada item como pendência.
+    selItens.forEach(nome=>{ const d=unf.itens?.[nome]||{}; onSolicitar(colab.id, { item:nome, marca:d.marca, tamanho:d.tamanho, motivo:"Solicitação múltipla" }); });
+    window.open(`https://wa.me/?text=${encodeURIComponent(linhas.join("\n"))}`, "_blank");
+    setModoSelMulti(false); setSelItens([]);
+  };
+
+  const cardStyle = (on)=>({ background:on?"#0d1f2e":(dark?"#0d1424":"#f8fafc"), border:`1px solid ${on?"#0ea5e9":(dark?"#1c2438":"#e2e8f0")}`, borderRadius:9, padding:"9px 11px", marginBottom:6 });
 
   return (
     <div style={S.card}>
@@ -689,100 +718,134 @@ function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onCo
             const alerta = dias>=UNIFORME_SLA_ALERTA;
             return (
               <div key={s.id} style={{ background:alerta?"#1a0202":(dark?"#1a1000":"#fffbeb"), border:`1px solid ${alerta?"#ef444455":"#f59e0b44"}`, borderRadius:10, padding:"10px 12px", marginBottom:8 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>
-                  {alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente
-                </div>
-                <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>
-                  Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}
-                </div>
-                {canManage && (
-                  <button onClick={()=>onConfirmar(colab.id, s.id)}
-                    style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                    ✓ Confirmar recebimento (zera SLA)
-                  </button>
-                )}
+                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente</div>
+                <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
+                {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>✓ Confirmar recebimento (zera SLA)</button>}
               </div>
             );
           })}
 
-          {/* Catálogo por categoria */}
-          {UNIFORME_CATALOGO.map(grupo=>(
-            <div key={grupo.cat} style={{ marginBottom:10 }}>
-              <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:6 }}>{grupo.cat}</div>
-              {grupo.itens.map(it=>{
-                const dados = unf.itens?.[it.nome];
-                const ult = dados?.ultimaTroca;
-                return (
-                  <div key={it.nome} style={{ background:dark?"#0d1424":"#f8fafc", border:`1px solid ${dark?"#1c2438":"#e2e8f0"}`, borderRadius:8, padding:"9px 11px", marginBottom:6 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12.5, fontWeight:600, color:txt }}>
-                          {it.nome}{dados?.marca?<span style={{color:txt2,fontWeight:400}}> · {dados.marca}</span>:it.sugMarca?<span style={{color:"#475569",fontWeight:400}}> · {it.sugMarca}?</span>:""}
-                        </div>
-                        <div style={{ fontSize:10, color:txt2 }}>
-                          {ult?`Última troca: ${fmtDate(ult.slice(0,10))}`:"Sem registro de troca"}{dados?.tamanho?` · Tam ${dados.tamanho}`:""}
+          {/* FASE 1 — montar lista */}
+          {modoMontar ? (
+            <div>
+              <div style={{ fontSize:11.5, color:txt2, marginBottom:10 }}>Marque o que <b style={{color:txt}}>{colab.nome}</b> usa. Nos itens de uniforme, informe o tamanho.</div>
+              {UNIFORME_CATALOGO.map(g=>(
+                <div key={g.cat} style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:6 }}>{g.cat}</div>
+                  {g.itens.map(it=>{
+                    const r = rascunho[it.nome] || { usa:false, tamanho:"", marca:"" };
+                    return (
+                      <div key={it.nome} style={cardStyle(r.usa)}>
+                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                          <div onClick={()=>setRascunho(p=>({...p,[it.nome]:{...r,usa:!r.usa}}))} style={{ width:22, height:22, borderRadius:6, flexShrink:0, cursor:"pointer", border:`2px solid ${r.usa?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:r.usa?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:900 }}>{r.usa?"✓":""}</div>
+                          <div style={{ flex:1, fontSize:12.5, fontWeight:600, color:r.usa?txt:txt2 }}>{it.nome}</div>
+                          {r.usa && it.pedeTamanho && (
+                            <input value={r.tamanho} onChange={e=>setRascunho(p=>({...p,[it.nome]:{...r,tamanho:e.target.value}}))} placeholder="tam/nº"
+                              style={{ width:72, background:dark?"#0a0f1e":"#fff", border:`1px solid ${dark?"#232b4a":"#cbd5e1"}`, borderRadius:6, padding:"6px 8px", color:txt, fontSize:12, textAlign:"center" }}/>
+                          )}
                         </div>
                       </div>
-                      {canManage && (
-                        <button onClick={()=>setForm({ item:it.nome, marca:dados?.marca||it.sugMarca||"", tamanho:dados?.tamanho||"", motivo:"", gravaMarca:it.gravaMarca })}
-                          style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 9px", flexShrink:0 }}>
-                          Solicitar
-                        </button>
-                      )}
-                    </div>
-                    {dados?.historico?.length>0 && (
-                      <button onClick={()=>setHistItem(histItem===it.nome?null:it.nome)}
-                        style={{ background:"transparent", border:"none", color:"#64748b", fontSize:10, cursor:"pointer", padding:"4px 0 0", textDecoration:"underline" }}>
-                        {histItem===it.nome?"ocultar histórico":`ver histórico (${dados.historico.length})`}
-                      </button>
-                    )}
-                    {histItem===it.nome && dados?.historico && (
-                      <div style={{ marginTop:6, paddingLeft:8, borderLeft:`2px solid ${dark?"#1c2438":"#e2e8f0"}` }}>
-                        {[...dados.historico].reverse().map((h,idx)=>(
-                          <div key={idx} style={{ fontSize:10, color:txt2, padding:"2px 0" }}>
-                            {fmtDate(h.data.slice(0,10))}{h.marca?` · ${h.marca}`:""}{h.tamanho?` · Tam ${h.tamanho}`:""}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ))}
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={()=>setModoMontar(false)} style={{ flex:1, background:"transparent", border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, color:txt2, borderRadius:9, padding:"11px", fontSize:13, fontWeight:700, cursor:"pointer" }}>Cancelar</button>
+                <button onClick={concluirMontagem} style={{ flex:2, background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:9, padding:"11px", fontSize:13, fontWeight:800, cursor:"pointer" }}>✓ Concluir lista de material</button>
+              </div>
             </div>
-          ))}
+          ) : !unf.listaMontada ? (
+            /* Estado inicial: lista ainda não montada */
+            <div style={{ textAlign:"center", padding:"14px 10px", border:`1px dashed ${dark?"#232b4a":"#cbd5e1"}`, borderRadius:10 }}>
+              <div style={{ fontSize:12.5, color:txt2, marginBottom:10 }}>Nenhuma lista de material montada ainda.</div>
+              {canManage && <button onClick={iniciarMontagem} style={{ background:"#0ea5e9", border:"none", color:"#fff", borderRadius:9, padding:"10px 18px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>➕ Montar lista de material</button>}
+            </div>
+          ) : (
+            /* FASE 2 — lista montada: só os itens que ele usa */
+            <div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                <div style={{ fontSize:11.5, color:txt2 }}>{itensUsados.length} item(ns) neste colaborador</div>
+                {canManage && <button onClick={iniciarMontagem} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 11px" }}>✏️ Editar lista</button>}
+              </div>
+
+              {itensUsados.length===0 ? (
+                <div style={{ fontSize:12, color:txt2, textAlign:"center", padding:"10px 0" }}>Nenhum item marcado. Toque em "Editar lista".</div>
+              ) : (
+                <>
+                  {UNIFORME_CATALOGO.map(g=>{
+                    const doGrupo = itensUsados.filter(i=>i.cat===g.cat);
+                    if(!doGrupo.length) return null;
+                    return (
+                      <div key={g.cat} style={{ marginBottom:10 }}>
+                        <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:6 }}>{g.cat}</div>
+                        {doGrupo.map(it=>{
+                          const d = it.dados||{};
+                          const ult = d.ultimaTroca;
+                          const sel = selItens.includes(it.nome);
+                          return (
+                            <div key={it.nome} style={cardStyle(modoSelMulti && sel)}>
+                              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                                {modoSelMulti && (
+                                  <div onClick={()=>toggleSelMulti(it.nome)} style={{ width:20, height:20, borderRadius:5, flexShrink:0, cursor:"pointer", border:`2px solid ${sel?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:sel?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, fontWeight:900 }}>{sel?"✓":""}</div>
+                                )}
+                                <div style={{ flex:1, minWidth:0 }}>
+                                  <div style={{ fontSize:12.5, fontWeight:600, color:txt }}>{it.nome}{d.tamanho?<span style={{color:txt2,fontWeight:400}}> · {d.tamanho}</span>:""}{d.marca?<span style={{color:txt2,fontWeight:400}}> · {d.marca}</span>:""}</div>
+                                  <div style={{ fontSize:10, color:txt2 }}>{ult?`Última troca: ${fmtDate(ult.slice(0,10))}`:"Sem registro de troca"}</div>
+                                </div>
+                                {!modoSelMulti && canManage && (
+                                  <button onClick={()=>setSolicForm({ item:it.nome, marca:d.marca||"", tamanho:d.tamanho||"", motivo:"" })} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 12px", flexShrink:0 }}>Solicitar</button>
+                                )}
+                              </div>
+                              {ult && d.historico?.length>0 && !modoSelMulti && (
+                                <button onClick={()=>setHistItem(histItem===it.nome?null:it.nome)} style={{ background:"transparent", border:"none", color:"#64748b", fontSize:10, cursor:"pointer", padding:"4px 0 0", textDecoration:"underline" }}>{histItem===it.nome?"ocultar":`histórico (${d.historico.length})`}</button>
+                              )}
+                              {histItem===it.nome && d.historico && (
+                                <div style={{ marginTop:6, paddingLeft:8, borderLeft:`2px solid ${dark?"#1c2438":"#e2e8f0"}` }}>
+                                  {[...d.historico].reverse().map((h,idx)=>(<div key={idx} style={{ fontSize:10, color:txt2, padding:"2px 0" }}>{fmtDate(h.data.slice(0,10))}{h.tamanho?` · ${h.tamanho}`:""}{h.marca?` · ${h.marca}`:""}</div>))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Seleção múltipla / envio */}
+                  {canManage && (modoSelMulti ? (
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={()=>{setModoSelMulti(false);setSelItens([]);}} style={{ flex:1, background:"transparent", border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, color:txt2, borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Cancelar</button>
+                      <button onClick={()=>setSelItens(itensUsados.map(i=>i.nome))} style={{ flex:1, background:"transparent", border:"1px solid #0ea5e944", color:"#0ea5e9", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Uniforme completo</button>
+                      <button disabled={!selItens.length} onClick={enviarWhatsMulti} style={{ flex:2, background:selItens.length?"#25d366":"#1e293b", border:"none", color:selItens.length?"#062":"#475569", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:800, cursor:selItens.length?"pointer":"not-allowed" }}>📲 Enviar {selItens.length||""} no WhatsApp</button>
+                    </div>
+                  ) : (
+                    <button onClick={()=>setModoSelMulti(true)} style={{ width:"100%", background:"transparent", border:"1px solid #0ea5e944", color:"#0ea5e9", borderRadius:9, padding:"10px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>☑️ Selecionar vários / Uniforme completo</button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modal de solicitação */}
-      {form && (
+      {/* Modal de solicitação única */}
+      {solicForm && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:210,padding:16}}>
           <div style={{background:dark?"#0b1220":"#fff",borderRadius:14,padding:"18px 16px",width:"100%",maxWidth:400,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
-            <div style={{fontSize:15,fontWeight:800,color:txt,marginBottom:2}}>Solicitar: {form.item}</div>
-            <div style={{fontSize:11,color:txt2,marginBottom:12}}>{colab.nome}</div>
-            {form.gravaMarca && (
-              <>
-                <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Marca</div>
-                <input value={form.marca} onChange={e=>setForm({...form,marca:e.target.value})} placeholder="Marca (grava para o item)"
-                  style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:10,boxSizing:"border-box"}}/>
-              </>
-            )}
-            <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Tamanho</div>
-            <input value={form.tamanho} onChange={e=>setForm({...form,tamanho:e.target.value})} placeholder="Ex.: 42 / G / M"
-              style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:10,boxSizing:"border-box"}}/>
+            <div style={{fontSize:15,fontWeight:800,color:txt,marginBottom:2}}>Solicitar: {solicForm.item}</div>
+            <div style={{fontSize:11,color:txt2,marginBottom:12}}>{colab.nome}{solicForm.tamanho?` · tam ${solicForm.tamanho}`:""}</div>
             <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Motivo</div>
-            <input value={form.motivo} onChange={e=>setForm({...form,motivo:e.target.value})} placeholder="Desgaste, extravio, troca de tamanho…"
+            <input value={solicForm.motivo} onChange={e=>setSolicForm({...solicForm,motivo:e.target.value})} placeholder="Desgaste, extravio, troca de tamanho…"
               style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:14,boxSizing:"border-box"}}/>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setForm(null)} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={()=>setSolicForm(null)} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
               <button onClick={async()=>{
-                  await onSolicitar(colab.id, { item:form.item, marca:form.marca, tamanho:form.tamanho, motivo:form.motivo });
-                  const msg = uniformeMsgWhats(projectNome, colab.nome, form.item, form.marca, form.tamanho, form.motivo);
+                  await onSolicitar(colab.id, { item:solicForm.item, marca:solicForm.marca, tamanho:solicForm.tamanho, motivo:solicForm.motivo });
+                  const msg = uniformeMsgWhats(projectNome, colab.nome, solicForm.item, solicForm.marca, solicForm.tamanho, solicForm.motivo);
                   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-                  setForm(null);
+                  setSolicForm(null);
                 }}
-                style={{flex:1,background:"#25d366",border:"none",color:"#062",borderRadius:8,padding:"11px",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>
-                📲 Salvar + WhatsApp
-              </button>
+                style={{flex:1,background:"#25d366",border:"none",color:"#062",borderRadius:8,padding:"11px",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>📲 Salvar + WhatsApp</button>
             </div>
           </div>
         </div>
@@ -791,7 +854,8 @@ function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onCo
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, dark }) {
+
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -985,6 +1049,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             dark={dark}
             onSolicitar={onSolicitarUniforme}
             onConfirmar={onConfirmarUniforme}
+            onSalvarLista={onSalvarListaUniforme}
           />
 
           {/* Histórico */}
@@ -2170,6 +2235,23 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setMontarLiderId(null);
   };
 
+  // ── Uniforme: salva a lista de material que o colaborador USA (Fase 1).
+  // lista = { [nomeItem]: { usa:true, tamanho, marca } }
+  const salvarListaUniforme = async (colabId, lista) => {
+    const colab = equipeData.colaboradores.find(c=>c.id===colabId);
+    if(!colab) return;
+    const unf = colab.uniforme || { itens:{}, solicitacoes:[] };
+    // Mescla: mantém histórico/ultimaTroca já existentes, atualiza usa/tamanho/marca.
+    const itens = { ...(unf.itens||{}) };
+    Object.entries(lista).forEach(([nome, dados])=>{
+      itens[nome] = { ...(itens[nome]||{}), usa:dados.usa, tamanho:dados.tamanho||itens[nome]?.tamanho||"", marca:dados.marca||itens[nome]?.marca||"" };
+    });
+    const novoUnf = { ...unf, itens, listaMontada:true };
+    const novos = equipeData.colaboradores.map(c=>c.id===colabId?{...c, uniforme:novoUnf}:c);
+    await save({ ...equipeData, colaboradores:novos });
+    setSelColab(novos.find(c=>c.id===colabId));
+  };
+
   // ── Uniforme: solicita troca (gera pendência com SLA) e confirma recebimento.
   // Dados aditivos em colab.uniforme = { itens:{[nome]:{ultimaTroca, marca, tamanho}}, solicitacoes:[...] }
   const solicitarUniforme = async (colabId, { item, marca, tamanho, motivo }) => {
@@ -2343,6 +2425,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         projectNome={`${project.id} · ${project.name||""}`}
         onSolicitarUniforme={solicitarUniforme}
         onConfirmarUniforme={confirmarRecebimentoUniforme}
+        onSalvarListaUniforme={salvarListaUniforme}
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
