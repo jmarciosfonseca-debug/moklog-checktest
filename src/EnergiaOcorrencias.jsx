@@ -529,7 +529,7 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
             <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>
               {d.fornecedor?.nome} · contato às {fmtHora(d.contatoEfetuadoEm)}
             </div>
-          ) : janela.liberada ? (
+          ) : (janela.liberada || aberto.tipoRegistro==="diesel_avulso") ? (
             <>
               <button onClick={()=>setCascataAberta(v=>!v)} style={{width:"100%",marginTop:8,padding:"9px",borderRadius:8,border:`1px solid ${COR.purple}55`,background:"transparent",color:COR.purple,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
                 ⛽ Fornecedor de diesel ▾
@@ -652,12 +652,16 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
 
   const eventos = data.eventos||[];
   const aberto = eventos.find(e=>!e.concluido && e.tipoRegistro!=="diesel_avulso");
-  // Chamados de diesel ainda pendentes (acionados mas sem abastecimento completo),
-  // mesmo que a queda de energia já tenha sido concluída, OU solicitações avulsas.
-  const dieselPendentes = eventos.filter(e=>
-    e.diesel && e.diesel.acionado && !e.diesel.abastecimentoCompletoEm
-    && !(aberto && e.id===aberto.id) // o da queda ainda aberta já aparece no cartão dela
-  );
+  // Chamados de diesel ainda pendentes: (a) quedas com diesel acionado mas sem
+  // abastecimento completo, e (b) solicitações avulsas ainda não finalizadas
+  // (mesmo antes de escolher a empresa, para o passo 1 aparecer).
+  const dieselPendentes = eventos.filter(e=>{
+    if(aberto && e.id===aberto.id) return false; // o da queda aberta aparece no cartão dela
+    const dz = e.diesel || {};
+    if(dz.abastecimentoCompletoEm) return false; // já finalizado
+    if(e.tipoRegistro==="diesel_avulso") return true; // avulso sempre aparece até finalizar
+    return dz.acionado; // queda: só se o diesel foi acionado
+  });
   const concluidos = [...eventos].filter(e=>e.concluido && e.tipoRegistro!=="diesel_avulso").sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
   const ultimaConcluida = concluidos[0];
   const baseContagem = ultimaConcluida?.fimQueda || data.config?.monitorandoDesde || null;
