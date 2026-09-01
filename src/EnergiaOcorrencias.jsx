@@ -478,6 +478,37 @@ function EditSheet({ cfgForm, setCfgForm, erro, onSave, onClose, saving, dark, S
   );
 }
 
+// ── Modal: quem solicitou o abastecimento avulso ─────────────────────────
+function DieselAvulsoModal({ dark, onConfirm, onCancel }){
+  const [quem, setQuem] = useState("");
+  const [papel, setPapel] = useState("Segurança");
+  const papeis = ["Segurança","Manutencista","Facilities","Gerência"];
+  const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b", card=dark?"#0b1220":"#fff";
+  const podeOk = quem.trim().length>=3;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
+      <div style={{background:card,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:410,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
+        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>⛽ Solicitar diesel (sem queda)</div>
+        <div style={{fontSize:12,color:txt2,marginBottom:14}}>Informe quem está solicitando o abastecimento.</div>
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Função</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+          {papeis.map(p=>(
+            <button key={p} onClick={()=>setPapel(p)} style={{background:papel===p?"#8b7cf6":"transparent",border:`1px solid ${papel===p?"#8b7cf6":(dark?"#1e293b":"#cbd5e1")}`,color:papel===p?"#fff":txt2,borderRadius:7,padding:"7px 11px",fontSize:11.5,fontWeight:700,cursor:"pointer"}}>{p}</button>
+          ))}
+        </div>
+        <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Nome do solicitante</div>
+        <input value={quem} onChange={e=>setQuem(e.target.value)} placeholder="Nome de quem solicitou"
+          style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px 11px",fontSize:14,color:txt,marginBottom:16,boxSizing:"border-box"}}/>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onCancel} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+          <button disabled={!podeOk} onClick={()=>podeOk&&onConfirm(`${papel} — ${quem.trim()}`)}
+            style={{flex:1,background:podeOk?"linear-gradient(135deg,#8b7cf6,#6d28d9)":"#1e293b",border:"none",color:podeOk?"#fff":"#475569",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:podeOk?"pointer":"not-allowed"}}>Abrir solicitação</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Timeline do fluxo de diesel dentro da ocorrência em aberto ───────────
 function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEntrega, onFinalizar }){
   const aberto = evento;
@@ -636,6 +667,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   const [selPDF,setSelPDF]=useState([]);       // ids selecionados
   const dieselOn = DIESEL_ELIGIBLE.includes(project?.id);
   const [dieselFornSel,setDieselFornSel]=useState(null); // fornecedor selecionado (cascata)
+  const [dieselAvulsoModal,setDieselAvulsoModal]=useState(false); // modal "quem solicitou"
   const [cfgForm,setCfgForm]=useState({});
   const [form,setForm]=useState({});
   const [erro,setErro]=useState(null);
@@ -662,7 +694,11 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     if(e.tipoRegistro==="diesel_avulso") return true; // avulso sempre aparece até finalizar
     return dz.acionado; // queda: só se o diesel foi acionado
   });
-  const concluidos = [...eventos].filter(e=>e.concluido && e.tipoRegistro!=="diesel_avulso").sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
+  const concluidos = [...eventos].filter(e=>{
+    // Avulsos: só aparecem no histórico depois de finalizados (senão estão no cartão pendente).
+    if(e.tipoRegistro==="diesel_avulso") return !!(e.diesel && e.diesel.abastecimentoCompletoEm);
+    return e.concluido;
+  }).sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
   const ultimaConcluida = concluidos[0];
   const baseContagem = ultimaConcluida?.fimQueda || data.config?.monitorandoDesde || null;
   const diasSemQueda = baseContagem ? Math.floor((agora-new Date(baseContagem).getTime())/86400000) : null;
@@ -712,13 +748,21 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   };
   // Solicitação avulsa de diesel (sem queda de energia vinculada).
   const registrarDieselAvulso = async () => {
+    // Impede abrir mais de uma solicitação avulsa ao mesmo tempo.
+    const jaAberto = eventos.some(e=>e.tipoRegistro==="diesel_avulso" && !(e.diesel&&e.diesel.abastecimentoCompletoEm));
+    if(jaAberto){ setToastMsg("Já existe uma solicitação de diesel em andamento ⛽"); return; }
+    setDieselAvulsoModal(true);
+  };
+  // Confirma a solicitação avulsa após informar quem solicitou.
+  const confirmarDieselAvulso = async (solicitante) => {
     const ev = {
       id:newId(), tipoRegistro:"diesel_avulso", concluido:true,
       inicioQueda:new Date().toISOString(), // usado só para ordenação no histórico
       turno:turnoAgora(), criadoEm:new Date().toISOString(), arquivado:false,
-      diesel:{ acionado:false }, // será preenchido pelo fluxo
+      diesel:{ acionado:false, solicitante: solicitante||"" },
     };
     await persist({ ...data, eventos:[...eventos, ev] });
+    setDieselAvulsoModal(false);
     setToastMsg("Solicitação de diesel aberta ⛽");
   };
 
@@ -1059,6 +1103,9 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             <div style={{fontSize:15,fontWeight:700,color:dark?"#fff":"#0f172a"}}>
               {ev.tipoRegistro==="diesel_avulso" ? "Solicitação de diesel (sem queda)" : "Diesel pendente — energia já restabelecida"}
             </div>
+            {ev.tipoRegistro==="diesel_avulso" && ev.diesel?.solicitante && (
+              <div style={{fontSize:11,...S.txt2,marginTop:2}}>Solicitado por: {ev.diesel.solicitante}</div>
+            )}
             {ev.tipoRegistro!=="diesel_avulso" && ev.fimQueda && (
               <div style={{fontSize:11,...S.txt2,marginTop:2}}>Queda concluída · {duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))} sem energia</div>
             )}
@@ -1100,8 +1147,19 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                     <div style={{fontSize:10.5,color:S.txt2.color,textTransform:"uppercase",letterSpacing:.5}}>{dm.m}</div>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:600,...S.txt}}>{fmtHora(ev.inicioQueda)} → {fmtHora(ev.fimQueda)}{ev.arquivado?" 📥":""}</div>
-                    <div style={{fontSize:12.5,color:S.txt2.color,marginTop:2}}>Duração: {duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))}</div>
+                    {ev.tipoRegistro==="diesel_avulso" ? (
+                      <>
+                        <div style={{fontSize:14,fontWeight:600,...S.txt}}>⛽ Abastecimento avulso{ev.diesel?.fornecedor?.nome?` · ${ev.diesel.fornecedor.nome}`:""}</div>
+                        <div style={{fontSize:12.5,color:S.txt2.color,marginTop:2}}>
+                          {ev.diesel?.litros?`${ev.diesel.litros}`:"—"}{ev.diesel?.solicitante?` · ${ev.diesel.solicitante}`:""}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{fontSize:14,fontWeight:600,...S.txt}}>{fmtHora(ev.inicioQueda)} → {fmtHora(ev.fimQueda)}{ev.arquivado?" 📥":""}{ev.diesel?.acionado?" ⛽":""}</div>
+                        <div style={{fontSize:12.5,color:S.txt2.color,marginTop:2}}>Duração: {duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))}</div>
+                      </>
+                    )}
                   </div>
                   <span style={{fontSize:10.5,fontWeight:700,padding:"4px 9px",borderRadius:999,letterSpacing:.4,flexShrink:0,
                     background:ev.turno==="Diurno"?"rgba(245,185,66,.12)":"rgba(139,124,246,.14)",
@@ -1154,6 +1212,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
       </div>
 
       {showSheet && <EditSheet cfgForm={cfgForm} setCfgForm={setCfgForm} erro={erro} onSave={salvarConfig} onClose={()=>setShowSheet(false)} saving={saving} dark={dark} S={S}/>}
+      {dieselAvulsoModal && <DieselAvulsoModal dark={dark} onConfirm={confirmarDieselAvulso} onCancel={()=>setDieselAvulsoModal(false)}/>}
       <Toast msg={toastMsg} dark={dark}/>
     </div></div>
   );
