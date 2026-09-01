@@ -245,21 +245,22 @@ function montarHtmlEnergia(project, lista, subtitulo, label){
     if(e.operador) medidas.push(`Operador: ${e.operador}`);
     if(e.obs) medidas.push(`Obs.: ${e.obs}`);
     // Dados do abastecimento de diesel (quando houve acionamento)
+    let dieselCol = "—", dieselDetalhe = "";
     if(e.diesel && e.diesel.acionado){
       const dz = e.diesel;
-      let tempoResp = "";
+      let tempoResp = "—";
       if(dz.contatoEfetuadoEm && dz.entregaChegouEm){
         const ms = new Date(dz.entregaChegouEm)-new Date(dz.contatoEfetuadoEm);
         const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
-        tempoResp = ` · tempo de resposta ${h>0?h+"h ":""}${m}min`;
+        tempoResp = `${h>0?h+"h ":""}${m}min`;
       }
-      const partes = [`⛽ Diesel: ${dz.fornecedor?.nome||"—"}`];
-      if(dz.litros) partes.push(dz.litros);
-      if(tempoResp) partes.push(tempoResp.replace(" · ",""));
-      if(dz.descricao) partes.push(dz.descricao);
-      medidas.push(partes.join(" · "));
+      dieselCol = `<span style="color:#16a34a;font-weight:800">✅</span>`;
+      const itens = [`<strong>Empresa:</strong> ${dz.fornecedor?.nome||"—"}`, `<strong>Tempo de resposta:</strong> ${tempoResp}`];
+      if(dz.litros) itens.push(`<strong>Litros:</strong> ${dz.litros}`);
+      if(dz.descricao) itens.push(`<strong>Detalhe:</strong> ${dz.descricao}`);
+      dieselDetalhe = `<tr class="det diesel"><td colspan="8">⛽ <strong style="color:#16a34a">Abastecimento de diesel solicitado</strong> · ${itens.join(" · ")}</td></tr>`;
     }
-    const detalhe = medidas.length ? `<tr class="det"><td colspan="7"><strong>Medidas / observações:</strong> ${medidas.join(" · ")}</td></tr>` : "";
+    const detalhe = medidas.length ? `<tr class="det"><td colspan="8"><strong>Medidas / observações:</strong> ${medidas.join(" · ")}</td></tr>` : "";
     return `<tr class="main${i%2?" alt":""}">
       <td>${fmtDataHora(e.inicioQueda)}</td>
       <td>${dur}</td>
@@ -267,8 +268,9 @@ function montarHtmlEnergia(project, lista, subtitulo, label){
       <td class="c">${e.gerador==="sim"?"✅":"—"}</td>
       <td class="c">${e.manutencista?"✅":"—"}</td>
       <td class="c">${e.impactoOperacao?"⚠️":"—"}</td>
+      <td class="c">${dieselCol}</td>
       <td class="prot">${e.protocolo||"—"}</td>
-    </tr>${detalhe}`;
+    </tr>${dieselDetalhe}${detalhe}`;
   }).join("");
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Energia ${label} ${project.id}</title>
@@ -297,6 +299,7 @@ function montarHtmlEnergia(project, lista, subtitulo, label){
   td.c{text-align:center} td.prot{font-size:9px;color:#475569;font-family:monospace}
   tr.main.alt td{background:#fafbfc}
   tr.det td{background:#f8f7ff;font-size:10px;color:#475569;border-bottom:2px solid #ede9fe;padding:6px 10px 9px}
+  tr.det.diesel td{background:#f0fdf4;border-bottom:2px solid #bbf7d0;color:#166534}
   tr{page-break-inside:avoid;break-inside:avoid}
   .analise{margin-top:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px}
   .analise h3{font-size:12px;color:#312e81;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
@@ -332,8 +335,8 @@ function montarHtmlEnergia(project, lista, subtitulo, label){
   <div class="kpi"><div class="kpi-val">${geradores}🔌 / ${manutencistas}🔧</div><div class="kpi-lbl">Gerador / Manutencista</div></div>
 </div>
 <div class="sec-title">📋 Registro detalhado — ${doPeriodo.length} ocorrência(s) · ${comProtocolo} com protocolo</div>
-<table><thead><tr><th>Início</th><th>Duração</th><th>Turno</th><th>Gerador</th><th>Manut.</th><th>Impacto</th><th>Protocolo</th></tr></thead>
-<tbody>${linhas||'<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:16px">Sem ocorrências selecionadas</td></tr>'}</tbody></table>
+<table><thead><tr><th>Início</th><th>Duração</th><th>Turno</th><th>Gerador</th><th>Manut.</th><th>Impacto</th><th>Diesel</th><th>Protocolo</th></tr></thead>
+<tbody>${linhas||'<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">Sem ocorrências selecionadas</td></tr>'}</tbody></table>
 <div class="analise">
   <h3>📊 Síntese analítica</h3>
   <div class="row"><span>Ocorrência mais longa</span><b>${maisLongaTxt}</b></div>
@@ -476,7 +479,8 @@ function EditSheet({ cfgForm, setCfgForm, erro, onSave, onClose, saving, dark, S
 }
 
 // ── Timeline do fluxo de diesel dentro da ocorrência em aberto ───────────
-function DieselFluxo({ aberto, agora, dark, fornSel, setFornSel, onContato, onEntrega, onFinalizar }){
+function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEntrega, onFinalizar }){
+  const aberto = evento;
   const d = aberto.diesel || {};
   const janela = dieselJanelaAgora();
   const [cascataAberta, setCascataAberta] = useState(false);
@@ -539,7 +543,7 @@ function DieselFluxo({ aberto, agora, dark, fornSel, setFornSel, onContato, onEn
                     </div>
                   ))}
                   {fornSel && (
-                    <button onClick={onContato} style={{width:"100%",marginTop:4,padding:"10px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
+                    <button onClick={()=>onContato(aberto.id, fornSel)} style={{width:"100%",marginTop:4,padding:"10px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
                       ✓ Contato efetuado → cravar horário e iniciar contagem
                     </button>
                   )}
@@ -565,7 +569,7 @@ function DieselFluxo({ aberto, agora, dark, fornSel, setFornSel, onContato, onEn
             {passo2Feito ? (
               <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Entrega chegou às {fmtHora(d.entregaChegouEm)}</div>
             ) : (
-              <button onClick={onEntrega} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
+              <button onClick={()=>onEntrega(aberto.id)} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
                 🚚 Entrega chegou → cravar horário
               </button>
             )}
@@ -598,7 +602,7 @@ function DieselFluxo({ aberto, agora, dark, fornSel, setFornSel, onContato, onEn
                     <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{addFotoDiesel(e.target.files?.[0]);e.target.value="";}}/>
                   </label>
                 )}
-                <button onClick={()=>onFinalizar(litros,descricao,foto)} style={{width:"100%",marginTop:8,padding:"11px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>
+                <button onClick={()=>onFinalizar(aberto.id,litros,descricao,foto)} style={{width:"100%",marginTop:8,padding:"11px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>
                   ✓ Finalizar abastecimento → para cronômetro do diesel
                 </button>
               </>
@@ -647,8 +651,14 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   useEffect(()=>{ if(!toastMsg) return; const t=setTimeout(()=>setToastMsg(null),2200); return ()=>clearTimeout(t); },[toastMsg]);
 
   const eventos = data.eventos||[];
-  const aberto = eventos.find(e=>!e.concluido);
-  const concluidos = [...eventos].filter(e=>e.concluido).sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
+  const aberto = eventos.find(e=>!e.concluido && e.tipoRegistro!=="diesel_avulso");
+  // Chamados de diesel ainda pendentes (acionados mas sem abastecimento completo),
+  // mesmo que a queda de energia já tenha sido concluída, OU solicitações avulsas.
+  const dieselPendentes = eventos.filter(e=>
+    e.diesel && e.diesel.acionado && !e.diesel.abastecimentoCompletoEm
+    && !(aberto && e.id===aberto.id) // o da queda ainda aberta já aparece no cartão dela
+  );
+  const concluidos = [...eventos].filter(e=>e.concluido && e.tipoRegistro!=="diesel_avulso").sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
   const ultimaConcluida = concluidos[0];
   const baseContagem = ultimaConcluida?.fimQueda || data.config?.monitorandoDesde || null;
   const diasSemQueda = baseContagem ? Math.floor((agora-new Date(baseContagem).getTime())/86400000) : null;
@@ -664,34 +674,48 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     setToastMsg("Queda registrada — em aberto ⏳");
   };
 
-  // ── Fluxo diesel: grava de forma aditiva o objeto `diesel` no evento aberto.
-  const patchDiesel = async (patch) => {
-    if(!aberto) return;
-    const novo = { ...(aberto.diesel||{}), ...patch };
-    await persist({ ...data, eventos:eventos.map(e=>e.id===aberto.id?{...e, diesel:novo}:e) });
+  // ── Fluxo diesel: grava de forma aditiva o objeto `diesel` num evento.
+  // Aceita eventId para funcionar mesmo após a queda ser concluída (diesel
+  // pendente) e para solicitações avulsas.
+  const patchDiesel = async (eventId, patch) => {
+    const alvo = eventId || aberto?.id;
+    if(!alvo) return;
+    await persist({ ...data, eventos:eventos.map(e=>e.id===alvo?{...e, diesel:{...(e.diesel||{}), ...patch}}:e) });
   };
-  const dieselContatoEfetuado = async () => {
-    if(!dieselFornSel) return;
-    await patchDiesel({
+  const dieselContatoEfetuado = async (eventId, forn) => {
+    const f = forn || dieselFornSel;
+    if(!f) return;
+    await patchDiesel(eventId, {
       acionado:true,
-      fornecedor:{ nome:dieselFornSel.nome, telefone:dieselFornSel.exibicao },
+      fornecedor:{ nome:f.nome, telefone:f.exibicao },
       janela:dieselJanelaAgora().tipo,
       acionadoPor: (sharedAuth?.nome)||"Segurança",
       contatoEfetuadoEm:new Date().toISOString(),
     });
     setToastMsg("Contato efetuado — cronômetro do diesel iniciado ⛽");
   };
-  const dieselEntregaChegou = async () => {
-    await patchDiesel({ entregaChegouEm:new Date().toISOString() });
+  const dieselEntregaChegou = async (eventId) => {
+    await patchDiesel(eventId, { entregaChegouEm:new Date().toISOString() });
     setToastMsg("Entrega registrada 🚚");
   };
-  const dieselFinalizar = async (litros, descricao, foto) => {
-    await patchDiesel({
+  const dieselFinalizar = async (eventId, litros, descricao, foto) => {
+    await patchDiesel(eventId, {
       abastecimentoCompletoEm:new Date().toISOString(),
       litros: litros||"", descricao: descricao||"", foto: foto||null,
       status:"completed",
     });
     setToastMsg("Abastecimento finalizado ✓");
+  };
+  // Solicitação avulsa de diesel (sem queda de energia vinculada).
+  const registrarDieselAvulso = async () => {
+    const ev = {
+      id:newId(), tipoRegistro:"diesel_avulso", concluido:true,
+      inicioQueda:new Date().toISOString(), // usado só para ordenação no histórico
+      turno:turnoAgora(), criadoEm:new Date().toISOString(), arquivado:false,
+      diesel:{ acionado:false }, // será preenchido pelo fluxo
+    };
+    await persist({ ...data, eventos:[...eventos, ev] });
+    setToastMsg("Solicitação de diesel aberta ⛽");
   };
 
   const abrirConcluir = () => {
@@ -982,7 +1006,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             {/* Fluxo de diesel (só projetos elegíveis) */}
             {dieselOn && (
               <DieselFluxo
-                aberto={aberto} agora={agora} dark={dark}
+                evento={aberto} agora={agora} dark={dark}
                 fornSel={dieselFornSel} setFornSel={setDieselFornSel}
                 onContato={dieselContatoEfetuado}
                 onEntrega={dieselEntregaChegou}
@@ -1012,8 +1036,37 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             ) : (
               <button onClick={abrirRegistro} disabled={saving} style={S.btn}>➕ Registrar falta de energia</button>
             )}
+            {/* Solicitação avulsa de diesel (sem queda) — só projetos elegíveis */}
+            {dieselOn && !modoRegistro && (
+              <button onClick={registrarDieselAvulso} disabled={saving} style={{...S.btnSec,fontSize:13,marginTop:8,borderColor:COR.amber,color:COR.amber}}>
+                ⛽ Solicitar diesel (sem queda de energia)
+              </button>
+            )}
           </>
         )}
+
+        {/* Cartões de diesel pendente (energia já voltou, mas abastecimento não chegou; ou avulso) */}
+        {dieselOn && dieselPendentes.map(ev=>(
+          <div key={ev.id} style={{background:dark?"#1a1000":"#fffbeb",border:`2px solid ${COR.amber}`,borderRadius:16,padding:16}}>
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11.5,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",
+              color:COR.amber,background:"rgba(245,185,66,.12)",padding:"5px 10px",borderRadius:999,marginBottom:10}}>
+              ⛽ Abastecimento em andamento
+            </div>
+            <div style={{fontSize:15,fontWeight:700,color:dark?"#fff":"#0f172a"}}>
+              {ev.tipoRegistro==="diesel_avulso" ? "Solicitação de diesel (sem queda)" : "Diesel pendente — energia já restabelecida"}
+            </div>
+            {ev.tipoRegistro!=="diesel_avulso" && ev.fimQueda && (
+              <div style={{fontSize:11,...S.txt2,marginTop:2}}>Queda concluída · {duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))} sem energia</div>
+            )}
+            <DieselFluxo
+              evento={ev} agora={agora} dark={dark}
+              fornSel={dieselFornSel} setFornSel={setDieselFornSel}
+              onContato={dieselContatoEfetuado}
+              onEntrega={dieselEntregaChegou}
+              onFinalizar={dieselFinalizar}
+            />
+          </div>
+        ))}
 
         {/* Últimos registros */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"6px 2px 0"}}>
