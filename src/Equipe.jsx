@@ -124,6 +124,44 @@ function montarEquipesDisponivel(projectId, colaboradores){
 }
 // Detecta se um colaborador é líder pelo cargo.
 function ehLider(c){ return /l[íi]der/i.test(c?.cargo||""); }
+
+// ── Uniforme e Material Tático ───────────────────────────────────────────
+// Catálogo em cascata por categoria. gravaMarca = pede marca; validade = item
+// com validade (colete balístico, documentos).
+const UNIFORME_CATALOGO = [
+  { cat:"👕 Uniforme", itens:[
+    { nome:"Sapato / Coturno", gravaMarca:true, sugMarca:"Macboot" },
+    { nome:"Calça", gravaMarca:true },
+    { nome:"Camisa / Camisão", gravaMarca:true },
+    { nome:"Jaqueta / Terno", gravaMarca:true },
+  ]},
+  { cat:"🛡️ Material Tático", itens:[
+    { nome:"Cinturão" }, { nome:"Coldre" }, { nome:"Pochete" },
+    { nome:"Capa Balística", validade:true }, { nome:"Porta Jetloader" },
+    { nome:"Porta Carregador" }, { nome:"Fone Lapela" }, { nome:"Tonfa" }, { nome:"Colete" },
+  ]},
+  { cat:"📄 Documento", itens:[
+    { nome:"CNV", validade:true }, { nome:"Crachá" },
+  ]},
+];
+const UNIFORME_SLA_ALERTA = 5; // dias em aberto para alertar
+function uniformeDiasAberto(desdeIso){
+  if(!desdeIso) return 0;
+  return Math.floor((Date.now()-new Date(desdeIso).getTime())/86400000);
+}
+// Monta a mensagem de WhatsApp da solicitação.
+function uniformeMsgWhats(projectNome, colabNome, item, marca, tamanho, motivo){
+  const linhas = [
+    "*SOLICITAÇÃO DE UNIFORME / MATERIAL* 📦",
+    `*Unidade:* ${projectNome||"—"}`,
+    `*Colaborador:* ${colabNome||"—"}`,
+    `*Item:* ${item}${marca?` (${marca})`:""}`,
+  ];
+  if(tamanho) linhas.push(`*Tamanho:* ${tamanho}`);
+  if(motivo) linhas.push(`*Motivo:* ${motivo}`);
+  linhas.push(`*Data:* ${new Date().toLocaleDateString("pt-BR")}`);
+  return linhas.join("\n");
+}
 function chkEqParseISO(iso){ const [y,m,d]=String(iso).split("-").map(Number); return new Date(y,(m||1)-1,d||1); }
 function chkEqISO(d){ return d.toLocaleDateString("sv-SE"); }
 // Sábado (>=) mais próximo à frente de uma data.
@@ -619,7 +657,141 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 }
 
 // ── Tela de ficha completa
-function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, dark }) {
+// ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
+function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onConfirmar }){
+  const S = getStyles(dark);
+  const [aberto, setAberto] = useState(false);
+  const [form, setForm] = useState(null); // {item, marca, tamanho, motivo} quando solicitando
+  const [histItem, setHistItem] = useState(null); // item cujo histórico está aberto
+  const unf = colab.uniforme || { itens:{}, solicitacoes:[] };
+  const pendentes = (unf.solicitacoes||[]).filter(s=>s.status==="pendente");
+  const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
+
+  const catInfo = (nomeItem)=>{
+    for(const g of UNIFORME_CATALOGO){ const it=g.itens.find(i=>i.nome===nomeItem); if(it) return it; }
+    return {};
+  };
+
+  return (
+    <div style={S.card}>
+      <div onClick={()=>setAberto(a=>!a)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer" }}>
+        <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>📦 Uniforme e Material Tático
+          {pendentes.length>0 && <span style={{ fontSize:10, color:"#f59e0b", marginLeft:8, fontWeight:700 }}>{pendentes.length} pendente(s)</span>}
+        </div>
+        <span style={{ color:"#64748b", fontSize:14 }}>{aberto?"▾":"›"}</span>
+      </div>
+
+      {aberto && (
+        <div style={{ marginTop:12 }}>
+          {/* Solicitações pendentes com SLA */}
+          {pendentes.map(s=>{
+            const dias = uniformeDiasAberto(s.solicitadoEm);
+            const alerta = dias>=UNIFORME_SLA_ALERTA;
+            return (
+              <div key={s.id} style={{ background:alerta?"#1a0202":(dark?"#1a1000":"#fffbeb"), border:`1px solid ${alerta?"#ef444455":"#f59e0b44"}`, borderRadius:10, padding:"10px 12px", marginBottom:8 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>
+                  {alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente
+                </div>
+                <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>
+                  Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}
+                </div>
+                {canManage && (
+                  <button onClick={()=>onConfirmar(colab.id, s.id)}
+                    style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                    ✓ Confirmar recebimento (zera SLA)
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Catálogo por categoria */}
+          {UNIFORME_CATALOGO.map(grupo=>(
+            <div key={grupo.cat} style={{ marginBottom:10 }}>
+              <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.5, marginBottom:6 }}>{grupo.cat}</div>
+              {grupo.itens.map(it=>{
+                const dados = unf.itens?.[it.nome];
+                const ult = dados?.ultimaTroca;
+                return (
+                  <div key={it.nome} style={{ background:dark?"#0d1424":"#f8fafc", border:`1px solid ${dark?"#1c2438":"#e2e8f0"}`, borderRadius:8, padding:"9px 11px", marginBottom:6 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12.5, fontWeight:600, color:txt }}>
+                          {it.nome}{dados?.marca?<span style={{color:txt2,fontWeight:400}}> · {dados.marca}</span>:it.sugMarca?<span style={{color:"#475569",fontWeight:400}}> · {it.sugMarca}?</span>:""}
+                        </div>
+                        <div style={{ fontSize:10, color:txt2 }}>
+                          {ult?`Última troca: ${fmtDate(ult.slice(0,10))}`:"Sem registro de troca"}{dados?.tamanho?` · Tam ${dados.tamanho}`:""}
+                        </div>
+                      </div>
+                      {canManage && (
+                        <button onClick={()=>setForm({ item:it.nome, marca:dados?.marca||it.sugMarca||"", tamanho:dados?.tamanho||"", motivo:"", gravaMarca:it.gravaMarca })}
+                          style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 9px", flexShrink:0 }}>
+                          Solicitar
+                        </button>
+                      )}
+                    </div>
+                    {dados?.historico?.length>0 && (
+                      <button onClick={()=>setHistItem(histItem===it.nome?null:it.nome)}
+                        style={{ background:"transparent", border:"none", color:"#64748b", fontSize:10, cursor:"pointer", padding:"4px 0 0", textDecoration:"underline" }}>
+                        {histItem===it.nome?"ocultar histórico":`ver histórico (${dados.historico.length})`}
+                      </button>
+                    )}
+                    {histItem===it.nome && dados?.historico && (
+                      <div style={{ marginTop:6, paddingLeft:8, borderLeft:`2px solid ${dark?"#1c2438":"#e2e8f0"}` }}>
+                        {[...dados.historico].reverse().map((h,idx)=>(
+                          <div key={idx} style={{ fontSize:10, color:txt2, padding:"2px 0" }}>
+                            {fmtDate(h.data.slice(0,10))}{h.marca?` · ${h.marca}`:""}{h.tamanho?` · Tam ${h.tamanho}`:""}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal de solicitação */}
+      {form && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:210,padding:16}}>
+          <div style={{background:dark?"#0b1220":"#fff",borderRadius:14,padding:"18px 16px",width:"100%",maxWidth:400,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
+            <div style={{fontSize:15,fontWeight:800,color:txt,marginBottom:2}}>Solicitar: {form.item}</div>
+            <div style={{fontSize:11,color:txt2,marginBottom:12}}>{colab.nome}</div>
+            {form.gravaMarca && (
+              <>
+                <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Marca</div>
+                <input value={form.marca} onChange={e=>setForm({...form,marca:e.target.value})} placeholder="Marca (grava para o item)"
+                  style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:10,boxSizing:"border-box"}}/>
+              </>
+            )}
+            <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Tamanho</div>
+            <input value={form.tamanho} onChange={e=>setForm({...form,tamanho:e.target.value})} placeholder="Ex.: 42 / G / M"
+              style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:10,boxSizing:"border-box"}}/>
+            <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Motivo</div>
+            <input value={form.motivo} onChange={e=>setForm({...form,motivo:e.target.value})} placeholder="Desgaste, extravio, troca de tamanho…"
+              style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:14,boxSizing:"border-box"}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setForm(null)} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+              <button onClick={async()=>{
+                  await onSolicitar(colab.id, { item:form.item, marca:form.marca, tamanho:form.tamanho, motivo:form.motivo });
+                  const msg = uniformeMsgWhats(projectNome, colab.nome, form.item, form.marca, form.tamanho, form.motivo);
+                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                  setForm(null);
+                }}
+                style={{flex:1,background:"#25d366",border:"none",color:"#062",borderRadius:8,padding:"11px",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>
+                📲 Salvar + WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -804,6 +976,16 @@ function FichaScreen({ colab, adminAuth, liderAuth, onBack, onEdit, onAddHist, o
               <div style={{ fontSize:13, color:colab.ultimaReciclagem?"#22c55e":"#ef4444", fontWeight:600 }}>{fmtDate(colab.ultimaReciclagem)}</div>
             </div>
           </div>
+
+          {/* Uniforme e Material Tático */}
+          <UniformeModulo
+            colab={colab}
+            projectNome={projectNome}
+            canManage={adminAuth || liderAuth}
+            dark={dark}
+            onSolicitar={onSolicitarUniforme}
+            onConfirmar={onConfirmarUniforme}
+          />
 
           {/* Histórico */}
           <div style={S.card}>
@@ -1988,6 +2170,44 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setMontarLiderId(null);
   };
 
+  // ── Uniforme: solicita troca (gera pendência com SLA) e confirma recebimento.
+  // Dados aditivos em colab.uniforme = { itens:{[nome]:{ultimaTroca, marca, tamanho}}, solicitacoes:[...] }
+  const solicitarUniforme = async (colabId, { item, marca, tamanho, motivo }) => {
+    const colab = equipeData.colaboradores.find(c=>c.id===colabId);
+    if(!colab) return;
+    const nova = {
+      id: (crypto?.randomUUID ? crypto.randomUUID() : "unf-"+Date.now()),
+      item, marca:marca||"", tamanho:tamanho||"", motivo:motivo||"",
+      status:"pendente", solicitadoEm:new Date().toISOString(),
+      solicitadoPor: authLevel==="admin" ? "Gerencial" : "Líder",
+    };
+    const unf = colab.uniforme || { itens:{}, solicitacoes:[] };
+    const novoUnf = { ...unf, solicitacoes:[...(unf.solicitacoes||[]), nova] };
+    const novos = equipeData.colaboradores.map(c=>c.id===colabId?{...c, uniforme:novoUnf}:c);
+    await save({ ...equipeData, colaboradores:novos });
+    const novoColab = novos.find(c=>c.id===colabId);
+    setSelColab(novoColab);
+    return nova;
+  };
+  const confirmarRecebimentoUniforme = async (colabId, solicId) => {
+    const colab = equipeData.colaboradores.find(c=>c.id===colabId);
+    if(!colab) return;
+    const unf = colab.uniforme || { itens:{}, solicitacoes:[] };
+    const solic = (unf.solicitacoes||[]).find(s=>s.id===solicId);
+    if(!solic) return;
+    const entregueEm = new Date().toISOString();
+    const solicitacoes = (unf.solicitacoes||[]).map(s=>s.id===solicId?{...s, status:"entregue", entregueEm}:s);
+    // Atualiza "última troca" do item + histórico do item.
+    const itens = { ...(unf.itens||{}) };
+    const chave = solic.item;
+    const histItem = [...((itens[chave]?.historico)||[]), { data:entregueEm, marca:solic.marca, tamanho:solic.tamanho }];
+    itens[chave] = { ...(itens[chave]||{}), ultimaTroca:entregueEm, marca:solic.marca||itens[chave]?.marca||"", tamanho:solic.tamanho||itens[chave]?.tamanho||"", historico:histItem };
+    const novoUnf = { ...unf, solicitacoes, itens };
+    const novos = equipeData.colaboradores.map(c=>c.id===colabId?{...c, uniforme:novoUnf}:c);
+    await save({ ...equipeData, colaboradores:novos });
+    setSelColab(novos.find(c=>c.id===colabId));
+  };
+
   const removeHist = async (colabId, histId) => {
     if(!adminAuth && !liderAuth) return;
     // Medida Disciplinar (advertência/suspensão) só o gerencial pode excluir.
@@ -2120,6 +2340,9 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     return (
       <>
       <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}
+        projectNome={`${project.id} · ${project.name||""}`}
+        onSolicitarUniforme={solicitarUniforme}
+        onConfirmarUniforme={confirmarRecebimentoUniforme}
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
