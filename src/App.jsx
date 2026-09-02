@@ -4179,9 +4179,9 @@ export default function App(){
 
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
-      {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
-      {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}
-      {hasGerencial() && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
+      {/* O acesso fica visível; o próprio AssistenteIA exige PIN e token no servidor. */}
+      <BotaoIA onClick={()=>setShowIA(true)}/>
+      <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>
     </div>
   );
 }
