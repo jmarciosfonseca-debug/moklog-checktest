@@ -164,7 +164,7 @@ export default function AssistenteIA({ open, onClose }) {
       >
         {/* Cabeçalho */}
         <div style={{ padding: "16px 16px 12px", borderBottom: `1px solid ${BORDER}`, background: BG2, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${RED}, #7a1414)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✨</div>
+          <div style={{ width: 34, height: 34, borderRadius: 9, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><img src={MOKED_IA_ICON} alt="Moked IA" style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: TXT }}>Assistente IA <span style={{ color: RED }}>MokLog</span></div>
             <div style={{ fontSize: 11, color: MUTED }}>Consulta dados operacionais atuais · somente leitura</div>
