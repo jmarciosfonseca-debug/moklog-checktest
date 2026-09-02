@@ -915,7 +915,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           const zonas = atualFull?.perimetral?.zonas || [];
           return (
             <div style={{position:"relative",width:"100%"}}>
-              <img src={`/mapas/${project.id}-ronda.jpg`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
+              <img src={`/mapas/${project.id}-ronda.jpg${project.id === "P311A" ? "?v=20260902-zonas-v2" : ""}`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
                 onError={(e)=>{e.currentTarget.style.display="none";}}/>
               {pts && pts.map((p,idx)=>{
                 const z = zonas[idx];
