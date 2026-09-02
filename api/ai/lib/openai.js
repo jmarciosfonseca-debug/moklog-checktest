@@ -103,9 +103,11 @@ async function callModel({ input, tools }) {
   const params = {
     model: model(),
     input,
-    tools,
-    tool_choice: "auto",
   };
+  if (Array.isArray(tools) && tools.length) {
+    params.tools = tools;
+    params.tool_choice = "auto";
+  }
   const eff = reasoningEffort();
   if (eff) {
     params.reasoning = { effort: eff };

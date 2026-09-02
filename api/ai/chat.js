@@ -16,7 +16,7 @@ const {
   callModel, model, toResponsesTools, toolResultItem,
 } = require("./lib/openai");
 const { TOOL_SCHEMAS, runTool } = require("./tools/index");
-const { SYSTEM_PROMPT } = require("./lib/systemPrompt");
+const { SYSTEM_PROMPT, buildDateContext } = require("./lib/systemPrompt");
 
 const MAX_MESSAGE_CHARS = 2000;
 const MAX_HISTORY_MESSAGES = 20;
@@ -40,6 +40,40 @@ function logEvent(ev) {
 // Converte uma mensagem simples {role, content} em item da Responses API.
 function msgItem(role, content) {
   return { role, content: String(content == null ? "" : content) };
+}
+
+function cleanPlainText(value) {
+  return String(value || "")
+    .replace(/```[\s\S]*?```/g, block => block.replace(/```[^\n]*\n?/g, ""))
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s*\*\s+/gm, "- ")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function extractProjectId(message) {
+  const match = String(message || "").toUpperCase().match(/\bP\d{3,4}[A-C]?\b/);
+  return match ? match[0] : null;
+}
+
+function requiredPrefetch(message, now = new Date()) {
+  const text = String(message || "").toLowerCase();
+  if (/((pior|melhor|menor|maior).{0,35}(índice|percentual|saúde)|(índice|percentual|saúde).{0,35}(pior|melhor|menor|maior))/.test(text)) {
+    return { name: "get_health_ranking", args: { order: /(melhor|maior)/.test(text) ? "best" : "worst" }, reason: "A pergunta pede ranking numérico de saúde do dashboard." };
+  }
+  if (/\b(equipe|efetivo|colaborador(?:es)?|afastamento(?:s)?|férias|ferias|cobertura(?:s)?)\b/.test(text)) {
+    return { name: "get_staffing_and_vacation_gaps", args: { projectId: extractProjectId(message) || undefined }, reason: "A pergunta é sobre equipe/efetivo." };
+  }
+  if (/\b(ronda|rondas|teste|testes)\s+perimetra/.test(text) && /\b(menor|maior|menos|mais|ranking|compar)/.test(text)) {
+    const c = buildDateContext(now);
+    return { name: "get_perimeter_round_gaps", args: { startDate: c.last7Start, endDate: c.today }, reason: "A pergunta pede comparação de rondas perimetrais." };
+  }
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -99,15 +133,26 @@ module.exports = async function handler(req, res) {
   const cap = maxToolCalls();
 
   try {
+    const prefetch = requiredPrefetch(userMessage, new Date());
+    if (prefetch) {
+      const canonical = await runTool(prefetch.name, prefetch.args);
+      toolsUsed.push(prefetch.name);
+      toolCallCount += 1;
+      input.push(msgItem("system", `FONTE CANÔNICA OBRIGATÓRIA (${prefetch.reason})\nFerramenta: ${prefetch.name}\nResultado: ${JSON.stringify(canonical)}\nResponda a partir deste resultado. Não substitua esta métrica por outra ferramenta.`));
+    }
+    // Ranking de saúde é uma métrica fechada do dashboard. Depois da leitura
+    // canônica, não oferecemos outras ferramentas ao modelo: isso impede que
+    // CTMK/criticidade seja confundido com o menor percentual de saúde.
+    const modelTools = prefetch && prefetch.name === "get_health_ranking" ? [] : tools;
     for (let step = 0; step < cap + 1; step++) {
-      const { outputText, toolCalls, raw } = await callModel({ input, tools });
+      const { outputText, toolCalls, raw } = await callModel({ input, tools: modelTools });
 
       if (!toolCalls || toolCalls.length === 0) {
         const durationMs = Date.now() - t0;
         logEvent({ requestId, sid, event: "completed", model: model(), tools: toolsUsed, toolCalls: toolCallCount, durationMs });
         return res.status(200).json({
           ok: true,
-          answer: outputText || "",
+          answer: cleanPlainText(outputText || ""),
           toolsUsed,
           asOf: new Date().toISOString(),
           requestId,
@@ -148,4 +193,8 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ ok: false, errorCode: "QUERY_FAILED", message: "Erro ao processar a pergunta.", retryable: true });
   }
 };
+
+module.exports.cleanPlainText = cleanPlainText;
+module.exports.extractProjectId = extractProjectId;
+module.exports.requiredPrefetch = requiredPrefetch;
 

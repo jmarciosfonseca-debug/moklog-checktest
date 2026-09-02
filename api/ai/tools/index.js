@@ -98,7 +98,7 @@ const TOOL_SCHEMAS = [
     type: "function",
     function: {
       name: "get_perimeter_round_gaps",
-      description: "Falhas de teste perimetral por zona. Plantões em andamento não contam como falta.",
+      description: "Compara rondas/testes perimetrais registrados por projeto e lista falhas por zona. O resumo traz totalTests, testsWithNonconformities e ranking; plantões em andamento não contam como falta.",
       parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), shift: { type: "string", enum: ["noturno", "diurno"] } } },
     },
   },

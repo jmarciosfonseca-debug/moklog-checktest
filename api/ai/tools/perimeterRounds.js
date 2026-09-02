@@ -34,6 +34,7 @@ async function get_perimeter_round_gaps(args = {}) {
   const db = getDb();
   const records = [];
   const warnings = [];
+  const projects = [];
 
   for (const pid of targets) {
     let snap;
@@ -42,10 +43,20 @@ async function get_perimeter_round_gaps(args = {}) {
     } catch (e) {
       return fail("QUERY_FAILED", "Falha ao consultar perimetral.", true);
     }
-    if (!snap.exists) { warnings.push(`${pid}: sem registros de teste perimetral.`); continue; }
+    if (!snap.exists) {
+      warnings.push(`${pid}: sem registros de teste perimetral.`);
+      projects.push({ projectId: pid, projectName: PROJECT_NAMES[pid] || pid, totalTests: 0, testsWithNonconformities: 0, nonconformingZones: 0 });
+      continue;
+    }
     const data = snap.data() || {};
     const testes = Array.isArray(data.testes) ? data.testes : [];
-    if (!testes.length) { warnings.push(`${pid}: sem testes perimetrais registrados.`); continue; }
+    if (!testes.length) {
+      warnings.push(`${pid}: sem testes perimetrais registrados.`);
+      projects.push({ projectId: pid, projectName: PROJECT_NAMES[pid] || pid, totalTests: 0, testsWithNonconformities: 0, nonconformingZones: 0 });
+      continue;
+    }
+
+    let totalTests = 0, testsWithNonconformities = 0, nonconformingZones = 0;
 
     for (const t of testes) {
       const diaMs = toMillis(t.data);
@@ -53,9 +64,13 @@ async function get_perimeter_round_gaps(args = {}) {
       if (startMs != null && diaMs < startMs) continue;
       if (endMs != null && diaMs > endMs) continue;
 
+      totalTests += 1;
+
       const zonas = t.zonas || {};
       const ruins = Object.entries(zonas).filter(([, z]) => (z && z.status ? z.status : "ok") !== "ok");
       if (!ruins.length) continue;
+      testsWithNonconformities += 1;
+      nonconformingZones += ruins.length;
 
       records.push(record({
         projectId: pid,
@@ -74,6 +89,7 @@ async function get_perimeter_round_gaps(args = {}) {
         source: { collection: "perimetral", recordId: `${pid}/testes` },
       }));
     }
+    projects.push({ projectId: pid, projectName: PROJECT_NAMES[pid] || pid, totalTests, testsWithNonconformities, nonconformingZones });
   }
 
   records.sort((a, b) => Date.parse(b.occurredAt || 0) - Date.parse(a.occurredAt || 0));
@@ -81,7 +97,11 @@ async function get_perimeter_round_gaps(args = {}) {
 
   return ok({
     filters: { projectId: v.id, startDate: args.startDate || null, endDate: args.endDate || null, shift: args.shift || null },
-    summary: { total: records.length },
+    summary: {
+      totalNonconformityRecords: records.length,
+      projects: projects.sort((a, b) => a.totalTests - b.totalTests || b.testsWithNonconformities - a.testsWithNonconformities),
+      rankingRule: "menor totalTests primeiro; empate por mais testes não conformes",
+    },
     records: rows,
     dataQualityWarnings: warnings.length ? warnings : ["Nota: plantões em andamento (sem teste fechado) não são contados como falta."],
     truncated,
