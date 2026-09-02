@@ -75,8 +75,13 @@ test("applyLimit: trunca e sinaliza", () => {
   assert.strictEqual(rows.length, 3);
   assert.strictEqual(truncated, true);
 });
-test("resolveTargets: sem projeto = todos os 10", () => {
-  assert.strictEqual(shape.resolveTargets(null).length, 10);
+test("resolveTargets: sem projeto = todos os 12", () => {
+  assert.strictEqual(shape.resolveTargets(null).length, 12);
+});
+test("P260B/C são projetos válidos e individuais", () => {
+  assert.strictEqual(shape.validateProjectId("P260B").id, "P260B");
+  assert.strictEqual(shape.validateProjectId("P260C").id, "P260C");
+  assert.notStrictEqual(shape.PROJECT_NAMES.P260B, shape.PROJECT_NAMES.P260C);
 });
 
 console.log("\n[auth]");
