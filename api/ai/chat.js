@@ -88,7 +88,7 @@ module.exports = async function handler(req, res) {
 
   // Input inicial da Responses API: system + histórico + pergunta.
   const input = [
-    msgItem("system", SYSTEM_PROMPT),
+    msgItem("system", SYSTEM_PROMPT(new Date())),
     ...safeHistory,
     msgItem("user", userMessage),
   ];
@@ -148,3 +148,4 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ ok: false, errorCode: "QUERY_FAILED", message: "Erro ao processar a pergunta.", retryable: true });
   }
 };
+
