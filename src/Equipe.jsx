@@ -122,8 +122,19 @@ function montarEquipesDisponivel(projectId, colaboradores){
   const n1236 = ativos.filter(c=>String(c.escala||"12x36").includes("12x36")).length;
   return n1236/ativos.length >= 0.5;
 }
-// Detecta se um colaborador é líder pelo cargo.
-function ehLider(c){ return /l[íi]der/i.test(c?.cargo||""); }
+// Detecta quem encabeça/monta uma equipe. "Líder" no cargo sempre encabeça.
+// "Ronda" só encabeça em projetos SEM cargo de líder (ex.: P607), passando
+// a lista de colaboradores como contexto.
+function temCargoLider(colaboradores){
+  return (colaboradores||[]).some(c=>/l[íi]der/i.test(String(c?.cargo||"")));
+}
+function ehLider(c, colaboradores){
+  const cg = String(c?.cargo||"");
+  if(/l[íi]der/i.test(cg)) return true;
+  // Ronda só vira "líder de equipe" quando o projeto não tem nenhum líder.
+  if(/ronda/i.test(cg) && colaboradores && !temCargoLider(colaboradores)) return true;
+  return false;
+}
 
 // ── Uniforme e Material Tático ───────────────────────────────────────────
 // Catálogo em cascata por categoria. gravaMarca = pede marca; validade = item
@@ -140,7 +151,7 @@ const UNIFORME_CATALOGO = [
     { nome:"Cinturão" }, { nome:"Coldre" }, { nome:"Pochete" },
     { nome:"Capa Balística", validade:true }, { nome:"Porta Jetloader" },
     { nome:"Porta Carregador" }, { nome:"Porta Algema" }, { nome:"Fone Lapela" },
-    { nome:"Tonfa" }, { nome:"Colete" },
+    { nome:"Tonfa" }, { nome:"Capacete" },
   ]},
   { cat:"📄 Documento", itens:[
     { nome:"CNV", validade:true }, { nome:"Crachá" },
@@ -1353,7 +1364,7 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
 // ── Modal: montar a equipe de um líder (selecionar membros) ──────────────
 function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, onClose }){
   const S = getStyles(dark);
-  const ativos = colaboradores.filter(c=>(c.status||"ativo")==="ativo" && !ehLider(c));
+  const ativos = colaboradores.filter(c=>(c.status||"ativo")==="ativo" && !ehLider(c, colaboradores));
   // Mostra membros do mesmo turno primeiro, mas permite qualquer um.
   const ordenados = [...ativos].sort((a,b)=>{
     const am = a.equipeLiderId===lider.id ? 0 : 1;
@@ -2716,8 +2727,8 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
           {/* VISÃO POR EQUIPE MONTADA */}
           {visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (()=>{
-            const lideres = ativos.filter(ehLider).sort((a,b)=>(a.turno||"").localeCompare(b.turno||""));
-            const semEquipe = ativos.filter(c=>!ehLider(c) && !c.equipeLiderId);
+            const lideres = ativos.filter(c=>ehLider(c, equipeData.colaboradores)).sort((a,b)=>(a.turno||"").localeCompare(b.turno||""));
+            const semEquipe = ativos.filter(c=>!ehLider(c, equipeData.colaboradores) && !c.equipeLiderId);
             const turnos = [...new Set(lideres.map(l=>l.turno))];
             return (
               <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
