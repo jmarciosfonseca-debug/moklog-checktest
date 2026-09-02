@@ -39,6 +39,7 @@ async function get_staffing_and_vacation_gaps(args = {}) {
   const db = getDb();
   const records = [];
   const warnings = [];
+  const projectSummaries = [];
 
   for (const pid of targets) {
     let snap;
@@ -52,7 +53,32 @@ async function get_staffing_and_vacation_gaps(args = {}) {
     const colaboradores = Array.isArray(data.colaboradores) ? data.colaboradores
       : Array.isArray(data.registros) ? data.registros : [];
 
-    if (!colaboradores.length) { warnings.push(`${pid}: equipe sem colaboradores cadastrados.`); continue; }
+    if (!colaboradores.length) {
+      warnings.push(`${pid}: equipe sem colaboradores cadastrados.`);
+      projectSummaries.push({ projectId: pid, projectName: PROJECT_NAMES[pid] || pid, totalAtivos: 0, porTurno: {}, porCargo: {}, afastamentosAbertos: 0 });
+      continue;
+    }
+
+    const ativos = colaboradores.filter(c => c && typeof c === "object" && String(c.status || "ativo").toLowerCase() !== "desligado");
+    const porTurno = {};
+    const porCargo = {};
+    let afastamentosAbertos = 0;
+    for (const c of ativos) {
+      const turno = String(c.turno || "Sem turno informado").trim();
+      const cargo = String(c.cargo || "Sem cargo informado").trim();
+      porTurno[turno] = (porTurno[turno] || 0) + 1;
+      porCargo[cargo] = (porCargo[cargo] || 0) + 1;
+      const historico = Array.isArray(c.historico) ? c.historico : [];
+      if (c.afastamentoAberto || historico.some(h => h && h.emAberto)) afastamentosAbertos += 1;
+    }
+    projectSummaries.push({
+      projectId: pid,
+      projectName: PROJECT_NAMES[pid] || pid,
+      totalAtivos: ativos.length,
+      porTurno,
+      porCargo,
+      afastamentosAbertos,
+    });
 
     let temCampoFerias = false;
 
@@ -109,6 +135,8 @@ async function get_staffing_and_vacation_gaps(args = {}) {
       total: records.length,
       semCobertura: records.filter(r => r.status === "sem cobertura definida").length,
       emAndamento: records.filter(r => /em andamento/.test(r.description)).length,
+      totalColaboradoresAtivos: projectSummaries.reduce((sum, p) => sum + p.totalAtivos, 0),
+      projetos: projectSummaries,
     },
     records: rows,
     dataQualityWarnings: warnings.concat(["Privacidade: telefones e documentos pessoais não são retornados."]),
