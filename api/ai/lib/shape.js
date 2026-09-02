@@ -12,7 +12,7 @@ const { nowIso, TIMEZONE } = require("./time");
 // esta lista para validar projectId e para varrer "todos os projetos".
 const PROJECT_IDS = [
   "P601", "P602", "P604", "P605", "P606", "P607",
-  "P311A", "P311B", "P505", "P260A",
+  "P311A", "P311B", "P505", "P260A", "P260B", "P260C",
 ];
 
 const PROJECT_NAMES = {
@@ -20,6 +20,7 @@ const PROJECT_NAMES = {
   P605: "Golgi Dutra", P606: "Golgi Duque de Caxias", P607: "Golgi Brasília",
   P311A: "Mega Curitiba", P311B: "Mega Itajaí",
   P505: "Klog Guarulhos", P260A: "Jatinox P260A",
+  P260B: "Jatinox P260B", P260C: "Jatinox P260C",
 };
 
 const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
