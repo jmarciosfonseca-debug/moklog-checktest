@@ -176,7 +176,92 @@ function abrirWhatsApp(project, config, ev){
   window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
 }
 
+// Relatório específico da solicitação avulsa de diesel (layout próprio, não
+// usa o de queda de energia). Foca em: solicitante, empresa, tempos, litros.
+function gerarPdfDieselAvulso(project, ev){
+  const dz = ev.diesel || {};
+  const fmtH = (iso)=> iso ? new Date(iso).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+  const durEntre = (a,b)=>{ if(!a||!b) return "—"; const ms=new Date(b)-new Date(a); const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return `${h>0?h+"h ":""}${m}min`; };
+  const tempoResposta = durEntre(dz.contatoEfetuadoEm, dz.entregaChegouEm);
+  const tempoTotal = durEntre(dz.contatoEfetuadoEm, dz.abastecimentoCompletoEm);
+  const statusTxt = dz.abastecimentoCompletoEm ? "Concluído" : dz.entregaChegouEm ? "Em abastecimento" : dz.acionado ? "Aguardando entrega" : "Aberto";
+  const janelaTxt = dz.janela==="weekday_commercial" ? "Horário comercial" : dz.janela==="weekend_holiday" ? "Fim de semana / feriado" : dz.janela==="night_shift" ? "Fora do horário comercial" : "—";
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Solicitação de Diesel ${project.id}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:22px;max-width:760px;margin:0 auto;background:#fff}
+  .cab{background:linear-gradient(135deg,#7c2d12 0%,#9a3412 55%,#c2410c 100%);color:#fff;border-radius:16px;padding:22px 24px;position:relative;overflow:hidden}
+  .cab .marca{font-size:10px;letter-spacing:2px;text-transform:uppercase;opacity:.75;font-weight:600}
+  .cab h1{font-size:22px;font-weight:800;margin-top:6px;letter-spacing:-.4px}
+  .cab .sub{font-size:12.5px;opacity:.9;margin-top:4px}
+  .cab .logo{position:absolute;top:20px;right:22px;width:64px;height:64px;object-fit:contain;background:#fff;border-radius:12px;padding:6px;border:2px solid rgba(255,255,255,.2)}
+  .cab .meta{margin-top:14px;display:flex;gap:22px;flex-wrap:wrap;font-size:11px;opacity:.92;border-top:1px solid rgba(255,255,255,.2);padding-top:12px}
+  .cab .meta b{display:block;font-size:13px;font-weight:800;margin-top:2px}
+  .intro{background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:10px;padding:13px 16px;margin:16px 0;font-size:11.5px;line-height:1.6;color:#7c2d12}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:18px}
+  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:15px 10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .kpi-val{font-size:20px;font-weight:900;color:#c2410c}
+  .kpi-lbl{font-size:8.5px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:4px;letter-spacing:.4px}
+  .sec-title{font-size:12px;font-weight:800;color:#c2410c;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 9px}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+  .row{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+  .row:last-child{border:none} .row .lbl{color:#64748b;font-weight:700}
+  .foto{margin-top:14px} .foto img{width:100%;max-width:420px;border-radius:10px;border:1px solid #e2e8f0}
+  .assinatura{margin-top:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;border-top:2px solid #c2410c;padding-top:14px}
+  .assinatura .resp{font-size:11px;color:#475569} .assinatura .resp b{font-size:13px;color:#0f172a}
+  .assinatura .selo{text-align:right;font-size:10px;color:#64748b}
+  .footer{text-align:center;margin-top:16px;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:14px"><button onclick="window.print()" style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:11px 30px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button></div>
+<div class="cab">
+  <img class="logo" src="${MOKED_LOGO}" alt="Moked">
+  <div class="marca">Moked Consulting Security</div>
+  <h1>⛽ Solicitação de Diesel</h1>
+  <div class="sub">${project.id} — ${project.name||""} · Abastecimento de geradores (sem queda de energia)</div>
+  <div class="meta">
+    <div>Gerado em<b>${new Date().toLocaleDateString("pt-BR")}</b></div>
+    <div>Status<b>${statusTxt}</b></div>
+    <div>Solicitado por<b>${dz.solicitante||"—"}</b></div>
+  </div>
+</div>
+<div class="intro">
+  Este registro documenta uma <b>solicitação avulsa de abastecimento de diesel</b> para os geradores do site, aberta pela equipe de segurança sem vínculo com queda de energia. Inclui a empresa acionada, os horários cravados de cada etapa, o tempo de resposta do fornecedor e a quantidade abastecida — gerado pelo sistema <b>MokLog CheckTest</b>.
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-val">${tempoResposta}</div><div class="kpi-lbl">Tempo de resposta</div></div>
+  <div class="kpi"><div class="kpi-val">${dz.litros||"—"}</div><div class="kpi-lbl">Litros abastecidos</div></div>
+  <div class="kpi"><div class="kpi-val">${dz.fornecedor?.nome||"—"}</div><div class="kpi-lbl">Empresa acionada</div></div>
+</div>
+<div class="sec-title">📋 Detalhamento da solicitação</div>
+<div class="card">
+  <div class="row"><span class="lbl">Solicitado por</span><span>${dz.solicitante||"—"}</span></div>
+  <div class="row"><span class="lbl">Janela operacional</span><span>${janelaTxt}</span></div>
+  <div class="row"><span class="lbl">Empresa acionada</span><span>${dz.fornecedor?.nome||"—"}${dz.fornecedor?.telefone?` · ${dz.fornecedor.telefone}`:""}</span></div>
+  <div class="row"><span class="lbl">Contato efetuado em</span><span>${fmtH(dz.contatoEfetuadoEm)}</span></div>
+  <div class="row"><span class="lbl">Entrega chegou em</span><span>${fmtH(dz.entregaChegouEm)}</span></div>
+  <div class="row"><span class="lbl">Abastecimento concluído em</span><span>${fmtH(dz.abastecimentoCompletoEm)}</span></div>
+  <div class="row"><span class="lbl">Tempo de resposta (contato→chegada)</span><span>${tempoResposta}</span></div>
+  <div class="row"><span class="lbl">Tempo total (contato→conclusão)</span><span>${tempoTotal}</span></div>
+  <div class="row"><span class="lbl">Litros abastecidos</span><span>${dz.litros||"—"}</span></div>
+  <div class="row"><span class="lbl">Geradores / descrição</span><span>${dz.descricao||"—"}</span></div>
+</div>
+${dz.foto?`<div class="foto"><div class="sec-title">📷 Evidência — bomba do caminhão</div><img src="${dz.foto}" alt="Foto do abastecimento"/></div>`:""}
+<div class="assinatura">
+  <div class="resp">Responsável pela extração<br><b>José Fonseca</b><br>Gestor de Divisão — MokLog</div>
+  <div class="selo"><b>Moked Consulting Security</b><br>30+ anos · ISO 9001:2015 · ISO 37001:2016</div>
+</div>
+<div class="footer">MokLog CheckTest © Moked Consulting Security · Solicitação de Diesel · ${project.id} — ${project.name||""}</div>
+</body></html>`;
+  const blob = new Blob([html],{type:"text/html"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download=`diesel_avulso_${project.id}_${new Date(ev.inicioQueda||Date.now()).toLocaleDateString("sv-SE")}.html`; a.click();
+}
+
 function gerarPdfEvento(project, config, ev){
+  // Solicitação avulsa de diesel tem relatório próprio.
+  if(ev.tipoRegistro==="diesel_avulso"){ return gerarPdfDieselAvulso(project, ev); }
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Queda de Energia ${project.id}</title>
 <style>
   body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:20px;max-width:760px;margin:0 auto}
@@ -943,10 +1028,38 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
   if(screen==="detalhe" && viewId){
     const ev = eventos.find(e=>e.id===viewId);
     if(!ev) { setScreen("home"); return null; }
+    const isAvulso = ev.tipoRegistro==="diesel_avulso";
+    const dz = ev.diesel || {};
+    const durEntre = (a,b)=>{ if(!a||!b) return "—"; const ms=new Date(b)-new Date(a); const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000); return `${h>0?h+"h ":""}${m}min`; };
     return (
       <div style={S.page}><div style={S.wrap}>
         {Header}
         <div style={{padding:"0 14px",display:"flex",flexDirection:"column",gap:10}}>
+          {isAvulso ? (
+            <>
+              <div style={S.card}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{fontSize:15,fontWeight:800,...S.txt}}>⛽ Solicitação de diesel</div>
+                  <span style={{fontSize:10.5,fontWeight:700,padding:"4px 9px",borderRadius:999,background:"rgba(194,65,12,.14)",color:"#f59e0b"}}>
+                    {dz.abastecimentoCompletoEm?"Concluído":dz.entregaChegouEm?"Em abastecimento":dz.acionado?"Aguardando":"Aberto"}
+                  </span>
+                </div>
+                <div style={{fontSize:12,...S.txt2,marginTop:4}}>Sem queda de energia · {fmtDataHora(ev.inicioQueda)}</div>
+              </div>
+              <div style={S.card}>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Solicitado por: <b style={S.txt}>{dz.solicitante||"—"}</b></div>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Empresa acionada: <b style={{color:COR.green}}>{dz.fornecedor?.nome||"—"}</b></div>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Contato efetuado: <b style={S.txt}>{dz.contatoEfetuadoEm?fmtDataHora(dz.contatoEfetuadoEm):"—"}</b></div>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Entrega chegou: <b style={S.txt}>{dz.entregaChegouEm?fmtDataHora(dz.entregaChegouEm):"—"}</b></div>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Concluído: <b style={S.txt}>{dz.abastecimentoCompletoEm?fmtDataHora(dz.abastecimentoCompletoEm):"—"}</b></div>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Tempo de resposta: <b style={{color:COR.amber}}>{durEntre(dz.contatoEfetuadoEm,dz.entregaChegouEm)}</b></div>
+                <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Litros: <b style={S.txt}>{dz.litros||"—"}</b></div>
+                <div style={{fontSize:12,...S.txt2}}>Geradores / descrição: <b style={S.txt}>{dz.descricao||"—"}</b></div>
+              </div>
+              {dz.foto && <div style={S.card}><img src={dz.foto} alt="" style={{width:"100%",borderRadius:8}}/></div>}
+            </>
+          ) : (
+          <>
           <div style={S.card}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>{fmtDataHora(ev.inicioQueda)} → {fmtHora(ev.fimQueda)}</div>
@@ -966,6 +1079,8 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             {ev.obs && <div style={{fontSize:12,...S.txt2,marginTop:6}}>📝 {ev.obs}</div>}
           </div>
           {ev.foto && <div style={S.card}><img src={ev.foto} alt="" style={{width:"100%",borderRadius:10}}/></div>}
+          </>
+          )}
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>gerarPdfEvento(project,data.config,ev)} style={{...S.btnSec,flex:1,fontSize:12,color:COR.purple}}>📄 PDF</button>
             <button onClick={()=>abrirWhatsApp(project,data.config,ev)} style={{...S.btnSec,flex:1,fontSize:12,color:COR.green}}>📲 WhatsApp</button>
