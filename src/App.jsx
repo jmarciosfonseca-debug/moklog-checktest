@@ -21,6 +21,7 @@ import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrenci
 import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
+import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 
 // ── Hook de conectividade
 function useOnlineStatus() {
@@ -2983,6 +2984,7 @@ export default function App(){
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
+  const [showIA,setShowIA]=useState(false); // drawer do Assistente IA Gerencial
   const [jatinoxSel,setJatinoxSel]=useState(null);
   const [project,setProject]=useState(PROJECTS.P601);
   const [state,setState]=useState(null);
@@ -4189,6 +4191,9 @@ export default function App(){
 
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
+      {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
+      {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}
+      {hasGerencial() && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
     </div>
   );
 }
