@@ -14,6 +14,8 @@ const { get_keyaccess_failures } = require("./keyAccess");
 const { get_weekly_report_items } = require("./weeklyReports");
 const { get_staffing_and_vacation_gaps } = require("./staffing");
 const { get_project_status, get_operational_overview } = require("./overview");
+const { get_health_ranking } = require("./health");
+const { get_project_vulnerabilities } = require("./vulnerabilities");
 const { fail } = require("../lib/shape");
 
 const HANDLERS = {
@@ -26,14 +28,32 @@ const HANDLERS = {
   get_keyaccess_failures,
   get_weekly_report_items,
   get_staffing_and_vacation_gaps,
+  get_health_ranking,
+  get_project_vulnerabilities,
 };
 
-const projectIdParam = { type: "string", description: "ID do projeto (P601, P602, P604, P605, P606, P607, P311A, P311B, P505, P260A). Omitir = todos." };
+const projectIdParam = { type: "string", description: "ID do projeto (P601, P602, P604, P605, P606, P607, P311A, P311B, P505, P260A, P260B, P260C). Omitir = todos." };
 const dateParam = (d) => ({ type: "string", description: `${d} (YYYY-MM-DD).` });
 const limitParam = { type: "integer", description: "Máximo de registros (limitado pelo servidor)." };
 
 // Schemas no formato OpenAI (tools / function calling).
 const TOOL_SCHEMAS = [
+  {
+    type: "function",
+    function: {
+      name: "get_health_ranking",
+      description: "Ranking de saúde dos projetos pela mesma fórmula do dashboard/checklist. Retorna total, INOP, parcial, percentual e categorias que mais pesam.",
+      parameters: { type: "object", properties: { order: { type: "string", enum: ["worst", "best"], description: "worst=pior para melhor; best=melhor para pior." } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_project_vulnerabilities",
+      description: "Explica as vulnerabilidades de um projeto por severidade e idade: equipamentos, CTMK, KeyAccess, rondas e energia.",
+      parameters: { type: "object", properties: { projectId: projectIdParam }, required: ["projectId"] },
+    },
+  },
   {
     type: "function",
     function: {
@@ -102,7 +122,7 @@ const TOOL_SCHEMAS = [
     type: "function",
     function: {
       name: "get_staffing_and_vacation_gaps",
-      description: "Férias/afastamentos e coberturas. Não expõe telefone nem dados pessoais. Diferencia férias futura/atual/concluída.",
+      description: "Consulta EQUIPE e EFETIVO de um projeto: total de colaboradores ativos, distribuição por turno e cargo, faltas, afastamentos, férias e coberturas. Use também para perguntas gerais como 'fale sobre a equipe do P311B'. Retorna resumo útil mesmo sem lacunas. Não expõe telefone nem documentos pessoais.",
       parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim") } },
     },
   },
