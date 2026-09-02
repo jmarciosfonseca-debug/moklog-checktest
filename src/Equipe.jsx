@@ -145,6 +145,8 @@ const UNIFORME_CATALOGO = [
     { nome:"Calça", gravaMarca:true, pedeTamanho:true },
     { nome:"Camisa / Camisão", gravaMarca:true, pedeTamanho:true },
     { nome:"Jaqueta / Terno", gravaMarca:true, pedeTamanho:true },
+    { nome:"Capa de Chuva", pedeTamanho:true },
+    { nome:"Galocha", pedeTamanho:true },
     { nome:"Boné" },
   ]},
   { cat:"🛡️ Material Tático", itens:[
