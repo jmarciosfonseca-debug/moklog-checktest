@@ -4078,18 +4078,6 @@ export default function App(){
           </div>
         </div>
 
-        {!notifGranted&&(
-          <div style={{background:"#0f172a",border:"1px solid #f59e0b44",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:16}}>🔔</span>
-            <div style={{flex:1}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Ativar notificacoes</div>
-              <div style={{fontSize:11,color:"#94a3b8"}}>Receba lembretes semanais e alertas</div>
-            </div>
-            <button onClick={()=>requestNotificationPermission().then(g=>setNotifGranted(g))}
-              style={{...S.sm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>Ativar</button>
-          </div>
-        )}
-
         {draft&&draft.projectId===project.id&&(
           <div style={{background:"linear-gradient(120deg,#131a2b 0%,#0f172a 55%,#1a1610 100%)",border:"1px solid #f59e0b55",borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 6px 18px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)"}}>
             <span style={{fontSize:16}}>📝</span>
