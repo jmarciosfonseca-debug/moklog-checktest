@@ -2985,6 +2985,7 @@ export default function App(){
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
   const [showIA,setShowIA]=useState(false); // drawer do Assistente IA Gerencial
+  const [iaAuthorized,setIaAuthorized]=useState(()=>hasGerencial());
   const [jatinoxSel,setJatinoxSel]=useState(null);
   const [project,setProject]=useState(PROJECTS.P601);
   const [state,setState]=useState(null);
@@ -3004,11 +3005,14 @@ export default function App(){
   const [syncStatus,setSyncStatus]=useState("");
   const [loaded,setLoaded]=useState(false);
   const [projectAuth,setProjectAuth]=useState({});
-  useEffect(()=>{ // sessão global: qualquer toque/clique renova a atividade (throttle em session.js)
-    const renew=()=>touchSession();
+  useEffect(()=>{ // sessão global: renova atividade e mantém a UI da IA sincronizada com a sessão
+    const syncIaAuth=()=>setIaAuthorized(hasGerencial());
+    const renew=()=>{touchSession();syncIaAuth();};
     window.addEventListener("click",renew,{passive:true});
     window.addEventListener("touchstart",renew,{passive:true});
-    return ()=>{window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);};
+    window.addEventListener("storage",syncIaAuth);
+    const timer=setInterval(syncIaAuth,5000);
+    return ()=>{window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);window.removeEventListener("storage",syncIaAuth);clearInterval(timer);};
   },[]);
   const [sigError,setSigError]=useState(false);
   const [showConfirmModal,setShowConfirmModal]=useState(false);
@@ -4180,8 +4184,8 @@ export default function App(){
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
       {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
-      {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}
-      {hasGerencial() && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
+      {iaAuthorized && <BotaoIA onClick={()=>setShowIA(true)}/>}
+      {iaAuthorized && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
     </div>
   );
 }
