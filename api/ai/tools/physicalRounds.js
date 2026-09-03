@@ -88,6 +88,9 @@ async function get_physical_round_gaps(args = {}) {
   const startMs = args.startDate ? toMillis(args.startDate) : null;
   const endMs = args.endDate ? toMillis(args.endDate) : null;
   const turno = args.turno ? String(args.turno).toLowerCase() : null;
+  if (turno && !["diurno", "noturno"].includes(turno)) {
+    return fail("VALIDATION_ERROR", "turno inválido; use diurno ou noturno.");
+  }
 
   const targets = resolveTargets(v.id);
   const db = getDb();
@@ -109,7 +112,12 @@ async function get_physical_round_gaps(args = {}) {
     if (!plantoes.length) { warnings.push(`${pid}: nenhum plantão registrado.`); continue; }
 
     for (const p of plantoes) {
-      if (turno && String(p.turno || "").toLowerCase() !== turno) continue;
+      const plantaoTurno = String(p.turno || "").toLowerCase();
+      if (!["diurno", "noturno"].includes(plantaoTurno)) {
+        warnings.push(`${pid}/${p.id || "?"}: turno ausente ou inválido; plantão não avaliado.`);
+        continue;
+      }
+      if (turno && plantaoTurno !== turno) continue;
       const diaMs = toMillis(p.dataPlantao);
       if (startMs != null && (diaMs == null || diaMs < startMs)) continue;
       if (endMs != null && (diaMs == null || diaMs > endMs)) continue;
@@ -130,7 +138,7 @@ async function get_physical_round_gaps(args = {}) {
         evidence: [
           `Projeto ${PROJECT_NAMES[pid] || pid}`,
           `Líder: ${p.lider || "não informado"}`,
-          `Rondas registradas: ${p.nRondas ?? 0}`,
+          `Rondas registradas: ${p.nRondas ?? "não informado"}`,
           `Enviado: ${p.enviado ? "sim" : "não"}`,
         ],
         source: { collection: "rondas", recordId: `${pid}/plantoes/${p.id || "?"}` },

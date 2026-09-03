@@ -32,6 +32,11 @@ async function test(name,fn){try{await fn();passed++;console.log("  ✓",name);}
     const older={meta:{date:"2026-09-01"},state:{a:{status:"inop"}}};
     assert.strictEqual(latestHistoryEntry([newest,older]),newest);
   });
+  await test("sem datas no histórico, a última entrada válida é escolhida",()=>{
+    const first={state:{a:{status:"inop"}}};
+    const last={state:{a:{status:"ok"}}};
+    assert.strictEqual(latestHistoryEntry([first,last]),last);
+  });
   await test("ranking pior primeiro",async()=>{
     const r=await get_health_ranking({order:"worst"});
     assert.strictEqual(r.ok,true); assert.strictEqual(r.records[0].projectId,"P260C");

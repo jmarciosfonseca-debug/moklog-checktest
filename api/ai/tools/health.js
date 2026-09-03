@@ -47,11 +47,13 @@ function computeHealthFromState(state) {
 function latestHistoryEntry(history) {
   let latest = null;
   let latestTime = -Infinity;
+  let hasDated = false;
   for (const entry of history || []) {
     if (!entry || !entry.state) continue;
     const time = toMillis(entry?.meta?.date ?? entry?.meta?.createdAt ?? entry?.createdAt ?? entry?.date);
-    if (time != null && time >= latestTime) { latest = entry; latestTime = time; }
-    else if (latest == null) latest = entry;
+    if (time != null) {
+      if (!hasDated || time >= latestTime) { latest = entry; latestTime = time; hasDated = true; }
+    } else if (!hasDated) latest = entry;
   }
   return latest;
 }

@@ -108,8 +108,8 @@ const TOOL_SCHEMAS = [
     type: "function",
     function: {
       name: "get_physical_round_gaps",
-      description: "Lacunas em plantões de rondas presenciais/diárias: plantão sem nenhuma ronda registrada, relatório não enviado após o prazo, ou sem líder identificado. Regra ainda em validação (v1, rascunho).",
-      parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), turno: { type: "string" }, limit: limitParam } },
+      description: "Lacunas em plantões de rondas presenciais/diárias: plantão encerrado sem rondas, relatório não enviado após o prazo, quantidade desconhecida ou líder não identificado.",
+      parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), turno: { type: "string", enum: ["diurno", "noturno"] }, limit: limitParam } },
     },
   },
   {

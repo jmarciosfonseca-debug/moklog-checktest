@@ -11,7 +11,11 @@ const path = require("path");
 // Data-only "YYYY-MM-DD" a N dias atrás (hoje = N=0), usada nas fixtures
 // de rondas presenciais para evitar datas fixas que envelhecem o teste.
 function dOffset(days) {
-  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(Date.now() - days * 86400000));
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 // ── Mock do Firestore Admin ─────────────────────────────────
@@ -73,6 +77,7 @@ const fake = {
         { id: "pl3", dataPlantao: dOffset(0), turno: "diurno", lider: "Bruno", nRondas: 5, enviado: false, enviadoEm: null }, // hoje, ainda dentro do prazo de graça
         { id: "pl4", dataPlantao: dOffset(3), turno: "noturno", lider: "", nRondas: 3, enviado: true, enviadoEm: dOffset(3) }, // só sem líder
         { id: "pl5", dataPlantao: dOffset(5), turno: "noturno", lider: "", nRondas: 0, enviado: false, enviadoEm: null }, // apagado — não deve aparecer
+        { id: "pl6", dataPlantao: dOffset(3), turno: "", lider: "Ana", nRondas: 0, enviado: false, enviadoEm: null }, // turno inválido — não pode ser classificado
       ],
       deletedIds: ["pl5"],
     },
@@ -201,6 +206,16 @@ async function test(name, fn) {
   await test("filtro turno restringe corretamente", async () => {
     const r = await get_physical_round_gaps({ projectId: "P606", turno: "diurno" });
     assert.ok(r.records.every(x => x.recordId !== "pl2" && x.recordId !== "pl4"), "só noturno excluído do resultado diurno");
+  });
+  await test("turno ausente no registro gera warning e não é classificado", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606" });
+    assert.ok(!r.records.some(x => x.recordId === "pl6"));
+    assert.ok(r.dataQualityWarnings.some(w => w.includes("P606/pl6") && w.includes("turno")));
+  });
+  await test("filtro de turno inválido retorna VALIDATION_ERROR", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606", turno: "madrugada" });
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.errorCode, "VALIDATION_ERROR");
   });
 
   console.log("\n[Equipamentos]");
