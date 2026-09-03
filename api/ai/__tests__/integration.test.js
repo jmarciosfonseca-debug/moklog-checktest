@@ -8,6 +8,12 @@
 const assert = require("assert");
 const path = require("path");
 
+// Data-only "YYYY-MM-DD" a N dias atrás (hoje = N=0), usada nas fixtures
+// de rondas presenciais para evitar datas fixas que envelhecem o teste.
+function dOffset(days) {
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+}
+
 // ── Mock do Firestore Admin ─────────────────────────────────
 // Estrutura: fake[collection][docId] = data | undefined
 const fake = {
@@ -59,6 +65,18 @@ const fake = {
       moto: { id: "m1", placa: "ABC1D23", status: "inop", dataProblem: "2026-07-25" },
     },
   },
+  rondas: {
+    P606: {
+      plantoes: [
+        { id: "pl1", dataPlantao: dOffset(10), turno: "noturno", lider: "Carlos", nRondas: 8, enviado: true, enviadoEm: dOffset(10) }, // ok, sem lacuna
+        { id: "pl2", dataPlantao: dOffset(3), turno: "noturno", lider: "Ana", nRondas: 0, enviado: false, enviadoEm: null }, // sem ronda + não enviado
+        { id: "pl3", dataPlantao: dOffset(0), turno: "diurno", lider: "Bruno", nRondas: 5, enviado: false, enviadoEm: null }, // hoje, ainda dentro do prazo de graça
+        { id: "pl4", dataPlantao: dOffset(3), turno: "noturno", lider: "", nRondas: 3, enviado: true, enviadoEm: dOffset(3) }, // só sem líder
+        { id: "pl5", dataPlantao: dOffset(5), turno: "noturno", lider: "", nRondas: 0, enviado: false, enviadoEm: null }, // apagado — não deve aparecer
+      ],
+      deletedIds: ["pl5"],
+    },
+  },
 };
 
 function makeDocRef(col, id) {
@@ -74,6 +92,7 @@ const { get_ctmk_status } = require("../tools/ctmk");
 const { get_recent_energy_events } = require("../tools/energy");
 const { get_keyaccess_failures } = require("../tools/keyAccess");
 const { get_virtual_round_nonconformities } = require("../tools/virtualRounds");
+const { get_physical_round_gaps, classificarPlantao } = require("../tools/physicalRounds");
 const { get_weekly_report_items } = require("../tools/weeklyReports");
 
 let passed = 0, failed = 0;
@@ -137,6 +156,51 @@ async function test(name, fn) {
     const r = await get_virtual_round_nonconformities({ projectId: "P601" });
     assert.ok(r.records.some(x => x.recordId === "t1"));
     assert.ok(!r.records.some(x => x.recordId === "t2"), "t2 em andamento não pode contar");
+  });
+
+  console.log("\n[Rondas Presenciais]");
+  await test("turno atual ou futuro nunca vira lacuna antes do encerramento", async () => {
+    const now=Date.parse("2026-09-03T12:00:00-03:00");
+    assert.strictEqual(classificarPlantao({dataPlantao:"2026-09-03",turno:"diurno",nRondas:0,enviado:false,lider:""},now),null);
+    assert.strictEqual(classificarPlantao({dataPlantao:"2026-09-04",turno:"noturno",nRondas:0,enviado:false,lider:""},now),null);
+  });
+  await test("nRondas ausente não é interpretado como zero", async () => {
+    const cls=classificarPlantao({dataPlantao:"2026-09-01",turno:"diurno",enviado:true,lider:"Ana"},Date.parse("2026-09-03T20:00:00-03:00"));
+    assert.ok(cls);
+    assert.strictEqual(cls.severity,"medium");
+    assert.ok(cls.motivos.includes("quantidade de rondas não informada"));
+    assert.ok(!cls.motivos.includes("nenhuma ronda registrada"));
+  });
+  await test("plantão sem nenhuma ronda + não enviado (fora do prazo) = critical, com os dois motivos", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606" });
+    const pl2 = r.records.find(x => x.recordId === "pl2");
+    assert.ok(pl2, "pl2 deveria aparecer como lacuna");
+    assert.strictEqual(pl2.severity, "critical");
+    assert.ok(pl2.status.includes("nenhuma ronda registrada"));
+    assert.ok(pl2.status.includes("não enviado"));
+  });
+  await test("plantão de hoje ainda não enviado, mas com rondas, NÃO é lacuna (prazo de graça)", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606" });
+    assert.ok(!r.records.some(x => x.recordId === "pl3"), "pl3 está dentro do prazo de graça");
+  });
+  await test("plantão só sem líder = severity medium", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606" });
+    const pl4 = r.records.find(x => x.recordId === "pl4");
+    assert.ok(pl4, "pl4 deveria aparecer (sem líder)");
+    assert.strictEqual(pl4.severity, "medium");
+    assert.ok(pl4.status.includes("sem líder"));
+  });
+  await test("plantão sem lacuna não aparece", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606" });
+    assert.ok(!r.records.some(x => x.recordId === "pl1"));
+  });
+  await test("plantão apagado (deletedIds) nunca aparece, mesmo sendo lacuna óbvia", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606" });
+    assert.ok(!r.records.some(x => x.recordId === "pl5"), "pl5 foi apagado, não pode contar");
+  });
+  await test("filtro turno restringe corretamente", async () => {
+    const r = await get_physical_round_gaps({ projectId: "P606", turno: "diurno" });
+    assert.ok(r.records.every(x => x.recordId !== "pl2" && x.recordId !== "pl4"), "só noturno excluído do resultado diurno");
   });
 
   console.log("\n[Equipamentos]");

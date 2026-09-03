@@ -10,6 +10,7 @@ const { get_ctmk_status } = require("./ctmk");
 const { get_recent_energy_events } = require("./energy");
 const { get_virtual_round_nonconformities } = require("./virtualRounds");
 const { get_perimeter_round_gaps } = require("./perimeterRounds");
+const { get_physical_round_gaps } = require("./physicalRounds");
 const { get_keyaccess_failures } = require("./keyAccess");
 const { get_weekly_report_items } = require("./weeklyReports");
 const { get_staffing_and_vacation_gaps } = require("./staffing");
@@ -25,6 +26,7 @@ const HANDLERS = {
   get_recent_energy_events,
   get_virtual_round_nonconformities,
   get_perimeter_round_gaps,
+  get_physical_round_gaps,
   get_keyaccess_failures,
   get_weekly_report_items,
   get_staffing_and_vacation_gaps,
@@ -100,6 +102,14 @@ const TOOL_SCHEMAS = [
       name: "get_perimeter_round_gaps",
       description: "Falhas de teste perimetral por zona. Plantões em andamento não contam como falta.",
       parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), shift: { type: "string", enum: ["noturno", "diurno"] } } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_physical_round_gaps",
+      description: "Lacunas em plantões de rondas presenciais/diárias: plantão sem nenhuma ronda registrada, relatório não enviado após o prazo, ou sem líder identificado. Regra ainda em validação (v1, rascunho).",
+      parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), turno: { type: "string" }, limit: limitParam } },
     },
   },
   {
