@@ -14,7 +14,21 @@ function withAgeAndPolicy(r) {
   let severity = r.severity;
   if (r.module === "keyaccess" && r.status === "sem término formal") severity = "critical";
   if (r.module === "equipamentos" && /INOP|CRITICO/i.test(r.status) && BLOCKING.test(r.description)) severity = "critical";
-  return { ...r, severity, ageDays: age, category: r.description.split(":")[0] || r.module };
+  const description = String(r.description || "");
+  return { ...r, severity, ageDays: age, category: description.split(":")[0] || r.module };
+}
+
+const NON_VULNERABILITY_STATUSES = new Set([
+  "ok", "online", "resolvido", "resolvida", "encerrado", "encerrada",
+  "concluido", "concluida", "normal", "com cobertura",
+]);
+
+function normalizeStatus(status) {
+  return String(status || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function isVulnerabilityRecord(record) {
+  return record && !NON_VULNERABILITY_STATUSES.has(normalizeStatus(record.status));
 }
 
 async function get_project_vulnerabilities(args = {}) {
@@ -35,8 +49,8 @@ async function get_project_vulnerabilities(args = {}) {
     if (!result.ok) warnings.push(result.message || result.errorCode);
     else { records.push(...result.records); warnings.push(...(result.dataQualityWarnings || [])); }
   }
-  const vulnerabilities = sortBySeverityThenAge(records.filter(r => r.status !== "online").map(withAgeAndPolicy));
+  const vulnerabilities = sortBySeverityThenAge(records.filter(isVulnerabilityRecord).map(withAgeAndPolicy));
   return ok({ filters: { projectId: pid }, summary: { total: vulnerabilities.length, critical: vulnerabilities.filter(r=>r.severity==="critical").length, high: vulnerabilities.filter(r=>r.severity==="high").length }, records: vulnerabilities, dataQualityWarnings: warnings });
 }
 
-module.exports = { get_project_vulnerabilities, withAgeAndPolicy };
+module.exports = { get_project_vulnerabilities, withAgeAndPolicy, isVulnerabilityRecord };
