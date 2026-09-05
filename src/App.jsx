@@ -22,6 +22,7 @@ import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
+import { reconcilePendingSince } from "./pendingSince";
 
 // ── Hook de conectividade
 function useOnlineStatus() {
@@ -3241,7 +3242,9 @@ export default function App(){
       return;
     }
     if(editingIdx!==null){
-      const result=await editReport(project.id,editingIdx,st,mt);
+      const previousReport=(stored[project.id]?.history??[])[editingIdx-1]??null;
+      const reconciled=reconcilePendingSince(project,previousReport,st,mt?.date||todayStr());
+      const result=await editReport(project.id,editingIdx,reconciled,mt);
       setSyncing(false);
       if(result?.ok!==false){
         setSyncStatus("saved");
@@ -3251,10 +3254,11 @@ export default function App(){
       return;
     }
     const prev=stored[project.id]?.history??[];
+    const reconciled=reconcilePendingSince(project,prev.slice(-1)[0]??null,st,mt?.date||todayStr());
     if(mt?.date && deletedTombstoneRef.current[project.id]?.has(mt.date)){
       deletedTombstoneRef.current[project.id].delete(mt.date); // novo registro intencional na mesma data — remove o "veto"
     }
-    const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
+    const next=[...prev,{state:reconciled,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
     const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
     try {
       setStored(up);
@@ -3280,10 +3284,10 @@ export default function App(){
     }
     catch(e){ setPendingSync({projectId:project.id, history:next}); }
     finally{ setSyncing(false); }
-    const h=computeHealth(project,st);
+    const h=computeHealth(project,reconciled);
     const criticalItems=[];
     for(const cat of project.categories){
-      const s=st[cat.id]; if(!s) continue;
+      const s=reconciled[cat.id]; if(!s) continue;
       if(cat.type==="items"){
         s.forEach((v,i)=>{
           const wks=getConsecutiveInopWeeks(project,next,cat.id,i);
