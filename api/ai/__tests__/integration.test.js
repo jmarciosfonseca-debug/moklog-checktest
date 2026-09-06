@@ -63,8 +63,8 @@ const fake = {
   equipamentos: {
     P601: {
       cftv: [
-        { id: "c1", identificacao: "Câmera 12", status: "inop", dataProblem: "2026-06-01", justificativa: "queimada" }, // >30d
-        { id: "c2", identificacao: "Câmera 30", status: "parcial", dataProblem: "2026-08-05" }, // recente
+        { id: "c1", identificacao: "Câmera 12", status: "inop", dataProblem: dOffset(40), justificativa: "queimada" }, // >30d
+        { id: "c2", identificacao: "Câmera 30", status: "parcial", dataProblem: dOffset(10) }, // recente
       ],
       moto: { id: "m1", placa: "ABC1D23", status: "inop", dataProblem: "2026-07-25" },
     },
@@ -81,6 +81,10 @@ const fake = {
       ],
       deletedIds: ["pl5"],
     },
+  },
+  sinistros: {
+    P601: { houve: true, tipo: "furto", dataOcorrido: dOffset(20), observacao: "NÃO EXPOR DETALHE SENSÍVEL", atualizadoPor: "gerencial" },
+    P602: { houve: false, semSinistroFaixa: "24m", observacao: "NÃO EXPOR" },
   },
 };
 
@@ -99,6 +103,7 @@ const { get_keyaccess_failures } = require("../tools/keyAccess");
 const { get_virtual_round_nonconformities } = require("../tools/virtualRounds");
 const { get_physical_round_gaps, classificarPlantao } = require("../tools/physicalRounds");
 const { get_weekly_report_items } = require("../tools/weeklyReports");
+const { get_project_sinistro_history } = require("../tools/sinistros");
 
 let passed = 0, failed = 0;
 async function test(name, fn) {
@@ -232,6 +237,25 @@ async function test(name, fn) {
   await test("moto INOP é varrida genericamente", async () => {
     const r = await get_weekly_report_items({ projectId: "P601" });
     assert.ok(r.records.some(x => x.module === "equipamentos" && /moto/i.test(x.description)));
+  });
+
+  console.log("\n[Sinistros]");
+  await test("sinistro recente aparece sem expor observação livre", async () => {
+    const r = await get_project_sinistro_history({ projectId: "P601" });
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.records[0].status, "sinistro registrado");
+    assert.strictEqual(r.records[0].severity, "high");
+    assert.ok(!JSON.stringify(r).includes("NÃO EXPOR"));
+    assert.ok(!JSON.stringify(r).includes("atualizadoPor"));
+  });
+  await test("24 meses sem sinistro retorna modulador atenuante", async () => {
+    const r = await get_project_sinistro_history({ projectId: "P602" });
+    assert.ok(r.records[0].evidence.includes("Modulador de risco: -1"));
+    assert.strictEqual(r.summary.atenuados24m, 1);
+  });
+  await test("onlyOccurred exclui declaração sem sinistro", async () => {
+    const r = await get_project_sinistro_history({ onlyOccurred: true });
+    assert.ok(r.records.every(item => item.status === "sinistro registrado"));
   });
 
   console.log("\n[Validação de argumentos]");

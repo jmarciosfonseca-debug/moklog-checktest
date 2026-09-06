@@ -14,9 +14,11 @@ const { get_physical_round_gaps } = require("./physicalRounds");
 const { get_keyaccess_failures } = require("./keyAccess");
 const { get_weekly_report_items } = require("./weeklyReports");
 const { get_staffing_and_vacation_gaps } = require("./staffing");
+const { get_staff_departures, get_team_composition } = require("./teamStructure");
 const { get_project_status, get_operational_overview } = require("./overview");
 const { get_health_ranking } = require("./health");
 const { get_project_vulnerabilities } = require("./vulnerabilities");
+const { get_project_sinistro_history } = require("./sinistros");
 const { fail } = require("../lib/shape");
 
 const HANDLERS = {
@@ -30,8 +32,11 @@ const HANDLERS = {
   get_keyaccess_failures,
   get_weekly_report_items,
   get_staffing_and_vacation_gaps,
+  get_staff_departures,
+  get_team_composition,
   get_health_ranking,
   get_project_vulnerabilities,
+  get_project_sinistro_history,
 };
 
 const projectIdParam = { type: "string", description: "ID do projeto (P601, P602, P604, P605, P606, P607, P311A, P311B, P505, P260A, P260B, P260C). Omitir = todos." };
@@ -40,6 +45,30 @@ const limitParam = { type: "integer", description: "Máximo de registros (limita
 
 // Schemas no formato OpenAI (tools / function calling).
 const TOOL_SCHEMAS = [
+  {
+    type: "function",
+    function: {
+      name: "get_staff_departures",
+      description: "Consulta o histórico de colaboradores desligados: nome, cargo, data e tipo categórico. Não expõe motivo livre, telefone nem documentos.",
+      parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), limit: limitParam } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_team_composition",
+      description: "Lista líderes e membros vinculados às equipes por turno. Informa a composição cadastrada, não a escala efetivamente presente em uma data.",
+      parameters: { type: "object", properties: { projectId: projectIdParam, shift: { type: "string", enum: ["diurno", "noturno", "folguista", "ferista"] }, limit: limitParam } },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_project_sinistro_history",
+      description: "Consulta o histórico declarado de sinistros por projeto e seu modulador base no cálculo de risco. Não expõe observações livres nem dados pessoais.",
+      parameters: { type: "object", properties: { projectId: projectIdParam, startDate: dateParam("Início"), endDate: dateParam("Fim"), onlyOccurred: { type: "boolean", description: "Retornar somente projetos com sinistro registrado." }, limit: limitParam } },
+    },
+  },
   {
     type: "function",
     function: {

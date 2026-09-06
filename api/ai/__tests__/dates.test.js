@@ -45,6 +45,12 @@ test("prompt injeta datas e exige o intervalo efetivo", () => {
   assert.match(prompt, /Sempre declare o intervalo YYYY-MM-DD/);
 });
 
+test("prompt prioriza agregadora em perguntas gerais de vulnerabilidade", () => {
+  const prompt = SYSTEM_PROMPT(new Date("2026-09-02T14:30:00Z"));
+  assert.match(prompt, /use SEMPRE get_project_vulnerabilities PRIMEIRO/);
+  assert.match(prompt, /Só use ferramentas individuais depois/);
+});
+
 test("rejeita data inválida", () => {
   assert.throws(() => buildDateContext(new Date("invalid")), /inválida/);
 });
