@@ -147,6 +147,7 @@ function SafeBlock({ name, children }) {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
+import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
@@ -1944,8 +1945,41 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 function PendenciesScreen({stored, onBack}) {
   const [filter, setFilter] = useState("all");
   const [openProj, setOpenProj] = useState({});
+  const [followups, setFollowups] = useState({}); // { [pid]: { [key]: {entries,resolvido,...} } }
+  const [fuOpen, setFuOpen] = useState(null); // key do item com painel de follow-up aberto
+  const [fuForm, setFuForm] = useState({ status:"aguardando", texto:"", link:"" });
+  const podeGerenciar = hasGerencial();
   const toggleProj = (pid) => setOpenProj(o=>({...o,[pid]:!o[pid]}));
-  const all = getAllPendencies(stored);
+
+  // Carrega follow-ups de todos os projetos com pendências, uma vez.
+  useEffect(()=>{
+    let vivo=true;
+    const pids=[...new Set(getAllPendencies(stored).map(p=>p.project))];
+    Promise.all(pids.map(pid=>loadFollowups(db,pid).then(m=>[pid,m]).catch(()=>[pid,{}])))
+      .then(pares=>{ if(vivo){ const obj={}; pares.forEach(([pid,m])=>{obj[pid]=m;}); setFollowups(obj); } });
+    return ()=>{ vivo=false; };
+  },[stored]);
+
+  const allRaw = getAllPendencies(stored);
+  // Rede de segurança: um item marcado "resolvido" no follow-up é OCULTADO,
+  // MAS só se o teste semanal atual não o reporta mais (aqui, se ele saiu de allRaw
+  // ele já sumiu naturalmente). Se ainda está em allRaw = teste ainda acusa = mostra
+  // com aviso. Portanto ocultamos apenas quando resolvido E o item NÃO está mais
+  // no teste — o que já acontece sozinho. Aqui marcamos os que têm follow-up para
+  // exibir badge/estado, sem removê-los indevidamente.
+  const all = allRaw;
+  const getFuKey = (p)=>canonicalFollowupKey(p.project, p.cat, p.item);
+  const getFu = (p)=>followups?.[p.project]?.[getFuKey(p)] || null;
+
+  const salvarFollowup = async (p)=>{
+    if(!podeGerenciar) return;
+    const key=getFuKey(p);
+    const novoMapa=await addFollowup(db, p.project, key, { ...fuForm, responsavel:"Gerencial" });
+    setFollowups(f=>({ ...f, [p.project]: novoMapa }));
+    setFuForm({ status:"aguardando", texto:"", link:"" });
+    setFuOpen(null);
+  };
+
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
   const critCount = all.filter(p => p.status === "inop").length;
   const partCount = all.filter(p => p.status === "partial").length;
@@ -2033,6 +2067,57 @@ function PendenciesScreen({stored, onBack}) {
                                 {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
                                 {p.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
                                 <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"}</div>
+                                {/* Follow-up: estado atual + botão + painel (só gerencial) */}
+                                {(()=>{
+                                  const fu=getFu(p); const fuKey=getFuKey(p);
+                                  const st=fu?.statusAtual?statusInfo(fu.statusAtual):null;
+                                  const aberto=fuOpen===fuKey;
+                                  return (
+                                    <div style={{marginTop:6}}>
+                                      {st&&(
+                                        <div style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:999,background:st.color+"22",color:st.color,marginBottom:4}}>
+                                          📋 {st.label}{fu?.resolvido?" · ⚠️ ainda consta no teste":""}
+                                        </div>
+                                      )}
+                                      {podeGerenciar&&(
+                                        <button onClick={()=>{setFuOpen(aberto?null:fuKey);setFuForm({status:fu?.statusAtual||"aguardando",texto:"",link:""});}}
+                                          style={{display:"block",width:"100%",marginTop:2,background:"#8b7cf611",border:"1px solid #8b7cf644",color:"#a78bfa",borderRadius:8,padding:"6px 10px",fontSize:10.5,fontWeight:700,cursor:"pointer"}}>
+                                          📋 {fu?"Atualizar / ver tratativas":"Registrar follow-up"}{fu?.entries?.length?` (${fu.entries.length})`:""}
+                                        </button>
+                                      )}
+                                      {aberto&&podeGerenciar&&(
+                                        <div style={{marginTop:7,background:"#0d0a1f",border:"1px solid #8b7cf633",borderRadius:9,padding:10}}>
+                                          <div style={{fontSize:9,color:"#a78bfa",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:5}}>Status da tratativa</div>
+                                          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+                                            {FOLLOWUP_STATUS.map(s=>(
+                                              <span key={s.id} onClick={()=>setFuForm(f=>({...f,status:s.id}))} style={{fontSize:9.5,padding:"5px 8px",borderRadius:7,cursor:"pointer",fontWeight:600,border:`1px solid ${fuForm.status===s.id?s.color:"#2a3450"}`,background:fuForm.status===s.id?s.color:"transparent",color:fuForm.status===s.id?"#fff":"#94a3b8"}}>{s.label}</span>
+                                            ))}
+                                          </div>
+                                          <textarea value={fuForm.texto} onChange={e=>setFuForm(f=>({...f,texto:e.target.value}))} rows={2} placeholder="O que está sendo tratado (ex.: proposta enviada, aguardando aprovação)"
+                                            style={{width:"100%",background:"#0a0f1e",border:"1px solid #232b4a",borderRadius:7,padding:8,color:"#e8ecf5",fontSize:11,marginBottom:7,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box"}}/>
+                                          <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link (proposta/orçamento) — opcional"
+                                            style={{width:"100%",background:"#0a0f1e",border:"1px solid #232b4a",borderRadius:7,padding:8,color:"#e8ecf5",fontSize:11,marginBottom:8,boxSizing:"border-box"}}/>
+                                          <button onClick={()=>salvarFollowup(p)} style={{width:"100%",background:"#8b7cf6",border:"none",color:"#fff",borderRadius:8,padding:9,fontSize:11,fontWeight:800,cursor:"pointer"}}>💾 Salvar follow-up</button>
+                                          {fu?.entries?.length>0&&(
+                                            <div style={{marginTop:9,borderTop:"1px solid #1c2438",paddingTop:8}}>
+                                              <div style={{fontSize:9,color:"#a78bfa",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:5}}>Histórico ({fu.entries.length})</div>
+                                              {fu.entries.map(e=>{const es=statusInfo(e.status);return(
+                                                <div key={e.id} style={{padding:"6px 0",borderBottom:"1px solid #141b2e"}}>
+                                                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                                                    <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:es.color+"22",color:es.color}}>{es.label}</span>
+                                                    <span style={{fontSize:9.5,color:"#64748b"}}>{fmtDate((e.em||"").slice(0,10))} · {e.responsavel}</span>
+                                                  </div>
+                                                  {e.texto&&<div style={{fontSize:10.5,color:"#cbd5e1"}}>{e.texto}</div>}
+                                                  {e.link&&<a href={e.link} target="_blank" rel="noreferrer" style={{fontSize:9.5,color:"#38bdf8",textDecoration:"none"}}>🔗 abrir link</a>}
+                                                </div>
+                                              );})}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </div>
