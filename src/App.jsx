@@ -1796,15 +1796,16 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
           <button onClick={async ()=>{
               const proj = viewReport.project||viewReport;
-              const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id)]);
-              generatePDF(
+              const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id), loadFollowups(db, proj.id).catch(()=>({}))]);
+              await generatePDF(
                 proj,
                 viewReport.report?.state||viewReport.state,
                 viewReport.report?.meta||viewReport.meta,
                 [],
                 ctmkInfoFor(proj.id),
                 inquilinosInfo,
-                energiaInfo
+                energiaInfo,
+                followupsInfo
               );
             }}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
@@ -1877,7 +1878,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
-                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id)]); generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
+                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id), loadFollowups(db, p.id).catch(()=>({}))]); await generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
                     <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
@@ -2329,7 +2330,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
           <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id)]); generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
+          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id), loadFollowups(db, project.id).catch(()=>({}))]); await generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
           <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?"✓ Copiado!":"📋 Copiar Texto"}</button>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
