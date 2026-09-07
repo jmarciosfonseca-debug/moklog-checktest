@@ -1,11 +1,9 @@
 // followups.js — Gestão de tratativas (follow-up) das pendências de equipamentos.
 //
-// Cada pendência inoperante/parcial do painel pode ter um histórico de tratativas
-// (o que está sendo feito sobre o problema): status, texto, link, data e responsável.
-// Fica em followups/{projectId}, amarrado ao item por um id normalizado, para
-// sobreviver entre relatórios semanais. É uma camada de GESTÃO — nunca contradiz
-// a verdade de campo do teste semanal: um item "Resolvido" some do painel, mas
-// reaparece se o próximo teste semanal ainda o reportar inoperante.
+// Os follow-ups são guardados numa LISTA `registros: [{ key, entries, ... }]`,
+// NÃO como objeto com chaves dinâmicas. Isso evita o erro do Firestore
+// "o.indexOf is not a function", que ocorre quando um nome de campo começa com
+// número (ex.: chave "04cancelas..."). Aqui a chave é sempre um VALOR.
 
 import { doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
@@ -28,41 +26,50 @@ export const FOLLOWUP_STATUS = [
 ];
 export const statusInfo = (id) => FOLLOWUP_STATUS.find(s => s.id === id) || FOLLOWUP_STATUS[0];
 
-// Carrega os follow-ups de um projeto: { [key]: { entries:[...], resolvido:bool, resolvidoEm } }
+// Converte a lista de registros do Firestore num mapa { [key]: registro } para a UI.
+// Aceita também o formato antigo (objeto itens) por retrocompatibilidade.
+function listaParaMapa(data) {
+  const mapa = {};
+  if (Array.isArray(data && data.registros)) {
+    data.registros.forEach(r => { if (r && r.key) mapa[r.key] = r; });
+  } else if (data && data.itens && typeof data.itens === "object") {
+    Object.entries(data.itens).forEach(([k, v]) => { mapa[k] = { key: k, ...v }; });
+  }
+  return mapa;
+}
+
+// Carrega os follow-ups de um projeto como mapa { [key]: {entries, statusAtual, ...} }.
 export async function loadFollowups(db, projectId) {
   try {
     const snap = await getDoc(doc(db, "followups", projectId));
-    if (snap.exists()) return snap.data()?.itens || {};
+    if (snap.exists()) return listaParaMapa(snap.data());
   } catch (e) { console.warn("loadFollowups falhou:", e); }
   return {};
 }
 
-// Adiciona uma tratativa a um item (aditivo). Retorna o mapa atualizado.
+// Adiciona uma tratativa a um item (aditivo). Grava como LISTA. Retorna o mapa atualizado.
 export async function addFollowup(db, projectId, key, { status, texto, link, responsavel }) {
-  const atual = await loadFollowups(db, projectId);
+  const mapa = await loadFollowups(db, projectId);
   const registro = {
-    id: (globalThis.crypto?.randomUUID ? crypto.randomUUID() : "fu-" + Date.now()),
+    id: (globalThis.crypto && globalThis.crypto.randomUUID ? crypto.randomUUID() : "fu-" + Date.now()),
     status: status || "aguardando",
     texto: texto || "",
     link: link || "",
     responsavel: responsavel || "Gerencial",
     em: new Date().toISOString(),
   };
-  const item = atual[key] || { entries: [] };
+  const item = mapa[key] || { key, entries: [] };
+  item.key = key;
   item.entries = [registro, ...(item.entries || [])];
-  // O status mais recente vira o status corrente do item.
   item.statusAtual = registro.status;
   item.resolvido = registro.status === "resolvido";
   item.resolvidoEm = item.resolvido ? registro.em : "";
-  const novo = { ...atual, [key]: item };
-  await setDoc(doc(db, "followups", projectId), { itens: novo, updatedAt: new Date().toISOString() });
-  return novo;
+  const novoMapa = { ...mapa, [key]: item };
+  const registros = Object.values(novoMapa);
+  await setDoc(doc(db, "followups", projectId), { registros, updatedAt: new Date().toISOString() });
+  return novoMapa;
 }
 
-// Decide se um item deve ser OCULTADO do painel: só quando marcado resolvido.
-// A "rede de segurança" (reaparecer se o teste ainda acusar) é aplicada em quem
-// consome — o painel só oculta se o item está resolvido E o teste semanal atual
-// concorda; se o teste ainda reporta inop, o painel ignora o "resolvido".
 export function isResolvido(followupsMap, key) {
-  return !!followupsMap?.[key]?.resolvido;
+  return !!(followupsMap && followupsMap[key] && followupsMap[key].resolvido);
 }
