@@ -1954,7 +1954,7 @@ function PendenciesScreen({stored, onBack}) {
   // Carrega follow-ups de todos os projetos com pendências, uma vez.
   useEffect(()=>{
     let vivo=true;
-    const pids=[...new Set(getAllPendencies(stored).map(p=>p.project))];
+    const pids=[...new Set(getAllPendencies(stored).map(p=>p.project.id))];
     Promise.all(pids.map(pid=>loadFollowups(db,pid).then(m=>[pid,m]).catch(()=>[pid,{}])))
       .then(pares=>{ if(vivo){ const obj={}; pares.forEach(([pid,m])=>{obj[pid]=m;}); setFollowups(obj); } });
     return ()=>{ vivo=false; };
@@ -1968,16 +1968,16 @@ function PendenciesScreen({stored, onBack}) {
   // no teste — o que já acontece sozinho. Aqui marcamos os que têm follow-up para
   // exibir badge/estado, sem removê-los indevidamente.
   const all = allRaw;
-  const getFuKey = (p)=>canonicalFollowupKey(p.project, p.cat, p.item);
-  const getFu = (p)=>followups?.[p.project]?.[getFuKey(p)] || null;
+  const getFuKey = (p)=>canonicalFollowupKey(p.project.id, p.cat, p.item);
+  const getFu = (p)=>followups?.[p.project.id]?.[getFuKey(p)] || null;
 
   const salvarFollowup = async (p)=>{
     if(!podeGerenciar){ alert("Apenas o perfil gerencial pode registrar follow-up."); return; }
     if(!fuForm.texto.trim() && fuForm.status==="aguardando"){ alert("Descreva a tratativa antes de salvar."); return; }
     const key=getFuKey(p);
     try{
-      const novoMapa=await addFollowup(db, p.project, key, { ...fuForm, responsavel:"Gerencial" });
-      setFollowups(f=>({ ...f, [p.project]: novoMapa }));
+      const novoMapa=await addFollowup(db, p.project.id, key, { ...fuForm, responsavel:"Gerencial" });
+      setFollowups(f=>({ ...f, [p.project.id]: novoMapa }));
       setFuForm({ status:"aguardando", texto:"", link:"" });
       // Mantém o painel aberto para o gerencial VER o registro recém-salvo no histórico.
     }catch(e){
