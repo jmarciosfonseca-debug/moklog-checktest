@@ -1979,7 +1979,7 @@ function PendenciesScreen({stored, onBack}) {
       const novoMapa=await addFollowup(db, p.project, key, { ...fuForm, responsavel:"Gerencial" });
       setFollowups(f=>({ ...f, [p.project]: novoMapa }));
       setFuForm({ status:"aguardando", texto:"", link:"" });
-      setFuOpen(null);
+      // Mantém o painel aberto para o gerencial VER o registro recém-salvo no histórico.
     }catch(e){
       console.error("Erro ao salvar follow-up:", e);
       alert("Não foi possível salvar o follow-up. Verifique sua conexão e tente novamente. ("+(e?.message||e)+")");
@@ -2104,21 +2104,22 @@ function PendenciesScreen({stored, onBack}) {
                                           <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link (proposta/orçamento) — opcional"
                                             style={{width:"100%",background:"#0a0f1e",border:"1px solid #232b4a",borderRadius:7,padding:8,color:"#e8ecf5",fontSize:11,marginBottom:8,boxSizing:"border-box"}}/>
                                           <button onClick={()=>salvarFollowup(p)} style={{width:"100%",background:"#8b7cf6",border:"none",color:"#fff",borderRadius:8,padding:9,fontSize:11,fontWeight:800,cursor:"pointer"}}>💾 Salvar follow-up</button>
-                                          {fu?.entries?.length>0&&(
-                                            <div style={{marginTop:9,borderTop:"1px solid #1c2438",paddingTop:8}}>
-                                              <div style={{fontSize:9,color:"#a78bfa",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:5}}>Histórico ({fu.entries.length})</div>
-                                              {fu.entries.map(e=>{const es=statusInfo(e.status);return(
-                                                <div key={e.id} style={{padding:"6px 0",borderBottom:"1px solid #141b2e"}}>
-                                                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
-                                                    <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:es.color+"22",color:es.color}}>{es.label}</span>
-                                                    <span style={{fontSize:9.5,color:"#64748b"}}>{fmtDate((e.em||"").slice(0,10))} · {e.responsavel}</span>
-                                                  </div>
-                                                  {e.texto&&<div style={{fontSize:10.5,color:"#cbd5e1"}}>{e.texto}</div>}
-                                                  {e.link&&<a href={e.link} target="_blank" rel="noreferrer" style={{fontSize:9.5,color:"#38bdf8",textDecoration:"none"}}>🔗 abrir link</a>}
-                                                </div>
-                                              );})}
+                                        </div>
+                                      )}
+                                      {/* Histórico de tratativas — SEMPRE visível quando há registros */}
+                                      {fu?.entries?.length>0&&(
+                                        <div style={{marginTop:8,background:"#0a0f1e",border:"1px solid #1c2438",borderRadius:8,padding:"8px 10px"}}>
+                                          <div style={{fontSize:9,color:"#a78bfa",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:5}}>📋 Tratativas registradas ({fu.entries.length})</div>
+                                          {fu.entries.map(e=>{const es=statusInfo(e.status);return(
+                                            <div key={e.id} style={{padding:"6px 0",borderBottom:"1px solid #141b2e"}}>
+                                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                                                <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:es.color+"22",color:es.color}}>{es.label}</span>
+                                                <span style={{fontSize:9.5,color:"#64748b"}}>{fmtDate((e.em||"").slice(0,10))} · {e.responsavel}</span>
+                                              </div>
+                                              {e.texto&&<div style={{fontSize:10.5,color:"#cbd5e1"}}>{e.texto}</div>}
+                                              {e.link&&<a href={e.link} target="_blank" rel="noreferrer" style={{fontSize:9.5,color:"#38bdf8",textDecoration:"none"}}>🔗 abrir link</a>}
                                             </div>
-                                          )}
+                                          );})}
                                         </div>
                                       )}
                                     </div>
