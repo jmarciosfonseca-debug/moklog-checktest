@@ -1972,12 +1972,18 @@ function PendenciesScreen({stored, onBack}) {
   const getFu = (p)=>followups?.[p.project]?.[getFuKey(p)] || null;
 
   const salvarFollowup = async (p)=>{
-    if(!podeGerenciar) return;
+    if(!podeGerenciar){ alert("Apenas o perfil gerencial pode registrar follow-up."); return; }
+    if(!fuForm.texto.trim() && fuForm.status==="aguardando"){ alert("Descreva a tratativa antes de salvar."); return; }
     const key=getFuKey(p);
-    const novoMapa=await addFollowup(db, p.project, key, { ...fuForm, responsavel:"Gerencial" });
-    setFollowups(f=>({ ...f, [p.project]: novoMapa }));
-    setFuForm({ status:"aguardando", texto:"", link:"" });
-    setFuOpen(null);
+    try{
+      const novoMapa=await addFollowup(db, p.project, key, { ...fuForm, responsavel:"Gerencial" });
+      setFollowups(f=>({ ...f, [p.project]: novoMapa }));
+      setFuForm({ status:"aguardando", texto:"", link:"" });
+      setFuOpen(null);
+    }catch(e){
+      console.error("Erro ao salvar follow-up:", e);
+      alert("Não foi possível salvar o follow-up. Verifique sua conexão e tente novamente. ("+(e?.message||e)+")");
+    }
   };
 
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
