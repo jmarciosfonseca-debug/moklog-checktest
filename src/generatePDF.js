@@ -1049,3 +1049,167 @@ ${estagnadosCriticos.length?`<div class="section" style="border:1px solid #fed7a
   a.href=url; a.download=`comparativo_${groupLabel.replace(/\s+/g,"_")}_${hoje.replace(/\//g,"-")}.html`;
   a.click(); URL.revokeObjectURL(url);
 }
+
+
+// ══════════════════════════════════════════════════════════════════
+//  RELATÓRIO EXECUTIVO CONSOLIDADO POR CLIENTE
+//  Recebe dados já montados pelo App (não acessa Firestore aqui).
+//  projetosData: [{ pid, nome, saude, cats:[{nome,frac,cls,pct}], pend:[{cat,item,dias}] }, ...]
+// ══════════════════════════════════════════════════════════════════
+export function generateClientConsolidatedPDF(grupoLabel, projetosData, opts) {
+  if(!Array.isArray(projetosData) || !projetosData.length) return;
+  opts = opts || {};
+  // paleta: usa a do primeiro projeto do grupo (todos do mesmo cliente)
+  const pal = getPaleta(projetosData[0].pid);
+  const ordem = [...projetosData].sort((a,b)=>(b.saude??0)-(a.saude??0)); // melhor -> pior
+  const semanaLabel = opts.semanaLabel || "";
+  const hoje = new Date().toLocaleDateString("pt-BR");
+
+  const scol = (s)=> s>=95?"#1d7a44": s>=90?"#b25e00":"#b42318";
+
+  const rankRows = ordem.map((d,i)=>{
+    const s = d.saude??0, col = scol(s);
+    return `<tr>
+      <td class="pos">${i+1}º</td>
+      <td class="rk-proj"><b>${d.pid}</b><small>${d.nome||""}</small></td>
+      <td class="rk-bar"><div class="bar-track"><div class="bar-fill" style="width:${s}%;background:${col}"></div></div></td>
+      <td class="rk-pct" style="color:${col}">${s}%</td>
+      <td class="rk-pend">${(d.pend||[]).length}</td>
+    </tr>`;
+  }).join("");
+
+  const blocks = ordem.map(d=>{
+    const cats = (d.cats||[]).map(c=>{
+      const sub = c.cls!=="ok";
+      return `<div class="disp-item${sub?" sub":""}">
+        <span class="d-nome">${c.nome}</span>
+        <span class="d-meta"><span class="frac">${c.frac||""}</span><span class="disp ${c.cls}">${c.pct}</span></span>
+      </div>`;
+    }).join("");
+    let pendHtml;
+    if((d.pend||[]).length){
+      const rows = [...d.pend].sort((a,b)=>(parseInt(b.dias)||0)-(parseInt(a.dias)||0)).map(p=>`<tr>
+        <td class="tag">${p.cat}<small>${p.item||""}</small></td>
+        <td class="aging"><b>${p.dias!=null?p.dias:0}</b><small>d</small></td>
+      </tr>`).join("");
+      pendHtml = `<div class="pend-sub"><div class="pend-tit">Pendências (${d.pend.length})</div>
+        <table class="pend-tab"><tbody>${rows}</tbody></table></div>`;
+    } else {
+      pendHtml = `<div class="pend-ok">✓ Sem pendências</div>`;
+    }
+    const s = d.saude??0, col = scol(s);
+    return `<section class="proj">
+      <div class="proj-cab">
+        <div class="proj-id"><b>${d.pid}</b> — ${d.nome||""}</div>
+        <div class="proj-saude" style="color:${col}">${s}%<small>saúde</small></div>
+      </div>
+      <div class="disp-grade">${cats||'<div style="color:#94a3b8;font-size:10px">Sem categorias</div>'}</div>
+      ${pendHtml}
+    </section>`;
+  }).join("");
+
+  const pids = ordem.map(d=>d.pid).join(" · ");
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consolidado ${grupoLabel} — MokLog CheckTest</title>
+<style>${consolidadoCSS(pal)}</style></head><body>
+<div class="no-print" style="text-align:center;margin:0 0 16px">
+  <button onclick="window.print()" style="background:${pal.cor};color:#fff;border:none;border-radius:6px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial">🖨️ Imprimir / Salvar PDF</button>
+</div>
+<div class="folha">
+<header class="topo">
+  <img class="logo" src="${MOKED_LOGO}" alt="Moked 30 anos">
+  <div class="doc-meta"><div class="doc-tipo">Relatório Executivo Consolidado</div>
+  <div class="doc-num">Cliente <b>${grupoLabel.toUpperCase()}</b> · ${ordem.length} unidade${ordem.length===1?"":"s"}</div>
+  <div class="doc-num">Emissão: <b>${hoje}</b></div></div>
+</header>
+<div class="titulo-bloco"><h1>Consolidado Operacional — ${grupoLabel}</h1>
+<div class="sub"><b>${ordem.length} parque${ordem.length===1?"":"s"} logístico${ordem.length===1?"":"s"}</b><span class="sep">·</span>${pids}${semanaLabel?`<span class="sep">·</span>${semanaLabel}`:""}</div></div>
+
+<div class="secao-cab"><span class="n">01</span><h2>Ranking de disponibilidade</h2><span class="rule"></span></div>
+<table class="rank"><thead><tr><th>#</th><th>Unidade</th><th>Disponibilidade</th><th class="r">Saúde</th><th class="c">Pend.</th></tr></thead>
+<tbody>${rankRows}</tbody></table>
+
+<div class="secao-cab"><span class="n">02</span><h2>Detalhamento por unidade</h2><span class="rule"></span></div>
+${blocks}
+
+<footer class="rodape">
+ <div class="esq"><div><b>Moked Consulting Security</b> · MokLog CheckTest</div><div>Consolidado ${grupoLabel.toUpperCase()} · gerado em ${hoje}</div></div>
+ <div class="dir"><div>${ordem.length} unidade${ordem.length===1?"":"s"} · ordenado por saúde</div><div>${semanaLabel||""}</div></div>
+</footer>
+</div></body></html>`;
+
+  const blob=new Blob([html],{type:"text/html"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`consolidado_${grupoLabel.replace(/\s+/g,"_")}_${hoje.replace(/\//g,"-")}.html`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// CSS do consolidado (parametrizado pela paleta do cliente)
+function consolidadoCSS(pal){
+  return `
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{background:#565c64;}
+  body{font-family:"Georgia","Times New Roman",serif;color:#15181d;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .folha{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:18mm 17mm 14mm;box-shadow:0 6px 30px rgba(0,0,0,.28);}
+  .topo{display:flex;justify-content:space-between;align-items:center;padding-bottom:15px;border-bottom:1px solid #d2d7dd;margin-bottom:2px;position:relative;}
+  .topo::after{content:"";position:absolute;left:0;bottom:-1px;width:96px;height:3px;background:${pal.accent};}
+  .topo .logo{height:58px;width:auto;object-fit:contain;}
+  .doc-meta{text-align:right;}
+  .doc-tipo{font-family:Arial,sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.4px;color:${pal.cor};text-transform:uppercase;}
+  .doc-num{font-family:Arial,sans-serif;font-size:9.5px;color:#8b95a1;margin-top:4px;}
+  .doc-num b{color:#4b535d;}
+  .titulo-bloco{margin:17px 0 2px;}
+  .titulo-bloco h1{font-size:25px;font-weight:400;letter-spacing:-.4px;}
+  .titulo-bloco .sub{font-family:Arial,sans-serif;font-size:12px;color:#4b535d;margin-top:7px;font-weight:500;}
+  .titulo-bloco .sub b{color:#15181d;} .titulo-bloco .sub .sep{color:#aab2bc;margin:0 7px;}
+  .secao-cab{display:flex;align-items:center;gap:11px;margin:22px 0 13px;}
+  .secao-cab .n{font-family:Arial,sans-serif;font-size:10px;font-weight:800;color:${pal.accent};display:flex;align-items:center;gap:7px;}
+  .secao-cab .n::before{content:"";width:14px;height:2px;background:${pal.accent};display:inline-block;}
+  .secao-cab h2{font-family:Arial,sans-serif;font-size:13.5px;font-weight:700;}
+  .secao-cab .rule{flex:1;height:1px;background:linear-gradient(90deg,${pal.accent} 0,${pal.accent} 26px,#e6e9ed 26px);}
+  table.rank{width:100%;border-collapse:collapse;font-family:Arial,sans-serif;}
+  table.rank td{padding:9px 10px;border-bottom:1px solid #e6e9ed;font-size:12px;vertical-align:middle;}
+  table.rank thead th{font-family:Arial,sans-serif;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#8b95a1;text-align:left;padding:0 10px 6px;}
+  table.rank thead th.c{text-align:center;} table.rank thead th.r{text-align:right;}
+  .rank .pos{font-weight:800;color:#8b95a1;width:34px;}
+  .rank .rk-proj b{font-weight:800;} .rank .rk-proj small{display:block;color:#8b95a1;font-size:10px;}
+  .rank .rk-bar{width:40%;}
+  .bar-track{background:#eef1f0;border-radius:4px;height:9px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:4px;}
+  .rank .rk-pct{font-weight:800;font-size:14px;text-align:right;width:56px;}
+  .rank .rk-pend{text-align:center;width:44px;color:#b42318;font-weight:700;}
+  .proj{margin-top:20px;break-inside:avoid;}
+  .proj-cab{display:flex;justify-content:space-between;align-items:baseline;padding:7px 11px;background:${pal.cor};color:#fff;border-radius:3px 3px 0 0;}
+  .proj-id{font-family:Arial,sans-serif;font-size:12px;font-weight:700;} .proj-id b{font-weight:800;}
+  .proj-saude{font-family:Arial,sans-serif;font-size:16px;font-weight:800;background:#fff;padding:1px 9px;border-radius:3px;}
+  .proj-saude small{font-size:7px;text-transform:uppercase;letter-spacing:.5px;margin-left:4px;color:#8b95a1;font-weight:700;}
+  .disp-grade{column-count:3;column-gap:16px;border:1px solid #e6e9ed;border-top:none;padding:10px 12px;}
+  .disp-item{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:4px 0;border-bottom:1px solid #f0f2f1;break-inside:avoid;}
+  .disp-item .d-nome{font-family:Arial,sans-serif;font-size:9px;color:#4b535d;line-height:1.2;}
+  .disp-item.sub .d-nome{color:#15181d;font-weight:700;}
+  .disp-item .d-meta{display:flex;gap:5px;flex-shrink:0;white-space:nowrap;align-items:baseline;}
+  .disp-item .frac{font-family:Arial,sans-serif;font-size:8px;color:#aab2bc;}
+  .disp-item .disp{font-family:Arial,sans-serif;font-size:9.5px;font-weight:800;}
+  .disp.ok{color:#aab2bc;font-weight:600;} .disp.parc{color:#b25e00;} .disp.inop{color:#b42318;}
+  .pend-sub{border:1px solid #e6e9ed;border-top:none;padding:9px 12px;background:#fbfbfc;}
+  .pend-tit{font-family:Arial,sans-serif;font-size:8px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#8b95a1;margin-bottom:6px;}
+  .pend-tab{width:100%;border-collapse:collapse;}
+  .pend-tab td{font-family:Arial,sans-serif;padding:3px 6px;font-size:10px;border-bottom:1px solid #eef1f0;}
+  .pend-tab .tag{font-weight:700;color:#15181d;} .pend-tab .tag small{display:block;font-weight:500;color:#8b95a1;font-size:9px;}
+  .pend-tab .aging{text-align:right;white-space:nowrap;width:52px;} .pend-tab .aging b{color:#b42318;font-size:11px;} .pend-tab .aging small{font-size:7px;color:#8b95a1;text-transform:uppercase;margin-left:2px;}
+  .pend-ok{border:1px solid #cdebd8;border-top:none;background:#f0faf4;color:#15803d;font-family:Arial,sans-serif;font-size:11px;font-weight:600;padding:9px 12px;border-radius:0 0 3px 3px;}
+  .rodape{margin-top:24px;padding-top:13px;border-top:1px solid #e6e9ed;display:flex;justify-content:space-between;align-items:flex-end;font-family:Arial,sans-serif;position:relative;}
+  .rodape::before{content:"";position:absolute;left:0;top:-1px;width:64px;height:2px;background:${pal.accent};}
+  .rodape .esq{font-size:9.5px;color:#8b95a1;line-height:1.7;} .rodape .esq b{color:#4b535d;}
+  .rodape .dir{text-align:right;font-size:9px;color:#aab2bc;line-height:1.7;}
+  @media print{
+   html,body{background:#fff;} .no-print{display:none!important;}
+   .folha{margin:0;box-shadow:none;width:auto;min-height:auto;padding:12mm 11mm;}
+   .proj,.disp-item{page-break-inside:avoid;}
+   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+   @page{margin:12mm;}
+  }`;
+}

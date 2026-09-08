@@ -20,7 +20,7 @@ import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
 import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
-import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
+import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, generateClientConsolidatedPDF } from "./generatePDF";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 
 // ── Hook de conectividade
@@ -1623,6 +1623,29 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     const mediaGrupo = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
     const tituloGrupo = grupoSel ? grupoSel.label : "Todos (interno Moked)";
     const scoreColor = (s)=> s>=90?"#22c55e":s>=75?"#f59e0b":"#ef4444";
+    const diasDesde = (since)=> since ? Math.floor((Date.now()-new Date(since+"T12:00:00").getTime())/86400000) : null;
+    // Monta os dados do consolidado por cliente (categorias + pendências + saúde do último teste)
+    const buildConsolidadoData = (ids) => ids.map(pid=>{
+      const p = PROJECTS[pid]; if(!p) return null;
+      const hist = stored[pid]?.history ?? [];
+      const last = hist.length ? hist[hist.length-1] : null;
+      if(!last) return { pid, nome:p.name||pid, saude:0, cats:[], pend:[] };
+      const st = last.state || {};
+      const h = computeHealth(p, st);
+      const cats = []; const pend = [];
+      for(const cat of (p.categories||[])){
+        if(cat.type==="notes"||cat.type==="maintenance") continue;
+        const s0 = st[cat.id];
+        let ok=0, total=0;
+        if(cat.type==="single"){ total=1; const r=resolveStatus(s0||{}); if(r==="ok")ok=1; if(r&&r!=="ok")pend.push({cat:cat.label,item:"\u2014",dias:diasDesde(s0?.since)}); }
+        else if(cat.type==="items"){ const arr=Array.isArray(s0)?s0:[]; total=arr.length; arr.forEach((v,i)=>{ const r=resolveStatus(v); if(r==="ok")ok++; else pend.push({cat:cat.label,item:(cat.itemLabels&&cat.itemLabels[i])||("Item "+(i+1)),dias:diasDesde(v?.since)}); }); }
+        else if(cat.type==="count"){ const inopArr=Array.isArray(s0?.inoperative)?s0.inoperative:[]; total=s0?.total??cat.total??0; ok=total-inopArr.length; inopArr.forEach(it=>pend.push({cat:cat.label,item:it.id||"?",dias:diasDesde(it.since)})); }
+        const pct = total>0?Math.round(ok/total*100):100;
+        const cls = pct===100?"ok":pct>0?"parc":"inop";
+        cats.push({ nome:cat.label, frac:ok+"/"+total, cls, pct: pct+"%" });
+      }
+      return { pid, nome:p.name||pid, saude:h.pct, cats, pend };
+    }).filter(Boolean);
     const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
     return (
       <div style={S.page}>
@@ -1648,6 +1671,15 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           {!loadingV&&v360Grupo==="todos"&&<div style={{fontSize:11,color:"#f59e0b",background:"#1a1000",border:"1px solid #f59e0b33",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
             ⚠ Visão "Todos" é de uso interno Moked. Para enviar a um cliente, selecione o grupo dele — o PDF nunca mistura clientes.
           </div>}
+
+          {!loadingV&&grupoSel&&rows.length>0&&<button onClick={()=>{
+            try{
+              const dados = buildConsolidadoData(grupoSel.ids);
+              generateClientConsolidatedPDF(grupoSel.label, dados, { semanaLabel: (()=>{ for(const pid of grupoSel.ids){ const hist=stored[pid]?.history??[]; const last=hist.length?hist[hist.length-1]:null; if(last?.meta?.date) return getWeekLabel(last.meta.date); } return ""; })() });
+            }catch(e){ alert("Não foi possível gerar o consolidado. "+(e?.message||e)); }
+          }} style={{width:"100%",background:"linear-gradient(135deg,#1E3A2F,#2c5545)",border:"none",color:"#fff",borderRadius:10,padding:"12px",fontSize:13,fontWeight:800,cursor:"pointer",marginBottom:8}}>
+            📄 Gerar Consolidado {grupoSel.label} ({rows.length} unidade{rows.length===1?"":"s"})
+          </button>}
 
           {loadingV&&<div style={{textAlign:"center",padding:"50px 0"}}>
             <div style={{fontSize:28,marginBottom:10}}>🎯</div>
