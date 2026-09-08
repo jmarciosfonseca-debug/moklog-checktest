@@ -1958,6 +1958,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           </div>
         </div>}
 
+        <button onClick={()=>carregarVisao360()} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#15803d,#22c55e)",fontSize:13,border:"1px solid #22c55e66",marginBottom:8}}>🎯 Visão 360 — Saúde Consolidada + Relatório por Cliente</button>
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📋 Análise de Risco por Grupo</div>
           <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Golgi</button>
