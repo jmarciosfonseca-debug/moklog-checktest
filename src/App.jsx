@@ -20,7 +20,7 @@ import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
 import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
-import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, generateClientConsolidatedPDF } from "./generatePDF";
+import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 
 // ── Hook de conectividade
@@ -147,7 +147,6 @@ function SafeBlock({ name, children }) {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
-import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
@@ -468,29 +467,29 @@ const PROJECTS = {
       {id:"infra",label:"22 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P311A: {id:"P311A",name:"Mega CL Curitiba",short:"Curitiba",categories:[
-      {id:"perimeter",label:"01 - ALM. PERIM. (Cerca El\u00e9trica)",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},{id:"perimeter_alphasense",label:"02 - ALM. PERIM. (AlphaSense)",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08"]},
-      {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},
-      {id:"botoeiras",label:"04 - BOTOEIRAS / PORT\u00d5ES DE ACESSO",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},
-      {id:"panic",label:"05 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["L\u00edder","CCO"]},
-      {id:"cancelas",label:"06 - CANCELAS DE ACESSO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
-      {id:"portas_cco",label:"07 - CCO / ABERTURA DE PORTAS",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},
-      {id:"cftv",label:"08 - CFTV",type:"count",total:140},
-      {id:"computadores",label:"09 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},
-      {id:"dilaceradores",label:"10 - DILACERADORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},
-      {id:"intercomunicadores",label:"11 - INTERCOMUNICADORES",type:"items",itemLabels:["Intercomunicador 01","Intercomunicador 02","Intercomunicador 03"]},
-      {id:"intercom_totem",label:"12 - INTERCOMUNICADORES DE TOTEM",type:"items",itemLabels:["Totem Superior 01","Totem Superior 02","Totem Superior 03","Totem Superior 04","Totem Superior 05","Totem Superior 06","Totem Inferior 01","Totem Inferior 02","Totem Inferior 03","Totem Inferior 04","Totem Inferior 05","Totem Inferior 06"]},
-      {id:"qr_code",label:"13 - LEITORES DE QR CODE",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},
-      {id:"materiais",label:"14 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
-      {id:"mon_cda",label:"15 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03"]},
-      {id:"mon_cftv",label:"16 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
-      {id:"portoes",label:"17 - PORT\u00d5ES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
-      {id:"alertas",label:"18 - RECEBIMENTO DE ALERTAS EXTERNOS",type:"items",itemLabels:["Central Moked","Central Auxiliar"]},
-      {id:"sdai",label:"19 - SDAI (INC\u00caNDIO)",type:"items",itemLabels:["Central 01","Central 02","Central 03","Central 04","Central 05"]},
-      {id:"keyaccess",label:"20 - SISTEMA KEYACCESS",type:"items",itemLabels:["Torniquete 01","Torniquete 02","Torniquete 03"]},
-      {id:"totens",label:"21 - TOTENS DE AUTOATENDIMENTO",type:"items",itemLabels:["Entrada","Sa\u00edda"]},
-      {id:"video_porteiro",label:"22 - V\u00cdDEO PORTEIRO",type:"items",itemLabels:["V\u00eddeo Porteiro 01","V\u00eddeo Porteiro 02","V\u00eddeo Porteiro 03","V\u00eddeo Porteiro 04"]},
-      {id:"manutencao",label:"23 - VISITA DE MANUTEN\u00c7\u00c3O",type:"maintenance"},
-      {id:"infra",label:"24 - INFRAESTRUTURA / OBS.",type:"notes"}
+      {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},
+      {id:"ac",label:"02 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},
+      {id:"botoeiras",label:"03 - BOTOEIRAS / PORT\u00d5ES DE ACESSO",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},
+      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["L\u00edder","CCO"]},
+      {id:"cancelas",label:"05 - CANCELAS DE ACESSO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
+      {id:"portas_cco",label:"06 - CCO / ABERTURA DE PORTAS",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},
+      {id:"cftv",label:"07 - CFTV",type:"count",total:140},
+      {id:"computadores",label:"08 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},
+      {id:"dilaceradores",label:"09 - DILACERADORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},
+      {id:"intercomunicadores",label:"10 - INTERCOMUNICADORES",type:"items",itemLabels:["Intercomunicador 01","Intercomunicador 02","Intercomunicador 03"]},
+      {id:"intercom_totem",label:"11 - INTERCOMUNICADORES DE TOTEM",type:"items",itemLabels:["Totem Superior 01","Totem Superior 02","Totem Superior 03","Totem Superior 04","Totem Superior 05","Totem Superior 06","Totem Inferior 01","Totem Inferior 02","Totem Inferior 03","Totem Inferior 04","Totem Inferior 05","Totem Inferior 06"]},
+      {id:"qr_code",label:"12 - LEITORES DE QR CODE",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},
+      {id:"materiais",label:"13 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
+      {id:"mon_cda",label:"14 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03"]},
+      {id:"mon_cftv",label:"15 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
+      {id:"portoes",label:"16 - PORT\u00d5ES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
+      {id:"alertas",label:"17 - RECEBIMENTO DE ALERTAS EXTERNOS",type:"items",itemLabels:["Central Moked","Central Auxiliar"]},
+      {id:"sdai",label:"18 - SDAI (INC\u00caNDIO)",type:"items",itemLabels:["Central 01","Central 02","Central 03","Central 04","Central 05"]},
+      {id:"keyaccess",label:"19 - SISTEMA KEYACCESS",type:"items",itemLabels:["Torniquete 01","Torniquete 02","Torniquete 03"]},
+      {id:"totens",label:"20 - TOTENS DE AUTOATENDIMENTO",type:"items",itemLabels:["Entrada","Sa\u00edda"]},
+      {id:"video_porteiro",label:"21 - V\u00cdDEO PORTEIRO",type:"items",itemLabels:["V\u00eddeo Porteiro 01","V\u00eddeo Porteiro 02","V\u00eddeo Porteiro 03","V\u00eddeo Porteiro 04"]},
+      {id:"manutencao",label:"22 - VISITA DE MANUTEN\u00c7\u00c3O",type:"maintenance"},
+      {id:"infra",label:"23 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P311B: {id:"P311B",name:"Mega CL Itaja\u00ed",short:"Itaja\u00ed",categories:[
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06"]},
@@ -1623,29 +1622,6 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     const mediaGrupo = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
     const tituloGrupo = grupoSel ? grupoSel.label : "Todos (interno Moked)";
     const scoreColor = (s)=> s>=90?"#22c55e":s>=75?"#f59e0b":"#ef4444";
-    const diasDesde = (since)=> since ? Math.floor((Date.now()-new Date(since+"T12:00:00").getTime())/86400000) : null;
-    // Monta os dados do consolidado por cliente (categorias + pendências + saúde do último teste)
-    const buildConsolidadoData = (ids) => ids.map(pid=>{
-      const p = PROJECTS[pid]; if(!p) return null;
-      const hist = stored[pid]?.history ?? [];
-      const last = hist.length ? hist[hist.length-1] : null;
-      if(!last) return { pid, nome:p.name||pid, saude:0, cats:[], pend:[] };
-      const st = last.state || {};
-      const h = computeHealth(p, st);
-      const cats = []; const pend = [];
-      for(const cat of (p.categories||[])){
-        if(cat.type==="notes"||cat.type==="maintenance") continue;
-        const s0 = st[cat.id];
-        let ok=0, total=0;
-        if(cat.type==="single"){ total=1; const r=resolveStatus(s0||{}); if(r==="ok")ok=1; if(r&&r!=="ok")pend.push({cat:cat.label,item:"\u2014",dias:diasDesde(s0?.since)}); }
-        else if(cat.type==="items"){ const arr=Array.isArray(s0)?s0:[]; total=arr.length; arr.forEach((v,i)=>{ const r=resolveStatus(v); if(r==="ok")ok++; else pend.push({cat:cat.label,item:(cat.itemLabels&&cat.itemLabels[i])||("Item "+(i+1)),dias:diasDesde(v?.since)}); }); }
-        else if(cat.type==="count"){ const inopArr=Array.isArray(s0?.inoperative)?s0.inoperative:[]; total=s0?.total??cat.total??0; ok=total-inopArr.length; inopArr.forEach(it=>pend.push({cat:cat.label,item:it.id||"?",dias:diasDesde(it.since)})); }
-        const pct = total>0?Math.round(ok/total*100):100;
-        const cls = pct===100?"ok":pct>0?"parc":"inop";
-        cats.push({ nome:cat.label, frac:ok+"/"+total, cls, pct: pct+"%" });
-      }
-      return { pid, nome:p.name||pid, saude:h.pct, cats, pend };
-    }).filter(Boolean);
     const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
     return (
       <div style={S.page}>
@@ -1671,15 +1647,6 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           {!loadingV&&v360Grupo==="todos"&&<div style={{fontSize:11,color:"#f59e0b",background:"#1a1000",border:"1px solid #f59e0b33",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
             ⚠ Visão "Todos" é de uso interno Moked. Para enviar a um cliente, selecione o grupo dele — o PDF nunca mistura clientes.
           </div>}
-
-          {!loadingV&&grupoSel&&rows.length>0&&<button onClick={()=>{
-            try{
-              const dados = buildConsolidadoData(grupoSel.ids);
-              generateClientConsolidatedPDF(grupoSel.label, dados, { semanaLabel: (()=>{ for(const pid of grupoSel.ids){ const hist=stored[pid]?.history??[]; const last=hist.length?hist[hist.length-1]:null; if(last?.meta?.date) return getWeekLabel(last.meta.date); } return ""; })() });
-            }catch(e){ alert("Não foi possível gerar o consolidado. "+(e?.message||e)); }
-          }} style={{width:"100%",background:"linear-gradient(135deg,#1E3A2F,#2c5545)",border:"none",color:"#fff",borderRadius:10,padding:"12px",fontSize:13,fontWeight:800,cursor:"pointer",marginBottom:8}}>
-            📄 Gerar Consolidado {grupoSel.label} ({rows.length} unidade{rows.length===1?"":"s"})
-          </button>}
 
           {loadingV&&<div style={{textAlign:"center",padding:"50px 0"}}>
             <div style={{fontSize:28,marginBottom:10}}>🎯</div>
@@ -1828,16 +1795,15 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
           <button onClick={async ()=>{
               const proj = viewReport.project||viewReport;
-              const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id), loadFollowups(db, proj.id).catch(()=>({}))]);
-              await generatePDF(
+              const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id)]);
+              generatePDF(
                 proj,
                 viewReport.report?.state||viewReport.state,
                 viewReport.report?.meta||viewReport.meta,
                 [],
                 ctmkInfoFor(proj.id),
                 inquilinosInfo,
-                energiaInfo,
-                followupsInfo
+                energiaInfo
               );
             }}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
@@ -1910,7 +1876,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
-                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id), loadFollowups(db, p.id).catch(()=>({}))]); await generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
+                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id)]); generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
                     <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
@@ -1978,47 +1944,8 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 function PendenciesScreen({stored, onBack}) {
   const [filter, setFilter] = useState("all");
   const [openProj, setOpenProj] = useState({});
-  const [followups, setFollowups] = useState({}); // { [pid]: { [key]: {entries,resolvido,...} } }
-  const [fuOpen, setFuOpen] = useState(null); // key do item com painel de follow-up aberto
-  const [fuForm, setFuForm] = useState({ status:"aguardando", texto:"", link:"" });
-  const podeGerenciar = hasGerencial();
   const toggleProj = (pid) => setOpenProj(o=>({...o,[pid]:!o[pid]}));
-
-  // Carrega follow-ups de todos os projetos com pendências, uma vez.
-  useEffect(()=>{
-    let vivo=true;
-    const pids=[...new Set(getAllPendencies(stored).map(p=>p.project.id))];
-    Promise.all(pids.map(pid=>loadFollowups(db,pid).then(m=>[pid,m]).catch(()=>[pid,{}])))
-      .then(pares=>{ if(vivo){ const obj={}; pares.forEach(([pid,m])=>{obj[pid]=m;}); setFollowups(obj); } });
-    return ()=>{ vivo=false; };
-  },[stored]);
-
-  const allRaw = getAllPendencies(stored);
-  // Rede de segurança: um item marcado "resolvido" no follow-up é OCULTADO,
-  // MAS só se o teste semanal atual não o reporta mais (aqui, se ele saiu de allRaw
-  // ele já sumiu naturalmente). Se ainda está em allRaw = teste ainda acusa = mostra
-  // com aviso. Portanto ocultamos apenas quando resolvido E o item NÃO está mais
-  // no teste — o que já acontece sozinho. Aqui marcamos os que têm follow-up para
-  // exibir badge/estado, sem removê-los indevidamente.
-  const all = allRaw;
-  const getFuKey = (p)=>canonicalFollowupKey(p.project.id, p.cat, p.item);
-  const getFu = (p)=>followups?.[p.project.id]?.[getFuKey(p)] || null;
-
-  const salvarFollowup = async (p)=>{
-    if(!podeGerenciar){ alert("Apenas o perfil gerencial pode registrar follow-up."); return; }
-    if(!fuForm.texto.trim() && fuForm.status==="aguardando"){ alert("Descreva a tratativa antes de salvar."); return; }
-    const key=getFuKey(p);
-    try{
-      const novoMapa=await addFollowup(db, p.project.id, key, { ...fuForm, responsavel:"Gerencial" });
-      setFollowups(f=>({ ...f, [p.project.id]: novoMapa }));
-      setFuForm({ status:"aguardando", texto:"", link:"" });
-      // Mantém o painel aberto para o gerencial VER o registro recém-salvo no histórico.
-    }catch(e){
-      console.error("Erro ao salvar follow-up:", e);
-      alert("Não foi possível salvar o follow-up. Verifique sua conexão e tente novamente. ("+(e?.message||e)+")");
-    }
-  };
-
+  const all = getAllPendencies(stored);
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
   const critCount = all.filter(p => p.status === "inop").length;
   const partCount = all.filter(p => p.status === "partial").length;
@@ -2106,58 +2033,6 @@ function PendenciesScreen({stored, onBack}) {
                                 {p.item&&p.item!=="—"&&<div style={{fontSize:11,color:"#94a3b8"}}>↳ {p.item}</div>}
                                 {p.note&&<div style={{fontSize:11,color:"#94a3b8",marginTop:2,fontStyle:"italic"}}>{p.note}</div>}
                                 <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"}</div>
-                                {/* Follow-up: estado atual + botão + painel (só gerencial) */}
-                                {(()=>{
-                                  const fu=getFu(p); const fuKey=getFuKey(p);
-                                  const st=fu?.statusAtual?statusInfo(fu.statusAtual):null;
-                                  const aberto=fuOpen===fuKey;
-                                  return (
-                                    <div style={{marginTop:6}}>
-                                      {st&&(
-                                        <div style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:999,background:st.color+"22",color:st.color,marginBottom:4}}>
-                                          📋 {st.label}{fu?.resolvido?" · ⚠️ ainda consta no teste":""}
-                                        </div>
-                                      )}
-                                      {podeGerenciar&&(
-                                        <button onClick={()=>{setFuOpen(aberto?null:fuKey);setFuForm({status:fu?.statusAtual||"aguardando",texto:"",link:""});}}
-                                          style={{display:"block",width:"100%",marginTop:2,background:"#8b7cf611",border:"1px solid #8b7cf644",color:"#a78bfa",borderRadius:8,padding:"6px 10px",fontSize:10.5,fontWeight:700,cursor:"pointer"}}>
-                                          📋 {fu?"Atualizar / ver tratativas":"Registrar follow-up"}{fu?.entries?.length?` (${fu.entries.length})`:""}
-                                        </button>
-                                      )}
-                                      {aberto&&podeGerenciar&&(
-                                        <div style={{marginTop:7,background:"#0d0a1f",border:"1px solid #8b7cf633",borderRadius:9,padding:10}}>
-                                          <div style={{fontSize:9,color:"#a78bfa",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:5}}>Status da tratativa</div>
-                                          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-                                            {FOLLOWUP_STATUS.map(s=>(
-                                              <span key={s.id} onClick={()=>setFuForm(f=>({...f,status:s.id}))} style={{fontSize:9.5,padding:"5px 8px",borderRadius:7,cursor:"pointer",fontWeight:600,border:`1px solid ${fuForm.status===s.id?s.color:"#2a3450"}`,background:fuForm.status===s.id?s.color:"transparent",color:fuForm.status===s.id?"#fff":"#94a3b8"}}>{s.label}</span>
-                                            ))}
-                                          </div>
-                                          <textarea value={fuForm.texto} onChange={e=>setFuForm(f=>({...f,texto:e.target.value}))} rows={2} placeholder="O que está sendo tratado (ex.: proposta enviada, aguardando aprovação)"
-                                            style={{width:"100%",background:"#0a0f1e",border:"1px solid #232b4a",borderRadius:7,padding:8,color:"#e8ecf5",fontSize:11,marginBottom:7,resize:"vertical",fontFamily:"inherit",boxSizing:"border-box"}}/>
-                                          <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link (proposta/orçamento) — opcional"
-                                            style={{width:"100%",background:"#0a0f1e",border:"1px solid #232b4a",borderRadius:7,padding:8,color:"#e8ecf5",fontSize:11,marginBottom:8,boxSizing:"border-box"}}/>
-                                          <button onClick={()=>salvarFollowup(p)} style={{width:"100%",background:"#8b7cf6",border:"none",color:"#fff",borderRadius:8,padding:9,fontSize:11,fontWeight:800,cursor:"pointer"}}>💾 Salvar follow-up</button>
-                                        </div>
-                                      )}
-                                      {/* Histórico de tratativas — SEMPRE visível quando há registros */}
-                                      {fu?.entries?.length>0&&(
-                                        <div style={{marginTop:8,background:"#0a0f1e",border:"1px solid #1c2438",borderRadius:8,padding:"8px 10px"}}>
-                                          <div style={{fontSize:9,color:"#a78bfa",textTransform:"uppercase",letterSpacing:.5,fontWeight:700,marginBottom:5}}>📋 Tratativas registradas ({fu.entries.length})</div>
-                                          {fu.entries.map(e=>{const es=statusInfo(e.status);return(
-                                            <div key={e.id} style={{padding:"6px 0",borderBottom:"1px solid #141b2e"}}>
-                                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
-                                                <span style={{fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:es.color+"22",color:es.color}}>{es.label}</span>
-                                                <span style={{fontSize:9.5,color:"#64748b"}}>{fmtDate((e.em||"").slice(0,10))} · {e.responsavel}</span>
-                                              </div>
-                                              {e.texto&&<div style={{fontSize:10.5,color:"#cbd5e1"}}>{e.texto}</div>}
-                                              {e.link&&<a href={e.link} target="_blank" rel="noreferrer" style={{fontSize:9.5,color:"#38bdf8",textDecoration:"none"}}>🔗 abrir link</a>}
-                                            </div>
-                                          );})}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })()}
                               </div>
                             </div>
                           </div>
@@ -2362,7 +2237,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
           <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id), loadFollowups(db, project.id).catch(()=>({}))]); await generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
+          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id)]); generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
           <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?"✓ Copiado!":"📋 Copiar Texto"}</button>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
@@ -2460,52 +2335,37 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const hdrBorder=dark?"#0a0f1e":"#e2e8f0";
   const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
 
-  // P260A já vem em PROJECTS; adicionamos apenas B e C (mesma convenção do RegistrosMenu) para não duplicar.
   const allProjects = [
     ...Object.values(PROJECTS),
-    {id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
+    {id:"P260A",name:"Jatinox Unidade A"},{id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
   ];
 
   const [equipData, setEquipData] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(()=>{
-    let alive = true;
     const loadAll = async () => {
       const results = {};
-      await Promise.all(allProjects.map(async p => {
-        // Fonte primária: Firestore (nuvem) — garante paridade com o resumo do RegistrosMenu.
-        try {
-          const snap = await getDoc(doc(db, "equipamentos", p.id));
-          if(snap.exists()){ results[p.id] = snap.data(); return; }
-        } catch(e){}
-        // Fallback: localStorage (offline / cache local).
+      for(const p of allProjects) {
         try {
           const local = localStorage.getItem(`equipamentos_${p.id}`);
           if(local) results[p.id] = JSON.parse(local);
         } catch(e){}
-      }));
-      if(alive){ setEquipData(results); setLoading(false); }
+      }
+      setEquipData(results);
+      setLoading(false);
     };
     loadAll();
-    return ()=>{ alive = false; };
   },[]);
 
-  // Contagem genérica (mesma lógica do resumo em RegistrosMenu): percorre TODOS os arrays do
-  // documento + o campo avulso "moto", contando apenas itens com status. Evita divergência
-  // por categorias que não estejam numa lista fixa de chaves.
   const countProblemas = (data) => {
     if(!data) return {inop:0,parcial:0,total:0};
-    let inop=0, parcial=0, total=0;
-    const contar = (it) => {
-      if(!it || typeof it!=="object" || !it.status) return;
-      total++;
-      if(it.status==="inop"||it.status==="critico") inop++;
-      else if(it.status==="parcial"||it.status==="baixo") parcial++;
+    const all = [...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])];
+    return {
+      inop:   all.filter(i=>i.status==="inop"||i.status==="critico").length,
+      parcial:all.filter(i=>i.status==="parcial"||i.status==="baixo").length,
+      total:  all.length,
     };
-    Object.values(data).forEach(v=>{ if(Array.isArray(v)) v.forEach(contar); });
-    if(data.moto) contar(data.moto);
-    return { inop, parcial, total };
   };
 
   return (
@@ -2588,22 +2448,64 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 
   // Estatísticas do dashboard (Colaboradores + Equipamentos) — Firestore com fallback localStorage
   const [dashStats, setDashStats] = useState(null);
+  const [colabCounts, setColabCounts] = useState({});
   useEffect(()=>{
     let alive = true;
     (async()=>{
       const hoje = new Date().toLocaleDateString("sv-SE");
+      const hojeMs = Date.now();
+      const DIA = 86400000;
+      // Categorias OFICIAIS de equipamento (estrutura canônica de Equipamentos.jsx).
+      const EQUIP_CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam"];
+      const RECICLAGEM_MESES = 12;
       let ativos=0, feriasHoje=0, projsColab=0, inop=0, parcial=0, totalEquip=0, projsEquip=0;
+      const veteranos=[];
+      const estabilidade=[];
+      let advNoHistorico=0, reciclagemVencida=0, reciclagemSemData=0, voltamFerias=0, materialPendente=0, projsSemEquipe=0;
+      const voltamDetalhe=[];
+      const colabCountsAcc={};
       await Promise.all(allProjects.map(async p=>{
         let eqData=null;
         try{ const snap=await getDoc(doc(db,"equipes",p.id)); if(snap.exists()) eqData=snap.data(); }catch(e){}
         if(!eqData){ try{ const l=localStorage.getItem(`equipe_${p.id}`); if(l) eqData=JSON.parse(l); }catch(e){} }
         if(eqData){
           const cols=(eqData.colaboradores||[]).filter(c=>c.status==="ativo");
-          if(cols.length>0) projsColab++;
+          colabCountsAcc[p.id]=cols.length;
+          if(cols.length>0) projsColab++; else projsSemEquipe++;
           ativos+=cols.length;
           (Array.isArray(eqData.ferias)?eqData.ferias:[]).forEach(f=>{
             if(f&&f.dataInicio&&f.dataRetorno&&f.dataInicio<=hoje&&hoje<=f.dataRetorno) feriasHoje++;
+            if(f&&f.dataRetorno){
+              const ret=new Date(f.dataRetorno+"T12:00:00").getTime();
+              if(!isNaN(ret)){ const dd=Math.round((ret-hojeMs)/DIA); if(dd>=0&&dd<=7){ voltamFerias++; voltamDetalhe.push({projeto:p.id, quando:f.dataRetorno}); } }
+            }
           });
+          cols.forEach(c=>{
+            if(c.dataContratacao){
+              const ini=new Date(c.dataContratacao+"T12:00:00").getTime();
+              if(!isNaN(ini) && ini<=hojeMs){ const meses=Math.floor((hojeMs-ini)/(DIA*30.44)); if(meses>=0) veteranos.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||"", turno:c.turno||"", meses}); }
+            }
+            if(c.ultimaReciclagem){
+              const ur=new Date(c.ultimaReciclagem+"T12:00:00").getTime();
+              if(!isNaN(ur)){ if((hojeMs-ur) > RECICLAGEM_MESES*30.44*DIA) reciclagemVencida++; } else reciclagemSemData++;
+            } else reciclagemSemData++;
+            const hist=Array.isArray(c.historico)?c.historico:[];
+            if(hist.some(h=>h && h.tipo==="Medida Disciplinar" && (h.detalhe==="Advertência"||h.detalhe==="Suspensão"))) advNoHistorico++;
+            // Material/uniforme: solicitações ficam em colaborador.uniforme.solicitacoes (status "pendente").
+            const solic = c.uniforme && Array.isArray(c.uniforme.solicitacoes) ? c.uniforme.solicitacoes : [];
+            materialPendente += solic.filter(x=>x && x.status==="pendente").length;
+          });
+          // Estabilidade: só desligamentos com data VÁLIDA e não-futura, nos últimos 90 dias.
+          const temDesligadosField = Array.isArray(eqData.desligados);
+          const desl90 = temDesligadosField ? eqData.desligados.filter(d=>{
+            if(!d||!d.desligadoEm) return false;
+            const de=new Date(d.desligadoEm).getTime();
+            return !isNaN(de) && de<=hojeMs && (hojeMs-de) <= 90*DIA;
+          }).length : 0;
+          // Projetos sem efetivo ativo ficam FORA do ranking de estabilidade.
+          if(cols.length>0) estabilidade.push({pid:p.id, nome:p.name||p.id, desligados90d:desl90, ativos:cols.length, temDados:temDesligadosField});
+        } else {
+          projsSemEquipe++;
         }
         let eqpData=null;
         try{ const snap=await getDoc(doc(db,"equipamentos",p.id)); if(snap.exists()) eqpData=snap.data(); }catch(e){}
@@ -2616,12 +2518,22 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
             if(it.status==="inop"||it.status==="critico") inop++;
             else if(it.status==="parcial"||it.status==="baixo") parcial++;
           };
-          Object.values(eqpData).forEach(v=>{ if(Array.isArray(v)) v.forEach(contar); });
+          EQUIP_CATS.forEach(k=>{ if(Array.isArray(eqpData[k])) eqpData[k].forEach(contar); });
           if(eqpData.moto) contar(eqpData.moto);
           if(tem) projsEquip++;
         }
       }));
-      if(alive) setDashStats({ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip});
+      veteranos.sort((a,b)=>b.meses-a.meses);
+      estabilidade.forEach(e=>{ e.taxa = e.ativos>0 ? e.desligados90d/e.ativos : 0; });
+      estabilidade.sort((a,b)=> (a.taxa-b.taxa) || (a.desligados90d-b.desligados90d));
+      if(alive) setColabCounts(colabCountsAcc);
+      if(alive) setDashStats({
+        ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip,
+        veteranos: veteranos.slice(0,8),
+        estabilidade,
+        advNoHistorico, reciclagemVencida, reciclagemSemData, voltamFerias, materialPendente, projsSemEquipe,
+        voltamDetalhe: voltamDetalhe.slice(0,5),
+      });
     })();
     return ()=>{ alive=false; };
   },[]);
@@ -2717,11 +2629,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
             {allProjects.map(p => {
               const hist = stored[p.id]?.history ?? [];
-              let colabCount = null;
-              try {
-                const local = localStorage.getItem(`equipe_${p.id}`);
-                if(local) { const d=JSON.parse(local); colabCount=(d.colaboradores||[]).filter(c=>c.status==="ativo").length; }
-              } catch(e){}
+              const colabCount = (p.id in colabCounts) ? colabCounts[p.id] : null;
               return (
                 <button key={p.id} onClick={()=>{ setSelProject(p); }}
                   style={{ background:cardBg, border:`1px solid ${colabCount>0?"#0ea5e944":border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:12 }}>
@@ -2805,6 +2713,60 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 </>
               )}
             </button>
+
+            {/* ══ CENTRAL DE RECURSOS — RH (somente leitura, atrás do PIN gerencial) ══ */}
+            {hasGerencial() && st && (st.advNoHistorico>0||st.reciclagemVencida>0||st.reciclagemSemData>0||st.voltamFerias>0||st.materialPendente>0||st.projsSemEquipe>0) && (
+              <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⚡ Requer atenção</div>
+                {st.voltamFerias>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#38bdf8",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.voltamFerias} volta(m) de férias em 7 dias</b>{st.voltamDetalhe?.length>0&&<div style={{fontSize:10,color:txt2,marginTop:1}}>{[...new Set(st.voltamDetalhe.map(v=>v.projeto))].join(" · ")} — planejar escala</div>}</div></div>}
+                {st.advNoHistorico>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.advNoHistorico} colaborador(es) com medida disciplinar no histórico</b><div style={{fontSize:10,color:txt2,marginTop:1}}>registro histórico — verificar vigência caso a caso</div></div><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{st.advNoHistorico}</span></div>}
+                {st.reciclagemVencida>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemVencida} reciclagem(ns) vencida(s)</b><div style={{fontSize:10,color:txt2,marginTop:1}}>+12 meses da última — agendar</div></div><span style={{fontSize:13,fontWeight:800,color:"#ef4444"}}>{st.reciclagemVencida}</span></div>}
+                {st.reciclagemSemData>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#64748b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemSemData} sem data de reciclagem</b><div style={{fontSize:10,color:txt2,marginTop:1}}>dado ausente — registrar / agendar</div></div><span style={{fontSize:13,fontWeight:800,color:"#64748b"}}>{st.reciclagemSemData}</span></div>}
+                {st.materialPendente>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>Material tático pendente</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{st.materialPendente} solicitação(ões) de uniforme/material em aberto</div></div><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{st.materialPendente}</span></div>}
+                {st.projsSemEquipe>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0"}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.projsSemEquipe} projeto(s) sem efetivo ativo</b><div style={{fontSize:10,color:txt2,marginTop:1}}>nenhum colaborador ativo cadastrado</div></div></div>}
+              </div>
+            )}
+
+            {hasGerencial() && st && st.veteranos?.length>0 && (
+              <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⭐ Veteranos — tempo de casa</div>
+                {st.veteranos.map((v,i)=>{
+                  const anos=Math.floor(v.meses/12), resto=v.meses%12;
+                  const tempo=anos>0?`${anos}a ${resto}m`:`${resto}m`;
+                  const estrelas=v.meses>=60?"⭐⭐⭐":v.meses>=36?"⭐⭐":v.meses>=12?"⭐":"";
+                  return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<st.veteranos.length-1?`1px solid ${dark?"#0c1524":"#eef2f7"}`:"none"}}>
+                    <div style={{width:26,height:26,borderRadius:"50%",background:dark?"#0c1a2e":"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:txt2,flexShrink:0,fontWeight:700}}>{i+1}</div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:txt,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v.nome}</div><div style={{fontSize:10,color:txt2}}>{v.projeto}{v.cargo?` · ${v.cargo}`:""}{v.turno?` · ${v.turno}`:""}</div></div>
+                    <span style={{fontSize:11,letterSpacing:1,flexShrink:0}}>{estrelas}</span>
+                    <span style={{fontSize:10,color:txt2,width:46,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{tempo}</span>
+                  </div>);
+                })}
+                <div style={{fontSize:9,color:txt2,marginTop:8,fontStyle:"italic"}}>⭐ 1 ano+ · ⭐⭐ 3 anos+ · ⭐⭐⭐ 5 anos+ · sobre a data de contratação</div>
+              </div>
+            )}
+
+            {hasGerencial() && st && st.estabilidade?.some(e=>e.temDados) && (
+              <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🛡️ Movimentação de equipe (90d) — menor no topo</div>
+                {st.estabilidade.filter(e=>e.temDados).slice(0,8).map((e,i)=>{
+                  const cor=e.desligados90d===0?"#22c55e":e.taxa<=0.1?"#84cc16":e.taxa<=0.25?"#f59e0b":"#ef4444";
+                  const pctBar=100-Math.min(80,Math.round(e.taxa*160));
+                  return (<div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"5px 0"}}>
+                    <span style={{fontSize:11,fontWeight:800,color:cor,width:52,flexShrink:0}}>{e.pid}</span>
+                    <div style={{flex:1,height:7,background:dark?"#0c1524":"#e2e8f0",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:`${pctBar}%`,background:cor,borderRadius:4}}/></div>
+                    <span style={{fontSize:10,color:txt2,width:110,textAlign:"right",flexShrink:0}}>{e.desligados90d} desligam. / {e.ativos} ativos</span>
+                  </div>);
+                })}
+                {st.estabilidade.some(e=>!e.temDados)&&<div style={{fontSize:9,color:txt2,marginTop:6}}>Sem registro de desligamentos: {st.estabilidade.filter(e=>!e.temDados).map(e=>e.pid).join(", ")}</div>}
+                <div style={{fontSize:9,color:txt2,marginTop:6,fontStyle:"italic"}}>Desligamentos registrados ÷ efetivo ativo, últimos 90 dias. Não representa rotatividade histórica completa.</div>
+              </div>
+            )}
 
             <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
               style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
@@ -4319,9 +4281,9 @@ export default function App(){
 
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
-      {/* O acesso fica visível; o próprio AssistenteIA exige PIN e token no servidor. */}
-      <BotaoIA onClick={()=>setShowIA(true)}/>
-      <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>
+      {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
+      {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}
+      {hasGerencial() && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
     </div>
   );
 }
