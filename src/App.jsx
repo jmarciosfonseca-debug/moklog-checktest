@@ -147,6 +147,7 @@ function SafeBlock({ name, children }) {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
+import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
@@ -1795,15 +1796,16 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
           <button onClick={async ()=>{
               const proj = viewReport.project||viewReport;
-              const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id)]);
-              generatePDF(
+              const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id), loadFollowups(db,proj.id).catch(()=>({}))]);
+              await generatePDF(
                 proj,
                 viewReport.report?.state||viewReport.state,
                 viewReport.report?.meta||viewReport.meta,
                 [],
                 ctmkInfoFor(proj.id),
                 inquilinosInfo,
-                energiaInfo
+                energiaInfo,
+                followupsInfo
               );
             }}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
@@ -1876,7 +1878,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
-                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id)]); generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
+                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id), loadFollowups(db,p.id).catch(()=>({}))]); await generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
                     <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
@@ -1944,7 +1946,59 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 function PendenciesScreen({stored, onBack}) {
   const [filter, setFilter] = useState("all");
   const [openProj, setOpenProj] = useState({});
+  const [followups, setFollowups] = useState({});
+  const [fuOpen, setFuOpen] = useState(null);
+  const [fuForm, setFuForm] = useState({status:"aguardando", texto:"", link:""});
+  const [fuSaving, setFuSaving] = useState(false);
+  const podeGerenciar = hasGerencial();
   const toggleProj = (pid) => setOpenProj(o=>({...o,[pid]:!o[pid]}));
+
+  useEffect(()=>{
+    let vivo = true;
+    const pids = [...new Set(getAllPendencies(stored).map(p=>p.project.id))];
+    Promise.all(pids.map(pid=>loadFollowups(db,pid).then(m=>[pid,m]).catch(()=>[pid,{}])))
+      .then(pares=>{
+        if(!vivo) return;
+        const obj = {};
+        pares.forEach(([pid,m])=>{ obj[pid]=m; });
+        setFollowups(obj);
+      });
+    return ()=>{ vivo=false; };
+  },[stored]);
+
+  const getFuKey = (p) => canonicalFollowupKey(p.project.id, p.cat, p.item||"—");
+  const getFu = (p) => followups[p.project.id]?.[getFuKey(p)] || null;
+  const abrirFollowup = (p) => {
+    const panelKey = `${p.project.id}:${getFuKey(p)}`;
+    if(fuOpen===panelKey){ setFuOpen(null); return; }
+    const atual = getFu(p);
+    setFuForm({status:atual?.statusAtual||"aguardando",texto:"",link:""});
+    setFuOpen(panelKey);
+  };
+  const salvarFollowup = async (p) => {
+    if(!podeGerenciar || fuSaving) return;
+    if(!fuForm.texto.trim() && !fuForm.link.trim()){
+      alert("Informe a tratativa ou um link antes de salvar.");
+      return;
+    }
+    setFuSaving(true);
+    try{
+      const key=getFuKey(p);
+      const atualizado=await addFollowup(db,p.project.id,key,{
+        status:fuForm.status,
+        texto:fuForm.texto.trim(),
+        link:fuForm.link.trim(),
+        responsavel:"Gerencial"
+      });
+      setFollowups(prev=>({...prev,[p.project.id]:atualizado}));
+      setFuForm(prev=>({...prev,texto:"",link:""}));
+    }catch(e){
+      console.error("Falha ao salvar follow-up:",e);
+      alert(`Não foi possível salvar o follow-up. ${e?.message||e}`);
+    }finally{
+      setFuSaving(false);
+    }
+  };
   const all = getAllPendencies(stored);
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
   const critCount = all.filter(p => p.status === "inop").length;
@@ -2020,6 +2074,10 @@ function PendenciesScreen({stored, onBack}) {
                       {g.itens.map((p,i)=>{
                         const color = p.status==="inop" ? "#ef4444" : "#f59e0b";
                         const urgency = p.days && p.days >= 30 ? "🔴" : p.days && p.days >= 14 ? "🟡" : "⚪";
+                        const fu = getFu(p);
+                        const fuInfo = fu ? statusInfo(fu.statusAtual) : null;
+                        const panelKey = `${p.project.id}:${getFuKey(p)}`;
+                        const painelAberto = fuOpen===panelKey;
                         return(
                           <div key={i} style={{background:"#04080f",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 12px"}}>
                             <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
@@ -2035,6 +2093,30 @@ function PendenciesScreen({stored, onBack}) {
                                 <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"}</div>
                               </div>
                             </div>
+                            <button type="button" onClick={()=>abrirFollowup(p)} style={{...S.sm,width:"100%",marginTop:8,padding:"7px 9px",fontSize:11,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <span>📋 {fu?"Atualizar / ver tratativas":"Registrar follow-up"}</span>
+                              {fuInfo&&<span style={{color:fuInfo.color,fontWeight:800}}>{fuInfo.label}</span>}
+                            </button>
+                            {painelAberto&&<div style={{marginTop:8,padding:"10px",border:"1px solid #1e293b",borderRadius:8,background:"#060c18"}}>
+                              {podeGerenciar?<>
+                                <label style={{display:"block",fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>STATUS DA TRATATIVA</label>
+                                <select value={fuForm.status} onChange={e=>setFuForm(f=>({...f,status:e.target.value}))} style={{...S.inp,width:"100%",marginBottom:7}}>
+                                  {FOLLOWUP_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+                                </select>
+                                <textarea value={fuForm.texto} onChange={e=>setFuForm(f=>({...f,texto:e.target.value}))} placeholder="Descreva a tratativa, responsável e próximo passo..." rows={3} style={{...S.inp,width:"100%",resize:"vertical",marginBottom:7}}/>
+                                <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link de evidência, chamado ou orçamento (opcional)" style={{...S.inp,width:"100%",marginBottom:7}}/>
+                                <button type="button" disabled={fuSaving} onClick={()=>salvarFollowup(p)} style={{...S.primaryBtn,width:"100%",fontSize:11,opacity:fuSaving?.65:1}}>{fuSaving?"Salvando...":"💾 Salvar follow-up"}</button>
+                              </>:<div style={{fontSize:11,color:"#94a3b8"}}>Somente o perfil gerencial pode registrar tratativas.</div>}
+                              <div style={{fontSize:10,color:"#94a3b8",fontWeight:800,marginTop:10,marginBottom:5}}>📋 Tratativas registradas ({fu?.entries?.length||0})</div>
+                              {(fu?.entries||[]).length===0?<div style={{fontSize:11,color:"#64748b"}}>Nenhuma tratativa registrada.</div>:(fu.entries||[]).map((entry,idx)=>{
+                                const info=statusInfo(entry.status);
+                                return <div key={entry.id||idx} style={{borderTop:"1px solid #0f172a",padding:"7px 0"}}>
+                                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,fontWeight:800,color:info.color}}>{info.label}</span><span style={{fontSize:10,color:"#64748b"}}>{entry.em?new Date(entry.em).toLocaleString("pt-BR"):"—"}</span></div>
+                                  {entry.texto&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:3,whiteSpace:"pre-wrap"}}>{entry.texto}</div>}
+                                  {entry.link&&<a href={entry.link} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#38bdf8",wordBreak:"break-all"}}>Abrir evidência ↗</a>}
+                                </div>;
+                              })}
+                            </div>}
                           </div>
                         );
                       })}
@@ -2237,7 +2319,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
           <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id)]); generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
+          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id), loadFollowups(db,project.id).catch(()=>({}))]); await generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
           <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?"✓ Copiado!":"📋 Copiar Texto"}</button>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
