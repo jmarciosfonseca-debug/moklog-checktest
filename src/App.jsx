@@ -1958,7 +1958,6 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           </div>
         </div>}
 
-        <button onClick={()=>carregarVisao360()} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#15803d,#22c55e)",fontSize:13,border:"1px solid #22c55e66",marginBottom:8}}>🎯 Visão 360 — Saúde Consolidada + Relatório por Cliente</button>
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📋 Análise de Risco por Grupo</div>
           <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Golgi</button>
@@ -2461,37 +2460,52 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const hdrBorder=dark?"#0a0f1e":"#e2e8f0";
   const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
 
+  // P260A já vem em PROJECTS; adicionamos apenas B e C (mesma convenção do RegistrosMenu) para não duplicar.
   const allProjects = [
     ...Object.values(PROJECTS),
-    {id:"P260A",name:"Jatinox Unidade A"},{id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
+    {id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
   ];
 
   const [equipData, setEquipData] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(()=>{
+    let alive = true;
     const loadAll = async () => {
       const results = {};
-      for(const p of allProjects) {
+      await Promise.all(allProjects.map(async p => {
+        // Fonte primária: Firestore (nuvem) — garante paridade com o resumo do RegistrosMenu.
+        try {
+          const snap = await getDoc(doc(db, "equipamentos", p.id));
+          if(snap.exists()){ results[p.id] = snap.data(); return; }
+        } catch(e){}
+        // Fallback: localStorage (offline / cache local).
         try {
           const local = localStorage.getItem(`equipamentos_${p.id}`);
           if(local) results[p.id] = JSON.parse(local);
         } catch(e){}
-      }
-      setEquipData(results);
-      setLoading(false);
+      }));
+      if(alive){ setEquipData(results); setLoading(false); }
     };
     loadAll();
+    return ()=>{ alive = false; };
   },[]);
 
+  // Contagem genérica (mesma lógica do resumo em RegistrosMenu): percorre TODOS os arrays do
+  // documento + o campo avulso "moto", contando apenas itens com status. Evita divergência
+  // por categorias que não estejam numa lista fixa de chaves.
   const countProblemas = (data) => {
     if(!data) return {inop:0,parcial:0,total:0};
-    const all = [...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])];
-    return {
-      inop:   all.filter(i=>i.status==="inop"||i.status==="critico").length,
-      parcial:all.filter(i=>i.status==="parcial"||i.status==="baixo").length,
-      total:  all.length,
+    let inop=0, parcial=0, total=0;
+    const contar = (it) => {
+      if(!it || typeof it!=="object" || !it.status) return;
+      total++;
+      if(it.status==="inop"||it.status==="critico") inop++;
+      else if(it.status==="parcial"||it.status==="baixo") parcial++;
     };
+    Object.values(data).forEach(v=>{ if(Array.isArray(v)) v.forEach(contar); });
+    if(data.moto) contar(data.moto);
+    return { inop, parcial, total };
   };
 
   return (
