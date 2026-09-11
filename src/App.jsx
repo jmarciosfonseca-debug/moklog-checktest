@@ -2489,7 +2489,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
                         {!hasProb&&<span style={{fontSize:11,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}>✅ OK</span>}
                       </div>
                     ):(
-                      <div style={{fontSize:11,color:txt2,marginTop:3}}>Sem itens cadastrados</div>
+                      <div style={{fontSize:11,color:txt2,marginTop:3}}>Inventário de equipamentos não preenchido</div>
                     )}
                   </div>
                   <span style={{color:txt2,fontSize:16}}>›</span>
@@ -2531,6 +2531,9 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   // Estatísticas do dashboard (Colaboradores + Equipamentos) — Firestore com fallback localStorage
   const [dashStats, setDashStats] = useState(null);
   const [colabCounts, setColabCounts] = useState({});
+  // Controla quais listas expansíveis da Central de Recursos estão abertas.
+  const [rhExpand, setRhExpand] = useState({});
+  const toggleRh = (k)=> setRhExpand(o=>({...o, [k]:!o[k]}));
   useEffect(()=>{
     let alive = true;
     (async()=>{
@@ -2540,12 +2543,25 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       // Categorias OFICIAIS de equipamento (estrutura canônica de Equipamentos.jsx).
       const EQUIP_CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam"];
       const RECICLAGEM_MESES = 12;
+      // Reciclagem é obrigatória apenas para funções de VIGILÂNCIA.
+      // NÃO fazem reciclagem: CDA, Porteiro/Porteiro CCO, Recepção/Recepcionista, AGP e AGP CCO.
+      const NAO_RECICLA = ["cda","porteiro","porteiro cco","recepção","recepcao","recepcionista","agp","agp cco"];
+      const fazReciclagem = (cargo)=>{
+        const c=String(cargo||"").trim().toLowerCase();
+        if(!c) return false;                       // sem cargo definido não entra na conta
+        return !NAO_RECICLA.includes(c);
+      };
       let ativos=0, feriasHoje=0, projsColab=0, inop=0, parcial=0, totalEquip=0, projsEquip=0;
       const veteranos=[];
       const estabilidade=[];
       let advNoHistorico=0, reciclagemVencida=0, reciclagemSemData=0, voltamFerias=0, materialPendente=0, projsSemEquipe=0;
       const voltamDetalhe=[];
       const colabCountsAcc={};
+      // Detalhes para as listas expansíveis (lote B)
+      const feriasDetalhe=[];        // {nome, projeto, retorno}
+      const reciclVencidaNomes=[];   // {nome, projeto, cargo, ultima}
+      const reciclSemDataNomes=[];   // {nome, projeto, cargo}
+      const materialDetalhe={};      // { [pid]: qtd }
       await Promise.all(allProjects.map(async p=>{
         let eqData=null;
         try{ const snap=await getDoc(doc(db,"equipes",p.id)); if(snap.exists()) eqData=snap.data(); }catch(e){}
@@ -2556,7 +2572,11 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           if(cols.length>0) projsColab++; else projsSemEquipe++;
           ativos+=cols.length;
           (Array.isArray(eqData.ferias)?eqData.ferias:[]).forEach(f=>{
-            if(f&&f.dataInicio&&f.dataRetorno&&f.dataInicio<=hoje&&hoje<=f.dataRetorno) feriasHoje++;
+            if(f&&f.dataInicio&&f.dataRetorno&&f.dataInicio<=hoje&&hoje<=f.dataRetorno){
+              feriasHoje++;
+              const cc=cols.find(c=>c.id===f.colabId);
+              feriasDetalhe.push({nome:cc?.nome||f.nome||"Colaborador", projeto:p.id, retorno:f.dataRetorno});
+            }
             if(f&&f.dataRetorno){
               const ret=new Date(f.dataRetorno+"T12:00:00").getTime();
               if(!isNaN(ret)){ const dd=Math.round((ret-hojeMs)/DIA); if(dd>=0&&dd<=7){ voltamFerias++; voltamDetalhe.push({projeto:p.id, quando:f.dataRetorno}); } }
@@ -2567,15 +2587,20 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               const ini=new Date(c.dataContratacao+"T12:00:00").getTime();
               if(!isNaN(ini) && ini<=hojeMs){ const meses=Math.floor((hojeMs-ini)/(DIA*30.44)); if(meses>=0) veteranos.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||"", turno:c.turno||"", meses}); }
             }
-            if(c.ultimaReciclagem){
-              const ur=new Date(c.ultimaReciclagem+"T12:00:00").getTime();
-              if(!isNaN(ur)){ if((hojeMs-ur) > RECICLAGEM_MESES*30.44*DIA) reciclagemVencida++; } else reciclagemSemData++;
-            } else reciclagemSemData++;
+            if(fazReciclagem(c.cargo)){
+              if(c.ultimaReciclagem){
+                const ur=new Date(c.ultimaReciclagem+"T12:00:00").getTime();
+                if(!isNaN(ur)){
+                  if((hojeMs-ur) > RECICLAGEM_MESES*30.44*DIA){ reciclagemVencida++; reciclVencidaNomes.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||"", ultima:c.ultimaReciclagem}); }
+                } else { reciclagemSemData++; reciclSemDataNomes.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||""}); }
+              } else { reciclagemSemData++; reciclSemDataNomes.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||""}); }
+            }
             const hist=Array.isArray(c.historico)?c.historico:[];
             if(hist.some(h=>h && h.tipo==="Medida Disciplinar" && (h.detalhe==="Advertência"||h.detalhe==="Suspensão"))) advNoHistorico++;
             // Material/uniforme: solicitações ficam em colaborador.uniforme.solicitacoes (status "pendente").
             const solic = c.uniforme && Array.isArray(c.uniforme.solicitacoes) ? c.uniforme.solicitacoes : [];
-            materialPendente += solic.filter(x=>x && x.status==="pendente").length;
+            const qtdSolic = solic.filter(x=>x && x.status==="pendente").length;
+            if(qtdSolic>0){ materialPendente += qtdSolic; materialDetalhe[p.id]=(materialDetalhe[p.id]||0)+qtdSolic; }
           });
           // Estabilidade: só desligamentos com data VÁLIDA e não-futura, nos últimos 90 dias.
           const temDesligadosField = Array.isArray(eqData.desligados);
@@ -2611,10 +2636,11 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       if(alive) setColabCounts(colabCountsAcc);
       if(alive) setDashStats({
         ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip,
-        veteranos: veteranos.slice(0,8),
+        veteranos,                                  // lista completa (cascata mostra todos)
         estabilidade,
         advNoHistorico, reciclagemVencida, reciclagemSemData, voltamFerias, materialPendente, projsSemEquipe,
         voltamDetalhe: voltamDetalhe.slice(0,5),
+        feriasDetalhe, reciclVencidaNomes, reciclSemDataNomes, materialDetalhe,
       });
     })();
     return ()=>{ alive=false; };
@@ -2796,47 +2822,85 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               )}
             </button>
 
-            {/* ══ CENTRAL DE RECURSOS — RH (somente leitura, atrás do PIN gerencial) ══ */}
-            {hasGerencial() && st && (st.advNoHistorico>0||st.reciclagemVencida>0||st.reciclagemSemData>0||st.voltamFerias>0||st.materialPendente>0||st.projsSemEquipe>0) && (
+{/* ══ CENTRAL DE RECURSOS — RH (somente leitura, atrás do PIN gerencial) ══ */}
+            {hasGerencial() && st && (st.advNoHistorico>0||st.reciclagemVencida>0||st.reciclagemSemData>0||st.voltamFerias>0||st.materialPendente>0||st.projsSemEquipe>0) && (()=>{
+              const rowBorder=`1px solid ${dark?"#0c1524":"#eef2f7"}`;
+              const chev=(open)=>(<span style={{fontSize:11,color:txt2,transition:"transform .15s",display:"inline-block",transform:open?"rotate(90deg)":"none",flexShrink:0}}>▶</span>);
+              const subItem=(nome,proj,extra)=>(<div style={{display:"flex",alignItems:"baseline",gap:8,padding:"4px 0 4px 16px",fontSize:11}}>
+                <span style={{color:txt,fontWeight:600,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{nome}</span>
+                <span style={{color:txt2,fontSize:10,flexShrink:0}}>{proj}{extra?` · ${extra}`:""}</span>
+              </div>);
+              return (
               <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
                 <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⚡ Requer atenção</div>
-                {st.voltamFerias>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
-                  <span style={{width:7,height:7,borderRadius:"50%",background:"#38bdf8",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.voltamFerias} volta(m) de férias em 7 dias</b>{st.voltamDetalhe?.length>0&&<div style={{fontSize:10,color:txt2,marginTop:1}}>{[...new Set(st.voltamDetalhe.map(v=>v.projeto))].join(" · ")} — planejar escala</div>}</div></div>}
-                {st.advNoHistorico>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
+
+                {st.voltamFerias>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("volta")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#38bdf8",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.voltamFerias} volta(m) de férias em 7 dias</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{[...new Set((st.voltamDetalhe||[]).map(v=>v.projeto))].join(" · ")} — planejar escala</div></div>{chev(rhExpand.volta)}</div>
+                  {rhExpand.volta&&<div style={{paddingBottom:6}}>{(st.voltamDetalhe||[]).map((v,i)=>subItem("Retorno "+new Date(v.quando+"T12:00:00").toLocaleDateString("pt-BR"),v.projeto,null))}</div>}
+                </div>}
+
+                {st.feriasHoje>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("ferias")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#38bdf8",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.feriasHoje} em férias hoje</b><div style={{fontSize:10,color:txt2,marginTop:1}}>toque para ver quem</div></div>{chev(rhExpand.ferias)}</div>
+                  {rhExpand.ferias&&<div style={{paddingBottom:6}}>{(st.feriasDetalhe||[]).map((f,i)=>subItem(f.nome,f.projeto,"volta "+new Date(f.retorno+"T12:00:00").toLocaleDateString("pt-BR")))}</div>}
+                </div>}
+
+                {st.advNoHistorico>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:rowBorder}}>
                   <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.advNoHistorico} colaborador(es) com medida disciplinar no histórico</b><div style={{fontSize:10,color:txt2,marginTop:1}}>registro histórico — verificar vigência caso a caso</div></div><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{st.advNoHistorico}</span></div>}
-                {st.reciclagemVencida>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
-                  <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemVencida} reciclagem(ns) vencida(s)</b><div style={{fontSize:10,color:txt2,marginTop:1}}>+12 meses da última — agendar</div></div><span style={{fontSize:13,fontWeight:800,color:"#ef4444"}}>{st.reciclagemVencida}</span></div>}
-                {st.reciclagemSemData>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
-                  <span style={{width:7,height:7,borderRadius:"50%",background:"#64748b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemSemData} sem data de reciclagem</b><div style={{fontSize:10,color:txt2,marginTop:1}}>dado ausente — registrar / agendar</div></div><span style={{fontSize:13,fontWeight:800,color:"#64748b"}}>{st.reciclagemSemData}</span></div>}
-                {st.materialPendente>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:`1px solid ${dark?"#0c1524":"#eef2f7"}`}}>
-                  <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>Material tático pendente</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{st.materialPendente} solicitação(ões) de uniforme/material em aberto</div></div><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{st.materialPendente}</span></div>}
+
+                {st.reciclagemVencida>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("recV")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemVencida} reciclagem(ns) vencida(s)</b><div style={{fontSize:10,color:txt2,marginTop:1}}>+12 meses da última — só vigilantes — agendar</div></div>{chev(rhExpand.recV)}<span style={{fontSize:13,fontWeight:800,color:"#ef4444",marginLeft:6}}>{st.reciclagemVencida}</span></div>
+                  {rhExpand.recV&&<div style={{paddingBottom:6}}>{(st.reciclVencidaNomes||[]).map((r,i)=>subItem(r.nome,r.projeto,r.cargo))}</div>}
+                </div>}
+
+                {st.reciclagemSemData>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("recS")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#64748b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemSemData} sem data de reciclagem</b><div style={{fontSize:10,color:txt2,marginTop:1}}>vigilantes sem registro — agendar</div></div>{chev(rhExpand.recS)}<span style={{fontSize:13,fontWeight:800,color:"#64748b",marginLeft:6}}>{st.reciclagemSemData}</span></div>
+                  {rhExpand.recS&&<div style={{paddingBottom:6}}>{(st.reciclSemDataNomes||[]).map((r,i)=>subItem(r.nome,r.projeto,r.cargo))}</div>}
+                </div>}
+
+                {st.materialPendente>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("mat")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>Material tático pendente</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{st.materialPendente} solicitação(ões) de uniforme/material em aberto</div></div>{chev(rhExpand.mat)}<span style={{fontSize:13,fontWeight:800,color:"#f59e0b",marginLeft:6}}>{st.materialPendente}</span></div>
+                  {rhExpand.mat&&<div style={{paddingBottom:6}}>{Object.entries(st.materialDetalhe||{}).sort((a,b)=>b[1]-a[1]).map(([pid,q],i)=>subItem(pid,"",q+" solicitação(ões)"))}</div>}
+                </div>}
+
                 {st.projsSemEquipe>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0"}}>
                   <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.projsSemEquipe} projeto(s) sem efetivo ativo</b><div style={{fontSize:10,color:txt2,marginTop:1}}>nenhum colaborador ativo cadastrado</div></div></div>}
-              </div>
-            )}
+              </div>);
+            })()}
 
-            {hasGerencial() && st && st.veteranos?.length>0 && (
+            {hasGerencial() && st && st.veteranos?.length>0 && (()=>{
+              const lista = rhExpand.vetAll ? st.veteranos : st.veteranos.slice(0,8);
+              return (
               <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
                 <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⭐ Veteranos — tempo de casa</div>
-                {st.veteranos.map((v,i)=>{
+                {lista.map((v,i)=>{
                   const anos=Math.floor(v.meses/12), resto=v.meses%12;
                   const tempo=anos>0?`${anos}a ${resto}m`:`${resto}m`;
                   const estrelas=v.meses>=60?"⭐⭐⭐":v.meses>=36?"⭐⭐":v.meses>=12?"⭐":"";
-                  return (<div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<st.veteranos.length-1?`1px solid ${dark?"#0c1524":"#eef2f7"}`:"none"}}>
+                  return (<div key={i} onClick={()=>{ const pj=allProjects.find(x=>x.id===v.projeto); if(pj){ setSelProject(pj); setSubScreen("colaboradores"); } }} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<lista.length-1?`1px solid ${dark?"#0c1524":"#eef2f7"}`:"none",cursor:"pointer"}}>
                     <div style={{width:26,height:26,borderRadius:"50%",background:dark?"#0c1a2e":"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:txt2,flexShrink:0,fontWeight:700}}>{i+1}</div>
                     <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:txt,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v.nome}</div><div style={{fontSize:10,color:txt2}}>{v.projeto}{v.cargo?` · ${v.cargo}`:""}{v.turno?` · ${v.turno}`:""}</div></div>
                     <span style={{fontSize:11,letterSpacing:1,flexShrink:0}}>{estrelas}</span>
                     <span style={{fontSize:10,color:txt2,width:46,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{tempo}</span>
                   </div>);
                 })}
-                <div style={{fontSize:9,color:txt2,marginTop:8,fontStyle:"italic"}}>⭐ 1 ano+ · ⭐⭐ 3 anos+ · ⭐⭐⭐ 5 anos+ · sobre a data de contratação</div>
-              </div>
-            )}
+                {st.veteranos.length>8&&<div onClick={()=>toggleRh("vetAll")} style={{textAlign:"center",fontSize:11,color:"#38bdf8",fontWeight:700,cursor:"pointer",padding:"7px 0 2px"}}>{rhExpand.vetAll?"▲ ver menos":`▼ ver todos (${st.veteranos.length})`}</div>}
+                <div style={{fontSize:9,color:txt2,marginTop:8,fontStyle:"italic"}}>⭐ 1 ano+ · ⭐⭐ 3 anos+ · ⭐⭐⭐ 5 anos+ · toque num nome para abrir o arquivo pessoal</div>
+              </div>);
+            })()}
 
-            {hasGerencial() && st && st.estabilidade?.some(e=>e.temDados) && (
+            {hasGerencial() && st && st.estabilidade?.some(e=>e.temDados) && (()=>{
+              const comDados = st.estabilidade.filter(e=>e.temDados);
+              const piorPrimeiro = [...comDados].sort((a,b)=> (b.taxa-a.taxa) || (b.desligados90d-a.desligados90d));
+              const lista = rhExpand.movPior ? piorPrimeiro : comDados.slice(0,8);
+              return (
               <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
-                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🛡️ Movimentação de equipe (90d) — menor no topo</div>
-                {st.estabilidade.filter(e=>e.temDados).slice(0,8).map((e,i)=>{
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🛡️ Movimentação de equipe (90d) — {rhExpand.movPior?"maior no topo":"menor no topo"}</div>
+                {lista.map((e,i)=>{
                   const cor=e.desligados90d===0?"#22c55e":e.taxa<=0.1?"#84cc16":e.taxa<=0.25?"#f59e0b":"#ef4444";
                   const pctBar=100-Math.min(80,Math.round(e.taxa*160));
                   return (<div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"5px 0"}}>
@@ -2845,10 +2909,11 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                     <span style={{fontSize:10,color:txt2,width:110,textAlign:"right",flexShrink:0}}>{e.desligados90d} desligam. / {e.ativos} ativos</span>
                   </div>);
                 })}
+                <div onClick={()=>toggleRh("movPior")} style={{textAlign:"center",fontSize:11,color:"#38bdf8",fontWeight:700,cursor:"pointer",padding:"7px 0 2px"}}>{rhExpand.movPior?"▲ ver menor movimentação":"▼ ver maior movimentação (turnover)"}</div>
                 {st.estabilidade.some(e=>!e.temDados)&&<div style={{fontSize:9,color:txt2,marginTop:6}}>Sem registro de desligamentos: {st.estabilidade.filter(e=>!e.temDados).map(e=>e.pid).join(", ")}</div>}
                 <div style={{fontSize:9,color:txt2,marginTop:6,fontStyle:"italic"}}>Desligamentos registrados ÷ efetivo ativo, últimos 90 dias. Não representa rotatividade histórica completa.</div>
-              </div>
-            )}
+              </div>);
+            })()}
 
             <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
               style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
@@ -2860,7 +2925,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
-                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} item(ns)`:"Carregando inventário..."}</div>
+                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} equipamento(s) cadastrado(s)`:"Carregando inventário..."}</div>
                 </div>
                 <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>
               </div>
