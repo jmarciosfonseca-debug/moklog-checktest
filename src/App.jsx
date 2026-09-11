@@ -327,8 +327,8 @@ const PROJECTS = {
       {id:"nobreaks",label:"16 - NOBREAKS",type:"items",itemLabels:["CCO","Portaria"]},
       {id:"paradox",label:"17 - PARADOX",type:"items",itemLabels:["CCO"]},
       {id:"reverso",label:"18 - PICTOGRAMA REVERSIVO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
-      {id:"portas_cco",label:"19 - PORTAS CCO",type:"items",itemLabels:["Entrada","Sa\u00edda"]},
-      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO 01","CCO 02","Fixo Externo"]},
+      {id:"portas_cco",label:"19 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
+      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO 01","CCO 02"]},
       {id:"panic_mob",label:"21 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["L\u00edder","Ronda 01","Ronda 02","Reserva"]},
       {id:"semaforos",label:"22 - SEM\u00c1FOROS",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
       {id:"sensores",label:"23 - SENSORES ANTI-ESMAGAMENTO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
@@ -352,7 +352,7 @@ const PROJECTS = {
       {id:"mon_cftv",label:"09 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
       {id:"mon_portaria",label:"10 - MONITOR PORTARIA",type:"notes"},
       {id:"portaria",label:"11 - PORTARIA",type:"items",itemLabels:["Tablet","Joystick","Ar-Condicionado","Transformador"]},
-      {id:"portoes_eclusa",label:"12 - PORT\u00d5ES ECLUSA",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},
+      {id:"portoes_eclusa",label:"12 - PORT\u00d5ES ECLUSA",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},{id:"panic_fix",label:"14 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01"]},{id:"eclusa_cco",label:"15 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"qr_eclusas",label:"13 - QR ECLUSAS",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04"]},
       {id:"qr_torn",label:"14 - QR TORNIQUETES",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},
       {id:"torniquetes",label:"15 - TORNIQUETES",type:"items",itemLabels:["Torniquete 01","Torniquete 02"]},
@@ -361,7 +361,7 @@ const PROJECTS = {
       {id:"infra",label:"18 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P604: {id:"P604",name:"Golgi Jundia\u00ed",short:"Jundia\u00ed",categories:[
-      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO (REPETIDORAS)",type:"items",itemLabels:["Repetidora 01","Repetidora 02","Repetidora 03","Repetidora 04"]},
+      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO (REPETIDORAS)",type:"items",itemLabels:["Repetidora 01","Repetidora 02","Repetidora 03","Repetidora 04"]},{id:"panic_fix",label:"01B - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01"]},{id:"panic_mob",label:"01C - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02","M\u00f3vel 03"]},{id:"eclusa_cco",label:"01D - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07"]},
       {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO 01","CCO 02","Recep\u00e7\u00e3o"]},
       {id:"cancelas_estac",label:"04 - CANCELAS ADM (ADMINISTRATIVAS)",type:"items",itemLabels:["Cancela 01","Cancela 02"]},
@@ -399,7 +399,7 @@ const PROJECTS = {
       {id:"cancelas",label:"05 - CANCELAS AS (ALTA SEGURAN\u00c7A)",type:"items",itemLabels:["Entrada 01","Entrada 02 Reversa","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},
       {id:"cftv",label:"06 - CFTV",type:"count",total:54},
       {id:"cofres",label:"07 - COFRES",type:"items",itemLabels:["CCO","Portaria"]},
-      {id:"eclusas",label:"08 - ECLUSAS",type:"items",itemLabels:["CCO Porta 01 Ext.","CCO Porta 02 Int.","Portaria Porta 01 Int.","Portaria Porta 01 Ext."]},
+      {id:"eclusas",label:"08 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"giroflex",label:"09 - GIROFLEX ECLUSAS",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},
       {id:"intercomunicador",label:"10 - INTERCOMUNICADORES",type:"items",itemLabels:["CCO","CDA","Elevador"]},
       {id:"internet",label:"11 - INTERNET",type:"items",itemLabels:["ADM","Visitantes"]},
@@ -411,8 +411,8 @@ const PROJECTS = {
       {id:"mon_portaria",label:"17 - MONITOR PORTARIA",type:"notes"},
       {id:"nobreak",label:"18 - NOBREAK CCO",type:"items",itemLabels:["CCO"]},
       {id:"pictogramas",label:"19 - PICTOGRAMAS / FAR\u00d3IS",type:"items",itemLabels:["Farol 01","Farol 02","Farol 03","Farol 04","Farol 05","Farol 06"]},
-      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO","Portaria"]},
-      {id:"panic_mob",label:"21 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["GA L\u00edder 01","GA L\u00edder 02","GB VSPP 01","GB VSPP 02"]},
+      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO"]},
+      {id:"panic_mob",label:"21 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["GA L\u00edder 01"]},
       {id:"semaforos",label:"22 - SEM\u00c1FOROS / L\u00c2MPADAS PILOTO",type:"items",itemLabels:["Entrada 01","Entrada 02 Reversa","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},
       {id:"telefone",label:"23 - TELEFONES",type:"items",itemLabels:["CCO Ramal","CCO Emergencial","CCO Fixo","Portaria 01","Portaria 02"]},
       {id:"torniquetes",label:"24 - TORNIQUETES",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},
@@ -421,9 +421,9 @@ const PROJECTS = {
       {id:"infra",label:"27 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P606: {id:"P606",name:"Golgi Duque de Caxias",short:"Duque",categories:[
-      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["CCO","Galp\u00e3o 01","Galp\u00e3o 02","Galp\u00e3o 03","Galp\u00e3o 04","Galp\u00e3o 05","Galp\u00e3o 06","Galp\u00e3o 07","Galp\u00e3o 08","Galp\u00e3o 09","Galp\u00e3o 10"]},
+      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["CCO","Galp\u00e3o 01","Galp\u00e3o 02","Galp\u00e3o 03","Galp\u00e3o 04","Galp\u00e3o 05","Galp\u00e3o 06","Galp\u00e3o 07","Galp\u00e3o 08","Galp\u00e3o 09","Galp\u00e3o 10"]},{id:"eclusa_cco",label:"01B - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03"]},
-      {id:"panic",label:"03 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02","Fixo CCO","Fixo Recep\u00e7\u00e3o","Fixo Guarita"]},
+      {id:"panic_fix",label:"03 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo CCO","Fixo Recep\u00e7\u00e3o","Fixo Guarita"]},{id:"panic_mob",label:"03B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02"]},
       {id:"cancela",label:"04 - CANCELA",type:"items",itemLabels:["Entrada Principal"]},
       {id:"cftv",label:"05 - CFTV",type:"count",total:72},
       {id:"dilaceradores",label:"06 - DILACERADORES",type:"items",itemLabels:["Entrada 01","Reversiva 02","Sa\u00edda 03"]},
@@ -444,7 +444,7 @@ const PROJECTS = {
       {id:"infra",label:"21 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P607: {id:"P607",name:"Golgi Bras\u00edlia",short:"Bras\u00edlia",categories:[
-      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["Painel CCO","Painel Guarita","Painel ADM"]},
+      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["Painel CCO","Painel Guarita","Painel ADM"]},{id:"eclusa_cco",label:"01B - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04"]},
       {id:"anti_esmag",label:"03 - ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa Ent 1 \u2013 AE 01","Eclusa Ent 1 \u2013 AE 02","Eclusa Ent 2 \u2013 AE 01","Eclusa Ent 2 \u2013 AE 02"]},
       {id:"ac",label:"04 - AR-CONDICIONADO CCO",type:"items",itemLabels:["Aparelho 01"]},
@@ -460,7 +460,7 @@ const PROJECTS = {
       {id:"motores",label:"14 - MOTORES DOS PORT\u00d5ES",type:"items",itemLabels:["Ent 1 \u2013 M01","Ent 1 \u2013 M02","Ent 1 \u2013 M03","Ent 2 \u2013 M01","Ent 2 \u2013 M02","Ent 2 \u2013 M03","Sa\u00ed 1 \u2013 M01","Sa\u00ed 1 \u2013 M02","Sa\u00ed 1 \u2013 M03","Sa\u00ed 1 \u2013 M04","Sa\u00ed 2 \u2013 M01","Sa\u00ed 2 \u2013 M02","Sa\u00ed 2 \u2013 M03","Sa\u00ed 2 \u2013 M04"]},
       {id:"nobreak",label:"15 - NOBREAK",type:"items",itemLabels:["CCO"]},
       {id:"portoes",label:"16 - PORT\u00d5ES",type:"items",itemLabels:["Eclusa Ent 1 \u2013 P01","Eclusa Ent 1 \u2013 P02","Eclusa Ent 2 \u2013 P01","Eclusa Ent 2 \u2013 P02","Eclusa Sa\u00ed 1 \u2013 P01","Eclusa Sa\u00ed 1 \u2013 P02","Eclusa Sa\u00ed 2 \u2013 P01","Eclusa Sa\u00ed 2 \u2013 P02"]},
-      {id:"panic",label:"17 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["Ronda","Pista","CCO"]},
+      {id:"panic_fix",label:"17 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01","Fixo 02"]},{id:"panic_mob",label:"17B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["Ronda"]},
       {id:"sensores",label:"18 - SENSORES DOS PORT\u00d5ES",type:"items",itemLabels:["Ent 1 \u2013 S01","Ent 1 \u2013 S02","Ent 1 \u2013 S03","Ent 1 \u2013 S04","Ent 2 \u2013 S01","Ent 2 \u2013 S02","Ent 2 \u2013 S03","Ent 2 \u2013 S04","Sa\u00ed 1 \u2013 S01","Sa\u00ed 1 \u2013 S02","Sa\u00ed 1 \u2013 S03","Sa\u00ed 1 \u2013 S04","Sa\u00ed 2 \u2013 S01","Sa\u00ed 2 \u2013 S02","Sa\u00ed 2 \u2013 S03","Sa\u00ed 2 \u2013 S04"]},
       {id:"tablets",label:"19 - TABLETS KEYACCESS",type:"items",itemLabels:["Tablet 01","Tablet 02"]},
       {id:"totens",label:"20 - TOTENS",type:"items",itemLabels:["Entrada","Sa\u00edda"]},
@@ -471,9 +471,9 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},
       {id:"ac",label:"02 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},
       {id:"botoeiras",label:"03 - BOTOEIRAS / PORT\u00d5ES DE ACESSO",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},
-      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["L\u00edder","CCO"]},
+      {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO"]},{id:"panic_mob",label:"04B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["L\u00edder"]},
       {id:"cancelas",label:"05 - CANCELAS DE ACESSO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
-      {id:"portas_cco",label:"06 - CCO / ABERTURA DE PORTAS",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},
+      {id:"portas_cco",label:"06 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"cftv",label:"07 - CFTV",type:"count",total:140},
       {id:"computadores",label:"08 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},
       {id:"dilaceradores",label:"09 - DILACERADORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},
@@ -496,7 +496,7 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06"]},
       {id:"ac",label:"02 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica"]},
       {id:"botoeiras",label:"03 - BOTOEIRAS DO DILACERADOR",type:"items",itemLabels:["Botoeira 01","Botoeira 02","Botoeira 03"]},
-      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["CCO Fixo","Ronda M\u00f3vel","L\u00edder M\u00f3vel"]},
+      {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO Fixo"]},{id:"panic_mob",label:"04B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["Ronda M\u00f3vel"]},
       {id:"portas_cco",label:"05 - CCO / CONTROLE DE ACESSO",type:"items",itemLabels:["Porta 01 Externa \u2013 Local","Porta 01 Externa \u2013 Remota","Porta 02 Interna \u2013 Local","Porta 02 Interna \u2013 Remota"]},
       {id:"cftv",label:"06 - CFTV",type:"count",total:114},
       {id:"computadores",label:"07 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador Principal","Computador Secund\u00e1rio","Internet"]},
@@ -516,10 +516,10 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08","Zona 09","Zona 10","Zona 11","Zona 12"]},
       {id:"sdai",label:"02 - ALARME SDAI PORTARIA",type:"items",itemLabels:["G100","G200"]},
       {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Portaria Aparelho 01"]},
-      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["Fixo CCO"]},
+      {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo CCO"]},
       {id:"cancelas",label:"05 - CANCELAS, HASTES E MOTORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},
       {id:"cftv",label:"06 - CFTV",type:"count",total:73},
-      {id:"eclusas",label:"07 - ECLUSAS CCO E PORTARIA",type:"items",itemLabels:["CCO Porta 01 Ext \u2013 Local","CCO Porta 02 Int \u2013 Local","Portaria Porta 01 Int \u2013 Local","Portaria Porta 02 Ext \u2013 Local"]},
+      {id:"eclusas",label:"07 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"eletroima",label:"08 - ELETROIM\u00c3 / ECLUSA / PORTAS",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},
       {id:"farois",label:"09 - FAR\u00d3IS DAS CANCELAS",type:"items",itemLabels:["Cancela Eclusa 01 Ext","Cancela Eclusa 01 Int","Cancela Eclusa 02 Ext","Cancela Eclusa 02 Int","Cancela Eclusa 03 Ext","Cancela Eclusa 03 Int","Cancela Eclusa 04 Ext"]},
       {id:"garra",label:"10 - GARRA DE TIGRE",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Reversiva 03","Eclusa Sa\u00edda 04"]},
@@ -538,7 +538,7 @@ const PROJECTS = {
       {id:"manutencao",label:"23 - VISITA DE MANUTEN\u00c7\u00c3O",type:"maintenance"},
       {id:"infra",label:"24 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
-  P260A: {id:"P260A",name:"Jatinox Unidade A",short:"Jatinox A",categories:[{id:"panic_fix",label:"01 - Bot\u00f5es de P\u00e2nico Fixos",type:"items",itemLabels:["CCO","P1","P2","P3"]},{id:"cerca",label:"02 - Cerca El\u00e9trica",type:"items",itemLabels:["Zona 07","Zona 08"]},{id:"eclusa_cco",label:"03 - Eclusa CCO",type:"items",itemLabels:["Abertura Remota","Sa\u00edda de Emerg\u00eancia"]},{id:"eclusa_p3",label:"04 - Port\u00e3o Eclusa P3",type:"items",itemLabels:["Externa (com interfone)","Interna (com interfone)"]},{id:"telefonia",label:"05 - Telefonia",type:"items",itemLabels:["Smartphone CCO/L\u00edder 01","Smartphone CCO/L\u00edder 02","Ramal P1","Ramal P2"]},{id:"cftv",label:"06 - Imagens CFTV",type:"count",total:65},{id:"campainhas",label:"07 - Campainhas",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02"]},{id:"sala_cftv",label:"08 - Sala de CFTV CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05","Monitor 06","Monitor 07","Teclado 01","Teclado 02","Teclado 03","RAC","Telefone Fixo 01","Telefone Fixo 02"]},{id:"cam_sistema",label:"09 - C\u00e2meras Sistema Sala",type:"count",total:132},{id:"recepcao_p3",label:"10 - Recep\u00e7\u00e3o P3",type:"items",itemLabels:["Monitor 01","Monitor 02","Teclado 01","Teclado 02","CPU 01","CPU 02","Telefone Fixo 01","Telefone Fixo 02","Impressora","Intercomunicador de Guich\u00ea","DVR 01","DVR 02"]},{id:"sirenes",label:"11 - Sirenes c/ Ilumina\u00e7\u00e3o",type:"items",itemLabels:["Roberto Koch (s/ ilum.)","Presidente Wilson 01 (c/ ilum.)","Presidente Wilson 02 (c/ ilum.)","Ubarana 01 (c/ ilum.)","Ubarana 02 (c/ ilum.)","Ubarana 03 (c/ ilum.)","Ubarana 04 (c/ ilum.)","Ubarana 05 (c/ ilum.)"]},{id:"manutencao",label:"12 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"13 - Infraestrutura / Obs.",type:"notes"}]},
+  P260A: {id:"P260A",name:"Jatinox Unidade A",short:"Jatinox A",categories:[{id:"panic_fix",label:"01 - Bot\u00f5es de P\u00e2nico Fixos",type:"items",itemLabels:["CCO","P1","P2","P3","P5"]},{id:"panic_mob",label:"01B - P\u00e2nico M\u00f5veis",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02"]},{id:"cerca",label:"02 - Cerca El\u00e9trica",type:"items",itemLabels:["Zona 07","Zona 08"]},{id:"eclusa_cco",label:"03 - Eclusa CCO (Abertura)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},{id:"eclusa_p3",label:"04 - Port\u00e3o Eclusa P3",type:"items",itemLabels:["Externa (com interfone)","Interna (com interfone)"]},{id:"telefonia",label:"05 - Telefonia",type:"items",itemLabels:["Smartphone CCO/L\u00edder 01","Smartphone CCO/L\u00edder 02","Ramal P1","Ramal P2"]},{id:"cftv",label:"06 - Imagens CFTV",type:"count",total:65},{id:"campainhas",label:"07 - Campainhas",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02"]},{id:"sala_cftv",label:"08 - Sala de CFTV CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05","Monitor 06","Monitor 07","Teclado 01","Teclado 02","Teclado 03","RAC","Telefone Fixo 01","Telefone Fixo 02"]},{id:"cam_sistema",label:"09 - C\u00e2meras Sistema Sala",type:"count",total:132},{id:"recepcao_p3",label:"10 - Recep\u00e7\u00e3o P3",type:"items",itemLabels:["Monitor 01","Monitor 02","Teclado 01","Teclado 02","CPU 01","CPU 02","Telefone Fixo 01","Telefone Fixo 02","Impressora","Intercomunicador de Guich\u00ea","DVR 01","DVR 02"]},{id:"sirenes",label:"11 - Sirenes c/ Ilumina\u00e7\u00e3o",type:"items",itemLabels:["Roberto Koch (s/ ilum.)","Presidente Wilson 01 (c/ ilum.)","Presidente Wilson 02 (c/ ilum.)","Ubarana 01 (c/ ilum.)","Ubarana 02 (c/ ilum.)","Ubarana 03 (c/ ilum.)","Ubarana 04 (c/ ilum.)","Ubarana 05 (c/ ilum.)"]},{id:"manutencao",label:"12 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"13 - Infraestrutura / Obs.",type:"notes"}]},
 };
 
 function daysSince(dateStr) {
@@ -2542,7 +2542,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       const DIA = 86400000;
       // Categorias OFICIAIS de equipamento (estrutura canônica de Equipamentos.jsx).
       const EQUIP_CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam"];
-      const RECICLAGEM_MESES = 12;
+      const RECICLAGEM_MESES = 24;
       // Reciclagem é obrigatória apenas para funções de VIGILÂNCIA.
       // NÃO fazem reciclagem: CDA, Porteiro/Porteiro CCO, Recepção/Recepcionista, AGP e AGP CCO.
       const NAO_RECICLA = ["cda","porteiro","porteiro cco","recepção","recepcao","recepcionista","agp","agp cco"];
