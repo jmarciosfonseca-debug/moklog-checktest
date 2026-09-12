@@ -15,6 +15,7 @@ import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
 import PainelLider from "./PainelLider";
+import { PROJECT_PINS } from "./accessConfig";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -237,11 +238,7 @@ function generateViewToken(projectId) {
   return Math.random().toString(36).substring(2,10) + Math.random().toString(36).substring(2,10);
 }
 
-const PROJECT_PINS = {
-  P601:"16601", P602:"16602", P604:"16604", P605:"16605",
-  P606:"16606", P607:"16607", P311A:"16311", P311B:"163112", P505:"16505",
-  P260A:"162601", P260B:"162602", P260C:"162603"
-};
+// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
 
 const JATINOX_SUBS = {
   P260A: { id:"P260A", name:"Jatinox Unidade A", hasAcesso:true,  hasEquipe:true,  hasCaoGuarda:false },
@@ -2508,6 +2505,8 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const [subScreen, setSubScreen] = useState(null);
   const [liderNonce, setLiderNonce] = useState(0); // força remontar no login de líder
   const [gerVerProjeto, setGerVerProjeto] = useState(null); // gerencial abre Painel do Líder de um projeto
+  const [entradaPin, setEntradaPin] = useState("");
+  const [entradaErr, setEntradaErr] = useState(false);
   const [selProject, setSelProject] = useState(null);
   const [pinAuth, setPinAuth] = useState(()=>hasGerencial());
   const [pinInput, setPinInput] = useState("");
@@ -2539,6 +2538,11 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const toggleRh = (k)=> setRhExpand(o=>({...o, [k]:!o[k]}));
   useEffect(()=>{
     let alive = true;
+    // BARREIRA DE ESCOPO: a varredura consolidada (todos os projetos) só roda
+    // para quem enxerga a visão global (gerencial/demo). Sem sessão ou sessão
+    // de líder, NÃO carrega dados globais — o líder já foi desviado para o
+    // PainelLider, e sessão ausente cai na tela de PIN antes de qualquer render.
+    if(!hasGerencial()){ return ()=>{ alive=false; }; }
     (async()=>{
       const hoje = new Date().toLocaleDateString("sv-SE");
       const hojeMs = Date.now();
@@ -2660,6 +2664,36 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       onBack={onBack} onToggleTheme={onToggleTheme}
       onEquipe={(pid)=>onEquipe(PROJECTS[pid] || { id:pid })}
       onEquipamentos={(pid)=>onEquipamentos(PROJECTS[pid] || { id:pid })}/>;
+  }
+
+  // BARREIRA DE SESSÃO: sem sessão gerencial/demo E sem sessão de líder, a aba
+  // Registros NÃO abre a visão global. Pede o PIN (gerencial, demo ou de
+  // projeto). PIN de projeto cria sessão de líder → remonta no PainelLider.
+  if(!hasGerencial() && !getScopedProjectId()) {
+    const bg=dark?"#04080f":"#f1f5f9";
+    const cardBg=dark?"#060c18":"#ffffff";
+    const border=dark?"#0f172a":"#e2e8f0";
+    const txt=dark?"#f1f5f9":"#0f172a";
+    const txt2=dark?"#64748b":"#94a3b8";
+    const tentar=()=>{ const r=checkPinAnyProject(entradaPin,PROJECT_PINS); if(r){ setEntradaPin(""); setEntradaErr(false); setLiderNonce(n=>n+1); } else setEntradaErr(true); };
+    return (
+      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
+          <div style={{fontSize:32,marginBottom:8}}>🔐</div>
+          <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Registros</div>
+          <div style={{fontSize:12,color:txt2,marginBottom:20}}>Insira o PIN gerencial ou o PIN do seu projeto</div>
+          <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={entradaPin}
+            onChange={e=>{setEntradaPin(e.target.value);setEntradaErr(false);}}
+            onKeyDown={e=>{ if(e.key==="Enter") tentar(); }}
+            style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${entradaErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
+          {entradaErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onBack} style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>← Início</button>
+            <button onClick={tentar} style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Entrar</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Gerencial escolheu um projeto na lista de material: abre o MESMO Painel do

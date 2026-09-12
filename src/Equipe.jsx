@@ -34,16 +34,13 @@ const db = getFirestore(fbApp);
 import { getAccess, grantSession, clearSession } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
 import { gerarPDFSolicitacoesColaborador } from "./pdfSolicitacoes";
+import { PROJECT_PINS } from "./accessConfig";
 
 const ADMIN_PIN = "872101";
 // Sem limite para desligados — ficam todos para consulta
 
 // PINs de acesso por projeto (líder pode cadastrar + adicionar histórico)
-const PROJECT_PINS = {
-  P601:"16601", P602:"16602", P604:"16604", P605:"16605",
-  P606:"16606", P607:"16607", P311A:"16311", P311B:"16311",
-  P505:"16505", P260A:"162601", P260B:"162602", P260C:"162603"
-};
+// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
 
 const CARGOS_PROJETO = {
   P601:  ["VSPP Líder","VSPP Apoio","Vig CCO","CDA","Recepção"],

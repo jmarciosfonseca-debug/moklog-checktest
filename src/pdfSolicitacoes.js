@@ -39,15 +39,18 @@ function pendentesDe(colab) {
   const sl = colab && colab.uniforme && Array.isArray(colab.uniforme.solicitacoes)
     ? colab.uniforme.solicitacoes : [];
   return sl
-    .filter(s => (s.status || "pendente") === "pendente")
-    .map(s => ({
-      item: s.item || s.nome || "Material",
-      tamanho: s.tamanho || "",
-      marca: s.marca || "",
-      motivo: s.motivo || "",
-      desde: s.solicitadoEm || s.desde || s.em || null,
-      dias: diasAberto(s.solicitadoEm || s.desde || s.em),
-    }));
+    .filter(s => s.status === "pendente") // estrito: status ausente NÃO é pendente
+    .map(s => {
+      const temData = !!s.solicitadoEm; // SLA só com solicitadoEm; sem substitutos
+      return {
+        item: s.item || s.nome || "Material",
+        tamanho: s.tamanho || "",
+        marca: s.marca || "",
+        motivo: s.motivo || "",
+        desde: temData ? s.solicitadoEm : null,
+        dias: temData ? diasAberto(s.solicitadoEm) : null, // null = cadastro incompleto
+      };
+    });
 }
 
 const NOMES_PROJETO = {
@@ -63,10 +66,11 @@ function linhasItens(pendentes, theme) {
     return `<tr><td colspan="5" style="padding:12px;text-align:center;color:#64748b;">Sem solicitações pendentes.</td></tr>`;
   }
   return pendentes.map(p => {
-    const alerta = p.dias >= SLA_ALERTA;
-    const badge = alerta
-      ? `<span style="color:#b91c1c;font-weight:700;">${p.dias} dia(s) · SLA excedido</span>`
-      : `<span style="color:#b45309;">${p.dias} dia(s)</span>`;
+    const badge = (p.dias == null)
+      ? `<span style="color:#94a3b8;">Cadastro incompleto (sem data)</span>`
+      : (p.dias >= SLA_ALERTA
+          ? `<span style="color:#b91c1c;font-weight:700;">${p.dias} dia(s) · SLA excedido</span>`
+          : `<span style="color:#b45309;">${p.dias} dia(s)</span>`);
     const detalhe = [p.tamanho ? `Tam ${esc(p.tamanho)}` : "", p.marca ? esc(p.marca) : ""].filter(Boolean).join(" · ");
     return `<tr>
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;font-weight:600;">${esc(p.item)}</td>
@@ -133,7 +137,7 @@ function montarHTML({ theme, projectId, titulo, corpo, totalItens }) {
 <style>${css(theme)}</style></head>
 <body>
   <div class="no-print">
-    <button onclick="window.print()" style="background:${theme.headerBg};color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
+    <button onclick="window.print()" style="background:${theme.headerBg};color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ Gerar documento para imprimir/salvar em PDF</button>
   </div>
   <div class="folha">
     <div class="topo">
