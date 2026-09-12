@@ -17,6 +17,7 @@ import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, 
 import PainelLider from "./PainelLider";
 import { PROJECT_PINS } from "./accessConfig";
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
+import { recursosHabilitados } from "./gerenciaisConfig";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -1931,6 +1932,21 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Mega</button>
           <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Klog</button>
         </div>}
+        {/* Recursos gerenciais renderizados a partir do registro único
+            (gerenciaisConfig.js). Evita que um recurso — como a Visão 360 —
+            fique órfão por remoção acidental do botão. */}
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+          {recursosHabilitados().map(r=>{
+            const acao = r.id==="visao-360" ? carregarVisao360 : null;
+            if(!acao) return null; // sem ação → não renderiza (o teste acusa órfão)
+            return (
+              <button key={r.id} onClick={acao}
+                style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e40af)",fontSize:13,border:"1px solid #1d4ed866"}}>
+                {r.icone} {r.label}
+              </button>
+            );
+          })}
+        </div>
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
