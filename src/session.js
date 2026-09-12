@@ -117,3 +117,14 @@ export function touchSession() {
 export function clearSession() {
   try { localStorage.removeItem(KEY); } catch (e) {}
 }
+
+// projectId autorizado da sessão de LÍDER (nível "equipe"), ou null.
+// Gerencial/demo retornam null aqui de propósito: eles NÃO têm escopo
+// fixo — enxergam a visão global. Serve para o RegistrosMenu decidir se
+// abre o Painel do Líder (escopado) em vez da visão gerencial. NUNCA
+// permite escolher/trocar de projeto: o escopo vem só da sessão.
+export function getScopedProjectId() {
+  const s = getSession();
+  if (!s) return null;
+  return s.nivel === "equipe" && s.projectId ? s.projectId : null;
+}
