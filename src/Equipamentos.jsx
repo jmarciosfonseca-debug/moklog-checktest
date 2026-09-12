@@ -84,8 +84,11 @@ async function loadEquip(projectId) {
 }
 
 async function saveEquip(projectId, data) {
-  try { await setDoc(doc(db,"equipamentos",projectId), data); } catch(e){ console.error(e); }
-  try { localStorage.setItem(`equipamentos_${projectId}`, JSON.stringify(data)); } catch(e){}
+  // Carimba updatedAt em toda gravação (preserva todos os campos) — base da
+  // proteção de concorrência usada por leitores externos (ex.: Painel do Líder).
+  const payload = { ...data, updatedAt: new Date().toISOString() };
+  try { await setDoc(doc(db,"equipamentos",projectId), payload); } catch(e){ console.error(e); }
+  try { localStorage.setItem(`equipamentos_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 
 function getStyles(dark) {
