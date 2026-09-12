@@ -13,7 +13,7 @@ import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
-import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId } from "./session";
+import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
 import PainelLider from "./PainelLider";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
@@ -2506,6 +2506,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
 
 function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEquipamentos, onBack }) {
   const [subScreen, setSubScreen] = useState(null);
+  const [liderNonce, setLiderNonce] = useState(0); // força remontar no login de líder
   const [selProject, setSelProject] = useState(null);
   const [pinAuth, setPinAuth] = useState(()=>hasGerencial());
   const [pinInput, setPinInput] = useState("");
@@ -2680,10 +2681,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
           <div style={{fontSize:32,marginBottom:8}}>🛡️</div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Equipamentos</div>
-          <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial para ver todos os projetos</div>
+          <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
             onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){if(checkPin(equipPinInput,{})){setEquipPinAuth(true);}else setEquipPinErr(true);}}}
+            onKeyDown={e=>{if(e.key==="Enter"){const r=checkPinAnyProject(equipPinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}}
             style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
           {equipPinErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
           <div style={{display:"flex",gap:8}}>
@@ -2691,7 +2692,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{if(checkPin(equipPinInput,{})){setEquipPinAuth(true);}else setEquipPinErr(true);}}
+            <button onClick={()=>{const r=checkPinAnyProject(equipPinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}
               style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
               Entrar
             </button>
@@ -2713,10 +2714,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
           <div style={{ fontSize:32, marginBottom:8 }}>🔐</div>
           <div style={{ fontSize:16, fontWeight:800, color:txt, marginBottom:4 }}>Área Restrita</div>
-          <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial para ver os colaboradores</div>
+          <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
             onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
-            onKeyDown={e=>{ if(e.key==="Enter"){ if(checkPin(pinInput,{})){setPinAuth(true);}else setPinErr(true); } }}
+            onKeyDown={e=>{ if(e.key==="Enter"){ const r=checkPinAnyProject(pinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); } }}
             style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
           {pinErr && <div role="alert" style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
           <div style={{ display:"flex", gap:8 }}>
@@ -2724,7 +2725,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{ if(checkPin(pinInput,{})){setPinAuth(true);}else setPinErr(true); }}
+            <button onClick={()=>{ const r=checkPinAnyProject(pinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); }}
               style={{ flex:1, background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
               Entrar
             </button>
