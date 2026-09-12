@@ -2830,6 +2830,46 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               </div>
             );
             return (<>
+            {hasGerencial() && (()=>{
+              const GRUPOS_PROJ = [
+                { key:"golgi",   label:"Golgi",   cor:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"] },
+                { key:"mega",    label:"Mega",    cor:"#0ea5e9", ids:["P311A","P311B"] },
+                { key:"klog",    label:"Klog",    cor:"#16a34a", ids:["P505"] },
+                { key:"jatinox", label:"Jatinox", cor:"#7c3aed", ids:["P260A","P260B","P260C"] },
+              ];
+              const nomeProj = (pid)=> (PROJECTS[pid]?.name || pid);
+              const rowBorderP = `1px solid ${dark?"#0f172a":"#eef2f7"}`;
+              return (
+                <div style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#334155":"#e2e8f0"}`, borderRadius:16, padding:"14px 18px", animation:"mkFadeIn .35s ease both" }}>
+                  <div onClick={()=>toggleRh("projetos")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                    <div style={{ fontSize:22 }}>🗂️</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:15, fontWeight:800, color:txt }}>Projetos</div>
+                      <div style={{ fontSize:11, color:txt2, marginTop:1 }}>Abrir o painel de um projeto (visão do líder)</div>
+                    </div>
+                    <span style={{ fontSize:11, color:txt2, display:"inline-block", transform:rhExpand.projetos?"rotate(90deg)":"none", transition:"transform .15s", flexShrink:0 }}>▶</span>
+                  </div>
+                  {rhExpand.projetos && (
+                    <div style={{ marginTop:10 }}>
+                      {GRUPOS_PROJ.map(g=>(
+                        <div key={g.key} style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:9, fontWeight:800, color:g.cor, textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>{g.label}</div>
+                          {g.ids.map(pid=>(
+                            <div key={pid} onClick={()=>setGerVerProjeto(pid)}
+                              style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 8px", borderBottom:rowBorderP, cursor:"pointer", borderRadius:8 }}>
+                              <span style={{ width:7, height:7, borderRadius:"50%", background:g.cor, flexShrink:0 }}/>
+                              <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{pid} <span style={{ color:txt2, fontWeight:400 }}>— {nomeProj(pid)}</span></div>
+                              <span style={{ color:txt2, fontSize:16 }}>›</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
               style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
                 boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
