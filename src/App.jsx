@@ -13,7 +13,8 @@ import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
-import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin } from "./session";
+import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId } from "./session";
+import PainelLider from "./PainelLider";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -2645,6 +2646,19 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     })();
     return ()=>{ alive=false; };
   },[]);
+
+  // ── Bifurcação de acesso ──────────────────────────────────────────────
+  // Sessão de LÍDER (nível "equipe"): abre o Painel do Líder escopado ao
+  // próprio projeto — sem seletor, sem PIN novo, sem métricas globais.
+  // Gerencial/demo NÃO entram aqui (getScopedProjectId retorna null) e
+  // seguem para a visão global abaixo, byte a byte inalterada.
+  const _liderPid = getScopedProjectId();
+  if(_liderPid && !hasGerencial()) {
+    return <PainelLider projectId={_liderPid} dark={dark}
+      onBack={onBack} onToggleTheme={onToggleTheme}
+      onEquipe={(pid)=>onEquipe(PROJECTS[pid] || { id:pid })}
+      onEquipamentos={(pid)=>onEquipamentos(PROJECTS[pid] || { id:pid })}/>;
+  }
 
   if(subScreen==="colaboradores" && selProject) {
     return (
