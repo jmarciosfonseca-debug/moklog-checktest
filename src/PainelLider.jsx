@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { statusReciclagem } from "./pendencias";
+import { gerarPDFSolicitacoesColaborador, gerarPDFSolicitacoesLote } from "./pdfSolicitacoes";
 import {
   QUALIDADE, detalharPendenciaEquip,
   situacaoChecagemEquipamentos, situacaoChecagemEquipe,
@@ -284,6 +285,12 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
                 <Metric label="Total" value={solicMaterial.length} cor={txt} />
               </div>
               <div style={{ fontSize:10, color:txt2, marginTop:8 }}>Aprovação/conclusão é gerencial. O líder pode abrir ou complementar.</div>
+              {materialPendente.length>0 && (
+                <button onClick={()=>gerarPDFSolicitacoesLote({id:projectId}, equipe?.colaboradores||[])}
+                  style={{ marginTop:10, width:"100%", background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:8, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                  📄 Baixar PDF das pendências (lote)
+                </button>
+              )}
             </Card>
 
             {/* Card 6 — Checagens Semanais */}
@@ -328,6 +335,12 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
               <div style={{ fontSize:14, fontWeight:800, color:txt }}>{drill.titulo}</div>
               <button onClick={()=>setDrill(null)} style={{ background:"transparent", border:"none", color:txt2, fontSize:20, cursor:"pointer" }}>✕</button>
             </div>
+            {drill.tipo==="material" && drill.itens.length>0 && (
+              <button onClick={()=>gerarPDFSolicitacoesLote({id:projectId}, equipe?.colaboradores||[])}
+                style={{ width:"100%", marginBottom:12, background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:8, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
+                📄 Baixar PDF de todas as pendências (lote)
+              </button>
+            )}
             {drill.itens.length===0 && <div style={{ color:txt2, fontSize:13 }}>Nenhum item.</div>}
             {drill.itens.map((it,i)=>(
               <div key={i} style={{ border:`1px solid ${border}`, borderRadius:10, padding:"12px", marginBottom:8 }}>

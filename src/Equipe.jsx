@@ -33,6 +33,7 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
+import { gerarPDFSolicitacoesColaborador } from "./pdfSolicitacoes";
 
 const ADMIN_PIN = "872101";
 // Sem limite para desligados — ficam todos para consulta
@@ -673,7 +674,7 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 
 // ── Tela de ficha completa
 // ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
-function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onConfirmar, onSalvarLista }){
+function UniformeModulo({ colab, projectNome, projectId, canManage, dark, onSolicitar, onConfirmar, onSalvarLista }){
   const S = getStyles(dark);
   const [aberto, setAberto] = useState(false);
   const [modoMontar, setModoMontar] = useState(false); // Fase 1: montar lista
@@ -720,7 +721,11 @@ function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onCo
         <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>📦 Uniforme e Material Tático
           {pendentes.length>0 && <span style={{ fontSize:10, color:"#f59e0b", marginLeft:8, fontWeight:700 }}>{pendentes.length} pendente(s)</span>}
         </div>
-        <span style={{ color:"#64748b", fontSize:14 }}>{aberto?"▾":"›"}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          {pendentes.length>0 && <button onClick={(e)=>{ e.stopPropagation(); gerarPDFSolicitacoesColaborador({id:projectId}, colab); }}
+            style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:7, padding:"5px 10px", fontSize:10.5, fontWeight:700, cursor:"pointer" }}>📄 PDF</button>}
+          <span style={{ color:"#64748b", fontSize:14 }}>{aberto?"▾":"›"}</span>
+        </div>
       </div>
 
       {aberto && (
@@ -1058,6 +1063,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           <UniformeModulo
             colab={colab}
             projectNome={projectNome}
+            projectId={(projectNome||"").split(" · ")[0]}
             canManage={adminAuth || liderAuth}
             dark={dark}
             onSolicitar={onSolicitarUniforme}
