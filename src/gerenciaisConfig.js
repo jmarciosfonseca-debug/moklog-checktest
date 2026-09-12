@@ -1,45 +1,38 @@
-// Teste anti-órfão de recursos gerenciais.
-// Falha se um recurso habilitado no registro não tiver ação/ponto de
-// entrada implementado. Trava a regressão que deixou a Visão 360 órfã.
+// ─────────────────────────────────────────────────────────────
+// gerenciaisConfig.js — Registro ÚNICO de recursos gerenciais.
+//
+// Motivo: a "Visão 360" existia no código (score, dados, tela e PDF)
+// mas ficou ÓRFÃ — o botão que a acionava foi removido e a função
+// nunca mais era chamada. Para isso não se repetir, todo recurso
+// gerencial que tem tela própria precisa estar registrado aqui, e
+// o menu do painel renderiza os botões a PARTIR deste registro.
+//
+// Um teste (gerenciaisConfig.test.js) falha se um recurso habilitado
+// não tiver ponto de entrada acionável — trava a regressão no build.
+// ─────────────────────────────────────────────────────────────
 
-import { RECURSOS_GERENCIAIS, recursosHabilitados, isRecursoGerencial } from "./gerenciaisConfig";
+// Cada recurso:
+//   id            — identificador estável (usado no teste e na allowlist)
+//   label         — texto do botão
+//   icone         — emoji do botão
+//   gerencialOnly — exige sessão gerencial (todos os atuais exigem)
+//   enabled       — se false, não renderiza (nem exige ponto de entrada)
+export const RECURSOS_GERENCIAIS = [
+  {
+    id: "visao-360",
+    label: "Visão 360 Executiva",
+    icone: "🎯",
+    gerencialOnly: true,
+    enabled: true,
+  },
+];
 
-// IDs que TÊM ação acionável implementada no menu do Dashboard (App.jsx).
-// Ao adicionar um recurso ao registro, o dev DEVE adicionar seu id aqui e
-// mapear a ação no App.jsx — senão este teste falha, sinalizando órfão.
-const IDS_COM_ACAO = ["visao-360"];
-
-export function run() {
-  let pass=0, fail=0;
-  const ok=(n,c)=>{ c?pass++:(fail++,console.log("FAIL:",n)); };
-
-  // 1) Todo recurso HABILITADO precisa ter ação implementada.
-  for(const r of recursosHabilitados()){
-    ok(`recurso habilitado '${r.id}' tem acao`, IDS_COM_ACAO.includes(r.id));
-  }
-
-  // 2) Todo id com ação precisa existir e estar habilitado no registro
-  //    (evita ação apontando para recurso removido/desabilitado).
-  for(const id of IDS_COM_ACAO){
-    ok(`acao '${id}' existe e habilitada`, isRecursoGerencial(id));
-  }
-
-  // 3) IDs únicos no registro.
-  const ids = RECURSOS_GERENCIAIS.map(r=>r.id);
-  ok("ids unicos", ids.length===new Set(ids).size);
-
-  // 4) Cada recurso tem label e ícone (botão renderizável).
-  for(const r of RECURSOS_GERENCIAIS){
-    ok(`'${r.id}' tem label e icone`, !!r.label && !!r.icone);
-  }
-
-  // 5) visao-360 continua registrada e habilitada (regressão específica).
-  ok("visao-360 registrada e habilitada", isRecursoGerencial("visao-360"));
-
-  console.log(`\n${pass} passaram, ${fail} falharam`);
-  return fail===0;
+// Helper: recursos habilitados que exigem ponto de entrada acionável.
+export function recursosHabilitados() {
+  return RECURSOS_GERENCIAIS.filter(r => r.enabled);
 }
 
-if (typeof require !== "undefined" && require.main === module) {
-  process.exit(run() ? 0 : 1);
+// Helper de allowlist: um id é um recurso gerencial válido e habilitado?
+export function isRecursoGerencial(id) {
+  return RECURSOS_GERENCIAIS.some(r => r.id === id && r.enabled);
 }
