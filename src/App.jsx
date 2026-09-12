@@ -16,6 +16,7 @@ import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
 import PainelLider from "./PainelLider";
 import { PROJECT_PINS } from "./accessConfig";
+import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -2415,10 +2416,8 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const hdrBorder=dark?"#0a0f1e":"#e2e8f0";
   const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
 
-  const allProjects = [
-    ...Object.values(PROJECTS),
-    {id:"P260A",name:"Jatinox Unidade A"},{id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
-  ];
+  // Lista única de projetos (Jatinox já está em PROJECTS — sem append manual).
+  const allProjects = listaProjetosUnica(PROJECTS);
 
   const [equipData, setEquipData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -2426,27 +2425,20 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   useEffect(()=>{
     const loadAll = async () => {
       const results = {};
-      for(const p of allProjects) {
-        try {
-          const local = localStorage.getItem(`equipamentos_${p.id}`);
-          if(local) results[p.id] = JSON.parse(local);
-        } catch(e){}
-      }
+      // Firestore prioritário; cache local só como fallback (helper compartilhado
+      // com o dashStats — mesma fonte, nunca divergem).
+      const getCache = (pid)=>{ try{ const l=localStorage.getItem(`equipamentos_${pid}`); return l?JSON.parse(l):null; }catch(e){ return null; } };
+      await Promise.all(allProjects.map(async p=>{
+        const { data } = await loadEquipData(p.id, { db, doc, getDoc, getCache });
+        if(data) results[p.id] = data;
+      }));
       setEquipData(results);
       setLoading(false);
     };
     loadAll();
   },[]);
 
-  const countProblemas = (data) => {
-    if(!data) return {inop:0,parcial:0,total:0};
-    const all = [...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])];
-    return {
-      inop:   all.filter(i=>i.status==="inop"||i.status==="critico").length,
-      parcial:all.filter(i=>i.status==="parcial"||i.status==="baixo").length,
-      total:  all.length,
-    };
-  };
+  const countProblemas = (data) => contarEquip(data);
 
   return (
     <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:60}}>
@@ -2524,11 +2516,9 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
   const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
 
-  const JATINOX_LIST = [
-    { id:"P260B", name:"Jatinox Unidade B" },
-    { id:"P260C", name:"Jatinox Unidade C" },
-  ];
-  const allProjects = [...Object.values(PROJECTS), ...JATINOX_LIST];
+  // Lista única de projetos (Jatinox já está em PROJECTS — sem append manual).
+  // Antes, JATINOX_LIST re-adicionava P260B/P260C, contando-os em dobro.
+  const allProjects = listaProjetosUnica(PROJECTS);
 
   // Estatísticas do dashboard (Colaboradores + Equipamentos) — Firestore com fallback localStorage
   const [dashStats, setDashStats] = useState(null);
@@ -2621,20 +2611,11 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         } else {
           projsSemEquipe++;
         }
-        let eqpData=null;
-        try{ const snap=await getDoc(doc(db,"equipamentos",p.id)); if(snap.exists()) eqpData=snap.data(); }catch(e){}
-        if(!eqpData){ try{ const l=localStorage.getItem(`equipamentos_${p.id}`); if(l) eqpData=JSON.parse(l); }catch(e){} }
+        const getCacheEqp = (pid)=>{ try{ const l=localStorage.getItem(`equipamentos_${pid}`); return l?JSON.parse(l):null; }catch(e){ return null; } };
+        const { data: eqpData } = await loadEquipData(p.id, { db, doc, getDoc, getCache: getCacheEqp });
         if(eqpData){
-          let tem=false;
-          const contar=(it)=>{
-            if(!it||typeof it!=="object"||!it.status) return;
-            tem=true; totalEquip++;
-            if(it.status==="inop"||it.status==="critico") inop++;
-            else if(it.status==="parcial"||it.status==="baixo") parcial++;
-          };
-          EQUIP_CATS.forEach(k=>{ if(Array.isArray(eqpData[k])) eqpData[k].forEach(contar); });
-          if(eqpData.moto) contar(eqpData.moto);
-          if(tem) projsEquip++;
+          const c = contarEquip(eqpData);
+          if(c.total>0){ totalEquip += c.total; inop += c.inop; parcial += c.parcial; projsEquip++; }
         }
       }));
       veteranos.sort((a,b)=>b.meses-a.meses);
