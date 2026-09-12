@@ -2507,6 +2507,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
 function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEquipamentos, onBack }) {
   const [subScreen, setSubScreen] = useState(null);
   const [liderNonce, setLiderNonce] = useState(0); // força remontar no login de líder
+  const [gerVerProjeto, setGerVerProjeto] = useState(null); // gerencial abre Painel do Líder de um projeto
   const [selProject, setSelProject] = useState(null);
   const [pinAuth, setPinAuth] = useState(()=>hasGerencial());
   const [pinInput, setPinInput] = useState("");
@@ -2657,6 +2658,15 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   if(_liderPid && !hasGerencial()) {
     return <PainelLider projectId={_liderPid} dark={dark}
       onBack={onBack} onToggleTheme={onToggleTheme}
+      onEquipe={(pid)=>onEquipe(PROJECTS[pid] || { id:pid })}
+      onEquipamentos={(pid)=>onEquipamentos(PROJECTS[pid] || { id:pid })}/>;
+  }
+
+  // Gerencial escolheu um projeto na lista de material: abre o MESMO Painel do
+  // Líder daquele projeto (mesma visão que o líder vê), com botão de PDF em lote.
+  if(gerVerProjeto && hasGerencial()) {
+    return <PainelLider projectId={gerVerProjeto} dark={dark}
+      onBack={()=>setGerVerProjeto(null)} onToggleTheme={onToggleTheme}
       onEquipe={(pid)=>onEquipe(PROJECTS[pid] || { id:pid })}
       onEquipamentos={(pid)=>onEquipamentos(PROJECTS[pid] || { id:pid })}/>;
   }
@@ -2879,7 +2889,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 {st.materialPendente>0&&<div style={{borderBottom:rowBorder}}>
                   <div onClick={()=>toggleRh("mat")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
                     <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>Material tático pendente</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{st.materialPendente} solicitação(ões) de uniforme/material em aberto</div></div>{chev(rhExpand.mat)}<span style={{fontSize:13,fontWeight:800,color:"#f59e0b",marginLeft:6}}>{st.materialPendente}</span></div>
-                  {rhExpand.mat&&<div style={{paddingBottom:6}}>{Object.entries(st.materialDetalhe||{}).sort((a,b)=>b[1]-a[1]).map(([pid,q],i)=>subItem(pid,"",q+" solicitação(ões)"))}</div>}
+                  {rhExpand.mat&&<div style={{paddingBottom:6}}>{Object.entries(st.materialDetalhe||{}).sort((a,b)=>b[1]-a[1]).map(([pid,q],i)=>(<div key={i} onClick={()=>setGerVerProjeto(pid)} style={{cursor:"pointer"}}>{subItem(pid,"",q+" solicitação(ões) ›")}</div>))}</div>}
                 </div>}
 
                 {st.projsSemEquipe>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0"}}>

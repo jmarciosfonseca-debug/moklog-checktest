@@ -175,6 +175,18 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
   const sitEquip = situacaoChecagemEquipamentos(equip?.checagemSemanal, chkAlvoTimestamp);
   const sitEquipe = situacaoChecagemEquipe(equipe?.checagemEquipe, numCheckinsEquipe(projectId, cols));
   const diasParaDomingo = (() => { const d = new Date(); return (7 - d.getDay()) % 7; })();
+
+  // Card de Próximos Passos — consolida prazos e pendências que se aproximam.
+  const alertas = [];
+  const prazoDom = diasParaDomingo === 0 ? "hoje (domingo)" : `em ${diasParaDomingo} dia(s)`;
+  if (sitEquipe.situacao !== "concluida") alertas.push({ cor:"#f59e0b", icone:"👥", txt:`Checagem de equipe pendente — vence ${prazoDom}` });
+  if (sitEquip.situacao !== "concluida") alertas.push({ cor:"#f59e0b", icone:"🛡️", txt:`Checagem de equipamentos pendente — vence ${prazoDom}` });
+  if (inop.length > 0) alertas.push({ cor:"#ef4444", icone:"⚠️", txt:`${inop.length} equipamento(s) inoperante(s)/crítico(s)` });
+  if (reciclVencida.length > 0) alertas.push({ cor:"#ef4444", icone:"🔄", txt:`${reciclVencida.length} reciclagem(ns) vencida(s)` });
+  if (reciclAlerta.length > 0) alertas.push({ cor:"#f59e0b", icone:"🔄", txt:`${reciclAlerta.length} reciclagem(ns) a vencer` });
+  if (retornos7.length > 0) alertas.push({ cor:"#0ea5e9", icone:"🏖️", txt:`${retornos7.length} retorno(s) de férias em 7 dias` });
+  if (coberturaPendente > 0) alertas.push({ cor:"#f59e0b", icone:"🏖️", txt:`${coberturaPendente} cobertura(s) de férias pendente(s)` });
+  if (materialPendente.length > 0) alertas.push({ cor:"#f59e0b", icone:"📦", txt:`${materialPendente.length} solicitação(ões) de material pendente(s)` });
   const rotuloSit = (s) => s==="concluida" ? "Concluída" : s==="parcial" ? "Parcial" : "Pendente";
   const corSit = (s) => s==="concluida" ? "#22c55e" : s==="parcial" ? "#f59e0b" : "#f59e0b";
 
@@ -227,6 +239,23 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
             <div style={{ color:txt2, fontSize:13, textAlign:"center", padding:"40px 0" }}>Carregando dados do projeto…</div>
           ) : (
           <>
+            {/* Card 0 — Próximos Passos / Alertas */}
+            <Card>
+              <CardTitle icon="🔔">Próximos Passos</CardTitle>
+              {alertas.length === 0 ? (
+                <div style={{ fontSize:12, color:"#22c55e", fontWeight:600 }}>✓ Tudo em dia. Nenhum alerta no momento.</div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                  {alertas.map((a,i)=>(
+                    <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:txt }}>
+                      <span style={{ width:6, height:6, borderRadius:"50%", background:a.cor, flexShrink:0 }}/>
+                      <span>{a.icone} {a.txt}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
             {/* Card 1 — Minha Equipe Hoje */}
             <Card>
               <CardTitle icon="👥" onOpen={()=>onEquipe && onEquipe(projectId)} openLabel="Ver equipe">Minha Equipe Hoje</CardTitle>
