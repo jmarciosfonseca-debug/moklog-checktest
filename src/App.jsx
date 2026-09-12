@@ -2553,8 +2553,6 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       const hoje = new Date().toLocaleDateString("sv-SE");
       const hojeMs = Date.now();
       const DIA = 86400000;
-      // Categorias OFICIAIS de equipamento (estrutura canônica de Equipamentos.jsx).
-      const EQUIP_CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam"];
       const RECICLAGEM_MESES = 24;
       // Reciclagem é obrigatória apenas para funções de VIGILÂNCIA.
       // NÃO fazem reciclagem: CDA, Porteiro/Porteiro CCO, Recepção/Recepcionista, AGP e AGP CCO.

@@ -202,11 +202,11 @@ const CHK_EQ_SLOTS_4x2 = [
 ];
 function chkEqSlots(numCheckins){ return numCheckins===3 ? CHK_EQ_SLOTS_4x2 : CHK_EQ_SLOTS_12x36; }
 // Alvo vigente = sábado da semana corrente (ou próximo). Janela cobre sáb+dom.
-function chkEqAlvoVigente(chk){
-  // NÃO retornar chk.alvo salvo: um alvo de ciclo anterior nunca avançaria,
-  // o contador calcularia um domingo vencido e sumiria da home. O alvo vigente
-  // é SEMPRE derivado da data atual; chk.alvo serve só para comparar se os
-  // check-ins pertencem ao ciclo corrente (ver chamadas).
+function chkEqAlvoVigente(){
+  // O alvo vigente é SEMPRE derivado da data atual. Não recebe mais o ciclo
+  // salvo: um alvo antigo nunca avançaria e o contador calcularia um domingo
+  // vencido. As chamadas ainda passam chk (arg extra é ignorado); a comparação
+  // chk.alvo === alvo (no chamador) é quem decide se os check-ins são do ciclo.
   const hoje=new Date(); hoje.setHours(0,0,0,0);
   // Se hoje é sáb/dom, o alvo é o sábado desta semana; senão o próximo sábado.
   const dia=hoje.getDay();
