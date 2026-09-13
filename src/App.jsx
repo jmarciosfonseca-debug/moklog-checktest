@@ -15,6 +15,7 @@ import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
 import PainelLider from "./PainelLider";
+import AuditoriaOperacional from "./AuditoriaOperacional";
 import { PROJECT_PINS } from "./accessConfig";
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import { recursosHabilitados } from "./gerenciaisConfig";
@@ -1474,9 +1475,46 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
   a.click(); URL.revokeObjectURL(url);
 }
 
-function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport}) {
+// Computa o score 360 de UM projeto (para a Auditoria Operacional), reusando
+// computeScore360/computeHealth. Só leitura; mesmos insumos do carregarVisao360,
+// escopados a um projeto. Retorna {score, base, penalidades, vulnerabilidades} ou null.
+function score360Calcular(pid, insumos, ctx){
+  const { stored, ctmkData } = ctx;
+  const p = PROJECTS[pid];
+  if (!p) return null;
+  const hist = stored?.[pid]?.history ?? [];
+  const last = hist[hist.length-1];
+  const base = last ? computeHealth(p,last.state).pct : 0;
+  const c = ctmkData?.[pid];
+  const ctmkIdade = c?.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
+  const ctmkDias = ctmkIdade ? Math.max(1, ctmkIdade.dias) : 0;
+  return computeScore360(base, { ctmkDias, keyAbertas: insumos.keyAbertas||0, bolsaoCriticos: insumos.bolsaoCriticos||0, perimetralZonasRuins: insumos.perimetralZonasRuins||0, rondaPct: insumos.rondaPct!==undefined ? insumos.rondaPct : null });
+}
+
+async function computeScore360Projeto(pid, ctx) {
+  try {
+    const { stored, ctmkData } = ctx;
+    const p = PROJECTS[pid]; if(!p) return null;
+    const [keySnap, bolsaoSnap, periSnap] = await Promise.all([
+      getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null),
+      (pid==="P311A"||pid==="P311B") ? getDoc(doc(db,"bolsao",pid)).catch(()=>null) : Promise.resolve(null),
+      getDoc(doc(db,"perimetral",pid)).catch(()=>null),
+    ]);
+    const keyAbertas = keySnap?.exists() ? (keySnap.data().registros||[]).filter(r=>!r.horaFim).length : 0;
+    const bolsaoCriticos = bolsaoSnap?.exists() ? Object.values(bolsaoSnap.data().placas||{}).filter(x=>x.status==="critico").length : 0;
+    let perimetralZonasRuins = 0;
+    if(periSnap?.exists()){ const testes=periSnap.data().testes||[]; if(testes.length){ const ult=[...testes].sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0]; perimetralZonasRuins=Object.values(ult.zonas||{}).filter(z=>(z?.status||"ok")!=="ok").length; } }
+    const r = score360Calcular(pid, { keyAbertas, bolsaoCriticos, perimetralZonasRuins, rondaPct:null }, { stored, ctmkData });
+    if (!r) return null;
+    // vulnerabilidades = as próprias penalidades (o que derruba a nota).
+    return { score:r.score, base:r.base, penalidades:r.penalidades, vulnerabilidades:r.penalidades.map(x=>x.label) };
+  } catch(e){ return null; }
+}
+
+function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport, dark=true}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
+  const [showAuditoria,setShowAuditoria]=useState(false);
   const [analiseRiscoPacote, setAnaliseRiscoPacote] = useState(null); // "golgi" | "mega" | "klog" | null
   const [v360Grupo, setV360Grupo] = useState("todos"); // todos | golgi | mega | klog — "todos" é uso interno Moked; PDF por cliente nunca mistura
   const V360_GRUPOS = { golgi:{label:"Golgi",ids:["P601","P602","P604","P605","P606","P607"]}, mega:{label:"Mega",ids:["P311A","P311B"]}, klog:{label:"Klog",ids:["P505"]} };
@@ -1513,23 +1551,16 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       if(rondaSnap?.exists()){ const regs=(rondaSnap.data().registros||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")); const ult=regs[0]; if(ult){ const slots=ult.slots||[]; const f=slots.filter(h=>ult.marcacoes?.[h]?.status==="feito").length; rondaPct = slots.length?Math.round((f/slots.length)*100):null; } }
       const rows = ids.map(pid=>{
         const p=PROJECTS[pid];
-        const hist=stored[pid]?.history??[];
-        const last=hist[hist.length-1];
-        const base = last ? computeHealth(p,last.state).pct : 0;
-        const c = ctmkData[pid];
-        const ctmkIdade = c?.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
-        // Penalidade de score permanece em DIAS (regra de negócio -2/dia). Mínimo 1
-        // quando offline (mesma regra de antes): estar offline já conta como 1 dia.
-        const ctmkDias = ctmkIdade ? Math.max(1, ctmkIdade.dias) : 0;
-        const r = computeScore360(base, {
-          ctmkDias,
+        const last=(stored[pid]?.history??[]).slice(-1)[0];
+        const r = score360Calcular(pid, {
           keyAbertas: keyAbertasBy[pid]||0,
           bolsaoCriticos: bolsaoBy[pid]||0,
           perimetralZonasRuins: periBy[pid]||0,
           rondaPct: pid==="P601"?rondaPct:null,
-        });
+        }, { stored, ctmkData });
+        if (!r) return null;
         return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0, energiaQuedas7d: energiaBy[pid]?.quedas7d||0, energiaAberta: energiaBy[pid]?.aberto||false };
-      }).sort((a,b)=>b.score-a.score);
+      }).filter(Boolean).sort((a,b)=>b.score-a.score);
       const media = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
       setV360({rows, media});
     } catch(e){ setV360({rows:[], media:0, erro:true}); }
@@ -1615,6 +1646,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     Object.keys(PROJECTS).forEach(id=>{ if(ANALISE_RISCO_ELIGIBLE.includes(id)) elegiveis[id]=PROJECTS[id]; });
     return <AnaliseRisco projects={elegiveis} stored={stored} pacote={analiseRiscoPacote} onBack={()=>setAnaliseRiscoPacote(null)} />;
   }
+  if(showAuditoria) {
+    return <AuditoriaOperacional dark={dark} projectId="P311A"
+      carregarScore360={(pid)=>computeScore360Projeto(pid, { stored, ctmkData })}
+      onBack={()=>setShowAuditoria(false)} />;
+  }
+
   if(v360) {
     const loadingV = v360==="loading";
     const allRows = loadingV?[]:(v360.rows||[]);
@@ -1937,7 +1974,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             fique órfão por remoção acidental do botão. */}
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           {recursosHabilitados().map(r=>{
-            const acao = r.id==="visao-360" ? carregarVisao360 : null;
+            const acao = r.id==="visao-360" ? carregarVisao360 : r.id==="auditoria-operacional" ? (()=>setShowAuditoria(true)) : null;
             if(!acao) return null; // sem ação → não renderiza (o teste acusa órfão)
             return (
               <button key={r.id} onClick={acao}
@@ -3959,7 +3996,7 @@ export default function App(){
     );
   }
 
-  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
+  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
 

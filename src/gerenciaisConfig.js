@@ -25,6 +25,13 @@ export const RECURSOS_GERENCIAIS = [
     gerencialOnly: true,
     enabled: true,
   },
+  {
+    id: "auditoria-operacional",
+    label: "Auditoria Operacional",
+    icone: "📋",
+    gerencialOnly: true,
+    enabled: true,
+  },
 ];
 
 // Helper: recursos habilitados que exigem ponto de entrada acionável.
