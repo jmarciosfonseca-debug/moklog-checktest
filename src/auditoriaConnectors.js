@@ -124,7 +124,7 @@ export async function conectorTesteSemanal(pid, deps) {
     resumo: `Última checagem ${chk.ultimaChecagem}` +
             (res.por ? ` por ${res.por}` : "") +
             (emAberto != null ? ` · ${emAberto} item(ns) em aberto` : " · itens em aberto não informados") +
-            (res.corrigidos != null ? ` · ${res.corrigidos} corrigido(s)` : "") +
+            (typeof res.corrigidos === "number" ? ` · ${res.corrigidos} corrigido(s)` : "") +
             (doCicloVigente ? "" : ` · checagem de ciclo anterior (alvo vigente: ${alvo})`),
     itens: [],
   };
