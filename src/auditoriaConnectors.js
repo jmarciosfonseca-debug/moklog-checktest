@@ -101,7 +101,9 @@ export async function conectorTesteSemanal(pid, deps) {
   const res = chk.ultimoResultado || {};
   // emAberto AUSENTE não é zero: é dado incompleto.
   const temEmAberto = res.emAberto != null;
-  const emAberto = temEmAberto ? res.emAberto : null;
+  // emAberto pode vir como número, 0, ou false (dado legado). Normaliza para número.
+  const emAbertoNum = (typeof res.emAberto === "number") ? res.emAberto : (res.emAberto ? null : 0);
+  const emAberto = temEmAberto ? emAbertoNum : null;
 
   // Alvo vigente do MÓDULO (não idade fixa). O prazo é o domingo-alvo 23:59.
   const alvo = chkAlvoVigente(chk);
@@ -111,9 +113,9 @@ export async function conectorTesteSemanal(pid, deps) {
   const doCicloVigente = chk.alvo === alvo;
 
   let situacao;
-  if (temEmAberto && emAberto > 0) situacao = "nao-conforme";      // itens em aberto = falha
+  if (emAberto != null && emAberto > 0) situacao = "nao-conforme";      // itens em aberto = falha
   else if (!doCicloVigente || vencido) situacao = "pendente";      // ciclo anterior/vencido não comprova o vigente
-  else if (!temEmAberto) situacao = "parcial";                     // sem info de itens em aberto = incompleto
+  else if (emAberto == null) situacao = "parcial";                 // sem info de itens em aberto = incompleto
   else situacao = "conforme";                                      // ciclo vigente, sem itens em aberto
 
   return {
@@ -121,7 +123,7 @@ export async function conectorTesteSemanal(pid, deps) {
     data: chk.ultimaChecagem, responsavel: res.por || null,
     resumo: `Última checagem ${chk.ultimaChecagem}` +
             (res.por ? ` por ${res.por}` : "") +
-            (temEmAberto ? ` · ${emAberto} item(ns) em aberto` : " · itens em aberto não informados") +
+            (emAberto != null ? ` · ${emAberto} item(ns) em aberto` : " · itens em aberto não informados") +
             (res.corrigidos != null ? ` · ${res.corrigidos} corrigido(s)` : "") +
             (doCicloVigente ? "" : ` · checagem de ciclo anterior (alvo vigente: ${alvo})`),
     itens: [],

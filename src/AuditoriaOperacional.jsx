@@ -44,6 +44,42 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
   const [matriz, setMatriz] = useState(null);
   const [emissao] = useState(agora());
   const [relId] = useState(() => "AUD-" + projectId + "-" + hojeISO().replace(/-/g,"") + "-" + Math.random().toString(36).slice(2,6).toUpperCase());
+  const [gerando, setGerando] = useState(false);
+  const [erroPdf, setErroPdf] = useState("");
+  const PROJ_NOME = "Mega CL Curitiba";
+
+  const baixarPDF = async () => {
+    if (!matriz) return;
+    setGerando(true); setErroPdf("");
+    try {
+      const payload = {
+        projectId, projetoNome: PROJ_NOME, emissao, responsavel, relId,
+        cobertura: matriz.cobertura, conformidade: matriz.conformidade,
+        linhas: matriz.linhas, vulnerabilidades: matriz.vulnerabilidades, acoes: matriz.acoes,
+      };
+      const resp = await fetch("/api/gerar-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        let msg = "Falha ao gerar PDF.";
+        try { const j = await resp.json(); if (j && j.error) msg = j.error; } catch (e) {}
+        throw new Error(msg);
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Auditoria-Operacional-${projectId}-${(emissao||"").slice(0,10).replace(/\//g,"-")}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch (e) {
+      setErroPdf(e && e.message ? e.message : "Erro ao gerar o PDF.");
+    } finally {
+      setGerando(false);
+    }
+  };
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -174,15 +210,16 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
             </Card>
           )}
 
-          {/* Preparação do dossiê — sem afirmar que é PDF */}
-          <Card style={{ borderStyle:"dashed" }}>
+          {/* Dossiê consolidado — PDF verdadeiro (pdf-lib no servidor) */}
+          <Card>
             <div style={{ fontSize:12.5, fontWeight:800, color:txt, marginBottom:4 }}>Dossiê consolidado</div>
             <div style={{ fontSize:11, color:txt2, marginBottom:10 }}>
-              O dossiê está montado em tela com as evidências acima. A geração de <b>PDF verdadeiro</b> e o
-              arquivamento serão habilitados na Fase 1B, após validação da infraestrutura (Vercel/Storage).
+              Gera um <b>PDF verdadeiro</b> com a matriz, evidências e origens acima, pronto para arquivar ou enviar.
             </div>
-            <button disabled title="Disponível na Fase 1B" style={{ width:"100%", background:"#334155", color:"#94a3b8", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"not-allowed" }}>
-              📄 Gerar PDF verdadeiro — Fase 1B (aguardando infraestrutura)
+            {erroPdf && <div role="alert" style={{ fontSize:11, color:"#ef4444", marginBottom:8 }}>{erroPdf}</div>}
+            <button onClick={baixarPDF} disabled={gerando || !matriz}
+              style={{ width:"100%", background: gerando?"#334155":"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor: gerando?"wait":"pointer" }}>
+              {gerando ? "Gerando PDF…" : "📄 Gerar PDF verdadeiro"}
             </button>
           </Card>
 
