@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { LOGO_MOKED_B64 } from "./_logo.js";
 
 // Cores (Moked).
 const VERMELHO = rgb(0.70, 0.12, 0.15);
@@ -42,10 +43,24 @@ export default async function handler(req, res) {
   }
 
   // Payload esperado (dados estruturados, não HTML).
+  // Em alguns runtimes o req.body não vem parseado — lê o stream cru como fallback.
   let body = req.body;
-  try { if (typeof body === "string") body = JSON.parse(body); } catch (e) { body = null; }
+  if (body == null || typeof body === "string") {
+    try {
+      let raw = typeof body === "string" ? body : "";
+      if (!raw) {
+        raw = await new Promise((resolve, reject) => {
+          let d = "";
+          req.on("data", (c) => { d += c; });
+          req.on("end", () => resolve(d));
+          req.on("error", reject);
+        });
+      }
+      body = raw ? JSON.parse(raw) : null;
+    } catch (e) { body = null; }
+  }
   if (!body || typeof body !== "object") {
-    res.status(400).json({ error: "Payload invalido." });
+    res.status(400).json({ error: "Payload invalido ou vazio." });
     return;
   }
   const {
@@ -63,6 +78,16 @@ export default async function handler(req, res) {
     const pdf = await PDFDocument.create();
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+    // Logo Moked (opcional — se falhar o embed, segue sem logo).
+    let logoImg = null, logoDims = null;
+    try {
+      const bytes = (typeof Buffer !== "undefined")
+        ? Buffer.from(LOGO_MOKED_B64, "base64")
+        : Uint8Array.from(atob(LOGO_MOKED_B64), (ch) => ch.charCodeAt(0));
+      logoImg = await pdf.embedJpg(bytes);
+      logoDims = logoImg.scale(0.22); // ~132px de largura
+    } catch (e) { logoImg = null; }
 
     let page = pdf.addPage([595, 842]); // A4 retrato (pt)
     const M = 48;                        // margem
@@ -93,17 +118,35 @@ export default async function handler(req, res) {
       page.drawText(s, { x, y, size, font: f, color: cor });
     };
 
-    // ── Cabeçalho / capa ──
-    page.drawRectangle({ x: M, y: y - 46, width: W, height: 46, color: PRETO });
-    page.drawRectangle({ x: M, y: y - 46, width: 5, height: 46, color: VERMELHO });
-    page.drawText("MOKED CONSULTING SECURITY", { x: M + 14, y: y - 18, size: 9, font: fontBold, color: rgb(1,1,1) });
-    page.drawText("Auditoria Operacional", { x: M + 14, y: y - 34, size: 15, font: fontBold, color: rgb(1,1,1) });
-    y -= 60;
+    // ── Cabeçalho: logo Moked + título do relatório ──
+    if (logoImg && logoDims) {
+      page.drawImage(logoImg, { x: M, y: y - logoDims.height, width: logoDims.width, height: logoDims.height });
+      y -= logoDims.height + 6;
+    } else {
+      page.drawText("MOKED CONSULTING SECURITY", { x: M, y: y - 12, size: 11, font: fontBold, color: PRETO });
+      y -= 22;
+    }
+    // Faixa de título
+    page.drawRectangle({ x: M, y: y - 34, width: W, height: 34, color: PRETO });
+    page.drawRectangle({ x: M, y: y - 34, width: 5, height: 34, color: VERMELHO });
+    page.drawText("RELATORIO DE AUDITORIA OPERACIONAL", { x: M + 14, y: y - 15, size: 12, font: fontBold, color: rgb(1,1,1) });
+    page.drawText("Seguranca Patrimonial - dados extraidos do MokLog CheckTest", { x: M + 14, y: y - 27, size: 7.5, font, color: rgb(0.85,0.85,0.85) });
+    y -= 46;
 
     texto(`${limpa(projectId)} - ${limpa(projetoNome)}`, M, 12, fontBold, PRETO); y -= 18;
     texto(`Emissao: ${limpa(emissao)}`, M, 9, font, CINZA); y -= 12;
     texto(`Responsavel: ${limpa(responsavel) || "-"}`, M, 9, font, CINZA); y -= 12;
     texto(`Identificador: ${limpa(relId)}`, M, 9, font, CINZA); y -= 20;
+
+    // ── Introducao / origem dos dados ──
+    y -= 4;
+    texto("Este relatorio consolida evidencias operacionais extraidas automaticamente do aplicativo MokLog " +
+          "CheckTest: teste semanal de dispositivos, inventario e status de equipamentos, CFTV (tempo de " +
+          "gravacao por camera), ronda perimetral por zona e o score de seguranca (Visao 360). Cada item " +
+          "aponta o modulo e o registro de origem. Ausencia de evidencia e marcada como 'Sem dado' e nunca " +
+          "tratada como conforme. Conclusoes criticas exigem validacao gerencial.",
+          M, 8, font, CINZA, W);
+    y -= 10;
 
     // ── Cobertura x Conformidade ──
     page.drawRectangle({ x: M, y: y - 52, width: W, height: 52, color: rgb(0.96,0.97,0.98) });
