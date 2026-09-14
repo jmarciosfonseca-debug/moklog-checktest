@@ -32,6 +32,20 @@ const ZONAS_P311A = ["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06"
 const hojeISO = () => new Date().toLocaleDateString("sv-SE");
 const agora = () => new Date().toLocaleString("pt-BR");
 
+// Componentes estáveis (definidos FORA do componente para não remontar a cada
+// render — senão o input do responsável perde o foco a cada tecla).
+function Card({ children, style, cardBg, border }) {
+  return <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:12, padding:"14px 16px", marginBottom:10, ...style }}>{children}</div>;
+}
+function SitBadge({ s }) {
+  const c = SIT_CFG[s] || SIT_CFG["sem-dado"];
+  return <span style={{ fontSize:10, fontWeight:700, color:c.cor, background:c.bg, padding:"2px 8px", borderRadius:6, whiteSpace:"nowrap" }}>{c.label}</span>;
+}
+function PrioBadge({ p }) {
+  const c = PRIO_CFG[p] || PRIO_CFG["baixa"];
+  return <span style={{ fontSize:9, fontWeight:700, color:c.cor }}>{c.label}</span>;
+}
+
 export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A", carregarScore360 = null, responsavelInicial = "" }) {
   const bg = dark ? "#04080f" : "#f1f5f9";
   const cardBg = dark ? "#060c18" : "#ffffff";
@@ -102,18 +116,6 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  const Card = ({ children, style }) => (
-    <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:12, padding:"14px 16px", marginBottom:10, ...style }}>{children}</div>
-  );
-  const SitBadge = ({ s }) => {
-    const c = SIT_CFG[s] || SIT_CFG["sem-dado"];
-    return <span style={{ fontSize:10, fontWeight:700, color:c.cor, background:c.bg, padding:"2px 8px", borderRadius:6, whiteSpace:"nowrap" }}>{c.label}</span>;
-  };
-  const PrioBadge = ({ p }) => {
-    const c = PRIO_CFG[p] || PRIO_CFG["baixa"];
-    return <span style={{ fontSize:9, fontWeight:700, color:c.cor }}>{c.label}</span>;
-  };
-
   return (
     <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
       <div style={{ width:"100%", maxWidth:640, padding:"14px 16px" }}>
@@ -127,7 +129,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
         </div>
 
         {/* Identificação da emissão */}
-        <Card>
+        <Card cardBg={cardBg} border={border}>
           <div>
             <div style={{ fontSize:9, color:txt2, fontWeight:700, textTransform:"uppercase" }}>Responsável pela emissão</div>
             <input value={responsavel} onChange={e=>setResponsavel(e.target.value)} placeholder="Nome do responsável" style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${border}`, borderRadius:7, color:txt, padding:"8px", fontSize:13, boxSizing:"border-box" }}/>
@@ -149,7 +151,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
         ) : (
         <>
           {/* Cobertura x Conformidade — SEPARADAS */}
-          <Card>
+          <Card cardBg={cardBg} border={border}>
             <div style={{ fontSize:13, fontWeight:800, color:txt, marginBottom:10 }}>Saúde operacional</div>
             <div style={{ display:"flex", gap:10 }}>
               <div style={{ flex:1, textAlign:"center", background:dark?"#020510":"#f8fafc", border:`1px solid ${border}`, borderRadius:10, padding:"12px 8px" }}>
@@ -171,7 +173,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
           </Card>
 
           {/* Matriz de auditoria */}
-          <Card>
+          <Card cardBg={cardBg} border={border}>
             <div style={{ fontSize:13, fontWeight:800, color:txt, marginBottom:10 }}>Matriz de auditoria</div>
             {matriz.linhas.map(l=>(
               <div key={l.id} style={{ border:`1px solid ${border}`, borderRadius:9, padding:"10px", marginBottom:8 }}>
@@ -189,7 +191,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
 
           {/* Vulnerabilidades e pendências */}
           {matriz.vulnerabilidades.length>0 && (
-            <Card>
+            <Card cardBg={cardBg} border={border}>
               <div style={{ fontSize:13, fontWeight:800, color:txt, marginBottom:8 }}>Principais vulnerabilidades e pendências</div>
               {matriz.vulnerabilidades.map((v,i)=>(
                 <div key={i} style={{ fontSize:11.5, color:txt, marginBottom:5, display:"flex", gap:8 }}>
@@ -202,7 +204,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
 
           {/* Ações recomendadas */}
           {matriz.acoes.length>0 && (
-            <Card>
+            <Card cardBg={cardBg} border={border}>
               <div style={{ fontSize:13, fontWeight:800, color:txt, marginBottom:8 }}>Ações recomendadas</div>
               {matriz.acoes.map((a,i)=>(
                 <div key={i} style={{ fontSize:11, color:txt2, marginBottom:5 }}>• {a.acao} <span style={{fontSize:9}}>(<PrioBadge p={a.prioridade}/>)</span></div>
@@ -211,7 +213,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
           )}
 
           {/* Dossiê consolidado — PDF verdadeiro (pdf-lib no servidor) */}
-          <Card>
+          <Card cardBg={cardBg} border={border}>
             <div style={{ fontSize:12.5, fontWeight:800, color:txt, marginBottom:4 }}>Dossiê consolidado</div>
             <div style={{ fontSize:11, color:txt2, marginBottom:10 }}>
               Gera um <b>PDF verdadeiro</b> com a matriz, evidências e origens acima, pronto para arquivar ou enviar.
