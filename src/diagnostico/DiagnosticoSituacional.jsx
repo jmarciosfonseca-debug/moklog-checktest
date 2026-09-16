@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { CATALOGO_REF, STATUS_ITEM, STATUS_ITEM_LISTA } from "./catalogoSchema";
-import { buildCatalogSections, calculateProgress, draftStorageKey, readDraft, writeDraft } from "./diagnosticoDraft";
+import { buildCatalogSections, calculateProgress, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
 
 const STATUS_UI = {
   [STATUS_ITEM.CONFORME]: { label: "Conforme", short: "C", color: "#22c55e" },
@@ -124,8 +124,8 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const clearDraft=()=>{if(!window.confirm("Limpar todas as marcações deste rascunho local?"))return;window.localStorage.removeItem(draftStorageKey(CATALOGO_REF.catalogoId,user.uid));setRespostas({});setCategoriaAtiva(secoes[0]?.id||"");setSavedAt(null);};
 
   if(!isAuthenticated)return <Login auth={auth} dark={dark} onBack={onBack}/>;
-  if(loading)return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.centerState}><div style={{fontSize:34}}>⟳</div><strong>Carregando catálogo publicado…</strong></div></main>;
   if(error)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:"#ef444466"}}><div style={{fontSize:38}}>⚠️</div><h1 style={styles.title}>Acesso indisponível</h1><p role="alert" style={{...styles.muted,color:c.muted}}>{error}</p><button onClick={onBack} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>← Voltar ao início</button></section></main>;
+  if(loading||!isDiagnosticDataReady(catalogo,profile))return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.centerState}><div style={{fontSize:34}}>⟳</div><strong>Carregando catálogo publicado…</strong></div></main>;
 
   return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.shell}>
     <header style={{...styles.header,background:c.bg,borderColor:c.border}}>

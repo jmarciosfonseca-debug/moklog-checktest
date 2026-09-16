@@ -51,3 +51,7 @@ export function readDraft(storage, key, versao) {
 export function writeDraft(storage, key, draft) {
   storage.setItem(key, JSON.stringify(draft));
 }
+
+export function isDiagnosticDataReady(catalogo, profile) {
+  return Boolean(catalogo && profile);
+}

@@ -1,4 +1,4 @@
-import { buildCatalogSections, calculateProgress, draftStorageKey, readDraft, writeDraft } from "./diagnosticoDraft";
+import { buildCatalogSections, calculateProgress, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
 
 describe("rascunho do Diagnóstico Situacional", () => {
   const catalogo = {
@@ -34,5 +34,11 @@ describe("rascunho do Diagnóstico Situacional", () => {
     writeDraft(storage, key, { versao: "1.0.0", respostas: { a: { status: "na" } } });
     expect(readDraft(storage, key, "1.0.0").respostas.a.status).toBe("na");
     expect(readDraft(storage, key, "2.0.0")).toBeNull();
+  });
+
+  test("não libera a tela entre o login e o carregamento dos dados", () => {
+    expect(isDiagnosticDataReady(null, null)).toBe(false);
+    expect(isDiagnosticDataReady({ versao: "1.0.0" }, null)).toBe(false);
+    expect(isDiagnosticDataReady({ versao: "1.0.0" }, { role: "gerente" })).toBe(true);
   });
 });
