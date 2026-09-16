@@ -27,6 +27,7 @@ import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
+import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 
 // ── Hook de conectividade
 function useOnlineStatus() {
@@ -3290,6 +3291,7 @@ export default function App(){
   const [acessoScreen,setAcessoScreen]=useState("menu");
   const [dark,setDark]=useState(true);
   const [showRegistros,setShowRegistros]=useState(false);
+  const [showDiagnostico,setShowDiagnostico]=useState(false);
   const [showAcessoCCO,setShowAcessoCCO]=useState(false);
   const [acessoCCOProject,setAcessoCCOProject]=useState(null);
   const [acessoCCOAbas,setAcessoCCOAbas]=useState(null); // filtro de abas p/ Jatinox B/C (Supervisão+Manutenção)
@@ -3877,6 +3879,7 @@ export default function App(){
   );
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
+  if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
   if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)}/></ErrorBoundary>;
   if(showRegistros) return <ErrorBoundary moduleName="Registros"><RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/></ErrorBoundary>;
   if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);setAcessoCCOAbas(null);}} sharedAuth={getProjectAuthMode(acessoCCOProject.id)} onAuthGranted={(mode)=>grantAuth(acessoCCOProject.id,mode)} abasPermitidas={acessoCCOAbas}/></ErrorBoundary>;
@@ -4476,6 +4479,12 @@ export default function App(){
             <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1.5}}>Seleção de Projeto</div>
             <div style={{height:1,flex:1,background:"linear-gradient(90deg,#1e293b,transparent)"}}/>
           </div>
+          <button onClick={()=>setShowDiagnostico(true)}
+            style={{marginBottom:10,width:"100%",background:"linear-gradient(135deg,#123458 0%,#0b1d33 58%,#12243d 100%)",border:"1.5px solid #38bdf866",borderRadius:18,padding:"16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 10px 26px rgba(0,0,0,.48), 0 0 20px #38bdf812, inset 0 1px 0 rgba(255,255,255,.06)"}}>
+            <div style={{width:48,height:48,borderRadius:14,background:"#38bdf814",border:"1px solid #38bdf844",display:"flex",alignItems:"center",justifyContent:"center",fontSize:25,flexShrink:0}}>🧭</div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:"#e0f2fe"}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:"#7dd3fc",marginTop:3}}>Catálogo publicado · rascunho local</div></div>
+            <span style={{color:"#38bdf8",fontSize:20}}>›</span>
+          </button>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
               {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"]},

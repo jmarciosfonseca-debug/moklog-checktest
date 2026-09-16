@@ -1,4 +1,8 @@
 # ── Seed one-shot do Diagnóstico (scripts/seed) ──────────────
+# Artefatos locais do aplicativo CRA.
+node_modules/
+build/
+
 # Dependências instaladas só localmente para a execução real.
 scripts/seed/node_modules/
 # Segredos de credencial — NUNCA versionar.
