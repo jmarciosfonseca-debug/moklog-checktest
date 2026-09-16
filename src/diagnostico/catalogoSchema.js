@@ -1,4 +1,3 @@
-// Fase 1 — contrato de catálogo aprovado para uso futuro no runtime.
 // ─────────────────────────────────────────────────────────────
 // catalogoSchema.js — Estrutura e enums do Diagnóstico Situacional
 // Perfil: Centro Logístico. Contém APENAS enums, shapes e contrato de

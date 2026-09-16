@@ -1,0 +1,8 @@
+# ── Seed one-shot do Diagnóstico (scripts/seed) ──────────────
+# Dependências instaladas só localmente para a execução real.
+scripts/seed/node_modules/
+# Segredos de credencial — NUNCA versionar.
+scripts/seed/.env*
+scripts/seed/*service-account*.json
+# Observação: scripts/seed/package.json DEVE permanecer versionado
+# (não usar scripts/seed/*.json, que o excluiria).

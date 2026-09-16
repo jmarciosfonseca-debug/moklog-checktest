@@ -1,0 +1,171 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// firestore.rules — PROPOSTA CORRIGIDA (NÃO PUBLICAR)
+// Projeto: moklog-checktest · revisão P0 (Codex + DeepSeek)
+//
+// Substitui a global `allow read, write: if true` por cobertura
+// explícita. Fail-closed: caminho não listado é negado.
+//
+// COBERTURA LEGADA = união de:
+//   • 31 coleções reais do Firestore (coleta do Codex, 15/09);
+//   • 'config' (usada no App.jsx; coleção ainda sem doc, logo não
+//     aparece na listagem do Console) — incluída para não negar a
+//     primeira escrita.
+//   Total: 32 coleções cobertas.
+//
+// Comportamento legado PRESERVADO (if true) nesta fase. Endurecimento
+// do legado é fase separada, módulo a módulo (ver nota authReady).
+// Diagnóstico é restrito; caminhos futuros do Diagnóstico = if false.
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers do Diagnóstico ──────────────────────────────
+    function isSignedIn()   { return request.auth != null; }
+    function isNotAnonymous() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    function userDoc() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+    function userExistsActive() {
+      return isNotAnonymous()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && userDoc().active == true;
+    }
+    // Gerente-raiz: acesso global. role gerente + scopeAll==true.
+    function isGerenteRaiz() {
+      return userExistsActive()
+        && userDoc().role == 'gerente'
+        && userDoc().scopeAll == true;
+    }
+    // Gerente limitado: role gerente, SEM visão global por si só.
+    // Usar só onde a regra validar escopo explícito (fase futura).
+    function isGerenteEscopo() {
+      return userExistsActive() && userDoc().role == 'gerente';
+    }
+    // Leitura de catálogo: auditor ou gerente ativo (qualquer escopo).
+    function isAuditorOrGerente() {
+      return userExistsActive()
+        && (userDoc().role == 'auditor' || userDoc().role == 'gerente');
+    }
+
+    // ═════════════════════════════════════════════════════════
+    // BLOCO LEGADO — 32 coleções. Comportamento atual preservado.
+    // Doc raiz + subcoleções recursivas (Rules v2: {sub=**}).
+    // NOTA: nenhuma escrita legada espera authReady (varredura no
+    // App.jsx). Endurecer para `isSignedIn()` só após teste dedicado,
+    // em fase separada — senão gravação antes do anônimo pronto quebra.
+    // ═════════════════════════════════════════════════════════
+    match /acesso/{id}            { allow read, write: if true; }
+    match /acesso/{id}/{sub=**}   { allow read, write: if true; }
+    match /acesso_cco/{id}        { allow read, write: if true; }
+    match /acesso_cco/{id}/{sub=**} { allow read, write: if true; }
+    match /acessos_jatinox/{id}   { allow read, write: if true; }
+    match /acessos_jatinox/{id}/{sub=**} { allow read, write: if true; }
+    match /acessos_p260a/{id}     { allow read, write: if true; }
+    match /acessos_p260a/{id}/{sub=**} { allow read, write: if true; }
+    match /ambulancias/{id}       { allow read, write: if true; }
+    match /ambulancias/{id}/{sub=**} { allow read, write: if true; }
+    match /bolsao/{id}            { allow read, write: if true; }
+    match /bolsao/{id}/{sub=**}   { allow read, write: if true; }
+    match /bolsao_inquilinos/{id} { allow read, write: if true; }
+    match /bolsao_inquilinos/{id}/{sub=**} { allow read, write: if true; }
+    match /cco_bodycam/{id}       { allow read, write: if true; }
+    match /cco_bodycam/{id}/{sub=**} { allow read, write: if true; }
+    match /cco_intervalo/{id}     { allow read, write: if true; }
+    match /cco_intervalo/{id}/{sub=**} { allow read, write: if true; }
+    match /cco_manutencao/{id}    { allow read, write: if true; }
+    match /cco_manutencao/{id}/{sub=**} { allow read, write: if true; }
+    match /cco_ronda/{id}         { allow read, write: if true; }
+    match /cco_ronda/{id}/{sub=**} { allow read, write: if true; }
+    match /cco_supervisao/{id}    { allow read, write: if true; }
+    match /cco_supervisao/{id}/{sub=**} { allow read, write: if true; }
+    match /cftv_gravacao/{id}     { allow read, write: if true; }
+    match /cftv_gravacao/{id}/{sub=**} { allow read, write: if true; }
+    match /config/{id}           { allow read, write: if true; }
+    match /config/{id}/{sub=**}  { allow read, write: if true; }
+    match /contadores/{id}        { allow read, write: if true; }
+    match /contadores/{id}/{sub=**} { allow read, write: if true; }
+    match /ctmk/{id}              { allow read, write: if true; }
+    match /ctmk/{id}/{sub=**}     { allow read, write: if true; }
+    match /empresa_info/{id}      { allow read, write: if true; }
+    match /empresa_info/{id}/{sub=**} { allow read, write: if true; }
+    match /energia_ocorrencias/{id} { allow read, write: if true; }
+    match /energia_ocorrencias/{id}/{sub=**} { allow read, write: if true; }
+    match /equipamentos/{id}      { allow read, write: if true; }
+    match /equipamentos/{id}/{sub=**} { allow read, write: if true; }
+    match /equipes/{id}           { allow read, write: if true; }
+    match /equipes/{id}/{sub=**}  { allow read, write: if true; }
+    match /followups/{id}         { allow read, write: if true; }
+    match /followups/{id}/{sub=**} { allow read, write: if true; }
+    match /iluminacao/{id}        { allow read, write: if true; }
+    match /iluminacao/{id}/{sub=**} { allow read, write: if true; }
+    match /inquilinos/{id}        { allow read, write: if true; }
+    match /inquilinos/{id}/{sub=**} { allow read, write: if true; }
+    match /intervalos/{id}        { allow read, write: if true; }
+    match /intervalos/{id}/{sub=**} { allow read, write: if true; }
+    match /keyaccess_falhas/{id}  { allow read, write: if true; }
+    match /keyaccess_falhas/{id}/{sub=**} { allow read, write: if true; }
+    match /ocorrencias/{id}       { allow read, write: if true; }
+    match /ocorrencias/{id}/{sub=**} { allow read, write: if true; }
+    match /perimetral/{id}        { allow read, write: if true; }
+    match /perimetral/{id}/{sub=**} { allow read, write: if true; }
+    match /projects/{id}          { allow read, write: if true; }
+    match /projects/{id}/{sub=**} { allow read, write: if true; }
+    match /ronda_vspp/{id}        { allow read, write: if true; }
+    match /ronda_vspp/{id}/{sub=**} { allow read, write: if true; }
+    match /rondas/{id}            { allow read, write: if true; }
+    match /rondas/{id}/{sub=**}   { allow read, write: if true; }
+    match /rondas_plantoes/{id}   { allow read, write: if true; }
+    match /rondas_plantoes/{id}/{sub=**} { allow read, write: if true; }
+    match /visitas/{id}           { allow read, write: if true; }
+    match /visitas/{id}/{sub=**}  { allow read, write: if true; }
+
+    // ═════════════════════════════════════════════════════════
+    // BLOCO DIAGNÓSTICO SITUACIONAL — restrito
+    // ═════════════════════════════════════════════════════════
+
+    // Catálogo publicado: leitura por identidade não anônima, ativa e
+    // autorizada. Escrita só por Admin SDK/Console (ignoram estas regras).
+    match /catalogos_diagnostico/{catalogoId} {
+      allow read:  if isAuditorOrGerente();
+      allow write: if false;
+      match /itens/{itemId} {
+        allow read:  if isAuditorOrGerente();
+        allow write: if false;
+      }
+    }
+
+    // Perfis/escopo. Sem escalada de privilégio:
+    //  • leitura: o próprio usuário, ou gerente-raiz (visão global).
+    //  • escrita pelo APP: BLOQUEADA nesta Fase 1 — não há regra de
+    //    escopo pronta para operações de perfil, então preferimos negar
+    //    a liberar promoção indevida. Criação/edição de perfil é feita
+    //    por Console/Admin SDK (bootstrap), que ignoram estas regras.
+    //  • scopeAll:true nunca é criável/promovível pela UI (garantido por
+    //    write:false aqui; nem gerente-raiz promove pela app).
+    match /usuarios/{uid} {
+      allow read: if isGerenteRaiz()
+                  || (userExistsActive() && request.auth.uid == uid);
+      allow write: if false;
+    }
+
+    // Caminhos FUTUROS do Diagnóstico — NÃO abertos na Fase 1.
+    // Fase 1 não cria diagnósticos, respostas, evidências, revisões
+    // nem entregáveis. Tudo negado até a fase que implementar modelo
+    // e escopo real.
+    match /diagnosticos/{document=**} {
+      allow read, write: if false;
+    }
+    match /respostas/{document=**}    { allow read, write: if false; }
+    match /evidencias/{document=**}   { allow read, write: if false; }
+    match /revisoes/{document=**}     { allow read, write: if false; }
+    match /entregaveis/{document=**}  { allow read, write: if false; }
+
+    // Fail-closed: qualquer caminho não listado é NEGADO.
+  }
+}

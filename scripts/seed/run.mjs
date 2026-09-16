@@ -1,4 +1,3 @@
-// Fase 1 — executor administrativo aprovado; não é parte do runtime.
 // ─────────────────────────────────────────────────────────────
 // scripts/seed/run.mjs — Executor ONE-SHOT do catálogo (Admin SDK)
 //
@@ -29,8 +28,10 @@
 //   SEED_DRY_RUN=1 → apenas confere integridade e imprime plano; NÃO escreve.
 // ─────────────────────────────────────────────────────────────
 
-import { initializeApp, applicationDefault } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+// NOTA: os imports de firebase-admin são DINÂMICOS, feitos só no fluxo
+// não-dry-run (dentro de main, após o retorno do SEED_DRY_RUN). Assim o
+// DRY_RUN valida integridade sem exigir a dependência instalada nem tocar
+// em credencial/rede.
 import { CATALOGO_SEED } from "./catalogoSeed.mjs";
 
 const DRY = process.env.SEED_DRY_RUN === "1";
@@ -50,11 +51,11 @@ function assertIntegridade(s) {
   if (errs.length) throw new Error("Integridade falhou:\n- " + errs.join("\n- "));
 }
 
-async function gravarItens(rootRef, itens) {
+async function gravarItens(db, rootRef, itens, FieldValue) {
   const now = FieldValue.serverTimestamp();
   let n = 0;
   for (let i = 0; i < itens.length; i += CHUNK) {
-    const batch = getFirestore().batch();
+    const batch = db.batch();
     for (const it of itens.slice(i, i + CHUNK)) {
       batch.set(rootRef.collection("itens").doc(it.id), { ...it, updatedAt: now }, { merge: true });
       n++;
@@ -70,6 +71,10 @@ async function main() {
   console.log(`Catálogo ${s.catalogoId} v${s.versao}: ${s.categorias.length} cat, ${s.subcategorias.length} subcat, ${s.itens.length} itens.`);
 
   if (DRY) { console.log("DRY RUN — integridade OK; nada gravado."); return; }
+
+  // Imports DINÂMICOS — só chegam aqui no fluxo não-dry-run.
+  const { initializeApp, applicationDefault } = await import("firebase-admin/app");
+  const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
 
   initializeApp({ credential: applicationDefault() });
   const db = getFirestore();
@@ -104,7 +109,7 @@ async function main() {
       }
       throw e;
     }
-    const n = await gravarItens(rootRef, s.itens);
+    const n = await gravarItens(db, rootRef, s.itens, FieldValue);
     await rootRef.update({ seedCompleto: true, updatedAt: FieldValue.serverTimestamp() });
     console.log(`OK — catálogo criado + ${n} itens. seedCompleto=true.`);
     return;
@@ -122,7 +127,7 @@ async function main() {
   // Mesma versão, seedCompleto !== true → retomada segura. NÃO altera createdAt.
   console.log("Retomada: raiz existe com mesma versão e seed incompleto. Regravando itens…");
   await rootRef.set({ ...rootMeta, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-  const n = await gravarItens(rootRef, s.itens);
+  const n = await gravarItens(db, rootRef, s.itens, FieldValue);
   await rootRef.update({ seedCompleto: true, updatedAt: FieldValue.serverTimestamp() });
   console.log(`OK — retomada concluída + ${n} itens regravados. seedCompleto=true. createdAt preservado.`);
 }

@@ -95,3 +95,43 @@ Se, em fase futura, a aplicação passar a escrever em `usuarios/{uid}` — por 
 Não aplicar o seed, não publicar regras, não criar UI, não persistir
 diagnóstico, respostas, fotos ou Storage. Os arquivos entregues são apenas
 estrutura, dados e este roteiro, para auditoria final.
+
+## Execução do seed — credencial, DRY RUN e timestamps
+
+### Credencial (fora do repositório)
+- O executor `scripts/seed/run.mjs` usa **Application Default Credentials**.
+- Convenção: um arquivo `service-account.json` mantido **fora do repositório**
+  (nunca versionado — coberto pelo `.gitignore`: `scripts/seed/*service-account*.json`,
+  `scripts/seed/.env*`).
+- A variável de ambiente `GOOGLE_APPLICATION_CREDENTIALS` aponta para esse arquivo:
+  ```
+  export GOOGLE_APPLICATION_CREDENTIALS=/caminho/seguro/service-account.json
+  ```
+
+### DRY RUN (validação sem Firebase)
+- `SEED_DRY_RUN=1 node scripts/seed/run.mjs` valida a integridade da matriz
+  (8 categorias, 16 subcategorias, 110 itens, sem órfãos, sem duplicados) e
+  **retorna antes** de qualquer import de `firebase-admin`, credencial,
+  `initializeApp` ou I/O.
+- Funciona **sem `firebase-admin` instalado, sem credencial e sem Firebase** —
+  serve para conferência em qualquer máquina.
+
+### Execução real (one-shot)
+- Instalar as dependências **apenas dentro de `scripts/seed/`** (isoladas do
+  bundle CRA em `src/`):
+  ```
+  cd scripts/seed && npm install
+  GOOGLE_APPLICATION_CREDENTIALS=/caminho/service-account.json node run.mjs
+  ```
+- `scripts/seed/node_modules/` é ignorado pelo Git.
+
+### Timestamps (`createdAt` / `updatedAt`)
+- Ambos **existem** no documento raiz do catálogo.
+- Na **criação inicial**, podem ser **iguais** (mesmo `serverTimestamp()`).
+- Numa **retomada** (mesma versão, `seedCompleto` ainda não `true`), o
+  `createdAt` **não muda** e o `updatedAt` **é atualizado**.
+- No Console (escrita manual de `usuarios/{uid}`): timestamp **literal**.
+  No Admin SDK (seed): **`serverTimestamp()`**.
+
+Seed e publicação de regras permanecem **vedados** até autorização expressa
+do Marcio.
