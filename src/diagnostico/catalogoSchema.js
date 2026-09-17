@@ -40,6 +40,8 @@ export const STATUS_ITEM = {
 };
 // Conjunto de ESCOLHAS possíveis (apenas isso — não carrega regra de cálculo).
 export const STATUS_ITEM_LISTA = Object.values(STATUS_ITEM);
+export const STATUS_QUE_EXIGEM_ANALISE = [STATUS_ITEM.PARCIAL, STATUS_ITEM.NAO_CONFORME, STATUS_ITEM.AUSENTE_NECESSARIO];
+export const STATUS_QUE_EXIGEM_OBSERVACAO = [STATUS_ITEM.SEM_DADO];
 
 // ── Regras declarativas de denominador/avaliação.
 // Espelham o que é persistido no doc raiz do catálogo no Firestore (fonte
