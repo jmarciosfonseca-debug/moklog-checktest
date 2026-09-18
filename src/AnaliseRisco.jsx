@@ -29,8 +29,7 @@
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { setDoc } from "./fireGuard"; // escrita guardada (demo-safe) p/ contador AR
-import { classificarVetor, consolidarSite, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
+import { classificarVetor, consolidarSite, classificarRiscoOperacional, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
 import { coletarRegional, moduladorRegional } from "./regionalConfig";
 
@@ -50,11 +49,8 @@ const db = getFirestore(fbApp);
 // Contador B (decidido 11/08): número FIXO por projeto/análise.
 //   • 1ª geração do projeto → assume o próximo número global e GRAVA.
 //   • Gerações seguintes → REUSAM o mesmo número (não queima novo).
-// Persistência aditiva/retrocompatível, SEM runTransaction:
-//   contadores/{pid}      { arSeq, arRef, criadoEm }
-//   contadores/_arGlobal  { seq }   ← sequência global única entre projetos
-// Escrita via fireGuard (demo GAL não grava). Falha de rede → fallback local
-// determinístico pelo número do projeto (nunca quebra a geração do PDF).
+// A geração de análise é somente leitura: se houver referência registrada ela
+// é reutilizada; caso contrário usa uma referência determinística local.
 // ─────────────────────────────────────────────────────────────
 function numeroProjeto(pid) {
   return (pid || "").replace(/\D/g, "") || "000";
@@ -73,18 +69,7 @@ async function obterRefSequencial(pid) {
       if (d.arRef) return d.arRef;
       if (d.arSeq != null) return formatarRefAR(pid, d.arSeq);
     }
-    // 2) primeira geração: pega próximo da sequência GLOBAL e grava tudo.
-    const gRef = doc(db, "contadores", "_arGlobal");
-    const gSnap = await getDoc(gRef);
-    const atual = gSnap.exists() ? (gSnap.data().seq || 0) : 0;
-    const proximo = atual + 1;
-    const ref = formatarRefAR(pid, proximo);
-    // grava a sequência global (merge) e o número fixo do projeto (merge).
-    await setDoc(gRef, { seq: proximo }, { merge: true });
-    await setDoc(doc(db, "contadores", pid), {
-      arSeq: proximo, arRef: ref, criadoEm: new Date().toLocaleDateString("sv-SE"),
-    }, { merge: true });
-    return ref;
+    return formatarRefAR(pid, 1);
   } catch (e) {
     // fallback determinístico: nunca impede a geração do documento.
     return formatarRefAR(pid, 1);
@@ -107,6 +92,11 @@ const statusPerimetralPeso = (status) => ({ inoperante: 3, parcial: 2, ok: 1 }[S
 const temHoraConfiavel = (valor) => /T\d{2}:\d{2}|\d{2}:\d{2}:\d{2}/.test(String(valor || ""));
 const diaDaRonda = (valor) => String(valor || "").slice(0, 10);
 const textoZonaSemNome = (n) => `Ponto físico nº ${n} da ronda perimetral, sem identificação nominal`;
+const normalizarZona = (valor) => {
+  const texto = String(valor || "").trim();
+  const m = texto.match(/(?:zona\s*|z\s*-?\s*)0*(\d{1,3})\b/i);
+  return m ? `Z-${String(m[1]).padStart(2, "0")}` : texto.toUpperCase();
+};
 
 function gravidadeBrecha({ totalZonas = 1, zonaIndex = 1, coberturaAlternativa = "não informada", estadoTotal = false }) {
   if (estadoTotal) return "total";
@@ -305,14 +295,17 @@ async function coletarPerimetralRondas(pid) {
     let totalAcion = 0, okAcion = 0;
     comPeri.forEach((p) => {
       (p.perimetral.zonas || []).forEach((z, i) => {
-        const chave = z.id || nomeLegivel(z) || `pos_${i}`; // agrupamento interno
+        // Sem cadastro nominal não há zona distinta comprovada. Todos os
+        // pontos anônimos ficam num único grupo técnico, sem inflar o risco.
+        const nome = nomeLegivel(z);
+        const chave = nome ? normalizarZona(nome) : "__sem-cadastro__";
         const st = (z.status || "ok").toLowerCase();
         if (!zonaStats[chave]) {
-          zonaStats[chave] = { chave, ordem: i, nomeReal: nomeLegivel(z), total: 0, ruins: 0, pendenciaCadastro: !nomeLegivel(z) };
+          zonaStats[chave] = { chave, ordem: i, nomeReal: nome, total: 0, ruins: 0, pendenciaCadastro: !nome };
         }
         // preserva a menor ordem observada (posição de cadastro) para rotular
         if (i < zonaStats[chave].ordem) zonaStats[chave].ordem = i;
-        if (!zonaStats[chave].nomeReal) zonaStats[chave].nomeReal = nomeLegivel(z);
+        if (!zonaStats[chave].nomeReal) zonaStats[chave].nomeReal = nome;
         zonaStats[chave].total++;
         totalAcion++;
         if (st === "ok") okAcion++;
@@ -325,8 +318,8 @@ async function coletarPerimetralRondas(pid) {
         ...z,
         // Nunca inventar Z-01 pela posição. Sem nome, a posição é mostrada
         // somente como referência operacional e fica marcada como pendência.
-        nome: z.nomeReal || textoZonaSemNome(idx + 1),
-        zonaCanonica: z.nomeReal || `ponto-fisico-${idx + 1}`,
+        nome: z.nomeReal || "Perímetro sem cadastro",
+        zonaCanonica: z.nomeReal ? normalizarZona(z.nomeReal) : "perimetro-sem-cadastro",
         pontoFisicoNumero: idx + 1,
         pctFalha: z.total ? Math.round((z.ruins / z.total) * 100) : 0,
       }));
@@ -346,7 +339,8 @@ async function coletarPerimetralRondas(pid) {
     ordenadosPorData.forEach((p) => {
       const dt = String(dataDe(p));
       (p.perimetral.zonas || []).forEach((z, i) => {
-        const chave = z.id || nomeLegivel(z) || `pos_${i}`;
+        const nome = nomeLegivel(z);
+        const chave = nome ? normalizarZona(nome) : "__sem-cadastro__";
         const st = (z.status || "ok").toLowerCase();
         (leiturasPorZona[chave] ||= []).push({ status: st, data: dt, temHora: temHoraConfiavel(dt) });
       });
@@ -734,6 +728,48 @@ function vetorRondaVirtual(rv) {
   };
 }
 
+const MAPA_CACHE = new Map();
+function comTimeout(promise, ms, mensagem) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(mensagem)), ms))]);
+}
+async function carregarMapaDataUrl(path) {
+  if (!path || path.startsWith("data:")) return path || null;
+  if (MAPA_CACHE.has(path)) return MAPA_CACHE.get(path);
+  const url = new URL(path, window.location.origin).href;
+  const dataUrl = await comTimeout(fetch(url).then(async (r) => {
+    if (!r.ok) throw new Error(`mapa indisponível (${r.status})`);
+    const blob = await r.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob);
+    });
+  }), 10000, "timeout ao carregar mapa");
+  MAPA_CACHE.set(path, dataUrl);
+  return dataUrl;
+}
+
+function textoLimpo(html) { return String(html || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(); }
+function abrirDocumento(html) {
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  const w = window.open(url, "_blank");
+  if (!w) { const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+function documentoBase(titulo, corpo) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
+    @page{size:A4;margin:14mm} *{box-sizing:border-box} body{font:11pt Arial,sans-serif;color:#17212b;margin:0;line-height:1.42}.top{background:#17212b;color:#fff;padding:16px 20px}.top h1{margin:0;font-size:20px}.top p{margin:5px 0 0;color:#d7e2e8}.wrap{max-width:180mm;margin:auto}.section{margin:18px 0;break-inside:avoid}.tag{display:inline-block;padding:4px 8px;border-radius:4px;background:#f4e5e3;color:#8e231b;font-weight:bold}.card{border:1px solid #d8dfe3;border-left:5px solid #b7791f;padding:10px 12px;margin:8px 0;break-inside:avoid}.card.crit{border-left-color:#b02a1e}.muted{color:#5b6b70}.mapa{width:100%;max-height:88mm;object-fit:contain;border:1px solid #d8dfe3}.placeholder{border:1px dashed #b7791f;padding:18px;color:#6b5319;background:#fff8e8}table{width:100%;border-collapse:collapse;font-size:9pt}th,td{border:1px solid #d8dfe3;padding:6px;text-align:left;vertical-align:top}th{background:#eef2f3}@media print{body{font-size:10pt}.no-print{display:none}.wrap{max-width:none}.top{margin:-14mm -14mm 10mm;padding:14mm}.section{margin:12px 0}}button{margin:12px;padding:8px 12px}</style></head><body><button class="no-print" onclick="window.print()">Salvar como PDF</button><main class="wrap">${corpo}</main></body></html>`;
+}
+function gerarHTMLExecutivo(ctx, mapaDataUrl, erroMapa) {
+  const relevantes = ctx.vetores.filter((v) => v.bloqueadorCaido || v.nivel >= NIVEIS.ELEVADO).slice(0, 8);
+  const cards = relevantes.length ? relevantes.map((v) => `<div class="card ${v.nivel === NIVEIS.CRITICO ? "crit" : ""}"><b>${esc(v.label)}</b><br>${esc(textoLimpo(v.descricao))}<br><span class="muted">Fonte: ${esc(v.fonteCredito || "—")}</span></div>`).join("") : '<p>Nenhum vetor operacional relevante apurado.</p>';
+  const map = mapaDataUrl ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa territorial ${esc(ctx.project.id)}">` : `<div class="placeholder">Mapa territorial indisponível: ${esc(erroMapa || "falha técnica de carregamento")}. O relatório executivo foi gerado sem ocultar a indisponibilidade.</div>`;
+  const recs = (ctx.recomendacoes || []).slice(0, 6).map((r) => `<li>${esc(r.texto)}</li>`).join("") || "<li>Manter rotina de prevenção e correções registradas.</li>";
+  return documentoBase(`Análise de Risco — ${ctx.project.id}`, `<header class="top"><h1>Análise de Risco de Segurança — ${esc(ctx.project.id)}</h1><p>${esc(ctx.project.name || "")} · ${esc(ctx.ref || "")}</p></header><section class="section"><span class="tag">${esc(ctx.geral.label)}</span><h2>Classificação operacional</h2><p>${esc(ctx.geral.motivoMatriz || ctx.geral.motivo || "Avaliação baseada no estado atual do Teste Semanal.")}</p></section><section class="section"><h2>Vetores relevantes consolidados</h2>${cards}</section><section class="section"><h2>Diagnóstico territorial</h2>${map}<p class="muted">O território contextualiza a prioridade da correção; não determina a classificação sozinho.</p></section><section class="section"><h2>Prioridades de ação</h2><ol>${recs}</ol><p class="muted">Detalhamento integral disponível no Anexo Técnico separado.</p></section>`);
+}
+function gerarHTMLAnexo(ctx) {
+  const linhas = ctx.vetores.map((v) => `<tr><td>${esc(v.label)}</td><td>${esc(v.fonteCredito || "—")}</td><td>${esc(textoLimpo(v.descricao))}</td><td>${esc(v.zonaCanonica || "—")}</td></tr>`).join("");
+  return documentoBase(`Anexo Técnico — ${ctx.project.id}`, `<header class="top"><h1>Anexo Técnico — ${esc(ctx.project.id)}</h1><p>${esc(ctx.ref || "")} · evidências completas</p></header><section class="section"><p>Documento complementar ao Relatório Executivo. Pontos sem zona nominal são registrados como “Perímetro sem cadastro” e não são convertidos em zonas artificiais.</p><table><thead><tr><th>Vetor</th><th>Fonte</th><th>Evidência</th><th>Zona/área</th></tr></thead><tbody>${linhas || '<tr><td colspan="4">Sem vetores registrados.</td></tr>'}</tbody></table></section>`);
+}
+
 // Vetor Energia (se houver evento aberto ou grave).
 function vetorEnergia(en) {
   if (!en?.ok || (!en.aberto && !(en.graves || []).length)) return null;
@@ -818,7 +854,7 @@ function aplicarCruzamentos(vetores, dados) {
 //   • ronda mais recente OK  → rebaixa o bloqueador do alarme perimetral
 //   • ronda mais recente FALHA→ mantém/eleva a bloqueador
 // Itens sem ronda diária não são tocados aqui (o teste semanal manda neles).
-function aplicarRecenciaPerimetro(vetores, peri) {
+function aplicarRecenciaPerimetro(vetores, peri, dataTesteSemanal) {
   if (!peri?.ok || !peri.estadoRecenteZonas) return vetores;
   const recente = peri.estadoRecenteZonas; // { "Z-05": {ok, status, data}, ... }
   const ehAlarmePerim = (v) => /alarme perimetral|perímetro|perimetr/i.test(v.label || "")
@@ -837,6 +873,14 @@ function aplicarRecenciaPerimetro(vetores, peri) {
     const cobertas = zonasCitadas.filter((zn) => recente[zn]);
     if (!cobertas.length) return; // ronda não cobre essa zona → teste semanal manda
     const dt = recente[cobertas[0]]?.data;
+    // O teste semanal atualizado é o estado principal. Uma ronda só o
+    // substitui quando está comprovadamente posterior por data/hora. Em data
+    // igual sem hora do teste não há prova de precedência e nada é rebaixado.
+    const dataRonda = String(dt || "");
+    const diaTeste = diaDaRonda(dataTesteSemanal);
+    const diaRonda = diaDaRonda(dataRonda);
+    const rondaPosterior = !!diaTeste && !!diaRonda && diaRonda > diaTeste && temHoraConfiavel(dataRonda);
+    if (!rondaPosterior) return;
     const dtTxt = dt ? " (" + fmtDate(dt) + ")" : "";
     const todasOkNaRonda = cobertas.every((zn) => recente[zn].ok);
     const algumaFalhaNaRonda = cobertas.some((zn) => !recente[zn].ok);
@@ -845,8 +889,8 @@ function aplicarRecenciaPerimetro(vetores, peri) {
       v.bloqueadorCaido = false;
       v.nivel = NIVEIS.BAIXO;
       v.rebaixadoPorRonda = true;
-      v.descricao = `${v.descricao || ""} <b>Recuperado:</b> a ronda perimetral mais recente${dtTxt} registra ${cobertas.join(", ")} operante(s) — vetor rebaixado pela leitura diária (a ronda prevalece sobre o teste semanal).`;
-      v.motivo = "zona recuperada na ronda diária (recência)";
+      v.descricao = `${v.descricao || ""} <b>Recuperado:</b> ronda posterior ao último Teste Semanal${dtTxt} registra ${cobertas.join(", ")} operante(s).`;
+      v.motivo = "zona recuperada por ronda com data/hora posterior";
     } else if (algumaFalhaNaRonda) {
       // CONFIRMA/ELEVA: a ronda diária confirma a falha do teste semanal.
       v.bloqueadorCaido = true;
@@ -1414,6 +1458,10 @@ const FONTES_DEF = [
 async function coletarFontes(project, stored, marcadas) {
   const dados = {};
   const faltantes = [];
+  const segura = async (nome, fn) => {
+    try { return await comTimeout(fn(), 15000, `timeout em ${nome}`); }
+    catch { return { ok: false, temDado: false, motivo: `dados indisponíveis (${nome})` }; }
+  };
 
   if (marcadas.teste) {
     const r = coletarTesteSemanal(project, stored);
@@ -1421,32 +1469,32 @@ async function coletarFontes(project, stored, marcadas) {
     if (!r.ok) faltantes.push({ key: "teste", label: "Teste Semanal", motivo: r.motivo });
   }
   if (marcadas.ctmk) {
-    const r = await coletarCTMK(project.id);
+    const r = await segura("CTMK", () => coletarCTMK(project.id));
     dados.ctmk = r;
     if (!r.ok) faltantes.push({ key: "ctmk", label: "Monitor CTMK", motivo: r.motivo });
   }
   if (marcadas.iluminacao) {
-    const r = await coletarIluminacao(project.id);
+    const r = await segura("iluminação", () => coletarIluminacao(project.id));
     dados.ilum = r;
     if (!r.ok) faltantes.push({ key: "iluminacao", label: "Iluminação", motivo: r.motivo });
   }
   if (marcadas.perimetral) {
-    const r = await coletarPerimetral(project.id);
+    const r = await segura("ronda perimetral", () => coletarPerimetral(project.id));
     dados.peri = r;
     if (!r.ok) faltantes.push({ key: "perimetral", label: "Ronda Perimetral", motivo: r.motivo });
   }
   if (marcadas.rondaVirtual) {
-    const r = await coletarRondaVirtual(project.id);
+    const r = await segura("ronda virtual", () => coletarRondaVirtual(project.id));
     dados.rondaVirtual = r;
     if (!r.ok) faltantes.push({ key: "rondaVirtual", label: "Ronda Virtual", motivo: r.motivo });
   }
   if (marcadas.energia) {
-    const r = await coletarEnergia(project.id);
+    const r = await segura("energia", () => coletarEnergia(project.id));
     dados.energia = r;
     if (!r.ok) faltantes.push({ key: "energia", label: "Ocorrências de Energia", motivo: r.motivo });
   }
   if (marcadas.equipe) {
-    const r = await coletarEquipe(project.id);
+    const r = await segura("equipe", () => coletarEquipe(project.id));
     dados.equipe = r;
     if (!r.ok) faltantes.push({ key: "equipe", label: "Mapa de Equipe", motivo: r.motivo });
   }
@@ -1469,7 +1517,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   const vEq = vetorEquipe(dados.equipe); if (vEq) vetores.push(vEq);
 
   aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual, peri: dados.peri });
-  aplicarRecenciaPerimetro(vetores, dados.peri); // ronda diária prevalece sobre teste semanal
+  aplicarRecenciaPerimetro(vetores, dados.peri, dados.ts?.dataRaw);
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
   // Consolidação por grupos canônicos. Não colapsa todo o perímetro por
@@ -1487,6 +1535,17 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     motivo: v.label,
   }));
   const cons = consolidarSite(vetoresRC);
+  const zonasNomeadas = vetores.filter((v) => v.grupo === "perimetral" && !v.pendenciaCadastro).length;
+  const cftvInoperante = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
+  const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador|cancela alta/i.test(v.label || "") && !v.observacaoManutencao).length;
+  const matriz = classificarRiscoOperacional({
+    zonasPerimetrais: zonasNomeadas,
+    cftvInoperante,
+    barreirasCriticas,
+    panicoFixoInoperante: vetores.some((v) => v.travaTipo === "panicoFixoInoperante"),
+    ctmkOffline: vetores.some((v) => v.travaTipo === "ctmkOffline"),
+    perimetroTotal30d: vetores.some((v) => v.travaTipo === "perimetroTotal30d"),
+  });
 
   // Moduladores (sinistro + regional) — somados como delta CONTEXTUAL.
   // Equipe/capacitação NÃO pondera na v3 (fora do score).
@@ -1498,16 +1557,9 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   // OPÇÃO B (decidida 11/08): moduladores/território sobem no máximo até
   // ELEVADO. NUNCA cruzam para CRÍTICO sozinhos — CRÍTICO só com 2+ bloqueadores.
   // Se a consolidação já é CRÍTICA (2+ bloq), o delta não rebaixa.
-  const nivelBase = cons.nivel || RC_NIVEL.BAIXO;
-  let nivelAjustado = nivelBase;
-  if (deltaTot !== 0) {
-    if (nivelBase >= RC_NIVEL.CRITICO) {
-      nivelAjustado = RC_NIVEL.CRITICO; // já crítico por bloqueadores; delta não mexe
-    } else {
-      const tetoDelta = RC_NIVEL.ELEVADO; // território não cruza para CRÍTICO
-      nivelAjustado = Math.max(RC_NIVEL.BAIXO, Math.min(tetoDelta, nivelBase + deltaTot));
-    }
-  }
+  const nivelBase = matriz.nivel || cons.nivel || RC_NIVEL.BAIXO;
+  // Territorial é contextual: não altera a classe operacional.
+  const nivelAjustado = nivelBase;
   const labelAjustado = RC_LABEL[nivelAjustado];
 
   const nBloq = cons.nBloqueadores || 0;
@@ -1515,12 +1567,14 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   const geral = {
     label: labelAjustado, cor: CORES[nivelAjustado] || MOKED.elevado,
     criticos: nBloq, prepCriticos: 0,
-    nBloqueadores: nBloq, alerta: !!cons.alerta,
+    nBloqueadores: nBloq, alerta: zonasNomeadas > 0,
     // compat: campos antigos preservados p/ o template (agora nível único)
     nivelMoked: nivelAjustado, nivelCliente: nivelAjustado,
     labelMoked: labelAjustado, labelCliente: labelAjustado,
     nivel: nivelAjustado,
-    modulador: motivosMod ? { delta: deltaTot, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
+    motivoMatriz: matriz.motivo,
+    modulador: motivosMod ? { delta: 0, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
+    metricas: { zonasNomeadas, cftvInoperante, barreirasCriticas },
   };
   const recomendacoes = gerarRecomendacoes(vetores);
 
@@ -1582,40 +1636,31 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
   async function gerar(forcar) {
     if (!selProjeto) return;
     setEstado("coletando");
-    const { dados, faltantes: falt } = await coletarFontes(selProjeto, stored, marcadas);
-    if (falt.length && !forcar) {
-      setFaltantes(falt);
+    try {
+      const { dados, faltantes: falt } = await comTimeout(coletarFontes(selProjeto, stored, marcadas), 60000, "timeout global na consolidação");
+      if (falt.length && !forcar) { setFaltantes(falt); setEstado("aviso"); return; }
+      const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
+      analise.ref = await obterRefSequencial(selProjeto.id);
+      setAnalisePronta(analise);
+      await abrirPDF(analise);
+      setEstado("pronto");
+    } catch (e) {
+      setFaltantes([{ key: "consolidacao", label: "Consolidação", motivo: "dados indisponíveis; tente novamente" }]);
       setEstado("aviso");
-      return;
     }
-    const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
-    analise.ref = await obterRefSequencial(selProjeto.id); // Nº AR fixo (contador B)
-    setAnalisePronta(analise);
-    setEstado("pronto");
-    abrirPDF(analise);
   }
 
   // v3 (11/08): documento único. A fusão de PDF regional foi eliminada — o
   // diagnóstico territorial agora é seção nativa do próprio documento (mapa
   // embutido via MAPA_REGIONAL). Não há mais "Gerar Completo" nem anexação.
 
-  function abrirPDF(analise) {
-    const html = gerarHTMLAnaliseRisco(analise);
-    // Usa blob URL (renderiza o HTML completo, inclusive o <script> da barra
-    // "Salvar como PDF"). Mais confiável que document.write para páginas
-    // grandes (mapa/logo em base64) e funciona em mobile e desktop.
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const w = window.open(url, "_blank");
-    if (!w) {
-      // popup bloqueado: navega via âncora (mesma aba/nova aba conforme SO).
-      const a = document.createElement("a");
-      a.href = url; a.target = "_blank"; a.rel = "noopener";
-      document.body.appendChild(a); a.click();
-      setTimeout(() => { document.body.removeChild(a); }, 1000);
-    }
-    // revoga depois de um tempo para não quebrar o carregamento.
-    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+  async function abrirPDF(analise) {
+    let mapa = null, erroMapa = null;
+    try { mapa = await carregarMapaDataUrl(MAPA_REGIONAL[analise.project.id]); }
+    catch (e) { erroMapa = e.message || "falha ao carregar mapa"; }
+    abrirDocumento(gerarHTMLExecutivo(analise, mapa, erroMapa));
+    // O anexo é deliberadamente separado para nunca atrasar o executivo.
+    setTimeout(() => abrirDocumento(gerarHTMLAnexo(analise)), 250);
   }
 
   // ── estilos inline (dark, padrão do app) ──

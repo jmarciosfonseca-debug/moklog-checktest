@@ -412,5 +412,28 @@ export function consolidarSite(vetoresClassificados, escopo = "moked") {
   return { nivel, label: NIVEL_LABEL[nivel], motivo, temTrava: travas.length > 0, nBloqueadores, gruposBloqueadores: grupos };
 }
 
+// Matriz operacional final aprovada para o relatório executivo. Ela é
+// intencionalmente pequena: manutenção e contexto territorial não podem
+// promover o risco. A função é pura para poder ser testada sem Firestore.
+export function classificarRiscoOperacional({
+  zonasPerimetrais = 0,
+  cftvInoperante = 0,
+  barreirasCriticas = 0,
+  panicoFixoInoperante = false,
+  ctmkOffline = false,
+  perimetroTotal30d = false,
+} = {}) {
+  const trava = panicoFixoInoperante || ctmkOffline || perimetroTotal30d;
+  if (trava) return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "trava crítica de segurança" };
+  if (zonasPerimetrais >= 2) return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "duas ou mais zonas perimetrais inoperantes" };
+  if (zonasPerimetrais === 1 && (cftvInoperante > 5 || barreirasCriticas > 0)) {
+    return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "zona perimetral exposta combinada a cobertura ou barreira crítica" };
+  }
+  if (zonasPerimetrais === 1) return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "uma zona perimetral inoperante" };
+  if (cftvInoperante > 5) return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "mais de cinco câmeras inoperantes" };
+  if (barreirasCriticas >= 2) return { nivel: NIVEL.MODERADO, label: NIVEL_LABEL[NIVEL.MODERADO], motivo: "duas barreiras críticas de acesso indisponíveis" };
+  return { nivel: NIVEL.BAIXO, label: NIVEL_LABEL[NIVEL.BAIXO], motivo: "somente manutenção ou barreira isolada" };
+}
+
 // ── util ──
 function round1(x) { return Math.round(x * 10) / 10; }
