@@ -1,4 +1,4 @@
-import { classificarRiscoOperacional, NIVEL } from "./riscoConfig";
+import { classificarRiscoOperacional, classificarVetor, NIVEL } from "./riscoConfig";
 
 describe("matriz operacional final", () => {
   test("uma zona perimetral é elevado", () => expect(classificarRiscoOperacional({ zonasPerimetrais: 1 }).nivel).toBe(NIVEL.ELEVADO));
@@ -9,4 +9,5 @@ describe("matriz operacional final", () => {
   test("cancela AS e bollard são moderado", () => expect(classificarRiscoOperacional({ barreirasCriticas: 2 }).nivel).toBe(NIVEL.MODERADO));
   test("cofre e joystick não entram na matriz", () => expect(classificarRiscoOperacional({}).nivel).toBe(NIVEL.BAIXO));
   test("trava crítica vence qualquer outro estado", () => expect(classificarRiscoOperacional({ ctmkOffline: true }).nivel).toBe(NIVEL.CRITICO));
+  test("pânico fixo inoperante é trava imediata", () => expect(classificarVetor({ labelCategoria: "Botão de pânico", labelItem: "Fixo", inop: 1 }).travaTipo).toBe("panicoFixoInoperante"));
 });

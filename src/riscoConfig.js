@@ -376,7 +376,9 @@ export function classificarVetor(v) {
   const nItens = v.inop && v.inop > 1 ? v.inop : 1;
   const pvt = peso * multTemporal(v.dias) * fatorVolume(nItens);
   let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
-  const travaTipo = base.travaTipo || (flags.panicoFixo && (v.dias || 0) >= 10 ? "panicoFixoInoperante" : null);
+  // Botão de pânico fixo inoperante é trava imediata; não depende do número
+  // de dias informado no Teste Semanal.
+  const travaTipo = base.travaTipo || (flags.panicoFixo ? "panicoFixoInoperante" : null);
   const bloqueadorCaido = base.bloqueadorCaido || (classeKey === "BLOQUEADOR" && nivel >= NIVEL.ELEVADO);
   return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt), travaTipo, bloqueadorCaido,
            motivo: flags.panicoMovel ? "pânico móvel (coberto pelo fixo)" : (regra.via === "fallback" ? "item não mapeado (fallback Automação)" : "") };
