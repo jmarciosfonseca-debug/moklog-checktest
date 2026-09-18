@@ -767,12 +767,13 @@ function documentoBase(titulo, corpo) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
     @page{size:A4;margin:14mm} *{box-sizing:border-box} body{font:11pt Arial,sans-serif;color:#17212b;margin:0;line-height:1.42}.top{background:#17212b;color:#fff;padding:16px 20px}.top h1{margin:0;font-size:20px}.top p{margin:5px 0 0;color:#d7e2e8}.wrap{max-width:180mm;margin:auto}.section{margin:18px 0;break-inside:avoid}.tag{display:inline-block;padding:4px 8px;border-radius:4px;background:#f4e5e3;color:#8e231b;font-weight:bold}.card{border:1px solid #d8dfe3;border-left:5px solid #b7791f;padding:10px 12px;margin:8px 0;break-inside:avoid}.card.crit{border-left-color:#b02a1e}.muted{color:#5b6b70}.mapa{width:100%;max-height:88mm;object-fit:contain;border:1px solid #d8dfe3}.placeholder{border:1px dashed #b7791f;padding:18px;color:#6b5319;background:#fff8e8}table{width:100%;border-collapse:collapse;font-size:9pt}th,td{border:1px solid #d8dfe3;padding:6px;text-align:left;vertical-align:top}th{background:#eef2f3}@media print{body{font-size:10pt}.no-print{display:none}.wrap{max-width:none}.top{margin:-14mm -14mm 10mm;padding:14mm}.section{margin:12px 0}}button{margin:12px;padding:8px 12px}</style></head><body><button class="no-print" onclick="window.print()">Salvar como PDF</button><main class="wrap">${corpo}</main></body></html>`;
 }
-function gerarHTMLExecutivo(ctx, mapaDataUrl, erroMapa) {
+function gerarHTMLExecutivo(ctx, mapaDataUrl, erroMapa, anexoUrl = "") {
   const relevantes = ctx.vetores.filter((v) => v.bloqueadorCaido || v.nivel >= NIVEIS.ELEVADO).slice(0, 8);
   const cards = relevantes.length ? relevantes.map((v) => `<div class="card ${v.nivel === NIVEIS.CRITICO ? "crit" : ""}"><b>${esc(v.label)}</b><br>${esc(textoLimpo(v.descricao))}<br><span class="muted">Fonte: ${esc(v.fonteCredito || "—")}</span></div>`).join("") : '<p>Nenhum vetor operacional relevante apurado.</p>';
   const map = mapaDataUrl ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa territorial ${esc(ctx.project.id)}">` : `<div class="placeholder">Mapa territorial indisponível: ${esc(erroMapa || "falha técnica de carregamento")}. O relatório executivo foi gerado sem ocultar a indisponibilidade.</div>`;
   const recs = (ctx.recomendacoes || []).slice(0, 6).map((r) => `<li>${esc(r.texto)}</li>`).join("") || "<li>Manter rotina de prevenção e correções registradas.</li>";
-  return documentoBase(`Análise de Risco — ${ctx.project.id}`, `<header class="top"><h1>Análise de Risco de Segurança — ${esc(ctx.project.id)}</h1><p>${esc(ctx.project.name || "")} · ${esc(ctx.ref || "")}</p></header><section class="section"><span class="tag">${esc(ctx.geral.label)}</span><h2>Classificação operacional</h2><p>${esc(ctx.geral.motivoMatriz || ctx.geral.motivo || "Avaliação baseada no estado atual do Teste Semanal.")}</p></section><section class="section"><h2>Vetores relevantes consolidados</h2>${cards}</section><section class="section"><h2>Diagnóstico territorial</h2>${map}<p class="muted">O território contextualiza a prioridade da correção; não determina a classificação sozinho.</p></section><section class="section"><h2>Prioridades de ação</h2><ol>${recs}</ol><p class="muted">Detalhamento integral disponível no Anexo Técnico separado.</p></section>`);
+  const linkAnexo = anexoUrl ? `<p><a href="${anexoUrl}" target="_blank" rel="noopener">Abrir Anexo Técnico separado</a></p>` : "";
+  return documentoBase(`Análise de Risco — ${ctx.project.id}`, `<header class="top"><h1>Análise de Risco de Segurança — ${esc(ctx.project.id)}</h1><p>${esc(ctx.project.name || "")} · ${esc(ctx.ref || "")}</p></header><section class="section"><span class="tag">${esc(ctx.geral.label)}</span><h2>Classificação operacional</h2><p>${esc(ctx.geral.motivoMatriz || ctx.geral.motivo || "Avaliação baseada no estado atual do Teste Semanal.")}</p></section><section class="section"><h2>Vetores relevantes consolidados</h2>${cards}</section><section class="section"><h2>Diagnóstico territorial</h2>${map}<p class="muted">O território contextualiza a prioridade da correção; não determina a classificação sozinho.</p></section><section class="section"><h2>Prioridades de ação</h2><ol>${recs}</ol><p class="muted">Detalhamento integral disponível no Anexo Técnico separado.</p>${linkAnexo}</section>`);
 }
 function gerarHTMLAnexo(ctx) {
   const linhas = ctx.vetores.map((v) => `<tr><td>${esc(v.label)}</td><td>${esc(v.fonteCredito || "—")}</td><td>${esc(textoLimpo(v.descricao))}</td><td>${esc(v.zonaCanonica || "—")}</td></tr>`).join("");
@@ -1668,9 +1669,11 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
     let mapa = null, erroMapa = null;
     try { mapa = await carregarMapaDataUrl(MAPA_REGIONAL[analise.project.id]); }
     catch (e) { erroMapa = e.message || "falha ao carregar mapa"; }
-    preencherJanelaRelatorio(janelas.executivo, gerarHTMLExecutivo(analise, mapa, erroMapa));
+    const anexoUrl = URL.createObjectURL(new Blob([gerarHTMLAnexo(analise)], { type: "text/html" }));
+    preencherJanelaRelatorio(janelas.executivo, gerarHTMLExecutivo(analise, mapa, erroMapa, anexoUrl));
     // O anexo é deliberadamente separado para nunca atrasar o executivo.
-    preencherJanelaRelatorio(janelas.anexo, gerarHTMLAnexo(analise));
+    if (janelas.anexo) preencherJanelaRelatorio(janelas.anexo, gerarHTMLAnexo(analise));
+    setTimeout(() => URL.revokeObjectURL(anexoUrl), 600000);
   }
 
   // ── estilos inline (dark, padrão do app) ──
