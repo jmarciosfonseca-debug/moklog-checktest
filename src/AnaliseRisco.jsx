@@ -994,7 +994,7 @@ const NIVEL_PILL_CLASS = { 4: "b-crit", 3: "b-elev", 2: "b-mod", 1: "b-baixo" };
 // território como SEÇÃO NATIVA (mapa embutido), sem fusão de PDF externo.
 // Todos os dados vêm do coletor (ctx). Datas via fmtDate/hojeBR.
 // ═════════════════════════════════════════════════════════════
-function gerarHTMLAnaliseRisco(ctx) {
+function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) {
   const {
     project, pacoteLabel, vetores, geral, fontesUsadas,
     ts, ctmk, ilum, rondaVirtual, equipe, regional, contextos,
@@ -1027,8 +1027,44 @@ function gerarHTMLAnaliseRisco(ctx) {
   const empurrar = (v, classe) => {
     cardsAcao.push({ v, classe });
   };
-  vetBloq.forEach((v) => empurrar(v, "crit"));
-  vetElev.forEach((v) => empurrar(v, "elev"));
+
+  // Consolidação universal: pontos de perímetro sem cadastro de zona
+  // (pendenciaCadastro) viram UM único card, com contagem total e até 2
+  // exemplos. Vale para qualquer projeto. Zonas nomeadas seguem individuais.
+  const ehSemCadastro = (v) =>
+    v.pendenciaCadastro === true || v.zonaCanonica === "perimetro-sem-cadastro";
+
+  const bloqSemCad = vetBloq.filter(ehSemCadastro);
+  const bloqComCad = vetBloq.filter((v) => !ehSemCadastro(v));
+  const elevSemCad = vetElev.filter(ehSemCadastro);
+  const elevComCad = vetElev.filter((v) => !ehSemCadastro(v));
+
+  const semCadastro = [...bloqSemCad, ...elevSemCad];
+  if (semCadastro.length) {
+    const classe = bloqSemCad.length ? "crit" : "elev";
+    const base = bloqSemCad[0] || elevSemCad[0];
+    // extrai o nº do ponto físico da descrição/label para exemplos
+    const numDe = (v) => {
+      const m = String(v.label || v.descricao || "").match(/n[ºo]\s*(\d+)/i);
+      return m ? m[1] : null;
+    };
+    const exemplos = semCadastro.map(numDe).filter(Boolean).slice(0, 2);
+    const exTxt = exemplos.length
+      ? ` (ex.: ponto físico nº ${exemplos.join(", nº ")})`
+      : "";
+    const vConsolidado = {
+      ...base,
+      label: "Perímetro eletrônico — Perímetro sem cadastro",
+      fonteCredito: base.fonteCredito || "Ronda Perimetral",
+      zonaCanonica: "perimetro-sem-cadastro",
+      barreiraFisica: "perimetro",
+      pendenciaCadastro: true,
+      descricao: `${semCadastro.length} ponto(s) físico(s) sem identificação nominal inoperante(s)${exTxt}. Pendência de cadastro de zona.`,
+    };
+    empurrar(vConsolidado, classe);
+  }
+  bloqComCad.forEach((v) => empurrar(v, "crit"));
+  elevComCad.forEach((v) => empurrar(v, "elev"));
 
   const vulnCardHTML = (item) => {
     const { v, classe } = item;
@@ -1074,12 +1110,26 @@ function gerarHTMLAnaliseRisco(ctx) {
     if (v.nivel === NIVEIS.MODERADO) return '<span class="pz p-mod">soma &#183;</span>';
     return '<span class="pz p-nul">registra</span>';
   };
-  const contaLinhas = vetores.map((v) => {
+  // Mesma consolidação na conta completa: grupo sem cadastro = 1 linha.
+  const ehSemCad2 = (v) =>
+    v.pendenciaCadastro === true || v.zonaCanonica === "perimetro-sem-cadastro";
+  const vetSemCad = vetores.filter(ehSemCad2);
+  const vetComCad = vetores.filter((v) => !ehSemCad2(v));
+  const linhasNormais = vetComCad.map((v) => {
     const nome = esc(v.label.replace(/ —.*/, "").replace(/^\d+\s*-\s*/, ""));
     const fonte = esc((v.fonteCredito || "").replace(/ ·.*/, ""));
     const sit = esc((v.descricao || "").replace(/<[^>]+>/g, "").slice(0, 70));
     return `<tr><td class="it"><b>${nome}</b><span>${fonte}</span></td><td class="sit">${sit}</td><td>${contribTag(v)}</td></tr>`;
   }).join("");
+  let linhaSemCad = "";
+  if (vetSemCad.length) {
+    const algumBloq = vetSemCad.some((v) => v.bloqueadorCaido);
+    const tag = algumBloq
+      ? '<span class="pz p-crit">bloqueador &#9650;&#9650;</span>'
+      : '<span class="pz p-elev">soma &#9650;</span>';
+    linhaSemCad = `<tr><td class="it"><b>Perímetro sem cadastro</b><span>Ronda Perimetral</span></td><td class="sit">${vetSemCad.length} ponto(s) físico(s) sem identificação nominal — pendência de cadastro</td><td>${tag}</td></tr>`;
+  }
+  const contaLinhas = linhaSemCad + linhasNormais;
 
   const somaR = nBloq >= 2
     ? `resulta em <em>CRÍTICO</em> &#183; colapso amplo`
@@ -1125,10 +1175,13 @@ function gerarHTMLAnaliseRisco(ctx) {
     });
     const sspList = [...ufs].map((uf) => `SSP-${uf}`).join(" · ");
     const fontesTerr = `${sspList ? sspList + " · " : ""}SINESP/MJSP · secretarias estaduais de segurança pública`;
+    const mapaHTML = mapaDataUrl
+      ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa tático do entorno do ${esc(project.id)}">`
+      : `<div class="terr-pend"><div class="tp-ico">🛈</div><div class="tp-txt"><b>Mapa territorial indisponível.</b> ${esc(erroMapa || "O ativo não pôde ser carregado nesta geração.")}</div></div>`;
     territHTML = `
     <div class="bloco">
       <div class="eyebrow">Diagnóstico territorial — por que a falha importa aqui</div>
-      <img class="mapa" src="${MAPA_REGIONAL[project.id] || ""}" alt="Mapa tático do entorno do ${esc(project.id)}">
+      ${mapaHTML}
       <div class="mapa-cap">${cap}</div>
       <div class="mapa-parecer">${parecerImg}</div>
       <div class="quad">${qCardHTML}</div>
@@ -1477,37 +1530,23 @@ async function coletarFontes(project, stored, marcadas) {
     dados.ts = r;
     if (!r.ok) faltantes.push({ key: "teste", label: "Teste Semanal", motivo: r.motivo });
   }
-  if (marcadas.ctmk) {
-    const r = await segura("CTMK", () => coletarCTMK(project.id));
-    dados.ctmk = r;
-    if (!r.ok) faltantes.push({ key: "ctmk", label: "Monitor CTMK", motivo: r.motivo });
-  }
-  if (marcadas.iluminacao) {
-    const r = await segura("iluminação", () => coletarIluminacao(project.id));
-    dados.ilum = r;
-    if (!r.ok) faltantes.push({ key: "iluminacao", label: "Iluminação", motivo: r.motivo });
-  }
-  if (marcadas.perimetral) {
-    const r = await segura("ronda perimetral", () => coletarPerimetral(project.id));
-    dados.peri = r;
-    if (!r.ok) faltantes.push({ key: "perimetral", label: "Ronda Perimetral", motivo: r.motivo });
-  }
-  if (marcadas.rondaVirtual) {
-    const r = await segura("ronda virtual", () => coletarRondaVirtual(project.id));
-    dados.rondaVirtual = r;
-    if (!r.ok) faltantes.push({ key: "rondaVirtual", label: "Ronda Virtual", motivo: r.motivo });
-  }
-  if (marcadas.energia) {
-    const r = await segura("energia", () => coletarEnergia(project.id));
-    dados.energia = r;
-    if (!r.ok) faltantes.push({ key: "energia", label: "Ocorrências de Energia", motivo: r.motivo });
-  }
-  if (marcadas.equipe) {
-    const r = await segura("equipe", () => coletarEquipe(project.id));
-    dados.equipe = r;
-    if (!r.ok) faltantes.push({ key: "equipe", label: "Mapa de Equipe", motivo: r.motivo });
-  }
-  { const r = await coletarSinistros(project.id); dados.sinistros = r; }
+  // Fontes independentes: executar em paralelo para que uma fonte ausente
+  // nunca some seus 15 s de timeout às demais e deixe a UI em espera.
+  const coletarMarcada = async (marcada, chave, rotulo, nome, coleta) => {
+    if (!marcada) return;
+    const r = await segura(nome, coleta);
+    dados[chave] = r;
+    if (!r.ok) faltantes.push({ key: chave, label: rotulo, motivo: r.motivo });
+  };
+  await Promise.all([
+    coletarMarcada(marcadas.ctmk, "ctmk", "Monitor CTMK", "CTMK", () => coletarCTMK(project.id)),
+    coletarMarcada(marcadas.iluminacao, "ilum", "Iluminação", "iluminação", () => coletarIluminacao(project.id)),
+    coletarMarcada(marcadas.perimetral, "peri", "Ronda Perimetral", "ronda perimetral", () => coletarPerimetral(project.id)),
+    coletarMarcada(marcadas.rondaVirtual, "rondaVirtual", "Ronda Virtual", "ronda virtual", () => coletarRondaVirtual(project.id)),
+    coletarMarcada(marcadas.energia, "energia", "Ocorrências de Energia", "energia", () => coletarEnergia(project.id)),
+    coletarMarcada(marcadas.equipe, "equipe", "Mapa de Equipe", "equipe", () => coletarEquipe(project.id)),
+    (async () => { dados.sinistros = await segura("sinistros", () => coletarSinistros(project.id)); })(),
+  ]);
   { dados.regional = coletarRegional(project.id); }
   return { dados, faltantes };
 }
@@ -1642,6 +1681,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
   const [estado, setEstado] = useState("idle"); // idle | coletando | aviso | pronto
   const [faltantes, setFaltantes] = useState([]);
   const [analisePronta, setAnalisePronta] = useState(null);
+  const [coletaPendente, setColetaPendente] = useState(null);
 
   const toggleFonte = (k) => setMarcadas((m) => ({ ...m, [k]: !m[k] }));
   const algumaMarcada = Object.values(marcadas).some(Boolean);
@@ -1649,17 +1689,29 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
   async function gerar(forcar) {
     if (!selProjeto) return;
     setEstado("coletando");
-    const janelas = prepararJanelasRelatorio();
     try {
-      const { dados, faltantes: falt } = await comTimeout(coletarFontes(selProjeto, stored, marcadas), 60000, "timeout global na consolidação");
-      if (falt.length && !forcar) { setFaltantes(falt); setEstado("aviso"); return; }
+      const resultado = forcar && coletaPendente?.projectId === selProjeto.id
+        ? coletaPendente
+        : await comTimeout(coletarFontes(selProjeto, stored, marcadas), 60000, "timeout global na consolidação");
+      const { dados, faltantes: falt } = resultado;
+      if (falt.length && !forcar) {
+        setColetaPendente({ projectId: selProjeto.id, dados, faltantes: falt });
+        setFaltantes(falt);
+        setEstado("aviso");
+        return;
+      }
       const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
       analise.ref = await obterRefSequencial(selProjeto.id);
       setAnalisePronta(analise);
+      setColetaPendente(null);
+      // Popups só são abertos quando há um documento efetivo a ser escrito.
+      // Assim falha/aviso de fonte nunca deixa abas about:blank para o usuário.
+      const janelas = prepararJanelasRelatorio();
       await abrirPDF(analise, janelas);
       setEstado("pronto");
     } catch (e) {
-      setFaltantes([{ key: "consolidacao", label: "Consolidação", motivo: "dados indisponíveis; tente novamente" }]);
+      console.error("[analise-risco] falha na consolidação", e);
+      setFaltantes([{ key: "consolidacao", label: "Consolidação", motivo: e?.message || "dados indisponíveis; tente novamente" }]);
       setEstado("aviso");
     }
   }
@@ -1673,7 +1725,11 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
     try { mapa = await carregarMapaDataUrl(MAPA_REGIONAL[analise.project.id]); }
     catch (e) { erroMapa = e.message || "falha ao carregar mapa"; }
     const anexoUrl = URL.createObjectURL(new Blob([gerarHTMLAnexo(analise)], { type: "text/html" }));
-    preencherJanelaRelatorio(janelas.executivo, gerarHTMLExecutivo(analise, mapa, erroMapa, anexoUrl));
+    // A UI passa a renderizar o relatório institucional completo (capa MOKED,
+    // régua, territorial, pontos fortes, palavra do consultor) que já contém a
+    // consolidação de pontos sem cadastro. O gerador simplificado
+    // (gerarHTMLExecutivo) fica descontinuado como saída da UI.
+    preencherJanelaRelatorio(janelas.executivo, gerarHTMLAnaliseRisco(analise, mapa, erroMapa));
     // O anexo é deliberadamente separado para nunca atrasar o executivo.
     if (janelas.anexo) preencherJanelaRelatorio(janelas.anexo, gerarHTMLAnexo(analise));
     setTimeout(() => URL.revokeObjectURL(anexoUrl), 600000);
