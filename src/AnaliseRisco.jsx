@@ -754,6 +754,15 @@ function abrirDocumento(html) {
   if (!w) { const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+function prepararJanelasRelatorio() {
+  // Precisa ocorrer no clique do usuário; browsers bloqueiam popups abertos
+  // depois das leituras assíncronas do Firestore.
+  return { executivo: window.open("", "_blank"), anexo: window.open("", "_blank") };
+}
+function preencherJanelaRelatorio(janela, html) {
+  if (!janela) return abrirDocumento(html);
+  janela.document.open(); janela.document.write(html); janela.document.close();
+}
 function documentoBase(titulo, corpo) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
     @page{size:A4;margin:14mm} *{box-sizing:border-box} body{font:11pt Arial,sans-serif;color:#17212b;margin:0;line-height:1.42}.top{background:#17212b;color:#fff;padding:16px 20px}.top h1{margin:0;font-size:20px}.top p{margin:5px 0 0;color:#d7e2e8}.wrap{max-width:180mm;margin:auto}.section{margin:18px 0;break-inside:avoid}.tag{display:inline-block;padding:4px 8px;border-radius:4px;background:#f4e5e3;color:#8e231b;font-weight:bold}.card{border:1px solid #d8dfe3;border-left:5px solid #b7791f;padding:10px 12px;margin:8px 0;break-inside:avoid}.card.crit{border-left-color:#b02a1e}.muted{color:#5b6b70}.mapa{width:100%;max-height:88mm;object-fit:contain;border:1px solid #d8dfe3}.placeholder{border:1px dashed #b7791f;padding:18px;color:#6b5319;background:#fff8e8}table{width:100%;border-collapse:collapse;font-size:9pt}th,td{border:1px solid #d8dfe3;padding:6px;text-align:left;vertical-align:top}th{background:#eef2f3}@media print{body{font-size:10pt}.no-print{display:none}.wrap{max-width:none}.top{margin:-14mm -14mm 10mm;padding:14mm}.section{margin:12px 0}}button{margin:12px;padding:8px 12px}</style></head><body><button class="no-print" onclick="window.print()">Salvar como PDF</button><main class="wrap">${corpo}</main></body></html>`;
@@ -1636,13 +1645,14 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
   async function gerar(forcar) {
     if (!selProjeto) return;
     setEstado("coletando");
+    const janelas = prepararJanelasRelatorio();
     try {
       const { dados, faltantes: falt } = await comTimeout(coletarFontes(selProjeto, stored, marcadas), 60000, "timeout global na consolidação");
       if (falt.length && !forcar) { setFaltantes(falt); setEstado("aviso"); return; }
       const analise = montarAnalise(selProjeto, pacoteInfo.label, dados, contextos);
       analise.ref = await obterRefSequencial(selProjeto.id);
       setAnalisePronta(analise);
-      await abrirPDF(analise);
+      await abrirPDF(analise, janelas);
       setEstado("pronto");
     } catch (e) {
       setFaltantes([{ key: "consolidacao", label: "Consolidação", motivo: "dados indisponíveis; tente novamente" }]);
@@ -1654,13 +1664,13 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
   // diagnóstico territorial agora é seção nativa do próprio documento (mapa
   // embutido via MAPA_REGIONAL). Não há mais "Gerar Completo" nem anexação.
 
-  async function abrirPDF(analise) {
+  async function abrirPDF(analise, janelas = {}) {
     let mapa = null, erroMapa = null;
     try { mapa = await carregarMapaDataUrl(MAPA_REGIONAL[analise.project.id]); }
     catch (e) { erroMapa = e.message || "falha ao carregar mapa"; }
-    abrirDocumento(gerarHTMLExecutivo(analise, mapa, erroMapa));
+    preencherJanelaRelatorio(janelas.executivo, gerarHTMLExecutivo(analise, mapa, erroMapa));
     // O anexo é deliberadamente separado para nunca atrasar o executivo.
-    setTimeout(() => abrirDocumento(gerarHTMLAnexo(analise)), 250);
+    preencherJanelaRelatorio(janelas.anexo, gerarHTMLAnexo(analise));
   }
 
   // ── estilos inline (dark, padrão do app) ──
@@ -1753,7 +1763,9 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
             {estado === "coletando" ? "Consolidando…" : "📄 Gerar Análise de Risco (PDF)"}
           </button>
           {estado === "pronto" && (
-            <button style={{ ...S.smallBtn, marginTop: 8, width: "100%" }} onClick={() => abrirPDF(analisePronta)}>Reabrir PDF</button>
+            <button style={{ ...S.smallBtn, marginTop: 8, width: "100%" }} onClick={() => {
+              const janelas = prepararJanelasRelatorio(); abrirPDF(analisePronta, janelas);
+            }}>Reabrir PDF</button>
           )}
         </div>
       )}
