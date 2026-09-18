@@ -108,6 +108,59 @@ export const REGIONAL = {
     ],
   },
 
+  // ── P604 — Golgi Jundiaí (AR-PAT-2026-004) ────────────────
+  // Graus e textos seguem o parecer territorial v2, com redação prudencial.
+  // Tempos de pronta-resposta são estimativas operacionais e devem ser
+  // substituídos por medição/registro formal quando disponível.
+  P604: {
+    codigo: "AR-PAT-2026-004",
+    versao: "1.0.0",
+    emissao: "2026-09-17",
+    ativo: "P604 Golgi Jundiaí",
+    marcoZero: "Galpão P604 — Distrito Industrial, Vetor Oeste",
+    municipioUF: "Jundiaí / SP",
+    coordenadas: "23°10'32.4\"S 46°58'54.2\"W",
+    pdfPath: "/regional/P604.pdf",
+
+    quadrantes: [
+      {
+        lado: "CORREDOR LOGÍSTICO (SP-300)",
+        regiao: "Eixo SP-300 / SP-348 / SP-330 — Distrito Industrial",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "furto", desc: "Exposição a roubo e furto de cargas em trânsito, característica de eixos logísticos de alto valor." },
+          { natureza: "acesso", desc: "Acesso direto à SP-300 favorece evasão veicular em direção às alças da Bandeirantes e Anhanguera." },
+          { natureza: "furto", desc: "Faixas de domínio limítrofes expõem cabeamento elétrico e óptico a furto e sabotagem." },
+        ],
+      },
+      {
+        lado: "VETOR NORTE (mata / campo)",
+        regiao: "Área não ocupada ao norte do galpão",
+        grau: "MODERADO",
+        vetores: [
+          { natureza: "perimetro", desc: "Mata e campo ao norte podem favorecer aproximação a pé menos observada até as divisas perimetrais." },
+          { natureza: "perimetro", desc: "Vegetação e declives limítrofes podem formar pontos cegos de cercamento, exigindo integridade perimetral." },
+        ],
+      },
+      {
+        lado: "NÚCLEO PERIURBANO (Vetor Oeste)",
+        regiao: "Almerinda Chaves, Novo Horizonte, Residencial Jundiaí, Tereza Cristina e Medeiros",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "perimetro", desc: "Adensamento residencial no entorno eleva a exposição a tentativas de intrusão perimetral e furto noturno." },
+          { natureza: "violento", desc: "Vias vicinais e pontos de ônibus ampliam a exposição de colaboradores nas trocas de turno." },
+        ],
+      },
+    ],
+
+    protecao: [
+      { orgao: "2ª Cia do 11º BPM/I — Jundiaí", uf: "SP", distanciaKm: 5.8, tempoMin: 9, tipo: "pm", titular: true, fonte: "estimativa operacional — validar" },
+      { orgao: "4º BPRv — Base SP-300/Bandeirantes", uf: "SP", distanciaKm: 4.2, tempoMin: 7, tipo: "pm", fonte: "estimativa operacional — validar" },
+      { orgao: "UPA Vetor Oeste — Novo Horizonte", uf: "SP", distanciaKm: 5.1, tempoMin: 9, tipo: "hospital", fonte: "estimativa operacional — validar" },
+      { orgao: "Hospital São Vicente de Paulo", uf: "SP", distanciaKm: 11.5, tempoMin: 20, tipo: "hospital", fonte: "estimativa operacional — validar" },
+    ],
+  },
+
   // ── Próximos projetos: duplicar o bloco acima quando a regional
   //    for elaborada. Ex.: P605, P311A... ──────────────
 };

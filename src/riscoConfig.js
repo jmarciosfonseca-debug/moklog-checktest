@@ -129,9 +129,9 @@ export function norm(s) {
 export const MAPA_NOMEBASE = [
   // ── Pânico: distinguir fixo vs móvel (item interno decide) ──
   // IMPORTANTE: exige "panico" ou "botao" — NÃO casar "telefone fixo" etc.
-  { match: ["panico fixo", "botao de panico fixo", "botao fixo", "panico ztrax"], classe: "BLOQUEADOR", flags: { panicoFixo: true, trava: true } },
+  { match: ["panico fixo", "botao de panico fixo", "botao fixo", "panico ztrax"], classe: "BLOQUEADOR", flags: { panicoFixo: true } },
   { match: ["panico movel", "panico móvel", "panico mov"], classe: "AUTOMACAO", flags: { panicoMovel: true, peso: 4 } },
-  { match: ["botoes de panico", "botao de panico", "panico"], classe: "BLOQUEADOR", flags: { panicoFixo: true, trava: true } }, // pânico genérico em categoria própria = fixo (conservador p/ trava)
+  { match: ["botoes de panico", "botao de panico", "panico"], classe: "BLOQUEADOR", flags: { panicoFixo: true } }, // pânico genérico em categoria própria = fixo (conservador p/ trava)
 
   // ── Perímetro (regra especial) ──
   { match: ["alarme perimetral", "perimetro", "cerca eletr", "fibra otica", "sensor ir perimetr"], classe: "BLOQUEADOR", flags: { perimetro: true } },
@@ -140,12 +140,23 @@ export const MAPA_NOMEBASE = [
   // "Leitor QR Cancela" tem "cancela" no nome mas é automação, não contenção.
   { match: ["leitor qr", "qr cancela", "qr torniquete", "qr eclusa"], classe: "AUTOMACAO", flags: { antesDe: "cancela" } },
 
+  // Controles administrativos não são barreira patrimonial. Devem constar
+  // no plano de manutenção, mas não podem alterar a classificação do site.
+  { match: ["cancela adm", "cancela administrativa", "portao adm", "portao administrativo"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+
+  // Cofre e periféricos são explicitamente mapeados antes do fallback. Sem
+  // esta linha, "cofre" cairia em Automação e elevaria o risco indevidamente.
+  { match: ["cofre"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+
   // ── Contenção física (bloqueador) ──
-  { match: ["bollard", "bolard", "pino retratil", "dilacerador", "garra"], classe: "BLOQUEADOR", flags: { conjunto: true } },
-  { match: ["cancela alta seg", "cancela veicular", "cancela inclusa", "cancela baia", "cancela"], classe: "BLOQUEADOR", flags: { conjunto: true } },
+  { match: ["bollard", "bolard", "pino retratil", "dilacerador", "garra"], classe: "BLOQUEADOR", flags: { conjunto: true, barreiraAcesso: true } },
+  { match: ["cancela alta seg", "cancela veicular", "cancela inclusa", "cancela baia"], classe: "BLOQUEADOR", flags: { conjunto: true, barreiraAcesso: true } },
+  // Uma "cancela" sem indicação de alta segurança ou de barreira crítica é
+  // administrativa por padrão conservador de classificação (não infla risco).
+  { match: ["cancela"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
 
   // ── CTMK / monitoramento central ──
-  { match: ["ctmk", "central de monitor"], classe: "BLOQUEADOR", flags: { trava: true } },
+  { match: ["ctmk", "central de monitor"], classe: "BLOQUEADOR", flags: { ctmk: true } },
 
   // ── Incêndio (pontua, sem trava) ──
   { match: ["alarme de incendio", "incendio", "sdai", "repetidora"], classe: "TATICO", flags: { semTrava: true } },
@@ -176,12 +187,12 @@ export const MAPA_NOMEBASE = [
   { match: ["iluminacao", "quadrante", "lampada", "refletor"], classe: "ILUMINACAO", flags: { iluminacao: true } },
 
   // ── Periféricos (só MOKED) ──
-  { match: ["joystick", "mesa gatbox", "mesa controle", "mesa controladora"], classe: "PERIFERICO", flags: { soMoked: true } },
-  { match: ["monitor", "cpu", "computador"], classe: "PERIFERICO", flags: { soMoked: true } },
-  { match: ["ar-condicionado", "ar condicionado", "ar-cond"], classe: "PERIFERICO", flags: { soMoked: true } },
-  { match: ["nobreak", "no-break", "transformador"], classe: "PERIFERICO", flags: { soMoked: true } },
-  { match: ["internet", "telefone", "interfone", "intercomunicador", "radio ht", "bodycam", "lanterna", "smartphone", "tablet"], classe: "PERIFERICO", flags: { soMoked: true } },
-  { match: ["guarita"], classe: "PERIFERICO", flags: { soMoked: true } },
+  { match: ["joystick", "mesa gatbox", "mesa controle", "mesa controladora"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+  { match: ["monitor", "cpu", "computador"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+  { match: ["ar-condicionado", "ar condicionado", "ar-cond"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+  { match: ["nobreak", "no-break", "transformador"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+  { match: ["internet", "telefone", "interfone", "intercomunicador", "radio ht", "bodycam", "lanterna", "smartphone", "tablet"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+  { match: ["guarita"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
 
   // ── Capacitação / brigada (só MOKED, não é equipamento) ──
   { match: ["brigada", "capacitacao", "reciclagem", "efetivo"], classe: "PERIFERICO", flags: { soMoked: true, naoEquipamento: true } },
@@ -223,6 +234,40 @@ export function rotuloPorPVT(pvt) {
   return NIVEL.BAIXO;
 }
 
+// Trava não é uma flag aberta. Só estes três eventos podem levar um site a
+// CRÍTICO sem dois bloqueadores independentes. O campo semântico evita que
+// uma regra futura de item (ex.: cancela) crie uma trava por acidente.
+export function travaFechada(vetor) {
+  return ["panicoFixoInoperante", "ctmkOffline", "perimetroTotal30d"].includes(vetor?.travaTipo);
+}
+
+function chave(v) { return norm(v || "") || "pendente"; }
+
+// Agrupa todos os bloqueadores antes da contagem. Comparação pairwise falha
+// quando há três ou mais eventos; a chave canônica deixa a regra auditável.
+// Causa ambígua é agrupada conservadoramente como uma frente pendente, nunca
+// inflada por inferência de independência.
+export function agruparBloqueadores(vetores = []) {
+  const grupos = new Map();
+  vetores.filter((v) => v?.incluir !== false && v?.bloqueadorCaido).forEach((v) => {
+    const causa = chave(v.causaRaiz);
+    const ambigua = !v.causaRaiz || causa === "pendente" || causa === "ambigua";
+    const key = ambigua
+      ? `pendente:${chave(v.barreiraFisica || v.grupo || "bloqueador")}`
+      : `${chave(v.barreiraFisica)}:${chave(v.zonaCanonica || v.area)}:${causa}`;
+    const anterior = grupos.get(key) || { key, vetores: [], pendente: ambigua };
+    anterior.vetores.push(v);
+    grupos.set(key, anterior);
+  });
+  return [...grupos.values()];
+}
+
+// Conveniência para testes/documentação. A consolidação usa sempre o
+// agrupamento acima, não esta comparação binária isolada.
+export function saoIndependentes(a, b) {
+  return agruparBloqueadores([a, b]).length === 2;
+}
+
 // ═════════════════════════════════════════════════════════════
 // CLASSIFICADOR PRINCIPAL DE UM VETOR
 // entrada: {
@@ -247,9 +292,28 @@ export function classificarVetor(v) {
 
   const base = {
     classe: CLASSE[classeKey].nome, classeKey, peso,
-    incluir, trava: false, tag: null, motivo: "",
+    incluir,
+    // Só aceita uma trava já nomeada na lista fechada; uma flag genérica
+    // passada por qualquer fonte nunca promove o site a crítico.
+    travaTipo: ["panicoFixoInoperante", "ctmkOffline", "perimetroTotal30d"].includes(v.travaTipo) ? v.travaTipo : null,
+    bloqueadorCaido: !!v.bloqueadorCaido, observacaoManutencao: !!flags.observacaoManutencao,
+    tag: null, motivo: "",
     via: regra.via,
+    // Metadados de evidência pertencem ao vetor de origem, não à regra de
+    // classificação. Preservá-los aqui permite verificar independência no
+    // consolidado sem inventar relação entre zonas, causas ou coberturas.
+    zonaCanonica: v.zonaCanonica || null,
+    barreiraFisica: v.barreiraFisica || null,
+    causaRaiz: v.causaRaiz || null,
+    coberturaAlternativa: v.coberturaAlternativa || "não informada",
+    gravidade: v.gravidade || null,
+    pendenciaCadastro: !!v.pendenciaCadastro,
   };
+
+  if (flags.observacaoManutencao) {
+    return { ...base, nivel: NIVEL.BAIXO, label: "OBSERVAÇÃO", pvt: 0,
+             motivo: "item de manutenção sem impacto direto na classificação" };
+  }
 
   // ── PERÍMETRO (regra especial) ──
   if (flags.perimetro) {
@@ -260,11 +324,12 @@ export function classificarVetor(v) {
     // totalmente desconfigurado + >30d → CRÍTICO + trava
     if (v.estadoTotal && (v.dias || 0) > 30) {
       return { ...base, nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO],
-               pvt: 999, trava: true, motivo: "perímetro totalmente desconfigurado há mais de 30 dias" };
+               pvt: 999, travaTipo: "perimetroTotal30d", bloqueadorCaido: true,
+               motivo: "perímetro totalmente desconfigurado há mais de 30 dias" };
     }
     // desconfig recente OU zona(s) isolada(s) → ELEVADO, sem trava
     return { ...base, nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO],
-             pvt: 0, motivo: "zona perimetral inoperante" };
+             pvt: 0, bloqueadorCaido: true, motivo: "zona perimetral inoperante" };
   }
 
   // ── PARADOX (condicional a total desconfiguração) ──
@@ -278,16 +343,24 @@ export function classificarVetor(v) {
     const pctCego = v.total ? (v.inop / v.total) * 100 : 0;
     const pvt = 7 * fatorCoberturaCFTV(pctCego) * multTemporalLeve(v.dias);
     let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
+    const criticaExposta = !!v.cameraCritica && v.coberturaAlternativa !== "redundante";
+    if (criticaExposta) nivel = NIVEL.ELEVADO;
     return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt),
-             motivo: `${v.inop} de ${v.total} câmeras (${pctCego.toFixed(1)}% cego)` };
+             bloqueadorCaido: criticaExposta,
+             motivo: `${v.inop} de ${v.total} câmeras (${pctCego.toFixed(1)}% cego)${criticaExposta ? "; câmera crítica sem cobertura alternativa" : ""}` };
   }
 
   // ── CONJUNTO (proporção domina) ──
   if (flags.conjunto) {
+    if (flags.barreiraAcesso && (v.barreiraEfetiva === false || v.coberturaAlternativa === "redundante")) {
+      return { ...base, nivel: NIVEL.BAIXO, label: "OBSERVAÇÃO", pvt: 0,
+               observacaoManutencao: true, motivo: "barreira com cobertura alternativa ou sem criticidade confirmada" };
+    }
     const pvt = peso * fatorProporcao(v.inop, v.total) * multTemporalLeve(v.dias);
     let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
     const f = v.total ? Math.round((v.inop / v.total) * 100) : 0;
     return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt),
+             bloqueadorCaido: !!flags.barreiraAcesso && v.barreiraEfetiva !== false && v.coberturaAlternativa !== "redundante",
              motivo: `${v.inop} de ${v.total} (${f}% do conjunto)` };
   }
 
@@ -303,8 +376,9 @@ export function classificarVetor(v) {
   const nItens = v.inop && v.inop > 1 ? v.inop : 1;
   const pvt = peso * multTemporal(v.dias) * fatorVolume(nItens);
   let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
-  const trava = !!(flags.trava && (v.dias || 0) >= 10);
-  return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt), trava,
+  const travaTipo = base.travaTipo || (flags.panicoFixo && (v.dias || 0) >= 10 ? "panicoFixoInoperante" : null);
+  const bloqueadorCaido = base.bloqueadorCaido || (classeKey === "BLOQUEADOR" && nivel >= NIVEL.ELEVADO);
+  return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt), travaTipo, bloqueadorCaido,
            motivo: flags.panicoMovel ? "pânico móvel (coberto pelo fixo)" : (regra.via === "fallback" ? "item não mapeado (fallback Automação)" : "") };
 }
 
@@ -315,21 +389,27 @@ export function classificarVetor(v) {
 // - escopo cliente: teto ELEVADO no consolidado
 // ═════════════════════════════════════════════════════════════
 export function consolidarSite(vetoresClassificados, escopo = "moked") {
-  const incl = vetoresClassificados.filter(v => v.incluir);
-  const temTrava = incl.some(v => v.trava);
-  let nivel;
-  let motivo;
-  if (temTrava) {
+  const incl = vetoresClassificados.filter(v => v.incluir !== false && !v.observacaoManutencao);
+  const travas = incl.filter(travaFechada);
+  const grupos = agruparBloqueadores(incl);
+  const nBloqueadores = grupos.length;
+  const temTatico = incl.some(v => !v.bloqueadorCaido && (v.nivel || 0) >= NIVEL.MODERADO);
+  let nivel = NIVEL.BAIXO;
+  let motivo = "somente observações/manutenção";
+  if (travas.length) {
     nivel = NIVEL.CRITICO;
-    const g = incl.find(v => v.trava);
-    motivo = g ? g.motivo : "trava de segurança acionada";
-  } else {
-    nivel = incl.reduce((m, v) => Math.max(m, v.nivel || 0), NIVEL.BAIXO);
-    motivo = "pior vetor de segurança do período";
+    motivo = travas[0].motivo || "trava fechada de segurança acionada";
+  } else if (nBloqueadores >= 2) {
+    nivel = NIVEL.CRITICO;
+    motivo = `${nBloqueadores} bloqueadores independentes identificados`;
+  } else if (nBloqueadores === 1) {
+    nivel = NIVEL.ELEVADO;
+    motivo = "1 bloqueador identificado";
+  } else if (temTatico) {
+    nivel = NIVEL.MODERADO;
+    motivo = "vetor(es) tático(s) sem bloqueador";
   }
-  // teto do escopo cliente
-  if (escopo === "cliente" && nivel > NIVEL.ELEVADO) nivel = NIVEL.ELEVADO;
-  return { nivel, label: NIVEL_LABEL[nivel], motivo, temTrava };
+  return { nivel, label: NIVEL_LABEL[nivel], motivo, temTrava: travas.length > 0, nBloqueadores, gruposBloqueadores: grupos };
 }
 
 // ── util ──
