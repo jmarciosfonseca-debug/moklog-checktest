@@ -719,8 +719,8 @@ function vetorRondaVirtual(rv) {
   const insuficiente = (rv.pct != null && rv.pct < 90) || rv.semJustif > 0 || rv.naoexec > 0;
   if (!insuficiente) return null;
   return {
-    chave: "ronda-virtual", label: "Ronda Virtual (CFTV)", nivel: NIVEIS.MODERADO,
-    bloqueadorCaido: false, contribuicao: "tatico", grupo: "rondaVirtual",
+    chave: "ronda-virtual", label: "Ronda Virtual (CFTV)", nivel: NIVEIS.BAIXO,
+    bloqueadorCaido: false, contribuicao: "observacao", observacaoManutencao: true, grupo: "rondaVirtual",
     fonteCredito: "Ronda Virtual (CFTV)", sinceTxt: null,
     descricao: `${rv.feitas}/${rv.previstas} rondas executadas (${rv.pct}%). ${rv.naoexec || 0} não executada(s) e ${rv.semJustif || 0} ocorrência(s) sem justificativa.`,
     impactoFontes: "Ronda Virtual", barreiraFisica: "monitoramento-virtual",
@@ -803,17 +803,17 @@ function vetorEquipe(eq) {
   if (!eq?.ok) return null;
   const l = eq.lider;
   if (!l) {
-    return { chave:"lideranca", label:"Liderança operacional", nivel:NIVEIS.MODERADO, grupo:"equipe",
+    return { chave:"lideranca", label:"Liderança operacional", nivel:NIVEIS.BAIXO, observacaoManutencao:true, grupo:"equipe",
       fonteCredito:"Mapa de Equipe", descricao:"Líder responsável não identificado no cadastro de equipe.",
       impactoFontes:"Mapa de Equipe", bloqueadorCaido:false, contribuicao:"tatico", causaRaiz:"cadastro-pendente", coberturaAlternativa:"não informada", gravidade:"localizada" };
   }
   if (l.afastado && !l.coberturaAtiva) {
-    return { chave:"lideranca", label:"Liderança operacional", nivel:NIVEIS.MODERADO, grupo:"equipe",
+    return { chave:"lideranca", label:"Liderança operacional", nivel:NIVEIS.BAIXO, observacaoManutencao:true, grupo:"equipe",
       fonteCredito:"Mapa de Equipe", descricao:`${l.cargo} afastado sem cobertura ativa.`,
       impactoFontes:"Mapa de Equipe", bloqueadorCaido:false, contribuicao:"tatico", causaRaiz:"lider-afastado-sem-cobertura", coberturaAlternativa:"exposta", gravidade:"localizada" };
   }
   if (eq?.perfilSeguranca?.ccoDedicada === "nao") {
-    return { chave:"cco", label:"CCO — operação", nivel:NIVEIS.MODERADO, grupo:"equipe",
+    return { chave:"cco", label:"CCO — operação", nivel:NIVEIS.BAIXO, observacaoManutencao:true, grupo:"equipe",
       fonteCredito:"Mapa de Equipe", descricao:"CCO dedicado não confirmado no cadastro operacional.",
       impactoFontes:"Mapa de Equipe", bloqueadorCaido:false, contribuicao:"tatico", causaRaiz:"cco-sem-dedicacao", coberturaAlternativa:"não informada", gravidade:"localizada" };
   }
@@ -821,14 +821,13 @@ function vetorEquipe(eq) {
   // eslint-disable-next-line no-unreachable
   if (!eq?.ok) return null;
   if (!eq.brigadaNaoAplicada && !eq.reciclagemVencida) return null;
-  let nivel = NIVEIS.MODERADO;
-  if (eq.reciclagemVencida > 0 || eq.brigadaNaoAplicada >= Math.ceil(eq.total / 2)) nivel = NIVEIS.ELEVADO;
+  const nivel = NIVEIS.BAIXO;
   const partes = [];
   if (eq.brigadaNaoAplicada) partes.push(`brigada não aplicada para ${eq.brigadaNaoAplicada} colaborador(es)`);
   if (eq.reciclagemVencida) partes.push(`${eq.reciclagemVencida} reciclagem(ns) vencida(s)`);
   if (eq.reciclagemAlerta) partes.push(`${eq.reciclagemAlerta} próxima(s) do vencimento`);
   return {
-    chave: "equipe", label: "Efetivo — capacitação", nivel, preponderante: false,
+    chave: "equipe", label: "Efetivo — capacitação", nivel, observacaoManutencao: true, preponderante: false,
     piorDias: null, qtd: eq.total,
     fonteCredito: "Mapa de Equipe",
     sinceTxt: null,
@@ -1545,7 +1544,11 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     motivo: v.label,
   }));
   const cons = consolidarSite(vetoresRC);
-  const zonasNomeadas = vetores.filter((v) => v.grupo === "perimetral" && !v.pendenciaCadastro).length;
+  // A zona pode vir da ronda ou do Teste Semanal/alarme. A mesma zona é
+  // deduplicada pelo identificador canônico antes de aplicar a matriz.
+  const zonasNomeadas = new Set(vetores
+    .filter((v) => v.barreiraFisica === "perimetro" && v.zonaCanonica && !v.pendenciaCadastro)
+    .map((v) => normalizarZona(v.zonaCanonica))).size;
   const cftvInoperante = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
   const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador|cancela alta/i.test(v.label || "") && !v.observacaoManutencao).length;
   const matriz = classificarRiscoOperacional({
