@@ -108,6 +108,49 @@ export const REGIONAL = {
     ],
   },
 
+  // ── P602 — Golgi Mauá (AR-PAT-2026-002 · MK-602-AR-0002) ────
+  P602: {
+    codigo: "AR-PAT-2026-002",
+    versao: "1.0 (Auditável)",
+    emissao: "2026-09-18",
+    ativo: "P602 Golgi Mauá",
+    marcoZero: "Estr. Mun. do Sertãozinho, 1.700 — Bairro Sertãozinho, Mauá/SP",
+    municipioUF: "Mauá / SP (Sertãozinho, a ~1,8 km do Rodoanel Mário Covas)",
+    coordenadas: "23°39'46.8\"S 46°26'12.4\"W",
+    mapsUrl: "https://maps.app.goo.gl/j6s5AL2W32z5rW2u5",
+    pdfPath: "/regional/P602.pdf",
+
+    quadrantes: [
+      {
+        lado: "EIXO RODOVIÁRIO (SP-021 / Jacu-Pêssego / SP-031)",
+        regiao: "Rodoanel Mário Covas (Trecho Sul) · Complexo Jacu-Pêssego · SP-031 (Índio Tibiriçá)",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "acesso", desc: "Corredor crítico de roubo e interceptação de cargas em trânsito e desaceleração" },
+          { natureza: "acesso", desc: "Evasão rápida para a malha do Rodoanel em menos de 3 minutos" },
+          { natureza: "furto", desc: "Pontos de transbordo e desengate de carretas nas faixas de domínio da SP-031" },
+        ],
+      },
+      {
+        lado: "NÚCLEO PERIURBANO (Complexo Zaíra / Jardim Itapeva)",
+        regiao: "Comunidades limítrofes ao ativo — encostas e taludes",
+        grau: "GRAVISSIMO",
+        vetores: [
+          { natureza: "perimetro", desc: "Pressão perimétrica em encostas e taludes acidentados com vegetação" },
+          { natureza: "violento", desc: "Risco de roubos a transeuntes nos pontos de ônibus nas trocas de turno (06h e 22h)" },
+          { natureza: "furto", desc: "Histórico de furto de cabos e cabeamento subterrâneo nas vias municipais de acesso" },
+        ],
+      },
+    ],
+
+    protecao: [
+      { orgao: "1ª Cia 30º BPM/M (PMESP)", uf: "SP", distanciaKm: 3.8, tempoMin: 7, tipo: "pm", titular: true },
+      { orgao: "1º BPRv — Rodoanel Sul (PMRv)", uf: "SP", distanciaKm: 3.2, tempoMin: 5, tipo: "pm" },
+      { orgao: "UPA Zaíra", uf: "SP", distanciaKm: 4.1, tempoMin: 8, tipo: "hospital" },
+      { orgao: "Hospital Dr. Radamés Nardini", uf: "SP", distanciaKm: 6.5, tempoMin: 12, tipo: "hospital" },
+    ],
+  },
+
   // ── P604 — Golgi Jundiaí (AR-PAT-2026-004) ────────────────
   // Graus e textos seguem o parecer territorial v2, com redação prudencial.
   // Tempos de pronta-resposta são estimativas operacionais e devem ser

@@ -621,6 +621,43 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
     const outros = g.itens.length > 1 ? ` (+${g.itens.length - 1} ponto${g.itens.length - 1 > 1 ? "s" : ""} do mesmo conjunto)` : "";
     const propTxt = aggc.total ? ` — ${aggc.inop} de ${aggc.total}` : "";
     const sinceTxt = it?.since ? `inoperante desde ${fmtDate(it.since)}` : null;
+
+    // Perímetro nomeado: cada zona é uma evidência própria. Não agrupar
+    // Z-04 e Z-07 em "+1 ponto", pois isso perde a rastreabilidade e a
+    // contagem operacional das zonas perimetrais distintas.
+    const catEhPerimetral = /alarme perimetral|per[ií]metr/i.test(g.catLabel);
+    const zonaDoItem = (item) => {
+      const txt = `${g.catLabel} ${item.itemLabel || ""}`;
+      const mz = txt.match(/zona\s*0?(\d{1,3})|z-?0?(\d{1,3})/i);
+      return mz ? `zona-${String(mz[1] || mz[2]).padStart(2, "0")}` : null;
+    };
+    const zonasNomeadas = catEhPerimetral
+      ? g.itens.map((item) => ({ item, zona: zonaDoItem(item) })).filter((x) => x.zona)
+      : [];
+    const zonasDistintas = new Set(zonasNomeadas.map((x) => x.zona));
+    if (catEhPerimetral && zonasDistintas.size >= 2) {
+      for (const { item, zona } of zonasNomeadas) {
+        const rcZ = classificarVetor({
+          pid: ts.pid, labelCategoria: g.catLabel, labelItem: item.itemLabel || "",
+          inop: 1, total: aggc.total, dias: item.dias ?? piorDias, escopo: "moked",
+        });
+        const sinceZ = item.since ? `inoperante desde ${fmtDate(item.since)}` : null;
+        out.push({
+          chave: `cat:${g.catLabel}:${zona}`, label: g.catLabel,
+          nivel: rcZ.nivel, classeV2: rcZ.classe, incluirCliente: rcZ.incluir !== false,
+          bloqueadorCaido: !!rcZ.bloqueadorCaido, travaTipo: rcZ.travaTipo || null,
+          observacaoManutencao: !!rcZ.observacaoManutencao,
+          zonaCanonica: zona, barreiraFisica: "perimetro",
+          causaRaiz: null, coberturaAlternativa: "não informada", gravidade: "localizada",
+          preponderante: g.preponderante, piorDias: item.dias ?? piorDias, qtd: 1,
+          fonteCredito: `Teste Semanal · ${dataUlt}`, sinceTxt: sinceZ,
+          descricao: `<b>${item.itemLabel || zona}</b> ${(item.status || "inoperante").toLowerCase()} ${(item.dias ?? piorDias) != null ? `há ${item.dias ?? piorDias} dias` : "recentemente"} — ${aggc.inop} de ${aggc.total}. <i>${rcZ.motivo || ""}</i>`,
+          note: item.note || "", grupo: "teste",
+        });
+      }
+      continue;
+    }
+
     const textoPerimetral = `${g.catLabel} ${piorItem?.itemLabel || ""}`;
     const mz = textoPerimetral.match(/zona\s*0?(\d{1,2})|z-?0?(\d{1,2})/i);
     const zonaCanonica = mz ? `zona-${String(mz[1] || mz[2]).padStart(2, "0")}` : null;
