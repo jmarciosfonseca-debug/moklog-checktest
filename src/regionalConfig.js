@@ -151,6 +151,46 @@ export const REGIONAL = {
     ],
   },
 
+  // ── P605 — Golgi Dutra (AR-PAT-2026-005) ─────────────────
+  P605: {
+    codigo: "AR-PAT-2026-005",
+    versao: "1.0.0",
+    emissao: "2026-09-20",
+    ativo: "P605 Golgi Dutra",
+    marcoZero: "Entroncamento Dutra (BR-116, km 204/205) × Rodoanel Mário Covas (SP-021 Leste)",
+    municipioUF: "Arujá / SP (limite operacional com Guarulhos)",
+    coordenadas: "23°24'36.2\"S 46°21'22.4\"W",
+    mapsUrl: "",
+    pdfPath: "/regional/P605.jpg",
+    quadrantes: [
+      {
+        lado: "CORREDOR LOGÍSTICO RODOVIÁRIO (Dutra / Rodoanel Leste)",
+        regiao: "BR-116 km 204/205 × SP-021 (entroncamento imediato)",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "furto", desc: "Exposição a roubo de carga e abordagem na desaceleração de composições pesadas nas alças entre o Rodoanel Leste e a Dutra; risco de comboios armados nas pistas marginais." },
+          { natureza: "acesso", desc: "Acesso quase instantâneo à pista expressa da BR-116 (sentidos Rio e Capital/Cumbica) e ao Rodoanel, viabilizando evasão imediata rumo a Santos ou interior." },
+          { natureza: "furto", desc: "Faixas lindeiras e viadutos do entroncamento expõem infraestrutura e pátios à ação em trânsito." },
+        ],
+      },
+      {
+        lado: "NÚCLEO PERIURBANO E DIVISAS (Vetor Oeste / Sul)",
+        regiao: "Vila Sadokim / Álamo (oeste) · Jardim Joia / Tupi (sul, junto às alças)",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "perimetro", desc: "Vegetação e taludes voltados para o viário e divisas laterais industriais sem ocupação ativa contínua favorecem intrusão perimetral e pontos cegos de desnível." },
+          { natureza: "violento", desc: "Malha urbana periférica mista a oeste e núcleos residenciais ao sul ampliam a exposição de colaboradores nas vias de acesso e trocas de turno." },
+        ],
+      },
+    ],
+    protecao: [
+      { orgao: "31º BPM/M — 3ª Cia (Arujá)", uf: "SP", distanciaKm: null, tempoMin: 8, tipo: "pm", titular: true },
+      { orgao: "1º BPRv — 3ª Cia (Rodoanel Leste)", uf: "SP", distanciaKm: null, tempoMin: 5, tipo: "pm" },
+      { orgao: "Posto de Bombeiros de Arujá (17º GB)", uf: "SP", distanciaKm: null, tempoMin: 10, tipo: "bombeiro" },
+      { orgao: "Pronto Atendimento Central de Arujá", uf: "SP", distanciaKm: null, tempoMin: 12, tipo: "hospital" },
+    ],
+  },
+
   // ── P604 — Golgi Jundiaí (AR-PAT-2026-004) ────────────────
   // Graus e textos seguem o parecer territorial v2, com redação prudencial.
   // Tempos de pronta-resposta são estimativas operacionais e devem ser
