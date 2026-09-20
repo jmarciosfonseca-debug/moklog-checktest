@@ -420,20 +420,43 @@ export function consolidarSite(vetoresClassificados, escopo = "moked") {
 export function classificarRiscoOperacional({
   zonasPerimetrais = 0,
   cftvInoperante = 0,
-  barreirasCriticas = 0,
+  barreirasCriticas = 0,        // bollard / garra / dilacerador (NÃO cancela AS)
   panicoFixoInoperante = false,
   ctmkOffline = false,
   perimetroTotal30d = false,
 } = {}) {
-  const trava = panicoFixoInoperante || ctmkOffline || perimetroTotal30d;
-  if (trava) return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "trava crítica de segurança" };
-  if (zonasPerimetrais >= 2) return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "duas ou mais zonas perimetrais inoperantes" };
-  if (zonasPerimetrais === 1 && (cftvInoperante > 5 || barreirasCriticas > 0)) {
-    return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "zona perimetral exposta combinada a cobertura ou barreira crítica" };
+  // ── Régua Marcio (20/09): SÓ o perímetro puxa CRÍTICO. ──
+  // Perímetro totalmente desconfigurado >30d é falha do próprio perímetro → CRÍTICO.
+  if (perimetroTotal30d) {
+    return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "perímetro totalmente desconfigurado (>30 dias)" };
   }
-  if (zonasPerimetrais === 1) return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "uma zona perimetral inoperante" };
-  if (cftvInoperante > 5) return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "mais de cinco câmeras inoperantes" };
-  if (barreirasCriticas >= 2) return { nivel: NIVEL.MODERADO, label: NIVEL_LABEL[NIVEL.MODERADO], motivo: "duas barreiras críticas de acesso indisponíveis" };
+  // 2+ zonas perimetrais inoperantes → CRÍTICO (com ou sem outras falhas).
+  if (zonasPerimetrais >= 2) {
+    return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "duas ou mais zonas perimetrais inoperantes" };
+  }
+  // 1 zona perimetral + outra falha relevante → CRÍTICO.
+  const outraFalhaRelevante = cftvInoperante > 5 || barreirasCriticas > 0 || panicoFixoInoperante || ctmkOffline;
+  if (zonasPerimetrais === 1 && outraFalhaRelevante) {
+    return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "uma zona perimetral inoperante somada a outra falha relevante" };
+  }
+  // 1 zona perimetral sozinha → ELEVADO.
+  if (zonasPerimetrais === 1) {
+    return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "uma zona perimetral inoperante" };
+  }
+  // ── Sem zona perimetral inoperante: NUNCA crítico (barreira de pé). ──
+  if (panicoFixoInoperante) {
+    return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "pânico fixo inoperante (perímetro íntegro)" };
+  }
+  if (ctmkOffline) {
+    return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "CTMK offline (perímetro íntegro)" };
+  }
+  if (cftvInoperante > 5) {
+    return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "mais de cinco câmeras inoperantes (perímetro íntegro)" };
+  }
+  if (barreirasCriticas > 0) {
+    return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "barreira crítica de bloqueio inoperante (perímetro íntegro)" };
+  }
+  // Tático sem bloqueador → MODERADO tratado no fluxo; aqui, base BAIXO.
   return { nivel: NIVEL.BAIXO, label: NIVEL_LABEL[NIVEL.BAIXO], motivo: "somente manutenção ou barreira isolada" };
 }
 

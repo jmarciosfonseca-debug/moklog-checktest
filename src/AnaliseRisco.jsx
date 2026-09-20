@@ -1626,7 +1626,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     .filter((v) => v.barreiraFisica === "perimetro" && v.zonaCanonica && !v.pendenciaCadastro)
     .map((v) => normalizarZona(v.zonaCanonica))).size;
   const cftvInoperante = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
-  const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador|cancela alta/i.test(v.label || "") && !v.observacaoManutencao).length;
+  const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador/i.test(v.label || "") && !v.observacaoManutencao).length;
   const matriz = classificarRiscoOperacional({
     zonasPerimetrais: zonasNomeadas,
     cftvInoperante,
