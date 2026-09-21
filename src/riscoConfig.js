@@ -181,7 +181,8 @@ export const MAPA_NOMEBASE = [
   { match: ["totem", "token", "totem token"], classe: "AUTOMACAO", flags: {} },
   { match: ["botoeira"], classe: "AUTOMACAO", flags: {} },
   { match: ["torniquete", "catraca"], classe: "AUTOMACAO", flags: {} }, // pedestre
-  { match: ["portao", "portoes", "porta cco", "motor portao"], classe: "AUTOMACAO", flags: {} },
+  { match: ["porta cco", "porta da cco", "porta do cco"], classe: "PERIFERICO", flags: { observacaoManutencao: true } },
+  { match: ["portao", "portoes", "motor portao"], classe: "AUTOMACAO", flags: {} },
 
   // ── Iluminação (fora do motor de proporção) ──
   { match: ["iluminacao", "quadrante", "lampada", "refletor"], classe: "ILUMINACAO", flags: { iluminacao: true } },
@@ -238,10 +239,15 @@ export function rotuloPorPVT(pvt) {
 // CRÍTICO sem dois bloqueadores independentes. O campo semântico evita que
 // uma regra futura de item (ex.: cancela) crie uma trava por acidente.
 export function travaFechada(vetor) {
-  return ["panicoFixoInoperante", "ctmkOffline", "perimetroTotal30d"].includes(vetor?.travaTipo);
+  return ["perimetroTotal30d"].includes(vetor?.travaTipo);
 }
 
 function chave(v) { return norm(v || "") || "pendente"; }
+
+function ehPerimetroSemCadastro(v) {
+  return chave(v.barreiraFisica) === "perimetro"
+    && (chave(v.zonaCanonica || v.area) === "perimetro-sem-cadastro" || v.pendenciaCadastro === true);
+}
 
 // Agrupa todos os bloqueadores antes da contagem. Comparação pairwise falha
 // quando há três ou mais eventos; a chave canônica deixa a regra auditável.
@@ -249,13 +255,20 @@ function chave(v) { return norm(v || "") || "pendente"; }
 // inflada por inferência de independência.
 export function agruparBloqueadores(vetores = []) {
   const grupos = new Map();
-  vetores.filter((v) => v?.incluir !== false && v?.bloqueadorCaido).forEach((v) => {
+  vetores.filter((v) => v?.incluir !== false && v?.bloqueadorCaido
+      && !ehPerimetroSemCadastro(v)
+    ).forEach((v) => {
     const causa = chave(v.causaRaiz);
     const ambigua = !v.causaRaiz || causa === "pendente" || causa === "ambigua";
-    const key = ambigua
-      ? `pendente:${chave(v.barreiraFisica || v.grupo || "bloqueador")}`
+    const zona = chave(v.zonaCanonica || v.area);
+    const zonaNomeada = zona !== "pendente" && zona !== "perimetro-sem-cadastro";
+    const ehPerimetro = chave(v.barreiraFisica) === "perimetro";
+    const key = (ehPerimetro && zonaNomeada)
+      ? `perimetro:${zona}`
+      : ambigua
+        ? `pendente:${chave(v.barreiraFisica || v.grupo || "bloqueador")}`
       : `${chave(v.barreiraFisica)}:${chave(v.zonaCanonica || v.area)}:${causa}`;
-    const anterior = grupos.get(key) || { key, vetores: [], pendente: ambigua };
+    const anterior = grupos.get(key) || { key, vetores: [], pendente: ambigua && !(ehPerimetro && zonaNomeada) };
     anterior.vetores.push(v);
     grupos.set(key, anterior);
   });
@@ -303,7 +316,7 @@ export function classificarVetor(v) {
     // classificação. Preservá-los aqui permite verificar independência no
     // consolidado sem inventar relação entre zonas, causas ou coberturas.
     zonaCanonica: v.zonaCanonica || null,
-    barreiraFisica: v.barreiraFisica || null,
+    barreiraFisica: v.barreiraFisica || (flags.perimetro ? "perimetro" : null),
     causaRaiz: v.causaRaiz || null,
     coberturaAlternativa: v.coberturaAlternativa || "não informada",
     gravidade: v.gravidade || null,
