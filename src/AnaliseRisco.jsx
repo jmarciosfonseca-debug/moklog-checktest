@@ -277,14 +277,34 @@ async function coletarPerimetralRondas(pid) {
     const idx = idxSnap.data();
     const entradas = (idx.plantoes || []).filter((p) => !(idx.deletedIds || []).includes(p.id));
     if (!entradas.length) return { ok: false, temDado: false, motivo: "sem plantões no período" };
-    // busca os plantões completos (com perimetral.zonas)
-    const plantoes = await Promise.all(entradas.map(async (e) => {
-      if (e.perimetral || e.rondas) return e; // formato antigo já completo
-      try { const s = await getDoc(doc(db, "rondas_plantoes", e.id)); return s.exists() ? s.data() : e; }
-      catch { return e; }
-    }));
+    // Leitura pelo resumo leve do índice: sem getDoc por plantão. Entradas
+    // históricas sem resumo são "não avaliadas", nunca uma falha inventada.
+    let historicoSemResumo = 0;
+    const plantoes = [];
+    for (const e of entradas) {
+      if (e.perimetral || e.rondas) { plantoes.push(e); continue; }
+      if (e.perimetralResumo && e.perimetralResumo.feito) {
+        const r = e.perimetralResumo;
+        plantoes.push({
+          id: e.id,
+          data: r.data || e.dataPlantao || null,
+          rondas: [],
+          perimetral: {
+            feito: true,
+            zonas: (r.zonas || []).map((z) => ({ nome: z.nome ?? null, status: z.status ?? "ok" })),
+          },
+        });
+      } else if (e.temPerimetral !== false) {
+        historicoSemResumo++;
+      }
+    }
     const comPeri = plantoes.filter((p) => p.perimetral?.feito && (p.perimetral.zonas || []).length);
-    if (!comPeri.length) return { ok: false, temDado: false, motivo: "nenhum teste perimetral com zonas no período" };
+    if (!comPeri.length) {
+      const motivo = historicoSemResumo
+        ? "Ronda Perimetral não avaliada neste ciclo — histórico ainda não consolidado"
+        : "nenhum teste perimetral com zonas no período";
+      return { ok: false, temDado: false, motivo, historicoSemResumo };
+    }
     // agrega por zona
     // Identidade estável = campo de nome legível, ou o id (UUID) apenas como CHAVE
     // interna de agrupamento (nunca exibida). O rótulo mostrado ao cliente segue a
