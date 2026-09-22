@@ -518,27 +518,35 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08","Zona 09","Zona 10","Zona 11","Zona 12"]},
       {id:"sdai",label:"02 - ALARME SDAI PORTARIA",type:"items",itemLabels:["G100","G200"]},
       {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Portaria Aparelho 01"]},
-      {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo CCO"]},
-      {id:"cancelas",label:"05 - CANCELAS, HASTES E MOTORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},
-      {id:"cftv",label:"06 - CFTV",type:"count",total:73},
-      {id:"eclusas",label:"07 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
-      {id:"eletroima",label:"08 - ELETROIM\u00c3 / ECLUSA / PORTAS",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},
-      {id:"farois",label:"09 - FAR\u00d3IS DAS CANCELAS",type:"items",itemLabels:["Cancela Eclusa 01 Ext","Cancela Eclusa 01 Int","Cancela Eclusa 02 Ext","Cancela Eclusa 02 Int","Cancela Eclusa 03 Ext","Cancela Eclusa 03 Int","Cancela Eclusa 04 Ext"]},
-      {id:"garra",label:"10 - GARRA DE TIGRE",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Reversiva 03","Eclusa Sa\u00edda 04"]},
-      {id:"giroflex",label:"11 - GIROFLEX DAS ECLUSAS",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},
-      {id:"intercomunicadores",label:"12 - INTERCOMUNICADORES",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},
-      {id:"internet",label:"13 - INTERNET",type:"single"},
-      {id:"facial",label:"14 - LEITORES FACIAIS ECLUSAS/CANCELAS",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Sa\u00edda 03 Reversiva","Eclusa Sa\u00edda 04"]},
-      {id:"mesa",label:"15 - MESA CONTROLADORA CCO E PORTARIA",type:"items",itemLabels:["CCO","Portaria"]},
-      {id:"mon_cda",label:"16 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01"]},
-      {id:"mon_cftv",label:"17 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05"]},
-      {id:"mon_portaria",label:"18 - MONITOR PORTARIA",type:"notes"},
-      {id:"portoes",label:"19 - PORT\u00d5ES / ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},
-      {id:"telefone",label:"20 - TELEFONE FIXO CCO E PORTARIA",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},
-      {id:"torniquetes",label:"21 - TORNIQUETES LEITORES FACIAIS",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},
-      {id:"totens",label:"22 - TOTENS VISITANTES / MOTORISTAS",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},
-      {id:"manutencao",label:"23 - VISITA DE MANUTEN\u00c7\u00c3O",type:"maintenance"},
-      {id:"infra",label:"24 - INFRAESTRUTURA / OBS.",type:"notes"}
+      {id:"panic_fix",label:"04 - PÂNICO FIXO",type:"items",itemLabels:["Fixo CCO","Unidade 02"]},
+      {id:"panic_mob",label:"04B - PÂNICO MÓVEL",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03"]},
+      {id:"cancelas",label:"05 - CANCELAS, HASTES E MECANISMOS",type:"items",itemLabels:["Entrada 01","Entrada 02","Saída 03 Reversiva","Saída 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
+      {id:"cftv",label:"06 - CFTV FIXAS",type:"count",total:65},
+      {id:"speed_dome",label:"06B - CFTV SPEED DOME",type:"count",total:8},
+      {id:"eclusas",label:"07 - ECLUSA CCO (PORTAS/ABERTURA)",type:"items",itemLabels:["Porta 01 — Local","Porta 01 — Remota","Porta 02 — Local","Porta 02 — Remota"]},
+      {id:"eletroima",label:"08 - ELETROÍMÃS DA ECLUSA CCO",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},
+      {id:"farois",label:"09 - FARÓIS/LED DAS CANCELAS",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04","Cancela 05","Cancela 06","Cancela 07","Cancela 08"]},
+      {id:"garra",label:"10 - GARRA DE TIGRE (DILACERADORES)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
+      {id:"giroflex",label:"11 - GIROFLEX DAS ECLUSAS",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
+      {id:"internet",label:"12 - INTERNET (LINK DE DADOS)",type:"single"},
+      {id:"facial_vias",label:"13 - LEITORES FACIAIS — VIAS VEICULARES (SUBSOLO)",type:"count",total:19},
+      {id:"mesa",label:"14 - MESA CONTROLADORA (CCO 32 BOTÕES)",type:"items",itemLabels:["CCO","Portaria"]},
+      {id:"mon_portaria_dispositivos",label:"15 - MONITORES CONTROLE DE ACESSO PORTARIA",type:"items",itemLabels:["Unidade 01","Unidade 02"]},
+      {id:"mon_cda",label:"16 - MONITOR CONTROLE DE ACESSO CCO",type:"items",itemLabels:["Unidade 01"]},
+      {id:"mon_cftv",label:"17 - MONITORES CFTV CCO (MURAL/TELAS)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05"]},
+      {id:"portoes_controle",label:"18 - PORTÕES (FOLHAS)",type:"count",total:16},
+      {id:"motores",label:"19 - MOTORES DE PORTÕES",type:"count",total:16},
+      {id:"sensores",label:"20 - SENSORES ANTI-ESMAGAMENTO",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
+      {id:"telefone",label:"21 - TELEFONE FIXO CCO E PORTARIA",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},
+      {id:"torniquetes",label:"22 - TORNIQUETES (ESTRUTURA MECÂNICA)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
+      {id:"facial_torniquetes",label:"23 - LEITORES FACIAIS DOS TORNIQUETES",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
+      {id:"totens",label:"24 - TOTENS VISITANTES/MOTORISTAS",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},
+      {id:"intercomunicadores",label:"LEGADO (HISTÓRICO) — INTERCOMUNICADORES",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},
+      {id:"facial",label:"LEGADO (HISTÓRICO) — LEITORES FACIAIS ECLUSAS/CANCELAS",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Saída 03 Reversiva","Eclusa Saída 04"]},
+      {id:"portoes",label:"LEGADO (HISTÓRICO) — PORTÕES / ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},
+      {id:"mon_portaria_legacy",label:"LEGADO (HISTÓRICO) — MONITOR PORTARIA",type:"notes"},
+      {id:"manutencao",label:"25 - VISITA DE MANUTENÇÃO",type:"maintenance"},
+      {id:"infra",label:"26 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P260A: {id:"P260A",name:"Jatinox Unidade A",short:"Jatinox A",categories:[{id:"panic_fix",label:"01 - Bot\u00f5es de P\u00e2nico Fixos",type:"items",itemLabels:["CCO","P1","P2","P3","P5"]},{id:"panic_mob",label:"01B - P\u00e2nico M\u00f5veis",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02"]},{id:"cerca",label:"02 - Cerca El\u00e9trica",type:"items",itemLabels:["Zona 07","Zona 08"]},{id:"eclusa_cco",label:"03 - Eclusa CCO (Abertura)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},{id:"eclusa_p3",label:"04 - Port\u00e3o Eclusa P3",type:"items",itemLabels:["Externa (com interfone)","Interna (com interfone)"]},{id:"telefonia",label:"05 - Telefonia",type:"items",itemLabels:["Smartphone CCO/L\u00edder 01","Smartphone CCO/L\u00edder 02","Ramal P1","Ramal P2"]},{id:"cftv",label:"06 - Imagens CFTV",type:"count",total:65},{id:"campainhas",label:"07 - Campainhas",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02"]},{id:"sala_cftv",label:"08 - Sala de CFTV CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05","Monitor 06","Monitor 07","Teclado 01","Teclado 02","Teclado 03","RAC","Telefone Fixo 01","Telefone Fixo 02"]},{id:"cam_sistema",label:"09 - C\u00e2meras Sistema Sala",type:"count",total:132},{id:"recepcao_p3",label:"10 - Recep\u00e7\u00e3o P3",type:"items",itemLabels:["Monitor 01","Monitor 02","Teclado 01","Teclado 02","CPU 01","CPU 02","Telefone Fixo 01","Telefone Fixo 02","Impressora","Intercomunicador de Guich\u00ea","DVR 01","DVR 02"]},{id:"sirenes",label:"11 - Sirenes c/ Ilumina\u00e7\u00e3o",type:"items",itemLabels:["Roberto Koch (s/ ilum.)","Presidente Wilson 01 (c/ ilum.)","Presidente Wilson 02 (c/ ilum.)","Ubarana 01 (c/ ilum.)","Ubarana 02 (c/ ilum.)","Ubarana 03 (c/ ilum.)","Ubarana 04 (c/ ilum.)","Ubarana 05 (c/ ilum.)"]},{id:"manutencao",label:"12 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"13 - Infraestrutura / Obs.",type:"notes"}]},
 };
@@ -720,12 +728,23 @@ function buildBlank(project) {
   const st = {};
   for(const cat of project.categories){
     if(cat.type==="single") st[cat.id]={status:"ok",note:"",since:""};
-    else if(cat.type==="items") st[cat.id]=cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
+    else if(cat.type==="items") st[cat.id]=cat.itemLabels.map((_,i)=>{
+      const unitId=getUnitId(project.id,cat,i);
+      return {...(unitId?{unitId}:{}),status:"ok",note:"",since:""};
+    });
     else if(cat.type==="count") st[cat.id]={total:cat.total,inoperative:[]};
     else if(cat.type==="notes") st[cat.id]={items:[]};
     else if(cat.type==="maintenance") st[cat.id]={visits:[]};
   }
   return st;
+}
+
+// Identidade estável da unidade para relatórios novos. Categorias legadas sem
+// itemIds explícito mantêm o ID derivado da posição original; o leitor abaixo
+// conserva compatibilidade com históricos que ainda não o possuem.
+function getUnitId(projectId, cat, index) {
+  if(projectId!=="P505") return null;
+  return cat.itemIds?.[index] || (cat.id+"-"+(index+1));
 }
 
 function buildFromLast(project, lastState) {
@@ -740,10 +759,14 @@ function buildFromLast(project, lastState) {
       const prev=lastState[cat.id]??cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
       // normaliza para array (compat com estados antigos salvos como objeto)
       const prevArr=Array.isArray(prev)?prev:Object.keys(prev).sort((a,b)=>(+a)-(+b)).map(k=>prev[k]);
+      const prevPorId=new Map(prevArr.filter(p=>p?.unitId).map(p=>[p.unitId,p]));
       st[cat.id]=cat.itemLabels.map((_,i)=>{
-        const p=prevArr[i]??{status:"ok"};
+        // Prioriza ID estável dos relatórios novos; histórico sem ID continua
+        // sendo lido pela posição, sem migração nem alteração do registro.
+        const unitId=getUnitId(project.id,cat,i);
+        const p=(unitId?prevPorId.get(unitId):null)??prevArr[i]??{status:"ok"};
         const pSt=resolveStatus(p);
-        return {status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
+        return {...(unitId?{unitId}:{}), status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
       });
     } else if(cat.type==="count"){
       st[cat.id]={total:lastState[cat.id]?.total??cat.total, inoperative:[...(lastState[cat.id]?.inoperative??[])]};
@@ -2195,6 +2218,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
     const rep = viewReport.report || viewReport;
     const repMeta = rep.meta || {};
     const repState = rep.state || {};
+    const reportProject = project;
     const ultimos = hist.slice(0,4).map(r=>({ wk:getWeekLabel(r.meta?.date), data:fmtDate(r.meta?.date), leader:r.meta?.leader||"—", cco:r.meta?.cco||"—", sig:r.meta?.signature||"" }));
     return(
     <div style={S.page}>
@@ -2205,7 +2229,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)}{repMeta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(repMeta.tempoPreenchimentoSeg/60)}min`:""}{canManage?"":" · somente leitura"}</div>
           </div>
-          <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
+          <HealthRing pct={computeHealth(reportProject,repState).pct} size={46}/>
         </div>
         {canManage&&(
           <div style={{display:"flex",gap:8,marginBottom:8}}>
@@ -2242,7 +2266,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
             ))}
           </div>
         </div>
-        {project.categories.map(cat=>{
+        {reportProject.categories.map(cat=>{
           const sv=repState[cat.id]; if(!sv) return null;
           const itemLabels=Array.isArray(cat.itemLabels)?cat.itemLabels:[];
           let cp=100;
@@ -3636,7 +3660,8 @@ export default function App(){
     if(mt?.date && deletedTombstoneRef.current[project.id]?.has(mt.date)){
       deletedTombstoneRef.current[project.id].delete(mt.date); // novo registro intencional na mesma data — remove o "veto"
     }
-    const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
+    const novoRelatorio={state:st,meta:mt,savedAt:new Date().toISOString()};
+    const next=[...prev,novoRelatorio].slice(-MAX_HISTORY);
     const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
     try {
       setStored(up);
