@@ -78,6 +78,8 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const [savedAt,setSavedAt]=useState(null);
   const [projetoContexto,setProjetoContexto]=useState(null);
   const [diagnosticos,setDiagnosticos]=useState([]);
+  const [progressoProjetos,setProgressoProjetos]=useState({});
+  const [diagnosticoSelecionado,setDiagnosticoSelecionado]=useState(false);
   const [persistBusy,setPersistBusy]=useState(false);
   const [persistError,setPersistError]=useState("");
   const contentTopRef=useRef(null);
@@ -121,6 +123,18 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
     return()=>clearTimeout(timer);
   },[categoriaAtiva,catalogo,draftReady,respostas,user?.uid,projetoContexto]);
 
+  useEffect(()=>{
+    if(!isAuthenticated||!itens.length)return;
+    let cancel=false;
+    (async()=>{
+      const out={};
+      const ids=Object.values(projectGroups).flat();
+      await Promise.all(ids.map(async pid=>{try{const s=await getDocs(collection(db,"diagnosticos",pid,"itens"));const docs=s.docs.map(d=>d.data()).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||"")));const d=docs[0];if(d)out[pid]={pct:calculateProgress(itens,d.respostas||{}).percentual,estado:d.estado||"rascunho"};}catch{}}));
+      if(!cancel)setProgressoProjetos(out);
+    })();
+    return()=>{cancel=true;};
+  },[db,isAuthenticated,itens,projectGroups]);
+
   const secoes=useMemo(()=>buildCatalogSections(catalogo,itens),[catalogo,itens]);
   const secaoAtiva=secoes.find(x=>x.id===categoriaAtiva)||secoes[0];
   const progresso=useMemo(()=>calculateProgress(itens,respostas),[itens,respostas]);
@@ -152,6 +166,7 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   };
   const escolherProjeto=async(ctx)=>{
     setProjetoContexto(ctx);
+    setDiagnosticoSelecionado(ctx?.tipo==="novo");
     setRespostas({});
     setCategoriaAtiva(secoes[0]?.id||"");
     setSavedAt(null);
@@ -166,15 +181,18 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
       setDiagnosticos(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||""))));
     }catch(e){setDiagnosticos([]);}
   };
+  const abrirDiagnostico=(d)=>{setRespostas(d.respostas||{});setSavedAt(d.atualizadoEm?new Date(d.atualizadoEm).getTime():null);setProjetoContexto(p=>({...p,diagnosticoId:d.id,criadoEm:d.criadoEm,estado:d.estado||"rascunho"}));setDiagnosticoSelecionado(true);};
+  const novoDiagnostico=()=>{setRespostas({});setSavedAt(null);setProjetoContexto(p=>({...p,diagnosticoId:null,criadoEm:null,estado:"rascunho"}));setDiagnosticoSelecionado(true);};
 
   if(!isAuthenticated)return <Login auth={auth} dark={dark} onBack={onBack}/>;
   if(error)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:"#ef444466"}}><div style={{fontSize:38}}>⚠️</div><h1 style={styles.title}>Acesso indisponível</h1><p role="alert" style={{...styles.muted,color:c.muted}}>{error}</p><button onClick={onBack} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>← Voltar ao início</button></section></main>;
   if(loading||!isDiagnosticDataReady(catalogo,profile))return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.centerState}><div style={{fontSize:34}}>⟳</div><strong>Carregando catálogo publicado…</strong></div></main>;
-  if(!projetoContexto)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Selecionar projeto</h1><p style={{...styles.muted,color:c.muted}}>Escolha o contexto deste diagnóstico antes de preencher.</p><button onClick={()=>{const slug=prompt("Nome do cliente/projeto novo:","");if(slug?.trim()){const chave="novo_"+user.uid+"_"+slug.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-")+"_"+Date.now().toString(36);escolherProjeto({tipo:"novo",chave,rotuloLivre:slug.trim()});}}} style={styles.primary}>＋ Projeto novo</button>{Object.entries(projectGroups).map(([grupo,ids])=><div key={grupo}><strong style={{display:"block",margin:"14px 0 6px",color:c.text,textTransform:"uppercase"}}>{grupo}</strong>{ids.map(pid=>projects[pid]&&<button key={pid} onClick={()=>escolherProjeto({tipo:"existente",projetoRef:pid,grupo})} style={{...styles.secondary,width:"100%",marginBottom:6,color:c.text,borderColor:c.border,textAlign:"left"}}>{pid} — {projects[pid].name}</button>)}</div>)}</section></main>;
+  if(!projetoContexto)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Selecionar projeto</h1><p style={{...styles.muted,color:c.muted}}>Escolha o contexto deste diagnóstico antes de preencher.</p><button onClick={()=>{const slug=prompt("Nome do cliente/projeto novo:","");if(slug?.trim()){const chave="novo_"+user.uid+"_"+slug.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-")+"_"+Date.now().toString(36);escolherProjeto({tipo:"novo",chave,rotuloLivre:slug.trim()});}}} style={styles.primary}>＋ Projeto novo</button>{Object.entries(projectGroups).map(([grupo,ids])=><div key={grupo}><strong style={{display:"block",margin:"14px 0 6px",color:c.text,textTransform:"uppercase"}}>{grupo}</strong>{ids.map(pid=>{if(!projects[pid])return null;const p=progressoProjetos[pid];return <button key={pid} onClick={()=>escolherProjeto({tipo:"existente",projetoRef:pid,grupo})} style={{...styles.secondary,width:"100%",marginBottom:6,color:c.text,borderColor:c.border,textAlign:"left"}}><div>{pid} — {projects[pid].name}</div>{p&&<div style={{fontSize:11,marginTop:5,color:p.pct===100?"#22c55e":c.muted}}>{p.estado==="arquivado"||p.pct===100?"concluído":"em andamento"} · {p.pct}%</div>}</button>;})}</div>)}</section></main>;
+  if(projetoContexto.tipo==="existente"&&!diagnosticoSelecionado&&diagnosticos.length>0)return <main style={{...styles.page,background:c.bg}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Diagnósticos — {projetoContexto.projetoRef}</h1><p style={{...styles.muted,color:c.muted}}>Escolha um diagnóstico para continuar ou inicie um novo.</p>{diagnosticos.map(d=><button key={d.id} onClick={()=>abrirDiagnostico(d)} style={{...styles.secondary,width:"100%",marginBottom:8,color:c.text,borderColor:c.border,textAlign:"left"}}>{d.estado||"rascunho"} · {d.atualizadoEm?new Date(d.atualizadoEm).toLocaleString("pt-BR"):"sem data"} · {calculateProgress(itens,d.respostas||{}).percentual}%</button>)}<button onClick={novoDiagnostico} style={styles.primary}>＋ Novo diagnóstico</button><button onClick={()=>setProjetoContexto(null)} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>Trocar projeto</button></section></main>;
 
   return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.shell}>
     <header style={{...styles.header,background:c.bg,borderColor:c.border}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={onBack} style={{...styles.iconButton,color:c.muted,borderColor:c.border}} aria-label="Voltar ao início">←</button><div style={{minWidth:0,flex:1}}><h1 style={{...styles.headerTitle,color:c.text}}>Diagnóstico Situacional</h1><div style={{...styles.muted,color:c.muted}}>{String(catalogo.perfil||"").replace(/_/g," ")} · v{catalogo.versao} · {profile.role}</div></div><button onClick={onToggleTheme} style={{...styles.iconButton,color:c.text,borderColor:c.border}} aria-label="Alternar tema">{dark?"☀️":"🌙"}</button></div>
+      <div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setProjetoContexto(null)} style={{...styles.iconButton,color:c.muted,borderColor:c.border}} aria-label="Voltar à seleção de projeto">←</button><div style={{minWidth:0,flex:1}}><h1 style={{...styles.headerTitle,color:c.text}}>Diagnóstico Situacional</h1><div style={{...styles.muted,color:c.muted}}>{projetoContexto.rotuloLivre||projetoContexto.projetoRef} · {String(catalogo.perfil||"").replace(/_/g," ")} · v{catalogo.versao} · {profile.role}</div></div><button onClick={onToggleTheme} style={{...styles.iconButton,color:c.text,borderColor:c.border}} aria-label="Alternar tema">{dark?"☀️":"🌙"}</button></div>
       <div style={{...styles.progressCard,background:c.card,borderColor:c.border}}><div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",gap:12}}><strong style={{fontSize:14}}>{progresso.percentual}% concluído</strong><span style={{...styles.muted,color:c.muted}}>{progresso.respondidos}/{progresso.total} itens</span></div><div style={{...styles.progressTrack,background:c.border}}><div style={{...styles.progressFill,width:`${progresso.percentual}%`}}/></div><div style={{...styles.saveLine,color:c.muted}}><span>✓ Rascunho local automático</span><span>{savedAt?`salvo às ${new Date(savedAt).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:"ainda sem alterações"}</span></div></div>
       <nav style={styles.categoryNav} aria-label="Categorias do diagnóstico">{secoes.map(cat=>{const catItens=cat.subcategorias.flatMap(sub=>sub.itens);const p=calculateProgress(catItens,respostas);const selected=cat.id===secaoAtiva?.id;return <button key={cat.id} onClick={()=>goTo(cat.id)} aria-current={selected?"step":undefined} style={{...styles.categoryChip,background:selected?"#1d4ed8":c.card,color:selected?"#fff":c.muted,borderColor:selected?"#3b82f6":c.border}}><span>{cat.id}</span><span style={{opacity:.8}}>{p.respondidos}/{p.total}</span></button>;})}</nav>
     </header>
