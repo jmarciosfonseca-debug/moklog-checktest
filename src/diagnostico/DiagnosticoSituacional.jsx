@@ -102,9 +102,8 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
         if(nextCatalogo.versao!==CATALOGO_REF.versao) throw new Error("CATALOG_VERSION");
         const nextItens=itensSnap.docs.map(item=>({id:item.id,...item.data()}));
         if(!nextItens.length) throw new Error("CATALOG_EMPTY");
-        const localDraft=readDraft(window.localStorage,draftStorageKey(CATALOGO_REF.catalogoId,user.uid),nextCatalogo.versao);
         const first=[...(nextCatalogo.categorias||[])].sort((a,b)=>a.ordem-b.ordem)[0]?.id||"";
-        if(!cancelled){setProfile(nextProfile);setCatalogo(nextCatalogo);setItens(nextItens);setRespostas(localDraft?.respostas||{});setCategoriaAtiva(localDraft?.categoriaAtiva||first);setSavedAt(localDraft?.savedAt||null);setDraftReady(true);}
+        if(!cancelled){setProfile(nextProfile);setCatalogo(nextCatalogo);setItens(nextItens);setRespostas({});setCategoriaAtiva(first);setSavedAt(null);setDraftReady(true);}
       }catch(err){
         const messages={PROFILE_MISSING:"Seu usuário não possui perfil de acesso ao Diagnóstico.",PROFILE_DENIED:"Seu perfil está inativo ou não tem permissão para este módulo.",CATALOG_MISSING:"O catálogo publicado não foi encontrado.",CATALOG_INCOMPLETE:"O catálogo ainda não está pronto para uso.",CATALOG_VERSION:"A versão publicada do catálogo não é compatível com esta tela.",CATALOG_EMPTY:"O catálogo publicado não contém itens."};
         if(!cancelled)setError(messages[err?.message]||"Não foi possível ler o catálogo. Verifique sua conexão e seu acesso.");
@@ -114,10 +113,12 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   },[db,isAuthenticated,user?.uid]);
 
   useEffect(()=>{
-    if(!draftReady||!catalogo||!user?.uid)return undefined;
-    const timer=setTimeout(()=>{const now=Date.now();writeDraft(window.localStorage,draftStorageKey(CATALOGO_REF.catalogoId,user.uid),{catalogoId:CATALOGO_REF.catalogoId,versao:catalogo.versao,categoriaAtiva,respostas,savedAt:now});setSavedAt(now);},350);
+    if(!draftReady||!catalogo||!user?.uid||!projetoContexto)return undefined;
+    const chave=projetoContexto.tipo==="existente"?projetoContexto.projetoRef:projetoContexto.chave;
+    const key=`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${chave}`;
+    const timer=setTimeout(()=>{const now=Date.now();writeDraft(window.localStorage,key,{catalogoId:CATALOGO_REF.catalogoId,versao:catalogo.versao,categoriaAtiva,respostas,savedAt:now,projetoRef:chave});setSavedAt(now);},350);
     return()=>clearTimeout(timer);
-  },[categoriaAtiva,catalogo,draftReady,respostas,user?.uid]);
+  },[categoriaAtiva,catalogo,draftReady,respostas,user?.uid,projetoContexto]);
 
   const secoes=useMemo(()=>buildCatalogSections(catalogo,itens),[catalogo,itens]);
   const secaoAtiva=secoes.find(x=>x.id===categoriaAtiva)||secoes[0];
@@ -126,7 +127,9 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const mark=(itemId,status)=>setRespostas(current=>{const anterior=current[itemId]||{};const proxima={...anterior,status,updatedAt:Date.now()};if(!STATUS_QUE_EXIGEM_ANALISE.includes(status)){delete proxima.situacao;delete proxima.impacto;delete proxima.indicacao;}if(!STATUS_QUE_EXIGEM_OBSERVACAO.includes(status))delete proxima.observacao;return {...current,[itemId]:proxima};});
   const updateResposta=(itemId,campo,valor)=>setRespostas(current=>({...current,[itemId]:{...(current[itemId]||{}),[campo]:valor,updatedAt:Date.now()}}));
   const goTo=(id)=>{setCategoriaAtiva(id);requestAnimationFrame(()=>contentTopRef.current?.scrollIntoView({behavior:"smooth",block:"start"}));};
-  const clearDraft=()=>{if(!window.confirm("Limpar todas as marcações deste rascunho local?"))return;window.localStorage.removeItem(draftStorageKey(CATALOGO_REF.catalogoId,user.uid));setRespostas({});setCategoriaAtiva(secoes[0]?.id||"");setSavedAt(null);};
+  const chaveDoProjeto=projetoContexto?(projetoContexto.tipo==="existente"?projetoContexto.projetoRef:projetoContexto.chave):null;
+  const chaveDraft=chaveDoProjeto?`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${chaveDoProjeto}`:null;
+  const clearDraft=()=>{if(!window.confirm("Limpar todas as marcações deste rascunho local?"))return;if(chaveDraft)window.localStorage.removeItem(chaveDraft);setRespostas({});setCategoriaAtiva(secoes[0]?.id||"");setSavedAt(null);};
   const chaveProjeto=projetoContexto?.tipo==="existente"?projetoContexto.projetoRef:projetoContexto?.chave;
   const salvarDiagnostico=async(estado="rascunho")=>{
     if(!chaveProjeto||!user?.uid||!catalogo)return;
@@ -144,6 +147,14 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   };
   const escolherProjeto=async(ctx)=>{
     setProjetoContexto(ctx);
+    setRespostas({});
+    setCategoriaAtiva(secoes[0]?.id||"");
+    setSavedAt(null);
+    if(ctx&&catalogo&&user?.uid){
+      const chave=ctx.tipo==="existente"?ctx.projetoRef:ctx.chave;
+      const draft=readDraft(window.localStorage,`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${chave}`,catalogo.versao);
+      if(draft){setRespostas(draft.respostas||{});setCategoriaAtiva(draft.categoriaAtiva||secoes[0]?.id||"");setSavedAt(draft.savedAt||null);}
+    }
     if(!ctx)return;
     try{
       const snap=await getDocs(collection(db,"diagnosticos",ctx.tipo==="existente"?ctx.projetoRef:ctx.chave,"itens"));
