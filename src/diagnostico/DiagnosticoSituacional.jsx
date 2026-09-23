@@ -3,6 +3,7 @@ import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, serverTimesta
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { CATALOGO_REF, STATUS_ITEM, STATUS_ITEM_LISTA, STATUS_QUE_EXIGEM_ANALISE, STATUS_QUE_EXIGEM_OBSERVACAO } from "./catalogoSchema";
 import { buildCatalogSections, calculateProgress, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
+import { mergeRespostasPorAtualizacao } from "./diagnosticoSync";
 
 const STATUS_UI = {
   [STATUS_ITEM.CONFORME]: { label: "Conforme", short: "C", color: "#22c55e" },
@@ -138,9 +139,13 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
       const diagnosticoId=projetoContexto.diagnosticoId||crypto.randomUUID();
       const ref=doc(db,"diagnosticos",chaveProjeto,"itens",diagnosticoId);
       const agora=new Date().toISOString();
-      const payload={catalogoId:CATALOGO_REF.catalogoId,versaoCatalogo:catalogo.versao,tipo:projetoContexto.tipo,projetoRef:projetoContexto.projetoRef||null,grupo:projetoContexto.grupo||null,rotuloLivre:projetoContexto.rotuloLivre||null,estado,respostas,autorUid:user.uid,criadoEm:projetoContexto.criadoEm||agora,atualizadoEm:agora,arquivadoEm:estado==="arquivado"?agora:null};
+      const remoto=await getDoc(ref);
+      const remotas=remoto.exists()?(remoto.data().respostas||{}):{};
+      const merged=mergeRespostasPorAtualizacao(remotas,respostas);
+      const payload={catalogoId:CATALOGO_REF.catalogoId,versaoCatalogo:catalogo.versao,tipo:projetoContexto.tipo,projetoRef:projetoContexto.projetoRef||null,grupo:projetoContexto.grupo||null,rotuloLivre:projetoContexto.rotuloLivre||null,estado,respostas:merged,autorUid:user.uid,criadoEm:projetoContexto.criadoEm||agora,atualizadoEm:agora,arquivadoEm:estado==="arquivado"?agora:null};
       await setDoc(ref,payload,{merge:true});
       setProjetoContexto({...projetoContexto,diagnosticoId,criadoEm:payload.criadoEm});
+      setRespostas(merged);
       setDiagnosticos(xs=>[{id:diagnosticoId,...payload},...xs.filter(x=>x.id!==diagnosticoId)]);
     }catch(e){setPersistError("Não foi possível salvar o diagnóstico no Firestore.");}
     finally{setPersistBusy(false);}
