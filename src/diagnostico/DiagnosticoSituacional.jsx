@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { CATALOGO_REF, STATUS_ITEM, STATUS_ITEM_LISTA, STATUS_QUE_EXIGEM_ANALISE, STATUS_QUE_EXIGEM_OBSERVACAO } from "./catalogoSchema";
 import { buildCatalogSections, calculateProgress, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
@@ -64,7 +64,7 @@ function Login({ auth, dark, onBack }) {
   </main>;
 }
 
-export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, onBack }) {
+export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, onBack, projects={}, projectGroups={} }) {
   const [user,setUser]=useState(()=>auth.currentUser);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
@@ -75,6 +75,10 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const [categoriaAtiva,setCategoriaAtiva]=useState("");
   const [draftReady,setDraftReady]=useState(false);
   const [savedAt,setSavedAt]=useState(null);
+  const [projetoContexto,setProjetoContexto]=useState(null);
+  const [diagnosticos,setDiagnosticos]=useState([]);
+  const [persistBusy,setPersistBusy]=useState(false);
+  const [persistError,setPersistError]=useState("");
   const contentTopRef=useRef(null);
   const c=palette(dark);
   const isAuthenticated=!!user&&!user.isAnonymous;
@@ -123,10 +127,34 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const updateResposta=(itemId,campo,valor)=>setRespostas(current=>({...current,[itemId]:{...(current[itemId]||{}),[campo]:valor,updatedAt:Date.now()}}));
   const goTo=(id)=>{setCategoriaAtiva(id);requestAnimationFrame(()=>contentTopRef.current?.scrollIntoView({behavior:"smooth",block:"start"}));};
   const clearDraft=()=>{if(!window.confirm("Limpar todas as marcações deste rascunho local?"))return;window.localStorage.removeItem(draftStorageKey(CATALOGO_REF.catalogoId,user.uid));setRespostas({});setCategoriaAtiva(secoes[0]?.id||"");setSavedAt(null);};
+  const chaveProjeto=projetoContexto?.tipo==="existente"?projetoContexto.projetoRef:projetoContexto?.chave;
+  const salvarDiagnostico=async(estado="rascunho")=>{
+    if(!chaveProjeto||!user?.uid||!catalogo)return;
+    setPersistBusy(true);setPersistError("");
+    try{
+      const diagnosticoId=projetoContexto.diagnosticoId||crypto.randomUUID();
+      const ref=doc(db,"diagnosticos",chaveProjeto,"itens",diagnosticoId);
+      const agora=new Date().toISOString();
+      const payload={catalogoId:CATALOGO_REF.catalogoId,versaoCatalogo:catalogo.versao,tipo:projetoContexto.tipo,projetoRef:projetoContexto.projetoRef||null,grupo:projetoContexto.grupo||null,rotuloLivre:projetoContexto.rotuloLivre||null,estado,respostas,autorUid:user.uid,criadoEm:projetoContexto.criadoEm||agora,atualizadoEm:agora,arquivadoEm:estado==="arquivado"?agora:null};
+      await setDoc(ref,payload,{merge:true});
+      setProjetoContexto({...projetoContexto,diagnosticoId,criadoEm:payload.criadoEm});
+      setDiagnosticos(xs=>[{id:diagnosticoId,...payload},...xs.filter(x=>x.id!==diagnosticoId)]);
+    }catch(e){setPersistError("Não foi possível salvar o diagnóstico no Firestore.");}
+    finally{setPersistBusy(false);}
+  };
+  const escolherProjeto=async(ctx)=>{
+    setProjetoContexto(ctx);
+    if(!ctx)return;
+    try{
+      const snap=await getDocs(collection(db,"diagnosticos",ctx.tipo==="existente"?ctx.projetoRef:ctx.chave,"itens"));
+      setDiagnosticos(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||""))));
+    }catch(e){setDiagnosticos([]);}
+  };
 
   if(!isAuthenticated)return <Login auth={auth} dark={dark} onBack={onBack}/>;
   if(error)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:"#ef444466"}}><div style={{fontSize:38}}>⚠️</div><h1 style={styles.title}>Acesso indisponível</h1><p role="alert" style={{...styles.muted,color:c.muted}}>{error}</p><button onClick={onBack} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>← Voltar ao início</button></section></main>;
   if(loading||!isDiagnosticDataReady(catalogo,profile))return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.centerState}><div style={{fontSize:34}}>⟳</div><strong>Carregando catálogo publicado…</strong></div></main>;
+  if(!projetoContexto)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Selecionar projeto</h1><p style={{...styles.muted,color:c.muted}}>Escolha o contexto deste diagnóstico antes de preencher.</p><button onClick={()=>{const slug=prompt("Nome do cliente/projeto novo:","");if(slug?.trim()){const chave="novo_"+user.uid+"_"+slug.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-")+"_"+Date.now().toString(36);escolherProjeto({tipo:"novo",chave,rotuloLivre:slug.trim()});}}} style={styles.primary}>＋ Projeto novo</button>{Object.entries(projectGroups).map(([grupo,ids])=><div key={grupo}><strong style={{display:"block",margin:"14px 0 6px",color:c.text,textTransform:"uppercase"}}>{grupo}</strong>{ids.map(pid=>projects[pid]&&<button key={pid} onClick={()=>escolherProjeto({tipo:"existente",projetoRef:pid,grupo})} style={{...styles.secondary,width:"100%",marginBottom:6,color:c.text,borderColor:c.border,textAlign:"left"}}>{pid} — {projects[pid].name}</button>)}</div>)}</section></main>;
 
   return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.shell}>
     <header style={{...styles.header,background:c.bg,borderColor:c.border}}>
@@ -138,7 +166,7 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
       <div style={{...styles.categoryHeading,background:c.card,borderColor:c.border}}><div style={styles.eyebrow}>Categoria {indiceAtivo+1} de {secoes.length}</div><h2 style={{margin:"4px 0 0",fontSize:19}}>{secaoAtiva?.id} · {secaoAtiva?.nome}</h2></div>
       {secaoAtiva?.subcategorias.map(sub=><section key={sub.id} style={{...styles.subcategory,background:c.card,borderColor:c.border}}><div style={{...styles.subcategoryHeader,borderColor:c.border}}><div><div style={styles.eyebrow}>{sub.id}</div><h3 style={{margin:"3px 0 0",fontSize:15}}>{sub.nome}</h3></div><span style={{...styles.counter,color:c.muted,borderColor:c.border}}>{calculateProgress(sub.itens,respostas).respondidos}/{sub.itens.length}</span></div><div>{sub.itens.map((item,index)=>{const resposta=respostas[item.id]||{};const selectedStatus=resposta.status;const exigeAnalise=STATUS_QUE_EXIGEM_ANALISE.includes(selectedStatus);const exigeObservacao=STATUS_QUE_EXIGEM_OBSERVACAO.includes(selectedStatus);const criticidade=CRITICIDADE_UI[item.criticidade]||CRITICIDADE_UI.informativo;return <article key={item.id} style={{...styles.item,borderColor:c.border}}><div style={{display:"flex",gap:10,alignItems:"flex-start"}}><div style={{...styles.itemNumber,background:c.alt,color:c.muted}}>{index+1}</div><div style={{flex:1,minWidth:0}}><div style={{fontSize:13,lineHeight:1.45,fontWeight:650}}>{item.texto}</div><div style={{display:"flex",gap:7,alignItems:"center",marginTop:5}}><span style={{fontSize:9,fontWeight:800,color:criticidade.color,textTransform:"uppercase",letterSpacing:.5}}>{criticidade.label}</span><span style={{...styles.muted,color:c.muted}}>{item.id}</span></div></div></div><div style={styles.statusGrid} role="group" aria-label={`Avaliação de ${item.texto}`}>{STATUS_ITEM_LISTA.map(status=>{const info=STATUS_UI[status];const selected=selectedStatus===status;return <button key={status} onClick={()=>mark(item.id,status)} title={info.label} aria-pressed={selected} style={{...styles.statusButton,color:selected?"#fff":info.color,borderColor:selected?info.color:`${info.color}55`,background:selected?info.color:"transparent"}}><strong>{info.short}</strong><span>{info.label}</span></button>;})}</div>{exigeAnalise&&<div style={{...styles.analysisPanel,background:c.alt,borderColor:c.border}}><div style={{...styles.analysisHint,color:c.muted}}>Registre a ocorrência para este item.</div><label style={{...styles.fieldLabel,color:c.muted}}>Situação<textarea value={resposta.situacao||""} onChange={e=>updateResposta(item.id,"situacao",e.target.value)} placeholder="O que foi encontrado?" style={{...styles.responseInput,background:c.input,color:c.text,borderColor:c.border}}/></label><label style={{...styles.fieldLabel,color:c.muted}}>Impacto<textarea value={resposta.impacto||""} onChange={e=>updateResposta(item.id,"impacto",e.target.value)} placeholder="Qual o risco ou consequência?" style={{...styles.responseInput,background:c.input,color:c.text,borderColor:c.border}}/></label><label style={{...styles.fieldLabel,color:c.muted}}>Indicação<textarea value={resposta.indicacao||""} onChange={e=>updateResposta(item.id,"indicacao",e.target.value)} placeholder="Qual a ação recomendada?" style={{...styles.responseInput,background:c.input,color:c.text,borderColor:c.border}}/></label></div>}{exigeObservacao&&<div style={{...styles.analysisPanel,background:c.alt,borderColor:c.border}}><label style={{...styles.fieldLabel,color:c.muted}}>Observação<textarea value={resposta.observacao||""} onChange={e=>updateResposta(item.id,"observacao",e.target.value)} placeholder="Por que não foi possível obter o dado?" style={{...styles.responseInput,background:c.input,color:c.text,borderColor:c.border}}/></label></div>}</article>;})}</div></section>)}
       <div style={styles.footerActions}><button disabled={indiceAtivo===0} onClick={()=>goTo(secoes[indiceAtivo-1]?.id)} style={{...styles.secondary,color:c.muted,borderColor:c.border,opacity:indiceAtivo===0 ? 0.4 : 1}}>← Anterior</button>{indiceAtivo<secoes.length-1?<button onClick={()=>goTo(secoes[indiceAtivo+1]?.id)} style={styles.primary}>Próxima categoria →</button>:<button disabled style={{...styles.primary,background:progresso.percentual===100?"#15803d":"#334155"}}>{progresso.percentual===100?"✓ Rascunho completo":"Complete os itens"}</button>}</div>
-      <button onClick={clearDraft} style={{...styles.clearButton,color:c.muted}}>Limpar rascunho local</button><p style={{...styles.disclaimer,color:c.muted}}>Nesta primeira versão, as marcações ficam somente neste aparelho. Nenhum diagnóstico é enviado ao Firestore.</p>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button onClick={()=>salvarDiagnostico("rascunho")} disabled={persistBusy} style={styles.primary}>{persistBusy?"Salvando…":"Salvar diagnóstico"}</button><button onClick={()=>salvarDiagnostico("arquivado")} disabled={persistBusy} style={styles.secondary}>Arquivar</button><button onClick={()=>setProjetoContexto(null)} style={styles.secondary}>Trocar projeto</button></div>{persistError&&<p style={styles.error}>{persistError}</p>}<button onClick={clearDraft} style={{...styles.clearButton,color:c.muted}}>Limpar rascunho local</button><p style={{...styles.disclaimer,color:c.muted}}>Diagnóstico vinculado a {projetoContexto.rotuloLivre||projetoContexto.projetoRef}; catálogo permanece somente leitura.</p>
     </section>
   </div></main>;
 }
