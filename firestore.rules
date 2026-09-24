@@ -154,13 +154,39 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Caminhos FUTUROS do Diagnóstico — NÃO abertos na Fase 1.
-    // Fase 1 não cria diagnósticos, respostas, evidências, revisões
-    // nem entregáveis. Tudo negado até a fase que implementar modelo
-    // e escopo real.
-    match /diagnosticos/{document=**} {
-      allow read, write: if false;
+    // Diagnóstico Situacional — escopo por projeto e autor.
+    match /diagnosticos/{chaveProjeto}/itens/{diagnosticoId} {
+      function projetoExistentePermitido(dados) {
+        return dados.tipo == 'existente'
+          && dados.projetoRef == chaveProjeto
+          && (isGerenteRaiz()
+            || (userExistsActive()
+              && userDoc().projectIds.hasAny([dados.projetoRef])));
+      }
+      function projetoNovoDoAutor(dados) {
+        return dados.tipo == 'novo'
+          && dados.projetoRef == null
+          && dados.autorUid == request.auth.uid
+          && chaveProjeto.matches('novo_' + request.auth.uid + '_.*');
+      }
+      function podeLer(dados) {
+        return isAuditorOrGerente()
+          && (projetoExistentePermitido(dados) || projetoNovoDoAutor(dados));
+      }
+      allow read: if podeLer(resource.data);
+      allow create: if isAuditorOrGerente()
+        && (projetoExistentePermitido(request.resource.data)
+          || projetoNovoDoAutor(request.resource.data));
+      allow update: if podeLer(resource.data)
+        && request.resource.data.tipo == resource.data.tipo
+        && request.resource.data.projetoRef == resource.data.projetoRef
+        && request.resource.data.autorUid == resource.data.autorUid
+        && request.resource.data.criadoEm == resource.data.criadoEm
+        && request.resource.data.catalogoId == resource.data.catalogoId
+        && request.resource.data.versaoCatalogo == resource.data.versaoCatalogo;
+      allow delete: if false;
     }
+    match /diagnosticos/{document=**} { allow read, write: if false; }
     match /respostas/{document=**}    { allow read, write: if false; }
     match /evidencias/{document=**}   { allow read, write: if false; }
     match /revisoes/{document=**}     { allow read, write: if false; }
