@@ -1,4 +1,4 @@
-import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, filtrosConsultaDiagnosticos, mergeRespostasPorAtualizacao, normalizarAtualizacao } from "./diagnosticoSync";
+import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, filtrarDiagnosticosPorEstado, filtrosConsultaDiagnosticos, mergeRespostasPorAtualizacao, normalizarAtualizacao } from "./diagnosticoSync";
 
 test("não tenta ler um diagnóstico remoto antes da primeira gravação",()=>{
   expect(deveBuscarDiagnosticoRemoto(null)).toBe(false);
@@ -33,4 +33,10 @@ test("consulta de projeto novo fica limitada ao autor",()=>{
     ["projetoRef","==",null],
     ["autorUid","==","uid"],
   ]);
+});
+
+test("separa diagnósticos ativos dos arquivados sem apagar registros",()=>{
+  const docs=[{id:"a",estado:"rascunho"},{id:"b",estado:"arquivado"},{id:"c"}];
+  expect(filtrarDiagnosticosPorEstado(docs,"ativos").map(d=>d.id)).toEqual(["a","c"]);
+  expect(filtrarDiagnosticosPorEstado(docs,"arquivados").map(d=>d.id)).toEqual(["b"]);
 });

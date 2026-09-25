@@ -33,3 +33,7 @@ export function filtrosConsultaDiagnosticos(contexto,uid) {
   }
   return [];
 }
+
+export function filtrarDiagnosticosPorEstado(diagnosticos=[],filtro="ativos") {
+  return diagnosticos.filter(diagnostico=>filtro==="arquivados"?diagnostico?.estado==="arquivado":diagnostico?.estado!=="arquivado");
+}
