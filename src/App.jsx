@@ -13,7 +13,12 @@ import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
-import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin } from "./session";
+import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
+import PainelLider from "./PainelLider";
+import AuditoriaOperacional from "./AuditoriaOperacional";
+import { PROJECT_PINS } from "./accessConfig";
+import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
+import { recursosHabilitados } from "./gerenciaisConfig";
 import CCO from "./CCO";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
@@ -22,7 +27,7 @@ import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
-import DiagnosticoSituacional from "./DiagnosticoSituacional";
+import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 
 // ── Hook de conectividade
 function useOnlineStatus() {
@@ -148,6 +153,7 @@ function SafeBlock({ name, children }) {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
+import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const EMAILJS_SERVICE_ID  = "service_k7e0d0j";
@@ -236,11 +242,7 @@ function generateViewToken(projectId) {
   return Math.random().toString(36).substring(2,10) + Math.random().toString(36).substring(2,10);
 }
 
-const PROJECT_PINS = {
-  P601:"16601", P602:"16602", P604:"16604", P605:"16605",
-  P606:"16606", P607:"16607", P311A:"16311", P311B:"16311", P505:"16505",
-  P260A:"162601", P260B:"162602", P260C:"162603"
-};
+// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
 
 const JATINOX_SUBS = {
   P260A: { id:"P260A", name:"Jatinox Unidade A", hasAcesso:true,  hasEquipe:true,  hasCaoGuarda:false },
@@ -327,8 +329,8 @@ const PROJECTS = {
       {id:"nobreaks",label:"16 - NOBREAKS",type:"items",itemLabels:["CCO","Portaria"]},
       {id:"paradox",label:"17 - PARADOX",type:"items",itemLabels:["CCO"]},
       {id:"reverso",label:"18 - PICTOGRAMA REVERSIVO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
-      {id:"portas_cco",label:"19 - PORTAS CCO",type:"items",itemLabels:["Entrada","Sa\u00edda"]},
-      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO 01","CCO 02","Fixo Externo"]},
+      {id:"portas_cco",label:"19 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
+      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO 01","CCO 02"]},
       {id:"panic_mob",label:"21 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["L\u00edder","Ronda 01","Ronda 02","Reserva"]},
       {id:"semaforos",label:"22 - SEM\u00c1FOROS",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
       {id:"sensores",label:"23 - SENSORES ANTI-ESMAGAMENTO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Entrada 05","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04","Sa\u00edda 05"]},
@@ -352,7 +354,7 @@ const PROJECTS = {
       {id:"mon_cftv",label:"09 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
       {id:"mon_portaria",label:"10 - MONITOR PORTARIA",type:"notes"},
       {id:"portaria",label:"11 - PORTARIA",type:"items",itemLabels:["Tablet","Joystick","Ar-Condicionado","Transformador"]},
-      {id:"portoes_eclusa",label:"12 - PORT\u00d5ES ECLUSA",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},
+      {id:"portoes_eclusa",label:"12 - PORT\u00d5ES ECLUSA",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},{id:"panic_fix",label:"14 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01"]},{id:"eclusa_cco",label:"15 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"qr_eclusas",label:"13 - QR ECLUSAS",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Entrada 04","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03","Sa\u00edda 04"]},
       {id:"qr_torn",label:"14 - QR TORNIQUETES",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 01","Sa\u00edda 02"]},
       {id:"torniquetes",label:"15 - TORNIQUETES",type:"items",itemLabels:["Torniquete 01","Torniquete 02"]},
@@ -361,7 +363,7 @@ const PROJECTS = {
       {id:"infra",label:"18 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P604: {id:"P604",name:"Golgi Jundia\u00ed",short:"Jundia\u00ed",categories:[
-      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO (REPETIDORAS)",type:"items",itemLabels:["Repetidora 01","Repetidora 02","Repetidora 03","Repetidora 04"]},
+      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO (REPETIDORAS)",type:"items",itemLabels:["Repetidora 01","Repetidora 02","Repetidora 03","Repetidora 04"]},{id:"panic_fix",label:"01B - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01"]},{id:"panic_mob",label:"01C - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02","M\u00f3vel 03"]},{id:"eclusa_cco",label:"01D - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07"]},
       {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO 01","CCO 02","Recep\u00e7\u00e3o"]},
       {id:"cancelas_estac",label:"04 - CANCELAS ADM (ADMINISTRATIVAS)",type:"items",itemLabels:["Cancela 01","Cancela 02"]},
@@ -399,7 +401,7 @@ const PROJECTS = {
       {id:"cancelas",label:"05 - CANCELAS AS (ALTA SEGURAN\u00c7A)",type:"items",itemLabels:["Entrada 01","Entrada 02 Reversa","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},
       {id:"cftv",label:"06 - CFTV",type:"count",total:54},
       {id:"cofres",label:"07 - COFRES",type:"items",itemLabels:["CCO","Portaria"]},
-      {id:"eclusas",label:"08 - ECLUSAS",type:"items",itemLabels:["CCO Porta 01 Ext.","CCO Porta 02 Int.","Portaria Porta 01 Int.","Portaria Porta 01 Ext."]},
+      {id:"eclusas",label:"08 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"giroflex",label:"09 - GIROFLEX ECLUSAS",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},
       {id:"intercomunicador",label:"10 - INTERCOMUNICADORES",type:"items",itemLabels:["CCO","CDA","Elevador"]},
       {id:"internet",label:"11 - INTERNET",type:"items",itemLabels:["ADM","Visitantes"]},
@@ -411,8 +413,8 @@ const PROJECTS = {
       {id:"mon_portaria",label:"17 - MONITOR PORTARIA",type:"notes"},
       {id:"nobreak",label:"18 - NOBREAK CCO",type:"items",itemLabels:["CCO"]},
       {id:"pictogramas",label:"19 - PICTOGRAMAS / FAR\u00d3IS",type:"items",itemLabels:["Farol 01","Farol 02","Farol 03","Farol 04","Farol 05","Farol 06"]},
-      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO","Portaria"]},
-      {id:"panic_mob",label:"21 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["GA L\u00edder 01","GA L\u00edder 02","GB VSPP 01","GB VSPP 02"]},
+      {id:"panic_fix",label:"20 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO"]},
+      {id:"panic_mob",label:"21 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["GA L\u00edder 01"]},
       {id:"semaforos",label:"22 - SEM\u00c1FOROS / L\u00c2MPADAS PILOTO",type:"items",itemLabels:["Entrada 01","Entrada 02 Reversa","Sa\u00edda 03 Reversa","Sa\u00edda 04"]},
       {id:"telefone",label:"23 - TELEFONES",type:"items",itemLabels:["CCO Ramal","CCO Emergencial","CCO Fixo","Portaria 01","Portaria 02"]},
       {id:"torniquetes",label:"24 - TORNIQUETES",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},
@@ -421,9 +423,9 @@ const PROJECTS = {
       {id:"infra",label:"27 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P606: {id:"P606",name:"Golgi Duque de Caxias",short:"Duque",categories:[
-      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["CCO","Galp\u00e3o 01","Galp\u00e3o 02","Galp\u00e3o 03","Galp\u00e3o 04","Galp\u00e3o 05","Galp\u00e3o 06","Galp\u00e3o 07","Galp\u00e3o 08","Galp\u00e3o 09","Galp\u00e3o 10"]},
+      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["CCO","Galp\u00e3o 01","Galp\u00e3o 02","Galp\u00e3o 03","Galp\u00e3o 04","Galp\u00e3o 05","Galp\u00e3o 06","Galp\u00e3o 07","Galp\u00e3o 08","Galp\u00e3o 09","Galp\u00e3o 10"]},{id:"eclusa_cco",label:"01B - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03"]},
-      {id:"panic",label:"03 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02","Fixo CCO","Fixo Recep\u00e7\u00e3o","Fixo Guarita"]},
+      {id:"panic_fix",label:"03 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo CCO","Fixo Recep\u00e7\u00e3o","Fixo Guarita"]},{id:"panic_mob",label:"03B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02"]},
       {id:"cancela",label:"04 - CANCELA",type:"items",itemLabels:["Entrada Principal"]},
       {id:"cftv",label:"05 - CFTV",type:"count",total:72},
       {id:"dilaceradores",label:"06 - DILACERADORES",type:"items",itemLabels:["Entrada 01","Reversiva 02","Sa\u00edda 03"]},
@@ -444,7 +446,7 @@ const PROJECTS = {
       {id:"infra",label:"21 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P607: {id:"P607",name:"Golgi Bras\u00edlia",short:"Bras\u00edlia",categories:[
-      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["Painel CCO","Painel Guarita","Painel ADM"]},
+      {id:"fire",label:"01 - ALARME DE INC\u00caNDIO",type:"items",itemLabels:["Painel CCO","Painel Guarita","Painel ADM"]},{id:"eclusa_cco",label:"01B - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04"]},
       {id:"anti_esmag",label:"03 - ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa Ent 1 \u2013 AE 01","Eclusa Ent 1 \u2013 AE 02","Eclusa Ent 2 \u2013 AE 01","Eclusa Ent 2 \u2013 AE 02"]},
       {id:"ac",label:"04 - AR-CONDICIONADO CCO",type:"items",itemLabels:["Aparelho 01"]},
@@ -460,7 +462,7 @@ const PROJECTS = {
       {id:"motores",label:"14 - MOTORES DOS PORT\u00d5ES",type:"items",itemLabels:["Ent 1 \u2013 M01","Ent 1 \u2013 M02","Ent 1 \u2013 M03","Ent 2 \u2013 M01","Ent 2 \u2013 M02","Ent 2 \u2013 M03","Sa\u00ed 1 \u2013 M01","Sa\u00ed 1 \u2013 M02","Sa\u00ed 1 \u2013 M03","Sa\u00ed 1 \u2013 M04","Sa\u00ed 2 \u2013 M01","Sa\u00ed 2 \u2013 M02","Sa\u00ed 2 \u2013 M03","Sa\u00ed 2 \u2013 M04"]},
       {id:"nobreak",label:"15 - NOBREAK",type:"items",itemLabels:["CCO"]},
       {id:"portoes",label:"16 - PORT\u00d5ES",type:"items",itemLabels:["Eclusa Ent 1 \u2013 P01","Eclusa Ent 1 \u2013 P02","Eclusa Ent 2 \u2013 P01","Eclusa Ent 2 \u2013 P02","Eclusa Sa\u00ed 1 \u2013 P01","Eclusa Sa\u00ed 1 \u2013 P02","Eclusa Sa\u00ed 2 \u2013 P01","Eclusa Sa\u00ed 2 \u2013 P02"]},
-      {id:"panic",label:"17 - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["Ronda","Pista","CCO"]},
+      {id:"panic_fix",label:"17 - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01","Fixo 02"]},{id:"panic_mob",label:"17B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["Ronda"]},
       {id:"sensores",label:"18 - SENSORES DOS PORT\u00d5ES",type:"items",itemLabels:["Ent 1 \u2013 S01","Ent 1 \u2013 S02","Ent 1 \u2013 S03","Ent 1 \u2013 S04","Ent 2 \u2013 S01","Ent 2 \u2013 S02","Ent 2 \u2013 S03","Ent 2 \u2013 S04","Sa\u00ed 1 \u2013 S01","Sa\u00ed 1 \u2013 S02","Sa\u00ed 1 \u2013 S03","Sa\u00ed 1 \u2013 S04","Sa\u00ed 2 \u2013 S01","Sa\u00ed 2 \u2013 S02","Sa\u00ed 2 \u2013 S03","Sa\u00ed 2 \u2013 S04"]},
       {id:"tablets",label:"19 - TABLETS KEYACCESS",type:"items",itemLabels:["Tablet 01","Tablet 02"]},
       {id:"totens",label:"20 - TOTENS",type:"items",itemLabels:["Entrada","Sa\u00edda"]},
@@ -471,9 +473,9 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},
       {id:"ac",label:"02 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},
       {id:"botoeiras",label:"03 - BOTOEIRAS / PORT\u00d5ES DE ACESSO",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},
-      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["L\u00edder","CCO"]},
+      {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO"]},{id:"panic_mob",label:"04B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["L\u00edder"]},
       {id:"cancelas",label:"05 - CANCELAS DE ACESSO",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
-      {id:"portas_cco",label:"06 - CCO / ABERTURA DE PORTAS",type:"items",itemLabels:["Porta 01 Externa","Porta 02 Interna"]},
+      {id:"portas_cco",label:"06 - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"cftv",label:"07 - CFTV",type:"count",total:140},
       {id:"computadores",label:"08 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador 01","Computador 02","Internet/Rede"]},
       {id:"dilaceradores",label:"09 - DILACERADORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 04","Sa\u00edda 05"]},
@@ -496,7 +498,7 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06"]},
       {id:"ac",label:"02 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica"]},
       {id:"botoeiras",label:"03 - BOTOEIRAS DO DILACERADOR",type:"items",itemLabels:["Botoeira 01","Botoeira 02","Botoeira 03"]},
-      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["CCO Fixo","Ronda M\u00f3vel","L\u00edder M\u00f3vel"]},
+      {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO Fixo"]},{id:"panic_mob",label:"04B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["Ronda M\u00f3vel"]},
       {id:"portas_cco",label:"05 - CCO / CONTROLE DE ACESSO",type:"items",itemLabels:["Porta 01 Externa \u2013 Local","Porta 01 Externa \u2013 Remota","Porta 02 Interna \u2013 Local","Porta 02 Interna \u2013 Remota"]},
       {id:"cftv",label:"06 - CFTV",type:"count",total:114},
       {id:"computadores",label:"07 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador Principal","Computador Secund\u00e1rio","Internet"]},
@@ -516,29 +518,37 @@ const PROJECTS = {
       {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07","Zona 08","Zona 09","Zona 10","Zona 11","Zona 12"]},
       {id:"sdai",label:"02 - ALARME SDAI PORTARIA",type:"items",itemLabels:["G100","G200"]},
       {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Portaria Aparelho 01"]},
-      {id:"panic",label:"04 - BOT\u00d5ES DE P\u00c2NICO",type:"items",itemLabels:["Fixo CCO"]},
-      {id:"cancelas",label:"05 - CANCELAS, HASTES E MOTORES",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},
-      {id:"cftv",label:"06 - CFTV",type:"count",total:73},
-      {id:"eclusas",label:"07 - ECLUSAS CCO E PORTARIA",type:"items",itemLabels:["CCO Porta 01 Ext \u2013 Local","CCO Porta 02 Int \u2013 Local","Portaria Porta 01 Int \u2013 Local","Portaria Porta 02 Ext \u2013 Local"]},
-      {id:"eletroima",label:"08 - ELETROIM\u00c3 / ECLUSA / PORTAS",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},
-      {id:"farois",label:"09 - FAR\u00d3IS DAS CANCELAS",type:"items",itemLabels:["Cancela Eclusa 01 Ext","Cancela Eclusa 01 Int","Cancela Eclusa 02 Ext","Cancela Eclusa 02 Int","Cancela Eclusa 03 Ext","Cancela Eclusa 03 Int","Cancela Eclusa 04 Ext"]},
-      {id:"garra",label:"10 - GARRA DE TIGRE",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Reversiva 03","Eclusa Sa\u00edda 04"]},
-      {id:"giroflex",label:"11 - GIROFLEX DAS ECLUSAS",type:"items",itemLabels:["Entrada 01","Entrada 02","Sa\u00edda 03 Reversiva","Sa\u00edda 04"]},
-      {id:"intercomunicadores",label:"12 - INTERCOMUNICADORES",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},
-      {id:"internet",label:"13 - INTERNET",type:"single"},
-      {id:"facial",label:"14 - LEITORES FACIAIS ECLUSAS/CANCELAS",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Sa\u00edda 03 Reversiva","Eclusa Sa\u00edda 04"]},
-      {id:"mesa",label:"15 - MESA CONTROLADORA CCO E PORTARIA",type:"items",itemLabels:["CCO","Portaria"]},
-      {id:"mon_cda",label:"16 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01"]},
-      {id:"mon_cftv",label:"17 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05"]},
-      {id:"mon_portaria",label:"18 - MONITOR PORTARIA",type:"notes"},
-      {id:"portoes",label:"19 - PORT\u00d5ES / ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},
-      {id:"telefone",label:"20 - TELEFONE FIXO CCO E PORTARIA",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},
-      {id:"torniquetes",label:"21 - TORNIQUETES LEITORES FACIAIS",type:"items",itemLabels:["Torniquete 01 E/S","Torniquete 02 E/S","Torniquete 03 E/S","Torniquete 04 E/S"]},
-      {id:"totens",label:"22 - TOTENS VISITANTES / MOTORISTAS",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},
-      {id:"manutencao",label:"23 - VISITA DE MANUTEN\u00c7\u00c3O",type:"maintenance"},
-      {id:"infra",label:"24 - INFRAESTRUTURA / OBS.",type:"notes"}
+      {id:"panic_fix",label:"04 - PÂNICO FIXO",type:"items",itemLabels:["Fixo CCO","Unidade 02"]},
+      {id:"panic_mob",label:"04B - PÂNICO MÓVEL",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03"]},
+      {id:"cancelas",label:"05 - CANCELAS, HASTES E MECANISMOS",type:"items",itemLabels:["Entrada 01","Entrada 02","Saída 03 Reversiva","Saída 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
+      {id:"cftv",label:"06 - CFTV FIXAS",type:"count",total:65},
+      {id:"speed_dome",label:"06B - CFTV SPEED DOME",type:"count",total:8},
+      {id:"eclusas",label:"07 - ECLUSA CCO (PORTAS/ABERTURA)",type:"items",itemLabels:["Porta 01 — Local","Porta 01 — Remota","Porta 02 — Local","Porta 02 — Remota"]},
+      {id:"eletroima",label:"08 - ELETROÍMÃS DA ECLUSA CCO",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},
+      {id:"farois",label:"09 - FARÓIS/LED DAS CANCELAS",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04","Cancela 05","Cancela 06","Cancela 07","Cancela 08"]},
+      {id:"garra",label:"10 - GARRA DE TIGRE (DILACERADORES)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
+      {id:"giroflex",label:"11 - GIROFLEX DAS ECLUSAS",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
+      {id:"internet",label:"12 - INTERNET (LINK DE DADOS)",type:"single"},
+      {id:"facial_vias",label:"13 - LEITORES FACIAIS — VIAS VEICULARES (SUBSOLO)",type:"count",total:19},
+      {id:"mesa",label:"14 - MESA CONTROLADORA (CCO 32 BOTÕES)",type:"items",itemLabels:["CCO","Portaria"]},
+      {id:"mon_portaria_dispositivos",label:"15 - MONITORES CONTROLE DE ACESSO PORTARIA",type:"items",itemLabels:["Unidade 01","Unidade 02"]},
+      {id:"mon_cda",label:"16 - MONITOR CONTROLE DE ACESSO CCO",type:"items",itemLabels:["Unidade 01"]},
+      {id:"mon_cftv",label:"17 - MONITORES CFTV CCO (MURAL/TELAS)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05"]},
+      {id:"portoes_controle",label:"18 - PORTÕES (FOLHAS)",type:"count",total:16},
+      {id:"motores",label:"19 - MOTORES DE PORTÕES",type:"count",total:16},
+      {id:"sensores",label:"20 - SENSORES ANTI-ESMAGAMENTO",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
+      {id:"telefone",label:"21 - TELEFONE FIXO CCO E PORTARIA",type:"items",itemLabels:["Ramal CCO","Ramal Portaria"]},
+      {id:"torniquetes",label:"22 - TORNIQUETES (ESTRUTURA MECÂNICA)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
+      {id:"facial_torniquetes",label:"23 - LEITORES FACIAIS DOS TORNIQUETES",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
+      {id:"totens",label:"24 - TOTENS VISITANTES/MOTORISTAS",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},
+      {id:"intercomunicadores",label:"LEGADO (HISTÓRICO) — INTERCOMUNICADORES",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},
+      {id:"facial",label:"LEGADO (HISTÓRICO) — LEITORES FACIAIS ECLUSAS/CANCELAS",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Saída 03 Reversiva","Eclusa Saída 04"]},
+      {id:"portoes",label:"LEGADO (HISTÓRICO) — PORTÕES / ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},
+      {id:"mon_portaria_legacy",label:"LEGADO (HISTÓRICO) — MONITOR PORTARIA",type:"notes"},
+      {id:"manutencao",label:"25 - VISITA DE MANUTENÇÃO",type:"maintenance"},
+      {id:"infra",label:"26 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
-  P260A: {id:"P260A",name:"Jatinox Unidade A",short:"Jatinox A",categories:[{id:"panic_fix",label:"01 - Bot\u00f5es de P\u00e2nico Fixos",type:"items",itemLabels:["CCO","P1","P2","P3"]},{id:"cerca",label:"02 - Cerca El\u00e9trica",type:"items",itemLabels:["Zona 07","Zona 08"]},{id:"eclusa_cco",label:"03 - Eclusa CCO",type:"items",itemLabels:["Abertura Remota","Sa\u00edda de Emerg\u00eancia"]},{id:"eclusa_p3",label:"04 - Port\u00e3o Eclusa P3",type:"items",itemLabels:["Externa (com interfone)","Interna (com interfone)"]},{id:"telefonia",label:"05 - Telefonia",type:"items",itemLabels:["Smartphone CCO/L\u00edder 01","Smartphone CCO/L\u00edder 02","Ramal P1","Ramal P2"]},{id:"cftv",label:"06 - Imagens CFTV",type:"count",total:65},{id:"campainhas",label:"07 - Campainhas",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02"]},{id:"sala_cftv",label:"08 - Sala de CFTV CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05","Monitor 06","Monitor 07","Teclado 01","Teclado 02","Teclado 03","RAC","Telefone Fixo 01","Telefone Fixo 02"]},{id:"cam_sistema",label:"09 - C\u00e2meras Sistema Sala",type:"count",total:132},{id:"recepcao_p3",label:"10 - Recep\u00e7\u00e3o P3",type:"items",itemLabels:["Monitor 01","Monitor 02","Teclado 01","Teclado 02","CPU 01","CPU 02","Telefone Fixo 01","Telefone Fixo 02","Impressora","Intercomunicador de Guich\u00ea","DVR 01","DVR 02"]},{id:"sirenes",label:"11 - Sirenes c/ Ilumina\u00e7\u00e3o",type:"items",itemLabels:["Roberto Koch (s/ ilum.)","Presidente Wilson 01 (c/ ilum.)","Presidente Wilson 02 (c/ ilum.)","Ubarana 01 (c/ ilum.)","Ubarana 02 (c/ ilum.)","Ubarana 03 (c/ ilum.)","Ubarana 04 (c/ ilum.)","Ubarana 05 (c/ ilum.)"]},{id:"manutencao",label:"12 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"13 - Infraestrutura / Obs.",type:"notes"}]},
+  P260A: {id:"P260A",name:"Jatinox Unidade A",short:"Jatinox A",categories:[{id:"panic_fix",label:"01 - Bot\u00f5es de P\u00e2nico Fixos",type:"items",itemLabels:["CCO","P1","P2","P3","P5"]},{id:"panic_mob",label:"01B - P\u00e2nico M\u00f5veis",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02"]},{id:"cerca",label:"02 - Cerca El\u00e9trica",type:"items",itemLabels:["Zona 07","Zona 08"]},{id:"eclusa_cco",label:"03 - Eclusa CCO (Abertura)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},{id:"eclusa_p3",label:"04 - Port\u00e3o Eclusa P3",type:"items",itemLabels:["Externa (com interfone)","Interna (com interfone)"]},{id:"telefonia",label:"05 - Telefonia",type:"items",itemLabels:["Smartphone CCO/L\u00edder 01","Smartphone CCO/L\u00edder 02","Ramal P1","Ramal P2"]},{id:"cftv",label:"06 - Imagens CFTV",type:"count",total:65},{id:"campainhas",label:"07 - Campainhas",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02"]},{id:"sala_cftv",label:"08 - Sala de CFTV CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05","Monitor 06","Monitor 07","Teclado 01","Teclado 02","Teclado 03","RAC","Telefone Fixo 01","Telefone Fixo 02"]},{id:"cam_sistema",label:"09 - C\u00e2meras Sistema Sala",type:"count",total:132},{id:"recepcao_p3",label:"10 - Recep\u00e7\u00e3o P3",type:"items",itemLabels:["Monitor 01","Monitor 02","Teclado 01","Teclado 02","CPU 01","CPU 02","Telefone Fixo 01","Telefone Fixo 02","Impressora","Intercomunicador de Guich\u00ea","DVR 01","DVR 02"]},{id:"sirenes",label:"11 - Sirenes c/ Ilumina\u00e7\u00e3o",type:"items",itemLabels:["Roberto Koch (s/ ilum.)","Presidente Wilson 01 (c/ ilum.)","Presidente Wilson 02 (c/ ilum.)","Ubarana 01 (c/ ilum.)","Ubarana 02 (c/ ilum.)","Ubarana 03 (c/ ilum.)","Ubarana 04 (c/ ilum.)","Ubarana 05 (c/ ilum.)"]},{id:"manutencao",label:"12 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"13 - Infraestrutura / Obs.",type:"notes"}]},
 };
 
 function daysSince(dateStr) {
@@ -718,12 +728,23 @@ function buildBlank(project) {
   const st = {};
   for(const cat of project.categories){
     if(cat.type==="single") st[cat.id]={status:"ok",note:"",since:""};
-    else if(cat.type==="items") st[cat.id]=cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
+    else if(cat.type==="items") st[cat.id]=cat.itemLabels.map((_,i)=>{
+      const unitId=getUnitId(project.id,cat,i);
+      return {...(unitId?{unitId}:{}),status:"ok",note:"",since:""};
+    });
     else if(cat.type==="count") st[cat.id]={total:cat.total,inoperative:[]};
     else if(cat.type==="notes") st[cat.id]={items:[]};
     else if(cat.type==="maintenance") st[cat.id]={visits:[]};
   }
   return st;
+}
+
+// Identidade estável da unidade para relatórios novos. Categorias legadas sem
+// itemIds explícito mantêm o ID derivado da posição original; o leitor abaixo
+// conserva compatibilidade com históricos que ainda não o possuem.
+function getUnitId(projectId, cat, index) {
+  if(projectId!=="P505") return null;
+  return cat.itemIds?.[index] || (cat.id+"-"+(index+1));
 }
 
 function buildFromLast(project, lastState) {
@@ -738,10 +759,14 @@ function buildFromLast(project, lastState) {
       const prev=lastState[cat.id]??cat.itemLabels.map(()=>({status:"ok",note:"",since:""}));
       // normaliza para array (compat com estados antigos salvos como objeto)
       const prevArr=Array.isArray(prev)?prev:Object.keys(prev).sort((a,b)=>(+a)-(+b)).map(k=>prev[k]);
+      const prevPorId=new Map(prevArr.filter(p=>p?.unitId).map(p=>[p.unitId,p]));
       st[cat.id]=cat.itemLabels.map((_,i)=>{
-        const p=prevArr[i]??{status:"ok"};
+        // Prioriza ID estável dos relatórios novos; histórico sem ID continua
+        // sendo lido pela posição, sem migração nem alteração do registro.
+        const unitId=getUnitId(project.id,cat,i);
+        const p=(unitId?prevPorId.get(unitId):null)??prevArr[i]??{status:"ok"};
         const pSt=resolveStatus(p);
-        return {status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
+        return {...(unitId?{unitId}:{}), status:pSt, note:p.note||"", since:pSt!=="ok"?p.since||todayStr():""};
       });
     } else if(cat.type==="count"){
       st[cat.id]={total:lastState[cat.id]?.total??cat.total, inoperative:[...(lastState[cat.id]?.inoperative??[])]};
@@ -1474,9 +1499,46 @@ function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
   a.click(); URL.revokeObjectURL(url);
 }
 
-function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport}) {
+// Computa o score 360 de UM projeto (para a Auditoria Operacional), reusando
+// computeScore360/computeHealth. Só leitura; mesmos insumos do carregarVisao360,
+// escopados a um projeto. Retorna {score, base, penalidades, vulnerabilidades} ou null.
+function score360Calcular(pid, insumos, ctx){
+  const { stored, ctmkData } = ctx;
+  const p = PROJECTS[pid];
+  if (!p) return null;
+  const hist = stored?.[pid]?.history ?? [];
+  const last = hist[hist.length-1];
+  const base = last ? computeHealth(p,last.state).pct : 0;
+  const c = ctmkData?.[pid];
+  const ctmkIdade = c?.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
+  const ctmkDias = ctmkIdade ? Math.max(1, ctmkIdade.dias) : 0;
+  return computeScore360(base, { ctmkDias, keyAbertas: insumos.keyAbertas||0, bolsaoCriticos: insumos.bolsaoCriticos||0, perimetralZonasRuins: insumos.perimetralZonasRuins||0, rondaPct: insumos.rondaPct!==undefined ? insumos.rondaPct : null });
+}
+
+async function computeScore360Projeto(pid, ctx) {
+  try {
+    const { stored, ctmkData } = ctx;
+    const p = PROJECTS[pid]; if(!p) return null;
+    const [keySnap, bolsaoSnap, periSnap] = await Promise.all([
+      getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null),
+      (pid==="P311A"||pid==="P311B") ? getDoc(doc(db,"bolsao",pid)).catch(()=>null) : Promise.resolve(null),
+      getDoc(doc(db,"perimetral",pid)).catch(()=>null),
+    ]);
+    const keyAbertas = keySnap?.exists() ? (keySnap.data().registros||[]).filter(r=>!r.horaFim).length : 0;
+    const bolsaoCriticos = bolsaoSnap?.exists() ? Object.values(bolsaoSnap.data().placas||{}).filter(x=>x.status==="critico").length : 0;
+    let perimetralZonasRuins = 0;
+    if(periSnap?.exists()){ const testes=periSnap.data().testes||[]; if(testes.length){ const ult=[...testes].sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0]; perimetralZonasRuins=Object.values(ult.zonas||{}).filter(z=>(z?.status||"ok")!=="ok").length; } }
+    const r = score360Calcular(pid, { keyAbertas, bolsaoCriticos, perimetralZonasRuins, rondaPct:null }, { stored, ctmkData });
+    if (!r) return null;
+    // vulnerabilidades = as próprias penalidades (o que derruba a nota).
+    return { score:r.score, base:r.base, penalidades:r.penalidades, vulnerabilidades:r.penalidades.map(x=>x.label) };
+  } catch(e){ return null; }
+}
+
+function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport, dark=true}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
+  const [showAuditoria,setShowAuditoria]=useState(false);
   const [analiseRiscoPacote, setAnaliseRiscoPacote] = useState(null); // "golgi" | "mega" | "klog" | null
   const [v360Grupo, setV360Grupo] = useState("todos"); // todos | golgi | mega | klog — "todos" é uso interno Moked; PDF por cliente nunca mistura
   const V360_GRUPOS = { golgi:{label:"Golgi",ids:["P601","P602","P604","P605","P606","P607"]}, mega:{label:"Mega",ids:["P311A","P311B"]}, klog:{label:"Klog",ids:["P505"]} };
@@ -1513,23 +1575,16 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       if(rondaSnap?.exists()){ const regs=(rondaSnap.data().registros||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")); const ult=regs[0]; if(ult){ const slots=ult.slots||[]; const f=slots.filter(h=>ult.marcacoes?.[h]?.status==="feito").length; rondaPct = slots.length?Math.round((f/slots.length)*100):null; } }
       const rows = ids.map(pid=>{
         const p=PROJECTS[pid];
-        const hist=stored[pid]?.history??[];
-        const last=hist[hist.length-1];
-        const base = last ? computeHealth(p,last.state).pct : 0;
-        const c = ctmkData[pid];
-        const ctmkIdade = c?.status==="offline" ? ctmkOfflineIdade(c.offlineSince) : null;
-        // Penalidade de score permanece em DIAS (regra de negócio -2/dia). Mínimo 1
-        // quando offline (mesma regra de antes): estar offline já conta como 1 dia.
-        const ctmkDias = ctmkIdade ? Math.max(1, ctmkIdade.dias) : 0;
-        const r = computeScore360(base, {
-          ctmkDias,
+        const last=(stored[pid]?.history??[]).slice(-1)[0];
+        const r = score360Calcular(pid, {
           keyAbertas: keyAbertasBy[pid]||0,
           bolsaoCriticos: bolsaoBy[pid]||0,
           perimetralZonasRuins: periBy[pid]||0,
           rondaPct: pid==="P601"?rondaPct:null,
-        });
+        }, { stored, ctmkData });
+        if (!r) return null;
         return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0, energiaQuedas7d: energiaBy[pid]?.quedas7d||0, energiaAberta: energiaBy[pid]?.aberto||false };
-      }).sort((a,b)=>b.score-a.score);
+      }).filter(Boolean).sort((a,b)=>b.score-a.score);
       const media = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
       setV360({rows, media});
     } catch(e){ setV360({rows:[], media:0, erro:true}); }
@@ -1615,6 +1670,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     Object.keys(PROJECTS).forEach(id=>{ if(ANALISE_RISCO_ELIGIBLE.includes(id)) elegiveis[id]=PROJECTS[id]; });
     return <AnaliseRisco projects={elegiveis} stored={stored} pacote={analiseRiscoPacote} onBack={()=>setAnaliseRiscoPacote(null)} />;
   }
+  if(showAuditoria) {
+    return <AuditoriaOperacional dark={dark} projectId="P311A"
+      carregarScore360={(pid)=>computeScore360Projeto(pid, { stored, ctmkData })}
+      onBack={()=>setShowAuditoria(false)} />;
+  }
+
   if(v360) {
     const loadingV = v360==="loading";
     const allRows = loadingV?[]:(v360.rows||[]);
@@ -1796,15 +1857,16 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
           <button onClick={async ()=>{
               const proj = viewReport.project||viewReport;
-              const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id)]);
-              generatePDF(
+              const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(proj.id), loadEnergiaResumoParaPDF(proj.id), loadFollowups(db,proj.id).catch(()=>({}))]);
+              await generatePDF(
                 proj,
                 viewReport.report?.state||viewReport.state,
                 viewReport.report?.meta||viewReport.meta,
                 [],
                 ctmkInfoFor(proj.id),
                 inquilinosInfo,
-                energiaInfo
+                energiaInfo,
+                followupsInfo
               );
             }}
             style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
@@ -1877,7 +1939,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
                     <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
-                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id)]); generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
+                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id), loadFollowups(db,p.id).catch(()=>({}))]); await generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
                     <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
                   </div>
                 </div>
@@ -1931,6 +1993,21 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Mega</button>
           <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Klog</button>
         </div>}
+        {/* Recursos gerenciais renderizados a partir do registro único
+            (gerenciaisConfig.js). Evita que um recurso — como a Visão 360 —
+            fique órfão por remoção acidental do botão. */}
+        <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
+          {recursosHabilitados().map(r=>{
+            const acao = r.id==="visao-360" ? carregarVisao360 : r.id==="auditoria-operacional" ? (()=>setShowAuditoria(true)) : null;
+            if(!acao) return null; // sem ação → não renderiza (o teste acusa órfão)
+            return (
+              <button key={r.id} onClick={acao}
+                style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e40af)",fontSize:13,border:"1px solid #1d4ed866"}}>
+                {r.icone} {r.label}
+              </button>
+            );
+          })}
+        </div>
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
@@ -1945,7 +2022,59 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 function PendenciesScreen({stored, onBack}) {
   const [filter, setFilter] = useState("all");
   const [openProj, setOpenProj] = useState({});
+  const [followups, setFollowups] = useState({});
+  const [fuOpen, setFuOpen] = useState(null);
+  const [fuForm, setFuForm] = useState({status:"aguardando", texto:"", link:""});
+  const [fuSaving, setFuSaving] = useState(false);
+  const podeGerenciar = hasGerencial();
   const toggleProj = (pid) => setOpenProj(o=>({...o,[pid]:!o[pid]}));
+
+  useEffect(()=>{
+    let vivo = true;
+    const pids = [...new Set(getAllPendencies(stored).map(p=>p.project.id))];
+    Promise.all(pids.map(pid=>loadFollowups(db,pid).then(m=>[pid,m]).catch(()=>[pid,{}])))
+      .then(pares=>{
+        if(!vivo) return;
+        const obj = {};
+        pares.forEach(([pid,m])=>{ obj[pid]=m; });
+        setFollowups(obj);
+      });
+    return ()=>{ vivo=false; };
+  },[stored]);
+
+  const getFuKey = (p) => canonicalFollowupKey(p.project.id, p.cat, p.item||"—");
+  const getFu = (p) => followups[p.project.id]?.[getFuKey(p)] || null;
+  const abrirFollowup = (p) => {
+    const panelKey = `${p.project.id}:${getFuKey(p)}`;
+    if(fuOpen===panelKey){ setFuOpen(null); return; }
+    const atual = getFu(p);
+    setFuForm({status:atual?.statusAtual||"aguardando",texto:"",link:""});
+    setFuOpen(panelKey);
+  };
+  const salvarFollowup = async (p) => {
+    if(!podeGerenciar || fuSaving) return;
+    if(!fuForm.texto.trim() && !fuForm.link.trim()){
+      alert("Informe a tratativa ou um link antes de salvar.");
+      return;
+    }
+    setFuSaving(true);
+    try{
+      const key=getFuKey(p);
+      const atualizado=await addFollowup(db,p.project.id,key,{
+        status:fuForm.status,
+        texto:fuForm.texto.trim(),
+        link:fuForm.link.trim(),
+        responsavel:"Gerencial"
+      });
+      setFollowups(prev=>({...prev,[p.project.id]:atualizado}));
+      setFuForm(prev=>({...prev,texto:"",link:""}));
+    }catch(e){
+      console.error("Falha ao salvar follow-up:",e);
+      alert(`Não foi possível salvar o follow-up. ${e?.message||e}`);
+    }finally{
+      setFuSaving(false);
+    }
+  };
   const all = getAllPendencies(stored);
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
   const critCount = all.filter(p => p.status === "inop").length;
@@ -2021,6 +2150,10 @@ function PendenciesScreen({stored, onBack}) {
                       {g.itens.map((p,i)=>{
                         const color = p.status==="inop" ? "#ef4444" : "#f59e0b";
                         const urgency = p.days && p.days >= 30 ? "🔴" : p.days && p.days >= 14 ? "🟡" : "⚪";
+                        const fu = getFu(p);
+                        const fuInfo = fu ? statusInfo(fu.statusAtual) : null;
+                        const panelKey = `${p.project.id}:${getFuKey(p)}`;
+                        const painelAberto = fuOpen===panelKey;
                         return(
                           <div key={i} style={{background:"#04080f",border:`1px solid ${color}33`,borderRadius:10,padding:"10px 12px"}}>
                             <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
@@ -2036,6 +2169,30 @@ function PendenciesScreen({stored, onBack}) {
                                 <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>Desde: {fmtDate(p.since)||"—"}</div>
                               </div>
                             </div>
+                            <button type="button" onClick={()=>abrirFollowup(p)} style={{...S.sm,width:"100%",marginTop:8,padding:"7px 9px",fontSize:11,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <span>📋 {fu?"Atualizar / ver tratativas":"Registrar follow-up"}</span>
+                              {fuInfo&&<span style={{color:fuInfo.color,fontWeight:800}}>{fuInfo.label}</span>}
+                            </button>
+                            {painelAberto&&<div style={{marginTop:8,padding:"10px",border:"1px solid #1e293b",borderRadius:8,background:"#060c18"}}>
+                              {podeGerenciar?<>
+                                <label style={{display:"block",fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>STATUS DA TRATATIVA</label>
+                                <select value={fuForm.status} onChange={e=>setFuForm(f=>({...f,status:e.target.value}))} style={{...S.inp,width:"100%",marginBottom:7}}>
+                                  {FOLLOWUP_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}
+                                </select>
+                                <textarea value={fuForm.texto} onChange={e=>setFuForm(f=>({...f,texto:e.target.value}))} placeholder="Descreva a tratativa, responsável e próximo passo..." rows={3} style={{...S.inp,width:"100%",resize:"vertical",marginBottom:7}}/>
+                                <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link de evidência, chamado ou orçamento (opcional)" style={{...S.inp,width:"100%",marginBottom:7}}/>
+                                <button type="button" disabled={fuSaving} onClick={()=>salvarFollowup(p)} style={{...S.primaryBtn,width:"100%",fontSize:11,opacity:fuSaving?.65:1}}>{fuSaving?"Salvando...":"💾 Salvar follow-up"}</button>
+                              </>:<div style={{fontSize:11,color:"#94a3b8"}}>Somente o perfil gerencial pode registrar tratativas.</div>}
+                              <div style={{fontSize:10,color:"#94a3b8",fontWeight:800,marginTop:10,marginBottom:5}}>📋 Tratativas registradas ({fu?.entries?.length||0})</div>
+                              {(fu?.entries||[]).length===0?<div style={{fontSize:11,color:"#64748b"}}>Nenhuma tratativa registrada.</div>:(fu.entries||[]).map((entry,idx)=>{
+                                const info=statusInfo(entry.status);
+                                return <div key={entry.id||idx} style={{borderTop:"1px solid #0f172a",padding:"7px 0"}}>
+                                  <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,fontWeight:800,color:info.color}}>{info.label}</span><span style={{fontSize:10,color:"#64748b"}}>{entry.em?new Date(entry.em).toLocaleString("pt-BR"):"—"}</span></div>
+                                  {entry.texto&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:3,whiteSpace:"pre-wrap"}}>{entry.texto}</div>}
+                                  {entry.link&&<a href={entry.link} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#38bdf8",wordBreak:"break-all"}}>Abrir evidência ↗</a>}
+                                </div>;
+                              })}
+                            </div>}
                           </div>
                         );
                       })}
@@ -2061,6 +2218,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
     const rep = viewReport.report || viewReport;
     const repMeta = rep.meta || {};
     const repState = rep.state || {};
+    const reportProject = project;
     const ultimos = hist.slice(0,4).map(r=>({ wk:getWeekLabel(r.meta?.date), data:fmtDate(r.meta?.date), leader:r.meta?.leader||"—", cco:r.meta?.cco||"—", sig:r.meta?.signature||"" }));
     return(
     <div style={S.page}>
@@ -2071,7 +2229,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
             <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{project.id} — {getWeekLabel(repMeta.date)}</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>{fmtDate(repMeta.date)}{repMeta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(repMeta.tempoPreenchimentoSeg/60)}min`:""}{canManage?"":" · somente leitura"}</div>
           </div>
-          <HealthRing pct={computeHealth(project,repState).pct} size={46}/>
+          <HealthRing pct={computeHealth(reportProject,repState).pct} size={46}/>
         </div>
         {canManage&&(
           <div style={{display:"flex",gap:8,marginBottom:8}}>
@@ -2108,7 +2266,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
             ))}
           </div>
         </div>
-        {project.categories.map(cat=>{
+        {reportProject.categories.map(cat=>{
           const sv=repState[cat.id]; if(!sv) return null;
           const itemLabels=Array.isArray(cat.itemLabels)?cat.itemLabels:[];
           let cp=100;
@@ -2238,7 +2396,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
           <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id)]); generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
+          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id), loadFollowups(db,project.id).catch(()=>({}))]); await generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
           <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?"✓ Copiado!":"📋 Copiar Texto"}</button>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
@@ -2336,10 +2494,8 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const hdrBorder=dark?"#0a0f1e":"#e2e8f0";
   const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
 
-  const allProjects = [
-    ...Object.values(PROJECTS),
-    {id:"P260A",name:"Jatinox Unidade A"},{id:"P260B",name:"Jatinox Unidade B"},{id:"P260C",name:"Jatinox Unidade C"}
-  ];
+  // Lista única de projetos (Jatinox já está em PROJECTS — sem append manual).
+  const allProjects = listaProjetosUnica(PROJECTS);
 
   const [equipData, setEquipData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -2347,27 +2503,20 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   useEffect(()=>{
     const loadAll = async () => {
       const results = {};
-      for(const p of allProjects) {
-        try {
-          const local = localStorage.getItem(`equipamentos_${p.id}`);
-          if(local) results[p.id] = JSON.parse(local);
-        } catch(e){}
-      }
+      // Firestore prioritário; cache local só como fallback (helper compartilhado
+      // com o dashStats — mesma fonte, nunca divergem).
+      const getCache = (pid)=>{ try{ const l=localStorage.getItem(`equipamentos_${pid}`); return l?JSON.parse(l):null; }catch(e){ return null; } };
+      await Promise.all(allProjects.map(async p=>{
+        const { data } = await loadEquipData(p.id, { db, doc, getDoc, getCache });
+        if(data) results[p.id] = data;
+      }));
       setEquipData(results);
       setLoading(false);
     };
     loadAll();
   },[]);
 
-  const countProblemas = (data) => {
-    if(!data) return {inop:0,parcial:0,total:0};
-    const all = [...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])];
-    return {
-      inop:   all.filter(i=>i.status==="inop"||i.status==="critico").length,
-      parcial:all.filter(i=>i.status==="parcial"||i.status==="baixo").length,
-      total:  all.length,
-    };
-  };
+  const countProblemas = (data) => contarEquip(data);
 
   return (
     <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:60}}>
@@ -2408,7 +2557,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
                         {!hasProb&&<span style={{fontSize:11,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}>✅ OK</span>}
                       </div>
                     ):(
-                      <div style={{fontSize:11,color:txt2,marginTop:3}}>Sem itens cadastrados</div>
+                      <div style={{fontSize:11,color:txt2,marginTop:3}}>Inventário de equipamentos não preenchido</div>
                     )}
                   </div>
                   <span style={{color:txt2,fontSize:16}}>›</span>
@@ -2424,6 +2573,10 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
 
 function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEquipamentos, onBack }) {
   const [subScreen, setSubScreen] = useState(null);
+  const [liderNonce, setLiderNonce] = useState(0); // força remontar no login de líder
+  const [gerVerProjeto, setGerVerProjeto] = useState(null); // gerencial abre Painel do Líder de um projeto
+  const [entradaPin, setEntradaPin] = useState("");
+  const [entradaErr, setEntradaErr] = useState(false);
   const [selProject, setSelProject] = useState(null);
   const [pinAuth, setPinAuth] = useState(()=>hasGerencial());
   const [pinInput, setPinInput] = useState("");
@@ -2441,51 +2594,173 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const hdrBorder = dark ? "#0a0f1e" : "#e2e8f0";
   const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
 
-  const JATINOX_LIST = [
-    { id:"P260B", name:"Jatinox Unidade B" },
-    { id:"P260C", name:"Jatinox Unidade C" },
-  ];
-  const allProjects = [...Object.values(PROJECTS), ...JATINOX_LIST];
+  // Lista única de projetos (Jatinox já está em PROJECTS — sem append manual).
+  // Antes, JATINOX_LIST re-adicionava P260B/P260C, contando-os em dobro.
+  const allProjects = listaProjetosUnica(PROJECTS);
 
   // Estatísticas do dashboard (Colaboradores + Equipamentos) — Firestore com fallback localStorage
   const [dashStats, setDashStats] = useState(null);
+  const [colabCounts, setColabCounts] = useState({});
+  // Controla quais listas expansíveis da Central de Recursos estão abertas.
+  const [rhExpand, setRhExpand] = useState({});
+  const toggleRh = (k)=> setRhExpand(o=>({...o, [k]:!o[k]}));
   useEffect(()=>{
     let alive = true;
+    // BARREIRA DE ESCOPO: a varredura consolidada (todos os projetos) só roda
+    // para quem enxerga a visão global (gerencial/demo). Sem sessão ou sessão
+    // de líder, NÃO carrega dados globais — o líder já foi desviado para o
+    // PainelLider, e sessão ausente cai na tela de PIN antes de qualquer render.
+    if(!hasGerencial()){ return ()=>{ alive=false; }; }
     (async()=>{
       const hoje = new Date().toLocaleDateString("sv-SE");
+      const hojeMs = Date.now();
+      const DIA = 86400000;
+      const RECICLAGEM_MESES = 24;
+      // Reciclagem é obrigatória apenas para funções de VIGILÂNCIA.
+      // NÃO fazem reciclagem: CDA, Porteiro/Porteiro CCO, Recepção/Recepcionista, AGP e AGP CCO.
+      const NAO_RECICLA = ["cda","porteiro","porteiro cco","recepção","recepcao","recepcionista","agp","agp cco"];
+      const fazReciclagem = (cargo)=>{
+        const c=String(cargo||"").trim().toLowerCase();
+        if(!c) return false;                       // sem cargo definido não entra na conta
+        return !NAO_RECICLA.includes(c);
+      };
       let ativos=0, feriasHoje=0, projsColab=0, inop=0, parcial=0, totalEquip=0, projsEquip=0;
+      const veteranos=[];
+      const estabilidade=[];
+      let advNoHistorico=0, reciclagemVencida=0, reciclagemSemData=0, voltamFerias=0, materialPendente=0, projsSemEquipe=0;
+      const voltamDetalhe=[];
+      const colabCountsAcc={};
+      // Detalhes para as listas expansíveis (lote B)
+      const feriasDetalhe=[];        // {nome, projeto, retorno}
+      const reciclVencidaNomes=[];   // {nome, projeto, cargo, ultima}
+      const reciclSemDataNomes=[];   // {nome, projeto, cargo}
+      const materialDetalhe={};      // { [pid]: qtd }
       await Promise.all(allProjects.map(async p=>{
         let eqData=null;
         try{ const snap=await getDoc(doc(db,"equipes",p.id)); if(snap.exists()) eqData=snap.data(); }catch(e){}
         if(!eqData){ try{ const l=localStorage.getItem(`equipe_${p.id}`); if(l) eqData=JSON.parse(l); }catch(e){} }
         if(eqData){
           const cols=(eqData.colaboradores||[]).filter(c=>c.status==="ativo");
-          if(cols.length>0) projsColab++;
+          colabCountsAcc[p.id]=cols.length;
+          if(cols.length>0) projsColab++; else projsSemEquipe++;
           ativos+=cols.length;
           (Array.isArray(eqData.ferias)?eqData.ferias:[]).forEach(f=>{
-            if(f&&f.dataInicio&&f.dataRetorno&&f.dataInicio<=hoje&&hoje<=f.dataRetorno) feriasHoje++;
+            if(f&&f.dataInicio&&f.dataRetorno&&f.dataInicio<=hoje&&hoje<=f.dataRetorno){
+              feriasHoje++;
+              const cc=cols.find(c=>c.id===f.colabId);
+              feriasDetalhe.push({nome:cc?.nome||f.nome||"Colaborador", projeto:p.id, retorno:f.dataRetorno});
+            }
+            if(f&&f.dataRetorno){
+              const ret=new Date(f.dataRetorno+"T12:00:00").getTime();
+              if(!isNaN(ret)){ const dd=Math.round((ret-hojeMs)/DIA); if(dd>=0&&dd<=7){ voltamFerias++; voltamDetalhe.push({projeto:p.id, quando:f.dataRetorno}); } }
+            }
           });
+          cols.forEach(c=>{
+            if(c.dataContratacao){
+              const ini=new Date(c.dataContratacao+"T12:00:00").getTime();
+              if(!isNaN(ini) && ini<=hojeMs){ const meses=Math.floor((hojeMs-ini)/(DIA*30.44)); if(meses>=0) veteranos.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||"", turno:c.turno||"", meses}); }
+            }
+            if(fazReciclagem(c.cargo)){
+              if(c.ultimaReciclagem){
+                const ur=new Date(c.ultimaReciclagem+"T12:00:00").getTime();
+                if(!isNaN(ur)){
+                  if((hojeMs-ur) > RECICLAGEM_MESES*30.44*DIA){ reciclagemVencida++; reciclVencidaNomes.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||"", ultima:c.ultimaReciclagem}); }
+                } else { reciclagemSemData++; reciclSemDataNomes.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||""}); }
+              } else { reciclagemSemData++; reciclSemDataNomes.push({nome:c.nome||"—", projeto:p.id, cargo:c.cargo||""}); }
+            }
+            const hist=Array.isArray(c.historico)?c.historico:[];
+            if(hist.some(h=>h && h.tipo==="Medida Disciplinar" && (h.detalhe==="Advertência"||h.detalhe==="Suspensão"))) advNoHistorico++;
+            // Material/uniforme: solicitações ficam em colaborador.uniforme.solicitacoes (status "pendente").
+            const solic = c.uniforme && Array.isArray(c.uniforme.solicitacoes) ? c.uniforme.solicitacoes : [];
+            const qtdSolic = solic.filter(x=>x && x.status==="pendente").length;
+            if(qtdSolic>0){ materialPendente += qtdSolic; materialDetalhe[p.id]=(materialDetalhe[p.id]||0)+qtdSolic; }
+          });
+          // Estabilidade: só desligamentos com data VÁLIDA e não-futura, nos últimos 90 dias.
+          const temDesligadosField = Array.isArray(eqData.desligados);
+          const desl90 = temDesligadosField ? eqData.desligados.filter(d=>{
+            if(!d||!d.desligadoEm) return false;
+            const de=new Date(d.desligadoEm).getTime();
+            return !isNaN(de) && de<=hojeMs && (hojeMs-de) <= 90*DIA;
+          }).length : 0;
+          // Projetos sem efetivo ativo ficam FORA do ranking de estabilidade.
+          if(cols.length>0) estabilidade.push({pid:p.id, nome:p.name||p.id, desligados90d:desl90, ativos:cols.length, temDados:temDesligadosField});
+        } else {
+          projsSemEquipe++;
         }
-        let eqpData=null;
-        try{ const snap=await getDoc(doc(db,"equipamentos",p.id)); if(snap.exists()) eqpData=snap.data(); }catch(e){}
-        if(!eqpData){ try{ const l=localStorage.getItem(`equipamentos_${p.id}`); if(l) eqpData=JSON.parse(l); }catch(e){} }
+        const getCacheEqp = (pid)=>{ try{ const l=localStorage.getItem(`equipamentos_${pid}`); return l?JSON.parse(l):null; }catch(e){ return null; } };
+        const { data: eqpData } = await loadEquipData(p.id, { db, doc, getDoc, getCache: getCacheEqp });
         if(eqpData){
-          let tem=false;
-          const contar=(it)=>{
-            if(!it||typeof it!=="object"||!it.status) return;
-            tem=true; totalEquip++;
-            if(it.status==="inop"||it.status==="critico") inop++;
-            else if(it.status==="parcial"||it.status==="baixo") parcial++;
-          };
-          Object.values(eqpData).forEach(v=>{ if(Array.isArray(v)) v.forEach(contar); });
-          if(eqpData.moto) contar(eqpData.moto);
-          if(tem) projsEquip++;
+          const c = contarEquip(eqpData);
+          if(c.total>0){ totalEquip += c.total; inop += c.inop; parcial += c.parcial; projsEquip++; }
         }
       }));
-      if(alive) setDashStats({ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip});
+      veteranos.sort((a,b)=>b.meses-a.meses);
+      estabilidade.forEach(e=>{ e.taxa = e.ativos>0 ? e.desligados90d/e.ativos : 0; });
+      estabilidade.sort((a,b)=> (a.taxa-b.taxa) || (a.desligados90d-b.desligados90d));
+      if(alive) setColabCounts(colabCountsAcc);
+      if(alive) setDashStats({
+        ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip,
+        veteranos,                                  // lista completa (cascata mostra todos)
+        estabilidade,
+        advNoHistorico, reciclagemVencida, reciclagemSemData, voltamFerias, materialPendente, projsSemEquipe,
+        voltamDetalhe: voltamDetalhe.slice(0,5),
+        feriasDetalhe, reciclVencidaNomes, reciclSemDataNomes, materialDetalhe,
+      });
     })();
     return ()=>{ alive=false; };
   },[]);
+
+  // ── Bifurcação de acesso ──────────────────────────────────────────────
+  // Sessão de LÍDER (nível "equipe"): abre o Painel do Líder escopado ao
+  // próprio projeto — sem seletor, sem PIN novo, sem métricas globais.
+  // Gerencial/demo NÃO entram aqui (getScopedProjectId retorna null) e
+  // seguem para a visão global abaixo, byte a byte inalterada.
+  const _liderPid = getScopedProjectId();
+  if(_liderPid && !hasGerencial()) {
+    return <PainelLider projectId={_liderPid} dark={dark}
+      onBack={onBack} onToggleTheme={onToggleTheme}
+      onEquipe={(pid)=>onEquipe(PROJECTS[pid] || { id:pid })}
+      onEquipamentos={(pid)=>onEquipamentos(PROJECTS[pid] || { id:pid })}/>;
+  }
+
+  // BARREIRA DE SESSÃO: sem sessão gerencial/demo E sem sessão de líder, a aba
+  // Registros NÃO abre a visão global. Pede o PIN (gerencial, demo ou de
+  // projeto). PIN de projeto cria sessão de líder → remonta no PainelLider.
+  if(!hasGerencial() && !getScopedProjectId()) {
+    const bg=dark?"#04080f":"#f1f5f9";
+    const cardBg=dark?"#060c18":"#ffffff";
+    const border=dark?"#0f172a":"#e2e8f0";
+    const txt=dark?"#f1f5f9":"#0f172a";
+    const txt2=dark?"#64748b":"#94a3b8";
+    const tentar=()=>{ const r=checkPinAnyProject(entradaPin,PROJECT_PINS); if(r){ setEntradaPin(""); setEntradaErr(false); setLiderNonce(n=>n+1); } else setEntradaErr(true); };
+    return (
+      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
+          <div style={{fontSize:32,marginBottom:8}}>🔐</div>
+          <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Registros</div>
+          <div style={{fontSize:12,color:txt2,marginBottom:20}}>Insira o PIN gerencial ou o PIN do seu projeto</div>
+          <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={entradaPin}
+            onChange={e=>{setEntradaPin(e.target.value);setEntradaErr(false);}}
+            onKeyDown={e=>{ if(e.key==="Enter") tentar(); }}
+            style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${entradaErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
+          {entradaErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={onBack} style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}}>← Início</button>
+            <button onClick={tentar} style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Entrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Gerencial escolheu um projeto na lista de material: abre o MESMO Painel do
+  // Líder daquele projeto (mesma visão que o líder vê), com botão de PDF em lote.
+  if(gerVerProjeto && hasGerencial()) {
+    return <PainelLider projectId={gerVerProjeto} dark={dark}
+      onBack={()=>setGerVerProjeto(null)} onToggleTheme={onToggleTheme}
+      onEquipe={(pid)=>onEquipe(PROJECTS[pid] || { id:pid })}
+      onEquipamentos={(pid)=>onEquipamentos(PROJECTS[pid] || { id:pid })}/>;
+  }
 
   if(subScreen==="colaboradores" && selProject) {
     return (
@@ -2507,10 +2782,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
           <div style={{fontSize:32,marginBottom:8}}>🛡️</div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Equipamentos</div>
-          <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial para ver todos os projetos</div>
+          <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
             onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){if(checkPin(equipPinInput,{})){setEquipPinAuth(true);}else setEquipPinErr(true);}}}
+            onKeyDown={e=>{if(e.key==="Enter"){const r=checkPinAnyProject(equipPinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}}
             style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
           {equipPinErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
           <div style={{display:"flex",gap:8}}>
@@ -2518,7 +2793,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{if(checkPin(equipPinInput,{})){setEquipPinAuth(true);}else setEquipPinErr(true);}}
+            <button onClick={()=>{const r=checkPinAnyProject(equipPinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}
               style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
               Entrar
             </button>
@@ -2540,10 +2815,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
           <div style={{ fontSize:32, marginBottom:8 }}>🔐</div>
           <div style={{ fontSize:16, fontWeight:800, color:txt, marginBottom:4 }}>Área Restrita</div>
-          <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial para ver os colaboradores</div>
+          <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
             onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
-            onKeyDown={e=>{ if(e.key==="Enter"){ if(checkPin(pinInput,{})){setPinAuth(true);}else setPinErr(true); } }}
+            onKeyDown={e=>{ if(e.key==="Enter"){ const r=checkPinAnyProject(pinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); } }}
             style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
           {pinErr && <div role="alert" style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
           <div style={{ display:"flex", gap:8 }}>
@@ -2551,7 +2826,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{ if(checkPin(pinInput,{})){setPinAuth(true);}else setPinErr(true); }}
+            <button onClick={()=>{ const r=checkPinAnyProject(pinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); }}
               style={{ flex:1, background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
               Entrar
             </button>
@@ -2578,11 +2853,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
             {allProjects.map(p => {
               const hist = stored[p.id]?.history ?? [];
-              let colabCount = null;
-              try {
-                const local = localStorage.getItem(`equipe_${p.id}`);
-                if(local) { const d=JSON.parse(local); colabCount=(d.colaboradores||[]).filter(c=>c.status==="ativo").length; }
-              } catch(e){}
+              const colabCount = (p.id in colabCounts) ? colabCounts[p.id] : null;
               return (
                 <button key={p.id} onClick={()=>{ setSelProject(p); }}
                   style={{ background:cardBg, border:`1px solid ${colabCount>0?"#0ea5e944":border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:12 }}>
@@ -2635,6 +2906,46 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               </div>
             );
             return (<>
+            {hasGerencial() && (()=>{
+              const GRUPOS_PROJ = [
+                { key:"golgi",   label:"Golgi",   cor:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"] },
+                { key:"mega",    label:"Mega",    cor:"#0ea5e9", ids:["P311A","P311B"] },
+                { key:"klog",    label:"Klog",    cor:"#16a34a", ids:["P505"] },
+                { key:"jatinox", label:"Jatinox", cor:"#7c3aed", ids:["P260A","P260B","P260C"] },
+              ];
+              const nomeProj = (pid)=> (PROJECTS[pid]?.name || pid);
+              const rowBorderP = `1px solid ${dark?"#0f172a":"#eef2f7"}`;
+              return (
+                <div style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#334155":"#e2e8f0"}`, borderRadius:16, padding:"14px 18px", animation:"mkFadeIn .35s ease both" }}>
+                  <div onClick={()=>toggleRh("projetos")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
+                    <div style={{ fontSize:22 }}>🗂️</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:15, fontWeight:800, color:txt }}>Projetos</div>
+                      <div style={{ fontSize:11, color:txt2, marginTop:1 }}>Abrir o painel de um projeto (visão do líder)</div>
+                    </div>
+                    <span style={{ fontSize:11, color:txt2, display:"inline-block", transform:rhExpand.projetos?"rotate(90deg)":"none", transition:"transform .15s", flexShrink:0 }}>▶</span>
+                  </div>
+                  {rhExpand.projetos && (
+                    <div style={{ marginTop:10 }}>
+                      {GRUPOS_PROJ.map(g=>(
+                        <div key={g.key} style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:9, fontWeight:800, color:g.cor, textTransform:"uppercase", letterSpacing:.8, marginBottom:4 }}>{g.label}</div>
+                          {g.ids.map(pid=>(
+                            <div key={pid} onClick={()=>setGerVerProjeto(pid)}
+                              style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 8px", borderBottom:rowBorderP, cursor:"pointer", borderRadius:8 }}>
+                              <span style={{ width:7, height:7, borderRadius:"50%", background:g.cor, flexShrink:0 }}/>
+                              <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{pid} <span style={{ color:txt2, fontWeight:400 }}>— {nomeProj(pid)}</span></div>
+                              <span style={{ color:txt2, fontSize:16 }}>›</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
               style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
                 boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
@@ -2667,6 +2978,99 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               )}
             </button>
 
+{/* ══ CENTRAL DE RECURSOS — RH (somente leitura, atrás do PIN gerencial) ══ */}
+            {hasGerencial() && st && (st.advNoHistorico>0||st.reciclagemVencida>0||st.reciclagemSemData>0||st.voltamFerias>0||st.materialPendente>0||st.projsSemEquipe>0) && (()=>{
+              const rowBorder=`1px solid ${dark?"#0c1524":"#eef2f7"}`;
+              const chev=(open)=>(<span style={{fontSize:11,color:txt2,transition:"transform .15s",display:"inline-block",transform:open?"rotate(90deg)":"none",flexShrink:0}}>▶</span>);
+              const subItem=(nome,proj,extra)=>(<div style={{display:"flex",alignItems:"baseline",gap:8,padding:"4px 0 4px 16px",fontSize:11}}>
+                <span style={{color:txt,fontWeight:600,flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{nome}</span>
+                <span style={{color:txt2,fontSize:10,flexShrink:0}}>{proj}{extra?` · ${extra}`:""}</span>
+              </div>);
+              return (
+              <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⚡ Requer atenção</div>
+
+                {st.voltamFerias>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("volta")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#38bdf8",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.voltamFerias} volta(m) de férias em 7 dias</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{[...new Set((st.voltamDetalhe||[]).map(v=>v.projeto))].join(" · ")} — planejar escala</div></div>{chev(rhExpand.volta)}</div>
+                  {rhExpand.volta&&<div style={{paddingBottom:6}}>{(st.voltamDetalhe||[]).map((v,i)=>subItem("Retorno "+new Date(v.quando+"T12:00:00").toLocaleDateString("pt-BR"),v.projeto,null))}</div>}
+                </div>}
+
+                {st.feriasHoje>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("ferias")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#38bdf8",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.feriasHoje} em férias hoje</b><div style={{fontSize:10,color:txt2,marginTop:1}}>toque para ver quem</div></div>{chev(rhExpand.ferias)}</div>
+                  {rhExpand.ferias&&<div style={{paddingBottom:6}}>{(st.feriasDetalhe||[]).map((f,i)=>subItem(f.nome,f.projeto,"volta "+new Date(f.retorno+"T12:00:00").toLocaleDateString("pt-BR")))}</div>}
+                </div>}
+
+                {st.advNoHistorico>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:rowBorder}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.advNoHistorico} colaborador(es) com medida disciplinar no histórico</b><div style={{fontSize:10,color:txt2,marginTop:1}}>registro histórico — verificar vigência caso a caso</div></div><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{st.advNoHistorico}</span></div>}
+
+                {st.reciclagemVencida>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("recV")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemVencida} reciclagem(ns) vencida(s)</b><div style={{fontSize:10,color:txt2,marginTop:1}}>+12 meses da última — só vigilantes — agendar</div></div>{chev(rhExpand.recV)}<span style={{fontSize:13,fontWeight:800,color:"#ef4444",marginLeft:6}}>{st.reciclagemVencida}</span></div>
+                  {rhExpand.recV&&<div style={{paddingBottom:6}}>{(st.reciclVencidaNomes||[]).map((r,i)=>subItem(r.nome,r.projeto,r.cargo))}</div>}
+                </div>}
+
+                {st.reciclagemSemData>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("recS")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#64748b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.reciclagemSemData} sem data de reciclagem</b><div style={{fontSize:10,color:txt2,marginTop:1}}>vigilantes sem registro — agendar</div></div>{chev(rhExpand.recS)}<span style={{fontSize:13,fontWeight:800,color:"#64748b",marginLeft:6}}>{st.reciclagemSemData}</span></div>
+                  {rhExpand.recS&&<div style={{paddingBottom:6}}>{(st.reciclSemDataNomes||[]).map((r,i)=>subItem(r.nome,r.projeto,r.cargo))}</div>}
+                </div>}
+
+                {st.materialPendente>0&&<div style={{borderBottom:rowBorder}}>
+                  <div onClick={()=>toggleRh("mat")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
+                    <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>Material tático pendente</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{st.materialPendente} solicitação(ões) de uniforme/material em aberto</div></div>{chev(rhExpand.mat)}<span style={{fontSize:13,fontWeight:800,color:"#f59e0b",marginLeft:6}}>{st.materialPendente}</span></div>
+                  {rhExpand.mat&&<div style={{paddingBottom:6}}>{Object.entries(st.materialDetalhe||{}).sort((a,b)=>b[1]-a[1]).map(([pid,q],i)=>(<div key={i} onClick={()=>setGerVerProjeto(pid)} style={{cursor:"pointer"}}>{subItem(pid,"",q+" solicitação(ões) ›")}</div>))}</div>}
+                </div>}
+
+                {st.projsSemEquipe>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0"}}>
+                  <span style={{width:7,height:7,borderRadius:"50%",background:"#ef4444",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>{st.projsSemEquipe} projeto(s) sem efetivo ativo</b><div style={{fontSize:10,color:txt2,marginTop:1}}>nenhum colaborador ativo cadastrado</div></div></div>}
+              </div>);
+            })()}
+
+            {hasGerencial() && st && st.veteranos?.length>0 && (()=>{
+              const lista = rhExpand.vetAll ? st.veteranos : st.veteranos.slice(0,8);
+              return (
+              <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⭐ Veteranos — tempo de casa</div>
+                {lista.map((v,i)=>{
+                  const anos=Math.floor(v.meses/12), resto=v.meses%12;
+                  const tempo=anos>0?`${anos}a ${resto}m`:`${resto}m`;
+                  const estrelas=v.meses>=60?"⭐⭐⭐":v.meses>=36?"⭐⭐":v.meses>=12?"⭐":"";
+                  return (<div key={i} onClick={()=>{ const pj=allProjects.find(x=>x.id===v.projeto); if(pj){ setSelProject(pj); setSubScreen("colaboradores"); } }} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:i<lista.length-1?`1px solid ${dark?"#0c1524":"#eef2f7"}`:"none",cursor:"pointer"}}>
+                    <div style={{width:26,height:26,borderRadius:"50%",background:dark?"#0c1a2e":"#e0f2fe",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:txt2,flexShrink:0,fontWeight:700}}>{i+1}</div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:600,color:txt,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v.nome}</div><div style={{fontSize:10,color:txt2}}>{v.projeto}{v.cargo?` · ${v.cargo}`:""}{v.turno?` · ${v.turno}`:""}</div></div>
+                    <span style={{fontSize:11,letterSpacing:1,flexShrink:0}}>{estrelas}</span>
+                    <span style={{fontSize:10,color:txt2,width:46,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{tempo}</span>
+                  </div>);
+                })}
+                {st.veteranos.length>8&&<div onClick={()=>toggleRh("vetAll")} style={{textAlign:"center",fontSize:11,color:"#38bdf8",fontWeight:700,cursor:"pointer",padding:"7px 0 2px"}}>{rhExpand.vetAll?"▲ ver menos":`▼ ver todos (${st.veteranos.length})`}</div>}
+                <div style={{fontSize:9,color:txt2,marginTop:8,fontStyle:"italic"}}>⭐ 1 ano+ · ⭐⭐ 3 anos+ · ⭐⭐⭐ 5 anos+ · toque num nome para abrir o arquivo pessoal</div>
+              </div>);
+            })()}
+
+            {hasGerencial() && st && st.estabilidade?.some(e=>e.temDados) && (()=>{
+              const comDados = st.estabilidade.filter(e=>e.temDados);
+              const piorPrimeiro = [...comDados].sort((a,b)=> (b.taxa-a.taxa) || (b.desligados90d-a.desligados90d));
+              const lista = rhExpand.movPior ? piorPrimeiro : comDados.slice(0,8);
+              return (
+              <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🛡️ Movimentação de equipe (90d) — {rhExpand.movPior?"maior no topo":"menor no topo"}</div>
+                {lista.map((e,i)=>{
+                  const cor=e.desligados90d===0?"#22c55e":e.taxa<=0.1?"#84cc16":e.taxa<=0.25?"#f59e0b":"#ef4444";
+                  const pctBar=100-Math.min(80,Math.round(e.taxa*160));
+                  return (<div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"5px 0"}}>
+                    <span style={{fontSize:11,fontWeight:800,color:cor,width:52,flexShrink:0}}>{e.pid}</span>
+                    <div style={{flex:1,height:7,background:dark?"#0c1524":"#e2e8f0",borderRadius:4,overflow:"hidden"}}><div style={{height:"100%",width:`${pctBar}%`,background:cor,borderRadius:4}}/></div>
+                    <span style={{fontSize:10,color:txt2,width:110,textAlign:"right",flexShrink:0}}>{e.desligados90d} desligam. / {e.ativos} ativos</span>
+                  </div>);
+                })}
+                <div onClick={()=>toggleRh("movPior")} style={{textAlign:"center",fontSize:11,color:"#38bdf8",fontWeight:700,cursor:"pointer",padding:"7px 0 2px"}}>{rhExpand.movPior?"▲ ver menor movimentação":"▼ ver maior movimentação (turnover)"}</div>
+                {st.estabilidade.some(e=>!e.temDados)&&<div style={{fontSize:9,color:txt2,marginTop:6}}>Sem registro de desligamentos: {st.estabilidade.filter(e=>!e.temDados).map(e=>e.pid).join(", ")}</div>}
+                <div style={{fontSize:9,color:txt2,marginTop:6,fontStyle:"italic"}}>Desligamentos registrados ÷ efetivo ativo, últimos 90 dias. Não representa rotatividade histórica completa.</div>
+              </div>);
+            })()}
+
             <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
               style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
                 boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none"), animation:"mkFadeIn .35s ease both", animationDelay:"60ms" }}>
@@ -2677,7 +3081,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
-                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} item(ns)`:"Carregando inventário..."}</div>
+                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} equipamento(s) cadastrado(s)`:"Carregando inventário..."}</div>
                 </div>
                 <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>
               </div>
@@ -2893,16 +3297,6 @@ function DemoBanner(){
   );
 }
 
-function DiagnosticoCard({ onClick }) {
-  return (
-    <button onClick={onClick} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#0284c711,#0ea5e906)",border:"1.5px solid #38bdf855",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}>
-      <div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #38bdf844",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🧭</span></div>
-      <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#38bdf8"}}>Diagnóstico Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Avaliação estruturada · 110 itens</div></div>
-      <span style={{color:"#38bdf866",fontSize:18}}>›</span>
-    </button>
-  );
-}
-
 export default function App(){
   const [screen,setScreen]=useState("home");
   // ── Auth anônimo: acompanha se o crachá já chegou. NÃO bloqueia a UI
@@ -2921,6 +3315,7 @@ export default function App(){
   const [acessoScreen,setAcessoScreen]=useState("menu");
   const [dark,setDark]=useState(true);
   const [showRegistros,setShowRegistros]=useState(false);
+  const [showDiagnostico,setShowDiagnostico]=useState(false);
   const [showAcessoCCO,setShowAcessoCCO]=useState(false);
   const [acessoCCOProject,setAcessoCCOProject]=useState(null);
   const [acessoCCOAbas,setAcessoCCOAbas]=useState(null); // filtro de abas p/ Jatinox B/C (Supervisão+Manutenção)
@@ -2996,9 +3391,6 @@ export default function App(){
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
   const [showIA,setShowIA]=useState(false); // drawer do Assistente IA Gerencial
-  const [showDiagnostico,setShowDiagnostico]=useState(false);
-  const [diagnosticoProject,setDiagnosticoProject]=useState(null);
-  const [iaAuthorized,setIaAuthorized]=useState(()=>hasGerencial());
   const [jatinoxSel,setJatinoxSel]=useState(null);
   const [project,setProject]=useState(PROJECTS.P601);
   const [state,setState]=useState(null);
@@ -3018,14 +3410,11 @@ export default function App(){
   const [syncStatus,setSyncStatus]=useState("");
   const [loaded,setLoaded]=useState(false);
   const [projectAuth,setProjectAuth]=useState({});
-  useEffect(()=>{ // sessão global: renova atividade e mantém a UI da IA sincronizada com a sessão
-    const syncIaAuth=()=>setIaAuthorized(hasGerencial());
-    const renew=()=>{touchSession();syncIaAuth();};
+  useEffect(()=>{ // sessão global: qualquer toque/clique renova a atividade (throttle em session.js)
+    const renew=()=>touchSession();
     window.addEventListener("click",renew,{passive:true});
     window.addEventListener("touchstart",renew,{passive:true});
-    window.addEventListener("storage",syncIaAuth);
-    const timer=setInterval(syncIaAuth,5000);
-    return ()=>{window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);window.removeEventListener("storage",syncIaAuth);clearInterval(timer);};
+    return ()=>{window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);};
   },[]);
   const [sigError,setSigError]=useState(false);
   const [showConfirmModal,setShowConfirmModal]=useState(false);
@@ -3271,7 +3660,8 @@ export default function App(){
     if(mt?.date && deletedTombstoneRef.current[project.id]?.has(mt.date)){
       deletedTombstoneRef.current[project.id].delete(mt.date); // novo registro intencional na mesma data — remove o "veto"
     }
-    const next=[...prev,{state:st,meta:mt,savedAt:new Date().toISOString()}].slice(-MAX_HISTORY);
+    const novoRelatorio={state:st,meta:mt,savedAt:new Date().toISOString()};
+    const next=[...prev,novoRelatorio].slice(-MAX_HISTORY);
     const up={...stored,[project.id]:{...stored[project.id],history:next,updatedAt:new Date().toISOString()}};
     try {
       setStored(up);
@@ -3514,8 +3904,8 @@ export default function App(){
   );
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
+  if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} projects={PROJECTS} projectGroups={{golgi:["P601","P602","P604","P605","P606","P607"],mega:["P311A","P311B"],klog:["P505"]}} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
   if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)}/></ErrorBoundary>;
-  if(showDiagnostico&&diagnosticoProject) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional project={diagnosticoProject} dark={dark} onBack={()=>{setShowDiagnostico(false);setDiagnosticoProject(null);}}/></ErrorBoundary>;
   if(showRegistros) return <ErrorBoundary moduleName="Registros"><RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/></ErrorBoundary>;
   if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);setAcessoCCOAbas(null);}} sharedAuth={getProjectAuthMode(acessoCCOProject.id)} onAuthGranted={(mode)=>grantAuth(acessoCCOProject.id,mode)} abasPermitidas={acessoCCOAbas}/></ErrorBoundary>;
   if(showOcorrencias&&ocorrenciasProject) return <ErrorBoundary moduleName="Ocorrências"><Ocorrencias project={ocorrenciasProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowOcorrencias(false);setOcorrenciasProject(null);}} sharedAuth={getProjectAuthMode(ocorrenciasProject.id)} onAuthGranted={(mode)=>grantAuth(ocorrenciasProject.id,mode)}/></ErrorBoundary>;
@@ -3623,7 +4013,6 @@ export default function App(){
             <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico de Relatórios Semanais</button>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <DiagnosticoCard onClick={()=>{setDiagnosticoProject({id:"P260A",name:"Jatinox Unidade A"});setShowDiagnostico(true);}}/>
               <button onClick={()=>{setEquipeProject({id:"P260A",name:"Jatinox Unidade A"});setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
               <button onClick={()=>{setAcessoCCOProject({id:"P260A",name:"Jatinox Unidade A"});setShowAcessoCCO(true);}} style={{background:"linear-gradient(165deg,#22c55e11,#22c55e06)",border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#22c55e15",border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:"#22c55e44",fontSize:18}}>›</span></button><button onClick={()=>{abrirRS({id:"P260A",name:"Jatinox Unidade A"});}} style={{background:"linear-gradient(165deg,#f59e0b11,#f59e0b06)",border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",gridColumn:"1/-1",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#f59e0b15",border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#f59e0b"}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts["P260A"]&&rsCounts["P260A"].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts["P260A"].total} RS</span>{rsCounts["P260A"].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts["P260A"].naoVistas} nova(s)</span>}</div>)}<span style={{color:"#f59e0b44",fontSize:18}}>›</span></button>
             </div>
@@ -3635,7 +4024,7 @@ export default function App(){
     );
   }
 
-  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport}/>;
+  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
 
@@ -4009,7 +4398,6 @@ export default function App(){
                   <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
                   <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico de Relatórios Semanais</button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <DiagnosticoCard onClick={()=>{setDiagnosticoProject(project);setShowDiagnostico(true);}}/>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:"linear-gradient(165deg,#22c55e11,#22c55e06)",border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#22c55e15",border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:"#22c55e44",fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#f59e0b11,#f59e0b06)",border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#f59e0b15",border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#f59e0b"}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:"#f59e0b44",fontSize:18}}>›</span></button>
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:"linear-gradient(165deg,#f59e0b11,#f59e0b06)",border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#f59e0b15",border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🛡️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#f59e0b"}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:"#f59e0b44",fontSize:18}}>›</span></button>
@@ -4037,7 +4425,6 @@ export default function App(){
                     </div>
                   </button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <DiagnosticoCard onClick={()=>{setDiagnosticoProject(project);setShowDiagnostico(true);}}/>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:"linear-gradient(165deg,#0ea5e911,#0ea5e906)",border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e915",border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#0ea5e9"}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:"#0ea5e944",fontSize:18}}>›</span></button>
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:"linear-gradient(165deg,#22c55e11,#22c55e06)",border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#22c55e15",border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:"#22c55e44",fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#f59e0b11,#f59e0b06)",border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#f59e0b15",border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#f59e0b"}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:"#f59e0b44",fontSize:18}}>›</span></button>
                     <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:"linear-gradient(165deg,#f59e0b11,#f59e0b06)",border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}><div style={{width:44,height:44,borderRadius:12,background:"#f59e0b15",border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🛡️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:"#f59e0b"}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:"#f59e0b44",fontSize:18}}>›</span></button>
@@ -4117,6 +4504,12 @@ export default function App(){
             <div style={{fontSize:11,color:"#64748b",fontWeight:700,textTransform:"uppercase",letterSpacing:1.5}}>Seleção de Projeto</div>
             <div style={{height:1,flex:1,background:"linear-gradient(90deg,#1e293b,transparent)"}}/>
           </div>
+          <button onClick={()=>setShowDiagnostico(true)}
+            style={{marginBottom:10,width:"100%",background:"linear-gradient(135deg,#123458 0%,#0b1d33 58%,#12243d 100%)",border:"1.5px solid #38bdf866",borderRadius:18,padding:"16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 10px 26px rgba(0,0,0,.48), 0 0 20px #38bdf812, inset 0 1px 0 rgba(255,255,255,.06)"}}>
+            <div style={{width:48,height:48,borderRadius:14,background:"#38bdf814",border:"1px solid #38bdf844",display:"flex",alignItems:"center",justifyContent:"center",fontSize:25,flexShrink:0}}>🧭</div>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:"#e0f2fe"}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:"#7dd3fc",marginTop:3}}>Catálogo publicado · rascunho local</div></div>
+            <span style={{color:"#38bdf8",fontSize:20}}>›</span>
+          </button>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
               {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"]},
@@ -4201,8 +4594,8 @@ export default function App(){
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
       </div>
       {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
-      {iaAuthorized && <BotaoIA onClick={()=>setShowIA(true)}/>}
-      {iaAuthorized && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
+      {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}
+      {hasGerencial() && <AssistenteIA open={showIA} onClose={()=>setShowIA(false)}/>}
     </div>
   );
 }

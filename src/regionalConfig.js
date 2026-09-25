@@ -108,6 +108,142 @@ export const REGIONAL = {
     ],
   },
 
+  // ── P602 — Golgi Mauá (AR-PAT-2026-002 · MK-602-AR-0002) ────
+  P602: {
+    codigo: "AR-PAT-2026-002",
+    versao: "1.0 (Auditável)",
+    emissao: "2026-09-18",
+    ativo: "P602 Golgi Mauá",
+    marcoZero: "Estr. Mun. do Sertãozinho, 1.700 — Bairro Sertãozinho, Mauá/SP",
+    municipioUF: "Mauá / SP (Sertãozinho, a ~1,8 km do Rodoanel Mário Covas)",
+    coordenadas: "23°39'46.8\"S 46°26'12.4\"W",
+    mapsUrl: "https://maps.app.goo.gl/j6s5AL2W32z5rW2u5",
+    pdfPath: "/regional/P602.pdf",
+
+    quadrantes: [
+      {
+        lado: "EIXO RODOVIÁRIO (SP-021 / Jacu-Pêssego / SP-031)",
+        regiao: "Rodoanel Mário Covas (Trecho Sul) · Complexo Jacu-Pêssego · SP-031 (Índio Tibiriçá)",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "acesso", desc: "Corredor crítico de roubo e interceptação de cargas em trânsito e desaceleração" },
+          { natureza: "acesso", desc: "Evasão rápida para a malha do Rodoanel em menos de 3 minutos" },
+          { natureza: "furto", desc: "Pontos de transbordo e desengate de carretas nas faixas de domínio da SP-031" },
+        ],
+      },
+      {
+        lado: "NÚCLEO PERIURBANO (Complexo Zaíra / Jardim Itapeva)",
+        regiao: "Comunidades limítrofes ao ativo — encostas e taludes",
+        grau: "GRAVISSIMO",
+        vetores: [
+          { natureza: "perimetro", desc: "Pressão perimétrica em encostas e taludes acidentados com vegetação" },
+          { natureza: "violento", desc: "Risco de roubos a transeuntes nos pontos de ônibus nas trocas de turno (06h e 22h)" },
+          { natureza: "furto", desc: "Histórico de furto de cabos e cabeamento subterrâneo nas vias municipais de acesso" },
+        ],
+      },
+    ],
+
+    protecao: [
+      { orgao: "1ª Cia 30º BPM/M (PMESP)", uf: "SP", distanciaKm: 3.8, tempoMin: 7, tipo: "pm", titular: true },
+      { orgao: "1º BPRv — Rodoanel Sul (PMRv)", uf: "SP", distanciaKm: 3.2, tempoMin: 5, tipo: "pm" },
+      { orgao: "UPA Zaíra", uf: "SP", distanciaKm: 4.1, tempoMin: 8, tipo: "hospital" },
+      { orgao: "Hospital Dr. Radamés Nardini", uf: "SP", distanciaKm: 6.5, tempoMin: 12, tipo: "hospital" },
+    ],
+  },
+
+  // ── P605 — Golgi Dutra (AR-PAT-2026-005) ─────────────────
+  P605: {
+    codigo: "AR-PAT-2026-005",
+    versao: "1.0.0",
+    emissao: "2026-09-20",
+    ativo: "P605 Golgi Dutra",
+    marcoZero: "Entroncamento Dutra (BR-116, km 204/205) × Rodoanel Mário Covas (SP-021 Leste)",
+    municipioUF: "Arujá / SP (limite operacional com Guarulhos)",
+    coordenadas: "23°24'36.2\"S 46°21'22.4\"W",
+    mapsUrl: "",
+    pdfPath: "/regional/P605.jpg",
+    quadrantes: [
+      {
+        lado: "CORREDOR LOGÍSTICO RODOVIÁRIO (Dutra / Rodoanel Leste)",
+        regiao: "BR-116 km 204/205 × SP-021 (entroncamento imediato)",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "furto", desc: "Exposição a roubo de carga e abordagem na desaceleração de composições pesadas nas alças entre o Rodoanel Leste e a Dutra; risco de comboios armados nas pistas marginais." },
+          { natureza: "acesso", desc: "Acesso quase instantâneo à pista expressa da BR-116 (sentidos Rio e Capital/Cumbica) e ao Rodoanel, viabilizando evasão imediata rumo a Santos ou interior." },
+          { natureza: "furto", desc: "Faixas lindeiras e viadutos do entroncamento expõem infraestrutura e pátios à ação em trânsito." },
+        ],
+      },
+      {
+        lado: "NÚCLEO PERIURBANO E DIVISAS (Vetor Oeste / Sul)",
+        regiao: "Vila Sadokim / Álamo (oeste) · Jardim Joia / Tupi (sul, junto às alças)",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "perimetro", desc: "Vegetação e taludes voltados para o viário e divisas laterais industriais sem ocupação ativa contínua favorecem intrusão perimetral e pontos cegos de desnível." },
+          { natureza: "violento", desc: "Malha urbana periférica mista a oeste e núcleos residenciais ao sul ampliam a exposição de colaboradores nas vias de acesso e trocas de turno." },
+        ],
+      },
+    ],
+    protecao: [
+      { orgao: "31º BPM/M — 3ª Cia (Arujá)", uf: "SP", distanciaKm: null, tempoMin: 8, tipo: "pm", titular: true },
+      { orgao: "1º BPRv — 3ª Cia (Rodoanel Leste)", uf: "SP", distanciaKm: null, tempoMin: 5, tipo: "pm" },
+      { orgao: "Posto de Bombeiros de Arujá (17º GB)", uf: "SP", distanciaKm: null, tempoMin: 10, tipo: "bombeiro" },
+      { orgao: "Pronto Atendimento Central de Arujá", uf: "SP", distanciaKm: null, tempoMin: 12, tipo: "hospital" },
+    ],
+  },
+
+  // ── P604 — Golgi Jundiaí (AR-PAT-2026-004) ────────────────
+  // Graus e textos seguem o parecer territorial v2, com redação prudencial.
+  // Tempos de pronta-resposta são estimativas operacionais e devem ser
+  // substituídos por medição/registro formal quando disponível.
+  P604: {
+    codigo: "AR-PAT-2026-004",
+    versao: "1.0.0",
+    emissao: "2026-09-17",
+    ativo: "P604 Golgi Jundiaí",
+    marcoZero: "Galpão P604 — Distrito Industrial, Vetor Oeste",
+    municipioUF: "Jundiaí / SP",
+    coordenadas: "23°10'32.4\"S 46°58'54.2\"W",
+    pdfPath: "/regional/P604.pdf",
+
+    quadrantes: [
+      {
+        lado: "CORREDOR LOGÍSTICO (SP-300)",
+        regiao: "Eixo SP-300 / SP-348 / SP-330 — Distrito Industrial",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "furto", desc: "Exposição a roubo e furto de cargas em trânsito, característica de eixos logísticos de alto valor." },
+          { natureza: "acesso", desc: "Acesso direto à SP-300 favorece evasão veicular em direção às alças da Bandeirantes e Anhanguera." },
+          { natureza: "furto", desc: "Faixas de domínio limítrofes expõem cabeamento elétrico e óptico a furto e sabotagem." },
+        ],
+      },
+      {
+        lado: "VETOR NORTE (mata / campo)",
+        regiao: "Área não ocupada ao norte do galpão",
+        grau: "MODERADO",
+        vetores: [
+          { natureza: "perimetro", desc: "Mata e campo ao norte podem favorecer aproximação a pé menos observada até as divisas perimetrais." },
+          { natureza: "perimetro", desc: "Vegetação e declives limítrofes podem formar pontos cegos de cercamento, exigindo integridade perimetral." },
+        ],
+      },
+      {
+        lado: "NÚCLEO PERIURBANO (Vetor Oeste)",
+        regiao: "Almerinda Chaves, Novo Horizonte, Residencial Jundiaí, Tereza Cristina e Medeiros",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "perimetro", desc: "Adensamento residencial no entorno eleva a exposição a tentativas de intrusão perimetral e furto noturno." },
+          { natureza: "violento", desc: "Vias vicinais e pontos de ônibus ampliam a exposição de colaboradores nas trocas de turno." },
+        ],
+      },
+    ],
+
+    protecao: [
+      { orgao: "2ª Cia do 11º BPM/I — Jundiaí", uf: "SP", distanciaKm: 5.8, tempoMin: 9, tipo: "pm", titular: true, fonte: "estimativa operacional — validar" },
+      { orgao: "4º BPRv — Base SP-300/Bandeirantes", uf: "SP", distanciaKm: 4.2, tempoMin: 7, tipo: "pm", fonte: "estimativa operacional — validar" },
+      { orgao: "UPA Vetor Oeste — Novo Horizonte", uf: "SP", distanciaKm: 5.1, tempoMin: 9, tipo: "hospital", fonte: "estimativa operacional — validar" },
+      { orgao: "Hospital São Vicente de Paulo", uf: "SP", distanciaKm: 11.5, tempoMin: 20, tipo: "hospital", fonte: "estimativa operacional — validar" },
+    ],
+  },
+
   // ── Próximos projetos: duplicar o bloco acima quando a regional
   //    for elaborada. Ex.: P605, P311A... ──────────────
 };

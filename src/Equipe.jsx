@@ -33,16 +33,14 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
+import { gerarPDFSolicitacoesColaborador } from "./pdfSolicitacoes";
+import { PROJECT_PINS } from "./accessConfig";
 
 const ADMIN_PIN = "872101";
 // Sem limite para desligados — ficam todos para consulta
 
 // PINs de acesso por projeto (líder pode cadastrar + adicionar histórico)
-const PROJECT_PINS = {
-  P601:"16601", P602:"16602", P604:"16604", P605:"16605",
-  P606:"16606", P607:"16607", P311A:"16311", P311B:"16311",
-  P505:"16505", P260A:"162601", P260B:"162602", P260C:"162603"
-};
+// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
 
 const CARGOS_PROJETO = {
   P601:  ["VSPP Líder","VSPP Apoio","Vig CCO","CDA","Recepção"],
@@ -204,8 +202,11 @@ const CHK_EQ_SLOTS_4x2 = [
 ];
 function chkEqSlots(numCheckins){ return numCheckins===3 ? CHK_EQ_SLOTS_4x2 : CHK_EQ_SLOTS_12x36; }
 // Alvo vigente = sábado da semana corrente (ou próximo). Janela cobre sáb+dom.
-function chkEqAlvoVigente(chk){
-  if(chk && chk.alvo) return chk.alvo;
+function chkEqAlvoVigente(){
+  // O alvo vigente é SEMPRE derivado da data atual. Não recebe mais o ciclo
+  // salvo: um alvo antigo nunca avançaria e o contador calcularia um domingo
+  // vencido. As chamadas ainda passam chk (arg extra é ignorado); a comparação
+  // chk.alvo === alvo (no chamador) é quem decide se os check-ins são do ciclo.
   const hoje=new Date(); hoje.setHours(0,0,0,0);
   // Se hoje é sáb/dom, o alvo é o sábado desta semana; senão o próximo sábado.
   const dia=hoje.getDay();
@@ -673,7 +674,7 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 
 // ── Tela de ficha completa
 // ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
-function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onConfirmar, onSalvarLista }){
+function UniformeModulo({ colab, projectNome, projectId, canManage, dark, onSolicitar, onConfirmar, onSalvarLista }){
   const S = getStyles(dark);
   const [aberto, setAberto] = useState(false);
   const [modoMontar, setModoMontar] = useState(false); // Fase 1: montar lista
@@ -720,7 +721,11 @@ function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onCo
         <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>📦 Uniforme e Material Tático
           {pendentes.length>0 && <span style={{ fontSize:10, color:"#f59e0b", marginLeft:8, fontWeight:700 }}>{pendentes.length} pendente(s)</span>}
         </div>
-        <span style={{ color:"#64748b", fontSize:14 }}>{aberto?"▾":"›"}</span>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          {pendentes.length>0 && <button onClick={(e)=>{ e.stopPropagation(); gerarPDFSolicitacoesColaborador({id:projectId}, colab); }}
+            style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:7, padding:"5px 10px", fontSize:10.5, fontWeight:700, cursor:"pointer" }}>📄 PDF</button>}
+          <span style={{ color:"#64748b", fontSize:14 }}>{aberto?"▾":"›"}</span>
+        </div>
       </div>
 
       {aberto && (
@@ -796,20 +801,20 @@ function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onCo
                           const ult = d.ultimaTroca;
                           const sel = selItens.includes(it.nome);
                           return (
-                            <div key={it.nome} style={cardStyle(modoSelMulti && sel)}>
+                            <div key={it.nome} style={cardStyle(sel)}>
                               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                                {modoSelMulti && (
-                                  <div onClick={()=>toggleSelMulti(it.nome)} style={{ width:20, height:20, borderRadius:5, flexShrink:0, cursor:"pointer", border:`2px solid ${sel?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:sel?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:11, fontWeight:900 }}>{sel?"✓":""}</div>
+                                {canManage && (
+                                  <div onClick={()=>toggleSelMulti(it.nome)} style={{ width:22, height:22, borderRadius:6, flexShrink:0, cursor:"pointer", border:`2px solid ${sel?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:sel?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:900 }}>{sel?"✓":""}</div>
                                 )}
                                 <div style={{ flex:1, minWidth:0 }}>
                                   <div style={{ fontSize:12.5, fontWeight:600, color:txt }}>{it.nome}{d.tamanho?<span style={{color:txt2,fontWeight:400}}> · {d.tamanho}</span>:""}{d.marca?<span style={{color:txt2,fontWeight:400}}> · {d.marca}</span>:""}</div>
                                   <div style={{ fontSize:10, color:txt2 }}>{ult?`Última troca: ${fmtDate(ult.slice(0,10))}`:"Sem registro de troca"}</div>
                                 </div>
-                                {!modoSelMulti && canManage && (
+                                {canManage && (
                                   <button onClick={()=>setSolicForm({ item:it.nome, marca:d.marca||"", tamanho:d.tamanho||"", motivo:"" })} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 12px", flexShrink:0 }}>Solicitar</button>
                                 )}
                               </div>
-                              {ult && d.historico?.length>0 && !modoSelMulti && (
+                              {ult && d.historico?.length>0 && (
                                 <button onClick={()=>setHistItem(histItem===it.nome?null:it.nome)} style={{ background:"transparent", border:"none", color:"#64748b", fontSize:10, cursor:"pointer", padding:"4px 0 0", textDecoration:"underline" }}>{histItem===it.nome?"ocultar":`histórico (${d.historico.length})`}</button>
                               )}
                               {histItem===it.nome && d.historico && (
@@ -824,16 +829,16 @@ function UniformeModulo({ colab, projectNome, canManage, dark, onSolicitar, onCo
                     );
                   })}
 
-                  {/* Seleção múltipla / envio */}
-                  {canManage && (modoSelMulti ? (
-                    <div style={{ display:"flex", gap:8 }}>
-                      <button onClick={()=>{setModoSelMulti(false);setSelItens([]);}} style={{ flex:1, background:"transparent", border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, color:txt2, borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Cancelar</button>
-                      <button onClick={()=>setSelItens(itensUsados.map(i=>i.nome))} style={{ flex:1, background:"transparent", border:"1px solid #0ea5e944", color:"#0ea5e9", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Uniforme completo</button>
+                  {/* Barra de envio múltiplo — aparece quando há itens marcados */}
+                  {canManage && (
+                    <div style={{ display:"flex", gap:8, position:"sticky", bottom:0 }}>
+                      {selItens.length>0 && (
+                        <button onClick={()=>setSelItens([])} style={{ flex:1, background:"transparent", border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, color:txt2, borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Limpar</button>
+                      )}
+                      <button onClick={()=>setSelItens(selItens.length===itensUsados.length?[]:itensUsados.map(i=>i.nome))} style={{ flex:1, background:"transparent", border:"1px solid #0ea5e944", color:"#0ea5e9", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>{selItens.length===itensUsados.length?"Desmarcar todos":"Uniforme completo"}</button>
                       <button disabled={!selItens.length} onClick={enviarWhatsMulti} style={{ flex:2, background:selItens.length?"#25d366":"#1e293b", border:"none", color:selItens.length?"#062":"#475569", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:800, cursor:selItens.length?"pointer":"not-allowed" }}>📲 Enviar {selItens.length||""} no WhatsApp</button>
                     </div>
-                  ) : (
-                    <button onClick={()=>setModoSelMulti(true)} style={{ width:"100%", background:"transparent", border:"1px solid #0ea5e944", color:"#0ea5e9", borderRadius:9, padding:"10px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>☑️ Selecionar vários / Uniforme completo</button>
-                  ))}
+                  )}
                 </>
               )}
             </div>
@@ -1058,6 +1063,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           <UniformeModulo
             colab={colab}
             projectNome={projectNome}
+            projectId={(projectNome||"").split(" · ")[0]}
             canManage={adminAuth || liderAuth}
             dark={dark}
             onSolicitar={onSolicitarUniforme}
@@ -2355,7 +2361,9 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       tipoDesligamento: tipoDeslig || "Demissão"
     };
     const newColabs = equipeData.colaboradores.filter(c=>c.id!==colab.id);
-    const newDesligados = [desligado, ...(equipeData.desligados||[])];
+    // Evita triplicar: remove qualquer desligado pré-existente com o mesmo id antes de inserir.
+    const desligadosLimpos = (equipeData.desligados||[]).filter(c=>c.id!==colab.id);
+    const newDesligados = [desligado, ...desligadosLimpos];
     await save({...equipeData, colaboradores:newColabs, desligados:newDesligados});
     setScreen("list"); setSelColab(null);
   };
@@ -2367,10 +2375,18 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     await save({...equipeData, colaboradores:[...equipeData.colaboradores, reativado], desligados:newDesligados});
   };
 
-  const excluirDesligado = async (colab) => {
+  const excluirDesligado = async (colab, idx) => {
     if(!adminAuth) return;
-    const newDesligados = (equipeData.desligados||[]).filter(c=>c.id!==colab.id);
-    await save({...equipeData, desligados:newDesligados});
+    // Remove APENAS o registro no índice informado — evita apagar duplicatas
+    // que compartilham o mesmo id. Fallback: se idx não vier, remove a 1ª ocorrência.
+    const lista = [...(equipeData.desligados||[])];
+    let alvo = idx;
+    if(typeof alvo!=="number" || alvo<0 || alvo>=lista.length){
+      alvo = lista.findIndex(c=>c.id===colab.id);
+    }
+    if(alvo<0) return;
+    lista.splice(alvo,1);
+    await save({...equipeData, desligados:lista});
   };
 
   if(loading) return (
@@ -2889,8 +2905,8 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
               </button>
               {showDesligados && (
                 <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
-                  {desligados.map(c=>(
-                    <div key={c.id} style={{ background:"#1a0202", borderRadius:10, padding:"10px 12px", border:"1px solid #ef444422", marginBottom:6 }}>
+                  {desligados.map((c,idx)=>(
+                    <div key={`${c.id}-${idx}`} style={{ background:"#1a0202", borderRadius:10, padding:"10px 12px", border:"1px solid #ef444422", marginBottom:6 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <Avatar foto={c.foto} size={40} border="#ef444444"/>
                         <div style={{ flex:1 }}>
@@ -2912,7 +2928,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                               if(window.confirm(`Excluir permanentemente ${c.nome}?
 
 Esta ação não pode ser desfeita.`))
-                                excluirDesligado(c);
+                                excluirDesligado(c, idx);
                             }}
                               style={{ ...S.btnSm, color:"#ef4444", border:"1px solid #ef444433", fontSize:10, padding:"4px 10px" }}>
                               🗑 Excluir

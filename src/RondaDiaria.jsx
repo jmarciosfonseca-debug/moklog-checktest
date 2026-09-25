@@ -147,12 +147,34 @@ function comprimirFoto(file){
 // Índice leve por projeto: rondas/{projectId} = { plantoes:[entrada leve], deletedIds }
 // Plantão completo (com fotos): rondas_plantoes/{plantaoId}
 // Compat: entradas antigas do índice podem trazer "rondas" embutidas.
-function entradaLeve(p){
+function resumoPerimetral(p){
+  const per = p && p.perimetral;
+  if (!(per && per.feito && (per.zonas || []).length)) return null;
   return {
+    versao: 1,
+    feito: true,
+    data: p.dataPlantao || null,
+    zonas: (per.zonas || []).map((z) => ({
+      nome: z.nome ?? z.zona ?? z.label ?? null,
+      status: z.status ?? "ok",
+    })),
+  };
+}
+
+function entradaLeve(p){
+  const e = {
     id:p.id, dataPlantao:p.dataPlantao, turno:p.turno, lider:p.lider||"",
     nRondas:(p.rondas||[]).length, enviado:!!p.enviado, enviadoEm:p.enviadoEm||null,
     criadoEm:p.criadoEm||null,
   };
+  const rp = resumoPerimetral(p);
+  if (rp) {
+    e.temPerimetral = true;
+    e.perimetralResumo = rp;
+  } else {
+    e.temPerimetral = false;
+  }
+  return e;
 }
 async function loadIndex(projectId){
   let data = null;
@@ -915,7 +937,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           const zonas = atualFull?.perimetral?.zonas || [];
           return (
             <div style={{position:"relative",width:"100%"}}>
-              <img src={`/mapas/${project.id}-ronda.jpg${project.id === "P311A" ? "?v=20260902-zonas-v2" : ""}`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
+              <img src={`/mapas/${project.id}-ronda.jpg`} alt="" style={{width:"100%",borderRadius:12,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,display:"block"}}
                 onError={(e)=>{e.currentTarget.style.display="none";}}/>
               {pts && pts.map((p,idx)=>{
                 const z = zonas[idx];

@@ -117,3 +117,37 @@ export function touchSession() {
 export function clearSession() {
   try { localStorage.removeItem(KEY); } catch (e) {}
 }
+
+// projectId autorizado da sessão de LÍDER (nível "equipe"), ou null.
+// Gerencial/demo retornam null aqui de propósito: eles NÃO têm escopo
+// fixo — enxergam a visão global. Serve para o RegistrosMenu decidir se
+// abre o Painel do Líder (escopado) em vez da visão gerencial. NUNCA
+// permite escolher/trocar de projeto: o escopo vem só da sessão.
+export function getScopedProjectId() {
+  const s = getSession();
+  if (!s) return null;
+  return s.nivel === "equipe" && s.projectId ? s.projectId : null;
+}
+
+// Verifica um PIN contra QUALQUER projeto do mapa fornecido (PROJECT_PINS).
+// Usado nas gates globais (Registros): se o valor for o PIN de um projeto,
+// cria a sessão de líder daquele projeto e retorna o projectId. Também
+// aceita gerencial (872101) e demo (601604), delegando ao checkPin.
+// Retorno: { level, projectId } ou null.
+//   level: "admin" | "demo" | "lider"
+export function checkPinAnyProject(valor, projectPins) {
+  const v = String(valor || "").trim();
+  if (!v) return null;
+  // Gerencial e demo primeiro (não dependem de projeto).
+  if (v === DEMO_PIN) { grantSession("demo"); return { level: "demo", projectId: null }; }
+  if (v === "872101") { grantSession("admin"); return { level: "admin", projectId: null }; }
+  // PIN de projeto: procura correspondência exata no mapa.
+  const map = projectPins || {};
+  for (const pid in map) {
+    if (String(map[pid]) === v) {
+      grantSession("lider", pid);
+      return { level: "lider", projectId: pid };
+    }
+  }
+  return null;
+}
