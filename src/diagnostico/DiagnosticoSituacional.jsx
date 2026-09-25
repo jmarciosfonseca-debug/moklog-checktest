@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { CATALOGO_REF, STATUS_ITEM, STATUS_ITEM_LISTA, STATUS_QUE_EXIGEM_ANALISE, STATUS_QUE_EXIGEM_OBSERVACAO } from "./catalogoSchema";
-import { buildCatalogSections, calculateProgress, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
+import { buildCatalogSections, calculateProgress, draftHasResponses, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
 import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, filtrosConsultaDiagnosticos, mergeRespostasPorAtualizacao } from "./diagnosticoSync";
 import { baixarTextoDiagnostico, criarPdfDiagnostico, montarRelatorioDiagnostico } from "./diagnosticoExport";
 
@@ -87,6 +87,7 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const [savedAt,setSavedAt]=useState(null);
   const [projetoContexto,setProjetoContexto]=useState(null);
   const [diagnosticos,setDiagnosticos]=useState([]);
+  const [rascunhoLocal,setRascunhoLocal]=useState(null);
   const [progressoProjetos,setProgressoProjetos]=useState({});
   const [diagnosticoSelecionado,setDiagnosticoSelecionado]=useState(false);
   const [persistBusy,setPersistBusy]=useState(false);
@@ -96,6 +97,7 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const [exportError,setExportError]=useState("");
   const [showResumo,setShowResumo]=useState(false);
   const contentTopRef=useRef(null);
+  const skipNextDraftWriteRef=useRef(false);
   const c=palette(dark);
   const isAuthenticated=!!user&&!user.isAnonymous;
 
@@ -129,12 +131,13 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   },[db,isAuthenticated,user?.uid]);
 
   useEffect(()=>{
-    if(!draftReady||!catalogo||!user?.uid||!projetoContexto)return undefined;
+    if(!draftReady||!catalogo||!user?.uid||!projetoContexto||!diagnosticoSelecionado)return undefined;
+    if(skipNextDraftWriteRef.current){skipNextDraftWriteRef.current=false;return undefined;}
     const chave=projetoContexto.tipo==="existente"?projetoContexto.projetoRef:projetoContexto.chave;
     const key=`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${chave}`;
-    const timer=setTimeout(()=>{const now=Date.now();writeDraft(window.localStorage,key,{catalogoId:CATALOGO_REF.catalogoId,versao:catalogo.versao,categoriaAtiva,respostas,savedAt:now,projetoRef:chave});setSavedAt(now);},350);
+    const timer=setTimeout(()=>{const now=Date.now();const draft={catalogoId:CATALOGO_REF.catalogoId,versao:catalogo.versao,categoriaAtiva,respostas,savedAt:now,projetoRef:chave};writeDraft(window.localStorage,key,draft);setRascunhoLocal(draft);setSavedAt(now);},350);
     return()=>clearTimeout(timer);
-  },[categoriaAtiva,catalogo,draftReady,respostas,user?.uid,projetoContexto]);
+  },[categoriaAtiva,catalogo,draftReady,respostas,user?.uid,projetoContexto,diagnosticoSelecionado]);
 
   useEffect(()=>{
     if(!isAuthenticated||!itens.length)return;
@@ -158,20 +161,21 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const goTo=(id)=>{setCategoriaAtiva(id);requestAnimationFrame(()=>contentTopRef.current?.scrollIntoView({behavior:"smooth",block:"start"}));};
   const chaveDoProjeto=projetoContexto?(projetoContexto.tipo==="existente"?projetoContexto.projetoRef:projetoContexto.chave):null;
   const chaveDraft=chaveDoProjeto?`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${chaveDoProjeto}`:null;
-  const clearDraft=()=>{if(!window.confirm("Limpar todas as marcações deste rascunho local?"))return;if(chaveDraft)window.localStorage.removeItem(chaveDraft);setRespostas({});setCategoriaAtiva(secoes[0]?.id||"");setSavedAt(null);};
+  const temRascunhoLocal=draftHasResponses(rascunhoLocal);
+  const clearDraft=()=>{if(!window.confirm("Limpar todas as marcações deste rascunho local?"))return;if(chaveDraft)window.localStorage.removeItem(chaveDraft);setRascunhoLocal(null);setRespostas({});setCategoriaAtiva(secoes[0]?.id||"");setSavedAt(null);};
   const chaveProjeto=projetoContexto?.tipo==="existente"?projetoContexto.projetoRef:projetoContexto?.chave;
   const salvarDiagnostico=async(estado="rascunho")=>{
     if(!chaveProjeto||!user?.uid||!catalogo)return;
     setPersistBusy(true);setPersistError("");setPersistSuccess("");
     try{
-      const diagnosticoExistente=deveBuscarDiagnosticoRemoto(projetoContexto.diagnosticoId);
+      const diagnosticoExistente=projetoContexto.remotoPersistido===true&&deveBuscarDiagnosticoRemoto(projetoContexto.diagnosticoId);
       const diagnosticoId=projetoContexto.diagnosticoId||criarDiagnosticoId();
       const ref=doc(db,"diagnosticos",chaveProjeto,"itens",diagnosticoId);
       const agora=new Date().toISOString();
       const criadoEm=projetoContexto.criadoEm||agora;
       // Preserva o mesmo ID em uma repetição após falha de rede. Um diagnóstico
       // novo não pode ser lido antes de existir: a regra segura nega esse get.
-      if(!diagnosticoExistente)setProjetoContexto(current=>({...current,diagnosticoId,criadoEm}));
+      if(!diagnosticoExistente)setProjetoContexto(current=>({...current,diagnosticoId,criadoEm,remotoPersistido:false}));
       let remotas={};
       if(diagnosticoExistente){
         const remoto=await getDoc(ref);
@@ -180,7 +184,10 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
       const merged=mergeRespostasPorAtualizacao(remotas,respostas);
       const payload={catalogoId:CATALOGO_REF.catalogoId,versaoCatalogo:catalogo.versao,tipo:projetoContexto.tipo,projetoRef:projetoContexto.projetoRef||null,grupo:projetoContexto.grupo||null,rotuloLivre:projetoContexto.rotuloLivre||null,estado,respostas:merged,autorUid:user.uid,criadoEm,atualizadoEm:agora,arquivadoEm:estado==="arquivado"?agora:null};
       await setDoc(ref,payload,{merge:true});
-      setProjetoContexto({...projetoContexto,diagnosticoId,criadoEm:payload.criadoEm,estado});
+      skipNextDraftWriteRef.current=true;
+      if(chaveDraft)window.localStorage.removeItem(chaveDraft);
+      setRascunhoLocal(null);
+      setProjetoContexto({...projetoContexto,diagnosticoId,criadoEm:payload.criadoEm,estado,remotoPersistido:true});
       setRespostas(merged);
       setDiagnosticos(xs=>[{id:diagnosticoId,...payload},...xs.filter(x=>x.id!==diagnosticoId)]);
       setPersistSuccess(estado==="arquivado"?"Diagnóstico arquivado no Firestore.":"Diagnóstico salvo no Firestore.");
@@ -190,12 +197,14 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const escolherProjeto=async(ctx)=>{
     setProjetoContexto(ctx);
     setDiagnosticoSelecionado(ctx?.tipo==="novo");
+    setRascunhoLocal(null);
     setRespostas({});
     setCategoriaAtiva(secoes[0]?.id||"");
     setSavedAt(null);
     if(ctx&&catalogo&&user?.uid){
       const chave=ctx.tipo==="existente"?ctx.projetoRef:ctx.chave;
       const draft=readDraft(window.localStorage,`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${chave}`,catalogo.versao);
+      setRascunhoLocal(draft);
       if(draft){setRespostas(draft.respostas||{});setCategoriaAtiva(draft.categoriaAtiva||secoes[0]?.id||"");setSavedAt(draft.savedAt||null);}
     }
     if(!ctx)return;
@@ -203,18 +212,21 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
       const base=collection(db,"diagnosticos",ctx.tipo==="existente"?ctx.projetoRef:ctx.chave,"itens");
       const filtros=filtrosConsultaDiagnosticos(ctx,user.uid).map(args=>where(...args));
       const snap=await getDocs(query(base,...filtros));
-      setDiagnosticos(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||""))));
+      const encontrados=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||"")));
+      setDiagnosticos(encontrados);
+      if(encontrados.length===0&&!draftHasResponses(readDraft(window.localStorage,`${draftStorageKey(CATALOGO_REF.catalogoId,user.uid)}:${ctx.tipo==="existente"?ctx.projetoRef:ctx.chave}`,catalogo.versao)))setDiagnosticoSelecionado(true);
     }catch(e){setDiagnosticos([]);}
   };
-  const abrirDiagnostico=(d)=>{setRespostas(d.respostas||{});setSavedAt(d.atualizadoEm?new Date(d.atualizadoEm).getTime():null);setProjetoContexto(p=>({...p,diagnosticoId:d.id,criadoEm:d.criadoEm,estado:d.estado||"rascunho"}));setDiagnosticoSelecionado(true);};
-  const novoDiagnostico=()=>{setRespostas({});setSavedAt(null);setProjetoContexto(p=>({...p,diagnosticoId:null,criadoEm:null,estado:"rascunho"}));setDiagnosticoSelecionado(true);};
+  const abrirDiagnostico=(d)=>{setRespostas(d.respostas||{});setSavedAt(d.atualizadoEm?new Date(d.atualizadoEm).getTime():null);setProjetoContexto(p=>({...p,diagnosticoId:d.id,criadoEm:d.criadoEm,estado:d.estado||"rascunho",remotoPersistido:true}));setDiagnosticoSelecionado(true);};
+  const continuarRascunhoLocal=()=>{if(!rascunhoLocal)return;setRespostas(rascunhoLocal.respostas||{});setCategoriaAtiva(rascunhoLocal.categoriaAtiva||secoes[0]?.id||"");setSavedAt(rascunhoLocal.savedAt||null);setProjetoContexto(p=>({...p,diagnosticoId:null,criadoEm:null,estado:"rascunho",remotoPersistido:false}));setDiagnosticoSelecionado(true);};
+  const novoDiagnostico=()=>{if(temRascunhoLocal)return;setRespostas({});setSavedAt(null);setProjetoContexto(p=>({...p,diagnosticoId:null,criadoEm:null,estado:"rascunho",remotoPersistido:false}));setDiagnosticoSelecionado(true);};
   const exportarPdf=async()=>{setExportBusy(true);setExportError("");try{await criarPdfDiagnostico(relatorio,{salvar:true});}catch(e){console.error("[diagnostico] falha ao gerar PDF",e);setExportError("Não foi possível gerar o PDF neste aparelho.");}finally{setExportBusy(false);}};
 
   if(!isAuthenticated)return <Login auth={auth} dark={dark} onBack={onBack}/>;
   if(error)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:"#ef444466"}}><div style={{fontSize:38}}>⚠️</div><h1 style={styles.title}>Acesso indisponível</h1><p role="alert" style={{...styles.muted,color:c.muted}}>{error}</p><button onClick={onBack} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>← Voltar ao início</button></section></main>;
   if(loading||!isDiagnosticDataReady(catalogo,profile))return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.centerState}><div style={{fontSize:34}}>⟳</div><strong>Carregando catálogo publicado…</strong></div></main>;
   if(!projetoContexto)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Selecionar projeto</h1><p style={{...styles.muted,color:c.muted}}>Escolha o contexto deste diagnóstico antes de preencher.</p><button onClick={()=>{const slug=prompt("Nome do cliente/projeto novo:","");if(slug?.trim()){const chave="novo_"+user.uid+"_"+slug.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-")+"_"+Date.now().toString(36);escolherProjeto({tipo:"novo",chave,rotuloLivre:slug.trim()});}}} style={styles.primary}>＋ Projeto novo</button>{Object.entries(projectGroups).map(([grupo,ids])=><div key={grupo}><strong style={{display:"block",margin:"14px 0 6px",color:c.text,textTransform:"uppercase"}}>{grupo}</strong>{ids.map(pid=>{if(!projects[pid])return null;const p=progressoProjetos[pid];return <button key={pid} onClick={()=>escolherProjeto({tipo:"existente",projetoRef:pid,grupo})} style={{...styles.secondary,width:"100%",marginBottom:6,color:c.text,borderColor:c.border,textAlign:"left"}}><div>{pid} — {projects[pid].name}</div>{p&&<div style={{fontSize:11,marginTop:5,color:p.pct===100?"#22c55e":c.muted}}>{p.estado==="arquivado"||p.pct===100?"concluído":"em andamento"} · {p.pct}%</div>}</button>;})}</div>)}</section></main>;
-  if(projetoContexto.tipo==="existente"&&!diagnosticoSelecionado&&diagnosticos.length>0)return <main style={{...styles.page,background:c.bg}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Diagnósticos — {projetoContexto.projetoRef}</h1><p style={{...styles.muted,color:c.muted}}>Escolha um diagnóstico para continuar ou inicie um novo.</p>{diagnosticos.map(d=><button key={d.id} onClick={()=>abrirDiagnostico(d)} style={{...styles.secondary,width:"100%",marginBottom:8,color:c.text,borderColor:c.border,textAlign:"left"}}>{d.estado||"rascunho"} · {d.atualizadoEm?new Date(d.atualizadoEm).toLocaleString("pt-BR"):"sem data"} · {calculateProgress(itens,d.respostas||{}).percentual}%</button>)}<button onClick={novoDiagnostico} style={styles.primary}>＋ Novo diagnóstico</button><button onClick={()=>setProjetoContexto(null)} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>Trocar projeto</button></section></main>;
+  if(projetoContexto.tipo==="existente"&&!diagnosticoSelecionado&&(diagnosticos.length>0||temRascunhoLocal))return <main style={{...styles.page,background:c.bg}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Diagnósticos — {projetoContexto.projetoRef}</h1><p style={{...styles.muted,color:c.muted}}>Escolha um diagnóstico para continuar ou inicie um novo.</p>{temRascunhoLocal&&<><button onClick={continuarRascunhoLocal} style={{...styles.localDraftButton,color:c.text}}><strong>Continuar rascunho deste aparelho</strong><span>{rascunhoLocal.savedAt?new Date(rascunhoLocal.savedAt).toLocaleString("pt-BR"):"sem data"} · {calculateProgress(itens,rascunhoLocal.respostas||{}).percentual}%</span></button><p style={{...styles.muted,color:"#f59e0b"}}>Protegido localmente. Abra e salve no Firestore antes de iniciar outro.</p></>}{diagnosticos.map(d=><button key={d.id} disabled={temRascunhoLocal} onClick={()=>abrirDiagnostico(d)} style={{...styles.secondary,width:"100%",marginBottom:8,color:c.text,borderColor:c.border,textAlign:"left",opacity:temRascunhoLocal ? .55 : 1}}>{d.estado||"rascunho"} · {d.atualizadoEm?new Date(d.atualizadoEm).toLocaleString("pt-BR"):"sem data"} · {calculateProgress(itens,d.respostas||{}).percentual}%</button>)}<button disabled={temRascunhoLocal} onClick={novoDiagnostico} style={{...styles.primary,opacity:temRascunhoLocal ? .55 : 1}}>＋ Novo diagnóstico</button><button onClick={()=>setProjetoContexto(null)} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>Trocar projeto</button></section></main>;
 
   return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.shell}>
     <header style={{...styles.header,background:c.bg,borderColor:c.border}}>
@@ -234,5 +246,5 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
 }
 
 const styles={
-  page:{minHeight:"100vh",fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",justifyContent:"center"},shell:{width:"100%",maxWidth:760},header:{position:"sticky",top:0,zIndex:20,padding:"12px 14px 10px",borderBottom:"1px solid"},headerTitle:{margin:0,fontSize:17,fontWeight:850,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},title:{margin:0,fontSize:21,fontWeight:850},muted:{margin:0,fontSize:11},iconButton:{width:38,height:38,borderRadius:10,border:"1px solid",background:"transparent",cursor:"pointer",fontSize:16},progressCard:{marginTop:10,border:"1px solid",borderRadius:12,padding:"10px 12px"},progressTrack:{height:7,borderRadius:8,overflow:"hidden",marginTop:7},progressFill:{height:"100%",borderRadius:8,background:"linear-gradient(90deg,#2563eb,#38bdf8)",transition:"width .25s ease"},saveLine:{display:"flex",justifyContent:"space-between",gap:10,fontSize:10,marginTop:7},categoryNav:{display:"flex",gap:7,overflowX:"auto",paddingTop:9,paddingBottom:2,scrollbarWidth:"thin"},categoryChip:{border:"1px solid",borderRadius:999,padding:"7px 10px",cursor:"pointer",display:"flex",gap:6,alignItems:"center",fontSize:11,fontWeight:750,whiteSpace:"nowrap"},content:{display:"grid",gap:11,padding:"13px 12px 48px",scrollMarginTop:190},categoryHeading:{border:"1px solid",borderRadius:14,padding:"14px 16px"},eyebrow:{fontSize:9,fontWeight:850,letterSpacing:.8,textTransform:"uppercase",color:"#38bdf8"},subcategory:{border:"1px solid",borderRadius:14,overflow:"hidden"},subcategoryHeader:{padding:"12px 14px",borderBottom:"1px solid",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12},counter:{fontSize:10,fontWeight:800,border:"1px solid",borderRadius:999,padding:"4px 8px"},item:{padding:"13px 14px",borderBottom:"1px solid"},itemNumber:{width:25,height:25,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:850,flexShrink:0},statusGrid:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:6,marginTop:11},statusButton:{minHeight:38,border:"1px solid",borderRadius:8,cursor:"pointer",padding:"5px 6px",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:9,lineHeight:1.1},analysisPanel:{display:"grid",gap:9,marginTop:10,padding:11,border:"1px solid",borderRadius:10},analysisHint:{fontSize:10,lineHeight:1.35},fieldLabel:{display:"grid",gap:5,fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:.45},responseInput:{boxSizing:"border-box",width:"100%",minHeight:54,resize:"vertical",border:"1px solid",borderRadius:8,padding:9,fontSize:12,fontFamily:"inherit",outline:"none",lineHeight:1.35},footerActions:{display:"grid",gridTemplateColumns:"1fr 1.35fr",gap:8,marginTop:3},primary:{border:"none",borderRadius:10,background:"linear-gradient(135deg,#2563eb,#1d4ed8)",color:"#fff",padding:"12px 14px",fontSize:12,fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid",borderRadius:10,background:"transparent",padding:"12px 14px",fontSize:12,fontWeight:700,cursor:"pointer"},exportCard:{display:"grid",gap:9,border:"1px solid",borderRadius:12,padding:12},exportActions:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:7},summaryBox:{display:"grid",gap:6,border:"1px solid",borderRadius:9,padding:10,fontSize:11},summaryCounts:{display:"flex",flexWrap:"wrap",gap:"5px 12px",fontWeight:800},clearButton:{justifySelf:"center",border:"none",background:"transparent",textDecoration:"underline",cursor:"pointer",fontSize:11,padding:8},disclaimer:{textAlign:"center",fontSize:10,lineHeight:1.5,padding:"0 20px"},loginCard:{alignSelf:"center",width:"calc(100% - 32px)",maxWidth:360,boxSizing:"border-box",border:"1px solid",borderRadius:18,padding:"28px 24px",display:"grid",justifyItems:"center",textAlign:"center",gap:20},label:{display:"grid",gap:6,textAlign:"left",fontSize:11,fontWeight:750,textTransform:"uppercase",letterSpacing:.5},input:{boxSizing:"border-box",width:"100%",border:"1px solid",borderRadius:9,padding:12,fontSize:14,outline:"none"},error:{color:"#fecaca",background:"#7f1d1d",border:"1px solid #ef4444",borderRadius:8,padding:"9px 10px",fontSize:11},success:{color:"#dcfce7",background:"#14532d",border:"1px solid #22c55e",borderRadius:8,padding:"9px 10px",fontSize:11},centerState:{alignSelf:"center",display:"grid",justifyItems:"center",gap:10}
+  page:{minHeight:"100vh",fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",justifyContent:"center"},shell:{width:"100%",maxWidth:760},header:{position:"sticky",top:0,zIndex:20,padding:"12px 14px 10px",borderBottom:"1px solid"},headerTitle:{margin:0,fontSize:17,fontWeight:850,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},title:{margin:0,fontSize:21,fontWeight:850},muted:{margin:0,fontSize:11},iconButton:{width:38,height:38,borderRadius:10,border:"1px solid",background:"transparent",cursor:"pointer",fontSize:16},progressCard:{marginTop:10,border:"1px solid",borderRadius:12,padding:"10px 12px"},progressTrack:{height:7,borderRadius:8,overflow:"hidden",marginTop:7},progressFill:{height:"100%",borderRadius:8,background:"linear-gradient(90deg,#2563eb,#38bdf8)",transition:"width .25s ease"},saveLine:{display:"flex",justifyContent:"space-between",gap:10,fontSize:10,marginTop:7},categoryNav:{display:"flex",gap:7,overflowX:"auto",paddingTop:9,paddingBottom:2,scrollbarWidth:"thin"},categoryChip:{border:"1px solid",borderRadius:999,padding:"7px 10px",cursor:"pointer",display:"flex",gap:6,alignItems:"center",fontSize:11,fontWeight:750,whiteSpace:"nowrap"},content:{display:"grid",gap:11,padding:"13px 12px 48px",scrollMarginTop:190},categoryHeading:{border:"1px solid",borderRadius:14,padding:"14px 16px"},eyebrow:{fontSize:9,fontWeight:850,letterSpacing:.8,textTransform:"uppercase",color:"#38bdf8"},subcategory:{border:"1px solid",borderRadius:14,overflow:"hidden"},subcategoryHeader:{padding:"12px 14px",borderBottom:"1px solid",display:"flex",justifyContent:"space-between",alignItems:"center",gap:12},counter:{fontSize:10,fontWeight:800,border:"1px solid",borderRadius:999,padding:"4px 8px"},item:{padding:"13px 14px",borderBottom:"1px solid"},itemNumber:{width:25,height:25,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:850,flexShrink:0},statusGrid:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:6,marginTop:11},statusButton:{minHeight:38,border:"1px solid",borderRadius:8,cursor:"pointer",padding:"5px 6px",display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:9,lineHeight:1.1},analysisPanel:{display:"grid",gap:9,marginTop:10,padding:11,border:"1px solid",borderRadius:10},analysisHint:{fontSize:10,lineHeight:1.35},fieldLabel:{display:"grid",gap:5,fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:.45},responseInput:{boxSizing:"border-box",width:"100%",minHeight:54,resize:"vertical",border:"1px solid",borderRadius:8,padding:9,fontSize:12,fontFamily:"inherit",outline:"none",lineHeight:1.35},footerActions:{display:"grid",gridTemplateColumns:"1fr 1.35fr",gap:8,marginTop:3},primary:{border:"none",borderRadius:10,background:"linear-gradient(135deg,#2563eb,#1d4ed8)",color:"#fff",padding:"12px 14px",fontSize:12,fontWeight:800,cursor:"pointer"},secondary:{border:"1px solid",borderRadius:10,background:"transparent",padding:"12px 14px",fontSize:12,fontWeight:700,cursor:"pointer"},localDraftButton:{display:"grid",gap:4,width:"100%",border:"1px solid #f59e0b",borderRadius:10,background:"#f59e0b18",padding:"12px 14px",textAlign:"left",cursor:"pointer",fontSize:12},exportCard:{display:"grid",gap:9,border:"1px solid",borderRadius:12,padding:12},exportActions:{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:7},summaryBox:{display:"grid",gap:6,border:"1px solid",borderRadius:9,padding:10,fontSize:11},summaryCounts:{display:"flex",flexWrap:"wrap",gap:"5px 12px",fontWeight:800},clearButton:{justifySelf:"center",border:"none",background:"transparent",textDecoration:"underline",cursor:"pointer",fontSize:11,padding:8},disclaimer:{textAlign:"center",fontSize:10,lineHeight:1.5,padding:"0 20px"},loginCard:{alignSelf:"center",width:"calc(100% - 32px)",maxWidth:360,boxSizing:"border-box",border:"1px solid",borderRadius:18,padding:"28px 24px",display:"grid",justifyItems:"center",textAlign:"center",gap:20},label:{display:"grid",gap:6,textAlign:"left",fontSize:11,fontWeight:750,textTransform:"uppercase",letterSpacing:.5},input:{boxSizing:"border-box",width:"100%",border:"1px solid",borderRadius:9,padding:12,fontSize:14,outline:"none"},error:{color:"#fecaca",background:"#7f1d1d",border:"1px solid #ef4444",borderRadius:8,padding:"9px 10px",fontSize:11},success:{color:"#dcfce7",background:"#14532d",border:"1px solid #22c55e",borderRadius:8,padding:"9px 10px",fontSize:11},centerState:{alignSelf:"center",display:"grid",justifyItems:"center",gap:10}
 };

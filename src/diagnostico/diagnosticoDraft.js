@@ -52,6 +52,10 @@ export function writeDraft(storage, key, draft) {
   storage.setItem(key, JSON.stringify(draft));
 }
 
+export function draftHasResponses(draft) {
+  return Boolean(draft && draft.respostas && Object.keys(draft.respostas).length > 0);
+}
+
 export function isDiagnosticDataReady(catalogo, profile) {
   return Boolean(catalogo && profile);
 }
