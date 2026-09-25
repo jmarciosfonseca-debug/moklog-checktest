@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { CATALOGO_REF, STATUS_ITEM, STATUS_ITEM_LISTA, STATUS_QUE_EXIGEM_ANALISE, STATUS_QUE_EXIGEM_OBSERVACAO } from "./catalogoSchema";
 import { buildCatalogSections, calculateProgress, draftStorageKey, isDiagnosticDataReady, readDraft, writeDraft } from "./diagnosticoDraft";
-import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, mergeRespostasPorAtualizacao } from "./diagnosticoSync";
+import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, filtrosConsultaDiagnosticos, mergeRespostasPorAtualizacao } from "./diagnosticoSync";
 
 const STATUS_UI = {
   [STATUS_ITEM.CONFORME]: { label: "Conforme", short: "C", color: "#22c55e" },
@@ -138,7 +138,7 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
     (async()=>{
       const out={};
       const ids=Object.values(projectGroups).flat();
-      await Promise.all(ids.map(async pid=>{try{const s=await getDocs(collection(db,"diagnosticos",pid,"itens"));const docs=s.docs.map(d=>d.data()).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||"")));const d=docs[0];if(d)out[pid]={pct:calculateProgress(itens,d.respostas||{}).percentual,estado:d.estado||"rascunho"};}catch{}}));
+      await Promise.all(ids.map(async pid=>{try{const base=collection(db,"diagnosticos",pid,"itens");const filtros=filtrosConsultaDiagnosticos({tipo:"existente",projetoRef:pid},user.uid).map(args=>where(...args));const s=await getDocs(query(base,...filtros));const docs=s.docs.map(d=>d.data()).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||"")));const d=docs[0];if(d)out[pid]={pct:calculateProgress(itens,d.respostas||{}).percentual,estado:d.estado||"rascunho"};}catch{}}));
       if(!cancel)setProgressoProjetos(out);
     })();
     return()=>{cancel=true;};
@@ -195,7 +195,9 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
     }
     if(!ctx)return;
     try{
-      const snap=await getDocs(collection(db,"diagnosticos",ctx.tipo==="existente"?ctx.projetoRef:ctx.chave,"itens"));
+      const base=collection(db,"diagnosticos",ctx.tipo==="existente"?ctx.projetoRef:ctx.chave,"itens");
+      const filtros=filtrosConsultaDiagnosticos(ctx,user.uid).map(args=>where(...args));
+      const snap=await getDocs(query(base,...filtros));
       setDiagnosticos(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||""))));
     }catch(e){setDiagnosticos([]);}
   };

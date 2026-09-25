@@ -23,3 +23,13 @@ export function criarDiagnosticoId(cryptoApi=globalThis.crypto) {
 export function deveBuscarDiagnosticoRemoto(diagnosticoId) {
   return typeof diagnosticoId==="string"&&diagnosticoId.length>0;
 }
+
+export function filtrosConsultaDiagnosticos(contexto,uid) {
+  if(contexto?.tipo==="existente"&&contexto.projetoRef){
+    return [["tipo","==","existente"],["projetoRef","==",contexto.projetoRef]];
+  }
+  if(contexto?.tipo==="novo"&&contexto.chave&&uid){
+    return [["tipo","==","novo"],["projetoRef","==",null],["autorUid","==",uid]];
+  }
+  return [];
+}

@@ -1,4 +1,4 @@
-import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, mergeRespostasPorAtualizacao, normalizarAtualizacao } from "./diagnosticoSync";
+import { criarDiagnosticoId, deveBuscarDiagnosticoRemoto, filtrosConsultaDiagnosticos, mergeRespostasPorAtualizacao, normalizarAtualizacao } from "./diagnosticoSync";
 
 test("não tenta ler um diagnóstico remoto antes da primeira gravação",()=>{
   expect(deveBuscarDiagnosticoRemoto(null)).toBe(false);
@@ -18,4 +18,19 @@ test("compara corretamente timestamps numéricos e ISO",()=>{
     {item:{status:"parcial",updatedAt:100}},
   );
   expect(merged.item.status).toBe("conforme");
+});
+
+test("consulta de projeto existente declara o escopo exigido pelas regras",()=>{
+  expect(filtrosConsultaDiagnosticos({tipo:"existente",projetoRef:"P607"},"uid")).toEqual([
+    ["tipo","==","existente"],
+    ["projetoRef","==","P607"],
+  ]);
+});
+
+test("consulta de projeto novo fica limitada ao autor",()=>{
+  expect(filtrosConsultaDiagnosticos({tipo:"novo",chave:"novo_uid_cliente"},"uid")).toEqual([
+    ["tipo","==","novo"],
+    ["projetoRef","==",null],
+    ["autorUid","==","uid"],
+  ]);
 });
