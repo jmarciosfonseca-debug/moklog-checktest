@@ -43,10 +43,11 @@ test("todos os Golgis possuem referência de mapa configurada", () => {
   ["P601", "P602", "P604", "P605", "P606", "P607"].forEach((id) => {
     expect(MAPA_REGIONAL[id]).toBeTruthy();
   });
-  expect(MAPA_REGIONAL.P602).toBe("/mapas/P602.jpg");
-  expect(MAPA_REGIONAL.P604).toBe("/mapas/P604.jpg");
-  expect(MAPA_REGIONAL.P605).toBe("/mapas/P605.jpg");
+  expect(MAPA_REGIONAL.P602).toBe("/regional/P602.jpg");
+  expect(MAPA_REGIONAL.P604).toBe("/regional/P604.jpg");
+  expect(MAPA_REGIONAL.P605).toBe("/regional/P605.jpg");
   expect(MAPA_REGIONAL.P606).toBe("/regional/P606.jpg");
+  expect(MAPA_REGIONAL.P505).toBe("/regional/P505.jpg");
 });
 
 test("PDF executivo usa três colunas, explica o cálculo e limita apontamentos", () => {
