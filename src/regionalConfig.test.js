@@ -1,5 +1,7 @@
 import { coletarRegional, REGIONAL } from "./regionalConfig";
 
+const PROJETOS_TERRITORIAIS = ["P601", "P602", "P604", "P605", "P606", "P607"];
+
 test("P606 possui diagnóstico territorial versionado e mapa dedicado", () => {
   const p606 = REGIONAL.P606;
 
@@ -30,5 +32,48 @@ test("vetores territoriais do P606 usam redação condicional", () => {
 
   descricoes.forEach((descricao) => {
     expect(descricao).toMatch(/\bpodem?\b/i);
+  });
+});
+
+test("cadastros territoriais ativos possuem fontes reproduzíveis", () => {
+  PROJETOS_TERRITORIAIS.forEach((projectId) => {
+    const regional = REGIONAL[projectId];
+    expect(regional.fontes?.length).toBeGreaterThan(0);
+    regional.fontes.forEach((fonte) => {
+      expect(fonte.orgao).toBeTruthy();
+      expect(fonte.url).toMatch(/^https:\/\//);
+      expect(fonte.periodo).toBeTruthy();
+      expect(fonte.consulta).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+});
+
+test("vetores territoriais ativos usam consequência condicional", () => {
+  PROJETOS_TERRITORIAIS.forEach((projectId) => {
+    REGIONAL[projectId].quadrantes.forEach((quadrante) => {
+      quadrante.vetores.forEach((vetor) => {
+        expect(vetor.desc).toMatch(/\bpodem?\b/i);
+      });
+    });
+  });
+});
+
+test("pronta-resposta ativa não apresenta estimativa como medição", () => {
+  PROJETOS_TERRITORIAIS.forEach((projectId) => {
+    REGIONAL[projectId].protecao.forEach((item) => {
+      expect(item.fonte).toMatch(/estimad|estimativa/i);
+    });
+  });
+});
+
+test("territorial não fixa classe nem usa grau fora do schema", () => {
+  const grausAceitos = new Set(["GRAVISSIMO", "GRAVE", "MODERADO", "BAIXO"]);
+
+  PROJETOS_TERRITORIAIS.forEach((projectId) => {
+    const regional = REGIONAL[projectId];
+    expect(regional).not.toHaveProperty("classe");
+    regional.quadrantes.forEach((quadrante) => {
+      expect(grausAceitos.has(quadrante.grau)).toBe(true);
+    });
   });
 });
