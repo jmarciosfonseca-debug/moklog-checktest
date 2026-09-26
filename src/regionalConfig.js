@@ -191,6 +191,55 @@ export const REGIONAL = {
     ],
   },
 
+  // ── P606 — Golgi Duque de Caxias (AR-PAT-2026-606) ──────
+  // Distâncias e tempos abaixo são estimativas operacionais. Os órgãos,
+  // a jurisdição e o marco zero foram conferidos no levantamento territorial.
+  P606: {
+    codigo: "AR-PAT-2026-606",
+    versao: "1.0.0",
+    emissao: "2026-09-21",
+    ativo: "P606 Golgi Duque de Caxias",
+    marcoZero: "Entroncamento Rod. Washington Luís (BR-040) × Arco Metropolitano (BR-493) — Duque de Caxias/RJ",
+    municipioUF: "Duque de Caxias / RJ (Baixada Fluminense)",
+    coordenadas: "22°39'51.3\"S 43°20'52.5\"W",
+    mapsUrl: "https://maps.app.goo.gl/P9bW4mBQJYWJMh3f6",
+    pdfPath: "/regional/P606.jpg",
+
+    quadrantes: [
+      {
+        lado: "ENTRONCAMENTO RODOVIÁRIO (BR-040 × BR-493)",
+        regiao: "Washington Luís × Arco Metropolitano — alças e retornos complexos",
+        grau: "GRAVE",
+        vetores: [
+          { natureza: "furto", desc: "A exposição ao corredor logístico pode elevar a possibilidade de abordagem e interceptação de cargas em trânsito ou desaceleração." },
+          { natureza: "acesso", desc: "As conexões imediatas com BR-040 e BR-493 podem ampliar as alternativas de evasão e reduzir o tempo disponível para contenção." },
+        ],
+      },
+      {
+        lado: "ISOLAMENTO E COBERTURA VEGETAL (perímetro rural)",
+        regiao: "Vegetação, relevo irregular e descampados no entorno imediato",
+        grau: "GRAVISSIMO",
+        vetores: [
+          { natureza: "perimetro", desc: "Vegetação e relevo irregular podem facilitar aproximação menos observada e ampliar pontos cegos junto às divisas." },
+          { natureza: "perimetro", desc: "Áreas abertas e baixa vigilância natural podem favorecer observação prévia do ativo e preparação de tentativa de intrusão." },
+          { natureza: "violento", desc: "O isolamento geográfico pode elevar a exposição a ações coordenadas e tornar a resposta pública mais dependente do deslocamento rodoviário." },
+        ],
+      },
+    ],
+
+    protecao: [
+      { orgao: "15º BPM/PMERJ — 1ª Cia (Duque de Caxias)", uf: "RJ", distanciaKm: 9, tempoMin: 12, tipo: "pm", titular: true, fonte: "estimativa operacional — validar" },
+      { orgao: "PRF — Unidade Operacional Duque de Caxias (BR-040 Km 104)", uf: "RJ", distanciaKm: 6, tempoMin: 8, tipo: "pm", fonte: "estimativa operacional — validar" },
+      { orgao: "14º GBM/CBMERJ (Duque de Caxias)", uf: "RJ", distanciaKm: 10, tempoMin: 14, tipo: "bombeiro", fonte: "estimativa operacional — validar" },
+      { orgao: "Hospital Municipalizado Adão Pereira Nunes (BR-040 Km 109)", uf: "RJ", distanciaKm: 8, tempoMin: 11, tipo: "hospital", fonte: "estimativa operacional — validar" },
+    ],
+
+    fontes: [
+      { orgao: "ISP-RJ", url: "https://www.ispdados.rj.gov.br/EstSeguranca.html", periodo: "ano-base 2025", consulta: "2026-09-26" },
+      { orgao: "Sinesp/MJSP", url: "https://www.gov.br/mj/pt-br/acesso-a-informacao/dados-abertos/ocorrencias-criminais-sinesp", periodo: "base nacional disponível", consulta: "2026-09-26" },
+    ],
+  },
+
   // ── P604 — Golgi Jundiaí (AR-PAT-2026-004) ────────────────
   // Graus e textos seguem o parecer territorial v2, com redação prudencial.
   // Tempos de pronta-resposta são estimativas operacionais e devem ser
