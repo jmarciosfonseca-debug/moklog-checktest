@@ -4,8 +4,8 @@
 //
 // Terceira perna do tripé (Operacional + Sinistros + REGIONAL).
 // O dado ESTRUTURADO vive aqui (versionado, auditável, lido pelo motor).
-// O DOCUMENTO (PDF técnico) vive na pasta pública: public/regional/{PID}.pdf
-// e é apenas APONTADO por `pdfPath` — anexado sob demanda na geração do PDF.
+// A FIGURA/REFERÊNCIA territorial pode viver em public/regional ou ser
+// incorporada ao gerador. `pdfPath` nunca deve apontar para arquivo inexistente.
 //
 // Para adicionar um projeto: duplique um bloco REGIONAL.Pxxx, preencha a
 // partir do respectivo Documento de Análise Regional (AR-PAT-xxxx) e
@@ -30,7 +30,8 @@ export const REGIONAL = {
     marcoZero: "Rodovia DF-290, KM 1,2 — Santa Maria/DF",
     municipioUF: "Santa Maria / DF (margem norte da DF-290)",
     coordenadas: "16°02'34\"S 47°58'12\"W",
-    pdfPath: "/regional/P607.pdf",   // arquivo em public/regional/P607.pdf
+    pdfPath: null,
+    mapaIncorporado: true,
 
     // Quadrantes limítrofes com grau e tipologias.
     quadrantes: [
@@ -39,9 +40,9 @@ export const REGIONAL = {
         regiao: "Santa Maria / Polo Multi-industrial (DF-290)",
         grau: "GRAVE",
         vetores: [
-          { natureza: "acesso",    desc: "Quadrilhas de roubo e transbordo de cargas" },
-          { natureza: "perimetro", desc: "Invasão perimetral e furto noturno em galpões" },
-          { natureza: "furto",     desc: "Furto/roubo de veículos e de infraestrutura" },
+          { natureza: "acesso", desc: "A proximidade de corredor logístico pode elevar a exposição a abordagem e transbordo de cargas." },
+          { natureza: "perimetro", desc: "A configuração do entorno pode ampliar a possibilidade de aproximação ao perímetro fora do horário de maior circulação." },
+          { natureza: "furto", desc: "A circulação de veículos e a infraestrutura externa podem ampliar a exposição patrimonial quando há falhas de detecção." },
         ],
       },
       {
@@ -49,20 +50,24 @@ export const REGIONAL = {
         regiao: "Jardim Céu Azul / Valparaíso de Goiás",
         grau: "GRAVISSIMO",
         vetores: [
-          { natureza: "violento", desc: "Crimes Violentos Letais Intencionais (CVLI) — ~20/100 mil hab." },
-          { natureza: "violento", desc: "Tráfico e atuação de facções na faixa de divisa" },
-          { natureza: "violento", desc: "Latrocínios e roubo a pedestres/trabalhadores" },
+          { natureza: "violento", desc: "O contexto de divisa pode elevar a exposição a ocorrências violentas, sem permitir atribuição direta ao ativo." },
+          { natureza: "violento", desc: "A faixa de divisa pode reduzir a previsibilidade jurisdicional da resposta em situações coordenadas." },
+          { natureza: "violento", desc: "A circulação a pé e por transporte coletivo pode ampliar a exposição de trabalhadores nas trocas de turno." },
         ],
       },
     ],
 
     // Fatores protetivos (pronta-resposta). distanciaKm atenua conforme proximidade.
     protecao: [
-      { orgao: "Hospital Regional de Santa Maria (HRSM)", uf: "DF", distanciaKm: 3.5, tempoMin: 5,  tipo: "hospital" },
-      { orgao: "26º BPM (PMDF)", uf: "DF", distanciaKm: 5.5, tempoMin: 8, tipo: "pm", titular: true },
-      { orgao: "18º CBMDF (Bombeiros)", uf: "DF", distanciaKm: 6.2, tempoMin: 9, tipo: "bombeiro" },
-      { orgao: "Hospital Municipal de Valparaíso", uf: "GO", distanciaKm: 3.8, tempoMin: 6, tipo: "hospital" },
-      { orgao: "20º BPM (PMGO)", uf: "GO", distanciaKm: 4.2, tempoMin: 7, tipo: "pm" },
+      { orgao: "Hospital Regional de Santa Maria (HRSM)", uf: "DF", distanciaKm: 3.5, tempoMin: 5, tipo: "hospital", fonte: "estimativa operacional — validar" },
+      { orgao: "26º BPM (PMDF)", uf: "DF", distanciaKm: 5.5, tempoMin: 8, tipo: "pm", titular: true, fonte: "estimativa operacional — validar" },
+      { orgao: "18º CBMDF (Bombeiros)", uf: "DF", distanciaKm: 6.2, tempoMin: 9, tipo: "bombeiro", fonte: "estimativa operacional — validar" },
+      { orgao: "Hospital Municipal de Valparaíso", uf: "GO", distanciaKm: 3.8, tempoMin: 6, tipo: "hospital", fonte: "estimativa operacional — validar" },
+      { orgao: "20º BPM (PMGO)", uf: "GO", distanciaKm: 4.2, tempoMin: 7, tipo: "pm", fonte: "estimativa operacional — validar" },
+    ],
+    fontes: [
+      { orgao: "SSP-DF", url: "https://ssp.df.gov.br/dados-por-regiao-administrativa/", periodo: "2025–2026", consulta: "2026-09-26", escopo: "DF e regiões administrativas" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -75,7 +80,8 @@ export const REGIONAL = {
     marcoZero: "Rod. dos Bandeirantes (SP-348/SP-354), margem leste — Cajamar/SP",
     municipioUF: "Cajamar / SP (limítrofe a Franco da Rocha a leste/nordeste)",
     coordenadas: "23°19'53\"S 46°48'55\"W",
-    pdfPath: "/regional/P601.pdf",
+    pdfPath: null,
+    mapaIncorporado: true,
 
     quadrantes: [
       {
@@ -83,9 +89,9 @@ export const REGIONAL = {
         regiao: "Rod. dos Bandeirantes / polo de galpões (Cajamar)",
         grau: "GRAVE",
         vetores: [
-          { natureza: "acesso",    desc: "Roubo e furto de carga em trânsito e em pátio" },
-          { natureza: "perimetro", desc: "Invasão perimetral e furto noturno em galpões" },
-          { natureza: "furto",     desc: "Furto de veículos e de infraestrutura" },
+          { natureza: "acesso", desc: "O corredor logístico pode elevar a exposição a abordagem de cargas em trânsito, desaceleração ou pátio." },
+          { natureza: "perimetro", desc: "A configuração logística do entorno pode ampliar a possibilidade de aproximação ao perímetro fora do horário de maior circulação." },
+          { natureza: "furto", desc: "Veículos e infraestrutura externa podem ficar mais expostos quando há redução da capacidade de detecção." },
         ],
       },
       {
@@ -93,18 +99,22 @@ export const REGIONAL = {
         regiao: "Comunidade Roseira — divisa Cajamar/Franco da Rocha",
         grau: "GRAVISSIMO",
         vetores: [
-          { natureza: "violento", desc: "Tráfico de drogas com pontos fixos (operações da 3ª Cia 26º BPM)" },
-          { natureza: "violento", desc: "Crime violento / homicídio por arma de fogo registrado" },
-          { natureza: "acesso",   desc: "Acesso ao perímetro pela Estr. Mun. p/ Parnaíba (jurisdição partilhada)" },
+          { natureza: "violento", desc: "O contexto urbano de divisa pode elevar a exposição a ocorrências violentas, sem permitir atribuição direta ao ativo." },
+          { natureza: "violento", desc: "A circulação nas vias do entorno pode ampliar a exposição de colaboradores, especialmente nas trocas de turno." },
+          { natureza: "acesso", desc: "O acesso pela Estrada Municipal para Parnaíba pode ampliar rotas de aproximação e tornar a resposta dependente de coordenação entre jurisdições." },
         ],
       },
     ],
 
     protecao: [
-      { orgao: "3ª Cia 26º BPM/M — Jordanésia (PMESP)", uf: "SP", distanciaKm: 2.5, tempoMin: 5, tipo: "pm", titular: true },
-      { orgao: "UPA de Jordanésia (pronto-atendimento)", uf: "SP", distanciaKm: 4.0, tempoMin: 8, tipo: "hospital" },
-      { orgao: "26º BPM/M (Sede) — Franco da Rocha", uf: "SP", distanciaKm: 7.0, tempoMin: 12, tipo: "pm" },
-      { orgao: "Hospital Estadual Albano da Franca Rocha", uf: "SP", distanciaKm: 8.0, tempoMin: 14, tipo: "hospital" },
+      { orgao: "3ª Cia 26º BPM/M — Jordanésia (PMESP)", uf: "SP", distanciaKm: 2.5, tempoMin: 5, tipo: "pm", titular: true, fonte: "estimativa operacional — validar" },
+      { orgao: "UPA de Jordanésia (pronto-atendimento)", uf: "SP", distanciaKm: 4.0, tempoMin: 8, tipo: "hospital", fonte: "estimativa operacional — validar" },
+      { orgao: "26º BPM/M (Sede) — Franco da Rocha", uf: "SP", distanciaKm: 7.0, tempoMin: 12, tipo: "pm", fonte: "estimativa operacional — validar" },
+      { orgao: "Hospital Estadual Albano da Franca Rocha", uf: "SP", distanciaKm: 8.0, tempoMin: 14, tipo: "hospital", fonte: "estimativa operacional — validar" },
+    ],
+    fontes: [
+      { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "município/circunscrição conforme consulta" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -118,7 +128,7 @@ export const REGIONAL = {
     municipioUF: "Mauá / SP (Sertãozinho, a ~1,8 km do Rodoanel Mário Covas)",
     coordenadas: "23°39'46.8\"S 46°26'12.4\"W",
     mapsUrl: "https://maps.app.goo.gl/j6s5AL2W32z5rW2u5",
-    pdfPath: "/regional/P602.pdf",
+    pdfPath: "/regional/P602.jpg",
 
     quadrantes: [
       {
@@ -126,9 +136,9 @@ export const REGIONAL = {
         regiao: "Rodoanel Mário Covas (Trecho Sul) · Complexo Jacu-Pêssego · SP-031 (Índio Tibiriçá)",
         grau: "GRAVE",
         vetores: [
-          { natureza: "acesso", desc: "Corredor crítico de roubo e interceptação de cargas em trânsito e desaceleração" },
-          { natureza: "acesso", desc: "Evasão rápida para a malha do Rodoanel em menos de 3 minutos" },
-          { natureza: "furto", desc: "Pontos de transbordo e desengate de carretas nas faixas de domínio da SP-031" },
+          { natureza: "acesso", desc: "O corredor rodoviário pode elevar a exposição a abordagem de cargas em trânsito ou desaceleração." },
+          { natureza: "acesso", desc: "A proximidade da malha do Rodoanel pode ampliar as alternativas de deslocamento e reduzir o tempo disponível para contenção." },
+          { natureza: "furto", desc: "As faixas de domínio podem ampliar a exposição a transbordo, desengate e subtração de cargas ou componentes." },
         ],
       },
       {
@@ -136,18 +146,22 @@ export const REGIONAL = {
         regiao: "Comunidades limítrofes ao ativo — encostas e taludes",
         grau: "GRAVISSIMO",
         vetores: [
-          { natureza: "perimetro", desc: "Pressão perimétrica em encostas e taludes acidentados com vegetação" },
-          { natureza: "violento", desc: "Risco de roubos a transeuntes nos pontos de ônibus nas trocas de turno (06h e 22h)" },
-          { natureza: "furto", desc: "Histórico de furto de cabos e cabeamento subterrâneo nas vias municipais de acesso" },
+          { natureza: "perimetro", desc: "Encostas, taludes e vegetação podem reduzir a vigilância natural e ampliar pontos de aproximação ao perímetro." },
+          { natureza: "violento", desc: "Pontos de ônibus e circulação a pé podem ampliar a exposição de trabalhadores nas trocas de turno." },
+          { natureza: "furto", desc: "Cabeamento e infraestrutura nas vias de acesso podem ficar mais expostos quando há falhas de iluminação ou detecção." },
         ],
       },
     ],
 
     protecao: [
-      { orgao: "1ª Cia 30º BPM/M (PMESP)", uf: "SP", distanciaKm: 3.8, tempoMin: 7, tipo: "pm", titular: true },
-      { orgao: "1º BPRv — Rodoanel Sul (PMRv)", uf: "SP", distanciaKm: 3.2, tempoMin: 5, tipo: "pm" },
-      { orgao: "UPA Zaíra", uf: "SP", distanciaKm: 4.1, tempoMin: 8, tipo: "hospital" },
-      { orgao: "Hospital Dr. Radamés Nardini", uf: "SP", distanciaKm: 6.5, tempoMin: 12, tipo: "hospital" },
+      { orgao: "1ª Cia 30º BPM/M (PMESP)", uf: "SP", distanciaKm: 3.8, tempoMin: 7, tipo: "pm", titular: true, fonte: "estimativa operacional — validar" },
+      { orgao: "1º BPRv — Rodoanel Sul (PMRv)", uf: "SP", distanciaKm: 3.2, tempoMin: 5, tipo: "pm", fonte: "estimativa operacional — validar" },
+      { orgao: "UPA Zaíra", uf: "SP", distanciaKm: 4.1, tempoMin: 8, tipo: "hospital", fonte: "estimativa operacional — validar" },
+      { orgao: "Hospital Dr. Radamés Nardini", uf: "SP", distanciaKm: 6.5, tempoMin: 12, tipo: "hospital", fonte: "estimativa operacional — validar" },
+    ],
+    fontes: [
+      { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "Mauá/circunscrição conforme consulta" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -168,9 +182,9 @@ export const REGIONAL = {
         regiao: "BR-116 km 204/205 × SP-021 (entroncamento imediato)",
         grau: "GRAVE",
         vetores: [
-          { natureza: "furto", desc: "Exposição a roubo de carga e abordagem na desaceleração de composições pesadas nas alças entre o Rodoanel Leste e a Dutra; risco de comboios armados nas pistas marginais." },
-          { natureza: "acesso", desc: "Acesso quase instantâneo à pista expressa da BR-116 (sentidos Rio e Capital/Cumbica) e ao Rodoanel, viabilizando evasão imediata rumo a Santos ou interior." },
-          { natureza: "furto", desc: "Faixas lindeiras e viadutos do entroncamento expõem infraestrutura e pátios à ação em trânsito." },
+          { natureza: "furto", desc: "A desaceleração de composições pesadas nas alças entre o Rodoanel Leste e a Dutra pode elevar a exposição a abordagem e subtração de cargas." },
+          { natureza: "acesso", desc: "O acesso à BR-116 e ao Rodoanel pode ampliar alternativas de deslocamento e reduzir o tempo disponível para contenção." },
+          { natureza: "furto", desc: "Faixas lindeiras e viadutos do entroncamento podem ampliar a exposição de infraestrutura e pátios quando há falhas de detecção." },
         ],
       },
       {
@@ -178,16 +192,20 @@ export const REGIONAL = {
         regiao: "Vila Sadokim / Álamo (oeste) · Jardim Joia / Tupi (sul, junto às alças)",
         grau: "GRAVE",
         vetores: [
-          { natureza: "perimetro", desc: "Vegetação e taludes voltados para o viário e divisas laterais industriais sem ocupação ativa contínua favorecem intrusão perimetral e pontos cegos de desnível." },
-          { natureza: "violento", desc: "Malha urbana periférica mista a oeste e núcleos residenciais ao sul ampliam a exposição de colaboradores nas vias de acesso e trocas de turno." },
+          { natureza: "perimetro", desc: "Vegetação, taludes e divisas laterais sem ocupação ativa contínua podem reduzir a vigilância natural e ampliar pontos cegos junto ao perímetro." },
+          { natureza: "violento", desc: "A malha urbana periférica e os núcleos residenciais podem ampliar a exposição de colaboradores nas vias de acesso e trocas de turno." },
         ],
       },
     ],
     protecao: [
-      { orgao: "31º BPM/M — 3ª Cia (Arujá)", uf: "SP", distanciaKm: null, tempoMin: 8, tipo: "pm", titular: true },
-      { orgao: "1º BPRv — 3ª Cia (Rodoanel Leste)", uf: "SP", distanciaKm: null, tempoMin: 5, tipo: "pm" },
-      { orgao: "Posto de Bombeiros de Arujá (17º GB)", uf: "SP", distanciaKm: null, tempoMin: 10, tipo: "bombeiro" },
-      { orgao: "Pronto Atendimento Central de Arujá", uf: "SP", distanciaKm: null, tempoMin: 12, tipo: "hospital" },
+      { orgao: "31º BPM/M — 3ª Cia (Arujá)", uf: "SP", distanciaKm: null, tempoMin: 8, tipo: "pm", titular: true, fonte: "tempo estimado — distância não aferida" },
+      { orgao: "1º BPRv — 3ª Cia (Rodoanel Leste)", uf: "SP", distanciaKm: null, tempoMin: 5, tipo: "pm", fonte: "tempo estimado — distância não aferida" },
+      { orgao: "Posto de Bombeiros de Arujá (17º GB)", uf: "SP", distanciaKm: null, tempoMin: 10, tipo: "bombeiro", fonte: "tempo estimado — distância não aferida" },
+      { orgao: "Pronto Atendimento Central de Arujá", uf: "SP", distanciaKm: null, tempoMin: 12, tipo: "hospital", fonte: "tempo estimado — distância não aferida" },
+    ],
+    fontes: [
+      { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "Arujá/Guarulhos conforme circunscrição" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -260,9 +278,9 @@ export const REGIONAL = {
         regiao: "Eixo SP-300 / SP-348 / SP-330 — Distrito Industrial",
         grau: "GRAVE",
         vetores: [
-          { natureza: "furto", desc: "Exposição a roubo e furto de cargas em trânsito, característica de eixos logísticos de alto valor." },
-          { natureza: "acesso", desc: "Acesso direto à SP-300 favorece evasão veicular em direção às alças da Bandeirantes e Anhanguera." },
-          { natureza: "furto", desc: "Faixas de domínio limítrofes expõem cabeamento elétrico e óptico a furto e sabotagem." },
+          { natureza: "furto", desc: "A circulação em eixo logístico de alto valor pode elevar a exposição a abordagem e subtração de cargas em trânsito." },
+          { natureza: "acesso", desc: "O acesso direto à SP-300 pode ampliar alternativas de deslocamento em direção às alças da Bandeirantes e Anhanguera." },
+          { natureza: "furto", desc: "Faixas de domínio limítrofes podem ampliar a exposição de cabeamento elétrico e óptico quando há falhas de detecção." },
         ],
       },
       {
@@ -279,8 +297,8 @@ export const REGIONAL = {
         regiao: "Almerinda Chaves, Novo Horizonte, Residencial Jundiaí, Tereza Cristina e Medeiros",
         grau: "GRAVE",
         vetores: [
-          { natureza: "perimetro", desc: "Adensamento residencial no entorno eleva a exposição a tentativas de intrusão perimetral e furto noturno." },
-          { natureza: "violento", desc: "Vias vicinais e pontos de ônibus ampliam a exposição de colaboradores nas trocas de turno." },
+          { natureza: "perimetro", desc: "O adensamento residencial no entorno pode elevar a exposição a tentativas de transposição perimetral fora do horário de maior circulação." },
+          { natureza: "violento", desc: "Vias vicinais e pontos de ônibus podem ampliar a exposição de colaboradores nas trocas de turno." },
         ],
       },
     ],
@@ -290,6 +308,10 @@ export const REGIONAL = {
       { orgao: "4º BPRv — Base SP-300/Bandeirantes", uf: "SP", distanciaKm: 4.2, tempoMin: 7, tipo: "pm", fonte: "estimativa operacional — validar" },
       { orgao: "UPA Vetor Oeste — Novo Horizonte", uf: "SP", distanciaKm: 5.1, tempoMin: 9, tipo: "hospital", fonte: "estimativa operacional — validar" },
       { orgao: "Hospital São Vicente de Paulo", uf: "SP", distanciaKm: 11.5, tempoMin: 20, tipo: "hospital", fonte: "estimativa operacional — validar" },
+    ],
+    fontes: [
+      { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "Jundiaí/circunscrição conforme consulta" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
