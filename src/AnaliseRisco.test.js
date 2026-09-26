@@ -1,4 +1,5 @@
 import { gerarHTMLAnaliseRisco, MAPA_REGIONAL } from "./AnaliseRisco";
+import { REGIONAL } from "./regionalConfig";
 
 function contexto(vetores = []) {
   return {
@@ -45,7 +46,7 @@ test("todos os Golgis possuem referência de mapa configurada", () => {
   expect(MAPA_REGIONAL.P602).toBe("/mapas/P602.jpg");
   expect(MAPA_REGIONAL.P604).toBe("/mapas/P604.jpg");
   expect(MAPA_REGIONAL.P605).toBe("/mapas/P605.jpg");
-  expect(MAPA_REGIONAL.P606).toBe("/mapas/P606.jpg");
+  expect(MAPA_REGIONAL.P606).toBe("/regional/P606.jpg");
 });
 
 test("PDF executivo usa três colunas, explica o cálculo e limita apontamentos", () => {
@@ -64,4 +65,18 @@ test("projeto sem diagnóstico regional ainda exibe o mapa como referência", ()
 
   expect(html).toContain("Mapa de referência do P604");
   expect(html).toContain("diagnóstico territorial interpretativo permanece em elaboração");
+});
+
+test("territorial do P606 exibe versão e fontes registradas sem prometer anexo inexistente", () => {
+  const dados = contexto([vetor(1)]);
+  dados.project = { id: "P606", name: "Golgi Duque de Caxias" };
+  dados.regional = { ok: true, temDado: true, ...REGIONAL.P606 };
+
+  const html = gerarHTMLAnaliseRisco(dados, "data:image/jpeg;base64,AA==");
+
+  expect(html).toContain("AR-PAT-2026-606");
+  expect(html).toContain("versão 1.0.0");
+  expect(html).toContain("ISP-RJ (ano-base 2025)");
+  expect(html).toContain("podem encontrar menor resistência eletrônica");
+  expect(html).not.toContain("versão completa em anexo");
 });
