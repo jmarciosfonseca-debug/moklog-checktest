@@ -1367,7 +1367,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa tático do entorno do ${esc(project.id)}">`
       : `<div class="terr-pend"><div class="tp-ico">🛈</div><div class="tp-txt"><b>Mapa territorial indisponível.</b> ${esc(erroMapa || "O ativo não pôde ser carregado nesta geração.")}</div></div>`;
     territHTML = `
-    <div class="bloco">
+    <div class="bloco bloco-territorial">
       <div class="eyebrow">Diagnóstico territorial — por que a falha importa aqui</div>
       ${mapaHTML}
       <div class="mapa-cap">${cap}</div>
@@ -1391,7 +1391,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa de referência do ${esc(project.id)}"><div class="mapa-cap">Figura — mapa de referência do ${esc(project.id)}. O diagnóstico territorial interpretativo permanece em elaboração.</div>`
       : "";
     territHTML = `
-    <div class="bloco">
+    <div class="bloco bloco-territorial">
       <div class="eyebrow">Diagnóstico territorial — por que a falha importa aqui</div>
       ${mapaReferencia}
       <div class="terr-pend">
@@ -1553,11 +1553,12 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .soma .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#9fb0c2;font-weight:600}
   .soma .r{font-family:'Fraunces';font-weight:700;font-size:19px}.soma .r em{color:#ffcf8a;font-style:normal}
   .nota{font-size:11px;color:var(--cinza);margin-top:9px;font-style:italic}
-  .mapa{width:100%;height:auto;display:block;border:1px solid var(--linha);border-radius:4px}
-  .mapa-parecer{font-size:12.5px;color:var(--grafite);line-height:1.55;margin-top:12px}
+  .bloco-territorial{margin-top:22px}
+  .mapa{width:auto;max-width:100%;height:auto;max-height:78mm;object-fit:contain;object-position:center;display:block;margin:8px auto 0;border:1px solid var(--linha);border-radius:4px}
+  .mapa-parecer{font-size:12.5px;color:var(--grafite);line-height:1.55;margin-top:8px}
   .mapa-parecer b{color:var(--tinta)}
-  .mapa-cap{font-size:10.5px;color:var(--cinza);font-style:italic;margin-top:7px;line-height:1.5}
-  .quad{margin-top:14px;font-size:0}
+  .mapa-cap{font-size:10.5px;color:var(--cinza);font-style:italic;margin-top:5px;line-height:1.4}
+  .quad{margin-top:10px;font-size:0}
   .qcard{display:inline-block;vertical-align:top;width:calc(50% - 6px);border:1px solid var(--linha);border-radius:4px;padding:14px 16px;background:#fff;font-size:12px}
   .qcard:first-child{margin-right:10px}
   .qcard .qh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -1613,6 +1614,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     body{background:#fff;padding:0}
     .folha{margin:0;box-shadow:none;max-width:none}
     @page{margin:12mm}
+    .mapa{max-height:72mm}
     /* Impede corte de blocos no meio — regra: aplicar em blocos pequenos/médios,
        NUNCA no container .folha/.corpo (senão força página em branco). */
     .veredito,.alerta,.regua,.vuln,.calc-card,.soma,.impact-card,.impact-territorial,.consultor,.assina,
