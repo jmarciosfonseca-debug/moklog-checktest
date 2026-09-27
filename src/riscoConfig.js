@@ -134,7 +134,7 @@ export const MAPA_NOMEBASE = [
   { match: ["botoes de panico", "botao de panico", "panico"], classe: "BLOQUEADOR", flags: { panicoFixo: true } }, // pânico genérico em categoria própria = fixo (conservador p/ trava)
 
   // ── Perímetro (regra especial) ──
-  { match: ["alarme perimetral", "perimetro", "cerca eletr", "fibra otica", "sensor ir perimetr"], classe: "BLOQUEADOR", flags: { perimetro: true } },
+  { match: ["alarme perimetral", "perimetro", "cerca eletr", "alpha sense", "fibra otica", "sensor ir perimetr"], classe: "BLOQUEADOR", flags: { perimetro: true } },
 
   // ── Automação de acesso que CONTÉM nome de item forte (deve vir ANTES) ──
   // "Leitor QR Cancela" tem "cancela" no nome mas é automação, não contenção.
@@ -437,7 +437,50 @@ export function classificarRiscoOperacional({
   panicoFixoInoperante = false,
   ctmkOffline = false,
   perimetroTotal30d = false,
+  camadasPerimetrais = null,
 } = {}) {
+  // Doutrina específica de perímetro em camadas. Só é aplicada quando o
+  // chamador fornece explicitamente as duas barreiras; os demais projetos
+  // continuam percorrendo a régua histórica abaixo sem qualquer alteração.
+  if (camadasPerimetrais) {
+    const primariaInop = Math.max(0, Number(camadasPerimetrais.primariaInop) || 0);
+    const secundariaInop = Math.max(0, Number(camadasPerimetrais.secundariaInop) || 0);
+    const secundariaTotal = Math.max(0, Number(camadasPerimetrais.secundariaTotal) || 0);
+
+    if (primariaInop >= 2) {
+      return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "duas ou mais zonas do Alpha Sense inoperantes" };
+    }
+    if (primariaInop >= 1 && secundariaInop >= 1) {
+      return { nivel: NIVEL.CRITICO, label: NIVEL_LABEL[NIVEL.CRITICO], motivo: "falha simultânea no Alpha Sense e na cerca elétrica" };
+    }
+    if (primariaInop === 1) {
+      return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "uma zona do Alpha Sense inoperante" };
+    }
+    if (secundariaTotal > 0 && secundariaInop >= secundariaTotal) {
+      return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "cerca elétrica totalmente inoperante com Alpha Sense íntegro" };
+    }
+
+    // Falha parcial apenas na camada secundária não se combina com CFTV,
+    // pânico, CTMK ou barreiras veiculares para formar CRÍTICO. Esses vetores
+    // continuam valendo por sua própria régua e podem levar a ELEVADO.
+    if (panicoFixoInoperante) {
+      return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "pânico fixo inoperante com Alpha Sense íntegro" };
+    }
+    if (ctmkOffline) {
+      return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "CTMK offline com Alpha Sense íntegro" };
+    }
+    if (cftvInoperante > 5) {
+      return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "mais de cinco câmeras inoperantes com Alpha Sense íntegro" };
+    }
+    if (barreirasCriticas > 0) {
+      return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "barreira crítica de bloqueio inoperante com Alpha Sense íntegro" };
+    }
+    if (secundariaInop > 0) {
+      return { nivel: NIVEL.BAIXO, label: NIVEL_LABEL[NIVEL.BAIXO], motivo: "falha parcial na cerca elétrica com Alpha Sense íntegro" };
+    }
+    return { nivel: NIVEL.BAIXO, label: NIVEL_LABEL[NIVEL.BAIXO], motivo: "camadas perimetrais íntegras" };
+  }
+
   // ── Régua Marcio (20/09): SÓ o perímetro puxa CRÍTICO. ──
   // Perímetro totalmente desconfigurado >30d é falha do próprio perímetro → CRÍTICO.
   if (perimetroTotal30d) {
