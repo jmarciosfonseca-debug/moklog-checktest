@@ -1,4 +1,4 @@
-import { formatarPlantoes, gerarHTMLAnaliseRisco, MAPA_REGIONAL, obterNarrativaClassificacao } from "./AnaliseRisco";
+import { aplicarDoutrinaCamadasP311A, formatarPlantoes, gerarHTMLAnaliseRisco, MAPA_REGIONAL, obterNarrativaClassificacao, vetoresDoTesteSemanal } from "./AnaliseRisco";
 import { REGIONAL } from "./regionalConfig";
 
 function contexto(vetores = []) {
@@ -156,4 +156,78 @@ test("os nove projetos compartilham capa e a mesma estrutura institucional", () 
     expect(html).toContain("Palavra do consultor");
     expect(html).not.toContain("undefined");
   });
+});
+
+test("P311A rebaixa somente a falha parcial da cerca secundária quando Alpha Sense está íntegro", () => {
+  const secundaria = {
+    ...vetor(1),
+    camadaPerimetral: "secundaria",
+    zonaCanonica: "zona-01",
+    observacaoManutencao: false,
+  };
+  const cftv = { ...vetor(2), barreiraFisica: null, camadaPerimetral: null, zonaCanonica: null };
+  const project = {
+    id: "P311A",
+    categories: [{ id: "perimeter", itemLabels: ["Zona 01", "Zona 02", "Zona 03", "Alambrado/Gradil"] }],
+  };
+
+  const resultado = aplicarDoutrinaCamadasP311A([secundaria, cftv], project);
+
+  expect(resultado.camadasPerimetrais).toEqual({ primariaInop: 0, secundariaInop: 1, secundariaTotal: 4 });
+  expect(resultado.vetores[0].nivel).toBe(1);
+  expect(resultado.vetores[0].bloqueadorCaido).toBe(false);
+  expect(resultado.vetores[0].observacaoManutencao).toBe(true);
+  expect(resultado.vetores[1]).toEqual(cftv);
+});
+
+test("memória de cálculo identifica separadamente Alpha Sense e cerca elétrica", () => {
+  const dados = contexto([]);
+  dados.project = { id: "P311A", name: "Mega CL Curitiba" };
+  dados.geral = {
+    label: "CRÍTICO",
+    nivel: 4,
+    motivoMatriz: "falha simultânea no Alpha Sense e na cerca elétrica",
+    metricas: {
+      zonasNomeadas: 0,
+      alphaSenseInoperante: 1,
+      cercaEletricaInoperante: 1,
+      cftvInoperante: 0,
+      barreirasCriticas: 0,
+    },
+  };
+
+  const html = gerarHTMLAnaliseRisco(dados);
+
+  expect(html).toContain("1 zona(s) do Alpha Sense inoperante(s)");
+  expect(html).toContain("1 zona(s) da cerca elétrica inoperante(s)");
+  expect(html).toContain("falha simultânea no Alpha Sense e na cerca elétrica");
+});
+
+test("Alambrado/Gradil conta como a quarta zona da cerca elétrica do P311A", () => {
+  const itens = ["Zona 01", "Zona 02", "Zona 03", "Alambrado/Gradil"];
+  const ts = {
+    ok: true,
+    pid: "P311A",
+    pend: itens.map((itemLabel) => ({
+      catId: "perimeter",
+      catLabel: "01 - ALARME CERCA ELÉTRICA",
+      itemLabel,
+      status: "INOPERANTE",
+      dias: 1,
+    })),
+    catAgg: {
+      "01 - ALARME CERCA ELÉTRICA": { total: 4, inop: 4, piorDias: 1 },
+    },
+  };
+  const project = {
+    id: "P311A",
+    categories: [{ id: "perimeter", itemLabels: itens }],
+  };
+
+  const vetores = vetoresDoTesteSemanal(ts, "27/09/2026");
+  const resultado = aplicarDoutrinaCamadasP311A(vetores, project);
+
+  expect(new Set(vetores.map((v) => v.zonaCanonica)).size).toBe(4);
+  expect(resultado.camadasPerimetrais.secundariaInop).toBe(4);
+  expect(resultado.vetores.every((v) => v.observacaoManutencao !== true)).toBe(true);
 });

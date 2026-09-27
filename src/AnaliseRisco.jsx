@@ -172,10 +172,10 @@ function coletarTesteSemanal(project, stored) {
   const state = last.state || {};
   const pend = [];
   let totalItens = 0, okItens = 0;
-  const catAgg = {};  // catLabel -> { catLabel, total, inop, piorDias, itemLabel }
+  const catAgg = {};  // catLabel -> { catId, catLabel, total, inop, piorDias, itemLabel }
   const pid = project.id;
-  const agg = (catLabel, total, inop, dias, itemLabel) => {
-    if (!catAgg[catLabel]) catAgg[catLabel] = { catLabel, total: 0, inop: 0, piorDias: null, itemLabel: null };
+  const agg = (catId, catLabel, total, inop, dias, itemLabel) => {
+    if (!catAgg[catLabel]) catAgg[catLabel] = { catId, catLabel, total: 0, inop: 0, piorDias: null, itemLabel: null };
     const a = catAgg[catLabel];
     a.total += total; a.inop += inop;
     if (dias != null && (a.piorDias == null || dias > a.piorDias)) { a.piorDias = dias; a.itemLabel = itemLabel || a.itemLabel; }
@@ -187,23 +187,23 @@ function coletarTesteSemanal(project, stored) {
     if (cat.type === "single") {
       totalItens++;
       const st = s.status ?? (s.ok === false ? "inop" : "ok");
-      if (st === "ok") { okItens++; agg(cat.label, 1, 0, null, null); }
-      else { const p = mkPend(cat.label, "", s, st, prep); pend.push(p); agg(cat.label, 1, 1, p.dias, ""); }
+      if (st === "ok") { okItens++; agg(cat.id, cat.label, 1, 0, null, null); }
+      else { const p = mkPend(cat.id, cat.label, "", s, st, prep); pend.push(p); agg(cat.id, cat.label, 1, 1, p.dias, ""); }
     } else if (cat.type === "items") {
       const arr = Array.isArray(s) ? s : [];
       arr.forEach((v, i) => {
         totalItens++;
         const st = v?.status ?? (v?.ok === false ? "inop" : "ok");
         const lbl = cat.itemLabels?.[i] || `Item ${i + 1}`;
-        if (st === "ok") { okItens++; agg(cat.label, 1, 0, null, null); }
-        else { const p = mkPend(cat.label, lbl, v, st, prep); pend.push(p); agg(cat.label, 1, 1, p.dias, lbl); }
+        if (st === "ok") { okItens++; agg(cat.id, cat.label, 1, 0, null, null); }
+        else { const p = mkPend(cat.id, cat.label, lbl, v, st, prep); pend.push(p); agg(cat.id, cat.label, 1, 1, p.dias, lbl); }
       });
     } else if (cat.type === "count") {
       const inop = Array.isArray(s.inoperative) ? s.inoperative : [];
       const tot = Number(s.total) || 0;
       totalItens += tot; okItens += Math.max(0, tot - inop.length);
-      agg(cat.label, tot, inop.length, null, null);
-      inop.forEach((it) => { const p = mkPend(cat.label, it.id || "?", it, "inop", prep); pend.push(p); agg(cat.label, 0, 0, p.dias, it.id || "?"); });
+      agg(cat.id, cat.label, tot, inop.length, null, null);
+      inop.forEach((it) => { const p = mkPend(cat.id, cat.label, it.id || "?", it, "inop", prep); pend.push(p); agg(cat.id, cat.label, 0, 0, p.dias, it.id || "?"); });
     }
   }
   const pct = totalItens ? Math.round((okItens / totalItens) * 100) : null;
@@ -213,10 +213,10 @@ function coletarTesteSemanal(project, stored) {
     lider: last.meta?.lider || last.meta?.liderName || null,
   };
 }
-function mkPend(catLabel, itemLabel, obj, st, prep) {
+function mkPend(catId, catLabel, itemLabel, obj, st, prep) {
   const dias = daysSince(obj?.since);
   return {
-    catLabel, itemLabel,
+    catId, catLabel, itemLabel,
     pontoFisico: detectarPontoFisico(itemLabel),
     status: st === "partial" ? "PARCIAL" : "INOPERANTE",
     dias, since: obj?.since || null, note: obj?.note || "",
@@ -615,15 +615,15 @@ export const MAPA_REGIONAL = {
 // ═════════════════════════════════════════════════════════════
 
 // Monta vetores a partir do Teste Semanal (agrupando por ponto físico).
-function vetoresDoTesteSemanal(ts, dataUlt) {
+export function vetoresDoTesteSemanal(ts, dataUlt) {
   if (!ts?.ok || !ts.pend?.length) return [];
   // v2 (motor riscoConfig): nível por CATEGORIA via classificarVetor.
   // Cada vetor guarda nivelMoked e nivelCliente (Moked = Cliente + 1, feito
   // no consolidarSite; aqui guardamos o nível-base e o flag incluir/soMoked).
   const porCat = {};
   for (const p of ts.pend) {
-    const chave = `cat:${p.catLabel}`;
-    if (!porCat[chave]) porCat[chave] = { catLabel: p.catLabel, itens: [], preponderante: p.preponderante };
+    const chave = `cat:${p.catId || p.catLabel}`;
+    if (!porCat[chave]) porCat[chave] = { catId: p.catId || null, catLabel: p.catLabel, itens: [], preponderante: p.preponderante };
     porCat[chave].itens.push(p);
     if (p.preponderante) porCat[chave].preponderante = true;
   }
@@ -648,11 +648,18 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
     // Perímetro nomeado: cada zona é uma evidência própria. Não agrupar
     // Z-04 e Z-07 em "+1 ponto", pois isso perde a rastreabilidade e a
     // contagem operacional das zonas perimetrais distintas.
-    const catEhPerimetral = /alarme perimetral|per[ií]metr/i.test(g.catLabel);
+    const camadaPerimetral = ts.pid === "P311A"
+      ? (g.catId === "perimeter_alphasense" ? "primaria" : g.catId === "perimeter" ? "secundaria" : null)
+      : null;
+    const barreiraPerimetral = camadaPerimetral ? `perimetro-${camadaPerimetral}` : "perimetro";
+    const catEhPerimetral = !!camadaPerimetral || /^perimeter/i.test(g.catId || "") || /alarme perimetral|per[ií]metr|cerca el[eé]trica|alpha sense/i.test(g.catLabel);
     const zonaDoItem = (item) => {
       const txt = `${g.catLabel} ${item.itemLabel || ""}`;
       const mz = txt.match(/zona\s*0?(\d{1,3})|z-?0?(\d{1,3})/i);
-      return mz ? `zona-${String(mz[1] || mz[2]).padStart(2, "0")}` : null;
+      if (mz) return `zona-${String(mz[1] || mz[2]).padStart(2, "0")}`;
+      return camadaPerimetral && item.itemLabel
+        ? `${camadaPerimetral}-${normalizarZona(item.itemLabel)}`
+        : null;
     };
     const zonasNomeadas = catEhPerimetral
       ? g.itens.map((item) => ({ item, zona: zonaDoItem(item) })).filter((x) => x.zona)
@@ -670,7 +677,7 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
           nivel: rcZ.nivel, classeV2: rcZ.classe, incluirCliente: rcZ.incluir !== false,
           bloqueadorCaido: !!rcZ.bloqueadorCaido, travaTipo: rcZ.travaTipo || null,
           observacaoManutencao: !!rcZ.observacaoManutencao,
-          zonaCanonica: zona, barreiraFisica: "perimetro",
+          zonaCanonica: zona, barreiraFisica: barreiraPerimetral, camadaPerimetral,
           causaRaiz: null, coberturaAlternativa: "não informada", gravidade: "localizada",
           preponderante: g.preponderante, piorDias: item.dias ?? piorDias, qtd: 1,
           fonteCredito: `Teste Semanal · ${dataUlt}`, sinceTxt: sinceZ,
@@ -683,15 +690,19 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
 
     const textoPerimetral = `${g.catLabel} ${piorItem?.itemLabel || ""}`;
     const mz = textoPerimetral.match(/zona\s*0?(\d{1,2})|z-?0?(\d{1,2})/i);
-    const zonaCanonica = mz ? `zona-${String(mz[1] || mz[2]).padStart(2, "0")}` : null;
-    const ehPerimetral = /per[ií]metr|cerca|fibra|sensor ir/i.test(textoPerimetral);
+    const zonaCanonica = mz
+      ? `zona-${String(mz[1] || mz[2]).padStart(2, "0")}`
+      : camadaPerimetral && piorItem?.itemLabel
+        ? `${camadaPerimetral}-${normalizarZona(piorItem.itemLabel)}`
+        : null;
+    const ehPerimetral = catEhPerimetral || /per[ií]metr|cerca|alpha sense|fibra|sensor ir/i.test(textoPerimetral);
     out.push({
       chave: `cat:${g.catLabel}`, label: g.catLabel,
       nivel: rc.nivel, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
       bloqueadorCaido: !!rc.bloqueadorCaido,
       travaTipo: rc.travaTipo || null, observacaoManutencao: !!rc.observacaoManutencao,
       // Fontes diferentes sem causa validada não provam falhas independentes.
-      zonaCanonica, barreiraFisica: ehPerimetral ? "perimetro" : null,
+      zonaCanonica, barreiraFisica: ehPerimetral ? barreiraPerimetral : null, camadaPerimetral,
       causaRaiz: null, coberturaAlternativa: "não informada", gravidade: ehPerimetral ? "localizada" : null,
       preponderante: g.preponderante, piorDias, qtd: g.itens.length,
       fonteCredito: `Teste Semanal · ${dataUlt}`, sinceTxt,
@@ -700,6 +711,38 @@ function vetoresDoTesteSemanal(ts, dataUlt) {
     });
   }
   return out;
+}
+
+// Aplica a doutrina de duas camadas somente ao P311A. A cerca elétrica é
+// redundância; enquanto o Alpha Sense estiver íntegro, uma falha parcial nela
+// permanece como manutenção e não é apresentada como bloqueador derrubado.
+export function aplicarDoutrinaCamadasP311A(vetores, project) {
+  if (project?.id !== "P311A") return { vetores, camadasPerimetrais: null };
+
+  const contarZonas = (camada) => new Set(vetores
+    .filter((v) => v.camadaPerimetral === camada && v.zonaCanonica && !v.pendenciaCadastro)
+    .map((v) => normalizarZona(v.zonaCanonica))).size;
+  const primariaInop = contarZonas("primaria");
+  const secundariaInop = contarZonas("secundaria");
+  const secundariaTotal = project.categories?.find((cat) => cat.id === "perimeter")?.itemLabels?.length || 4;
+  const secundariaParcialCoberta = primariaInop === 0 && secundariaInop > 0 && secundariaInop < secundariaTotal;
+
+  const ajustados = secundariaParcialCoberta
+    ? vetores.map((v) => v.camadaPerimetral === "secundaria"
+      ? {
+          ...v,
+          nivel: NIVEIS.BAIXO,
+          bloqueadorCaido: false,
+          observacaoManutencao: true,
+          descricao: `${v.descricao} <i>Camada secundária coberta pelo Alpha Sense íntegro.</i>`,
+        }
+      : v)
+    : vetores;
+
+  return {
+    vetores: ajustados,
+    camadasPerimetrais: { primariaInop, secundariaInop, secundariaTotal },
+  };
 }
 
 // Vetor CTMK (fonte painel).
@@ -1196,17 +1239,22 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   // completa de itens continua disponível no Anexo Técnico.
   const metricas = geral.metricas || {};
   const zonasCalc = Number(metricas.zonasNomeadas) || 0;
+  const alphaCalc = Number(metricas.alphaSenseInoperante) || 0;
+  const cercaCalc = Number(metricas.cercaEletricaInoperante) || 0;
   const cftvCalc = Number(metricas.cftvInoperante) || 0;
   const barreirasCalc = Number(metricas.barreirasCriticas) || 0;
   const panicoCalc = vetores.some((v) => v.travaTipo === "panicoFixoInoperante");
   const ctmkCalc = vetores.some((v) => v.travaTipo === "ctmkOffline");
   const fatosCalculo = [
-    zonasCalc ? `${zonasCalc} zona(s) perimetral(is) inoperante(s)` : "perímetro sem zona nominal inoperante",
+    alphaCalc ? `${alphaCalc} zona(s) do Alpha Sense inoperante(s)` : null,
+    cercaCalc ? `${cercaCalc} zona(s) da cerca elétrica inoperante(s)` : null,
+    zonasCalc ? `${zonasCalc} zona(s) perimetral(is) inoperante(s)` : null,
     cftvCalc ? `${cftvCalc} câmera(s) inoperante(s)` : null,
     barreirasCalc ? `${barreirasCalc} barreira(s) crítica(s) inoperante(s)` : null,
     panicoCalc ? "pânico fixo inoperante" : null,
     ctmkCalc ? "CTMK off-line" : null,
   ].filter(Boolean);
+  if (!fatosCalculo.length) fatosCalculo.push("nenhuma falha determinante identificada");
   const regraAplicada = narrativa.motivo;
   const calculoHTML = `
     <div class="calc-card"><div class="calc-k">1 · Evidências</div><div class="calc-v">${fatosCalculo.map((x) => `<span>${esc(x)}</span>`).join("")}</div></div>
@@ -1647,7 +1695,7 @@ async function coletarFontes(project, stored, marcadas) {
 
 // Monta a lista de vetores + base documental a partir dos dados coletados.
 function montarAnalise(project, pacoteLabel, dados, contextos) {
-  const vetores = [];
+  let vetores = [];
   const dataUlt = dados.ts?.ok ? dados.ts.data : hojeBR();
 
   if (dados.ts?.ok) vetores.push(...vetoresDoTesteSemanal(dados.ts, dataUlt));
@@ -1660,6 +1708,8 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
 
   aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual, peri: dados.peri });
   aplicarRecenciaPerimetro(vetores, dados.peri, dados.ts?.dataRaw);
+  const doutrinaCamadas = aplicarDoutrinaCamadasP311A(vetores, project);
+  vetores = doutrinaCamadas.vetores;
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
   // Consolidação por grupos canônicos. Não colapsa todo o perímetro por
@@ -1691,6 +1741,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     panicoFixoInoperante: vetores.some((v) => v.travaTipo === "panicoFixoInoperante"),
     ctmkOffline: vetores.some((v) => v.travaTipo === "ctmkOffline"),
     perimetroTotal30d: vetores.some((v) => v.travaTipo === "perimetroTotal30d"),
+    camadasPerimetrais: doutrinaCamadas.camadasPerimetrais,
   });
 
   // Moduladores (sinistro + regional) — somados como delta CONTEXTUAL.
@@ -1713,14 +1764,20 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   const geral = {
     label: labelAjustado, cor: CORES[nivelAjustado] || MOKED.elevado,
     criticos: nBloq, prepCriticos: 0,
-    nBloqueadores: nBloq, alerta: zonasNomeadas > 0,
+    nBloqueadores: nBloq, alerta: zonasNomeadas > 0 || (doutrinaCamadas.camadasPerimetrais?.primariaInop || 0) > 0,
     // compat: campos antigos preservados p/ o template (agora nível único)
     nivelMoked: nivelAjustado, nivelCliente: nivelAjustado,
     labelMoked: labelAjustado, labelCliente: labelAjustado,
     nivel: nivelAjustado,
     motivoMatriz: matriz.motivo,
     modulador: motivosMod ? { delta: 0, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
-    metricas: { zonasNomeadas, cftvInoperante, barreirasCriticas },
+    metricas: {
+      zonasNomeadas,
+      cftvInoperante,
+      barreirasCriticas,
+      alphaSenseInoperante: doutrinaCamadas.camadasPerimetrais?.primariaInop || 0,
+      cercaEletricaInoperante: doutrinaCamadas.camadasPerimetrais?.secundariaInop || 0,
+    },
   };
   const recomendacoes = gerarRecomendacoes(vetores);
 
