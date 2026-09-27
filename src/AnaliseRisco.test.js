@@ -1,4 +1,4 @@
-import { gerarHTMLAnaliseRisco, MAPA_REGIONAL } from "./AnaliseRisco";
+import { formatarPlantoes, gerarHTMLAnaliseRisco, MAPA_REGIONAL, obterNarrativaClassificacao } from "./AnaliseRisco";
 import { REGIONAL } from "./regionalConfig";
 
 function contexto(vetores = []) {
@@ -80,4 +80,80 @@ test("territorial do P606 exibe versão e fontes registradas sem prometer anexo 
   expect(html).toContain("ISP-RJ (ano-base 2025)");
   expect(html).toContain("podem encontrar menor resistência eletrônica");
   expect(html).not.toContain("versão completa em anexo");
+});
+
+test("P311A crítico por zona mais falha relevante mantém selo, texto e somatório coerentes", () => {
+  const dados = contexto([vetor(1)]);
+  dados.project = { id: "P311A", name: "Mega CL Curitiba" };
+  dados.geral = {
+    label: "CRÍTICO",
+    nivel: 4,
+    nBloqueadores: 1,
+    motivoMatriz: "uma zona perimetral inoperante somada a outra falha relevante",
+    metricas: { zonasNomeadas: 1, cftvInoperante: 6, barreirasCriticas: 0 },
+  };
+
+  const html = gerarHTMLAnaliseRisco(dados);
+
+  expect(html).toContain("Risco Geral</div><div class=\"val\">CRÍTICO");
+  expect(html).toContain("resulta em <em>CRÍTICO</em>");
+  expect(html).toContain("uma zona perimetral inoperante somada a outra falha relevante");
+  expect(html).not.toContain("resulta em <em>ELEVADO</em>");
+});
+
+test("P607 crítico por colapso não recebe narrativa de bloqueador isolado", () => {
+  const narrativa = obterNarrativaClassificacao({
+    label: "CRÍTICO",
+    nivel: 4,
+    nBloqueadores: 1,
+    motivoMatriz: "duas ou mais zonas perimetrais inoperantes",
+  });
+
+  expect(narrativa.label).toBe("CRÍTICO");
+  expect(narrativa.complemento).toContain("colapso amplo");
+  expect(narrativa.complemento).toContain("duas ou mais zonas perimetrais inoperantes");
+});
+
+test("classe final prevalece sobre contagem auxiliar divergente no somatório", () => {
+  const dados = contexto([vetor(1), vetor(2)]);
+  dados.project = { id: "P602", name: "Golgi Mauá" };
+  dados.geral = {
+    label: "ELEVADO",
+    nivel: 3,
+    nBloqueadores: 2,
+    motivoMatriz: "barreira crítica de bloqueio inoperante (perímetro íntegro)",
+    metricas: { zonasNomeadas: 0, cftvInoperante: 0, barreirasCriticas: 1 },
+  };
+
+  const html = gerarHTMLAnaliseRisco(dados);
+
+  expect(html).toContain("resulta em <em>ELEVADO</em>");
+  expect(html).not.toContain("resulta em <em>CRÍTICO</em>");
+});
+
+test("quantidade ausente de plantões é omitida em vez de imprimir undefined", () => {
+  expect(formatarPlantoes(undefined, { prefixo: " em " })).toBe("");
+  expect(formatarPlantoes(null)).toBe("");
+  expect(formatarPlantoes(1)).toBe("1 plantão");
+  expect(formatarPlantoes(3, { prefixo: " em " })).toBe(" em 3 plantões");
+});
+
+test("os nove projetos compartilham capa e a mesma estrutura institucional", () => {
+  const projetos = ["P601", "P602", "P604", "P605", "P606", "P607", "P311A", "P311B", "P505"];
+
+  projetos.forEach((id) => {
+    const dados = contexto([]);
+    dados.project = { id, name: `Projeto ${id}` };
+    const html = gerarHTMLAnaliseRisco(dados);
+
+    expect(html).toContain("Moked Consulting Security");
+    expect(html).toContain("Análise de Risco de Segurança");
+    expect(html).toContain("Risco Geral");
+    expect(html).toContain("Vetores de vulnerabilidade — ação necessária");
+    expect(html).toContain("Como se chega à classificação — memória de cálculo");
+    expect(html).toContain("Diagnóstico territorial — por que a falha importa aqui");
+    expect(html).toContain("O que sustenta a operação — pontos fortes");
+    expect(html).toContain("Palavra do consultor");
+    expect(html).not.toContain("undefined");
+  });
 });

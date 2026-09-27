@@ -761,7 +761,7 @@ function vetoresPerimetrais(peri) {
       chave: `perimetral:${z.zonaCanonica}`, label: `Perímetro eletrônico — ${z.nome}`, nivel: NIVEIS.ELEVADO,
       preponderante: true, bloqueadorCaido: true, piorDias: null, qtd: 1,
       fonteCredito: "Ronda Perimetral", sinceTxt: null,
-      descricao: `Teste perimetral com <b>${peri.pctOk}% de acionamentos OK</b> em ${peri.plantoes} plantões; <b>${z.nome}</b> está ${atual.status || "com falha"}.${conflito}`,
+      descricao: `Teste perimetral com <b>${peri.pctOk}% de acionamentos OK</b>${formatarPlantoes(peri.plantoes, { prefixo: " em " })}; <b>${z.nome}</b> está ${atual.status || "com falha"}.${conflito}`,
       impactoCruzado: "falha perimetral requer validação de cobertura física e eletrônica alternativa.",
       impactoFontes: "Ronda Perimetral", grupo: "perimetral",
       // Sem causa-raiz confirmada, mantém o grupo do perímetro pendente;
@@ -1050,6 +1050,32 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "
 
 const NIVEL_PILL_CLASS = { 4: "b-crit", 3: "b-elev", 2: "b-mod", 1: "b-baixo" };
 
+export function formatarPlantoes(valor, { prefixo = "" } = {}) {
+  const quantidade = Number(valor);
+  if (!Number.isFinite(quantidade) || quantidade <= 0) return "";
+  return `${prefixo}${quantidade} ${quantidade === 1 ? "plantão" : "plantões"}`;
+}
+
+// Uma única decisão alimenta selo, veredito, memória e somatório. A contagem
+// auxiliar de bloqueadores continua disponível para auditoria, mas não pode
+// mais escolher uma narrativa diferente daquela produzida pela matriz.
+export function obterNarrativaClassificacao(geral = {}) {
+  const nivel = Number(geral.nivel ?? geral.nivelMoked ?? 1);
+  const label = geral.label || NIVEL_LABEL[nivel] || "—";
+  const motivo = geral.motivoMatriz || geral.motivo || "avaliação operacional do período";
+  let complemento = motivo;
+
+  if (nivel === NIVEIS.CRITICO && /duas ou mais zonas|perímetro totalmente desconfigurado/i.test(motivo)) {
+    complemento = `colapso amplo · ${motivo}`;
+  } else if (nivel === NIVEIS.CRITICO) {
+    complemento = motivo;
+  } else if (nivel === NIVEIS.ELEVADO) {
+    complemento = `sob alerta · ${motivo}`;
+  }
+
+  return { nivel, label, motivo, complemento };
+}
+
 // ═════════════════════════════════════════════════════════════
 // GERADOR v3 — Documento único "Análise de Risco de Segurança" (maquete MK-…-AR)
 // Reescrito conforme parecer_p607_final.html (aprovado 11/08). Documento único,
@@ -1068,8 +1094,9 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   const nFontes = fontesUsadas.length;
 
   // ── Nível geral e régua (4 níveis) ──
-  const nivelGeral = geral.nivel ?? geral.nivelMoked ?? 1; // 1..4
-  const labelGeral = geral.label || NIVEL_LABEL[nivelGeral] || "—";
+  const narrativa = obterNarrativaClassificacao(geral);
+  const nivelGeral = narrativa.nivel; // 1..4
+  const labelGeral = narrativa.label;
   const alerta = !!geral.alerta;
   const nBloq = geral.nBloqueadores || 0;
   const idxGeral = Math.max(1, Math.min(4, nivelGeral)); // 1..4 p/ régua
@@ -1162,11 +1189,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     ? cardsAcao.slice(0, limiteApontamentos).map(vulnCardHTML).join("")
     : `<div class="vuln"><div class="top"><div class="nome">Sem vetores em ação necessária</div></div><div class="dado">Nenhum vetor bloqueador ou elevado apurado no período.</div></div>`;
 
-  const somaR = nBloq >= 2
-    ? `resulta em <em>CRÍTICO</em> &#183; colapso amplo`
-    : nBloq === 1
-      ? `resulta em <em>${esc(labelGeral)}</em> &#183; sob alerta`
-      : `resulta em <em>${esc(labelGeral)}</em>`;
+  const somaR = `resulta em <em>${esc(labelGeral)}</em> &#183; ${esc(narrativa.complemento)}`;
 
   // ── Memória executiva do cálculo ───────────────────────────
   // Três colunas: fatos observados, regra aplicada e conclusão/ação. A lista
@@ -1184,13 +1207,11 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     panicoCalc ? "pânico fixo inoperante" : null,
     ctmkCalc ? "CTMK off-line" : null,
   ].filter(Boolean);
-  const regraAplicada = geral.motivoMatriz || (nBloq >= 2
-    ? "dois ou mais bloqueadores independentes"
-    : nBloq === 1 ? "um bloqueador identificado" : "somente vetores de manutenção");
+  const regraAplicada = narrativa.motivo;
   const calculoHTML = `
     <div class="calc-card"><div class="calc-k">1 · Evidências</div><div class="calc-v">${fatosCalculo.map((x) => `<span>${esc(x)}</span>`).join("")}</div></div>
     <div class="calc-card"><div class="calc-k">2 · Regra aplicada</div><div class="calc-v"><b>${esc(regraAplicada)}</b><span>${fontesUsadas.length} fonte(s) operacional(is) cruzada(s), sem transformar manutenção isolada em risco crítico.</span></div></div>
-    <div class="calc-card calc-result"><div class="calc-k">3 · Conclusão e resposta</div><div class="calc-v"><b>${esc(labelGeral)}</b><span>${textoLimpo(geral.motivoMatriz || regraAplicada)}.</span><span>Priorizar manutenção dos bloqueadores e restabelecer a cobertura antes da próxima revisão.</span></div></div>`;
+    <div class="calc-card calc-result"><div class="calc-k">3 · Conclusão e resposta</div><div class="calc-v"><b>${esc(labelGeral)}</b><span>${esc(narrativa.motivo)}.</span><span>Priorizar manutenção dos bloqueadores e restabelecer a cobertura antes da próxima revisão.</span></div></div>`;
   const apontamentosRestantes = Math.max(0, cardsAcao.length - limiteApontamentos);
 
   // ── Diagnóstico territorial (seção nativa, mapa embutido) ──
@@ -1708,7 +1729,12 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   if (dados.ts?.ok) fontesUsadas.push({ titulo: "Teste Semanal / Comparativo", detalhe: `Saúde ${dados.ts.pct}% · ${dados.ts.total} pontos · ${dataUlt}` });
   if (dados.ctmk?.ok) fontesUsadas.push({ titulo: "Monitor CTMK (painel)", detalhe: dados.ctmk.offline ? `Off-line há ${dados.ctmk.dias} dias` : "Online" });
   if (dados.ilum?.ok) fontesUsadas.push({ titulo: "Relatório de Iluminação", detalhe: `${dados.ilum.total} pontos · ${dados.ilum.pct}% operante` });
-  if (dados.peri?.ok) fontesUsadas.push({ titulo: "Ronda Perimetral", detalhe: dados.peri.fonte === "rondas" ? `${dados.peri.plantoes} plantões · ${dados.peri.pctOk}% OK` : `${dados.peri.pctOk}% OK · ${dados.peri.dataUlt}` });
+  if (dados.peri?.ok) {
+    const plantoes = formatarPlantoes(dados.peri.plantoes);
+    const detalheRondas = [plantoes, `${dados.peri.pctOk}% OK`].filter(Boolean).join(" · ");
+    const detalheComparativo = [`${dados.peri.pctOk}% OK`, dados.peri.dataUlt].filter(Boolean).join(" · ");
+    fontesUsadas.push({ titulo: "Ronda Perimetral", detalhe: dados.peri.fonte === "rondas" ? detalheRondas : detalheComparativo });
+  }
   if (dados.rondaVirtual?.ok) fontesUsadas.push({ titulo: "Ronda Virtual (CFTV)", detalhe: `${dados.rondaVirtual.turnos} turnos · ${dados.rondaVirtual.feitas}/${dados.rondaVirtual.previstas} rondas · ${dados.rondaVirtual.pct}% execução` });
   if (dados.energia?.ok) fontesUsadas.push({ titulo: "Ocorrências de Energia", detalhe: `${dados.energia.quedas} queda(s) em 30 dias${dados.energia.aberto ? " · evento aberto" : ""}` });
   if (dados.equipe?.ok) {
