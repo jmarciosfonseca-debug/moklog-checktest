@@ -319,6 +319,66 @@ export const REGIONAL = {
   //    for elaborada. Ex.: P605, P311A... ──────────────
 };
 
+// Contextos qualitativos dos projetos que ainda não possuíam diagnóstico
+// regional estruturado. Eles aparecem no laudo, mas permanecem neutros na
+// régua até que o recorte quantitativo municipal seja validado.
+Object.assign(REGIONAL, {
+  P311A: {
+    codigo: "AR-PAT-2026-311A", versao: "1.0 (qualitativo)", emissao: "2026-09-27",
+    ativo: "P311A Mega Curitiba", marcoZero: "Complexo logístico P311A — Curitiba/PR",
+    municipioUF: "Curitiba / PR", coordenadas: "não aferidas", pdfPath: null,
+    mapaIncorporado: true, aplicarModulador: false,
+    quadrantes: [{
+      lado: "ENTORNO IMEDIATO", regiao: "Complexo industrial/logístico e faixas vegetadas limítrofes", grau: "MODERADO",
+      vetores: [
+        { natureza: "perimetro", desc: "As faixas vegetadas observadas no mapa podem reduzir a visibilidade natural de alguns trechos limítrofes, tornando relevante a continuidade das camadas Alpha Sense e cerca elétrica." },
+        { natureza: "acesso", desc: "A circulação interna de veículos e docas pode ampliar a necessidade de rastreabilidade nos acessos e nas rotas entre os blocos." },
+      ],
+    }],
+    protecao: [],
+    fontes: [
+      { orgao: "SESP-PR/CAPE", url: "https://www.seguranca.pr.gov.br/CAPE/Estatisticas", periodo: "recorte municipal set/2025–set/2026 não aferido", consulta: "2026-09-27", escopo: "Curitiba" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "indicadores municipais conforme disponibilidade" },
+    ],
+  },
+  P311B: {
+    codigo: "AR-PAT-2026-311B", versao: "1.0 (qualitativo)", emissao: "2026-09-27",
+    ativo: "P311B Mega Itajaí", marcoZero: "Complexo logístico P311B — Itajaí/SC",
+    municipioUF: "Itajaí / SC", coordenadas: "não aferidas", pdfPath: null,
+    mapaIncorporado: true, aplicarModulador: false,
+    quadrantes: [{
+      lado: "ENTORNO IMEDIATO", regiao: "Complexo industrial com áreas abertas e operação de docas", grau: "MODERADO",
+      vetores: [
+        { natureza: "perimetro", desc: "As áreas abertas observadas no entorno podem ampliar a importância da detecção antecipada e da cobertura contínua dos limites do complexo." },
+        { natureza: "acesso", desc: "O fluxo logístico e as docas podem exigir controle consistente de veículos, pessoas e permanência nas áreas de carga." },
+      ],
+    }],
+    protecao: [],
+    fontes: [
+      { orgao: "SSP-SC/GEAC", url: "https://ssp.sc.gov.br/", periodo: "recorte municipal set/2025–set/2026 não aferido", consulta: "2026-09-27", escopo: "Itajaí" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "indicadores municipais conforme disponibilidade" },
+    ],
+  },
+  P505: {
+    codigo: "AR-PAT-2026-505", versao: "1.0 (qualitativo)", emissao: "2026-09-27",
+    ativo: "P505 Klog Paes de Barros", marcoZero: "Complexo logístico P505 — São Paulo/SP",
+    municipioUF: "São Paulo / SP (Zona Leste)", coordenadas: "não aferidas", pdfPath: null,
+    mapaIncorporado: true, aplicarModulador: false,
+    quadrantes: [{
+      lado: "ENTORNO IMEDIATO", regiao: "Complexo logístico em tecido industrial urbano", grau: "MODERADO",
+      vetores: [
+        { natureza: "perimetro", desc: "A divisa com vegetação e imóveis industriais adjacentes, observada no mapa, pode demandar continuidade de detecção e visibilidade perimetral." },
+        { natureza: "acesso", desc: "A operação de docas e pátios pode elevar a necessidade de identificação, segregação de fluxos e registro de acessos." },
+      ],
+    }],
+    protecao: [],
+    fontes: [
+      { orgao: "SSP-SP/CAP", url: "https://www.ssp.sp.gov.br/estatistica/consultas", periodo: "recorte distrital set/2025–set/2026 não aferido", consulta: "2026-09-27", escopo: "Zona Leste de São Paulo" },
+      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "município de São Paulo" },
+    ],
+  },
+});
+
 // Nível numérico da régua (espelha NIVEIS do AnaliseRisco): CRÍTICO4 ELEVADO3 MODERADO2 BAIXO1
 const NIVEL_CRITICO = 4, NIVEL_ELEVADO = 3;
 
@@ -336,6 +396,9 @@ export function coletarRegional(pid) {
 //   • Fatores protetivos próximos (PM < 5 km) atenuam parte do agravamento.
 export function moduladorRegional(reg, vetores) {
   if (!reg?.ok || !reg.temDado) return { delta: 0, motivo: null };
+  if (reg.aplicarModulador === false) {
+    return { delta: 0, motivo: "contexto territorial qualitativo; sem modulador quantitativo validado" };
+  }
 
   // 1) Pior grau entre os quadrantes
   let piorGrau = "BAIXO", piorQuad = null;

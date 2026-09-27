@@ -39,15 +39,10 @@ const vetor = (i) => ({
   barreiraFisica: "perimetro",
 });
 
-test("todos os Golgis possuem referência de mapa configurada", () => {
-  ["P601", "P602", "P604", "P605", "P606", "P607"].forEach((id) => {
-    expect(MAPA_REGIONAL[id]).toBeTruthy();
+test("os nove projetos possuem referência de mapa no acervo operacional", () => {
+  ["P601", "P602", "P604", "P605", "P606", "P607", "P311A", "P311B", "P505"].forEach((id) => {
+    expect(MAPA_REGIONAL[id]).toBe(`/mapas/${id}.jpg`);
   });
-  expect(MAPA_REGIONAL.P602).toBe("/regional/P602.jpg");
-  expect(MAPA_REGIONAL.P604).toBe("/regional/P604.jpg");
-  expect(MAPA_REGIONAL.P605).toBe("/regional/P605.jpg");
-  expect(MAPA_REGIONAL.P606).toBe("/regional/P606.jpg");
-  expect(MAPA_REGIONAL.P505).toBe("/regional/P505.jpg");
 });
 
 test("PDF executivo usa três colunas, explica o cálculo e limita apontamentos", () => {
@@ -59,6 +54,23 @@ test("PDF executivo usa três colunas, explica o cálculo e limita apontamentos"
   expect(html).toContain("Mais 3 apontamento(s)");
   expect((html.match(/class=\"vuln\"/g) || [])).toHaveLength(9);
   expect(html).toContain("Anexo Técnico separado");
+});
+
+test("matriz entra depois da memória de cálculo e antes do territorial", () => {
+  const html = gerarHTMLAnaliseRisco(contexto([
+    { ...vetor(1), inop: 1, total: 4 },
+    { ...vetor(2), inop: 1, total: 4 },
+    { ...vetor(3), label: "CFTV", barreiraFisica: null, zonaCanonica: null, bloqueadorCaido: false, nivel: 3, inop: 14, total: 73 },
+  ]));
+  const memoria = html.indexOf("Como se chega à classificação — memória de cálculo");
+  const matriz = html.indexOf("Matriz de Impacto Operacional e Exposição ao Risco");
+  const territorial = html.indexOf("Diagnóstico territorial — por que a falha importa aqui");
+
+  expect(memoria).toBeGreaterThan(-1);
+  expect(matriz).toBeGreaterThan(memoria);
+  expect(territorial).toBeGreaterThan(matriz);
+  expect(html).toContain("Perímetro eletrônico — exposição ampliada");
+  expect(html).toContain("CFTV — perda localizada de visibilidade");
 });
 
 test("projeto sem diagnóstico regional ainda exibe o mapa como referência", () => {
@@ -77,7 +89,9 @@ test("territorial do P606 exibe versão e fontes registradas sem prometer anexo 
 
   expect(html).toContain("AR-PAT-2026-606");
   expect(html).toContain("versão 1.0.0");
-  expect(html).toContain("ISP-RJ (ano-base 2025)");
+  expect(html).toContain("ISP-RJ · ano-base 2025 · consulta 2026-09-26");
+  expect(html).toContain('href="https://www.ispdados.rj.gov.br/EstSeguranca.html"');
+  expect(html).toContain("Indicadores comparáveis para o recorte municipal e o período de 12 meses ainda não aferidos");
   expect(html).toContain("podem encontrar menor resistência eletrônica");
   expect(html).not.toContain("versão completa em anexo");
 });
@@ -151,6 +165,7 @@ test("os nove projetos compartilham capa e a mesma estrutura institucional", () 
     expect(html).toContain("Risco Geral");
     expect(html).toContain("Vetores de vulnerabilidade — ação necessária");
     expect(html).toContain("Como se chega à classificação — memória de cálculo");
+    expect(html).toContain("Matriz de Impacto Operacional e Exposição ao Risco");
     expect(html).toContain("Diagnóstico territorial — por que a falha importa aqui");
     expect(html).toContain("O que sustenta a operação — pontos fortes");
     expect(html).toContain("Palavra do consultor");

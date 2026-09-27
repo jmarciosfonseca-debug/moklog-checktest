@@ -1,6 +1,6 @@
-import { coletarRegional, REGIONAL } from "./regionalConfig";
+import { coletarRegional, moduladorRegional, REGIONAL } from "./regionalConfig";
 
-const PROJETOS_TERRITORIAIS = ["P601", "P602", "P604", "P605", "P606", "P607"];
+const PROJETOS_TERRITORIAIS = ["P601", "P602", "P604", "P605", "P606", "P607", "P311A", "P311B", "P505"];
 
 test("P606 possui diagnóstico territorial versionado e mapa dedicado", () => {
   const p606 = REGIONAL.P606;
@@ -74,6 +74,17 @@ test("territorial não fixa classe nem usa grau fora do schema", () => {
     expect(regional).not.toHaveProperty("classe");
     regional.quadrantes.forEach((quadrante) => {
       expect(grausAceitos.has(quadrante.grau)).toBe(true);
+    });
+  });
+});
+
+test("contextos qualitativos novos permanecem neutros na régua", () => {
+  ["P311A", "P311B", "P505"].forEach((projectId) => {
+    const regional = coletarRegional(projectId);
+    expect(regional.aplicarModulador).toBe(false);
+    expect(moduladorRegional(regional, [{ label: "Perímetro", nivel: 4 }])).toEqual({
+      delta: 0,
+      motivo: "contexto territorial qualitativo; sem modulador quantitativo validado",
     });
   });
 });
