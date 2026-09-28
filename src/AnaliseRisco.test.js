@@ -56,13 +56,14 @@ test("PDF executivo usa três colunas, explica o cálculo e limita apontamentos"
   expect(html).toContain("Anexo Técnico separado");
 });
 
-test("mapa territorial é limitado e centralizado para compactar o PDF", () => {
+test("mapa territorial usa encaixe horizontal compacto sem perder proporção", () => {
   const html = gerarHTMLAnaliseRisco(contexto([vetor(1)]), "data:image/jpeg;base64,AA==");
 
   expect(html).toContain("bloco bloco-territorial");
-  expect(html).toContain(".mapa{width:auto;max-width:100%;height:auto;max-height:78mm");
-  expect(html).toContain("@page{margin:12mm}");
-  expect(html).toContain(".mapa{max-height:72mm}");
+  expect(html).toContain("territorial-resumo");
+  expect(html).toContain("grid-template-columns:minmax(0,42%) minmax(0,1fr)");
+  expect(html).toContain(".mapa{width:auto;max-width:100%;height:auto;max-height:96mm");
+  expect(html).toContain("object-fit:contain");
 });
 
 test("matriz entra depois da memória de cálculo e antes do territorial", () => {
