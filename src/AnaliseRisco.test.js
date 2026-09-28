@@ -91,9 +91,25 @@ test("territorial do P606 exibe versão e fontes registradas sem prometer anexo 
   expect(html).toContain("versão 1.0.0");
   expect(html).toContain("ISP-RJ · ano-base 2025 · consulta 2026-09-26");
   expect(html).toContain('href="https://www.ispdados.rj.gov.br/EstSeguranca.html"');
-  expect(html).toContain("Indicadores comparáveis para o recorte municipal e o período de 12 meses ainda não aferidos");
+  expect(html).toContain("Indicadores criminais comparáveis");
+  expect(html).toContain("não aferido · período de 12 meses não consolidado · Duque de Caxias/RJ");
   expect(html).toContain("podem encontrar menor resistência eletrônica");
   expect(html).not.toContain("versão completa em anexo");
+});
+
+test("territorial auditável explica método, recorte, limitação e escopo das fontes", () => {
+  const dados = contexto([vetor(1)]);
+  dados.project = { id: "P606", name: "Golgi Duque de Caxias" };
+  dados.regional = { ok: true, temDado: true, ...REGIONAL.P606 };
+
+  const html = gerarHTMLAnaliseRisco(dados, "data:image/jpeg;base64,AA==");
+
+  expect(html).toContain("Como este diagnóstico foi construído");
+  expect(html).toContain("Leitura consultiva.");
+  expect(html).toContain("Limitação.");
+  expect(html).toContain("recorte: Duque de Caxias/RJ");
+  expect(html).toContain("não aferido");
+  expect(html).toContain("O território contextualiza a urgência, mas não altera sozinho a classificação operacional.");
 });
 
 test("P311A crítico por zona mais falha relevante mantém selo, texto e somatório coerentes", () => {

@@ -48,6 +48,29 @@ test("cadastros territoriais ativos possuem fontes reproduzíveis", () => {
   });
 });
 
+test("cadastros territoriais explicam método, recorte e limitação sem inventar indicadores", () => {
+  PROJETOS_TERRITORIAIS.forEach((projectId) => {
+    const regional = REGIONAL[projectId];
+    expect(regional.auditoria?.metodo).toMatch(/leitura qualitativa/i);
+    expect(regional.auditoria?.recorte).toBeTruthy();
+    expect(regional.auditoria?.conclusao).toBeTruthy();
+    expect(regional.auditoria?.limitacao).toMatch(/não foi usado número estimado/i);
+    expect(regional.indicadores).toEqual(expect.arrayContaining([
+      expect.objectContaining({ valor: null }),
+    ]));
+  });
+});
+
+test("fontes Sinesp usam página institucional estável", () => {
+  PROJETOS_TERRITORIAIS.forEach((projectId) => {
+    REGIONAL[projectId].fontes
+      .filter((fonte) => /Sinesp/i.test(fonte.orgao))
+      .forEach((fonte) => {
+        expect(fonte.url).toBe("https://www.gov.br/mj/pt-br/acesso-a-informacao/dados-abertos/ocorrencias-criminais-sinesp");
+      });
+  });
+});
+
 test("vetores territoriais ativos usam consequência condicional", () => {
   PROJETOS_TERRITORIAIS.forEach((projectId) => {
     REGIONAL[projectId].quadrantes.forEach((quadrante) => {

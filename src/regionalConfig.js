@@ -20,6 +20,23 @@
 
 export const GRAU_PESO = { GRAVISSIMO: 3, GRAVE: 2, MODERADO: 1, BAIXO: 0 };
 
+const SINESP_URL = "https://www.gov.br/mj/pt-br/acesso-a-informacao/dados-abertos/ocorrencias-criminais-sinesp";
+const METODO_TERRITORIAL = "Leitura qualitativa do mapa de referência do projeto, do marco zero e das características físicas do entorno, confrontada com portais oficiais de segurança pública. O território contextualiza a urgência de correção, mas não altera a classificação operacional.";
+
+const auditoriaTerritorial = (recorte, conclusao) => ({
+  metodo: METODO_TERRITORIAL,
+  recorte,
+  conclusao,
+  limitacao: "Não foi usado número estimado nem indicador sem recorte e período comparáveis. Quando a extração oficial não está consolidada, o laudo registra o indicador como não aferido.",
+});
+
+const indicadorNaoAferido = (recorte) => ([{
+  nome: "Indicadores criminais comparáveis",
+  valor: null,
+  periodo: "período de 12 meses não consolidado",
+  recorte,
+}]);
+
 export const REGIONAL = {
   // ── P607 — Golgi Brasília (AR-PAT-2026-001) ────────────────
   P607: {
@@ -32,6 +49,11 @@ export const REGIONAL = {
     coordenadas: "16°02'34\"S 47°58'12\"W",
     pdfPath: null,
     mapaIncorporado: true,
+    auditoria: auditoriaTerritorial(
+      "Santa Maria/DF e faixa de divisa com Valparaíso de Goiás/GO",
+      "O marco zero está inserido em corredor logístico de divisa. A leitura territorial destaca acessos rodoviários, circulação nas trocas de turno e dependência de coordenação entre jurisdições como fatores contextuais, sem atribuir ocorrência criminal ao ativo.",
+    ),
+    indicadores: indicadorNaoAferido("Santa Maria/DF e município limítrofe de Valparaíso de Goiás/GO"),
 
     // Quadrantes limítrofes com grau e tipologias.
     quadrantes: [
@@ -67,7 +89,7 @@ export const REGIONAL = {
     ],
     fontes: [
       { orgao: "SSP-DF", url: "https://ssp.df.gov.br/dados-por-regiao-administrativa/", periodo: "2025–2026", consulta: "2026-09-26", escopo: "DF e regiões administrativas" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -82,6 +104,11 @@ export const REGIONAL = {
     coordenadas: "23°19'53\"S 46°48'55\"W",
     pdfPath: null,
     mapaIncorporado: true,
+    auditoria: auditoriaTerritorial(
+      "Cajamar/SP e divisa operacional com Franco da Rocha/SP",
+      "O mapa de referência posiciona o ativo junto a corredor logístico e a uma faixa de divisa municipal. Esses elementos podem ampliar rotas de aproximação e a exposição nas trocas de turno quando coincidem com falhas operacionais, sem determinar a classe de risco.",
+    ),
+    indicadores: indicadorNaoAferido("Cajamar/SP e circunscrição consultada"),
 
     quadrantes: [
       {
@@ -114,7 +141,7 @@ export const REGIONAL = {
     ],
     fontes: [
       { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "município/circunscrição conforme consulta" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -129,6 +156,11 @@ export const REGIONAL = {
     coordenadas: "23°39'46.8\"S 46°26'12.4\"W",
     mapsUrl: "https://maps.app.goo.gl/j6s5AL2W32z5rW2u5",
     pdfPath: "/regional/P602.jpg",
+    auditoria: auditoriaTerritorial(
+      "Mauá/SP, bairro Sertãozinho e circunscrição correspondente",
+      "O mapa de referência evidencia conexão com eixos rodoviários e áreas periurbanas limítrofes. A combinação pode aumentar a importância da detecção perimetral e do controle de acessos, mas não é usada para elevar a classificação operacional.",
+    ),
+    indicadores: indicadorNaoAferido("Mauá/SP e circunscrição consultada"),
 
     quadrantes: [
       {
@@ -161,7 +193,7 @@ export const REGIONAL = {
     ],
     fontes: [
       { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "Mauá/circunscrição conforme consulta" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -176,6 +208,11 @@ export const REGIONAL = {
     coordenadas: "23°24'36.2\"S 46°21'22.4\"W",
     mapsUrl: "",
     pdfPath: "/regional/P605.jpg",
+    auditoria: auditoriaTerritorial(
+      "Arujá/SP, limite operacional com Guarulhos/SP e entroncamento BR-116/SP-021",
+      "O entorno é caracterizado por conexões rodoviárias e divisas laterais com ocupação descontínua. Essas condições podem reduzir o tempo disponível para contenção quando existem falhas de acesso, CFTV ou perímetro, sem alterar sozinhas a classe calculada.",
+    ),
+    indicadores: indicadorNaoAferido("Arujá/SP e Guarulhos/SP conforme circunscrição"),
     quadrantes: [
       {
         lado: "CORREDOR LOGÍSTICO RODOVIÁRIO (Dutra / Rodoanel Leste)",
@@ -205,7 +242,7 @@ export const REGIONAL = {
     ],
     fontes: [
       { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "Arujá/Guarulhos conforme circunscrição" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -222,6 +259,11 @@ export const REGIONAL = {
     coordenadas: "22°39'51.3\"S 43°20'52.5\"W",
     mapsUrl: "https://maps.app.goo.gl/P9bW4mBQJYWJMh3f6",
     pdfPath: "/regional/P606.jpg",
+    auditoria: auditoriaTerritorial(
+      "Duque de Caxias/RJ, entorno do entroncamento BR-040/BR-493",
+      "O marco zero combina entroncamento rodoviário, áreas abertas e cobertura vegetal no entorno imediato. Esses fatores podem ampliar alternativas de aproximação e tornar a pronta-resposta dependente do deslocamento viário quando coincidem com vulnerabilidades operacionais.",
+    ),
+    indicadores: indicadorNaoAferido("Duque de Caxias/RJ; série municipal oficial disponível no ISP-RJ"),
 
     quadrantes: [
       {
@@ -253,8 +295,8 @@ export const REGIONAL = {
     ],
 
     fontes: [
-      { orgao: "ISP-RJ", url: "https://www.ispdados.rj.gov.br/EstSeguranca.html", periodo: "ano-base 2025", consulta: "2026-09-26" },
-      { orgao: "Sinesp/MJSP", url: "https://www.gov.br/mj/pt-br/acesso-a-informacao/dados-abertos/ocorrencias-criminais-sinesp", periodo: "base nacional disponível", consulta: "2026-09-26" },
+      { orgao: "ISP-RJ", url: "https://www.ispdados.rj.gov.br/EstSeguranca.html", periodo: "ano-base 2025", consulta: "2026-09-26", escopo: "Duque de Caxias/RJ; série municipal oficial" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -271,6 +313,11 @@ export const REGIONAL = {
     municipioUF: "Jundiaí / SP",
     coordenadas: "23°10'32.4\"S 46°58'54.2\"W",
     pdfPath: "/regional/P604.pdf",
+    auditoria: auditoriaTerritorial(
+      "Jundiaí/SP, Distrito Industrial e Vetor Oeste",
+      "O mapa de referência posiciona o ativo entre corredor logístico, faixa de vegetação e núcleos periurbanos. Esses elementos podem aumentar a importância da integridade perimetral, da iluminação e da detecção, sem substituir nem modificar a leitura dos equipamentos.",
+    ),
+    indicadores: indicadorNaoAferido("Jundiaí/SP e circunscrição consultada"),
 
     quadrantes: [
       {
@@ -311,7 +358,7 @@ export const REGIONAL = {
     ],
     fontes: [
       { orgao: "SSP-SP", url: "https://www.portal.ssp.sp.gov.br/estatistica/consultas", periodo: "dados criminais 2025–2026", consulta: "2026-09-26", escopo: "Jundiaí/circunscrição conforme consulta" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-26", escopo: "contexto nacional/municipal conforme disponibilidade" },
     ],
   },
 
@@ -328,6 +375,11 @@ Object.assign(REGIONAL, {
     ativo: "P311A Mega Curitiba", marcoZero: "Complexo logístico P311A — Curitiba/PR",
     municipioUF: "Curitiba / PR", coordenadas: "não aferidas", pdfPath: null,
     mapaIncorporado: true, aplicarModulador: false,
+    auditoria: auditoriaTerritorial(
+      "Curitiba/PR; entorno imediato do complexo logístico",
+      "O mapa de referência mostra faixas vegetadas e circulação interna de veículos e docas. O diagnóstico territorial reforça a relevância da continuidade das camadas Alpha Sense e cerca elétrica, sem recalcular a doutrina operacional do P311A.",
+    ),
+    indicadores: indicadorNaoAferido("Curitiba/PR; recorte municipal ainda não extraído"),
     quadrantes: [{
       lado: "ENTORNO IMEDIATO", regiao: "Complexo industrial/logístico e faixas vegetadas limítrofes", grau: "MODERADO",
       vetores: [
@@ -338,7 +390,7 @@ Object.assign(REGIONAL, {
     protecao: [],
     fontes: [
       { orgao: "SESP-PR/CAPE", url: "https://www.seguranca.pr.gov.br/CAPE/Estatisticas", periodo: "recorte municipal set/2025–set/2026 não aferido", consulta: "2026-09-27", escopo: "Curitiba" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "indicadores municipais conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "indicadores municipais conforme disponibilidade" },
     ],
   },
   P311B: {
@@ -346,6 +398,11 @@ Object.assign(REGIONAL, {
     ativo: "P311B Mega Itajaí", marcoZero: "Complexo logístico P311B — Itajaí/SC",
     municipioUF: "Itajaí / SC", coordenadas: "não aferidas", pdfPath: null,
     mapaIncorporado: true, aplicarModulador: false,
+    auditoria: auditoriaTerritorial(
+      "Itajaí/SC; entorno imediato do complexo industrial/logístico",
+      "O mapa de referência evidencia áreas abertas, docas e fluxos logísticos no entorno imediato. Esses elementos podem ampliar a necessidade de detecção antecipada e rastreabilidade de acessos, sem alterar a classificação calculada pelo motor.",
+    ),
+    indicadores: indicadorNaoAferido("Itajaí/SC; recorte municipal ainda não extraído"),
     quadrantes: [{
       lado: "ENTORNO IMEDIATO", regiao: "Complexo industrial com áreas abertas e operação de docas", grau: "MODERADO",
       vetores: [
@@ -356,7 +413,7 @@ Object.assign(REGIONAL, {
     protecao: [],
     fontes: [
       { orgao: "SSP-SC/GEAC", url: "https://ssp.sc.gov.br/", periodo: "recorte municipal set/2025–set/2026 não aferido", consulta: "2026-09-27", escopo: "Itajaí" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "indicadores municipais conforme disponibilidade" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "indicadores municipais conforme disponibilidade" },
     ],
   },
   P505: {
@@ -364,6 +421,11 @@ Object.assign(REGIONAL, {
     ativo: "P505 Klog Paes de Barros", marcoZero: "Complexo logístico P505 — São Paulo/SP",
     municipioUF: "São Paulo / SP (Zona Leste)", coordenadas: "não aferidas", pdfPath: null,
     mapaIncorporado: true, aplicarModulador: false,
+    auditoria: auditoriaTerritorial(
+      "São Paulo/SP, Zona Leste; entorno imediato do complexo logístico",
+      "O mapa de referência mostra tecido industrial urbano, docas, pátios e divisas com imóveis adjacentes. O contexto pode ampliar a importância da segregação de fluxos e da visibilidade perimetral, sem determinar a classe operacional.",
+    ),
+    indicadores: indicadorNaoAferido("São Paulo/SP; recorte distrital ainda não extraído"),
     quadrantes: [{
       lado: "ENTORNO IMEDIATO", regiao: "Complexo logístico em tecido industrial urbano", grau: "MODERADO",
       vetores: [
@@ -374,7 +436,7 @@ Object.assign(REGIONAL, {
     protecao: [],
     fontes: [
       { orgao: "SSP-SP/CAP", url: "https://www.ssp.sp.gov.br/estatistica/consultas", periodo: "recorte distrital set/2025–set/2026 não aferido", consulta: "2026-09-27", escopo: "Zona Leste de São Paulo" },
-      { orgao: "Sinesp/MJSP", url: "https://dados.mj.gov.br/dataset/sistema-nacional-de-estatisticas-de-seguranca-publica", periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "município de São Paulo" },
+      { orgao: "Sinesp/MJSP", url: SINESP_URL, periodo: "base nacional disponível", consulta: "2026-09-27", escopo: "município de São Paulo" },
     ],
   },
 });

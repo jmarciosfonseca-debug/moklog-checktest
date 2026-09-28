@@ -1362,14 +1362,25 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     const fontesRegistradas = (regional.fontes || []).map((f) => {
       const periodo = f.periodo ? ` · ${esc(f.periodo)}` : "";
       const consulta = f.consulta ? ` · consulta ${esc(f.consulta)}` : "";
-      const rotulo = `${esc(f.orgao || "Fonte registrada")}${periodo}${consulta}`;
+      const escopo = f.escopo ? ` · recorte: ${esc(f.escopo)}` : "";
+      const rotulo = `${esc(f.orgao || "Fonte registrada")}${periodo}${consulta}${escopo}`;
       return f.url ? `<a href="${escAttr(f.url)}" target="_blank" rel="noopener noreferrer">${rotulo}</a>` : rotulo;
     }).join("<br>");
     const fontesTerr = fontesRegistradas || esc(`${sspList ? sspList + " · " : ""}SINESP/MJSP · secretarias estaduais de segurança pública`);
     const indicadores = Array.isArray(regional.indicadores) ? regional.indicadores : [];
     const indicadoresHTML = indicadores.length
-      ? `<div class="indicadores"><div class="ih">Contexto criminológico</div>${indicadores.map((i) => `<div class="ind"><b>${esc(i.nome)}</b><span>${i.valor == null ? "não aferido" : esc(i.valor)}${i.periodo ? ` · ${esc(i.periodo)}` : ""}</span></div>`).join("")}</div>`
+      ? `<div class="indicadores"><div class="ih">Contexto criminológico</div>${indicadores.map((i) => `<div class="ind"><b>${esc(i.nome)}</b><span>${i.valor == null ? "não aferido" : esc(i.valor)}${i.periodo ? ` · ${esc(i.periodo)}` : ""}${i.recorte ? ` · ${esc(i.recorte)}` : ""}</span></div>`).join("")}</div>`
       : `<div class="indicadores pendente"><div class="ih">Contexto criminológico</div><p>Indicadores comparáveis para o recorte municipal e o período de 12 meses ainda não aferidos. Nenhum número estimado foi usado na classificação.</p></div>`;
+    const auditoria = regional.auditoria || {};
+    const auditoriaHTML = auditoria.metodo || auditoria.conclusao || auditoria.limitacao
+      ? `<div class="auditoria-terr">
+          <div class="ah">Como este diagnóstico foi construído</div>
+          ${auditoria.metodo ? `<p><b>Método.</b> ${esc(auditoria.metodo)}</p>` : ""}
+          ${auditoria.recorte ? `<p><b>Recorte.</b> ${esc(auditoria.recorte)}</p>` : ""}
+          ${auditoria.conclusao ? `<p><b>Leitura consultiva.</b> ${esc(auditoria.conclusao)}</p>` : ""}
+          ${auditoria.limitacao ? `<p><b>Limitação.</b> ${esc(auditoria.limitacao)}</p>` : ""}
+        </div>`
+      : "";
     const mapaHTML = mapaDataUrl
       ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa tático do entorno do ${esc(project.id)}">`
       : `<div class="terr-pend"><div class="tp-ico">🛈</div><div class="tp-txt"><b>Mapa territorial indisponível.</b> ${esc(erroMapa || "O ativo não pôde ser carregado nesta geração.")}</div></div>`;
@@ -1379,6 +1390,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       ${mapaHTML}
       <div class="mapa-cap">${cap}</div>
       <div class="mapa-parecer">${parecerImg}</div>
+      ${auditoriaHTML}
       <div class="quad">${qCardHTML}</div>
       ${protHTML}
       ${indicadoresHTML}
@@ -1587,6 +1599,10 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .indicadores .ind span{color:var(--cinza);text-align:right}
   .indicadores.pendente{display:block;background:var(--papel2)}
   .indicadores.pendente p{font-size:10px;line-height:1.45;color:var(--cinza)}
+  .auditoria-terr{margin-top:12px;border:1px solid var(--linha);border-radius:4px;padding:12px 16px;background:var(--papel2)}
+  .auditoria-terr .ah{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grafite);margin-bottom:6px}
+  .auditoria-terr p{font-size:10.5px;line-height:1.45;color:var(--grafite);margin:3px 0}
+  .auditoria-terr b{color:var(--tinta)}
   .qcard li{padding-left:14px;position:relative;margin-bottom:3px}
   .qcard li::before{content:"•";position:absolute;left:0;color:var(--cinza)}
   .fontes{margin-top:14px;font-size:11px;color:var(--grafite);background:var(--verde-cl);border:1px solid #cfe0d8;border-radius:4px;padding:12px 16px}
@@ -1623,7 +1639,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     /* Impede corte de blocos no meio — regra: aplicar em blocos pequenos/médios,
        NUNCA no container .folha/.corpo (senão força página em branco). */
     .veredito,.alerta,.regua,.vuln,.calc-card,.soma,.impact-card,.impact-territorial,.consultor,.assina,
-    .qcard,.prot,.indicadores,.fontes,.parecer-t,.fcard,.mapa,.mapa-cap,.pergunta,.eyebrow{
+    .qcard,.prot,.indicadores,.auditoria-terr,.fontes,.parecer-t,.fcard,.mapa,.mapa-cap,.pergunta,.eyebrow{
       break-inside:avoid;page-break-inside:avoid;
     }
     /* Mantém o rótulo da seção junto do conteúdo seguinte. */
