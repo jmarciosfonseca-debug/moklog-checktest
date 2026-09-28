@@ -470,7 +470,8 @@ const PROJECTS = {
       {id:"infra",label:"22 - INFRAESTRUTURA / OBS.",type:"notes"}
     ]},
   P311A: {id:"P311A",name:"Mega CL Curitiba",short:"Curitiba",categories:[
-      {id:"perimeter",label:"01 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},
+      {id:"perimeter",label:"01 - ALARME CERCA ELÉTRICA",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Alambrado/Gradil"]},
+      {id:"perimeter_alphasense",label:"01B - ALARME ALPHA SENSE",type:"items",itemLabels:["Alpha Zona 01","Alpha Zona 02","Alpha Zona 03","Alpha Zona 04","Alpha Zona 05","Alpha Zona 06","Alpha Zona 07","Alpha Zona 08"]},
       {id:"ac",label:"02 - AR-CONDICIONADO",type:"items",itemLabels:["CCO","Sala T\u00e9cnica","Sala Gest\u00e3o"]},
       {id:"botoeiras",label:"03 - BOTOEIRAS / PORT\u00d5ES DE ACESSO",type:"items",itemLabels:["Bot\u00e3o 01","Bot\u00e3o 02","Bot\u00e3o 03","Bot\u00e3o 04","Bot\u00e3o 05","Bot\u00e3o 06"]},
       {id:"panic_fix",label:"04 - P\u00c2NICO FIXO",type:"items",itemLabels:["CCO"]},{id:"panic_mob",label:"04B - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["L\u00edder"]},
