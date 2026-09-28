@@ -98,3 +98,15 @@ test("CFTV que elevou a classe por quantidade não some por ter baixa proporçã
   expect(cards[0].medida).toContain("6 de 120");
   expect(cards[0].peso).toBe("TATICO");
 });
+
+test("classe BAIXO não reapresenta manutenção residual como bloqueador", () => {
+  const cards = gerarImpactosOperacionais({
+    vetores: [
+      vetor({ label: "Pânico fixo", bloqueadorCaido: true, inop: 4, total: 4 }),
+      vetor({ label: "Cancela", nivel: 2, inop: 1, total: 20 }),
+    ],
+    geral: { nivel: 1, motivoMatriz: "somente manutenção ou barreira isolada" },
+  });
+
+  expect(cards).toEqual([]);
+});

@@ -1282,10 +1282,13 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   ].filter(Boolean);
   if (!fatosCalculo.length) fatosCalculo.push("nenhuma falha determinante identificada");
   const regraAplicada = narrativa.motivo;
+  const respostaCalculo = nivelGeral === NIVEIS.BAIXO
+    ? "Manter acompanhamento preventivo e executar eventuais manutenções conforme a programação operacional."
+    : "Priorizar manutenção dos bloqueadores e restabelecer a cobertura antes da próxima revisão.";
   const calculoHTML = `
     <div class="calc-card"><div class="calc-k">1 · Evidências</div><div class="calc-v">${fatosCalculo.map((x) => `<span>${esc(x)}</span>`).join("")}</div></div>
     <div class="calc-card"><div class="calc-k">2 · Regra aplicada</div><div class="calc-v"><b>${esc(regraAplicada)}</b><span>${fontesUsadas.length} fonte(s) operacional(is) cruzada(s), sem transformar manutenção isolada em risco crítico.</span></div></div>
-    <div class="calc-card calc-result"><div class="calc-k">3 · Conclusão e resposta</div><div class="calc-v"><b>${esc(labelGeral)}</b><span>${esc(narrativa.motivo)}.</span><span>Priorizar manutenção dos bloqueadores e restabelecer a cobertura antes da próxima revisão.</span></div></div>`;
+    <div class="calc-card calc-result"><div class="calc-k">3 · Conclusão e resposta</div><div class="calc-v"><b>${esc(labelGeral)}</b><span>${esc(narrativa.motivo)}.</span><span>${esc(respostaCalculo)}</span></div></div>`;
   const apontamentosRestantes = Math.max(0, cardsAcao.length - limiteApontamentos);
 
   // ── Matriz de impacto: traduz o que os vetores já classificados podem
@@ -1437,13 +1440,18 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   const ps = equipe?.perfilSeguranca || {};
   const armada = ps.armada === "sim";
   const cco = ps.ccoDedicada === "sim";
-  const forcaTxt = `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} cobertura consistente. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b> e a ` : "A "}maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde de equipamentos)` : ""}. Essa solidez torna a correção dos vetores acima <b>rápida e viável</b>: falta restaurar as barreiras eletrônicas.`;
+  const conclusaoForca = nivelGeral === NIVEIS.BAIXO
+    ? "Essa solidez sustenta a classificação atual e permite tratar eventuais itens de manutenção de forma programada, sem caracterizá-los como vetores determinantes."
+    : "Essa solidez torna a correção dos vetores acima <b>rápida e viável</b>, com prioridade proporcional à classificação apurada.";
+  const forcaTxt = `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} cobertura consistente. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b> e a ` : "A "}maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde de equipamentos)` : ""}. ${conclusaoForca}`;
 
   // ── Introdução dinâmica ──
   const saudePct = ts?.pct != null ? ts.pct : null;
   const rondaPct = rv?.pct != null ? rv.pct : null;
   const introSaude = (rondaPct != null || saudePct != null)
-    ? `Ainda que os indicadores gerais de saúde sejam elevados (${rondaPct != null ? `execução de rondas a ${rondaPct}%` : ""}${rondaPct != null && saudePct != null ? ", " : ""}${saudePct != null ? `${saudePct}% dos equipamentos operantes` : ""}), <b>fatores específicos</b> — detalhados adiante — elevam a classificação ao nível de risco ora aplicado.`
+    ? (nivelGeral === NIVEIS.BAIXO
+        ? `Os indicadores gerais de saúde permanecem elevados (${rondaPct != null ? `execução de rondas a ${rondaPct}%` : ""}${rondaPct != null && saudePct != null ? ", " : ""}${saudePct != null ? `${saudePct}% dos equipamentos operantes` : ""}), e não foram identificados vetores determinantes capazes de elevar a classificação no período.`
+        : `Ainda que os indicadores gerais de saúde sejam elevados (${rondaPct != null ? `execução de rondas a ${rondaPct}%` : ""}${rondaPct != null && saudePct != null ? ", " : ""}${saudePct != null ? `${saudePct}% dos equipamentos operantes` : ""}), <b>fatores específicos</b> — detalhados adiante — elevam a classificação ao nível de risco ora aplicado.`)
     : `<b>Fatores específicos</b> — detalhados adiante — determinam a classificação de risco ora aplicada.`;
 
   // ── Veredito (texto) ──

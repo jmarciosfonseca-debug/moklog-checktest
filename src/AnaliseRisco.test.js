@@ -83,6 +83,27 @@ test("matriz entra depois da memória de cálculo e antes do territorial", () =>
   expect(html).toContain("CFTV — perda localizada de visibilidade");
 });
 
+test("laudo BAIXO mantém matriz e textos coerentes com o motor", () => {
+  const dados = contexto([
+    { ...vetor(1), label: "Pânico fixo", inop: 4, total: 4 },
+  ]);
+  dados.geral = {
+    label: "BAIXO",
+    nivel: 1,
+    nBloqueadores: 0,
+    motivoMatriz: "somente manutenção ou barreira isolada",
+    metricas: {},
+  };
+
+  const html = gerarHTMLAnaliseRisco(dados);
+
+  expect(html).toContain("Nenhum vetor determinante de impacto foi identificado no período");
+  expect(html).toContain("não foram identificados vetores determinantes capazes de elevar a classificação");
+  expect(html).toContain("eventuais itens de manutenção de forma programada");
+  expect(html).not.toContain("falta restaurar as barreiras eletrônicas");
+  expect(html).not.toContain("Pânico fixo — comunicação de emergência");
+});
+
 test("projeto sem diagnóstico regional ainda exibe o mapa como referência", () => {
   const html = gerarHTMLAnaliseRisco(contexto([vetor(1)]), "data:image/jpeg;base64,AA==");
 

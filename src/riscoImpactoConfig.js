@@ -227,6 +227,11 @@ function medidaDoGrupo(familia, vetores, inop, total) {
 }
 
 export function gerarImpactosOperacionais({ vetores = [], geral = {} } = {}) {
+  // A matriz explica somente os vetores que sustentam uma elevação da classe.
+  // Se o motor concluiu BAIXO, itens residuais de manutenção não podem reaparecer
+  // como "bloqueadores" no laudo e contradizer selo, memória e somatório.
+  if (Number(geral.nivel) === 1) return [];
+
   const grupos = new Map();
   const metricas = geral.metricas || {};
   for (const vetor of vetores) {
