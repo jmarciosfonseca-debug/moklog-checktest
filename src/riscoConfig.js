@@ -235,6 +235,44 @@ export function rotuloPorPVT(pvt) {
   return NIVEL.BAIXO;
 }
 
+// Normaliza contagens vindas das fontes antes de qualquer percentual. O dado
+// original continua preservado no Firestore; apenas cálculo e apresentação
+// deixam de produzir frações impossíveis (ex.: 4 de 3).
+export function normalizarFracao(numerador, denominador, campo = "indicador") {
+  const total = Math.max(0, Number(denominador) || 0);
+  const informado = Math.max(0, Number(numerador) || 0);
+  const inop = total > 0 ? Math.min(informado, total) : informado;
+  const invalida = total > 0 && informado > total;
+  if (invalida && typeof console !== "undefined" && console.warn) {
+    console.warn(`[risco] ${campo}: fração inválida ${informado}/${total}; cálculo limitado a ${inop}/${total}`);
+  }
+  return { inop, total, informado, invalida };
+}
+
+// Iluminação é agravante, nunca determinante isolado. Só entra na matriz se
+// quatro ou mais quadrantes estiverem abaixo de 50% ou se a disponibilidade
+// global ficar abaixo de 75%.
+export function avaliarIluminacao({ quadrantes = [], disponibilidadeGlobal = null } = {}) {
+  const percentuais = quadrantes
+    .map((q) => Number(typeof q === "object" ? q.pct : q))
+    .filter(Number.isFinite);
+  const globalBruto = Number(disponibilidadeGlobal);
+  const globalPct = Number.isFinite(globalBruto)
+    ? (globalBruto <= 1 ? globalBruto * 100 : globalBruto)
+    : null;
+  const quadrantesCriticos = percentuais.filter((pct) => pct < 50).length;
+  const agravante = quadrantesCriticos >= 4 || (globalPct != null && globalPct < 75);
+  return {
+    agravante,
+    status: agravante ? "AGRAVANTE" : "ESTÁVEL",
+    quadrantesCriticos,
+    disponibilidadeGlobal: globalPct,
+    motivo: agravante
+      ? `${quadrantesCriticos} quadrante(s) crítico(s); disponibilidade global ${globalPct == null ? "não aferida" : `${Math.round(globalPct)}%`}`
+      : `disponibilidade global ${globalPct == null ? "não aferida" : `${Math.round(globalPct)}%`} e menos de quatro quadrantes críticos`,
+  };
+}
+
 // Trava não é uma flag aberta. Só estes três eventos podem levar um site a
 // CRÍTICO sem dois bloqueadores independentes. O campo semântico evita que
 // uma regra futura de item (ex.: cancela) crie uma trava por acidente.
@@ -353,14 +391,15 @@ export function classificarVetor(v) {
 
   // ── CFTV (régua própria) ──
   if (flags.cftv) {
-    const pctCego = v.total ? (v.inop / v.total) * 100 : 0;
+    const fracao = normalizarFracao(v.inop, v.total, v.labelCategoria || v.labelItem || "CFTV");
+    const pctCego = fracao.total ? (fracao.inop / fracao.total) * 100 : 0;
     const pvt = 7 * fatorCoberturaCFTV(pctCego) * multTemporalLeve(v.dias);
     let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
     const criticaExposta = !!v.cameraCritica && v.coberturaAlternativa !== "redundante";
     if (criticaExposta) nivel = NIVEL.ELEVADO;
     return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt),
              bloqueadorCaido: criticaExposta,
-             motivo: `${v.inop} de ${v.total} câmeras (${pctCego.toFixed(1)}% cego)${criticaExposta ? "; câmera crítica sem cobertura alternativa" : ""}` };
+             motivo: `${fracao.inop} de ${fracao.total} câmeras (${pctCego.toFixed(1)}% cego)${criticaExposta ? "; câmera crítica sem cobertura alternativa" : ""}` };
   }
 
   // ── CONJUNTO (proporção domina) ──
@@ -369,12 +408,13 @@ export function classificarVetor(v) {
       return { ...base, nivel: NIVEL.BAIXO, label: "OBSERVAÇÃO", pvt: 0,
                observacaoManutencao: true, motivo: "barreira com cobertura alternativa ou sem criticidade confirmada" };
     }
-    const pvt = peso * fatorProporcao(v.inop, v.total) * multTemporalLeve(v.dias);
+    const fracao = normalizarFracao(v.inop, v.total, v.labelCategoria || v.labelItem || "conjunto");
+    const pvt = peso * fatorProporcao(fracao.inop, fracao.total) * multTemporalLeve(v.dias);
     let nivel = aplicarTeto(rotuloPorPVT(pvt), classeKey, flags);
-    const f = v.total ? Math.round((v.inop / v.total) * 100) : 0;
+    const f = fracao.total ? Math.round((fracao.inop / fracao.total) * 100) : 0;
     return { ...base, nivel, label: NIVEL_LABEL[nivel], pvt: round1(pvt),
              bloqueadorCaido: !!flags.barreiraAcesso && v.barreiraEfetiva !== false && v.coberturaAlternativa !== "redundante",
-             motivo: `${v.inop} de ${v.total} (${f}% do conjunto)` };
+             motivo: `${fracao.inop} de ${fracao.total} (${f}% do conjunto)` };
   }
 
   // ── ILUMINAÇÃO (fora da proporção; teto MODERADO; não escala por %) ──
@@ -438,6 +478,7 @@ export function classificarRiscoOperacional({
   ctmkOffline = false,
   perimetroTotal30d = false,
   camadasPerimetrais = null,
+  falhaCompostaModerada = false,
 } = {}) {
   // Doutrina específica de perímetro em camadas. Só é aplicada quando o
   // chamador fornece explicitamente as duas barreiras; os demais projetos
@@ -508,6 +549,9 @@ export function classificarRiscoOperacional({
   }
   if (cftvInoperante > 5) {
     return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "mais de cinco câmeras inoperantes (perímetro íntegro)" };
+  }
+  if (falhaCompostaModerada) {
+    return { nivel: NIVEL.MODERADO, label: NIVEL_LABEL[NIVEL.MODERADO], motivo: "barreira veicular ausente de longa duração combinada com falhas localizadas de CFTV e portão" };
   }
   if (barreirasCriticas > 0) {
     return { nivel: NIVEL.ELEVADO, label: NIVEL_LABEL[NIVEL.ELEVADO], motivo: "barreira crítica de bloqueio inoperante (perímetro íntegro)" };

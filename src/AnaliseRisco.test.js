@@ -277,3 +277,16 @@ test("Alambrado/Gradil conta como a quarta zona da cerca elétrica do P311A", ()
   expect(resultado.camadasPerimetrais.secundariaInop).toBe(4);
   expect(resultado.vetores.every((v) => v.observacaoManutencao !== true)).toBe(true);
 });
+
+test("identificador técnico de zona órfã não aparece no relatório", () => {
+  const dados = contexto([{
+    ...vetor(1),
+    label: "Perímetro eletrônico — ponto sem cadastro",
+    zonaCanonica: "perimetro-sem-cadastro",
+    pendenciaCadastro: true,
+  }]);
+  const html = gerarHTMLAnaliseRisco(dados);
+
+  expect(html).not.toContain("Área/zona: perimetro-sem-cadastro");
+  expect(html).toContain("Área/zona: Perímetro sem identificação nominal");
+});

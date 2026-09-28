@@ -14,6 +14,9 @@ const percentual = (inop, total) => total > 0 ? Math.round((inop / total) * 100)
 
 function familiaDoVetor(vetor = {}) {
   const texto = normalizar(`${vetor.label} ${vetor.chave} ${vetor.grupo} ${vetor.barreiraFisica}`);
+  // Energia e equipe permanecem como dados informativos do laudo, mas não
+  // integram a matriz de risco físico.
+  if (/energia/.test(texto) || /equipe|lider|brigada|reciclagem/.test(texto)) return null;
   if (vetor.camadaPerimetral === "primaria" || /alpha sense/.test(texto)) return "PERIMETRO_PRIMARIO";
   if (vetor.camadaPerimetral === "secundaria" || /cerca eletrica/.test(texto)) return "PERIMETRO_SECUNDARIO";
   if (/perimetr|cerca|sensor ir|fibra/.test(texto)) return "PERIMETRO";
@@ -25,12 +28,11 @@ function familiaDoVetor(vetor = {}) {
   if (/panico/.test(texto)) return "PANICO";
   if (/ilumin/.test(texto)) return "ILUMINACAO";
   if (/catraca|leitor|qr|controle de acesso|torniquete/.test(texto)) return "CONTROLE_ACESSO";
-  if (/energia/.test(texto)) return "ENERGIA";
-  if (/equipe|lider|brigada|reciclagem|cco/.test(texto)) return "EQUIPE";
   return null;
 }
 
 function pesoDoVetor(vetor, familia) {
+  if (vetor.reclassificadoComposto) return "TATICO";
   if (vetor.bloqueadorCaido || ["PERIMETRO", "PERIMETRO_PRIMARIO", "BARREIRA_VEICULAR", "CANCELA", "PANICO"].includes(familia)) return "BLOQUEADOR";
   if (["CFTV", "CTMK", "RONDA_VIRTUAL"].includes(familia) || vetor.contribuicao === "tatico") return "TATICO";
   if (["ILUMINACAO", "CONTROLE_ACESSO", "ENERGIA"].includes(familia)) return "SOMA";
@@ -261,6 +263,7 @@ export function gerarImpactosOperacionais({ vetores = [], geral = {} } = {}) {
     if (familia === "CFTV" && metricas.cftvInoperante) inop = Number(metricas.cftvInoperante);
     if (familia === "PERIMETRO_PRIMARIO" && metricas.alphaSenseInoperante != null) inop = Number(metricas.alphaSenseInoperante);
     if (familia === "PERIMETRO_SECUNDARIO" && metricas.cercaEletricaInoperante != null) inop = Number(metricas.cercaEletricaInoperante);
+    if (total > 0) inop = Math.min(inop, total);
     const faixa = faixaDaFamilia(familia, inop, total, itens);
     const texto = TEXTOS[familia]?.[faixa] || TEXTOS[familia]?.UNICA;
     if (!texto) continue;
