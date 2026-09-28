@@ -1,8 +1,8 @@
 import {
-  NIVEL, PVT_CORTES, agruparBloqueadores, aplicarTeto,
+  NIVEL, PVT_CORTES, agruparBloqueadores, aplicarTeto, avaliarIluminacao,
   classificarRiscoOperacional, classificarVetor, consolidarSite,
   fatorCoberturaCFTV, fatorProporcao, fatorVolume, multTemporal,
-  resolverRegra, rotuloPorPVT, saoIndependentes, travaFechada,
+  normalizarFracao, resolverRegra, rotuloPorPVT, saoIndependentes, travaFechada,
 } from "./riscoConfig";
 
 describe("régua operacional final", () => {
@@ -221,5 +221,34 @@ describe("não regressão da régua sem camadas", () => {
 
   test("uma zona mais seis câmeras continua crítica nos demais projetos", () => {
     expect(classificarRiscoOperacional({ zonasPerimetrais: 1, cftvInoperante: 6 }).nivel).toBe(NIVEL.CRITICO);
+  });
+});
+
+describe("correções mandatórias do motor", () => {
+  test("falha composta de longa duração fica moderada sem forçar dado no Firestore", () => {
+    const risco = classificarRiscoOperacional({
+      barreirasCriticas: 1,
+      cftvInoperante: 2,
+      falhaCompostaModerada: true,
+    });
+
+    expect(risco.nivel).toBe(NIVEL.MODERADO);
+    expect(risco.motivo).toContain("falhas localizadas de CFTV e portão");
+  });
+
+  test("fração impossível é limitada ao denominador", () => {
+    expect(normalizarFracao(4, 3, "Pânico fixo")).toMatchObject({ inop: 3, total: 3, invalida: true });
+  });
+
+  test("iluminação com 91% global permanece estável", () => {
+    expect(avaliarIluminacao({ quadrantes: [85, 91, 92, 95], disponibilidadeGlobal: 0.91 }).status).toBe("ESTÁVEL");
+  });
+
+  test("quatro quadrantes críticos tornam iluminação agravante", () => {
+    expect(avaliarIluminacao({ quadrantes: [40, 35, 45, 30], disponibilidadeGlobal: 85 }).status).toBe("AGRAVANTE");
+  });
+
+  test("disponibilidade global abaixo de 75% torna iluminação agravante", () => {
+    expect(avaliarIluminacao({ quadrantes: [80, 82], disponibilidadeGlobal: 74 }).agravante).toBe(true);
   });
 });

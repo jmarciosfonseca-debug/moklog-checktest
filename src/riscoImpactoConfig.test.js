@@ -110,3 +110,26 @@ test("classe BAIXO não reapresenta manutenção residual como bloqueador", () =
 
   expect(cards).toEqual([]);
 });
+
+test("energia e equipe permanecem fora da matriz de impacto físico", () => {
+  const cards = gerarImpactosOperacionais({
+    vetores: [
+      vetor({ label: "Fornecimento de energia", grupo: "energia", nivel: 3, inop: 2, total: 1 }),
+      vetor({ label: "Equipe e liderança", grupo: "equipe", nivel: 3, inop: 2, total: 4 }),
+      vetor({ label: "CFTV", grupo: "cftv", nivel: 3, inop: 6, total: 74 }),
+    ],
+    geral: { metricas: { cftvInoperante: 6 } },
+  });
+
+  expect(cards.map((card) => card.familia)).toEqual(["CFTV"]);
+});
+
+test("matriz nunca apresenta percentual superior a cem", () => {
+  const cards = gerarImpactosOperacionais({
+    vetores: [vetor({ label: "Pânico fixo", inop: 4, total: 3, bloqueadorCaido: true })],
+    geral: {},
+  });
+
+  expect(cards[0].medida).toContain("3 de 3");
+  expect(cards[0].medida).toContain("100%");
+});
