@@ -29,7 +29,7 @@
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { classificarVetor, consolidarSite, classificarRiscoOperacional, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
+import { classificarVetor, consolidarSite, classificarRiscoOperacional, normalizarFracao, avaliarIluminacao, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
 import { coletarRegional, moduladorRegional } from "./regionalConfig";
 import { gerarImpactosOperacionais } from "./riscoImpactoConfig";
@@ -253,7 +253,8 @@ async function coletarIluminacao(pid) {
     if (!quads.length) return { ok: false, temDado: false, motivo: "sem quadrantes cadastrados" };
     let total = 0, def = 0;
     const setores = quads.map((q) => {
-      const t = Number(q.total) || 0, dfc = Number(q.deficientes) || 0;
+      const fracao = normalizarFracao(q.deficientes, q.total, `Iluminação ${q.nome || q.label || q.id || "quadrante"}`);
+      const t = fracao.total, dfc = fracao.inop;
       total += t; def += dfc;
       return { nome: q.nome || q.label || q.id || "—", total: t, deficientes: dfc, pct: t ? Math.round(((t - dfc) / t) * 100) : null };
     });
@@ -646,7 +647,9 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
   }
   const out = [];
   for (const g of Object.values(porCat)) {
-    const aggc = (ts.catAgg && ts.catAgg[g.catLabel]) || { total: g.itens.length, inop: g.itens.length, piorDias: null };
+    const aggRaw = (ts.catAgg && ts.catAgg[g.catLabel]) || { total: g.itens.length, inop: g.itens.length, piorDias: null };
+    const fracaoAgg = normalizarFracao(aggRaw.inop, aggRaw.total, g.catLabel || "Teste Semanal");
+    const aggc = { ...aggRaw, inop: fracaoAgg.inop, total: fracaoAgg.total };
     let piorDias = aggc.piorDias, piorItem = null;
     for (const it of g.itens) if (it.dias != null && (piorDias == null || it.dias >= piorDias)) { piorDias = it.dias; piorItem = it; }
     if (!piorItem) piorItem = g.itens[0];
@@ -655,6 +658,9 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
       pid: ts.pid, labelCategoria: g.catLabel, labelItem: piorItem?.itemLabel || "",
       inop: aggc.inop, total: aggc.total, dias: piorDias, escopo: "moked",
     });
+    const nivelOperacional = /c[âa]mera|cftv/i.test(g.catLabel || "") && aggc.inop > 5
+      ? NIVEIS.ELEVADO
+      : rc.nivel;
     if (rc.incluir === false && rc.nivel <= RC_NIVEL.SEMDADOS) continue; // fora do score
 
     const it = piorItem;
@@ -716,7 +722,7 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
     const ehPerimetral = catEhPerimetral || /per[ií]metr|cerca|alpha sense|fibra|sensor ir/i.test(textoPerimetral);
     out.push({
       chave: `cat:${g.catLabel}`, label: g.catLabel,
-      nivel: rc.nivel, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
+      nivel: nivelOperacional, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
       bloqueadorCaido: !!rc.bloqueadorCaido,
       travaTipo: rc.travaTipo || null, observacaoManutencao: !!rc.observacaoManutencao,
       inop: aggc.inop, total: aggc.total, proporcao: aggc.total ? aggc.inop / aggc.total : null,
@@ -789,19 +795,16 @@ function vetorCTMK(ctmk) {
 function vetorIluminacao(ilum) {
   if (!ilum?.ok || !ilum.pior) return null;
   const pior = ilum.pior;
-  // nível por gravidade do déficit
-  let nivel = NIVEIS.BAIXO;
-  if (pior.pct != null) {
-    if (pior.pct < 50) nivel = NIVEIS.ELEVADO;
-    else if (pior.pct < 80) nivel = NIVEIS.MODERADO;
-  }
+  const avaliacao = avaliarIluminacao({ quadrantes: ilum.setores, disponibilidadeGlobal: ilum.pct });
+  if (!avaliacao.agravante) return null;
+  const nivel = NIVEIS.MODERADO;
   return {
     chave: "iluminacao", label: `Iluminação — quadrante ${pior.nome}`, nivel, preponderante: false,
     piorDias: null, qtd: 1,
     inop: pior.deficientes, total: pior.total, proporcao: pior.total ? pior.deficientes / pior.total : null,
     fonteCredito: "Iluminação",
     sinceTxt: null,
-    descricao: `Quadrante ${pior.nome} com apenas <b>${pior.pct}% operante</b> (${pior.deficientes} de ${pior.total} pontos deficientes). Iluminação geral do projeto em ${ilum.pct}%.`,
+    descricao: `Quadrante ${pior.nome} com apenas <b>${pior.pct}% operante</b> (${pior.deficientes} de ${pior.total} pontos deficientes). Iluminação geral do projeto em ${ilum.pct}%. <i>${avaliacao.motivo}.</i>`,
     impactoCruzado: `baixa iluminação no ${pior.nome} <b>degrada a eficácia do CFTV noturno exatamente nessa região</b> e reduz a dissuasão perimetral — dois sistemas afetados por uma causa.`,
     impactoFontes: "Iluminação + CFTV",
     grupo: "iluminacao",
@@ -904,8 +907,12 @@ function gerarHTMLExecutivo(ctx, mapaDataUrl, erroMapa, anexoUrl = "") {
   const linkAnexo = anexoUrl ? `<p><a href="${anexoUrl}" target="_blank" rel="noopener">Abrir Anexo Técnico separado</a></p>` : "";
   return documentoBase(`Análise de Risco — ${ctx.project.id}`, `<header class="top"><h1>Análise de Risco de Segurança — ${esc(ctx.project.id)}</h1><p>${esc(ctx.project.name || "")} · ${esc(ctx.ref || "")}</p></header><section class="section"><span class="tag">${esc(ctx.geral.label)}</span><h2>Classificação operacional</h2><p>${esc(ctx.geral.motivoMatriz || ctx.geral.motivo || "Avaliação baseada no estado atual do Teste Semanal.")}</p></section><section class="section"><h2>Vetores relevantes consolidados</h2>${cards}</section><section class="section"><h2>Diagnóstico territorial</h2>${map}<p class="muted">O território contextualiza a prioridade da correção; não determina a classificação sozinho.</p></section><section class="section"><h2>Prioridades de ação</h2><ol>${recs}</ol><p class="muted">Detalhamento integral disponível no Anexo Técnico separado.</p>${linkAnexo}</section>`);
 }
+function zonaParaRelatorio(vetor) {
+  if (vetor?.pendenciaCadastro || vetor?.zonaCanonica === "perimetro-sem-cadastro") return "Perímetro sem identificação nominal";
+  return vetor?.zonaCanonica || "—";
+}
 function gerarHTMLAnexo(ctx) {
-  const linhas = ctx.vetores.map((v) => `<tr><td>${esc(v.label)}</td><td>${esc(v.fonteCredito || "—")}</td><td>${esc(textoLimpo(v.descricao))}</td><td>${esc(v.zonaCanonica || "—")}</td></tr>`).join("");
+  const linhas = ctx.vetores.map((v) => `<tr><td>${esc(v.label)}</td><td>${esc(v.fonteCredito || "—")}</td><td>${esc(textoLimpo(v.descricao))}</td><td>${esc(zonaParaRelatorio(v))}</td></tr>`).join("");
   return documentoBase(`Anexo Técnico — ${ctx.project.id}`, `<header class="top"><h1>Anexo Técnico — ${esc(ctx.project.id)}</h1><p>${esc(ctx.ref || "")} · evidências completas</p></header><section class="section"><p>Documento complementar ao Relatório Executivo. Pontos sem zona nominal são registrados como “Perímetro sem cadastro” e não são convertidos em zonas artificiais.</p><table><thead><tr><th>Vetor</th><th>Fonte</th><th>Evidência</th><th>Zona/área</th></tr></thead><tbody>${linhas || '<tr><td colspan="4">Sem vetores registrados.</td></tr>'}</tbody></table></section>`);
 }
 
@@ -1231,7 +1238,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     const fonte = esc(v.fonteCredito || "");
     const desde = v.sinceTxt ? " · " + esc(v.sinceTxt) : "";
     const rastreio = [
-      v.zonaCanonica ? `Área/zona: ${v.zonaCanonica}` : null,
+      v.zonaCanonica ? `Área/zona: ${zonaParaRelatorio(v)}` : null,
       v.barreiraFisica ? `Barreira: ${v.barreiraFisica}` : null,
       v.pendenciaCadastro ? "Pendência de cadastro" : null,
     ].filter(Boolean).map(esc).join(" · ");
@@ -1786,13 +1793,29 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
   const vI = vetorIluminacao(dados.ilum); if (vI) vetores.push(vI);
   vetores.push(...vetoresPerimetrais(dados.peri));
   const vRV = vetorRondaVirtual(dados.rondaVirtual); if (vRV) vetores.push(vRV);
-  const vEn = vetorEnergia(dados.energia); if (vEn) vetores.push(vEn);
-  const vEq = vetorEquipe(dados.equipe); if (vEq) vetores.push(vEq);
+  // Energia e equipe permanecem nas fontes, métricas e pontos fortes do PDF,
+  // mas não são convertidas em vetores de risco físico.
 
   aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual, peri: dados.peri });
   aplicarRecenciaPerimetro(vetores, dados.peri, dados.ts?.dataRaw);
   const doutrinaCamadas = aplicarDoutrinaCamadasP311A(vetores, project);
   vetores = doutrinaCamadas.vetores;
+  const cftvPendente = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
+  const dilaceradorAusentePersistente = vetores.some((v) => /dilacerador/i.test(`${v.label} ${textoLimpo(v.descricao)}`) && (v.piorDias || 0) >= 365);
+  const portaoDanificado = vetores.some((v) => /port[aã]o/i.test(`${v.label} ${textoLimpo(v.descricao)}`) && !v.observacaoManutencao);
+  const falhaCompostaModerada = project.id === "P311B" && dilaceradorAusentePersistente && cftvPendente > 0 && portaoDanificado;
+  if (falhaCompostaModerada) {
+    vetores = vetores.map((v) => /dilacerador/i.test(`${v.label} ${textoLimpo(v.descricao)}`)
+      ? {
+          ...v,
+          nivel: NIVEIS.MODERADO,
+          bloqueadorCaido: false,
+          contribuicao: "tatico",
+          reclassificadoComposto: true,
+          descricao: `${v.descricao} <i>Classificado no gatilho composto do P311B com CFTV e portão.</i>`,
+        }
+      : v);
+  }
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
   // Consolidação por grupos canônicos. Não colapsa todo o perímetro por
@@ -1816,7 +1839,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     .filter((v) => v.barreiraFisica === "perimetro" && v.zonaCanonica && !v.pendenciaCadastro)
     .map((v) => normalizarZona(v.zonaCanonica))).size;
   const cftvInoperante = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
-  const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador/i.test(v.label || "") && !v.observacaoManutencao).length;
+  const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador/i.test(v.label || "") && v.bloqueadorCaido && !v.observacaoManutencao).length;
   const matriz = classificarRiscoOperacional({
     zonasPerimetrais: zonasNomeadas,
     cftvInoperante,
@@ -1825,6 +1848,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     ctmkOffline: vetores.some((v) => v.travaTipo === "ctmkOffline"),
     perimetroTotal30d: vetores.some((v) => v.travaTipo === "perimetroTotal30d"),
     camadasPerimetrais: doutrinaCamadas.camadasPerimetrais,
+    falhaCompostaModerada,
   });
 
   // Moduladores (sinistro + regional) — somados como delta CONTEXTUAL.
