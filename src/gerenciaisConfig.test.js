@@ -44,6 +44,12 @@ export function run() {
   return fail === 0;
 }
 
+if (typeof test === "function") {
+  test("recursos gerenciais sem órfãos", () => {
+    expect(run()).toBe(true);
+  });
+}
+
 if (typeof require !== "undefined" && require.main === module) {
   process.exit(run() ? 0 : 1);
 }
