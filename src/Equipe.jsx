@@ -2301,9 +2301,17 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       const { colaboradores, alterados } = aplicarAprovacao(base.colaboradores||[], alvos, decisao);
       if(!alterados) return;
       const novo = { ...base, colaboradores };
-      await saveEquipe(project.id, novo);
+      // Atualização otimista: o selo muda imediatamente, sem esperar a rede.
       setEquipeData(novo);
       setSelColab(prev=> prev ? (colaboradores.find(c=>c.id===prev.id) || prev) : prev);
+      try {
+        await saveEquipe(project.id, novo);
+      } catch (e) {
+        const atual = await loadEquipe(project.id);
+        setEquipeData(atual || { colaboradores:[], desligados:[] });
+        setSelColab(prev=> prev ? ((atual?.colaboradores||[]).find(c=>c.id===prev.id) || prev) : prev);
+        throw e;
+      }
     } catch(e){
       console.error("Aprovação: erro ao gravar", e);
       alert("Erro ao gravar a aprovação. Verifique a conexão.");
