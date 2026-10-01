@@ -1536,7 +1536,7 @@ async function computeScore360Projeto(pid, ctx) {
   } catch(e){ return null; }
 }
 
-function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport, dark=true}) {
+function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport, onGestaoFV, dark=true}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
   const [showAuditoria,setShowAuditoria]=useState(false);
@@ -4026,15 +4026,16 @@ export default function App(){
     );
   }
 
-  if(screen==="gestao_fv") {
-  return (
-    <GestaoFV
-      dark={dark}
-      onBack={() => setScreen("home")}
-      validarPin={(pin) => checkPin(pin)}
-    />
+  if(screen==="gestao_fv") return (
+    <ErrorBoundary moduleName="Gestão FV">
+      <GestaoFV
+        dark={dark}
+        onBack={() => setScreen("dashboard")}
+        validarPin={(pin) => checkPin(pin) === "admin"}
+      />
+    </ErrorBoundary>
   );
-}if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
+  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
 

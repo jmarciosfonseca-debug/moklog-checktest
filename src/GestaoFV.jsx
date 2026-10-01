@@ -6,8 +6,8 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { FV_PROJETOS, FV_NOMES, FV_TIPOS, FV_TIPO_ROTULO, FV_DESATUALIZADO_H } from "./fvConfig";
+import FVPainel from "./FVPainel";
 
 const FB_CONFIG = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -17,7 +17,14 @@ const FB_CONFIG = {
   messagingSenderId: "390165325023",
   appId: "1:390165325023:web:3147cd333503916b0d756a"
 };
-const db = getFirestore(getApps().length ? getApps()[0] : initializeApp(FB_CONFIG));
+if (!getApps().length) initializeApp(FB_CONFIG);
+
+async function lerFV(pin, pid, signal) {
+  const response = await fetch("/api/fv-read", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pin, ...(pid ? {pid} : {})}), signal });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.erro || `Falha de leitura (${response.status})`);
+  return data;
+}
 
 const brl = n => typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }) : "—";
 const dt = iso => iso ? new Date(iso.length === 10 ? iso + "T12:00:00" : iso).toLocaleDateString("pt-BR") : "—";
@@ -52,47 +59,39 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
   const [posto, setPosto] = useState("todos");
   const [msgSync, setMsgSync] = useState("");
   const [sincronizando, setSincronizando] = useState(false);
+  const [versaoDados, setVersaoDados] = useState(0);
+  const [leituraErro, setLeituraErro] = useState("");
+  const [lancErro, setLancErro] = useState("");
 
   const carregar = useCallback(async () => {
     try {
-      const snaps = await Promise.all(FV_PROJETOS.map(pid => getDoc(doc(db, "fv", pid))));
-      const r = {}; snaps.forEach((s, i) => { if (s.exists()) r[FV_PROJETOS[i]] = s.data(); });
-      setResumos(r);
-      const st = await getDoc(doc(db, "fv_sync", "status"));
-      setStatus(st.exists() ? st.data() : null);
-      return st.exists() ? st.data() : null;
-    } catch (e) { console.warn("Gestão FV: falha na leitura", e); return null; }
+      const data = await lerFV(pin);
+      setResumos(data.resumos); setStatus(data.status); setLeituraErro("");
+      return data.status;
+    } catch (e) { setLeituraErro(e.message); return null; }
     finally { setCarregando(false); }
-  }, []);
+  }, [pin]);
 
   useEffect(() => { if (liberado) carregar(); }, [liberado, carregar]);
 
   useEffect(() => {
     if (!sel) { setLancs(null); return; }
-    let vivo = true; setLancs(null); setTipo("todos"); setPosto("todos");
-    getDocs(query(collection(db, "fv", sel, "lancamentos"), orderBy("data", "desc"), limit(300)))
-      .then(qs => { if (vivo) setLancs(qs.docs.map(d => d.data())); })
-      .catch(e => { console.warn(e); if (vivo) setLancs([]); });
-    return () => { vivo = false; };
-  }, [sel]);
+    let vivo = true; const controller = new AbortController();
+    setLancs(null); setLancErro(""); setTipo("todos"); setPosto("todos");
+    lerFV(pin, sel, controller.signal)
+      .then(data => { if (vivo) { setLancs(data.lancamentos); if (data.resumo) setResumos(r => ({...r,[sel]:data.resumo})); } })
+      .catch(e => { if (vivo && e.name !== "AbortError") setLancErro(e.message); });
+    return () => { vivo = false; controller.abort(); };
+  }, [sel, versaoDados, pin]);
 
   const atualizarAgora = async () => {
-    setSincronizando(true); setMsgSync("Solicitando sincronização...");
+    setSincronizando(true); setMsgSync("Aplicando arquivos Excel preparados...");
     try {
-      const r = await fetch("/api/fv-sync", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ pin }) });
+      const r = await fetch("/api/fv-apply", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ pin }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setMsgSync(j.erro || `Erro ${r.status}`); setSincronizando(false); return; }
-      setMsgSync(j.mensagem || "Sincronização iniciada.");
-      const antes = status?.ultimaExecucao || "";
-      let n = 0;
-      const t = setInterval(async () => {
-        n++;
-        const st = await carregar();
-        if ((st && st.ultimaExecucao && st.ultimaExecucao !== antes && !st.emExecucao) || n >= 15) {
-          clearInterval(t); setSincronizando(false);
-          setMsgSync(st && st.status === "erro" ? `Falhou: ${st.erro}` : (n >= 15 ? "Sem retorno em 5 min. Confira mais tarde." : "Atualizado."));
-        }
-      }, 20000);
+      await carregar(); setVersaoDados(v => v + 1);
+      setMsgSync(j.mensagem || "Atualizado."); setSincronizando(false);
     } catch (e) { setMsgSync("Sem conexão com o servidor."); setSincronizando(false); }
   };
 
@@ -126,8 +125,10 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
       </div>
       {status?.status === "erro" && <div style={{ fontSize:11, color:"#f59e0b", marginTop:6 }}>⚠️ Última tentativa ({dth(status.ultimaExecucao)}) falhou: {status.erro}. Exibindo o último dado válido.</div>}
       {status?.status !== "erro" && desatualizado && <div style={{ fontSize:11, color:"#f59e0b", marginTop:6 }}>⚠️ Dados desatualizados{horasSync !== null ? ` (há ${Math.floor(horasSync)} h)` : ""}.</div>}
-      <div style={{ fontSize:10.5, color:c.txt2, marginTop:6 }}>Automático às 08h e 16h · somente leitura · fonte: plataforma Gestão FV</div>
+      <div style={{ fontSize:10.5, color:c.txt2, marginTop:6 }}>Atualização manual por Excel · aplicada somente ao clicar · não consulta o portal em tempo real.</div>
+      {status?.dataExportacao && <div style={{ fontSize:10.5, color:c.txt2, marginTop:4 }}>Dados exportados em {dt(status.dataExportacao)}. Projeções são estimativas internas.</div>}
       {msgSync && <div style={{ fontSize:11, color:"#0ea5e9", marginTop:6 }}>{msgSync}</div>}
+      {leituraErro && <div role="alert" style={{fontSize:12,color:"#ef4444",marginTop:8}}>{leituraErro} <button style={btn} onClick={carregar}>Tentar leitura novamente</button></div>}
     </div>
   );
 
@@ -136,21 +137,16 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
     const r = resumos[sel];
     const lista = (lancs || []).filter(l => (tipo === "todos" || l.tipo === tipo) && (posto === "todos" || (l.posto || "—") === posto));
     const postos = [...new Set((lancs || []).map(l => l.posto || "—"))].sort();
-    const tm = r?.totaisMes || {};
-    const box = (rot, v, cor) => (
-      <div style={{ ...card, padding:"10px 12px" }}><div style={{ fontSize:10.5, color:c.txt2 }}>{rot}</div><div style={{ fontSize:17, fontWeight:800, color:cor || c.txt }}>{brl(v)}</div></div>
-    );
     return (
       <Page bg={c.bg}>
         <button onClick={() => setSel(null)} style={{ ...btn, alignSelf:"flex-start" }}>← Todos os projetos</button>
         <div style={{ fontSize:16, fontWeight:800, color:c.txt }}>{sel} · {FV_NOMES[sel]}</div>
         {statusBox}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          {box("Saldo atual", r?.saldoAtual, r ? (r.saldoAtual < 0 ? "#ef4444" : "#22c55e") : c.txt2)}
-          {box("Créditos + aportes (mês)", (tm.credito || 0) + (tm.aporte || 0))}
-          {box("VT (mês)", tm.vt || 0)}
-          {box("AM (mês)", tm.am || 0)}
-        </div>
+        {r?.diferencaConferenciaCentavos !== 0 && typeof r?.diferencaConferenciaCentavos === "number" && <div style={{ ...card, color:"#f59e0b", fontSize:11 }}>Saldo oficial preservado. Diferença entre soma dos lançamentos e saldo: {brl(r.diferencaConferenciaCentavos / 100)}.</div>}
+        {lancErro ? <div role="alert" style={{...card,color:"#ef4444"}}>{lancErro} <button style={btn} onClick={() => setVersaoDados(v => v + 1)}>Tentar novamente</button></div> : lancs === null
+          ? <div style={{ fontSize:12, color:c.txt2 }}>Carregando painel...</div>
+          : <FVPainel pid={sel} nome={FV_NOMES[sel]} resumo={r} lancamentos={lancs} dark={dark} podeEditar={liberado} pin={pin}/>}
+        <div style={{ fontSize:12.5, fontWeight:700, color:c.txt }}>Lançamentos sincronizados (portal)</div>
         <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
           {["todos", ...FV_TIPOS].map(k => (
             <button key={k} onClick={() => setTipo(k)} style={{ ...btn, padding:"5px 10px", fontSize:11, color:tipo === k ? "#fff" : c.txt2, background:tipo === k ? "#0ea5e9" : "transparent", borderColor:tipo === k ? "#0ea5e9" : c.bd }}>{k === "todos" ? "Todos" : FV_TIPO_ROTULO[k]}</button>
@@ -162,7 +158,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
             {postos.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         )}
-        {lancs === null && <div style={{ fontSize:12, color:c.txt2 }}>Carregando lançamentos...</div>}
+        {lancs === null && !lancErro && <div style={{ fontSize:12, color:c.txt2 }}>Carregando lançamentos...</div>}
         {lancs && lista.length === 0 && <div style={{ fontSize:12, color:c.txt2, textAlign:"center", padding:12 }}>Nenhum lançamento.</div>}
         {lista.map(l => {
           const entrada = l.tipo === "credito" || l.tipo === "aporte";
@@ -187,11 +183,11 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
       <div style={{ fontSize:16, fontWeight:800, color:c.txt }}>💰 Gestão FV</div>
       {statusBox}
       {carregando && <div style={{ fontSize:12, color:c.txt2 }}>Carregando...</div>}
-      {!carregando && FV_PROJETOS.map(pid => {
+      {!carregando && (!leituraErro || Object.keys(resumos).length > 0) && FV_PROJETOS.map(pid => {
         const r = resumos[pid];
         const cor = !r ? c.txt2 : (r.saldoAtual < 0 ? "#ef4444" : "#22c55e");
         return (
-          <div key={pid} onClick={() => r && setSel(pid)} style={{ ...card, cursor:r ? "pointer" : "default", border:`1px solid ${r && r.saldoAtual < 0 ? "#ef444455" : c.bd}` }}>
+          <div key={pid} onClick={() => setSel(pid)} style={{ ...card, cursor:"pointer", border:`1px solid ${r && r.saldoAtual < 0 ? "#ef444455" : c.bd}` }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
               <div style={{ minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:c.txt }}>{pid} · {FV_NOMES[pid]}</div>
