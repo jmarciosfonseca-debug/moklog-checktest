@@ -51,8 +51,7 @@ async function main() {
     r.avisos.forEach(a => console.log("AVISO:", a));
     if (!core.podeGravar(r)) throw new Error("Validação falhou: " + (r.erros.join("; ") || "nenhum projeto extraído"));
 
-    const resumoLog = Object.entries(r.docs).map(([pid, d]) => `${pid}=${d.resumo.saldoAtual}`).join(" ");
-    console.log(`OK ${Object.keys(r.docs).length} projeto(s): ${resumoLog}`);
+    console.log(`OK ${Object.keys(r.docs).length} projeto(s): ${Object.keys(r.docs).join(', ')}; valores não expostos nos logs.`);
     if (DRY) { console.log("DRY-RUN: nada gravado."); return; }
 
     for (const [pid, d] of Object.entries(r.docs)) {

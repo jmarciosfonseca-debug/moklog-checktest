@@ -30,25 +30,27 @@ async function extrair() {
     const page = await ctx.newPage();
     page.setDefaultTimeout(45000);
 
-    // Vai direto ao 1º posto; se cair na tela de login, autentica e volta.
-    const primeiro = SEL.postos[0];
-    await page.goto(SEL.urlPosto(primeiro), { waitUntil: "domcontentloaded" });
+    // Contexto novo: inicia na tela de login observada no portal real.
+    await page.goto(SEL.urlLogin, { waitUntil: "domcontentloaded" });
     if (await SEL.ehTelaLogin(page)) {
       await autenticar(page, user, pass);
-      await page.goto(SEL.urlPosto(primeiro), { waitUntil: "domcontentloaded" });
-      if (await SEL.ehTelaLogin(page)) throw erroFixo("Após o login, o portal voltou à tela de login.");
     }
 
     const projetos = {};
     for (const posto of SEL.postos) {
-      await page.goto(SEL.urlPosto(posto), { waitUntil: "domcontentloaded" });
+      const resposta = await page.goto(SEL.urlPosto(posto), { waitUntil: "domcontentloaded" });
       if (await SEL.ehTelaLogin(page)) throw new Error(`Sessão expirou ao abrir o posto ${posto}.`);
-      await page.waitForSelector("text=Saldo atual", { timeout: 30000 });
+      try {
+        await page.waitForSelector("text=Saldo atual", { timeout: 30000 });
+      } catch {
+        const url = new URL(page.url());
+        throw erroFixo(`Posto ${posto}: saldo não localizado; HTTP ${resposta?.status()}; página ${url.origin}${url.pathname}; título ${await page.title()}; tabelas ${await page.locator('table').count()}.`);
+      }
       const linhas = await SEL.lerLinhas(page);
       const t = parseTabelaPortal(linhas);
       if (t.saldo === null) throw new Error(`Posto ${posto}: "Saldo atual" não encontrado na página.`);
       projetos[posto] = { saldo: t.saldo, lancamentos: t.lancamentos.map(l => ({ ...l, posto })), conferirSoma: true };
-      console.log(`Posto ${posto} (${SEL.mapaProjetos[posto]}): ${t.lancamentos.length} lançamento(s), saldo ${t.saldo}`);
+      console.log(`Posto ${posto} (${SEL.mapaProjetos[posto]}): ${t.lancamentos.length} lançamento(s); saldo lido, sem expor o valor.`);
     }
     return { projetos };
   } finally {

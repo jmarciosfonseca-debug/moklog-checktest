@@ -23,7 +23,7 @@ const POSTOS = {
 
 module.exports = {
   CONFIGURADO: true,
-  urlLogin: `${BASE}/`,
+  urlLogin: `${BASE}/login.php`,
   urlPosto: id => `${BASE}/nota_fiscal/fundoVariavel/visualizar.php?posto=${id}`,
   mapaProjetos: POSTOS,
   postos: Object.keys(POSTOS),
