@@ -88,6 +88,12 @@ export async function run() {
   return fail===0;
 }
 
+if (typeof test === "function") {
+  test("reconciliação e unicidade de equipamentos", async () => {
+    await expect(run()).resolves.toBe(true);
+  });
+}
+
 // Execução direta.
 if (typeof require !== "undefined" && require.main === module) {
   run().then(okAll=>process.exit(okAll?0:1));

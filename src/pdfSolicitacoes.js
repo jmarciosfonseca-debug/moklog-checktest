@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { getTheme } from "./generatePDF";
+import { solicitacoesPorAprovacao } from "./equipeAprovacao";
 
 const SLA_ALERTA = 5; // dias em aberto para alertar (espelha Equipe.jsx)
 
@@ -126,7 +127,7 @@ function css(theme) {
   @media print{ .no-print{display:none!important;} html{background:#fff;} .folha{box-shadow:none;margin:0;width:auto;min-height:auto;padding:12mm;} .bloco{page-break-inside:avoid;} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;} @page{margin:12mm;} }`;
 }
 
-function montarHTML({ theme, projectId, titulo, corpo, totalItens }) {
+function montarHTML({ theme, projectId, titulo, corpo, totalItens, subtitulo, metaTxt }) {
   const nomeProj = NOMES_PROJETO[projectId] || projectId;
   const hoje = new Date().toLocaleDateString("pt-BR");
   const logo = theme.mokedLogo ? `<img src="${theme.mokedLogo}" alt="Moked"/>` : `<div style="font-weight:800;color:${theme.headerBg};font-size:18px;">MOKED</div>`;
@@ -142,11 +143,11 @@ function montarHTML({ theme, projectId, titulo, corpo, totalItens }) {
   <div class="folha">
     <div class="topo">
       ${logo}
-      <div class="tit"><h1>${esc(titulo)}</h1><div class="sub">Solicitações de material pendentes</div></div>
+      <div class="tit"><h1>${esc(titulo)}</h1><div class="sub">${esc(subtitulo || "Solicitações de material pendentes")}</div></div>
     </div>
     <div class="meta">
       <span><b>${esc(projectId)}</b> — ${esc(nomeProj)}</span>
-      <span>Emissão: ${hoje} · ${totalItens} item(ns) pendente(s)</span>
+      <span>Emissão: ${hoje} · ${esc(metaTxt || `${totalItens} item(ns) pendente(s)`)}</span>
     </div>
     ${corpo}
     <div class="rodape">
@@ -206,4 +207,98 @@ export function gerarPDFSolicitacoesLote(project, colaboradores) {
   });
   abrir(html, `solicitacoes_${projectId}_lote.html`);
   return { colaboradores: comPend.length, itens: totalItens };
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADENDO EQUIPE — PDFs externos (sem FV; valores financeiros NÃO saem).
+// ─────────────────────────────────────────────────────────────
+
+// ── PDF de solicitações APROVADAS (para envio à empresa) ─────────────
+// Lê apenas aprovacao === "aprovado" no ano informado (solicitadoEm).
+export function gerarPDFAprovados(project, colaboradores, ano) {
+  const projectId = project?.id || project;
+  const theme = getTheme(projectId);
+  const ativos = (colaboradores || []).filter(c => (c.status || "ativo") === "ativo");
+  const grupos = ativos
+    .map(c => ({ colab: c, itens: solicitacoesPorAprovacao(c, "aprovado", ano) }))
+    .filter(x => x.itens.length > 0)
+    .sort((a, b) => String(a.colab.nome || "").localeCompare(String(b.colab.nome || ""), "pt-BR"));
+
+  const totalItens = grupos.reduce((n, x) => n + x.itens.length, 0);
+  const linhas = (itens) => itens.map(s => {
+    const detalhe = [s.tamanho ? `Tam ${esc(s.tamanho)}` : "", s.marca ? esc(s.marca) : ""].filter(Boolean).join(" · ");
+    return `<tr>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;font-weight:600;">${esc(s.item || s.nome || "Material")}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${detalhe || "—"}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${fmtBR(s.solicitadoEm)}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;">${fmtBR(s.aprovadoEm)}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;">${esc(s.aprovadoPor || "Gerencial")}</td>
+    </tr>`;
+  }).join("");
+
+  const corpo = grupos.length
+    ? grupos.map(x => `
+  <div class="bloco">
+    <div class="colab-hdr">
+      <div class="colab-nome">${esc(x.colab.nome || "Colaborador")}</div>
+      <div class="colab-func">${esc(x.colab.cargo || x.colab.funcao || "")}${x.colab.turno ? ` · ${esc(x.colab.turno)}` : ""} · ${x.itens.length} item(ns) aprovado(s)</div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Item</th><th>Tam/Marca</th><th>Solicitado em</th><th>Aprovado em</th><th>Aprovado por</th></tr></thead>
+      <tbody>${linhas(x.itens)}</tbody>
+    </table>
+  </div>`).join("") + `
+  <div style="margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">
+    <b>Total:</b> ${totalItens} item(ns) aprovado(s) · ${grupos.length} colaborador(es)
+  </div>`
+    : `<div style="padding:24px;text-align:center;color:#64748b;">Nenhuma solicitação aprovada em ${esc(ano)}.</div>`;
+
+  const html = montarHTML({
+    theme, projectId,
+    titulo: "Solicitações Aprovadas",
+    subtitulo: `Material e uniforme aprovados · ${ano}`,
+    metaTxt: `${totalItens} item(ns) aprovado(s)`,
+    corpo, totalItens,
+  });
+  abrir(html, `aprovados_${projectId}_${ano}.html`);
+  return { colaboradores: grupos.length, itens: totalItens };
+}
+
+// ── PDF Cesta de Natal ────────────────────────────────────────────────
+// lista: [{ nome, cargo, turno }] — já filtrada pelos documentos
+// equipes/{pid}/cestaNatal do ano. Total de cestas no rodapé.
+export function gerarPDFCestaNatal(project, lista, ano) {
+  const projectId = project?.id || project;
+  const theme = getTheme(projectId);
+  const nomeProj = NOMES_PROJETO[projectId] || projectId;
+  const ordenada = [...(lista || [])].sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+  const linhas = ordenada.map((c, i) => `<tr>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;width:36px;">${i + 1}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;font-weight:600;">${esc(c.nome || "—")}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${esc(c.cargo || "—")}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${esc(c.turno || "—")}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${esc(projectId)} · ${esc(nomeProj)}</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;">✔</td>
+    </tr>`).join("");
+
+  const corpo = ordenada.length ? `
+  <div class="bloco">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Colaborador</th><th>Cargo</th><th>Turno</th><th>Unidade</th><th>Cesta</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+  </div>
+  <div style="margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+    <b>Total de cestas:</b> ${ordenada.length}
+  </div>` : `<div style="padding:24px;text-align:center;color:#64748b;">Nenhuma Cesta de Natal marcada em ${esc(ano)}.</div>`;
+
+  const html = montarHTML({
+    theme, projectId,
+    titulo: `Cesta de Natal ${ano}`,
+    subtitulo: "Relação de colaboradores para atendimento do lote de fim de ano",
+    metaTxt: `${ordenada.length} cesta(s)`,
+    corpo, totalItens: ordenada.length,
+  });
+  abrir(html, `cesta_natal_${projectId}_${ano}.html`);
+  return ordenada.length;
 }

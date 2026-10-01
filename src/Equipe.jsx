@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { setDoc } from "./fireGuard";
+import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { setDoc, deleteDoc } from "./fireGuard";
 // Firebase Storage removido - usando compressão local
 
 // ── Logos empresas de segurança
@@ -33,7 +33,8 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
-import { gerarPDFSolicitacoesColaborador } from "./pdfSolicitacoes";
+import { gerarPDFSolicitacoesColaborador, gerarPDFAprovados, gerarPDFCestaNatal } from "./pdfSolicitacoes";
+import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, aplicarAprovacao, contadoresAprovacao, cestaDocId, novoFV, parseValorBR, fmtBRL } from "./equipeAprovacao";
 import { PROJECT_PINS } from "./accessConfig";
 
 const ADMIN_PIN = "872101";
@@ -674,7 +675,7 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 
 // ── Tela de ficha completa
 // ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
-function UniformeModulo({ colab, projectNome, projectId, canManage, dark, onSolicitar, onConfirmar, onSalvarLista }){
+function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, onAprovar, dark, onSolicitar, onConfirmar, onSalvarLista }){
   const S = getStyles(dark);
   const [aberto, setAberto] = useState(false);
   const [modoMontar, setModoMontar] = useState(false); // Fase 1: montar lista
@@ -738,6 +739,7 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, dark, onSoli
               <div key={s.id} style={{ background:alerta?"#1a0202":(dark?"#1a1000":"#fffbeb"), border:`1px solid ${alerta?"#ef444455":"#f59e0b44"}`, borderRadius:10, padding:"10px 12px", marginBottom:8 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente</div>
                 <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
+                <AprovacaoInline solic={s} canApprove={canApprove} onAprovar={(dec)=>onAprovar && onAprovar([{ colabId:colab.id, solicId:s.id }], dec)} dark={dark}/>
                 {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>✓ Confirmar recebimento (zera SLA)</button>}
               </div>
             );
@@ -873,7 +875,188 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, dark, onSoli
 }
 
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, dark }) {
+// ── ADENDO EQUIPE — Aprovação / Cesta de Natal / FV ─────────────────────
+const APROV_CORES = {
+  aguardando: { cor:"#f59e0b", bg:"#f59e0b1a", rot:"Aguardando" },
+  aprovado:   { cor:"#22c55e", bg:"#22c55e1a", rot:"Aprovado" },
+  negado:     { cor:"#ef4444", bg:"#ef44441a", rot:"Negado" },
+};
+function SeloAprovacao({ status }){
+  const c = APROV_CORES[status] || APROV_CORES.aguardando;
+  return <span style={{ fontSize:10, fontWeight:700, color:c.cor, background:c.bg, border:`1px solid ${c.cor}44`, borderRadius:6, padding:"2px 8px", whiteSpace:"nowrap" }}>{c.rot}</span>;
+}
+// Selo para todos; botões apenas para o gerencial.
+function AprovacaoInline({ solic, canApprove, onAprovar, dark }){
+  const st = statusAprovacao(solic);
+  const txt2 = dark?"#94a3b8":"#64748b";
+  return (
+    <div style={{ marginTop:8 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+        <SeloAprovacao status={st}/>
+        {solic.aprovadoEm && <span style={{ fontSize:10, color:txt2 }}>{new Date(solic.aprovadoEm).toLocaleDateString("pt-BR")} · {solic.aprovadoPor||"Gerencial"}</span>}
+      </div>
+      {canApprove && (
+        <div style={{ display:"flex", gap:6, marginTop:8 }}>
+          {["aguardando","aprovado","negado"].map(k=>{
+            const c=APROV_CORES[k]; const on=st===k;
+            return <button key={k} onClick={()=>{ if(!on) onAprovar(k); }}
+              style={{ flex:1, fontSize:10.5, fontWeight:700, cursor:on?"default":"pointer", borderRadius:7, padding:"6px 4px",
+                color:on?"#fff":c.cor, background:on?c.cor:"transparent", border:`1px solid ${c.cor}66` }}>{c.rot}</button>;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+// Card Cesta de Natal na ficha — sem SLA, sem aprovação.
+function CestaNatalCard({ ano, registro, canManage, onToggle, dark }){
+  const S = getStyles(dark);
+  const txt2 = dark?"#94a3b8":"#64748b";
+  const [busy, setBusy] = useState(false);
+  const marcado = !!registro;
+  return (
+    <div style={{ ...S.card, border:`1px solid ${marcado?"#22c55e55":(dark?"#0f172a":"#e2e8f0")}` }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>🎄 Cesta de Natal {ano}</div>
+          <div style={{ fontSize:11, color:marcado?"#22c55e":txt2, marginTop:2 }}>
+            {marcado ? `Solicitada em ${new Date(registro.solicitadoEm).toLocaleDateString("pt-BR")} · ${registro.solicitadoPor||"—"}` : "Não solicitada"}
+          </div>
+        </div>
+        {canManage && (
+          <button disabled={busy} onClick={async()=>{ setBusy(true); try{ await onToggle(); } finally { setBusy(false); } }}
+            style={{ ...S.btnSm, fontSize:11, padding:"6px 12px", color:marcado?"#ef4444":"#22c55e", border:`1px solid ${marcado?"#ef444455":"#22c55e55"}`, opacity:busy?.6:1 }}>
+            {busy ? "..." : marcado ? "Desmarcar" : "Solicitar"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+// Card FV — valor digitável, somente gerencial. Contadores apenas informativos.
+function FVCard({ fv, projectLabel, contadores, ano, onSalvar, dark }){
+  const S = getStyles(dark);
+  const txt2 = dark?"#94a3b8":"#64748b";
+  const [edit, setEdit] = useState(false);
+  const [valorTxt, setValorTxt] = useState("");
+  const [erro, setErro] = useState("");
+  const [busy, setBusy] = useState(false);
+  const salvar = async ()=>{
+    const n = parseValorBR(valorTxt);
+    if(n===null){ setErro("Informe um valor válido"); return; }
+    setBusy(true);
+    try { await onSalvar(n); setEdit(false); setErro(""); }
+    catch(e){ setErro("Erro ao salvar. Verifique a conexão."); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div style={S.card}>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:10 }}>
+        <div>
+          <div style={{ fontSize:11, color:txt2, fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>FV · {projectLabel}</div>
+          <div style={{ fontSize:22, fontWeight:800, ...S.txtPrimary, marginTop:2 }}>{fv && typeof fv.valor==="number" ? fmtBRL(fv.valor) : "—"}</div>
+          <div style={{ fontSize:10.5, color:txt2 }}>{fv?.atualizadoEm ? `Atualizado em ${new Date(fv.atualizadoEm).toLocaleDateString("pt-BR")}` : "Sem valor registrado"}</div>
+        </div>
+        {!edit && <button onClick={()=>{ setValorTxt(fv && typeof fv.valor==="number" ? String(fv.valor).replace(".",",") : ""); setEdit(true); }}
+          style={{ ...S.btnSm, fontSize:11, color:"#f59e0b", border:"1px solid #f59e0b55", padding:"6px 12px" }}>✏️ Editar</button>}
+      </div>
+      {edit && (
+        <div style={{ marginTop:10 }}>
+          <input inputMode="decimal" placeholder="35.000,00" value={valorTxt} onChange={e=>{ setValorTxt(e.target.value); setErro(""); }}
+            style={{ width:"100%", boxSizing:"border-box", padding:"10px 12px", borderRadius:8, fontSize:14, background:dark?"#020510":"#fff", color:dark?"#e8ecf5":"#0f172a", border:`1px solid ${erro?"#ef4444":(dark?"#1e293b":"#cbd5e1")}` }}/>
+          {erro && <div style={{ fontSize:11, color:"#ef4444", marginTop:4 }}>{erro}</div>}
+          <div style={{ display:"flex", gap:6, marginTop:8 }}>
+            <button onClick={()=>{ setEdit(false); setErro(""); }} style={{ ...S.btnSm, flex:1, padding:"8px" }}>Cancelar</button>
+            <button disabled={busy} onClick={salvar} style={{ ...S.btnSm, flex:1, padding:"8px", color:"#fff", background:"#16a34a", border:"none", opacity:busy?.6:1 }}>{busy?"Salvando...":"Salvar"}</button>
+          </div>
+        </div>
+      )}
+      <div style={{ fontSize:11, color:txt2, marginTop:10 }}>
+        {ano}: <span style={{color:"#22c55e"}}>{contadores.aprovado} aprovado(s)</span> · <span style={{color:"#f59e0b"}}>{contadores.aguardando} aguardando</span> · <span style={{color:"#ef4444"}}>{contadores.negado} negado(s)</span>
+      </div>
+    </div>
+  );
+}
+// Tela de aprovação (individual e em lote) — somente gerencial.
+function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, onBack, dark }){
+  const S = getStyles(dark);
+  const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
+  const [aba, setAba] = useState("aguardando");
+  const [sel, setSel] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const itens = [];
+  (colaboradores||[]).forEach(c=>{
+    solicitacoesPorAprovacao(c, aba==="todas"?null:aba, ano).forEach(s=>itens.push({ c, s, key:`${c.id}|${s.id}` }));
+  });
+  itens.sort((a,b)=>String(a.c.nome||"").localeCompare(String(b.c.nome||""),"pt-BR"));
+  const cont = contadoresAprovacao(colaboradores, ano);
+  const toggle = (k)=>setSel(p=>p.includes(k)?p.filter(x=>x!==k):[...p,k]);
+  const todosSel = itens.length>0 && itens.every(i=>sel.includes(i.key));
+  const decidir = async (dec)=>{
+    const alvos = itens.filter(i=>sel.includes(i.key)).map(i=>({ colabId:i.c.id, solicId:i.s.id }));
+    if(!alvos.length) return;
+    setBusy(true);
+    try { await onAprovar(alvos, dec); setSel([]); } finally { setBusy(false); }
+  };
+  const abas = [["aguardando",`Aguardando (${cont.aguardando})`],["aprovado",`Aprovados (${cont.aprovado})`],["negado",`Negados (${cont.negado})`],["todas","Todas"]];
+  return (
+    <div style={S.page}>
+      <div style={S.wrap}>
+      <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <button onClick={onBack} style={{ ...S.btnSm, padding:"7px 12px" }}>← Voltar</button>
+          <div style={{ fontSize:14, fontWeight:800, color:txt }}>✅ Aprovação de solicitações</div>
+        </div>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+          <span style={{ fontSize:11, color:txt2 }}>Ano da solicitação</span>
+          <select value={ano} onChange={e=>{ onAno(Number(e.target.value)); setSel([]); }}
+            style={{ padding:"6px 10px", borderRadius:8, background:dark?"#020510":"#fff", color:txt, border:`1px solid ${dark?"#1e293b":"#cbd5e1"}` }}>
+            {anos.map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+          {abas.map(([k,r])=>(
+            <button key={k} onClick={()=>{ setAba(k); setSel([]); }}
+              style={{ ...S.btnSm, fontSize:10.5, padding:"6px 10px", color:aba===k?"#fff":txt2, background:aba===k?"#0ea5e9":"transparent", border:`1px solid ${aba===k?"#0ea5e9":(dark?"#1e293b":"#e2e8f0")}` }}>{r}</button>
+          ))}
+        </div>
+        <div style={{ ...S.card, padding:"10px 12px" }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, flexWrap:"wrap" }}>
+            <button onClick={()=>setSel(todosSel?[]:itens.map(i=>i.key))} style={{ ...S.btnSm, fontSize:10.5 }}>{todosSel?"☑ Desmarcar todas":`☐ Selecionar todas (${itens.length})`}</button>
+            <span style={{ fontSize:11, color:txt2 }}>{sel.length} selecionada(s)</span>
+          </div>
+          <div style={{ display:"flex", gap:6, marginTop:8 }}>
+            {[["aprovado","Aprovar"],["negado","Negar"],["aguardando","Aguardando"]].map(([k,r])=>{
+              const c=APROV_CORES[k];
+              return <button key={k} disabled={busy||!sel.length} onClick={()=>decidir(k)}
+                style={{ flex:1, fontSize:11, fontWeight:700, borderRadius:8, padding:"8px 4px", cursor:sel.length?"pointer":"default", color:"#fff", background:c.cor, border:"none", opacity:(busy||!sel.length)?.45:1 }}>{busy?"...":r}</button>;
+            })}
+          </div>
+        </div>
+        {itens.length===0 && <div style={{ fontSize:12, color:txt2, textAlign:"center", padding:"16px 0" }}>Nenhuma solicitação nesta aba em {ano}.</div>}
+        {itens.map(({c,s,key})=>{
+          const on = sel.includes(key);
+          return (
+            <div key={key} onClick={()=>toggle(key)} style={{ ...S.card, padding:"10px 12px", cursor:"pointer", border:`1px solid ${on?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:20, height:20, borderRadius:5, flexShrink:0, border:`2px solid ${on?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:on?"#0ea5e9":"transparent", color:"#fff", fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{on?"✓":""}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12.5, fontWeight:700, color:txt }}>{c.nome}</div>
+                  <div style={{ fontSize:11, color:txt2 }}>{s.item}{s.tamanho?` · ${s.tamanho}`:""} · {s.status==="entregue"?"entregue":"pendente"} · {s.solicitadoEm?new Date(s.solicitadoEm).toLocaleDateString("pt-BR"):"—"}</div>
+                </div>
+                <SeloAprovacao status={statusAprovacao(s)}/>
+              </div>
+            </div>
+          );
+        })}
+        <button onClick={onPDF} style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 PDF das aprovadas ({cont.aprovado}) — {ano}</button>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaRegistro, onToggleCesta, onAprovar, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -1059,12 +1242,19 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             </div>
           </div>
 
+          {/* Cesta de Natal (adendo Equipe) */}
+          {onToggleCesta && (
+            <CestaNatalCard ano={cestaAno} registro={cestaRegistro} canManage={adminAuth || liderAuth} onToggle={()=>onToggleCesta(colab)} dark={dark}/>
+          )}
+
           {/* Uniforme e Material Tático */}
           <UniformeModulo
             colab={colab}
             projectNome={projectNome}
             projectId={(projectNome||"").split(" · ")[0]}
             canManage={adminAuth || liderAuth}
+            canApprove={adminAuth}
+            onAprovar={onAprovar}
             dark={dark}
             onSolicitar={onSolicitarUniforme}
             onConfirmar={onConfirmarUniforme}
@@ -2038,6 +2228,98 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const liderAuth = authLevel === "lider" || authLevel === "admin";
   const cargos = CARGOS_PROJETO[project.id] || ["Colaborador"];
 
+  // ── ADENDO EQUIPE — FV / Cesta de Natal / Aprovação ─────────────────
+  const anoAtual = new Date().getFullYear();
+  const anosDisp = anosFiltro(anoAtual);
+  const [anoFiltro, setAnoFiltro] = useState(anoAtual);
+  const [filtroRapido, setFiltroRapido] = useState(null); // null | "cesta" | "aprovado" | "aguardando"
+  const [fvDoc, setFvDoc] = useState(null);
+  const [cestaPorAno, setCestaPorAno] = useState({}); // { [ano]: { [colabId]: registro } }
+
+  // FV: equipes/{pid}/fv/atual — leitura independente do documento principal.
+  useEffect(()=>{
+    let vivo = true;
+    getDoc(doc(db,"equipes",project.id,"fv","atual"))
+      .then(snap=>{ if(vivo) setFvDoc(snap.exists()?snap.data():null); })
+      .catch(e=>console.warn("FV: falha na leitura", e));
+    return ()=>{ vivo=false; };
+  }, [project.id]);
+
+  // Cesta: equipes/{pid}/cestaNatal/{ano}_{colabId} — carrega por ano sob demanda.
+  useEffect(()=>{
+    let vivo = true;
+    const anosCarregar = [...new Set([anoAtual, anoFiltro])];
+    Promise.all(anosCarregar.map(a=>
+      getDocs(query(collection(db,"equipes",project.id,"cestaNatal"), where("ano","==",a)))
+        .then(qs=>{ const m={}; qs.forEach(d=>{ const v=d.data(); if(v && v.colabId) m[v.colabId]=v; }); return [a,m]; })
+        .catch(e=>{ console.warn("Cesta: falha na leitura", e); return [a,null]; })
+    )).then(res=>{
+      if(!vivo) return;
+      setCestaPorAno(prev=>{ const n={...prev}; res.forEach(([a,m])=>{ if(m) n[a]=m; }); return n; });
+    });
+    return ()=>{ vivo=false; };
+  }, [project.id, anoFiltro, anoAtual]);
+
+  const salvarFV = async (valor)=>{
+    if(!adminAuth) return;
+    const novo = novoFV(fvDoc, valor);
+    await setDoc(doc(db,"equipes",project.id,"fv","atual"), novo);
+    setFvDoc(novo);
+  };
+
+  // Marca/desmarca a cesta do ANO ATUAL. Desmarcar exclui só o documento do colaborador.
+  const toggleCesta = async (colab)=>{
+    if(!liderAuth || !colab) return;
+    const ano = anoAtual;
+    const docId = cestaDocId(ano, colab.id);
+    if(!docId){ alert("Colaborador sem identificador válido para a Cesta de Natal."); return; }
+    const ref = doc(db,"equipes",project.id,"cestaNatal",docId);
+    const atual = (cestaPorAno[ano]||{})[colab.id];
+    try {
+      if(atual){
+        await deleteDoc(ref);
+        setCestaPorAno(prev=>{ const m={...(prev[ano]||{})}; delete m[colab.id]; return { ...prev, [ano]:m }; });
+      } else {
+        const reg = { ano, colabId:colab.id, nome:colab.nome||"", cargo:colab.cargo||"", turno:colab.turno||"",
+          solicitadoEm:new Date().toISOString(), solicitadoPor: adminAuth ? "Gerencial" : "Líder" };
+        await setDoc(ref, reg);
+        setCestaPorAno(prev=>({ ...prev, [ano]:{ ...(prev[ano]||{}), [colab.id]:reg } }));
+      }
+    } catch(e){
+      console.error("Cesta de Natal: erro ao gravar", e);
+      alert("Erro ao gravar a Cesta de Natal. Verifique a conexão.");
+    }
+  };
+
+  // Aprovação: relê equipes/{pid} no servidor, aplica SÓ o patch de aprovação e grava uma vez.
+  const aprovarSolicitacoes = async (alvos, decisao)=>{
+    if(!adminAuth || !alvos || !alvos.length) return;
+    setSaving(true);
+    try {
+      const snap = await getDoc(doc(db,"equipes",project.id));
+      const base = snap.exists() ? snap.data() : equipeData;
+      const { colaboradores, alterados } = aplicarAprovacao(base.colaboradores||[], alvos, decisao);
+      if(!alterados) return;
+      const novo = { ...base, colaboradores };
+      // Atualização otimista: o selo muda imediatamente, sem esperar a rede.
+      setEquipeData(novo);
+      setSelColab(prev=> prev ? (colaboradores.find(c=>c.id===prev.id) || prev) : prev);
+      try {
+        await saveEquipe(project.id, novo);
+      } catch (e) {
+        const atual = await loadEquipe(project.id);
+        setEquipeData(atual || { colaboradores:[], desligados:[] });
+        setSelColab(prev=> prev ? ((atual?.colaboradores||[]).find(c=>c.id===prev.id) || prev) : prev);
+        throw e;
+      }
+    } catch(e){
+      console.error("Aprovação: erro ao gravar", e);
+      alert("Erro ao gravar a aprovação. Verifique a conexão.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     loadEquipe(project.id).then(data => {
       setEquipeData(data || { colaboradores:[], desligados:[] });
@@ -2445,6 +2727,16 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       onSave={addHistorico} onCancel={()=>setScreen("view")} dark={dark}/>
   );
 
+  // ── Aprovação de solicitações (somente gerencial)
+  if(screen==="aprovacoes" && adminAuth) return (
+    <AprovacoesScreen
+      colaboradores={equipeData.colaboradores.filter(c=>(c.status||"ativo")==="ativo")}
+      ano={anoFiltro} anos={anosDisp} onAno={setAnoFiltro}
+      onAprovar={aprovarSolicitacoes}
+      onPDF={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
+      onBack={()=>setScreen("list")} dark={dark}/>
+  );
+
   // ── Ficha
   if(screen==="view"&&selColab) {
     const colab = equipeData.colaboradores.find(c=>c.id===selColab.id) || selColab;
@@ -2455,6 +2747,10 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         onSolicitarUniforme={solicitarUniforme}
         onConfirmarUniforme={confirmarRecebimentoUniforme}
         onSalvarListaUniforme={salvarListaUniforme}
+        cestaAno={anoAtual}
+        cestaRegistro={(cestaPorAno[anoAtual]||{})[colab.id]}
+        onToggleCesta={toggleCesta}
+        onAprovar={aprovarSolicitacoes}
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
@@ -2508,6 +2804,10 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                   <button onClick={()=>setScreen("ferias")}
                     style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
                     🏖️ Férias
+                  </button>
+                  <button onClick={()=>setScreen("aprovacoes")}
+                    style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px" }}>
+                    ✅ Aprovações
                   </button>
                   <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
                 </div>
@@ -2743,8 +3043,73 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
             </div>
           )}
 
+          {/* ADENDO EQUIPE — FV (somente gerencial) */}
+          {adminAuth && (
+            <FVCard fv={fvDoc} projectLabel={`${project.id} ${project.name||""}`.trim()}
+              contadores={contadoresAprovacao(ativos, anoFiltro)} ano={anoFiltro} onSalvar={salvarFV} dark={dark}/>
+          )}
+
+          {/* ADENDO EQUIPE — filtros rápidos + ano */}
+          <div style={{ ...S.card, padding:"10px 12px" }}>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              {[[null,"Todos"],["cesta","🎄 Cesta de Natal"],["aprovado","Aprovados"],["aguardando","Aguardando"]].map(([k,r])=>(
+                <button key={String(k)} onClick={()=>setFiltroRapido(k)}
+                  style={{ ...S.btnSm, fontSize:10.5, padding:"6px 10px", color:filtroRapido===k?"#fff":(dark?"#94a3b8":"#64748b"), background:filtroRapido===k?"#0ea5e9":"transparent", border:`1px solid ${filtroRapido===k?"#0ea5e9":(dark?"#1e293b":"#e2e8f0")}` }}>{r}</button>
+              ))}
+            </div>
+            {filtroRapido && (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:8 }}>
+                <span style={{ fontSize:11, color:dark?"#94a3b8":"#64748b" }}>Ano</span>
+                <select value={anoFiltro} onChange={e=>setAnoFiltro(Number(e.target.value))}
+                  style={{ padding:"5px 10px", borderRadius:8, background:dark?"#020510":"#fff", color:dark?"#e8ecf5":"#0f172a", border:`1px solid ${dark?"#1e293b":"#cbd5e1"}` }}>
+                  {anosDisp.map(a=><option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {filtroRapido && (()=>{
+            const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
+            const porId = Object.fromEntries(ativos.map(c=>[c.id,c]));
+            let linhas = [];
+            if(filtroRapido==="cesta"){
+              linhas = Object.values(cestaPorAno[anoFiltro]||{}).map(r=>{
+                const c = porId[r.colabId];
+                return { id:r.colabId, colab:c||null, nome:c?.nome||r.nome, cargo:c?.cargo||r.cargo, turno:c?.turno||r.turno, extra:"🎄" };
+              });
+            } else {
+              linhas = ativos.map(c=>({ c, n:solicitacoesPorAprovacao(c, filtroRapido, anoFiltro).length }))
+                .filter(x=>x.n>0).map(({c,n})=>({ id:c.id, colab:c, nome:c.nome, cargo:c.cargo, turno:c.turno, extra:`${n} item(ns)` }));
+            }
+            linhas.sort((a,b)=>String(a.nome||"").localeCompare(String(b.nome||""),"pt-BR"));
+            const carregando = filtroRapido==="cesta" && !cestaPorAno[anoFiltro];
+            return (
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                <div style={{ fontSize:11.5, color:txt2 }}>{carregando ? "Carregando..." : `${linhas.length} colaborador(es) · ${anoFiltro}`}</div>
+                {linhas.map(l=>(
+                  <div key={l.id} onClick={()=>{ if(l.colab){ setSelColab(l.colab); setScreen("view"); } }}
+                    style={{ ...S.card, padding:"10px 12px", cursor:l.colab?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontSize:12.5, fontWeight:700, color:txt }}>{l.nome}</div>
+                      <div style={{ fontSize:11, color:txt2 }}>{l.cargo||"—"}{l.turno?` · ${l.turno}`:""}{!l.colab?" · fora do quadro ativo":""}</div>
+                    </div>
+                    <span style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, whiteSpace:"nowrap" }}>{l.extra}</span>
+                  </div>
+                ))}
+                {adminAuth && filtroRapido==="cesta" && (
+                  <button onClick={()=>gerarPDFCestaNatal(project, linhas, anoFiltro)}
+                    style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 PDF Cesta de Natal ({linhas.length}) — {anoFiltro}</button>
+                )}
+                {adminAuth && filtroRapido==="aprovado" && (
+                  <button onClick={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
+                    style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 PDF Aprovados — {anoFiltro}</button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* VISÃO POR EQUIPE MONTADA */}
-          {visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (()=>{
+          {!filtroRapido && visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (()=>{
             const lideres = ativos.filter(c=>ehLider(c, equipeData.colaboradores)).sort((a,b)=>(a.turno||"").localeCompare(b.turno||""));
             const semEquipe = ativos.filter(c=>!ehLider(c, equipeData.colaboradores) && !c.equipeLiderId);
             const turnos = [...new Set(lideres.map(l=>l.turno))];
@@ -2808,7 +3173,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
           })()}
 
           {/* Cards por turno (visão padrão) */}
-          {!visaoEquipes && getTurnos(project.id).map(turno=>{
+          {!filtroRapido && !visaoEquipes && getTurnos(project.id).map(turno=>{
             const tc = TURNO_CONFIG[turno];
             const colabsDoTurno = ativos.filter(c=>c.turno===turno);
             if(colabsDoTurno.length===0 && !adminAuth) return null;

@@ -25,6 +25,7 @@ import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
 import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
+import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
@@ -1536,7 +1537,7 @@ async function computeScore360Projeto(pid, ctx) {
   } catch(e){ return null; }
 }
 
-function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport, dark=true}) {
+function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, onEditReport, onGestaoFV, dark=true}) {
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
   const [showAuditoria,setShowAuditoria]=useState(false);
@@ -1993,6 +1994,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Golgi</button>
           <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Mega</button>
           <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Klog</button>
+          <button onClick={onGestaoFV} style={{...S.primaryBtn,width:"100%",marginTop:8}}>💰 Gestão FV</button>
         </div>}
         {/* Recursos gerenciais renderizados a partir do registro único
             (gerenciaisConfig.js). Evita que um recurso — como a Visão 360 —
@@ -4025,7 +4027,16 @@ export default function App(){
     );
   }
 
-  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} dark={dark}/>;
+  if(screen==="gestao_fv") return (
+    <ErrorBoundary moduleName="Gestão FV">
+      <GestaoFV
+        dark={dark}
+        onBack={() => setScreen("dashboard")}
+        validarPin={(pin) => checkPin(pin) === "admin"}
+      />
+    </ErrorBoundary>
+  );
+  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
 
@@ -4631,3 +4642,4 @@ const S={
   addBtn:{background:"transparent",border:"1px dashed #0f172a",color:"#94a3b8",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",marginTop:4},
   subRow:{display:"flex",flexDirection:"column",gap:6,marginTop:8,paddingTop:8,borderTop:"1px solid #0f172a"},
 };
+
