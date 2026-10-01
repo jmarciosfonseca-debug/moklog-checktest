@@ -1,0 +1,41 @@
+# Robô FV — sincroniza a plataforma Gestão FV → Firestore (somente leitura no portal).
+# Horários: 08h e 16h (Brasília, UTC-3) = 11h e 19h UTC.
+name: fv-sync
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Somente extrair e validar (não grava)"
+        type: boolean
+        default: false
+      origem:
+        description: "Quem disparou"
+        type: string
+        default: "manual"
+concurrency:
+  group: fv-sync
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Dependências do robô (fora do bundle do app)
+        run: npm install --no-save --no-package-lock firebase-admin@12 playwright@1
+      - name: Navegador
+        run: npx playwright install --with-deps chromium
+      - name: Testes do núcleo
+        run: node --test scripts/fv-sync/fvCore.test.js
+      - name: Sincronizar
+        env:
+          FV_USER: ${{ secrets.FV_USER }}
+          FV_PASS: ${{ secrets.FV_PASS }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FV_ORIGEM: ${{ github.event_name == 'schedule' && 'cron' || inputs.origem }}
+        run: node scripts/fv-sync/index.js --dry-run
