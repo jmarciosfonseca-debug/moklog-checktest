@@ -1,153 +1,29 @@
-// ─────────────────────────────────────────────────────────────
-// session.js — Sessão global MokLog CheckTest (Etapa 1)
-// Sessão local persistida em localStorage com expiração por INATIVIDADE.
-//
-// Níveis:
-//   "gerencial" → PIN 872101. Acesso admin a TODOS os projetos/telas. 30 min.
-//   "equipe"    → PIN do projeto (ex: 16601). Acesso líder SÓ ao próprio projeto. 5 min.
-//   "demo"      → PIN GAL 601604. Vê e mexe em tudo como admin, mas NADA é
-//                 salvo (escritas interceptadas via fireGuard.js). Banner 🎭. 5 min.
-//
-// Qualquer PIN correto grava a sessão; enquanto válida, nenhuma tela
-// volta a pedir PIN. Qualquer toque/clique renova lastActivity
-// (listener global no App.jsx chama touchSession, com throttle aqui).
-// Fechar o app e voltar dentro da janela → segue logado.
-// ─────────────────────────────────────────────────────────────
-
-const KEY = "moklog_session_v1";
-const DEMO_PIN = "601604"; // PIN GAL — modo demonstração (nada é salvo)
-
-export const SESSION_TIMEOUTS = {
-  gerencial: 30 * 60 * 1000, // 30 min de inatividade
-  equipe:     5 * 60 * 1000, // 5 min de inatividade
-  demo:       5 * 60 * 1000, // 5 min de inatividade (Etapa 2)
-};
-
-function read() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    if (!s || !s.nivel || !SESSION_TIMEOUTS[s.nivel]) return null;
-    return s;
-  } catch (e) { return null; }
+// Server-issued token, held only in this page's memory. Never persist PINs or tokens.
+let current=null,pending=null;
+export const SESSION_TIMEOUTS={gerencial:8*3600000,equipe:8*3600000,demo:8*3600000,ronda:8*3600000};
+const announce=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('moklog-auth-changed'));};
+try{localStorage.removeItem('moklog_session_v1');}catch{}
+export function getSession(){if(current&&Date.now()>=current.exp)clearSession();return current;}
+export function getAccess(pid){const s=getSession();if(!s)return null;if(['gerencial','demo'].includes(s.nivel))return 'admin';return s.nivel==='equipe'&&s.projectId===pid?'lider':null;}
+export function isDemo(){return getSession()?.nivel==='demo';}
+export function hasGerencial(){return ['gerencial','demo'].includes(getSession()?.nivel);}
+export function getScopedProjectId(){const s=getSession();return s?.nivel==='equipe'?s.projectId:null;}
+export function clearSession(){current=null;announce();}
+export function touchSession(){getSession();}
+export function grantSession(){return getSession();} // Legacy callbacks cannot manufacture access.
+export async function checkPin(value,opts={}){
+ const pin=String(value||'').trim();if(!pin||pending)return null;
+ pending=(async()=>{
+ const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{})})});
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok||!data.ok){window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:data.erro||'Servidor de acesso indisponível.'}));return null;}
+ if(!['admin','lider','demo','ronda'].includes(data.nivel)||typeof data.token!=='string'||!Number.isFinite(data.exp)||data.exp<=Date.now()||(data.nivel==='lider'&&opts.projectId&&data.pid!==opts.projectId))return null;
+ if(opts.allowAdmin===false&&data.nivel==='admin')return null;
+ if((opts.adminOnly||(!opts.projectId&&!opts.anyProject))&&!['admin','demo'].includes(data.nivel))return null;
+ current={token:data.token,nivel:{admin:'gerencial',lider:'equipe',demo:'demo',ronda:'ronda'}[data.nivel],projectId:data.pid||null,exp:data.exp};announce();return data.nivel;
+ })();
+ try{return await pending;}catch{window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:'Sem conexão com o servidor de acesso.'}));return null;}finally{pending=null;}
 }
-
-function write(s) {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
-}
-
-// Sessão válida (não expirada) ou null. Sessão expirada é limpa.
-export function getSession() {
-  const s = read();
-  if (!s) return null;
-  const timeout = SESSION_TIMEOUTS[s.nivel];
-  if (Date.now() - (s.lastActivity || 0) > timeout) { clearSession(); return null; }
-  return s;
-}
-
-// Grava a sessão a partir do resultado de qualquer PinGate.
-// level: "admin" (PIN gerencial) | "lider" (PIN do projeto) | "demo" (GAL)
-export function grantSession(level, projectId) {
-  if (level === "admin") {
-    write({ nivel: "gerencial", lastActivity: Date.now() });
-  } else if (level === "lider" && projectId) {
-    write({ nivel: "equipe", projectId, lastActivity: Date.now() });
-  } else if (level === "demo") {
-    write({ nivel: "demo", lastActivity: Date.now() });
-  }
-}
-
-// Verificação central de PIN. Retorna o nível concedido ou null.
-// Use isto nos PinGates: o PIN demo (601604) é reconhecido em QUALQUER tela.
-//   checkPin(valor, { projectPin, allowAdmin, projectId })
-// - allowAdmin: se true, aceita o PIN gerencial 872101
-// - projectPin: PIN do projeto (ex "16601"); se casar → "lider"
-// SEMPRE aceita o DEMO_PIN → "demo".
-export function checkPin(valor, opts = {}) {
-  const v = String(valor || "").trim();
-  if (!v) return null;
-  if (v === DEMO_PIN) { grantSession("demo"); return "demo"; }
-  if (opts.allowAdmin !== false && v === "872101") { grantSession("admin"); return "admin"; }
-  if (opts.projectPin && v === String(opts.projectPin)) {
-    grantSession("lider", opts.projectId);
-    return "lider";
-  }
-  return null;
-}
-
-// Nível de acesso da sessão atual para um projeto: "admin" | "lider" | null.
-// Gerencial → admin em qualquer projeto; equipe → líder só no projeto dela.
-export function getAccess(projectId) {
-  const s = getSession();
-  if (!s) return null;
-  if (s.nivel === "gerencial") return "admin";
-  if (s.nivel === "demo") return "admin"; // demo enxerga tudo como admin (mas não salva)
-  if (s.nivel === "equipe") return projectId && s.projectId === projectId ? "lider" : null;
-  return null;
-}
-
-// true se a sessão atual é o modo demonstração (GAL). Usado pelo fireGuard
-// para bloquear TODA escrita, pelo banner 🎭 e pelos guards de e-mail/share.
-export function isDemo() {
-  const s = getSession();
-  return !!s && s.nivel === "demo";
-}
-
-// true se há sessão gerencial válida (telas 100% gerenciais)
-export function hasGerencial() {
-  const s = getSession();
-  // demo vê telas gerenciais (retorna true) mas a escrita é travada pelo fireGuard
-  return !!s && (s.nivel === "gerencial" || s.nivel === "demo");
-}
-
-// Renova lastActivity (throttle interno de 15s para não martelar o localStorage)
-let _lastTouch = 0;
-export function touchSession() {
-  const now = Date.now();
-  if (now - _lastTouch < 15000) return;
-  const s = getSession();
-  if (!s) return;
-  _lastTouch = now;
-  s.lastActivity = now;
-  write(s);
-}
-
-// Logout manual — limpa a sessão global
-export function clearSession() {
-  try { localStorage.removeItem(KEY); } catch (e) {}
-}
-
-// projectId autorizado da sessão de LÍDER (nível "equipe"), ou null.
-// Gerencial/demo retornam null aqui de propósito: eles NÃO têm escopo
-// fixo — enxergam a visão global. Serve para o RegistrosMenu decidir se
-// abre o Painel do Líder (escopado) em vez da visão gerencial. NUNCA
-// permite escolher/trocar de projeto: o escopo vem só da sessão.
-export function getScopedProjectId() {
-  const s = getSession();
-  if (!s) return null;
-  return s.nivel === "equipe" && s.projectId ? s.projectId : null;
-}
-
-// Verifica um PIN contra QUALQUER projeto do mapa fornecido (PROJECT_PINS).
-// Usado nas gates globais (Registros): se o valor for o PIN de um projeto,
-// cria a sessão de líder daquele projeto e retorna o projectId. Também
-// aceita gerencial (872101) e demo (601604), delegando ao checkPin.
-// Retorno: { level, projectId } ou null.
-//   level: "admin" | "demo" | "lider"
-export function checkPinAnyProject(valor, projectPins) {
-  const v = String(valor || "").trim();
-  if (!v) return null;
-  // Gerencial e demo primeiro (não dependem de projeto).
-  if (v === DEMO_PIN) { grantSession("demo"); return { level: "demo", projectId: null }; }
-  if (v === "872101") { grantSession("admin"); return { level: "admin", projectId: null }; }
-  // PIN de projeto: procura correspondência exata no mapa.
-  const map = projectPins || {};
-  for (const pid in map) {
-    if (String(map[pid]) === v) {
-      grantSession("lider", pid);
-      return { level: "lider", projectId: pid };
-    }
-  }
-  return null;
-}
+export async function checkPinAnyProject(value){const level=await checkPin(value,{anyProject:true});return level?{level,projectId:getSession()?.projectId||null}:null;}
+export function authHeaders(){const s=getSession();if(!s||s.nivel!=='gerencial')throw Error('Sessão gerencial ausente ou expirada. Entre novamente.');return {'Content-Type':'application/json',Authorization:'Bearer '+s.token};}
+export async function authFetch(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,...authHeaders()}});if(r.status===401)clearSession();return r;}

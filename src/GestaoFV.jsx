@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { FV_PROJETOS, FV_NOMES, FV_TIPOS, FV_TIPO_ROTULO, FV_DESATUALIZADO_H } from "./fvConfig";
 import FVPainel from "./FVPainel";
+import {authFetch,getSession} from './session';
 
 const FB_CONFIG = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -19,8 +20,8 @@ const FB_CONFIG = {
 };
 if (!getApps().length) initializeApp(FB_CONFIG);
 
-async function lerFV(pin, pid, signal) {
-  const response = await fetch("/api/fv-read", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pin, ...(pid ? {pid} : {})}), signal });
+async function lerFV(pid, signal) {
+  const response = await authFetch("/api/fv-read", { method:"POST", body:JSON.stringify(pid ? {pid} : {}), signal });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok) throw new Error(data.erro || `Falha de leitura (${response.status})`);
   return data;
@@ -48,7 +49,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
   const btn = { background:"transparent", border:`1px solid ${c.bd}`, color:c.txt2, borderRadius:8, padding:"7px 12px", fontSize:12, fontWeight:700, cursor:"pointer" };
 
   const [pin, setPin] = useState("");
-  const [liberado, setLiberado] = useState(false);
+  const [liberado, setLiberado] = useState(getSession()?.nivel==='gerencial');
   const [pinErro, setPinErro] = useState("");
   const [resumos, setResumos] = useState({});
   const [status, setStatus] = useState(null);
@@ -65,12 +66,12 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
 
   const carregar = useCallback(async () => {
     try {
-      const data = await lerFV(pin);
+      const data = await lerFV();
       setResumos(data.resumos); setStatus(data.status); setLeituraErro("");
       return data.status;
     } catch (e) { setLeituraErro(e.message); return null; }
     finally { setCarregando(false); }
-  }, [pin]);
+  }, []);
 
   useEffect(() => { if (liberado) carregar(); }, [liberado, carregar]);
 
@@ -78,16 +79,16 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
     if (!sel) { setLancs(null); return; }
     let vivo = true; const controller = new AbortController();
     setLancs(null); setLancErro(""); setTipo("todos"); setPosto("todos");
-    lerFV(pin, sel, controller.signal)
+    lerFV(sel, controller.signal)
       .then(data => { if (vivo) { setLancs(data.lancamentos); if (data.resumo) setResumos(r => ({...r,[sel]:data.resumo})); } })
       .catch(e => { if (vivo && e.name !== "AbortError") setLancErro(e.message); });
     return () => { vivo = false; controller.abort(); };
-  }, [sel, versaoDados, pin]);
+  }, [sel, versaoDados]);
 
   const atualizarAgora = async () => {
     setSincronizando(true); setMsgSync("Aplicando arquivos Excel preparados...");
     try {
-      const r = await fetch("/api/fv-apply", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ pin }) });
+      const r = await authFetch("/api/fv-apply", { method:"POST", body: JSON.stringify({}) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { setMsgSync(j.erro || `Erro ${r.status}`); setSincronizando(false); return; }
       await carregar(); setVersaoDados(v => v + 1);
@@ -106,7 +107,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
           onKeyDown={e => { if (e.key === "Enter") document.getElementById("fvPinOk")?.click(); }}
           style={{ width:"100%", boxSizing:"border-box", padding:"11px", borderRadius:8, fontSize:16, textAlign:"center", background:c.bg, color:c.txt, border:`1px solid ${pinErro ? "#ef4444" : c.bd}` }}/>
         {pinErro && <div style={{ fontSize:11, color:"#ef4444", marginTop:6 }}>{pinErro}</div>}
-        <button id="fvPinOk" onClick={() => { if (validarPin && validarPin(pin)) setLiberado(true); else setPinErro("PIN inválido"); }}
+        <button id="fvPinOk" onClick={async () => { if (validarPin && await validarPin(pin)) {setPin('');setLiberado(true);} else {setPin('');setPinErro("PIN inválido ou acesso indisponível");} }}
           style={{ ...btn, width:"100%", marginTop:10, background:"#16a34a", color:"#fff", border:"none", padding:"10px" }}>Entrar</button>
       </div>
     </Page>
@@ -145,7 +146,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
         {r?.diferencaConferenciaCentavos !== 0 && typeof r?.diferencaConferenciaCentavos === "number" && <div style={{ ...card, color:"#f59e0b", fontSize:11 }}>Saldo oficial preservado. Diferença entre soma dos lançamentos e saldo: {brl(r.diferencaConferenciaCentavos / 100)}.</div>}
         {lancErro ? <div role="alert" style={{...card,color:"#ef4444"}}>{lancErro} <button style={btn} onClick={() => setVersaoDados(v => v + 1)}>Tentar novamente</button></div> : lancs === null
           ? <div style={{ fontSize:12, color:c.txt2 }}>Carregando painel...</div>
-          : <FVPainel pid={sel} nome={FV_NOMES[sel]} resumo={r} lancamentos={lancs} dark={dark} podeEditar={liberado} pin={pin}/>}
+          : <FVPainel pid={sel} nome={FV_NOMES[sel]} resumo={r} lancamentos={lancs} dark={dark} podeEditar={liberado}/>}
         <div style={{ fontSize:12.5, fontWeight:700, color:c.txt }}>Lançamentos sincronizados (portal)</div>
         <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
           {["todos", ...FV_TIPOS].map(k => (

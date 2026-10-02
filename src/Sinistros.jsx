@@ -3,7 +3,7 @@
 // MokLog CheckTest · Análise de Risco v2
 //
 // Terceira perna do tripé de classificação (junto com Operacional e Regional).
-// Preenchido no painel GERENCIAL (PIN 872101). Um documento por projeto:
+// Preenchido no painel GERENCIAL (sessão validada no servidor). Um documento por projeto:
 //   Firestore: sinistros/{pid}
 //
 // Modelo de dados (sinistros/{pid}):

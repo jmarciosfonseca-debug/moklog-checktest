@@ -1,3 +1,4 @@
+import { checkPin } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -16,12 +17,8 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession } from "./session";
 
-const ADMIN_PIN = "872101";
-const PROJECT_PINS = {
-  P601:"16601",P602:"16602",P604:"16604",P605:"16605",
-  P606:"16606",P607:"16607",P311A:"16311",P311B:"16311",
-  P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
-};
+
+
 
 // ── Projetos COM aba CCO. Nestes, as visitas de SEGURANÇA são registradas
 // na aba CCO → Supervisão (fonte única). Aqui o histórico fica somente-leitura
@@ -218,12 +215,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
 
-  const tryPin = () => {
-    if(pin === "601604") { grantSession("demo"); onSuccess("admin"); return; } // PIN GAL demo
-    if(pin === ADMIN_PIN) { onSuccess("admin"); return; }
-    if(pin === PROJECT_PINS[project.id]) { onSuccess("lider"); return; }
-    setErr(true);
-  };
+  const tryPin = async () => { const level=await checkPin(pin,{projectId:project?.id}); if(level) { onSuccess(level === 'demo' ? 'admin' : level); } else setErr(true); };
 
   return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>

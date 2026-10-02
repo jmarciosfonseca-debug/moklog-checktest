@@ -5,9 +5,11 @@
 // Catálogo de preços: fv_plano/_catalogo → itens[{id,nome,valor}] (compartilhado).
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
+import { authFetch } from './session';
 import { getTheme } from "./generatePDF";
 import { FV_CREDITO_MENSAL } from "./fvConfig";
 import { LOGO_MOKED_30 } from "./fvLogo";
+import { UNIFORME_NOMES } from "./uniformeCatalogo";
 import {
   PLANO_TIPOS, PLANO_ROTULO, CATEGORIAS, serieMensal, saldoHistorico, projecao, totalReservas,
   resumoPeriodo, valorLanc, efeito, rotuloMes, mesDe, somaMes, novoIdPlano, recorrentesAtivos,
@@ -18,6 +20,8 @@ const brlK = n => (typeof n === "number" && Number.isFinite(n)) ? `${(n / 1000).
 const parseBR = t => { if (t == null) return null; const s = String(t).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", "."); if (s === "" || s === "-") return null; const n = Number(s); return Number.isFinite(n) ? Math.round(n * 100) / 100 : null; };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 const txtBR = n => String(n ?? "").replace(".", ",");
+const itemAprovacao=(l,catalogo)=>(catalogo||[]).find(i=>i.equipeItem===l.item)||(catalogo||[]).find(i=>i.id===l.itemId);
+const semPrecoAprovacao=(l,catalogo)=>l.vinculo==="aprovacao"&&!l.realizado&&!itemAprovacao(l,catalogo);
 
 // ── Gráficos SVG ─────────────────────────────────────────────
 export function svgBarras(serie, w = 340, h = 160) {
@@ -81,13 +85,13 @@ export function gerarPDFProjetoFV({ pid, nome, resumo, real, serie, proj, plano,
   const saldo = resumo?.saldoAtual;
   const disponivel = typeof saldo === "number" ? Math.round((saldo - reservas) * 100) / 100 : null;
   const sinal = v => `<span style="color:${v < 0 ? "#dc2626" : "#15803d"}">${brl(v)}</span>`;
-  const detalheLanc = l => l.vinculo === "cestaNatal" ? ` (${ctx.qtdCestas} × ${brl(Number(l.valorMedio) || 0)})` : l.vinculo === "catalogo" ? ` (${l.qtd} × ${brl(valorLanc({ ...l, qtd:1 }, ctx))})` : "";
+  const detalheLanc = l => l.vinculo === "cestaNatal" ? ` (${ctx.qtdCestas} × ${brl(Number(l.valorMedio) || 0)})` : ["catalogo","aprovacao"].includes(l.vinculo) ? ` (${l.qtd} × ${brl(valorLanc({ ...l, qtd:1 }, ctx))})` : "";
   const kpi = (r, v, sub = "", cls = "") => `<td class="${cls}"><div class="kr">${r}</div><div class="kv">${v}</div>${sub ? `<div class="ks2">${sub}</div>` : ""}</td>`;
 
   const tabCat = Object.entries(periodo.porCategoria).map(([k, v]) => `<tr><td>${CATEGORIAS[k]}</td><td class="r">${brl(v)}</td><td class="r">${periodo.debitos ? Math.round(v / periodo.debitos * 100) : 0}%</td></tr>`).join("");
   const tabMaiores = periodo.maiores.map(m => `<tr><td>${esc(m.descricao || "—")}</td><td>${m.data ? rotuloMes(String(m.data).slice(0, 7)) : "—"}</td><td class="r">${brl(m.valor)}</td></tr>`).join("");
   const tabFixos = [["Vale-transporte", P.vt], ["Assistência médica", P.am], ...recs.map(x => [x.descricao, x.valor])].map(([d, v]) => `<tr><td>${esc(d)}</td><td class="r">${brl(v)}</td><td class="r">${brl(v * 12)}</td></tr>`).join("");
-  const tabPlano = lancs.length ? lancs.map(l => `<tr><td>${esc(PLANO_ROTULO[l.tipo] || l.tipo)}</td><td>${esc(l.descricao || "")}${detalheLanc(l)}</td><td>${l.mes ? rotuloMes(l.mes) : "—"}</td><td class="r">${sinal(efeito(l, ctx))}</td><td>${l.realizado ? "Realizado" : "Previsto"}</td></tr>`).join("") : `<tr><td colspan="5" style="color:#64748b">Nenhum lançamento de planejamento cadastrado.</td></tr>`;
+  const tabPlano = lancs.length ? lancs.map(l => `<tr><td>${esc(PLANO_ROTULO[l.tipo] || l.tipo)}</td><td>${l.vinculo==="aprovacao"?"Equipe · ":""}${esc(l.descricao || "")}${detalheLanc(l)}</td><td>${l.mes ? rotuloMes(l.mes) : "—"}</td><td class="r">${sinal(efeito(l, ctx))}</td><td>${l.realizado ? "Realizado" : "Previsto"}${semPrecoAprovacao(l,ctx.catalogo)?" · sem preço no catálogo":""}${l.origemCancelada?" · origem cancelada":""}</td></tr>`).join("") : `<tr><td colspan="5" style="color:#64748b">Nenhum lançamento de planejamento cadastrado.</td></tr>`;
   const tabProj = proj.serie.map(p => `<tr><td>${rotuloMes(p.mes)}</td><td class="r" style="color:#15803d">${brl(P.creditoMensal)}</td><td class="r" style="color:#dc2626">${brl(P.fixos)}</td><td class="r">${p.extra ? sinal(p.extra) : "—"}</td><td style="color:#475569;font-size:10px">${p.eventos.map(e => esc(e.descricao)).join(", ") || ""}</td><td class="r" style="font-weight:700;color:${p.saldo < 0 ? "#dc2626" : "#111"}">${brl(p.saldo)}</td></tr>`).join("");
 
   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gestão FV ${esc(pid)}</title>
@@ -216,12 +220,14 @@ function FormRecorrente({ c, inicial, onSalvar, onCancelar, onExcluir }) {
 // Formulário de item do catálogo.
 function FormItem({ c, inicial, onSalvar, onCancelar, onExcluir }) {
   const [id] = useState(() => inicial?.id || novoIdPlano("it"));
+  const [equipeItem,setEquipeItem]=useState(inicial?.equipeItem||"");
   const [d, setD] = useState(inicial?.nome || ""); const [v, setV] = useState(inicial ? txtBR(inicial.valor) : ""); const [busy, setBusy] = useState(false);
   return (
     <div style={{ display:"flex", gap:6, alignItems:"center", padding:"6px 0", flexWrap:"wrap" }}>
       <Campo c={c} placeholder="Item (ex.: Camisa)" value={d} onChange={e => setD(e.target.value)} style={{ flex:2, minWidth:120 }}/>
       <Campo c={c} inputMode="decimal" placeholder="Preço unitário" value={v} onChange={e => setV(e.target.value)} style={{ flex:1, minWidth:90 }}/>
-      <Botao c={c} solid cor="#16a34a" disabled={busy} onClick={async () => { const n = parseBR(v); if (!d.trim() || n === null) return; setBusy(true); await onSalvar({ id, nome:d.trim(), valor:n }); setBusy(false); }}>Salvar</Botao>
+      <select aria-label="Item da Equipe" value={equipeItem} onChange={e=>setEquipeItem(e.target.value)} style={{maxWidth:"100%",padding:8,background:c.in,color:c.txt}}><option value="">Sem vínculo com a Equipe</option>{UNIFORME_NOMES.map(nome=><option key={nome}>{nome}</option>)}</select>
+      <Botao c={c} solid cor="#16a34a" disabled={busy} onClick={async () => { const n = parseBR(v); if (!d.trim() || n === null) return; setBusy(true); await onSalvar({ id, nome:d.trim(), valor:n, equipeItem:equipeItem||null }); setBusy(false); }}>Salvar</Botao>
       {onExcluir && <Botao c={c} cor="#ef4444" disabled={busy} onClick={onExcluir}>Excluir</Botao>}
       <Botao c={c} onClick={onCancelar}>✕</Botao>
     </div>
@@ -296,7 +302,7 @@ function FormLancamento({ c, inicial, catalogo, qtdCestas, onSalvar, onCancelar,
 }
 
 // ── Componente principal ─────────────────────────────────────
-export default function FVPainel({ pid, nome, resumo, lancamentos, pin, dark = true, podeEditar = true }) {
+export default function FVPainel({ pid, nome, resumo, lancamentos, dark = true, podeEditar = true }) {
   const c = dark ? { card:"#060c18", bd:"#0f172a", txt:"#e8ecf5", txt2:"#94a3b8", in:"#020510" } : { card:"#fff", bd:"#e2e8f0", txt:"#0f172a", txt2:"#64748b", in:"#fff" };
   const card = { background:c.card, border:`1px solid ${c.bd}`, borderRadius:12, padding:"12px 14px" };
   const titulo = (t, extra) => <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}><div style={{ fontSize:12.5, fontWeight:700, color:c.txt }}>{t}</div>{extra}</div>;
@@ -309,10 +315,11 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, pin, dark = t
   const [formItem, setFormItem] = useState(null);      // null | {} | item
   const [mostraCat, setMostraCat] = useState(false);
   const [erro, setErro] = useState("");
+  const [gravandoOrigem,setGravandoOrigem]=useState(false);
   const anoAtual = new Date().getFullYear();
 
   const requisitar = async operacao => {
-    const response = await fetch("/api/fv-plano", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({pin,pid,...operacao}) });
+    const response = await authFetch("/api/fv-plano", { method:"POST", body:JSON.stringify({pid,...operacao}) });
     let data; try { data = await response.json(); } catch { throw new Error("Servidor não retornou o planejamento. Tente novamente."); }
     if (!response.ok || !data.ok) throw new Error(data.erro || "Não foi possível salvar o planejamento.");
     return data;
@@ -323,7 +330,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, pin, dark = t
     setPlano(null); setCatalogo(null); setErro("");
     requisitar({acao:"ler"}).then(data => { if(vivo) {setPlano(data.plano);setCatalogo(data.catalogo);setQtdCestas(data.qtdCestas);} }).catch(e => vivo && setErro(e.message || "Falha ao carregar planejamento."));
     return () => { vivo = false; };
-  }, [pid, pin]);
+  }, [pid]);
 
   const msgErro = e => e.message || "Não foi possível salvar. Tente novamente.";
   // Releitura + alteração + gravação (plano do projeto).
@@ -373,6 +380,10 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, pin, dark = t
   const temCesta = (plano.lancamentos || []).some(l => l.vinculo === "cestaNatal");
   const salvarLanc = async reg => { if (await gravarPlano(b => { const i = b.lancamentos.findIndex(l => l.id === reg.id); if (i >= 0) b.lancamentos[i] = reg; else b.lancamentos.push(reg); return b; })) setFormLanc(null); };
   const excluirLanc = async id => { if (window.confirm("Excluir este lançamento?") && await gravarPlano(b => ({ ...b, lancamentos:b.lancamentos.filter(l => l.id !== id) }))) setFormLanc(null); };
+  const marcarAprovacao=async l=>{
+    setErro("");setGravandoOrigem(true);
+    try{const data=await requisitar({acao:"realizarAprovacao",id:l.id,realizado:!l.realizado});setPlano(data.plano);}catch(e){setErro(msgErro(e));}finally{setGravandoOrigem(false);}
+  };
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -420,7 +431,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, pin, dark = t
             {catalogo.map(it => formItem && formItem.id === it.id
               ? <FormItem key={it.id} c={c} inicial={it} onCancelar={() => setFormItem(null)} onSalvar={async d => { if (await gravarCatalogo(l => l.map(x => x.id === it.id ? { ...x, ...d } : x))) setFormItem(null); }} onExcluir={async () => { if (window.confirm("Excluir item do catálogo?") && await gravarCatalogo(l => l.filter(x => x.id !== it.id))) setFormItem(null); }}/>
               : <div key={it.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0", borderTop:`1px solid ${c.bd}` }}>
-                  <span style={{ fontSize:12, color:c.txt }}>{it.nome}</span>
+                  <span style={{ fontSize:12, color:c.txt }}>{it.nome}{it.equipeItem&&<small> · Equipe: {it.equipeItem}</small>}</span>
                   <span style={{ display:"flex", gap:6, alignItems:"center" }}><span style={{ fontSize:12, color:c.txt2 }}>{brl(it.valor)}</span>{podeEditar && <Botao c={c} onClick={() => setFormItem(it)} style={{ padding:"3px 7px" }}>✏️</Botao>}</span>
                 </div>)}
             {formItem && !formItem.id && <FormItem c={c} onCancelar={() => setFormItem(null)} onSalvar={async d => { if (await gravarCatalogo(l => [...l, { id:novoIdPlano("it"), ...d }])) setFormItem(null); }}/>}
@@ -436,16 +447,18 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, pin, dark = t
         {(plano.lancamentos || []).length === 0 && <div style={{ fontSize:11.5, color:c.txt2, marginTop:8 }}>Nenhum lançamento. Exemplos: Cesta de Natal, Ovo de Páscoa, treinamento, kit de uniforme × quantidade.</div>}
         {[...(plano.lancamentos || [])].sort((a, b) => String(a.mes).localeCompare(String(b.mes))).map(l => {
           const ef = efeito(l, ctx);
-          const det = l.vinculo === "cestaNatal" ? ` · ${qtdCestas} × ${brl(Number(l.valorMedio) || 0)}` : l.vinculo === "catalogo" ? ` · ${l.qtd} × ${brl(valorLanc({ ...l, qtd:1 }, ctx))}` : "";
+          const det = l.vinculo === "cestaNatal" ? ` · ${qtdCestas} × ${brl(Number(l.valorMedio) || 0)}` : ["catalogo","aprovacao"].includes(l.vinculo) ? ` · ${l.qtd} × ${brl(valorLanc({ ...l, qtd:1 }, ctx))}` : "";
           return (
             <div key={l.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:8, padding:"8px 0", borderTop:`1px solid ${c.bd}`, marginTop:6, opacity:l.realizado ? .5 : 1 }}>
               <div style={{ minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:c.txt }}>{l.descricao}</div>
+                <div style={{ fontSize:12, fontWeight:700, color:c.txt }}>{l.vinculo==="aprovacao"&&<span style={{color:"#0ea5e9"}}>Equipe · </span>}{l.descricao}</div>
                 <div style={{ fontSize:10.5, color:c.txt2 }}>{PLANO_ROTULO[l.tipo]} · {l.mes ? rotuloMes(l.mes) : "—"}{det}{l.realizado ? " · realizado" : ""}</div>
+                {semPrecoAprovacao(l,catalogo)&&<div style={{color:"#f59e0b",fontSize:11}}>Sem preço no catálogo — vincule o item da Equipe a um preço.</div>}
+                {l.origemCancelada&&<div style={{color:"#f59e0b",fontSize:11}}>Origem cancelada · registro realizado preservado para auditoria.</div>}
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:4 }}>
                 <span style={{ fontSize:12.5, fontWeight:800, color:ef < 0 ? "#ef4444" : "#22c55e", whiteSpace:"nowrap" }}>{brl(ef)}</span>
-                {podeEditar && <Botao c={c} onClick={() => setFormLanc(l)} style={{ padding:"4px 7px" }}>✏️</Botao>}
+                {podeEditar && (l.vinculo==="aprovacao"?<Botao c={c} disabled={gravandoOrigem||l.origemCancelada} onClick={()=>marcarAprovacao(l)}>{l.realizado?"Voltar a previsto":"Realizado"}</Botao>:<Botao c={c} onClick={() => setFormLanc(l)} style={{ padding:"4px 7px" }}>✏️</Botao>)}
               </div>
             </div>
           );

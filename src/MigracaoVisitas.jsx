@@ -1,3 +1,4 @@
+import { checkPin } from "./session";
 // ════════════════════════════════════════════════════════════════════════
 // MigracaoVisitas.jsx — Ferramenta de migração (uso gerencial, pontual)
 // MokLog CheckTest · Moked Consulting Security
@@ -31,7 +32,7 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-const ADMIN_PIN = "872101";
+
 
 // Projetos COM aba CCO (recebem migração). P260B/C ficam de fora.
 const PROJETOS_COM_CCO = [
@@ -198,12 +199,12 @@ export default function MigracaoVisitas({ dark=true, onBack }){
         <div style={{fontSize:11,color:"#f59e0b",marginBottom:18}}>Ferramenta gerencial · uso pontual</div>
         <input type="password" inputMode="numeric" placeholder="PIN gerencial" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setPinErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){ if(pin===ADMIN_PIN) setAuth(true); else setPinErr(true); }}}
+          onKeyDown={async e=>{if(e.key==="Enter"){ if((await checkPin(pin,{adminOnly:true}))) setAuth(true); else setPinErr(true); }}}
           style={{...inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:8}}/>
         {pinErr && <div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
         <div style={{display:"flex",gap:8}}>
           {onBack && <button onClick={onBack} style={{...btnSec,flex:1}}>← Voltar</button>}
-          <button onClick={()=>{ if(pin===ADMIN_PIN) setAuth(true); else setPinErr(true); }} style={{...btn,flex:1}}>Entrar</button>
+          <button onClick={async ()=>{ if((await checkPin(pin,{adminOnly:true}))) setAuth(true); else setPinErr(true); }} style={{...btn,flex:1}}>Entrar</button>
         </div>
       </div>
     </div>

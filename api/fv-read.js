@@ -1,6 +1,6 @@
 // Manager-only reading of the active FV snapshot. Never writes financial data.
 const { getDb } = require('./ai/lib/firebaseAdmin');
-const { pinOk } = require('./fv-apply');
+const { requireAdmin } = require('./ai/lib/accessAuth');
 const PIDS = ['P260A','P260B','P260C','P505','P601','P602','P604','P605','P606','P607'];
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
   let body;
   try { body=typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}; }
   catch { return res.status(400).json({ok:false,erro:'Pedido inválido'}); }
-  if(!pinOk(body.pin,process.env.FV_TRIGGER_PIN_HASH)) return res.status(403).json({ok:false,erro:'PIN inválido'});
+  if(!requireAdmin(req,res)) return;
   if(body.pid && !PIDS.includes(body.pid)) return res.status(400).json({ok:false,erro:'Projeto fora do escopo FV'});
   try {
     const db=getDb();

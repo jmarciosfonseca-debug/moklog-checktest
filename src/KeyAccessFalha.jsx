@@ -1,3 +1,4 @@
+import { checkPin } from "./session";
 // ════════════════════════════════════════════════════════════════════════
 // KeyAccessFalha.jsx — Registro de falhas do sistema KeyAccess
 // MokLog CheckTest · Moked Consulting Security
@@ -29,7 +30,7 @@ const db = getFirestore(fbApp);
 
 import { grantSession, hasGerencial } from "./session";
 
-const ADMIN_PIN = "872101";
+
 const COL = "keyaccess_falhas";
 
 // Brasão Moked (mesmo do Mapa de Equipe) — usado no cabeçalho do PDF.
@@ -561,7 +562,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
 function RelatoriosPinGate({ dark, S, onBack, onSuccess }){
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
-  const tryPin = () => { if(pin==="601604"){grantSession("demo");onSuccess();return;} if(pin===ADMIN_PIN) onSuccess(); else setErr(true); };
+  const tryPin = async () => { const level=await checkPin(pin,{adminOnly:true}); if(level) { onSuccess(level === 'demo' ? 'admin' : level); } else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>

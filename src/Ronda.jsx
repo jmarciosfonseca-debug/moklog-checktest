@@ -1,6 +1,8 @@
+import { checkPin } from "./session";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { setDoc } from './fireGuard';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -14,8 +16,8 @@ const firebaseConfig = {
 const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
-const RONDA_PIN = "16311";
-const RONDA_ADMIN_PIN = "872101";
+
+
 const RONDA_INTERVAL_MIN = 60;
 
 const PROJECTS = {
@@ -628,10 +630,10 @@ export default function RondaApp({onBack}) {
         <div style={{fontSize:12,color:"#475569",marginBottom:20}}>Insira o PIN</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setPinErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(pin===RONDA_PIN||pin===RONDA_ADMIN_PIN){setAuth(true);if(pin===RONDA_ADMIN_PIN)setAdminAuth(true);setScreen("project");}else setPinErr(true);}}}
+          onKeyDown={async e=>{if(e.key==='Enter'){const level=await checkPin(pin,{projectId:project?.id,ronda:true});if(level){setAuth(true);setAdminAuth(level==='admin'||level==='demo');setScreen('project');}else setPinErr(true);}}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {pinErr && <div style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(pin===RONDA_PIN||pin===RONDA_ADMIN_PIN){setAuth(true);if(pin===RONDA_ADMIN_PIN)setAdminAuth(true);setScreen("project");}else setPinErr(true);}}
+        <button onClick={async ()=>{const level=await checkPin(pin,{projectId:project?.id,ronda:true});if(level){setAuth(true);setAdminAuth(level==='admin'||level==='demo');setScreen('project');}else setPinErr(true);}}
           style={{...S.btn,marginBottom:10}}>Entrar</button>
         <button onClick={()=>{setScreen("home");setPin("");}} style={S.btnSec}>← Voltar</button>
       </div>

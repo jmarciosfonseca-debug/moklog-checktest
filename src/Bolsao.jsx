@@ -1,3 +1,4 @@
+import { checkPin } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -17,12 +18,8 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession } from "./session";
 
-const ADMIN_PIN = "872101";
-const PROJECT_PINS = {
-  P601:"16601",P602:"16602",P604:"16604",P605:"16605",
-  P606:"16606",P607:"16607",P311A:"16311",P311B:"16311",
-  P505:"16505",P260A:"162601",P260B:"162602",P260C:"162603"
-};
+
+
 
 // ── Regras do POP — janela de 12h e limiares de status (ajustáveis)
 const JANELA_HORAS = 12;       // mesma placa vista de novo só conta como "+1 dia" se passou desse tempo
@@ -149,12 +146,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   const [mode, setMode] = useState(null);
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
-  const tryPin = () => {
-    if(pin==="601604"){ grantSession("demo"); onSuccess("admin"); return; } // PIN GAL demo
-    if(pin===ADMIN_PIN){ onSuccess("admin"); return; }
-    if(pin===PROJECT_PINS[project.id]){ onSuccess("lider"); return; }
-    setErr(true);
-  };
+  const tryPin = async () => { const level=await checkPin(pin,{projectId:project?.id}); if(level) { onSuccess(level === 'demo' ? 'admin' : level); } else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>

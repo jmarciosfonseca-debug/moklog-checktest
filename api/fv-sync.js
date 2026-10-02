@@ -4,17 +4,11 @@
 // Env (Vercel): GH_DISPATCH_TOKEN, FV_TRIGGER_PIN_HASH (sha256 hex do PIN),
 //               GH_REPO (opcional, padrão jmarciosfonseca-debug/moklog-checktest)
 // ─────────────────────────────────────────────────────────────
-const crypto = require("crypto");
+const {requireAdmin}=require('./ai/lib/accessAuth');
 
 const REPO = process.env.GH_REPO || "jmarciosfonseca-debug/moklog-checktest";
 const INTERVALO_MIN = 15;
 
-function hashIgual(pin, esperado) {
-  if (!pin || !esperado) return false;
-  const h = crypto.createHash("sha256").update(String(pin)).digest("hex");
-  const a = Buffer.from(h), b = Buffer.from(String(esperado).toLowerCase());
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
 
 async function gh(path, opts = {}) {
   const r = await fetch(`https://api.github.com/repos/${REPO}${path}`, {
@@ -26,8 +20,8 @@ async function gh(path, opts = {}) {
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ ok: false, erro: "Método não permitido" });
-  const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-  if (!hashIgual(body.pin, process.env.FV_TRIGGER_PIN_HASH)) return res.status(403).json({ ok: false, erro: "PIN inválido" });
+  res.setHeader('Cache-Control','no-store');
+  if (!requireAdmin(req,res)) return;
   if (!process.env.GH_DISPATCH_TOKEN) return res.status(500).json({ ok: false, erro: "Gatilho não configurado" });
   try {
     const runs = await gh(`/actions/workflows/fv-sync.yml/runs?per_page=5`);

@@ -1,3 +1,4 @@
+import { checkPin } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
@@ -15,10 +16,10 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-const ADMIN_PIN = "872101";
+
 const CONSULTORES = [
-  { nome: "Marcio Fonseca", pin: "872101" },
-  { nome: "Cristian", pin: "872101" }
+  { nome: "Marcio Fonseca" },
+  { nome: "Cristian" }
 ];
 
 function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
@@ -267,10 +268,7 @@ function PinGate({ project, onSuccess, onBack, dark, initialStep, onPinOk }) {
   const [step, setStep] = useState(initialStep||"pin"); // pin | consultor
   const [err, setErr] = useState(false);
 
-  const tryPin = () => {
-    if(pin === "601604" || pin === ADMIN_PIN) { setStep("consultor"); setErr(false); onPinOk?.(); if(pin==="601604") grantSession("demo"); }
-    else { setErr(true); }
-  };
+  const tryPin = async () => { const level=await checkPin(pin,{adminOnly:true}); if(level){setStep('consultor');setErr(false);onPinOk?.();}else setErr(true); };
 
   const confirmConsultor = () => {
     if(!consultor) { setErr(true); return; }

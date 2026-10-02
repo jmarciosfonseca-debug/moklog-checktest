@@ -1,0 +1,9 @@
+node_modules
+build
+.env.local
+.env.*.local
+*.test.cjs
+*.test.js
+**/__tests__/**
+scripts/seed
+scripts/fv-sync

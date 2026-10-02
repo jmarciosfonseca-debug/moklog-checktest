@@ -8,7 +8,7 @@
 //
 // Comportamento:
 //   • Sessão normal (equipe/gerencial) → repassa direto ao Firestore real.
-//   • Sessão demo (PIN GAL 601604)     → NÃO grava nada; simula sucesso.
+//   • Sessão demo validada no servidor → NÃO grava nada; simula sucesso.
 //       - setDoc/updateDoc/deleteDoc → resolvem sem efeito no banco
 //       - addDoc → devolve um ref falso { id: "demo-..." } para a UI seguir
 //

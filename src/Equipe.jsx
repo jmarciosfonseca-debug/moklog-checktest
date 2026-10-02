@@ -1,3 +1,4 @@
+import { checkPin,authFetch,getSession } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
@@ -31,17 +32,18 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-import { getAccess, grantSession, clearSession } from "./session";
+import { getAccess, grantSession, clearSession, isDemo } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
 import { gerarPDFSolicitacoesColaborador, gerarPDFAprovados, gerarPDFCestaNatal } from "./pdfSolicitacoes";
 import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, aplicarAprovacao, contadoresAprovacao, cestaDocId, novoFV, parseValorBR, fmtBRL } from "./equipeAprovacao";
-import { PROJECT_PINS } from "./accessConfig";
 
-const ADMIN_PIN = "872101";
+import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
+import { fvNoEscopo } from "./fvConfig";
+
+
 // Sem limite para desligados — ficam todos para consulta
 
 // PINs de acesso por projeto (líder pode cadastrar + adicionar histórico)
-// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
 
 const CARGOS_PROJETO = {
   P601:  ["VSPP Líder","VSPP Apoio","Vig CCO","CDA","Recepção"],
@@ -138,26 +140,6 @@ function ehLider(c, colaboradores){
 // ── Uniforme e Material Tático ───────────────────────────────────────────
 // Catálogo em cascata por categoria. gravaMarca = pede marca; validade = item
 // com validade (colete balístico, documentos).
-const UNIFORME_CATALOGO = [
-  { cat:"👕 Uniforme", itens:[
-    { nome:"Sapato / Coturno", gravaMarca:true, sugMarca:"Macboot", pedeTamanho:true },
-    { nome:"Calça", gravaMarca:true, pedeTamanho:true },
-    { nome:"Camisa / Camisão", gravaMarca:true, pedeTamanho:true },
-    { nome:"Jaqueta / Terno", gravaMarca:true, pedeTamanho:true },
-    { nome:"Capa de Chuva", pedeTamanho:true },
-    { nome:"Galocha", pedeTamanho:true },
-    { nome:"Boné" },
-  ]},
-  { cat:"🛡️ Material Tático", itens:[
-    { nome:"Cinturão" }, { nome:"Coldre" }, { nome:"Pochete" },
-    { nome:"Capa Balística", validade:true }, { nome:"Porta Jetloader" },
-    { nome:"Porta Carregador" }, { nome:"Porta Algema" }, { nome:"Fone Lapela" },
-    { nome:"Tonfa" }, { nome:"Capacete" },
-  ]},
-  { cat:"📄 Documento", itens:[
-    { nome:"CNV", validade:true }, { nome:"Crachá" },
-  ]},
-];
 const UNIFORME_SLA_ALERTA = 5; // dias em aberto para alertar
 function uniformeDiasAberto(desdeIso){
   if(!desdeIso) return 0;
@@ -978,7 +960,7 @@ function FVCard({ fv, projectLabel, contadores, ano, onSalvar, dark }){
   );
 }
 // Tela de aprovação (individual e em lote) — somente gerencial.
-function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, onBack, dark }){
+function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, onBack, dark, fvControle }){
   const S = getStyles(dark);
   const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
   const [aba, setAba] = useState("aguardando");
@@ -1007,6 +989,7 @@ function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, o
           <button onClick={onBack} style={{ ...S.btnSm, padding:"7px 12px" }}>← Voltar</button>
           <div style={{ fontSize:14, fontWeight:800, color:txt }}>✅ Aprovação de solicitações</div>
         </div>
+        {fvControle}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
           <span style={{ fontSize:11, color:txt2 }}>Ano da solicitação</span>
           <select value={ano} onChange={e=>{ onAno(Number(e.target.value)); setSel([]); }}
@@ -2106,12 +2089,7 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
   const [err, setErr] = useState(false);
   const [mode, setMode] = useState(null); // "lider" | "admin"
 
-  const tryPin = (inputPin) => {
-    if(inputPin === "601604") { grantSession("demo"); onSuccess("admin"); return; } // PIN GAL demo
-    if(inputPin === ADMIN_PIN) { onSuccess("admin"); return; }
-    if(inputPin === PROJECT_PINS[project.id]) { onSuccess("lider"); return; }
-    setErr(true);
-  };
+  const tryPin = async (inputPin) => { const level=await checkPin(inputPin,{projectId:project?.id}); if(level) { onSuccess(level === 'demo' ? 'admin' : level); } else setErr(true); };
 
   return (
     <div style={{ ...S.page, alignItems:"center", justifyContent:"center" }}>
@@ -2234,6 +2212,38 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [anoFiltro, setAnoFiltro] = useState(anoAtual);
   const [filtroRapido, setFiltroRapido] = useState(null); // null | "cesta" | "aprovado" | "aguardando"
   const [fvDoc, setFvDoc] = useState(null);
+  const [fvMsg,setFvMsg]=useState("");
+  const [fvBusy,setFvBusy]=useState(false);
+  useEffect(()=>{setFvMsg("");},[project.id]);
+
+  const sincronizarAprovacoesFV=async(alvos,base=equipeData)=>{
+    if(!adminAuth||!fvNoEscopo(project.id)||isDemo())return;
+    if(getSession()?.nivel!=='gerencial'){setFvMsg("Aprovação mantida. Sessão gerencial expirada; entre novamente para reprocessar FV.");return;}
+    setFvBusy(true);let falhas=0,primeiroErro="";
+    try{
+      for(const alvo of alvos){
+        const colab=(base.colaboradores||[]).find(c=>c.id===alvo.colabId);
+        const solic=(colab?.uniforme?.solicitacoes||[]).find(s=>s.id===alvo.solicId);
+        if(!solic)continue;
+        try{
+          const response=await authFetch("/api/fv-plano",{method:"POST",body:JSON.stringify({pid:project.id,acao:"aprovacaoUniforme",solic:{id:solic.id,colabId:colab.id},decisao:statusAprovacao(solic)})});
+          const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.erro);
+        }catch(e){falhas++;if(!primeiroErro)primeiroErro=e.message||"Servidor de FV indisponível";}
+      }
+      setFvMsg(falhas?`Aprovação mantida. FV não atualizado em ${falhas} solicitação(ões) — tentar novamente. ${primeiroErro}`:"FV atualizado. Aprovações previstas não alteram o saldo real.");
+    }finally{setFvBusy(false);}
+  };
+  const reprocessarFV=async()=>{
+    if(!adminAuth||fvBusy||isDemo())return;
+    const snap=await getDoc(doc(db,"equipes",project.id));const base=snap.exists()?snap.data():equipeData;
+    const alvos=(base.colaboradores||[]).flatMap(c=>(c.uniforme?.solicitacoes||[]).map(s=>({colabId:c.id,solicId:s.id})));
+    await sincronizarAprovacoesFV(alvos,base);
+  };
+  const fvControle=adminAuth&&fvNoEscopo(project.id)&&!isDemo()?<div style={{padding:10,border:"1px solid #0ea5e966",borderRadius:8,fontSize:12}}>
+    <div>Equipe → planejamento FV · saldo oficial não é alterado</div>
+    <button disabled={fvBusy} onClick={()=>reprocessarFV().catch(()=>setFvMsg("FV não atualizado — falha ao reler Equipe. Tente novamente."))}>{fvBusy?"Atualizando FV...":"Reprocessar FV"}</button>
+    <div>{fvMsg||"A sincronização usa a sessão gerencial. Sem preço no catálogo, a aprovação continua válida."}</div>
+  </div>:null;
   const [cestaPorAno, setCestaPorAno] = useState({}); // { [ano]: { [colabId]: registro } }
 
   // FV: equipes/{pid}/fv/atual — leitura independente do documento principal.
@@ -2299,7 +2309,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       const snap = await getDoc(doc(db,"equipes",project.id));
       const base = snap.exists() ? snap.data() : equipeData;
       const { colaboradores, alterados } = aplicarAprovacao(base.colaboradores||[], alvos, decisao);
-      if(!alterados) return;
+      if(!alterados){await sincronizarAprovacoesFV(alvos,base);return;}
       const novo = { ...base, colaboradores };
       // Atualização otimista: o selo muda imediatamente, sem esperar a rede.
       setEquipeData(novo);
@@ -2312,6 +2322,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         setSelColab(prev=> prev ? ((atual?.colaboradores||[]).find(c=>c.id===prev.id) || prev) : prev);
         throw e;
       }
+      await sincronizarAprovacoesFV(alvos,novo);
     } catch(e){
       console.error("Aprovação: erro ao gravar", e);
       alert("Erro ao gravar a aprovação. Verifique a conexão.");
@@ -2684,7 +2695,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   if(screen==="pin") return (
     <PinScreen project={project} dark={dark}
       onBack={onBack}
-      onSuccess={(level)=>{ grantSession(level, project.id); setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
+      onSuccess={(level)=>{ const demo=isDemo(); setAuthLevel(level); setScreen("list"); if(!demo)onAuthGranted?.(level); }}/>
   );
 
   // ── Formulário: cadastro (líder ou admin) / edição (admin only)
@@ -2733,6 +2744,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       colaboradores={equipeData.colaboradores.filter(c=>(c.status||"ativo")==="ativo")}
       ano={anoFiltro} anos={anosDisp} onAno={setAnoFiltro}
       onAprovar={aprovarSolicitacoes}
+      fvControle={fvControle}
       onPDF={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
       onBack={()=>setScreen("list")} dark={dark}/>
   );
@@ -2742,6 +2754,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     const colab = equipeData.colaboradores.find(c=>c.id===selColab.id) || selColab;
     return (
       <>
+      {fvControle}
       <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}
         projectNome={`${project.id} · ${project.name||""}`}
         onSolicitarUniforme={solicitarUniforme}

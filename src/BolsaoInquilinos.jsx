@@ -1,3 +1,4 @@
+import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
 // BolsaoInquilinos.jsx — Checagem de Bolsão (P505), padrão Mega (P311A/B)
 // adaptado para vínculo com INQUILINO em vez de bloqueio de motorista.
@@ -29,8 +30,8 @@ const firebaseConfig = {
 const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-const ADMIN_PIN = "872101";
-const PROJECT_PINS = { P505:"16505" };
+
+
 
 const JANELA_HORAS = 12;   // mesma placa vista de novo só conta +1 dia se passou desse tempo
 const DIAS_ATENCAO = 3;
@@ -214,7 +215,7 @@ function StatusBadge({status}){ const c=STATUS_CFG[status]||STATUS_CFG.normal; r
 function PinGate({ project, onSuccess, onBack, dark }){
   const S = getStyles(dark);
   const [mode,setMode]=useState(null); const [pin,setPin]=useState(""); const [err,setErr]=useState(false);
-  const tryPin=()=>{ if(pin==="601604"){grantSession("demo");onSuccess("admin");return;} if(pin===ADMIN_PIN){onSuccess("admin");return;} if(pin===PROJECT_PINS[project.id]){onSuccess("lider");return;} setErr(true); };
+  const tryPin=async ()=>{ const level=await checkPin(pin,{projectId:project?.id}); if(level) { onSuccess(level === 'demo' ? 'admin' : level); } else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>

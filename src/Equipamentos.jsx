@@ -1,8 +1,9 @@
+import { checkPin } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
-import { PROJECT_PINS } from "./accessConfig";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -18,8 +19,7 @@ const db = getFirestore(fbApp);
 import { getAccess, grantSession, clearSession } from "./session";
 import { daysSince, DiasAberto } from "./pendencias";
 
-const ADMIN_PIN = "872101";
-// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
+
 
 // Projetos com equipamentos especiais
 const TEM_ZTRAX    = ["P311A","P311B"];
@@ -349,12 +349,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
 
-  const tryPin = () => {
-    if(pin==="601604"){ grantSession("demo"); onSuccess("admin"); return; } // PIN GAL demo
-    if(pin===ADMIN_PIN){ onSuccess("admin"); return; }
-    if(pin===PROJECT_PINS[project.id]){ onSuccess("lider"); return; }
-    setErr(true);
-  };
+  const tryPin = async () => { const level=await checkPin(pin,{projectId:project?.id}); if(level) { onSuccess(level === 'demo' ? 'admin' : level); } else setErr(true); };
 
   return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>

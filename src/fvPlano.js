@@ -123,8 +123,13 @@ export function precoCatalogo(catalogo, itemId) {
 }
 export function valorLanc(l, ctx = {}) {
   if (!l) return 0;
+  if (l.vinculo === "aprovacao") {
+    if(l.realizado && typeof l.valorUnit === "number")return r2(l.valorUnit * num(Number(l.qtd)));
+    const item=(ctx.catalogo||[]).find(i=>i.equipeItem===l.item)||(ctx.catalogo||[]).find(i=>i.id===l.itemId);
+    return r2(num(item?.valor) * num(Number(l.qtd)));
+  }
   if (l.vinculo === "cestaNatal") return r2(num(Number(l.valorMedio)) * num(ctx.qtdCestas));
-  if (l.vinculo === "catalogo") return r2(precoCatalogo(ctx.catalogo, l.itemId) * num(Number(l.qtd)));
+  if (l.vinculo === "catalogo") return r2((l.realizado&&typeof l.valorUnit==="number"?l.valorUnit:precoCatalogo(ctx.catalogo, l.itemId)) * num(Number(l.qtd)));
   return r2(num(Number(l.valor)));
 }
 export function efeito(l, ctx = {}) {

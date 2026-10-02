@@ -13,10 +13,10 @@ import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
-import { grantSession, getAccess, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
+import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
-import { PROJECT_PINS } from "./accessConfig";
+
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import { recursosHabilitados } from "./gerenciaisConfig";
 import CCO from "./CCO";
@@ -243,7 +243,6 @@ function generateViewToken(projectId) {
   return Math.random().toString(36).substring(2,10) + Math.random().toString(36).substring(2,10);
 }
 
-// PROJECT_PINS centralizado em accessConfig.js (importado no topo).
 
 const JATINOX_SUBS = {
   P260A: { id:"P260A", name:"Jatinox Unidade A", hasAcesso:true,  hasEquipe:true,  hasCaoGuarda:false },
@@ -251,7 +250,7 @@ const JATINOX_SUBS = {
   P260C: { id:"P260C", name:"Jatinox Unidade C", hasAcesso:false, hasEquipe:true,  hasCaoGuarda:true  },
 };
 
-const ADMIN_PIN = "872101";
+
 const MAX_HISTORY = 26;
 // Sessão de PIN centralizada em src/session.js (expiração por inatividade: gerencial 30min, equipe 5min)
 const INOP_ALERT_WEEKS = 2;
@@ -1368,9 +1367,9 @@ function MaintenanceCat({cat,value,onChange}){
 function ProjectPinGate({project, onSuccess, onBack}) {
   const [pin, setPin] = useState("");
   const [err, setErr] = useState(false);
-  const correct = PROJECT_PINS[project.id];
+  
   // PIN do projeto entra como líder; PIN master (gerencial) entra como admin em qualquer projeto
-  const try_ = () => { const lv = checkPin(pin, { projectPin: correct, projectId: project?.id }); if(lv) onSuccess(lv==="lider"?"lider":lv==="demo"?"demo":"admin"); else setErr(true); };
+  const try_ = async () => { const lv = await checkPin(pin, { projectId: project?.id }); if(lv) onSuccess(lv==="lider"?"lider":lv==="demo"?"demo":"admin"); else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
@@ -1659,10 +1658,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
           onChange={e=>{setPin(e.target.value);setErr(false);}}
-          onKeyDown={e=>{if(e.key==="Enter"){if(checkPin(pin,{})){setAuth(true);resetSess();}else setErr(true);}}}
+          onKeyDown={async e=>{if(e.key==="Enter"){if(await checkPin(pin,{})){setAuth(true);resetSess();}else setErr(true);}}}
           style={{...S.inp,textAlign:"center",fontSize:22,letterSpacing:10,marginBottom:10}}/>
         {err&&<div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
-        <button onClick={()=>{if(checkPin(pin,{})){setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
+        <button onClick={async ()=>{if(await checkPin(pin,{})){setAuth(true);resetSess();}else setErr(true);}} style={{...S.primaryBtn,width:"100%",marginBottom:10,fontSize:14}}>Entrar</button>
         <button onClick={onBack} style={{...S.secBtn,width:"100%",fontSize:14}} aria-label="Voltar">← Voltar</button>
       </div>
     </div>
@@ -2735,7 +2734,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     const border=dark?"#0f172a":"#e2e8f0";
     const txt=dark?"#f1f5f9":"#0f172a";
     const txt2=dark?"#64748b":"#94a3b8";
-    const tentar=()=>{ const r=checkPinAnyProject(entradaPin,PROJECT_PINS); if(r){ setEntradaPin(""); setEntradaErr(false); setLiderNonce(n=>n+1); } else setEntradaErr(true); };
+    const tentar=async ()=>{ const r=await checkPinAnyProject(entradaPin); if(r){ setEntradaPin(""); setEntradaErr(false); setLiderNonce(n=>n+1); } else setEntradaErr(true); };
     return (
       <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
@@ -2788,7 +2787,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
             onChange={e=>{setEquipPinInput(e.target.value);setEquipPinErr(false);}}
-            onKeyDown={e=>{if(e.key==="Enter"){const r=checkPinAnyProject(equipPinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}}
+            onKeyDown={async e=>{if(e.key==="Enter"){const r=await checkPinAnyProject(equipPinInput); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}}
             style={{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${equipPinErr?"#ef4444":border}`,borderRadius:7,color:txt,padding:"12px",fontSize:22,letterSpacing:10,textAlign:"center",boxSizing:"border-box",outline:"none",marginBottom:8}}/>
           {equipPinErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginBottom:8}}>PIN incorreto</div>}
           <div style={{display:"flex",gap:8}}>
@@ -2796,7 +2795,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{flex:1,background:dark?"#060c18":"#f8fafc",color:txt2,border:`1px solid ${border}`,borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer"}} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{const r=checkPinAnyProject(equipPinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}
+            <button onClick={async ()=>{const r=await checkPinAnyProject(equipPinInput); if(r){ if(r.level==="lider"){ setEquipPinInput(""); setLiderNonce(n=>n+1); } else { setEquipPinAuth(true); } } else setEquipPinErr(true);}}
               style={{flex:1,background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
               Entrar
             </button>
@@ -2821,7 +2820,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
             onChange={e=>{ setPinInput(e.target.value); setPinErr(false); }}
-            onKeyDown={e=>{ if(e.key==="Enter"){ const r=checkPinAnyProject(pinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); } }}
+            onKeyDown={async e=>{ if(e.key==="Enter"){ const r=await checkPinAnyProject(pinInput); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); } }}
             style={{ width:"100%", background:dark?"#020510":"#fff", border:`1px solid ${pinErr?"#ef4444":border}`, borderRadius:7, color:txt, padding:"12px", fontSize:22, letterSpacing:10, textAlign:"center", boxSizing:"border-box", outline:"none", marginBottom:8 }}/>
           {pinErr && <div role="alert" style={{ fontSize:12, color:"#ef4444", marginBottom:8 }}>PIN incorreto</div>}
           <div style={{ display:"flex", gap:8 }}>
@@ -2829,7 +2828,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ flex:1, background:dark?"#060c18":"#f8fafc", color:txt2, border:`1px solid ${border}`, borderRadius:10, padding:"12px", fontSize:13, fontWeight:600, cursor:"pointer" }} aria-label="Voltar">
               ← Voltar
             </button>
-            <button onClick={()=>{ const r=checkPinAnyProject(pinInput,PROJECT_PINS); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); }}
+            <button onClick={async ()=>{ const r=await checkPinAnyProject(pinInput); if(r){ if(r.level==="lider"){ setPinInput(""); setLiderNonce(n=>n+1); } else { setPinAuth(true); } } else setPinErr(true); }}
               style={{ flex:1, background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", border:"none", borderRadius:10, padding:"12px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
               Entrar
             </button>
@@ -3302,6 +3301,7 @@ function DemoBanner(){
 
 export default function App(){
   const [screen,setScreen]=useState("home");
+  const [,setSessionRevision]=useState(0);
   // ── Auth anônimo: acompanha se o crachá já chegou. NÃO bloqueia a UI
   // (failsafe): se demorar/falhar, o app segue — a regra ainda é `if true`.
   const [authReady,setAuthReady]=useState(false);
@@ -3413,11 +3413,16 @@ export default function App(){
   const [syncStatus,setSyncStatus]=useState("");
   const [loaded,setLoaded]=useState(false);
   const [projectAuth,setProjectAuth]=useState({});
-  useEffect(()=>{ // sessão global: qualquer toque/clique renova a atividade (throttle em session.js)
+  useEffect(()=>{ // Expiração absoluta: desmonta telas protegidas e limpa autorização local.
     const renew=()=>touchSession();
+    const changed=()=>{setSessionRevision(n=>n+1);if(!getSession()){setProjectAuth({});setScreen('home');}};
+    const error=e=>window.alert(e.detail||'Acesso indisponível.');
+    window.addEventListener('moklog-auth-changed',changed);
+    window.addEventListener('moklog-auth-error',error);
+    const timer=setInterval(renew,1000);
     window.addEventListener("click",renew,{passive:true});
     window.addEventListener("touchstart",renew,{passive:true});
-    return ()=>{window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);};
+    return ()=>{clearInterval(timer);window.removeEventListener('moklog-auth-changed',changed);window.removeEventListener('moklog-auth-error',error);window.removeEventListener("click",renew);window.removeEventListener("touchstart",renew);};
   },[]);
   const [sigError,setSigError]=useState(false);
   const [showConfirmModal,setShowConfirmModal]=useState(false);
@@ -4032,7 +4037,7 @@ export default function App(){
       <GestaoFV
         dark={dark}
         onBack={() => setScreen("dashboard")}
-        validarPin={(pin) => checkPin(pin) === "admin"}
+        validarPin={async (pin) => await checkPin(pin) === "admin"}
       />
     </ErrorBoundary>
   );

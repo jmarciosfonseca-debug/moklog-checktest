@@ -1,12 +1,8 @@
 // Backend only: apply the prepared Excel snapshot after managerial confirmation.
 const crypto = require('crypto');
 const { getDb } = require('./ai/lib/firebaseAdmin');
+const {requireAdmin}=require('./ai/lib/accessAuth');
 const PIDS = ['P260A','P260B','P260C','P505','P601','P602','P604','P605','P606','P607'];
-function pinOk(pin, expected) {
-  if (typeof pin !== 'string' || !/^[a-f0-9]{64}$/i.test(expected || '')) return false;
-  const actual = crypto.createHash('sha256').update(pin).digest();
-  return crypto.timingSafeEqual(actual, Buffer.from(expected, 'hex'));
-}
 function validate(pid, data) {
   if (!PIDS.includes(pid) || data?.resumo?.pid !== pid || !Number.isFinite(data.resumo.saldoAtual) || !Array.isArray(data.lancamentos) || data.lancamentos.length > 450) throw new Error('Lote inválido');
   const ids = new Set(); let sum = 0;
@@ -23,7 +19,7 @@ async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ok:false,erro:'Método não permitido'});
   let body;
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}; } catch { return res.status(400).json({ok:false,erro:'Pedido inválido'}); }
-  if (!pinOk(body.pin, process.env.FV_TRIGGER_PIN_HASH)) return res.status(403).json({ok:false,erro:'PIN inválido'});
+  if (!requireAdmin(req,res)) return;
   let db, lock, nonce;
   try {
     db = getDb(); const pointer = await db.collection('fv_sync').doc('importacao').get();
@@ -68,5 +64,4 @@ async function handler(req, res) {
   }
 }
 module.exports = handler;
-module.exports.pinOk = pinOk;
 module.exports.validate = validate;
