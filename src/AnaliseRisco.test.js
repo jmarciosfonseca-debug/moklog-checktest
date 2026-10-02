@@ -66,6 +66,29 @@ test("mapa territorial usa encaixe horizontal compacto sem perder proporção", 
   expect(html).toContain("object-fit:contain");
 });
 
+test.each(Object.keys(MAPA_REGIONAL))("relatório %s distingue planta e entorno e oferece localização", (pid) => {
+  const dados = contexto([vetor(1)]);
+  dados.project = { id: pid, name: pid };
+  dados.regional = { ok: true, temDado: true, ...REGIONAL[pid] };
+  const html = gerarHTMLAnaliseRisco(dados, "data:image/jpeg;base64,AA==");
+  expect(html).toContain("planta operacional de referência");
+  expect(html).toContain("Abrir localização no Google Maps");
+  expect(html).toContain("Coordenadas.");
+  expect(html).not.toContain("Mapa tático do entorno");
+  if (["P311A", "P311B", "P505"].includes(pid)) {
+    expect(html).toContain("Leitura territorial — observação, consequência e verificação");
+    expect(html).toContain("Consequência possível.");
+    expect(html).toContain("GRAU NÃO AFERIDO");
+    expect(html).toContain("Verificação operacional.");
+  }
+  if (pid === "P505") {
+    expect(html).toContain("Guarulhos / SP");
+    expect(html).toContain("graus do entorno não aferidos");
+    expect(html).not.toContain("Paes de Barros");
+    expect(html).not.toContain("Zona Leste");
+  }
+});
+
 test("matriz entra depois da memória de cálculo e antes do territorial", () => {
   const html = gerarHTMLAnaliseRisco(contexto([
     { ...vetor(1), inop: 1, total: 4 },

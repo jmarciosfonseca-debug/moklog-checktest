@@ -111,3 +111,32 @@ test("contextos qualitativos novos permanecem neutros na régua", () => {
     });
   });
 });
+
+test("P505 usa o local confirmado sem herdar os vetores do endereço antigo", () => {
+  expect(REGIONAL.P505.municipioUF).toBe("Guarulhos / SP");
+  expect(REGIONAL.P505.marcoZero).toContain("Indubel, 940");
+  expect(REGIONAL.P505.mapsUrl).toBe("https://maps.app.goo.gl/sZjhSZwo8Zzy1erVA");
+  expect(REGIONAL.P505.coordenadas).toBe("-23.4420114, -46.4476851");
+  expect(REGIONAL.P505.quadrantes).toEqual([]);
+  expect(REGIONAL.P505.fontes.every((f) => /Guarulhos/.test(f.escopo))).toBe(true);
+});
+
+test("P311A preserva nome comercial mas corrige município cadastral", () => {
+  expect(REGIONAL.P311A.ativo).toContain("Mega Curitiba");
+  expect(REGIONAL.P311A.municipioUF).toBe("Campina Grande do Sul / PR");
+  expect(REGIONAL.P311A.fontes[0].escopo).toBe("Campina Grande do Sul");
+});
+
+test.each(["P311A", "P311B", "P505"])("%s possui leitura visual rastreável sem grau inventado", (pid) => {
+  const r = REGIONAL[pid];
+  expect(r.leituraTerritorial.base).toContain("Marcio");
+  expect(r.leituraTerritorial.setores).toHaveLength(3);
+  r.leituraTerritorial.setores.forEach((s) => {
+    expect(s.observacao).toBeTruthy();
+    expect(s.implicacao).toMatch(/\bpode(m)?\b/);
+    expect(s.acao).toBeTruthy();
+    expect(s).not.toHaveProperty("grau");
+  });
+  expect(r.quadrantes).toEqual([]);
+  expect(r.aplicarModulador).toBe(false);
+});

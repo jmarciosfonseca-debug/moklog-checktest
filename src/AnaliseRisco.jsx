@@ -15,7 +15,7 @@
 //   7. Equipe                       → equipes/{pid} (colaboradores[])
 //
 // Navegação: pacote (Golgi/Mega/Klog) → projeto → seleção de fontes → PDF.
-// Acesso: gerencial (872101) e demo (601604). Renderizado atrás do gate no App.
+// Acesso: sessão gerencial ou demonstração, validada pelo servidor.
 //
 // Régua (definida com o Marcio, 24/07/2026):
 //   Dias em aberto: >90 CRÍTICO · 30–90 ELEVADO · 10–29 MODERADO · <10 BAIXO
@@ -32,6 +32,7 @@ import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { classificarVetor, consolidarSite, classificarRiscoOperacional, normalizarFracao, avaliarIluminacao, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
 import { coletarRegional, moduladorRegional } from "./regionalConfig";
+import { gerarMapaCriticidadeHTML, gerarLeituraTerritorialHTML } from "./MapaCriticidade";
 import { gerarImpactosOperacionais } from "./riscoImpactoConfig";
 
 const firebaseConfig = {
@@ -1319,23 +1320,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   // Campos reais do regionalConfig: quadrantes[{lado,regiao,grau,vetores[{desc}]}], protecao[].
   let territHTML = "";
   if (regional?.ok && (regional.quadrantes?.length || regional.temDado)) {
-    const acentuaGrau = (g) => {
-      const G = (g || "").toString().toUpperCase();
-      return G === "GRAVISSIMO" ? "GRAVÍSSIMO" : G === "CRITICO" ? "CRÍTICO" : G;
-    };
     const quads = (regional.quadrantes || []);
-    const qCardHTML = quads.map((q) => {
-      const grau = acentuaGrau(q.grau);
-      const norteSul = /norte/i.test(q.lado || "") ? "norte" : "sul";
-      const lista = (q.vetores || []).map((v) => `<li>${esc(v.desc || v.natureza || "")}</li>`).join("")
-        || `<li>Vetores de risco documentados na região.</li>`;
-      const reg = q.regiao ? `<div class="qsub">${esc(q.regiao)}</div>` : "";
-      return `<div class="qcard ${norteSul}">
-        <div class="qh"><span class="qn">${esc(q.lado || "Quadrante")}</span><span class="qg">${esc(grau)}</span></div>
-        ${reg}
-        <ul>${lista}</ul>
-      </div>`;
-    }).join("");
+    const qCardHTML = gerarMapaCriticidadeHTML(regional);
     // Fatores protetivos (pronta-resposta) — números reais.
     const prot = (regional.protecao || []).filter((p) => p.tipo === "pm" || p.tipo === "hospital");
     const protHTML = prot.length
@@ -1347,14 +1333,12 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
           return `<div class="pit"><b>${esc(p.orgao)}</b><span>${medidas.join(" · ") || "distância e tempo não aferidos"}</span></div>`;
         }).join("")}</div></div>`
       : "";
-    const cap = `Figura — Marco Zero do ${esc(project.id)} sobre a região do projeto.${regional.codigo ? " Diagnóstico " + esc(regional.codigo) + (regional.versao ? ", versão " + esc(regional.versao) + "." : ".") : ""}`;
+    const cap = `Figura — planta operacional de referência do ${esc(project.id)}. Não representa mapa geográfico ou medição de criticidade do entorno.${regional.codigo ? " Diagnóstico " + esc(regional.codigo) + (regional.versao ? ", versão " + esc(regional.versao) + "." : ".") : ""}`;
     const qtdQuadrantes = quads.length;
     const textoQuadrantes = qtdQuadrantes === 1 ? "um quadrante limítrofe" : `${qtdQuadrantes} quadrantes limítrofes`;
-    const temFontesRegistradas = Array.isArray(regional.fontes) && regional.fontes.length > 0;
-    const qualificacaoFonte = temFontesRegistradas
-      ? "documentados no levantamento e vinculados às fontes registradas"
-      : "documentados no levantamento territorial";
-    const parecerImg = `O projeto localiza-se ${regional.municipioUF ? "em <b>" + esc(regional.municipioUF) + "</b>, " : ""}numa região cujo entorno concentra fatores de risco <b>${qualificacaoFonte}</b>. O diagnóstico distingue ${textoQuadrantes} de gravidade distinta, detalhados abaixo.`;
+    const parecerImg = `Localização cadastral: <b>${esc(regional.municipioUF || "não aferida")}</b>. ${qtdQuadrantes ? `O levantamento qualitativo registra ${textoQuadrantes}, detalhados abaixo. As páginas oficiais relacionadas são referências de consulta; não comprovam, por si só, cada vetor local.` : "O levantamento de quadrantes e graus do entorno está pendente para este endereço."}`;
+    const mapsUrl = regional.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(regional.marcoZero || regional.municipioUF || project.id)}`;
+    const localizacaoHTML = `<p><b>Marco zero.</b> ${esc(regional.marcoZero || "não aferido")}<br><b>Coordenadas.</b> ${esc(regional.coordenadas || "não aferidas")}<br><a href="${escAttr(mapsUrl)}" target="_blank" rel="noopener noreferrer">Abrir localização no Google Maps${regional.mapsUrl ? "" : " (busca cadastral; não é ponto aferido)"}</a>${regional.localizacaoNota ? `<br>${esc(regional.localizacaoNota)}` : ""}${regional.localizacaoFonte ? `<br><a href="${escAttr(regional.localizacaoFonte)}" target="_blank" rel="noopener noreferrer">Fonte da localização</a>` : ""}</p>`;
     // Fontes oficiais — derivadas das UFs presentes no diagnóstico (genérico p/ qualquer projeto).
     const ufs = new Set();
     (regional.protecao || []).forEach((p) => { if (p.uf) ufs.add(p.uf); });
@@ -1385,8 +1369,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
         </div>`
       : "";
     const mapaHTML = mapaDataUrl
-      ? `<img class="mapa" src="${mapaDataUrl}" alt="Mapa tático do entorno do ${esc(project.id)}">`
-      : `<div class="terr-pend"><div class="tp-ico">🛈</div><div class="tp-txt"><b>Mapa territorial indisponível.</b> ${esc(erroMapa || "O ativo não pôde ser carregado nesta geração.")}</div></div>`;
+      ? `<img class="mapa" src="${mapaDataUrl}" alt="Planta operacional de referência do ${esc(project.id)}">`
+      : `<div class="terr-pend"><div class="tp-ico">🛈</div><div class="tp-txt"><b>Planta operacional indisponível.</b> ${esc(erroMapa || "O ativo não pôde ser carregado nesta geração.")}</div></div>`;
     territHTML = `
     <div class="bloco bloco-territorial">
       <div class="eyebrow">Diagnóstico territorial — por que a falha importa aqui</div>
@@ -1395,15 +1379,19 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
         <div class="territorial-texto">
           <div class="mapa-cap">${cap}</div>
           <div class="mapa-parecer">${parecerImg}</div>
+          ${localizacaoHTML}
         </div>
       </div>
       ${auditoriaHTML}
-      <div class="quad">${qCardHTML}</div>
+      ${gerarLeituraTerritorialHTML(regional)}
+      ${qCardHTML}
       ${protHTML}
       ${indicadoresHTML}
-      <div class="fontes"><div class="fh">Fontes oficiais · auditável</div>${fontesTerr}</div>
+      <div class="fontes"><div class="fh">Fontes e referências de consulta · recorte e limitações registrados</div>${fontesTerr}</div>
       <div class="parecer-t">${
-        nBloq >= 1
+        !quads.length
+          ? "A leitura territorial indica verificações contextuais, não ameaças comprovadas. As prioridades e a classificação permanecem baseadas nas falhas operacionais apuradas e na régua vigente."
+          : nBloq >= 1
           ? "O perímetro existe para conter os vetores identificados neste território. Quando está inoperante, esses vetores podem encontrar menor resistência eletrônica, elevando a prioridade de restabelecimento."
           : "As barreiras eletrônicas ajudam a conter os vetores identificados neste território. Mantê-las plenamente operantes pode reduzir a exposição do ativo."
       }</div>
