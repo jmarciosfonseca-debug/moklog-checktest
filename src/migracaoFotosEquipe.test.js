@@ -80,7 +80,7 @@ describe("Bolsão (RISCO 5)",()=>{
     expect(r).toMatchObject({removidas:2,preservadas:2});expect(r.doc.checagens[1].fotos).toEqual([JPG(900)]);expect(r.doc.checagens[2].fotos).toEqual([JPG(901)]);
   });
 });
-test("Bolsão: captura de fotos desligada por constante; bloco íntegro",()=>{
+test("Bolsão: captura de fotos preservada, fora do escopo desta publicação",()=>{
   const b=require("fs").readFileSync("src/BolsaoInquilinos.jsx","utf8");
-  expect(b).toContain("const PERMITE_FOTOS = false;");expect(b).toMatch(/\{PERMITE_FOTOS && \(<div style=\{S\.card\}>/);
+  expect(b).not.toContain("PERMITE_FOTOS");expect(b).toContain("Fotos do local (opcional, até 3)");
 });

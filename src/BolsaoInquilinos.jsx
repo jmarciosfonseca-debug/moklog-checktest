@@ -82,9 +82,6 @@ async function saveDados(projectId, data){
   try { localStorage.setItem(`bolsao_inq_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 
-// Decisão do Marcio (03/10/2026): fotos do Bolsão são desnecessárias e pesam o documento (P505 estava no limite de 1 MiB).
-// Para voltar a permitir, troque para true. Fotos já gravadas continuam aparecendo até serem removidas pelo script de limpeza.
-const PERMITE_FOTOS = false;
 function comprimirFoto(file){
   return new Promise((resolve)=>{
     try {
@@ -387,7 +384,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
         })}
         <button onClick={addItem} style={{...S.btnSec,fontSize:13}}>➕ Adicionar outro inquilino/placa</button>
 
-        {PERMITE_FOTOS && (<div style={S.card}>
+        <div style={S.card}>
           <label style={S.lbl}>Fotos do local (opcional, até 3)</label>
           <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
             {fotos.map((f,i)=>(
@@ -409,7 +406,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
               </>
             )}
           </div>
-        </div>)}
+        </div>
 
         {erro && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{erro}</div>}
         <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
