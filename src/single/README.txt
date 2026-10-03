@@ -27,3 +27,18 @@ Semente provisória não deve ser gravada sem aprovação da tabela.
 Backups devem incluir catalogo_ativos e single_projetos/**; diagnóstico continuará
 em diagnosticos/{singleId}/itens.
 Não publicar regras, seeds ou dados de teste no banco real.
+
+Revisão de integridade sobre main 917b54e (03/10/2026):
+- Vistorias devem enviar todas as famílias de total positivo; omissões retornam 400.
+- Rascunho compara revisão do projeto e da vistoria ao reabrir; cópia de conflito
+  deve ser gravada com sucesso antes de substituir o rascunho local.
+- Comparação usa somente a última vistoria concluída de data anterior.
+- Datas/variações em pt-BR e tabela/rodapé de impressão ajustados.
+- 246 testes / 33 suítes e build local aprovados; consultas de diagnóstico cobertas.
+- Login individual + banco reais e Safari/iOS NÃO validados nesta revisão.
+- Regras publicadas não foram alteradas nem inspecionadas nesta revisão. A API usa
+  Admin SDK (não depende de liberar as coleções ao navegador); perfil e propriedade
+  são verificados no servidor. Não confundir isso com aceite real E1-E12.
+- Pendentes: aprovação do catálogo, reabertura auditável de concluídas, desarquivar,
+  paginação das listagens e teste de backup/restauração remoto. Incluir no backup
+  catalogo_ativos, single_projetos/** e diagnosticos/sg_*/itens/**.

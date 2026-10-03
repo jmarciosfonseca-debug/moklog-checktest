@@ -62,6 +62,7 @@ async function executar(db,u,b){
    const supplied=lista(b.data?.itens);
    const keyed=new Map(supplied.map(x=>[id(x.id),x]));
    if(keyed.size!==supplied.length||supplied.some(x=>!template.some(t=>t.id===x.id)))throw erro(400,"Família fora do cenário.");
+   if(template.some(t=>inteiro(t.total)>0&&!keyed.has(t.id)))throw erro(400,"Vistoria incompleta: envie todas as famílias do cenário.");
    const itens=template.map(a=>{
     const s=keyed.get(a.id)||{};
     return {...a,parcial:inteiro(s.parcial),inoperante:inteiro(s.inoperante),falhas:lista(s.falhas||[]).map(f=>{
