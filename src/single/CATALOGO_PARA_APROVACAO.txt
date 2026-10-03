@@ -1,0 +1,196 @@
+CATÁLOGO SINGLE — PROVISÓRIO PARA APROVAÇÃO
+137 nomes distintos (sem prefixo numérico), 27 famílias, 0 sem destino.
+Não gravado no Firestore. Nomes de origem abaixo são os rótulos reais do código.
+
+Torniquetes e catracas
+  - 22 - TORNIQUETES (ESTRUTURA MECÂNICA)
+  - 24 - TORNIQUETES
+  - 25 - TORNIQUETES / QR CODE
+
+Leitores QR e faciais
+  - 09 - LEITORAS QR ECLUSAS
+  - 09 - LEITORES QR (BAIA)
+  - 09 - LEITORES QR CODE
+  - 10 - LEITORAS QR TORNIQUETES
+  - 10 - LEITORES QR (TORNIQUETES)
+  - 12 - LEITORES DE QR CODE
+  - 13 - LEITORES FACIAIS — VIAS VEICULARES (SUBSOLO)
+  - 13 - LEITORES QR CANCELAS
+  - 13 - QR ECLUSAS
+  - 14 - QR TORNIQUETES
+  - 15 - SISTEMA KEYACCESS
+  - 23 - LEITORES FACIAIS DOS TORNIQUETES
+
+Totens e tablets
+  - 16 - TOTEM ATM
+  - 16 - TOTENS NAS CANCELAS
+  - 19 - TABLETS KEYACCESS
+  - 19 - TOTENS KEYACCESS
+  - 20 - TOTENS
+  - 20 - TOTENS DE AUTOATENDIMENTO
+  - 24 - TOTENS VISITANTES/MOTORISTAS
+  - 25 - TOTEM MOTORISTA
+  - 26 - TOTENS AUTO ATENDIMENTO (PEDESTRES)
+  - 27 - TOTEM VISITANTES
+  - 27 - TOTENS CONTROLE VEICULAR
+
+Eclusas (portas, garras, giroflex, eletroímãs)
+  - 03 - Eclusa CCO (Abertura)
+  - 05 - CCO / CONTROLE DE ACESSO
+  - 06 - ECLUSA CCO (ABERTURA)
+  - 06 - GARRAS (ECLUSAS)
+  - 07 - ECLUSA CCO (PORTAS/ABERTURA)
+  - 08 - ELETROÍMÃS DA ECLUSA CCO
+  - 09 - GIROFLEX ECLUSAS
+  - 11 - GIROFLEX DAS ECLUSAS
+
+Cancelas de alta segurança
+  - 05 - CANCELAS AS (ALTA SEGURANÇA)
+
+Cancelas (administrativas e de acesso)
+  - 04 - CANCELA
+  - 04 - CANCELAS ADM (ADMINISTRATIVAS)
+  - 05 - CANCELAS DE ACESSO
+  - 05 - CANCELAS, HASTES E MECANISMOS
+
+Dilaceradores / garra de tigre
+  - 08 - DILACERADORES
+  - 10 - GARRA DE TIGRE (DILACERADORES)
+
+Bollards e pinos
+  - 04 - BOLLARDS / PINOS
+  - 20 - PINOS BOLLARDS
+
+Portões, motores e botoeiras
+  - 03 - BOTOEIRAS / PORTÕES DE ACESSO
+  - 03 - BOTOEIRAS DO DILACERADOR
+  - 04 - Portão Eclusa P3
+  - 05 - BOTOEIRAS PORTÕES
+  - 12 - PORTÕES ECLUSA
+  - 13 - PORTÕES
+  - 14 - MOTORES DOS PORTÕES
+  - 15 - PORTÕES BALANÇA HUBLOG
+  - 16 - PORTÕES PORTARIA
+  - 18 - PORTÕES (FOLHAS)
+  - 18 - SENSORES DOS PORTÕES
+  - 19 - MOTORES DE PORTÕES
+
+Sensores anti-esmagamento
+  - 03 - ANTI-ESMAGAMENTO
+  - 20 - SENSORES ANTI-ESMAGAMENTO
+
+Sinalização (semáforos, pictogramas, faróis, sirenes)
+  - 07 - Campainhas
+  - 09 - FARÓIS/LED DAS CANCELAS
+  - 11 - Sirenes c/ Iluminação
+  - 18 - PICTOGRAMA REVERSIVO
+  - 19 - PICTOGRAMAS / FARÓIS
+  - 21 - SEMÁFOROS (BAIA)
+  - 22 - SEMÁFOROS
+  - 22 - SEMÁFOROS / LÂMPADAS PILOTO
+
+Câmeras CFTV (fixas e speed dome)
+  - 06 - CFTV
+  - 06 - CFTV FIXAS
+  - 06 - Imagens CFTV
+  - 06B - CFTV SPEED DOME
+  - 09 - Câmeras Sistema Sala
+
+Monitores e televisores
+  - 11 - MONITOR CCO CDA (CONTROLE DE ACESSO)
+  - 12 - MONITOR CCO CFTV
+  - 12 - MONITOR KEYACCESS
+  - 15 - MONITORES CONTROLE DE ACESSO PORTARIA
+  - 16 - MONITOR CONTROLE DE ACESSO CCO
+  - 17 - MONITORES CFTV CCO (MURAL/TELAS)
+  - 17 - MONITORES RECEPÇÃO
+  - 18 - TELEVISORES
+
+Joystick e mesa controladora
+  - 08 - JOYSTICK
+  - 08 - JOYSTICK CFTV
+  - 11 - MESA CONTROLADORA
+  - 11 - MESA CONTROLE / BOTOEIRAS CCO
+  - 12 - JOYSTICK DIGIFORT
+  - 12 - MESA CONTROLADORA / BOTOEIRA
+  - 12 - MESA CONTROLE / BOTOEIRAS RECEPÇÃO
+  - 13 - MESA JOYSTICK
+  - 14 - MESA CONTROLADORA (CCO 32 BOTÕES)
+
+Computadores e CPU
+  - 07 - COMPUTADORES / CCO
+
+Nobreaks
+  - 15 - NOBREAK
+  - 16 - NOBREAKS
+  - 18 - NOBREAK CCO
+
+Alarme perimetral (zonas)
+  - 01 - ALARME PERIMETRAL
+
+Cerca elétrica e Alpha Sense
+  - 01 - ALARME CERCA ELÉTRICA
+  - 01B - ALARME ALPHA SENSE
+  - 02 - Cerca Elétrica
+
+Alarme de incêndio / SDAI
+  - 01 - ALARME DE INCÊNDIO
+  - 01 - ALARME DE INCÊNDIO (REPETIDORAS)
+  - 02 - ALARME SDAI
+  - 02 - ALARME SDAI PORTARIA
+  - 14 - SDAI (INCÊNDIO)
+
+Alarme patrimonial (Paradox)
+  - 19 - PARADOX
+
+Botão de pânico (fixo e móvel)
+  - 01 - Botões de Pânico Fixos
+  - 01B - Pânico Mõveis
+  - 04 - PÂNICO FIXO
+  - 04B - PÂNICO MÓVEL
+
+Recebimento de alertas externos
+  - 17 - RECEBIMENTO DE ALERTAS EXTERNOS
+
+Telefonia
+  - 05 - Telefonia
+  - 17 - TELEFONE FIXO CCO
+  - 21 - TELEFONE FIXO CCO E PORTARIA
+  - 23 - TELEFONE
+  - 23 - TELEFONES
+  - 24 - TELEFONE CCO
+
+Interfonia e vídeo porteiro
+  - 07 - INTERFONE / INTERCOMUNICADOR
+  - 07 - INTERFONES
+  - 10 - INTERCOMUNICADORES
+  - 11 - INTERCOMUNICADORES DE TOTEM
+  - 21 - VÍDEO PORTEIRO
+
+Internet / link de dados
+  - 11 - INTERNET
+  - 12 - INTERNET (LINK DE DADOS)
+
+Ar-condicionado
+  - 03 - AR-CONDICIONADO
+  - 04 - AR-CONDICIONADO CCO
+
+Cofres
+  - 07 - COFRES
+
+Fora da v1
+  - 04 - CCO (EQUIPAMENTOS)
+  - 07 - GUARITA / RECEPÇÃO
+  - 08 - Sala de CFTV CCO
+  - 10 - MATERIAIS OPERACIONAIS
+  - 10 - Recepção P3
+  - 11 - PORTARIA
+  - 12 - Visita de Manutenção
+  - 13 - Infraestrutura / Obs.
+  - 13 - MONITOR PORTARIA
+  - 25 - VISITA DE MANUTENÇÃO
+  - 26 - INFRAESTRUTURA / OBS.
+  - LEGADO (HISTÓRICO) — INTERCOMUNICADORES
+  - LEGADO (HISTÓRICO) — LEITORES FACIAIS ECLUSAS/CANCELAS
+  - LEGADO (HISTÓRICO) — MONITOR PORTARIA
+  - LEGADO (HISTÓRICO) — PORTÕES / ANTI-ESMAGAMENTO

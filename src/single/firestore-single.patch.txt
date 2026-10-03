@@ -1,0 +1,12 @@
+PROPOSTA SOMENTE — NÃO PUBLICADA.
+API Single usa Admin SDK e verifica Firebase Auth/usuarios/escopo/revisão no servidor.
+Não abrir gravação direta: isso permitiria contornar a proteção de concorrência.
+As coleções novas continuam bloqueadas por padrão nas regras atuais.
+Blocos explícitos possíveis:
+match /catalogo_ativos/{id} { allow read, write: if false; }
+match /single_projetos/{id}/{rest=**} { allow read, write: if false; }
+
+Diagnóstico legado exige chave novo_<uid>_*.
+O vínculo sg_* requer desenho de rota autenticada equivalente ou patch de regra
+com checagem de proprietário/permissão do Single. NÃO liberar por prefixo apenas.
+Preservar todas as regras e dados legados nesta etapa.

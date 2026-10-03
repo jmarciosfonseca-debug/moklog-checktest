@@ -1,0 +1,37 @@
+RETORNO SINGLE — ETAPA 1, 03/10/2026
+
+Construção iniciada em feat/single, worktree moklog-single, base origin/main bbf3c0a.
+Somente arquivos novos src/single/** e a API exclusiva autorizada api/single.js.
+
+Implementado:
+- catálogo provisório de 27 famílias; cobertura real 137/137, zero sem destino;
+- tabela em CATALOGO_PARA_APROVACAO.txt, não gravada no banco;
+- cálculo único para operantes, disponibilidade, pendências e variação;
+- API autenticada por Firebase Auth/usuarios, com transações e controle de revisão;
+- perfis revogados/inativos/anônimos bloqueados; projeto próprio ou gerente scopeAll;
+- validação dos dados, uma gravação por transação, conflito HTTP 409;
+- snapshots de nome/quantidade preservados nas inspeções existentes;
+- cliente de persistência bloqueia demonstração;
+- proposta de regras documentada, não publicada.
+
+Validação:
+Build local aprovado (primeira tentativa: permissão de cache; segunda: sucesso).
+Suíte completa: 205 testes/26 suítes passaram em 20,54 s.
+Depois foram acrescentados 3 testes de endpoint: suite Single 17/17, 5 suítes, 3,738 s.
+Equivalente a 191 anteriores + 17 novos; não foi repetida a suíte completa após
+a adição desses três testes, apenas a suíte Single.
+Sintaxe dos dois arquivos de servidor validada com node --check.
+Nenhum teste acessou Firestore real; nenhuma regra/variável/credencial foi alterada.
+
+Ainda não concluído:
+Etapa 2: telas, catálogo editável e rascunho local; vínculo Diagnóstico sg_* via API.
+Etapa 3: PDF HTML/impressão.
+Etapa 4: adaptador de risco não conectado.
+Prévia e aceite visual ainda não realizados. Não há URL de prévia Single.
+Não apresentar como funcionalidade disponível no aplicativo.
+
+Limitações:
+API rejeita conflito em vez de fazer merge automático: interface precisa preservar
+rascunho e oferecer recarga/reconciliação sem substituir silenciosamente o local.
+Listagens limitadas a 200: paginação pendente para expansão.
+Semente depende de aprovação antes de gravação.
