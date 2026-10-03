@@ -1,4 +1,4 @@
-import { checkPin,authFetch,getSession } from "./session";
+import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, where } from "firebase/firestore";
@@ -230,7 +230,7 @@ async function loadEquipe(projectId) {
 async function saveEquipe(projectId, data, before) {
   if(isDemo())return data;
   if(!before)throw Error("Base da edição ausente. Reabra a tela.");
-  const response=await authFetch("/api/equipe-save",{method:"POST",body:JSON.stringify({pid:projectId,before,after:data})});
+  const response=await authFetchEquipe("/api/equipe-save",{method:"POST",body:JSON.stringify({pid:projectId,before,after:data})});
   const result=await response.json();
   if(!response.ok||!result.ok)throw Error(result.erro||"Não foi possível salvar.");
   try{localStorage.setItem(`equipe_${projectId}`,JSON.stringify(result.data));}catch{}

@@ -27,3 +27,6 @@ export async function checkPin(value,opts={}){
 export async function checkPinAnyProject(value){const level=await checkPin(value,{anyProject:true});return level?{level,projectId:getSession()?.projectId||null}:null;}
 export function authHeaders(){const s=getSession();if(!s||s.nivel!=='gerencial')throw Error('Sessão gerencial ausente ou expirada. Entre novamente.');return {'Content-Type':'application/json',Authorization:'Bearer '+s.token};}
 export async function authFetch(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,...authHeaders()}});if(r.status===401)clearSession();return r;}
+// Exclusivo da Equipe. O servidor valida também o projeto do líder; FV segue gerencial.
+export function authHeadersEquipe(){const s=getSession();if(!s||!['gerencial','equipe'].includes(s.nivel))throw Error('Sessão ausente ou expirada. Entre novamente com o PIN.');return {'Content-Type':'application/json',Authorization:'Bearer '+s.token};}
+export async function authFetchEquipe(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,...authHeadersEquipe()}});if(r.status===401)clearSession();return r;}
