@@ -1791,7 +1791,7 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
 
 
 // ── Projeção de Férias
-function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, onSave, ferias, dark, onToggleTheme }) {
+export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, onSave, ferias, dark, onToggleTheme }) {
   const mapaFotos = useContext(FotosCtx);
   const S = getStyles(dark);
   // Líder e Gerencial podem agendar férias e reordenar a equipe — é trabalho do líder no dia a dia.
@@ -1885,9 +1885,14 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, 
 
   const salvar = async () => {
     setSaving(true);
-    await onSave(lista);
-    setSaving(false);
-    setEditId(null);
+    try {
+      await onSave(lista);
+      setEditId(null);
+    } catch(e) {
+      alert(e.message||"Não foi possível salvar as férias. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // PDF Projeção
