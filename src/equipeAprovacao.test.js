@@ -55,10 +55,10 @@ describe("equipeAprovacao", () => {
 
   test("filtro por aprovação e ano", () => {
     const [c1, c2] = base();
-    expect(solicitacoesPorAprovacao(c1, "aguardando", 2026).length).toBe(2);
+    expect(solicitacoesPorAprovacao(c1, "aguardando", 2026).length).toBe(1);
     expect(solicitacoesPorAprovacao(c2, "negado", 2026).length).toBe(0);
     expect(solicitacoesPorAprovacao(c2, "negado", 2025).length).toBe(1);
-    expect(contadoresAprovacao(base(), 2026)).toEqual({ aprovado:0, aguardando:2, negado:0 });
+    expect(contadoresAprovacao(base(), 2026)).toEqual({ aprovado:0, aguardando:1, negado:0, legado:1 });
   });
 
   test("cesta, FV e parse de valor", () => {
@@ -114,7 +114,7 @@ describe("equipeAprovacao — casos adicionais", () => {
   test("filtro ano=null retorna todos os anos", () => {
     const [, c2] = base();
     expect(solicitacoesPorAprovacao(c2, null, null).length).toBe(1);
-    expect(contadoresAprovacao(base(), null)).toEqual({ aprovado:0, aguardando:2, negado:1 });
+    expect(contadoresAprovacao(base(), null)).toEqual({ aprovado:0, aguardando:1, negado:1, legado:1 });
   });
 
   test("fmtBRL e parseValorBR com entradas vazias", () => {

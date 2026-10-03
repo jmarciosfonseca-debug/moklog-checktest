@@ -1,7 +1,7 @@
 import { checkPin,authFetch,getSession } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, where } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
 // Firebase Storage removido - usando compressão local
 
@@ -39,6 +39,9 @@ import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, aplicarAprovacao
 
 import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
 import { fvNoEscopo } from "./fvConfig";
+import {bloqueadaPorWhats, situacaoSolicitacao} from "./equipeAprovacao";
+import {criarSolicitacoes, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
+import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 
 
 // Sem limite para desligados — ficam todos para consulta
@@ -224,53 +227,14 @@ async function loadEquipe(projectId) {
   return { colaboradores:[], desligados:[] };
 }
 
-async function saveEquipe(projectId, data) {
-  // Save to Firebase (primary)
-  try {
-    await setDoc(doc(db,"equipes",projectId), data);
-  } catch(e){
-    console.warn("Firebase save failed, trying without photos:", e.message);
-    // If document too large, strip base64 photos and save URLs only
-    try {
-      const stripped = {
-        ...data,
-        colaboradores: (data.colaboradores||[]).map(c=>({
-          ...c,
-          foto: c.foto && c.foto.startsWith("http") ? c.foto : "" // keep URLs, strip base64
-        })),
-        desligados: (data.desligados||[]).map(c=>({
-          ...c,
-          foto: c.foto && c.foto.startsWith("http") ? c.foto : ""
-        }))
-      };
-      await setDoc(doc(db,"equipes",projectId), stripped);
-      console.log("Saved without photos to Firebase");
-    } catch(e2){
-      console.error("Firebase save failed completely:", e2);
-    }
-  }
-  // Always sync localStorage too (with size check)
-  try {
-    const json = JSON.stringify(data);
-    if(json.length < 4*1024*1024) { // 4MB safety limit
-      localStorage.setItem(`equipe_${projectId}`, json);
-    } else {
-      // Strip photos for localStorage too
-      const stripped = {
-        ...data,
-        colaboradores: (data.colaboradores||[]).map(c=>({...c, foto: c.foto?.startsWith("http")?c.foto:""})),
-        desligados: (data.desligados||[]).map(c=>({...c, foto: c.foto?.startsWith("http")?c.foto:""}))
-      };
-      localStorage.setItem(`equipe_${projectId}`, JSON.stringify(stripped));
-    }
-  } catch(e){
-    // QuotaExceededError - clear old data and try again
-    try {
-      localStorage.removeItem(`equipe_${projectId}`);
-      const minimal = {...data, colaboradores:(data.colaboradores||[]).map(c=>({...c,foto:""}))};
-      localStorage.setItem(`equipe_${projectId}`, JSON.stringify(minimal));
-    } catch(e2){ console.warn("localStorage completely full:", e2); }
-  }
+async function saveEquipe(projectId, data, before) {
+  if(isDemo())return data;
+  if(!before)throw Error("Base da edição ausente. Reabra a tela.");
+  const response=await authFetch("/api/equipe-save",{method:"POST",body:JSON.stringify({pid:projectId,before,after:data})});
+  const result=await response.json();
+  if(!response.ok||!result.ok)throw Error(result.erro||"Não foi possível salvar.");
+  try{localStorage.setItem(`equipe_${projectId}`,JSON.stringify(result.data));}catch{}
+  return result.data;
 }
 
 function emptyColab(cargo, projectId, turno) {
@@ -657,7 +621,7 @@ function Avatar({ foto, size=52, border="#1e293b" }) {
 
 // ── Tela de ficha completa
 // ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
-function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, onAprovar, dark, onSolicitar, onConfirmar, onSalvarLista }){
+export function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, onAprovar, onTodas, ano, onRegistrarWhats, dark, onSolicitar, onConfirmar, onSalvarLista }){
   const S = getStyles(dark);
   const [aberto, setAberto] = useState(false);
   const [modoMontar, setModoMontar] = useState(false); // Fase 1: montar lista
@@ -666,6 +630,9 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
   const [selItens, setSelItens] = useState([]);          // nomes selecionados p/ envio múltiplo
   const [solicForm, setSolicForm] = useState(null);      // {item, tamanho, marca, motivo} solicitação única
   const [histItem, setHistItem] = useState(null);
+  const [whatsFolha,setWhatsFolha]=useState(null);
+  const [solicBusy,setSolicBusy]=useState(false);
+  const [solicErro,setSolicErro]=useState("");
 
   const unf = colab.uniforme || { itens:{}, solicitacoes:[], listaMontada:false };
   const pendentes = (unf.solicitacoes||[]).filter(s=>s.status==="pendente");
@@ -686,15 +653,20 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
 
   const toggleSelMulti = (nome)=> setSelItens(s=> s.includes(nome) ? s.filter(x=>x!==nome) : [...s, nome]);
 
-  const enviarWhatsMulti = ()=>{
-    const linhas = ["*SOLICITAÇÃO DE UNIFORME / MATERIAL* 📦", `*Unidade:* ${projectNome||"—"}`, `*Colaborador:* ${colab.nome||"—"}`, "*Itens:*"];
-    selItens.forEach(nome=>{ const d=unf.itens?.[nome]; linhas.push(`• ${nome}${d?.tamanho?` (tam ${d.tamanho})`:""}${d?.marca?` — ${d.marca}`:""}`); });
-    linhas.push(`*Data:* ${new Date().toLocaleDateString("pt-BR")}`);
-    // Registra cada item como pendência.
-    selItens.forEach(nome=>{ const d=unf.itens?.[nome]||{}; onSolicitar(colab.id, { item:nome, marca:d.marca, tamanho:d.tamanho, motivo:"Solicitação múltipla" }); });
-    window.open(`https://wa.me/?text=${encodeURIComponent(linhas.join("\n"))}`, "_blank");
-    setModoSelMulti(false); setSelItens([]);
+  const registrarPedido=async(itens)=>{
+    if(solicBusy)return;
+    setSolicBusy(true);setSolicErro("");
+    try{
+      const novas=await onSolicitar(colab.id,itens);
+      setWhatsFolha(Array.isArray(novas)?novas:[novas]);
+      setSolicForm(null);setModoSelMulti(false);setSelItens([]);
+    }catch(e){setSolicErro(e.message||"Não foi possível registrar a solicitação. Tente novamente.");}
+    finally{setSolicBusy(false);}
   };
+  const enviarWhatsMulti=()=>registrarPedido(selItens.map(nome=>{
+    const d=unf.itens?.[nome]||{};
+    return {item:nome,marca:d.marca||"",tamanho:d.tamanho||"",motivo:"Solicitação múltipla"};
+  }));
 
   const cardStyle = (on)=>({ background:on?"#0d1f2e":(dark?"#0d1424":"#f8fafc"), border:`1px solid ${on?"#0ea5e9":(dark?"#1c2438":"#e2e8f0")}`, borderRadius:9, padding:"9px 11px", marginBottom:6 });
 
@@ -713,6 +685,7 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
 
       {aberto && (
         <div style={{ marginTop:12 }}>
+          {canApprove&&onTodas&&<BotaoAprovarTodas alvos={alvosAguardando([colab],ano)} onTodas={onTodas} rotulo="Aprovar todas as pendentes deste colaborador"/>}
           {/* Solicitações pendentes com SLA */}
           {pendentes.map(s=>{
             const dias = uniformeDiasAberto(s.solicitadoEm);
@@ -721,7 +694,9 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
               <div key={s.id} style={{ background:alerta?"#1a0202":(dark?"#1a1000":"#fffbeb"), border:`1px solid ${alerta?"#ef444455":"#f59e0b44"}`, borderRadius:10, padding:"10px 12px", marginBottom:8 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente</div>
                 <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
-                <AprovacaoInline solic={s} canApprove={canApprove} onAprovar={(dec)=>onAprovar && onAprovar([{ colabId:colab.id, solicId:s.id }], dec)} dark={dark}/>
+                <SeloWhats solic={s}/>
+                {canManage&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{s.whatsEnviadoEm?"Reenviar no WhatsApp":"📲 Enviar no WhatsApp"}</button>}
+                <AprovacaoInline solic={s} canApprove={canApprove} onAprovar={(dec,opts)=>onAprovar && onAprovar([{ colabId:colab.id, solicId:s.id }], dec,opts)} dark={dark}/>
                 {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>✓ Confirmar recebimento (zera SLA)</button>}
               </div>
             );
@@ -820,7 +795,7 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
                         <button onClick={()=>setSelItens([])} style={{ flex:1, background:"transparent", border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, color:txt2, borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>Limpar</button>
                       )}
                       <button onClick={()=>setSelItens(selItens.length===itensUsados.length?[]:itensUsados.map(i=>i.nome))} style={{ flex:1, background:"transparent", border:"1px solid #0ea5e944", color:"#0ea5e9", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>{selItens.length===itensUsados.length?"Desmarcar todos":"Uniforme completo"}</button>
-                      <button disabled={!selItens.length} onClick={enviarWhatsMulti} style={{ flex:2, background:selItens.length?"#25d366":"#1e293b", border:"none", color:selItens.length?"#062":"#475569", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:800, cursor:selItens.length?"pointer":"not-allowed" }}>📲 Enviar {selItens.length||""} no WhatsApp</button>
+                      <button disabled={solicBusy||!selItens.length} onClick={enviarWhatsMulti} style={{ flex:2, background:selItens.length?"#25d366":"#1e293b", border:"none", color:selItens.length?"#062":"#475569", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:800, cursor:selItens.length?"pointer":"not-allowed" }}>{solicBusy?"Registrando…":`Registrar ${selItens.length||""} itens`}</button>
                     </div>
                   )}
                 </>
@@ -830,6 +805,8 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
         </div>
       )}
 
+      {solicErro&&<div role="alert" style={{color:"#ef4444",position:solicForm?"fixed":undefined,zIndex:240,bottom:20,background:dark?"#0b1220":"#fff",padding:10}}>{solicErro}</div>}
+      {whatsFolha&&<FolhaWhats solicitacoes={whatsFolha} projectNome={projectNome} colab={colab} onRegistrar={onRegistrarWhats} onFechar={()=>setWhatsFolha(null)} dark={dark}/>}
       {/* Modal de solicitação única */}
       {solicForm && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:210,padding:16}}>
@@ -841,13 +818,8 @@ function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, 
               style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:14,boxSizing:"border-box"}}/>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setSolicForm(null)} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
-              <button onClick={async()=>{
-                  await onSolicitar(colab.id, { item:solicForm.item, marca:solicForm.marca, tamanho:solicForm.tamanho, motivo:solicForm.motivo });
-                  const msg = uniformeMsgWhats(projectNome, colab.nome, solicForm.item, solicForm.marca, solicForm.tamanho, solicForm.motivo);
-                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
-                  setSolicForm(null);
-                }}
-                style={{flex:1,background:"#25d366",border:"none",color:"#062",borderRadius:8,padding:"11px",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>📲 Salvar + WhatsApp</button>
+              <button disabled={solicBusy} onClick={()=>registrarPedido(solicForm)}
+                style={{flex:1,background:"#25d366",border:"none",color:"#062",borderRadius:8,padding:"11px",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>{solicBusy?"Registrando…":"Confirmar solicitação"}</button>
             </div>
           </div>
         </div>
@@ -862,33 +834,33 @@ const APROV_CORES = {
   aguardando: { cor:"#f59e0b", bg:"#f59e0b1a", rot:"Aguardando" },
   aprovado:   { cor:"#22c55e", bg:"#22c55e1a", rot:"Aprovado" },
   negado:     { cor:"#ef4444", bg:"#ef44441a", rot:"Negado" },
+  legado: {cor:"#94a3b8",bg:"#94a3b81a",rot:"Legado"},
 };
 function SeloAprovacao({ status }){
   const c = APROV_CORES[status] || APROV_CORES.aguardando;
   return <span style={{ fontSize:10, fontWeight:700, color:c.cor, background:c.bg, border:`1px solid ${c.cor}44`, borderRadius:6, padding:"2px 8px", whiteSpace:"nowrap" }}>{c.rot}</span>;
 }
 // Selo para todos; botões apenas para o gerencial.
-function AprovacaoInline({ solic, canApprove, onAprovar, dark }){
-  const st = statusAprovacao(solic);
-  const txt2 = dark?"#94a3b8":"#64748b";
-  return (
-    <div style={{ marginTop:8 }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-        <SeloAprovacao status={st}/>
-        {solic.aprovadoEm && <span style={{ fontSize:10, color:txt2 }}>{new Date(solic.aprovadoEm).toLocaleDateString("pt-BR")} · {solic.aprovadoPor||"Gerencial"}</span>}
-      </div>
-      {canApprove && (
-        <div style={{ display:"flex", gap:6, marginTop:8 }}>
-          {["aguardando","aprovado","negado"].map(k=>{
-            const c=APROV_CORES[k]; const on=st===k;
-            return <button key={k} onClick={()=>{ if(!on) onAprovar(k); }}
-              style={{ flex:1, fontSize:10.5, fontWeight:700, cursor:on?"default":"pointer", borderRadius:7, padding:"6px 4px",
-                color:on?"#fff":c.cor, background:on?c.cor:"transparent", border:`1px solid ${c.cor}66` }}>{c.rot}</button>;
-          })}
-        </div>
-      )}
-    </div>
-  );
+export function AprovacaoInline({solic,canApprove,onAprovar,dark}) {
+  const st=situacaoSolicitacao(solic),bloqueada=bloqueadaPorWhats(solic);
+  const [busy,setBusy]=useState(false),[erro,setErro]=useState("");
+  const decidir=async(dec,opts)=>{
+    setBusy(true);setErro("");
+    try{await onAprovar(dec,opts);}catch(e){setErro(e.message||"Não foi possível gravar a aprovação.");}finally{setBusy(false);}
+  };
+  return <div style={{marginTop:8}}>
+    <SeloAprovacao status={st}/>
+    {solic.aprovadoEm&&<div style={{fontSize:10,color:dark?"#94a3b8":"#64748b"}}>{new Date(solic.aprovadoEm).toLocaleString("pt-BR")} · {solic.aprovadoPor||"Gerencial"}</div>}
+    {canApprove&&<div style={{display:"flex",gap:6,marginTop:8}}>
+      {["aguardando","aprovado","negado"].map(k=><button key={k} disabled={busy||st===k||(k==="aprovado"&&bloqueada)}
+        title={k==="aprovado"&&bloqueada?"O líder ainda não enviou ao WhatsApp":undefined}
+        onClick={()=>decidir(k)}>{APROV_CORES[k].rot}</button>)}
+    </div>}
+    {canApprove&&bloqueada&&<button disabled={busy} onClick={()=>{
+      if(window.confirm("O líder não registrou o envio ao WhatsApp. Aprovar mesmo assim?")) decidir("aprovado",{dispensarWhats:true});
+    }} style={{marginTop:8,fontSize:11}}>Aprovar mesmo sem envio</button>}
+    {erro&&<div role="alert">{erro}</div>}
+  </div>;
 }
 // Card Cesta de Natal na ficha — sem SLA, sem aprovação.
 function CestaNatalCard({ ano, registro, canManage, onToggle, dark }){
@@ -960,7 +932,7 @@ function FVCard({ fv, projectLabel, contadores, ano, onSalvar, dark }){
   );
 }
 // Tela de aprovação (individual e em lote) — somente gerencial.
-function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, onBack, dark, fvControle }){
+export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onTodas, onPDF, onBack, dark, fvControle }){
   const S = getStyles(dark);
   const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
   const [aba, setAba] = useState("aguardando");
@@ -973,12 +945,13 @@ function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, o
   itens.sort((a,b)=>String(a.c.nome||"").localeCompare(String(b.c.nome||""),"pt-BR"));
   const cont = contadoresAprovacao(colaboradores, ano);
   const toggle = (k)=>setSel(p=>p.includes(k)?p.filter(x=>x!==k):[...p,k]);
-  const todosSel = itens.length>0 && itens.every(i=>sel.includes(i.key));
+  const elegiveis=itens.filter(i=>!bloqueadaPorWhats(i.s)&&situacaoSolicitacao(i.s)!=="legado");
+  const todosSel = elegiveis.length>0 && elegiveis.every(i=>sel.includes(i.key));
   const decidir = async (dec)=>{
-    const alvos = itens.filter(i=>sel.includes(i.key)).map(i=>({ colabId:i.c.id, solicId:i.s.id }));
+    const alvos = elegiveis.filter(i=>sel.includes(i.key)).map(i=>({ colabId:i.c.id, solicId:i.s.id }));
     if(!alvos.length) return;
     setBusy(true);
-    try { await onAprovar(alvos, dec); setSel([]); } finally { setBusy(false); }
+    try { await onAprovar(alvos, dec); setSel([]); } catch(e){alert(e.message||"Falha ao gravar.");} finally { setBusy(false); }
   };
   const abas = [["aguardando",`Aguardando (${cont.aguardando})`],["aprovado",`Aprovados (${cont.aprovado})`],["negado",`Negados (${cont.negado})`],["todas","Todas"]];
   return (
@@ -990,6 +963,8 @@ function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, o
           <div style={{ fontSize:14, fontWeight:800, color:txt }}>✅ Aprovação de solicitações</div>
         </div>
         {fvControle}
+        {aba==="aguardando"&&<BotaoAprovarTodas alvos={alvosAguardando(colaboradores,ano)} onTodas={onTodas}/>}
+        <div>{itens.filter(i=>bloqueadaPorWhats(i.s)).length} bloqueadas (sem envio ao WhatsApp)</div>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
           <span style={{ fontSize:11, color:txt2 }}>Ano da solicitação</span>
           <select value={ano} onChange={e=>{ onAno(Number(e.target.value)); setSel([]); }}
@@ -1005,7 +980,7 @@ function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, o
         </div>
         <div style={{ ...S.card, padding:"10px 12px" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, flexWrap:"wrap" }}>
-            <button onClick={()=>setSel(todosSel?[]:itens.map(i=>i.key))} style={{ ...S.btnSm, fontSize:10.5 }}>{todosSel?"☑ Desmarcar todas":`☐ Selecionar todas (${itens.length})`}</button>
+            <button onClick={()=>setSel(todosSel?[]:elegiveis.map(i=>i.key))} style={{ ...S.btnSm, fontSize:10.5 }}>{todosSel?"☑ Desmarcar todas":`☐ Selecionar todas (${elegiveis.length})`}</button>
             <span style={{ fontSize:11, color:txt2 }}>{sel.length} selecionada(s)</span>
           </div>
           <div style={{ display:"flex", gap:6, marginTop:8 }}>
@@ -1020,14 +995,15 @@ function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, o
         {itens.map(({c,s,key})=>{
           const on = sel.includes(key);
           return (
-            <div key={key} onClick={()=>toggle(key)} style={{ ...S.card, padding:"10px 12px", cursor:"pointer", border:`1px solid ${on?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}` }}>
+            <div key={key} onClick={()=>{if(!bloqueadaPorWhats(s)&&situacaoSolicitacao(s)!=="legado")toggle(key);}} style={{ ...S.card, padding:"10px 12px", cursor:"pointer", border:`1px solid ${on?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}` }}>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                 <div style={{ width:20, height:20, borderRadius:5, flexShrink:0, border:`2px solid ${on?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:on?"#0ea5e9":"transparent", color:"#fff", fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{on?"✓":""}</div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:12.5, fontWeight:700, color:txt }}>{c.nome}</div>
                   <div style={{ fontSize:11, color:txt2 }}>{s.item}{s.tamanho?` · ${s.tamanho}`:""} · {s.status==="entregue"?"entregue":"pendente"} · {s.solicitadoEm?new Date(s.solicitadoEm).toLocaleDateString("pt-BR"):"—"}</div>
                 </div>
-                <SeloAprovacao status={statusAprovacao(s)}/>
+                <SeloAprovacao status={situacaoSolicitacao(s)}/>
+                <SeloWhats solic={s}/>
               </div>
             </div>
           );
@@ -1039,7 +1015,7 @@ function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, onPDF, o
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaRegistro, onToggleCesta, onAprovar, dark }) {
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -1238,6 +1214,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             canManage={adminAuth || liderAuth}
             canApprove={adminAuth}
             onAprovar={onAprovar}
+            onTodas={onTodas} ano={anoAprovacao} onRegistrarWhats={onRegistrarWhats}
             dark={dark}
             onSolicitar={onSolicitarUniforme}
             onConfirmar={onConfirmarUniforme}
@@ -2301,34 +2278,45 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     }
   };
 
-  // Aprovação: relê equipes/{pid} no servidor, aplica SÓ o patch de aprovação e grava uma vez.
-  const aprovarSolicitacoes = async (alvos, decisao)=>{
-    if(!adminAuth || !alvos || !alvos.length) return;
+  const atualizarEquipeLocal=(base)=>{
+    setEquipeData(base);
+    setSelColab(prev=>prev?(base.colaboradores.find(c=>c.id===prev.id)||prev):prev);
+  };
+  const gravarSolicitacoes=async(transformar)=>{
+    if(isDemo())throw Error("Demonstração: solicitações não são gravadas.");
+    const snap=await getDocFromServer(doc(db,"equipes",project.id));
+    if(!snap.exists())throw Error("Equipe não encontrada no servidor.");
+    const before=snap.data(),resultado=transformar(before);
+    resultado.base=await saveEquipe(project.id,resultado.base,before);
+    return resultado;
+  };
+  const aprovarSolicitacoes = async (alvos, decisao, opcoes={})=>{
+    if(!adminAuth)throw Error("Apenas o gerencial pode aprovar.");
+    if(!alvos?.length)return {alterados:0,bloqueados:[]};
     setSaving(true);
-    try {
-      const snap = await getDoc(doc(db,"equipes",project.id));
-      const base = snap.exists() ? snap.data() : equipeData;
-      const { colaboradores, alterados } = aplicarAprovacao(base.colaboradores||[], alvos, decisao);
-      if(!alterados){await sincronizarAprovacoesFV(alvos,base);return;}
-      const novo = { ...base, colaboradores };
-      // Atualização otimista: o selo muda imediatamente, sem esperar a rede.
-      setEquipeData(novo);
-      setSelColab(prev=> prev ? (colaboradores.find(c=>c.id===prev.id) || prev) : prev);
-      try {
-        await saveEquipe(project.id, novo);
-      } catch (e) {
-        const atual = await loadEquipe(project.id);
-        setEquipeData(atual || { colaboradores:[], desligados:[] });
-        setSelColab(prev=> prev ? ((atual?.colaboradores||[]).find(c=>c.id===prev.id) || prev) : prev);
-        throw e;
-      }
-      await sincronizarAprovacoesFV(alvos,novo);
-    } catch(e){
-      console.error("Aprovação: erro ao gravar", e);
-      alert("Erro ao gravar a aprovação. Verifique a conexão.");
-    } finally {
-      setSaving(false);
+    try{
+      const resultado=await gravarSolicitacoes(base=>aprovarNaEquipe(base,alvos,decisao,opcoes,new Date().toISOString()));
+      atualizarEquipeLocal(resultado.base);
+      if(resultado.aplicados.length)await sincronizarAprovacoesFV(resultado.aplicados,resultado.base);
+      return resultado;
+    }finally{setSaving(false);}
+  };
+  const aprovarTodas=async(alvos)=>{
+    if(!adminAuth||isDemo())throw Error("Aprovação disponível apenas para o gerencial.");
+    const snap=await getDocFromServer(doc(db,"equipes",project.id));
+    if(!snap.exists())throw Error("Equipe não encontrada.");
+    let catalogo=[];
+    if(fvNoEscopo(project.id)){
+      const response=await authFetch("/api/fv-plano",{method:"POST",body:JSON.stringify({pid:project.id,acao:"ler"})});
+      const data=await response.json();
+      if(!response.ok||!data.ok)throw Error("Não foi possível conferir os preços no catálogo. Tente novamente.");
+      catalogo=data.catalogo||[];
     }
+    const resumo=resumoAprovacao(snap.data().colaboradores,alvos,catalogo,fvNoEscopo(project.id));
+    const mensagem=`Projeto ${project.id} · ${anoFiltro}\n${resumo.total} itens aguardando: aprovar ${resumo.aprovar}, bloqueadas ${resumo.bloqueadas}.\n${resumo.semPreco} sem preço no catálogo.\nEfeito no FV: ${resumo.previstos} previstos; o saldo real permanece igual.\nConfirmar?`;
+    if(!window.confirm(mensagem))return;
+    const resultado=await aprovarSolicitacoes(alvos,"aprovado",{somenteAguardando:true});
+    alert(`${resultado.alterados} aprovada(s); ${resultado.bloqueados.length} bloqueada(s) aguardando WhatsApp.`);
   };
 
   useEffect(() => {
@@ -2340,9 +2328,9 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   const save = async (newData) => {
     setSaving(true);
-    setEquipeData(newData);
-    await saveEquipe(project.id, newData);
-    setSaving(false);
+    try{atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));}
+    catch(e){alert(e.message||"Não foi possível salvar.");throw e;}
+    finally{setSaving(false);}
   };
 
   // Perfil de Segurança do projeto (aditivo — modula a Análise de Risco).
@@ -2353,7 +2341,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     const newData = { ...equipeData, perfilSeguranca: novoPerfil };
     setEquipeData(newData);
     try {
-      await saveEquipe(project.id, newData);
+      atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
     } catch(err) {
       console.error("Erro ao salvar perfil de segurança:", err);
       alert("Erro ao salvar perfil de segurança. Verifique a conexão.");
@@ -2368,7 +2356,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setSaving(true);
     try {
       // Comprime foto para max 400px e qualidade 0.7 antes de salvar
-      let fotoFinal = "";
+      let fotoFinal = form.foto || "";
       if(form.foto && form.foto.startsWith("data:")) {
         fotoFinal = await new Promise((resolve) => {
           const img = new Image();
@@ -2410,32 +2398,15 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         : equipeData.colaboradores.map(c=>c.id===form.id?formFinal:c);
       const newData = {...equipeData, colaboradores:newColabs};
       setEquipeData(newData);
-      await saveEquipe(project.id, newData);
+      atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
       setSaving(false);
       setScreen("list");
       setForm(null);
     } catch(err) {
       console.error("Erro ao salvar colaborador:", err);
       setSaving(false);
-      // Try saving without photo as fallback
-      try {
-        const formSemFoto = { ...form, foto: "" };
-        Object.keys(formSemFoto).forEach(k => { if(formSemFoto[k]===undefined) formSemFoto[k]=""; });
-        const isNew = !equipeData.colaboradores.find(c=>c.id===form.id);
-        const newColabs = isNew
-          ? [...equipeData.colaboradores, formSemFoto]
-          : equipeData.colaboradores.map(c=>c.id===form.id?formSemFoto:c);
-        const newData = {...equipeData, colaboradores:newColabs};
-        setEquipeData(newData);
-        await saveEquipe(project.id, newData);
-        setSaving(false);
-        setScreen("list");
-        setForm(null);
-        alert("Salvo sem foto (limite de armazenamento atingido).");
-      } catch(err2) {
-        console.error("Fallback save also failed:", err2);
-        alert("Erro ao salvar. Verifique sua conexão e tente novamente.");
-      }
+      setEquipeData(equipeData);
+      alert(err.message||"Não foi possível salvar. Os dados existentes foram preservados.");
     }
   };
 
@@ -2566,22 +2537,31 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   // ── Uniforme: solicita troca (gera pendência com SLA) e confirma recebimento.
   // Dados aditivos em colab.uniforme = { itens:{[nome]:{ultimaTroca, marca, tamanho}}, solicitacoes:[...] }
-  const solicitarUniforme = async (colabId, { item, marca, tamanho, motivo }) => {
-    const colab = equipeData.colaboradores.find(c=>c.id===colabId);
-    if(!colab) return;
-    const nova = {
-      id: (crypto?.randomUUID ? crypto.randomUUID() : "unf-"+Date.now()),
-      item, marca:marca||"", tamanho:tamanho||"", motivo:motivo||"",
-      status:"pendente", solicitadoEm:new Date().toISOString(),
-      solicitadoPor: authLevel==="admin" ? "Gerencial" : "Líder",
-    };
-    const unf = colab.uniforme || { itens:{}, solicitacoes:[] };
-    const novoUnf = { ...unf, solicitacoes:[...(unf.solicitacoes||[]), nova] };
-    const novos = equipeData.colaboradores.map(c=>c.id===colabId?{...c, uniforme:novoUnf}:c);
-    await save({ ...equipeData, colaboradores:novos });
-    const novoColab = novos.find(c=>c.id===colabId);
-    setSelColab(novoColab);
-    return nova;
+  const registrarSolicitacoes=async(colabId,itens)=>{
+    if(!liderAuth)throw Error("Sem permissão para solicitar.");
+    const novas=criarSolicitacoes(itens,authLevel,project.id);
+    setSaving(true);
+    try{
+      const r=await gravarSolicitacoes(base=>{
+        const existentes=base.colaboradores.find(c=>c.id===colabId)?.uniforme?.solicitacoes||[];
+        const repetidos=novas.filter(n=>existentes.some(s=>s.item===n.item&&s.status==='pendente'&&s.aprovacao!=='negado'));
+        if(repetidos.length&&!window.confirm(`Já há pedido pendente de: ${repetidos.map(s=>s.item).join(', ')}. Solicitar novamente pode gerar outro previsto no FV. Confirmar duplicidade?`))throw Error('Solicitação cancelada: pedido já pendente.');
+        return {base:anexarSolicitacoes(base,colabId,novas)};
+      });
+      atualizarEquipeLocal(r.base);
+      return novas;
+    }finally{setSaving(false);}
+  };
+  const solicitarUniforme=async(colabId,itens)=>{
+    const multiplo=Array.isArray(itens);
+    const novas=await registrarSolicitacoes(colabId,multiplo?itens:[itens]);
+    return multiplo?novas:novas[0];
+  };
+  const registrarWhats=async(colabId,ids,evento)=>{
+    if(!liderAuth)throw Error("Sem permissão para registrar envio.");
+    if(!evento?.id||!evento?.em)throw Error("Toque de envio não identificado.");
+    const r=await gravarSolicitacoes(base=>({base:marcarWhats(base,colabId,ids,evento.em,evento.id)}));
+    atualizarEquipeLocal(r.base);
   };
   const confirmarRecebimentoUniforme = async (colabId, solicId) => {
     const colab = equipeData.colaboradores.find(c=>c.id===colabId);
@@ -2639,7 +2619,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     // Update selColab if it's the one being edited
     const updated = newColabs.find(c=>c.id===colabId);
     if(updated) setSelColab(updated);
-    await saveEquipe(project.id, newData);
+    atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
     setEditHistItem(null);
     setScreen("view");
   };
@@ -2721,7 +2701,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       onSave={async(ferias)=>{
         const newData = {...equipeData, ferias};
         setEquipeData(newData);
-        await saveEquipe(project.id, newData);
+        atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
       }}
       ferias={equipeData.ferias||[]}
       dark={dark}
@@ -2743,7 +2723,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     <AprovacoesScreen
       colaboradores={equipeData.colaboradores.filter(c=>(c.status||"ativo")==="ativo")}
       ano={anoFiltro} anos={anosDisp} onAno={setAnoFiltro}
-      onAprovar={aprovarSolicitacoes}
+      onAprovar={aprovarSolicitacoes} onTodas={aprovarTodas}
       fvControle={fvControle}
       onPDF={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
       onBack={()=>setScreen("list")} dark={dark}/>
@@ -2763,7 +2743,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         cestaAno={anoAtual}
         cestaRegistro={(cestaPorAno[anoAtual]||{})[colab.id]}
         onToggleCesta={toggleCesta}
-        onAprovar={aprovarSolicitacoes}
+        onAprovar={aprovarSolicitacoes} onTodas={aprovarTodas} anoAprovacao={anoFiltro} onRegistrarWhats={registrarWhats}
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
@@ -3081,6 +3061,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
             )}
           </div>
 
+          {adminAuth&&filtroRapido==="aguardando"&&<BotaoAprovarTodas alvos={alvosAguardando(ativos,anoFiltro)} onTodas={aprovarTodas}/>}
           {filtroRapido && (()=>{
             const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
             const porId = Object.fromEntries(ativos.map(c=>[c.id,c]));
@@ -3104,6 +3085,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                     style={{ ...S.card, padding:"10px 12px", cursor:l.colab?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
                     <div style={{ minWidth:0 }}>
                       <div style={{ fontSize:12.5, fontWeight:700, color:txt }}>{l.nome}</div>
+                      {filtroRapido==="aguardando"&&l.colab&&solicitacoesPorAprovacao(l.colab,"aguardando",anoFiltro).map((s,i)=><SeloWhats key={`${s.id}-${i}`} solic={s}/>)}
                       <div style={{ fontSize:11, color:txt2 }}>{l.cargo||"—"}{l.turno?` · ${l.turno}`:""}{!l.colab?" · fora do quadro ativo":""}</div>
                     </div>
                     <span style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, whiteSpace:"nowrap" }}>{l.extra}</span>

@@ -13,6 +13,16 @@
 
 export const APROVACAO_STATUS = ["aguardando", "aprovado", "negado"];
 
+export function bloqueadaPorWhats(s) {
+  return s?.exigeWhats === true && !s.whatsEnviadoEm && !s.whatsDispensadoEm;
+}
+
+// Entregas antigas sem decisão não são solicitações aguardando aprovação.
+export function situacaoSolicitacao(s) {
+  if (APROVACAO_STATUS.includes(s?.aprovacao)) return s.aprovacao;
+  return s?.status === 'pendente' ? 'aguardando' : 'legado';
+}
+
 // Leitura tolerante do status de aprovação.
 export function statusAprovacao(solic) {
   const v = solic && solic.aprovacao;
@@ -37,7 +47,7 @@ export function solicitacoesPorAprovacao(colab, status, ano) {
   const sl = colab && colab.uniforme && Array.isArray(colab.uniforme.solicitacoes)
     ? colab.uniforme.solicitacoes : [];
   return sl.filter(s => {
-    if (status && statusAprovacao(s) !== status) return false;
+    if (status && situacaoSolicitacao(s) !== status) return false;
     if (ano != null && anoDe(s.solicitadoEm) !== Number(ano)) return false;
     return true;
   });
@@ -48,7 +58,7 @@ export function solicitacoesPorAprovacao(colab, status, ano) {
 // alvos: [{ colabId, solicId }]
 // decisao: "aprovado" | "negado" | "aguardando"
 // Retorna { colaboradores, alterados } sem mutar a entrada.
-export function aplicarAprovacao(colaboradores, alvos, decisao, agoraIso = new Date().toISOString(), por = "Gerencial") {
+export function aplicarAprovacao(colaboradores, alvos, decisao, agoraIso = new Date().toISOString(), por = "Gerencial", opcoes = {}) {
   if (!APROVACAO_STATUS.includes(decisao)) throw new Error("Decisão inválida: " + decisao);
   const mapa = new Map();
   (alvos || []).forEach(a => {
@@ -57,15 +67,24 @@ export function aplicarAprovacao(colaboradores, alvos, decisao, agoraIso = new D
     mapa.get(a.colabId).add(a.solicId);
   });
   let alterados = 0;
+  const bloqueados = [];
+  const aplicados = [];
   const lista = (colaboradores || []).map(c => {
     const ids = mapa.get(c.id);
     if (!ids || !c.uniforme || !Array.isArray(c.uniforme.solicitacoes)) return c;
     let mudou = false;
     const solicitacoes = c.uniforme.solicitacoes.map(s => {
       if (!ids.has(s.id)) return s;
+      if (opcoes.somenteAguardando && situacaoSolicitacao(s) !== 'aguardando') return s;
+      if (c.uniforme.solicitacoes.filter(x=>x.id===s.id).length !== 1) throw new Error('Identificador duplicado: aprovação requer revisão do pedido.');
+      if (decisao === 'aprovado' && bloqueadaPorWhats(s)) {
+        if (!opcoes.dispensarWhats) { bloqueados.push({colabId:c.id, solicId:s.id}); return s; }
+        s = {...s, whatsDispensadoEm:agoraIso, whatsDispensadoPor:por};
+      }
       const anterior = statusAprovacao(s);
       if (anterior === decisao && s.aprovacao === decisao) return s; // sem mudança real
       mudou = true; alterados++;
+      aplicados.push({colabId:c.id, solicId:s.id});
       const hist = Array.isArray(s.aprovacaoHist) ? s.aprovacaoHist : [];
       return {
         ...s,
@@ -78,14 +97,14 @@ export function aplicarAprovacao(colaboradores, alvos, decisao, agoraIso = new D
     });
     return mudou ? { ...c, uniforme: { ...c.uniforme, solicitacoes } } : c;
   });
-  return { colaboradores: lista, alterados };
+  return { colaboradores: lista, alterados, bloqueados, aplicados };
 }
 
 // Contadores informativos (sem cálculo financeiro).
 export function contadoresAprovacao(colaboradores, ano) {
-  const r = { aprovado: 0, aguardando: 0, negado: 0 };
+  const r = { aprovado: 0, aguardando: 0, negado: 0, legado: 0 };
   (colaboradores || []).forEach(c => {
-    solicitacoesPorAprovacao(c, null, ano).forEach(s => { r[statusAprovacao(s)]++; });
+    solicitacoesPorAprovacao(c, null, ano).forEach(s => { r[situacaoSolicitacao(s)]++; });
   });
   return r;
 }
