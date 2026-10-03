@@ -16,6 +16,8 @@ export function criarStore(auth,request=fetch){
   arquivar:p=>call("arquivar",{pid:p.id,revisao:p.revisao}),
   salvarInspecao:(pid,inspecao)=>call("inspecao",{pid,inspecaoId:inspecao.id,revisao:inspecao.revisao||0,data:inspecao}),
   listarInspecoes:pid=>call("inspecoes",{pid}),
+  listarDiagnosticos:pid=>call("diagnosticos",{pid}),
+  salvarDiagnostico:(pid,diagnosticoId,revisao,data)=>call("diagnostico",{pid,diagnosticoId,revisao:revisao||0,data}),
   lerCatalogo:()=>call("catalogo_ler"),
   editarCatalogo:c=>call("catalogo_salvar",{revisao:c.revisao||0,data:c})
  };

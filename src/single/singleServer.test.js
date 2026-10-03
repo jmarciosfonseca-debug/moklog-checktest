@@ -12,6 +12,20 @@ function banco(){
 const u={uid:"g",role:"gerente",scopeAll:true};
 const create={acao:"criar",pid:"sg_teste_1",revisao:0,data:{nome:"Teste",responsavel:"Gerente",dataVistoria:"2026-10-03"}};
 const asset={id:"cam",familiaId:"cftv_cameras",nome:"CFTV",grupo:"CFTV",total:100};
+test("diagnóstico Single exige revisão e não grava nos projetos legados",async()=>{
+ const db=banco();await executar(db,u,create);
+ const cmd={acao:"diagnostico",pid:create.pid,diagnosticoId:"d1",revisao:0,data:{estado:"rascunho",catalogoId:"mestre",versaoCatalogo:"1",respostas:{cftv:{status:"parcial",situacao:"Teste"}}}};
+ const result=await executar(db,u,cmd);expect(result.data.revisao).toBe(1);
+ expect(db.values["diagnosticos/sg_teste_1/itens/d1"].respostas.cftv.status).toBe("parcial");
+ await expect(executar(db,u,cmd)).rejects.toMatchObject({status:409});
+ expect(db.writes).toBe(2);
+});
+test("cenário alterado impede nova inspeção com totais obsoletos",async()=>{
+ const db=banco();await executar(db,u,create);
+ await executar(db,u,{acao:"ativos",pid:create.pid,revisao:1,data:{ativos:[asset]}});
+ await expect(executar(db,u,{acao:"inspecao",pid:create.pid,inspecaoId:"nova",revisao:0,data:{cenarioRevisao:1,itens:[]}})).rejects.toMatchObject({status:409});
+ expect(db.writes).toBe(2);
+});
 test("criação isolada e uma gravação; sem tocar projects",async()=>{
  const db=banco();const r=await executar(db,u,create);
  expect(r.data).toMatchObject({orgId:"moked",modulo:"single",revisao:1});
@@ -27,7 +41,7 @@ test("duas gravações concorrentes: uma confirma, outra conflita sem sobrescrev
 test("inspeção conserva snapshot após cenário e catálogo mudarem",async()=>{
  const db=banco();await executar(db,u,create);
  await executar(db,u,{acao:"ativos",pid:create.pid,revisao:1,data:{ativos:[asset]}});
- const cmd={acao:"inspecao",pid:create.pid,inspecaoId:"i1",revisao:0,data:{data:"2026-10-03",responsavel:"G",estado:"concluida",itens:[{id:"cam",parcial:4,inoperante:6}]}};
+ const cmd={acao:"inspecao",pid:create.pid,inspecaoId:"i1",revisao:0,data:{cenarioRevisao:2,data:"2026-10-03",responsavel:"G",estado:"concluida",itens:[{id:"cam",parcial:4,inoperante:6}]}};
  const first=await executar(db,u,cmd);expect(first.data.itens[0].operante).toBe(90);
  await executar(db,u,{acao:"ativos",pid:create.pid,revisao:2,data:{ativos:[{...asset,total:200,nome:"Novo nome"}]}});
  const second=await executar(db,u,{...cmd,revisao:1});
@@ -45,6 +59,6 @@ test("rejeita caminhos legados, datas falsas, excesso e famílias injetadas",asy
  await expect(executar(db,u,{...create,pid:"P601"})).rejects.toMatchObject({status:400});
  await expect(executar(db,u,{...create,data:{...create.data,dataVistoria:"2026-02-31"}})).rejects.toMatchObject({status:400});
  await executar(db,u,create);
- await expect(executar(db,u,{acao:"inspecao",pid:create.pid,inspecaoId:"i1",revisao:0,data:{itens:[{id:"injetado"}]}})).rejects.toMatchObject({status:400});
+ await expect(executar(db,u,{acao:"inspecao",pid:create.pid,inspecaoId:"i1",revisao:0,data:{cenarioRevisao:1,itens:[{id:"injetado"}]}})).rejects.toMatchObject({status:400});
  expect(db.writes).toBe(1);
 });

@@ -1,0 +1,5 @@
+import {calcularInspecao} from "./singleCalc";
+import {familias} from "./catalogoAtivos";
+let cat={familias,revisao:0};
+let p={id:"sg_visual",nome:"Condomínio Teste",responsavel:"Responsável de teste",estado:"ativo",revisao:1,ativos:[["cftv_cameras",100],["cftv_monitores",12],["vei_cancelas_as",4],["vei_dilaceradores",2],["ped_torniquetes",8]].map(([id,total])=>({...familias.find(f=>f.id===id),familiaId:id,custom:false,total}))},hist=[];
+export function criarStore(){return {listar:async()=>({projetos:[p]}),lerCatalogo:async()=>({data:cat}),listarInspecoes:async()=>({inspecoes:hist}),salvarAtivos:async(_,ativos)=>({data:p={...p,ativos,revisao:p.revisao+1}}),salvarInspecao:async(_,i)=>{const data={...calcularInspecao(i),revisao:(i.revisao||0)+1};hist=[data,...hist.filter(x=>x.id!==data.id)];return {data};},editarCatalogo:async c=>({data:cat={...c,revisao:c.revisao+1}}),criarSingle:async(id,data)=>({data:p={...data,id,estado:"ativo",revisao:1,ativos:[]}}),arquivar:async()=>({data:p={...p,estado:"arquivado"}})};}

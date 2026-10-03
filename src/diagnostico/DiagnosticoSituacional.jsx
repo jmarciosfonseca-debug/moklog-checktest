@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {criarStore} from "../single/singleStore";
+const SingleApp=React.lazy(()=>import("../single/SingleApp"));
 import { collection, doc, getDoc, getDocs, orderBy, query, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { CATALOGO_REF, STATUS_ITEM, STATUS_ITEM_LISTA, STATUS_QUE_EXIGEM_ANALISE, STATUS_QUE_EXIGEM_OBSERVACAO } from "./catalogoSchema";
@@ -77,6 +79,8 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const [draftReady,setDraftReady]=useState(false);
   const [savedAt,setSavedAt]=useState(null);
   const [projetoContexto,setProjetoContexto]=useState(null);
+  const [singleOpen,setSingleOpen]=useState(false);
+  const singleStore=useMemo(()=>criarStore(auth),[auth]);
   const [diagnosticos,setDiagnosticos]=useState([]);
   const [progressoProjetos,setProgressoProjetos]=useState({});
   const [diagnosticoSelecionado,setDiagnosticoSelecionado]=useState(false);
@@ -153,20 +157,21 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
       const diagnosticoId=projetoContexto.diagnosticoId||crypto.randomUUID();
       const ref=doc(db,"diagnosticos",chaveProjeto,"itens",diagnosticoId);
       const agora=new Date().toISOString();
-      const remoto=await getDoc(ref);
-      const remotas=remoto.exists()?(remoto.data().respostas||{}):{};
+      const remoto=projetoContexto.single?null:await getDoc(ref);
+      const remotas=remoto?.exists()?(remoto.data().respostas||{}):{};
       const merged=mergeRespostasPorAtualizacao(remotas,respostas);
       const payload={catalogoId:CATALOGO_REF.catalogoId,versaoCatalogo:catalogo.versao,tipo:projetoContexto.tipo,projetoRef:projetoContexto.projetoRef||null,grupo:projetoContexto.grupo||null,rotuloLivre:projetoContexto.rotuloLivre||null,estado,respostas:merged,autorUid:user.uid,criadoEm:projetoContexto.criadoEm||agora,atualizadoEm:agora,arquivadoEm:estado==="arquivado"?agora:null};
-      await setDoc(ref,payload,{merge:true});
-      setProjetoContexto({...projetoContexto,diagnosticoId,criadoEm:payload.criadoEm});
+      let revisao=projetoContexto.revisao||0;
+      if(projetoContexto.single){const result=await singleStore.salvarDiagnostico(chaveProjeto,diagnosticoId,revisao,payload);revisao=result.data.revisao;}else await setDoc(ref,payload,{merge:true});
+      setProjetoContexto({...projetoContexto,diagnosticoId,criadoEm:payload.criadoEm,revisao});
       setRespostas(merged);
-      setDiagnosticos(xs=>[{id:diagnosticoId,...payload},...xs.filter(x=>x.id!==diagnosticoId)]);
-    }catch(e){setPersistError("Não foi possível salvar o diagnóstico no Firestore.");}
+      setDiagnosticos(xs=>[{id:diagnosticoId,...payload,revisao},...xs.filter(x=>x.id!==diagnosticoId)]);
+    }catch(e){setPersistError(projetoContexto.single?e.message:"Não foi possível salvar o diagnóstico no Firestore.");}
     finally{setPersistBusy(false);}
   };
   const escolherProjeto=async(ctx)=>{
     setProjetoContexto(ctx);
-    setDiagnosticoSelecionado(ctx?.tipo==="novo");
+    setDiagnosticoSelecionado(ctx?.tipo==="novo"&&!ctx.single);
     setRespostas({});
     setCategoriaAtiva(secoes[0]?.id||"");
     setSavedAt(null);
@@ -177,18 +182,20 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
     }
     if(!ctx)return;
     try{
+      if(ctx.single){const result=await singleStore.listarDiagnosticos(ctx.chave);setDiagnosticos(result.diagnosticos);return;}
       const snap=await getDocs(collection(db,"diagnosticos",ctx.tipo==="existente"?ctx.projetoRef:ctx.chave,"itens"));
       setDiagnosticos(snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||""))));
     }catch(e){setDiagnosticos([]);}
   };
-  const abrirDiagnostico=(d)=>{setRespostas(d.respostas||{});setSavedAt(d.atualizadoEm?new Date(d.atualizadoEm).getTime():null);setProjetoContexto(p=>({...p,diagnosticoId:d.id,criadoEm:d.criadoEm,estado:d.estado||"rascunho"}));setDiagnosticoSelecionado(true);};
-  const novoDiagnostico=()=>{setRespostas({});setSavedAt(null);setProjetoContexto(p=>({...p,diagnosticoId:null,criadoEm:null,estado:"rascunho"}));setDiagnosticoSelecionado(true);};
+  const abrirDiagnostico=(d)=>{setRespostas(d.respostas||{});setSavedAt(d.atualizadoEm?new Date(d.atualizadoEm).getTime():null);setProjetoContexto(p=>({...p,diagnosticoId:d.id,criadoEm:d.criadoEm,estado:d.estado||"rascunho",revisao:d.revisao||0}));setDiagnosticoSelecionado(true);};
+  const novoDiagnostico=()=>{setRespostas({});setSavedAt(null);setProjetoContexto(p=>({...p,diagnosticoId:null,criadoEm:null,estado:"rascunho",revisao:0}));setDiagnosticoSelecionado(true);};
 
   if(!isAuthenticated)return <Login auth={auth} dark={dark} onBack={onBack}/>;
   if(error)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:"#ef444466"}}><div style={{fontSize:38}}>⚠️</div><h1 style={styles.title}>Acesso indisponível</h1><p role="alert" style={{...styles.muted,color:c.muted}}>{error}</p><button onClick={onBack} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>← Voltar ao início</button></section></main>;
   if(loading||!isDiagnosticDataReady(catalogo,profile))return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.centerState}><div style={{fontSize:34}}>⟳</div><strong>Carregando catálogo publicado…</strong></div></main>;
-  if(!projetoContexto)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Selecionar projeto</h1><p style={{...styles.muted,color:c.muted}}>Escolha o contexto deste diagnóstico antes de preencher.</p><button onClick={()=>{const slug=prompt("Nome do cliente/projeto novo:","");if(slug?.trim()){const chave="novo_"+user.uid+"_"+slug.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-")+"_"+Date.now().toString(36);escolherProjeto({tipo:"novo",chave,rotuloLivre:slug.trim()});}}} style={styles.primary}>＋ Projeto novo</button>{Object.entries(projectGroups).map(([grupo,ids])=><div key={grupo}><strong style={{display:"block",margin:"14px 0 6px",color:c.text,textTransform:"uppercase"}}>{grupo}</strong>{ids.map(pid=>{if(!projects[pid])return null;const p=progressoProjetos[pid];return <button key={pid} onClick={()=>escolherProjeto({tipo:"existente",projetoRef:pid,grupo})} style={{...styles.secondary,width:"100%",marginBottom:6,color:c.text,borderColor:c.border,textAlign:"left"}}><div>{pid} — {projects[pid].name}</div>{p&&<div style={{fontSize:11,marginTop:5,color:p.pct===100?"#22c55e":c.muted}}>{p.estado==="arquivado"||p.pct===100?"concluído":"em andamento"} · {p.pct}%</div>}</button>;})}</div>)}</section></main>;
-  if(projetoContexto.tipo==="existente"&&!diagnosticoSelecionado&&diagnosticos.length>0)return <main style={{...styles.page,background:c.bg}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Diagnósticos — {projetoContexto.projetoRef}</h1><p style={{...styles.muted,color:c.muted}}>Escolha um diagnóstico para continuar ou inicie um novo.</p>{diagnosticos.map(d=><button key={d.id} onClick={()=>abrirDiagnostico(d)} style={{...styles.secondary,width:"100%",marginBottom:8,color:c.text,borderColor:c.border,textAlign:"left"}}>{d.estado||"rascunho"} · {d.atualizadoEm?new Date(d.atualizadoEm).toLocaleString("pt-BR"):"sem data"} · {calculateProgress(itens,d.respostas||{}).percentual}%</button>)}<button onClick={novoDiagnostico} style={styles.primary}>＋ Novo diagnóstico</button><button onClick={()=>setProjetoContexto(null)} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>Trocar projeto</button></section></main>;
+  if(singleOpen&&!projetoContexto)return <React.Suspense fallback={<p>Carregando Single…</p>}><SingleApp auth={auth} profile={profile} onBack={()=>setSingleOpen(false)} onDiagnostico={p=>escolherProjeto({tipo:"novo",chave:p.id,rotuloLivre:p.nome,single:true})}/></React.Suspense>;
+  if(!projetoContexto)return <main style={{...styles.page,background:c.bg,color:c.text}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Selecionar projeto</h1><button onClick={()=>setSingleOpen(true)} style={styles.primary}>＋ Novo projeto (Single)</button><p style={{...styles.muted,color:c.muted}}>Escolha o contexto deste diagnóstico antes de preencher.</p><button onClick={()=>{const slug=prompt("Nome do cliente/projeto novo:","");if(slug?.trim()){const chave="novo_"+user.uid+"_"+slug.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-")+"_"+Date.now().toString(36);escolherProjeto({tipo:"novo",chave,rotuloLivre:slug.trim()});}}} style={styles.primary}>＋ Projeto novo</button>{Object.entries(projectGroups).map(([grupo,ids])=><div key={grupo}><strong style={{display:"block",margin:"14px 0 6px",color:c.text,textTransform:"uppercase"}}>{grupo}</strong>{ids.map(pid=>{if(!projects[pid])return null;const p=progressoProjetos[pid];return <button key={pid} onClick={()=>escolherProjeto({tipo:"existente",projetoRef:pid,grupo})} style={{...styles.secondary,width:"100%",marginBottom:6,color:c.text,borderColor:c.border,textAlign:"left"}}><div>{pid} — {projects[pid].name}</div>{p&&<div style={{fontSize:11,marginTop:5,color:p.pct===100?"#22c55e":c.muted}}>{p.estado==="arquivado"||p.pct===100?"concluído":"em andamento"} · {p.pct}%</div>}</button>;})}</div>)}</section></main>;
+  if((projetoContexto.tipo==="existente"||projetoContexto.single)&&!diagnosticoSelecionado&&diagnosticos.length>0)return <main style={{...styles.page,background:c.bg}}><section style={{...styles.loginCard,background:c.card,borderColor:c.border,textAlign:"left",justifyItems:"stretch"}}><h1 style={{...styles.title,color:c.text}}>Diagnósticos — {projetoContexto.projetoRef}</h1><p style={{...styles.muted,color:c.muted}}>Escolha um diagnóstico para continuar ou inicie um novo.</p>{diagnosticos.map(d=><button key={d.id} onClick={()=>abrirDiagnostico(d)} style={{...styles.secondary,width:"100%",marginBottom:8,color:c.text,borderColor:c.border,textAlign:"left"}}>{d.estado||"rascunho"} · {d.atualizadoEm?new Date(d.atualizadoEm).toLocaleString("pt-BR"):"sem data"} · {calculateProgress(itens,d.respostas||{}).percentual}%</button>)}<button onClick={novoDiagnostico} style={styles.primary}>＋ Novo diagnóstico</button><button onClick={()=>setProjetoContexto(null)} style={{...styles.secondary,color:c.muted,borderColor:c.border}}>Trocar projeto</button></section></main>;
 
   return <main style={{...styles.page,background:c.bg,color:c.text}}><div style={styles.shell}>
     <header style={{...styles.header,background:c.bg,borderColor:c.border}}>

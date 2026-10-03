@@ -1,0 +1,4 @@
+// Build a local sandbox with no network persistence; never deploy this directory.
+process.env.BABEL_ENV="development";
+const path=require("path"),webpack=require("webpack");
+webpack({mode:"development",entry:path.join(__dirname,"visual.fixture.jsx"),output:{path:path.resolve(__dirname,"../../../tmp/single-visual"),filename:"fixture.js"},resolve:{alias:{[path.join(__dirname,"singleStore.js")]:path.join(__dirname,"visualStore.fixture.js")},extensions:[".js",".jsx"]},module:{rules:[{test:/\.jsx?$/,exclude:/node_modules/,use:{loader:require.resolve("babel-loader"),options:{presets:[require.resolve("babel-preset-react-app")]}}},{test:/\.css$/,use:[require.resolve("style-loader"),require.resolve("css-loader")]}]}},(e,s)=>{if(e||s.hasErrors()){console.error(e||s.toString({all:false,errors:true}));process.exitCode=1;}else console.log("Local fixture built; no Firebase writes.");});

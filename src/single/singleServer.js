@@ -20,11 +20,12 @@ async function executar(db,u,b){
  const pid=catalogo?null:id(b.pid);
  if(pid&&!/^sg_/.test(pid))throw erro(400,"Projeto Single inválido.");
  const projectRef=catalogo?null:db.collection("single_projetos").doc(pid);
- if(action==="inspecoes"){
+ if(action==="inspecoes"||action==="diagnosticos"){
   const p=await projectRef.get();if(!p.exists||!permitido(p.data(),u))throw erro(403,"Projeto sem permissão.");
+  if(action==="diagnosticos")return {diagnosticos:(await db.collection("diagnosticos").doc(pid).collection("itens").limit(200).get()).docs.map(s=>({id:s.id,...s.data()}))};
   return {inspecoes:(await projectRef.collection("inspecoes").limit(200).get()).docs.map(s=>s.data())};
  }
- if(!["criar","ativos","arquivar","inspecao","catalogo_ler","catalogo_salvar"].includes(action))throw erro(400,"Ação inválida.");
+ if(!["criar","ativos","arquivar","inspecao","diagnostico","catalogo_ler","catalogo_salvar"].includes(action))throw erro(400,"Ação inválida.");
  return db.runTransaction(async tx=>{
   const profile=await tx.get(db.collection("usuarios").doc(u.uid));
   if(!profile.exists||profile.data().active!==true||profile.data().role!==u.role)throw erro(403,"Perfil revogado.");
@@ -37,10 +38,26 @@ async function executar(db,u,b){
   if(action==="criar"&&old)throw erro(409,"Identificador já existe; reabra o projeto.");
   const agora=new Date().toISOString();
   let target=ref, current=old, next;
-  if(action==="inspecao"){
+  if(action==="diagnostico"){
+   if(old.estado==="arquivado")throw erro(409,"Projeto arquivado.");
+   target=db.collection("diagnosticos").doc(pid).collection("itens").doc(id(b.diagnosticoId));
+   const ds=await tx.get(target);current=ds.exists?ds.data():null;
+   const input=b.data||{};
+   if(!["rascunho","arquivado"].includes(input.estado)||!input.respostas||typeof input.respostas!=="object"||Array.isArray(input.respostas))throw erro(400,"Diagnóstico inválido.");
+   const respostas={};
+   for(const [key,r] of Object.entries(input.respostas)){
+    if(!/^[a-zA-Z0-9_.-]{1,100}$/.test(key)||["__proto__","constructor","prototype"].includes(key)||!r||!["conforme","parcial","nao_conforme","ausente_necessario","na","sem_dado"].includes(r.status))throw erro(400,"Resposta inválida.");
+    respostas[key]={status:r.status,updatedAt:agora};
+    for(const field of ["situacao","impacto","indicacao","observacao"])if(r[field]!=null)respostas[key][field]=texto(r[field],10000);
+   }
+   next={tipo:"novo",projetoRef:null,rotuloLivre:old.nome,grupo:null,estado:input.estado,respostas,
+    catalogoId:current?.catalogoId||texto(input.catalogoId),versaoCatalogo:current?.versaoCatalogo||texto(input.versaoCatalogo),
+    autorUid:current?.autorUid||u.uid,criadoEm:current?.criadoEm||agora,arquivadoEm:input.estado==="arquivado"?agora:null};
+  }else if(action==="inspecao"){
    if(old.estado==="arquivado")throw erro(409,"Projeto arquivado.");
    target=projectRef.collection("inspecoes").doc(id(b.inspecaoId));
    const inspect=await tx.get(target);current=inspect.exists?inspect.data():null;
+   if(!current&&b.data?.cenarioRevisao!==old.revisao)throw erro(409,"O cenário mudou. Reabra o projeto antes de criar a vistoria; rascunho preservado.");
    const template=current?.itens||old.ativos||[];
    const supplied=lista(b.data?.itens);
    const keyed=new Map(supplied.map(x=>[id(x.id),x]));
@@ -54,7 +71,7 @@ async function executar(db,u,b){
    });
    const input=b.data||{};
    if(!["rascunho","concluida"].includes(input.estado)||!["situacional","semanal"].includes(input.tipo||"situacional"))throw erro(400,"Estado ou tipo inválido.");
-   next=calcularInspecao({id:b.inspecaoId,itens,tipo:input.tipo||"situacional",data:data(input.data),responsavel:texto(input.responsavel),observacoes:texto(input.observacoes||"",10000),estado:input.estado,autorUid:current?.autorUid||u.uid,criadoEm:current?.criadoEm||agora});
+   next=calcularInspecao({id:b.inspecaoId,itens,cenarioRevisao:current?.cenarioRevisao||old.revisao,tipo:input.tipo||"situacional",data:data(input.data),responsavel:texto(input.responsavel),observacoes:texto(input.observacoes||"",10000),estado:input.estado,autorUid:current?.autorUid||u.uid,criadoEm:current?.criadoEm||agora});
   }else if(action==="criar"){
    const input=b.data||{};
    next={id:pid,nome:texto(input.nome),codigo:input.codigo?texto(input.codigo,50):null,responsavel:texto(input.responsavel||""),dataVistoria:data(input.dataVistoria),criadoEm:agora,criadoPorUid:u.uid,estado:"ativo",orgId:"moked",modulo:"single",ativos:[]};
