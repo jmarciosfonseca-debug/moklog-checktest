@@ -6,6 +6,12 @@ const esperadosDe=d=>new Map(core.planejar(d).itens.map(i=>[i.ref,i.sha]));
 function txFalsa(principal,fotos){const gravado=[];return {gravado,tx:{get:async()=>({data:()=>JSON.parse(JSON.stringify(principal))}),
   getAll:async(...refs)=>refs.map(r=>({exists:!!fotos[r.id],data:()=>fotos[r.id]})),set:(_r,d)=>gravado.push(JSON.parse(JSON.stringify(d)))}};}
 const refFoto=id=>({id});
+test("migração preserva a marcação sem foto mesmo quando há cópia legada",()=>{
+  const d=doc();d.colaboradores[0].temFoto=false;
+  const r=core.aplicarLimpeza(d,esperadosDe(d));
+  expect(r.doc.colaboradores[0]).toMatchObject({foto:"",temFoto:false});
+  expect(r.doc.colaboradores[0].fotoRef).toBeTruthy();
+});
 
 test("planejar: usa o mesmo id do servidor, ignora quem já tem fotoRef e não-imagens",()=>{
   const d=doc(),p=core.planejar(d);

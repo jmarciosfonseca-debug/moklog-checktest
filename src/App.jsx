@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import AcessoApp from "./Acesso";
 import KeyAccessFalha from "./KeyAccessFalha";
 import EquipeApp, { ContadorEquipe } from "./Equipe";
-import { useFotosEquipe, fotoDe } from "./fotosEquipe";
+import { useFotosEquipe, fotoDe, referenciasFotos } from "./fotosEquipe";
 import AcessoCCO from "./AcessoCCO";
 import Ocorrencias from "./Ocorrencias";
 import EmpresaInfo from "./EmpresaInfo";
@@ -3120,8 +3120,8 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 }
 
 function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFull }) {
-  const fotosEq = useFotosEquipe(project.id);
   const [equipeData, setEquipeData] = useState(null);
+  const fotosEq = useFotosEquipe(project.id, referenciasFotos(equipeData?.colaboradores));
   const [loading, setLoading] = useState(true);
 
   const bg   = dark ? "#04080f" : "#f1f5f9";

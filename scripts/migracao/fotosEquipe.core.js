@@ -26,7 +26,7 @@ function aplicarLimpeza(doc, verificados) {
   for (const lista of LISTAS) for (const c of (Array.isArray(novo[lista]) ? novo[lista] : [])) {
     if (!c || c.fotoRef || !eh(c.foto)) continue;
     const ref = idFoto(c.id, c.foto);
-    if (verificados.get(ref) === sha(c.foto)) { c.foto = ""; c.fotoRef = ref; c.temFoto = true; limpos.push(c.id); }
+    if (verificados.get(ref) === sha(c.foto)) { c.foto = ""; c.fotoRef = ref; c.temFoto = c.temFoto !== false; limpos.push(c.id); }
     else ignorados.push(c.id);
   }
   return { doc: novo, limpos, ignorados };

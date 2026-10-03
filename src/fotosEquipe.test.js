@@ -32,6 +32,12 @@ test("R2: injetarFotos SEMPRE resolve (inclusive vazia): o PDF não recebe a có
 });
 describe("prepararColaborador",()=>{
   const form={id:"a",nome:"X",foto:""};
+  test("editar outros campos não reativa foto marcada como removida",()=>{
+    for (const existente of [{foto:JPG(6),temFoto:false},{fotoRef:"a-1",temFoto:false}]) {
+      const r=F.prepararColaborador({form,fotoFinal:"",ref:"",existente});
+      expect(r.temFoto).toBe(false);expect(F.fotoDe(r,{"a-1":JPG(5)})).toBe("");
+    }
+  });
   test("foto nova enviada: aponta para a referência e esvazia o campo legado",()=>{
     expect(F.prepararColaborador({form:{...form,foto:JPG(3)},fotoFinal:JPG(3),ref:"a-9",existente:{id:"a",foto:JPG(8)}})).toEqual({id:"a",nome:"X",foto:"",fotoRef:"a-9",temFoto:true});
   });
@@ -72,6 +78,25 @@ test("carregarFotos devolve só imagens válidas por id da foto",async()=>{
 describe("useFotosEquipe",()=>{
   let visto;const T=({pid})=>{visto=F.useFotosEquipe(pid);return null;};
   const montar=async(pid)=>{const h=document.createElement("div");const r=createRoot(h);await act(async()=>r.render(<T pid={pid}/>));return {r,trocar:async p=>act(async()=>r.render(<T pid={p}/>)),fechar:()=>act(async()=>r.unmount())};};
+  test("nova referência de outro aparelho ignora cache recente e PDF aguarda a foto",async()=>{
+    mockGetDocs.mockResolvedValueOnce(docs({"a-1":JPG(5)}));
+    const m=await montar("P601");
+    const lista=[{fotoRef:"a-2",temFoto:true}];
+    expect(F.fotosPendentes(lista,visto.mapa)).toBe(true);
+    mockGetDocs.mockResolvedValueOnce(docs({"a-1":JPG(5),"a-2":JPG(6)}));
+    await act(async()=>visto.referenciar(F.referenciasFotos(lista)));
+    expect(mockGetDocs).toHaveBeenCalledTimes(2);
+    expect(F.fotosPendentes(lista,visto.mapa)).toBe(false);
+    expect(F.fotoDe(lista[0],visto.mapa)).toBe(JPG(6));
+    await m.fechar();
+  });
+  test("falha de leitura permite tentativa explícita sem alterar cadastro",async()=>{
+    mockGetDocs.mockRejectedValueOnce(new Error("offline"));
+    const m=await montar("P601");
+    mockGetDocs.mockResolvedValueOnce(docs({"a-1":JPG(5)}));
+    await act(async()=>visto.recarregar());
+    expect(visto.mapa).toEqual({"a-1":JPG(5)});await m.fechar();
+  });
   test("cache de 10 min e revalidação depois",async()=>{
     jest.useFakeTimers();jest.setSystemTime(new Date(2026,9,3,10,0,0));
     mockGetDocs.mockResolvedValue(docs({"a-1":JPG(5)}));

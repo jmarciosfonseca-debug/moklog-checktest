@@ -42,7 +42,7 @@ import { fvNoEscopo } from "./fvConfig";
 import {bloqueadaPorWhats, situacaoSolicitacao} from "./equipeAprovacao";
 import { gravarComRecuperacao } from "./equipeConflito";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
-import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe } from "./fotosEquipe";
+import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
 import {criarSolicitacoes, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 
@@ -2142,6 +2142,10 @@ export function ContadorEquipe({ projectId }){
 function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted, fotosApi }) {
   const fotosMapa = fotosApi.mapa, definirFoto = fotosApi.definir;
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
+  const referenciarFotos = fotosApi.referenciar;
+  useEffect(() => {
+    referenciarFotos(referenciasFotos([...(equipeData.colaboradores || []), ...(equipeData.desligados || [])]));
+  }, [equipeData, referenciarFotos]);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | add | edit | view | addHist
   // Keyframe do "piscar" de reciclagem — injeta uma vez no documento.
   useEffect(()=>{
@@ -2843,6 +2847,11 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   {selPDF.length>0&&(
                     <button onClick={()=>{
                       const cols = ativos.filter(c=>selPDF.includes(c.id));
+                      if (fotosPendentes([...cols, ...(pdfComDesligados ? desligados : [])], fotosMapa)) {
+                        fotosApi.recarregar();
+                        alert("Há fotos que ainda não carregaram. Aguarde alguns instantes e tente gerar o PDF novamente. Se persistir, confira sua conexão e o acesso às fotos.");
+                        return;
+                      }
                       const titulo = selPDF.length===1
                         ? cols[0].nome
                         : selPDF.length===ativos.length

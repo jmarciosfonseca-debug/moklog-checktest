@@ -33,6 +33,12 @@ export function fotoDe(colab, mapa) {
 export function injetarFotos(lista, mapa) {
   return (lista || []).map(c => ({ ...c, foto: fotoDe(c, mapa) }));
 }
+export function referenciasFotos(lista) {
+  return JSON.stringify([...new Set((lista || []).filter(c => c.temFoto !== false && c.fotoRef).map(c => c.fotoRef))].sort());
+}
+export function fotosPendentes(lista, mapa) {
+  return (lista || []).some(c => c.temFoto !== false && c.fotoRef && !fotoDe(c, mapa));
+}
 export async function carregarFotos(db, pid) {
   const snap = await getDocs(collection(db, "equipes", pid, FOTO_SUBCOLECAO));
   const mapa = {};
@@ -57,6 +63,7 @@ export function prepararColaborador({ form, fotoFinal, ref, existente }) {
   const refAtual = ex.fotoRef || form.fotoRef || "";
   const legada = ehFoto(ex.foto) ? ex.foto : (ehFoto(form.foto) && !refAtual ? form.foto : "");
   const colab = { ...form, foto: refAtual ? "" : legada, temFoto: !!(refAtual || legada || ex.temFoto === true) };
+  if (ex.temFoto === false) colab.temFoto = false;
   if (refAtual) colab.fotoRef = refAtual;
   return colab;
 }
@@ -64,14 +71,18 @@ export function prepararColaborador({ form, fotoFinal, ref, existente }) {
 // Cache por projeto (10 min). Fotos são imutáveis: unir mapas nunca perde nem corrompe nada.
 const cache = new Map();
 export function limparCacheFotos() { cache.clear(); }
-export function useFotosEquipe(pid) {
+export function useFotosEquipe(pid, referencias = "[]") {
+  const [solicitadas, referenciar] = useState("[]");
+  const [tentativa, setTentativa] = useState(0);
+  const recarregar = useCallback(() => setTentativa(n => n + 1), []);
   const [estado, setEstado] = useState(() => { const c = pid && cache.get(pid); return { pid, mapa: c ? c.mapa : VAZIO, carregado: !!c }; });
   useEffect(() => {
     if (!pid) return undefined;
     let vivo = true;
     const c = cache.get(pid);
     setEstado(e => e.pid === pid ? e : { pid, mapa: c ? c.mapa : VAZIO, carregado: !!c });   // nunca mantém o mapa de outro projeto
-    if (c && Date.now() - c.em < VALIDADE_CACHE_MS) return undefined;
+    const refs = [...JSON.parse(referencias), ...JSON.parse(solicitadas)];
+    if (!tentativa && c && Date.now() - c.em < VALIDADE_CACHE_MS && refs.every(ref => ehFoto(c.mapa[ref]))) return undefined;
     carregarFotos(getFirestore(), pid)
       .then(m => {
         const uniao = { ...m, ...((cache.get(pid) || {}).mapa || {}) };
@@ -80,7 +91,7 @@ export function useFotosEquipe(pid) {
       })
       .catch(() => { /* sem foto: a tela mostra o ícone e continua funcionando */ });
     return () => { vivo = false; };
-  }, [pid]);
+  }, [pid, referencias, solicitadas, tentativa]);
   const definir = useCallback((ref, dataUrl) => {
     setEstado(e => {
       if (e.pid !== pid) return e;
@@ -90,5 +101,5 @@ export function useFotosEquipe(pid) {
     });
   }, [pid]);
   const atual = estado.pid === pid;
-  return { mapa: atual ? estado.mapa : VAZIO, definir, carregado: atual && estado.carregado };
+  return { mapa: atual ? estado.mapa : VAZIO, definir, referenciar, recarregar, carregado: atual && estado.carregado };
 }
