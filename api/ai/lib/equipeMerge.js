@@ -1,7 +1,36 @@
-const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const stable=x=>Array.isArray(x)?x.map(stable):(x!==null&&typeof x==='object')?Object.keys(x).sort().reduce((o,k)=>{if(x[k]!==undefined)o[k]=stable(x[k]);return o;},{}):x;
+const equal=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 function conflict(){const e=Error('Outro usuário alterou este registro. Reabra a tela antes de salvar. Nenhum dado foi sobrescrito.');e.status=409;throw e;}
-function merge(before,after,current){
+// checagemEquipe = { alvo, checkins:[{slotId,...}], concluidoEm?, proximoAlvo? }. Os check-ins não têm "id":
+// a chave é o slotId. Une os check-ins de líderes diferentes, nunca apaga, nunca sobrescreve o mesmo slot em silêncio.
+const slotKey=c=>(c&&typeof c==='object')?String(c.slotId||c.id||c.em||''):'';
+function mergeChecagem(before,after,current){
+ if(equal(before,after))return current;
+ if(equal(current,after))return current;
+ if(equal(before,current))return after;
+ if(!object(after))conflict();
+ if(!object(current))return after;
+ const cAfter=String(after.alvo||''),cCur=String(current.alvo||'');
+ if(cAfter&&cCur&&cAfter<cCur)return current;      // tela de um ciclo anterior não apaga o ciclo vigente
+ if(cAfter!==cCur)return after;                    // início de um novo ciclo
+ const list=x=>Array.isArray(x&&x.checkins)?x.checkins:[];
+ const bef=object(before)&&String(before.alvo||'')===cAfter?list(before):[];
+ const out=list(current).slice();
+ for(const a of list(after)){
+  const k=slotKey(a);if(!k)conflict();
+  const b=bef.find(x=>slotKey(x)===k),i=out.findIndex(x=>slotKey(x)===k);
+  if(b&&equal(a,b))continue;                       // este slot não foi alterado nesta edição
+  if(i<0){out.push(a);continue;}                   // slot novo
+  if(equal(out[i],a))continue;                     // retry idêntico: não duplica
+  if(b&&equal(b,out[i])){out[i]=a;continue;}       // ninguém mexeu neste slot desde a base: substitui
+  conflict();                                      // o mesmo slot foi assinado por outra pessoa
+ }
+ const merged={...current,checkins:out};
+ for(const key of Object.keys(after))if(key!=='checkins'&&merged[key]===undefined)merged[key]=after[key]; // concluidoEm, proximoAlvo
+ return merged;
+}
+function merge(before,after,current,depth=0){
  if(equal(before,after))return current;
  if(equal(current,after))return current;
  if(equal(before,current))return after;
@@ -9,7 +38,7 @@ function merge(before,after,current){
   const out={...current};
   for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
    if(['__proto__','constructor','prototype'].includes(key))conflict();
-   const value=merge(before[key],after[key],current[key]);
+   const value=(depth===0&&key==='checagemEquipe')?mergeChecagem(before[key],after[key],current[key]):merge(before[key],after[key],current[key],depth+1);
    if(value===undefined)delete out[key];else out[key]=value;
   }return out;
  }
@@ -17,9 +46,9 @@ function merge(before,after,current){
   const keyed=a=>a.every(x=>object(x)&&typeof x.id==='string'&&x.id)&&new Set(a.map(x=>x.id)).size===a.length;
   if(![before,after,current].every(keyed))conflict();
   const bm=new Map(before.map(x=>[x.id,x])),am=new Map(after.map(x=>[x.id,x]));
-  const out=current.map(x=>merge(bm.get(x.id),am.has(x.id)?am.get(x.id):bm.has(x.id)?undefined:x,x)).filter(x=>x!==undefined);
+  const out=current.map(x=>merge(bm.get(x.id),am.has(x.id)?am.get(x.id):bm.has(x.id)?undefined:x,x,depth+1)).filter(x=>x!==undefined);
   for(const a of after)if(!current.some(x=>x.id===a.id)){
-   const value=merge(bm.get(a.id),a,undefined);if(value!==undefined)out.push(value);
+   const value=merge(bm.get(a.id),a,undefined,depth+1);if(value!==undefined)out.push(value);
   }return out;
  }
  conflict();
