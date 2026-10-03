@@ -40,6 +40,8 @@ import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, aplicarAprovacao
 import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
 import { fvNoEscopo } from "./fvConfig";
 import {bloqueadaPorWhats, situacaoSolicitacao} from "./equipeAprovacao";
+import { gravarComRecuperacao } from "./equipeConflito";
+import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import {criarSolicitacoes, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 
@@ -202,8 +204,6 @@ function chkEqAlvoVigente(){
   else base=chkEqProxSabado(hoje);
   return chkEqISO(base);
 }
-// Fim da janela = domingo 23:59 (sábado-alvo + 1 dia).
-function chkEqFimTimestamp(alvoSabISO){ const d=chkEqParseISO(alvoSabISO); d.setDate(d.getDate()+1); d.setHours(23,59,0,0); return d.getTime(); }
 // Próximo alvo após concluir: sábado seguinte (+7 dias).
 function chkEqProximo(alvoSabISO){ const d=chkEqParseISO(alvoSabISO); d.setDate(d.getDate()+7); return chkEqISO(d); }
 
@@ -232,7 +232,7 @@ async function saveEquipe(projectId, data, before) {
   if(!before)throw Error("Base da edição ausente. Reabra a tela.");
   const response=await authFetchEquipe("/api/equipe-save",{method:"POST",body:JSON.stringify({pid:projectId,before,after:data})});
   const result=await response.json();
-  if(!response.ok||!result.ok)throw Error(result.erro||"Não foi possível salvar.");
+  if(!response.ok||!result.ok)throw Object.assign(Error(result.erro||"Não foi possível salvar."),{status:response.status});
   try{localStorage.setItem(`equipe_${projectId}`,JSON.stringify(result.data));}catch{}
   return result.data;
 }
@@ -2117,32 +2117,22 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
 export function ContadorEquipe({ projectId }){
   const [chk, setChk] = useState(undefined);
   const [colabs, setColabs] = useState([]);
-  const [agora, setAgora] = useState(()=>Date.now());
+  useAtualizarAoVoltar(); // reavalia ao voltar à aba; sem relógio em segundo plano
+  const janela = janelaChecagemAberta();
   useEffect(()=>{
+    if(!janela) return;   // fora de sáb/dom não baixa o documento da equipe só para decidir não mostrar nada
     let vivo=true;
     loadEquipe(projectId).then(d=>{ if(vivo){ setChk(d?.checagemEquipe||null); setColabs(d?.colaboradores||[]); } }).catch(()=>{ if(vivo) setChk(null); });
     return ()=>{ vivo=false; };
-  },[projectId]);
-  useEffect(()=>{ const t=setInterval(()=>setAgora(Date.now()),30000); return ()=>clearInterval(t); },[]);
-  if(chk===undefined) return null;
+  },[projectId, janela]);
+  if(!janela || chk===undefined) return null;
   const alvo=chkEqAlvoVigente(chk);
-  const fim=chkEqFimTimestamp(alvo);
   const num=chkEqNumCheckins(projectId, colabs);
   const feitos=(chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins.length : 0;
-  const completo=feitos>=num;
-  const hoje=new Date(); const dia=hoje.getDay();
-  const janelaAberta = dia===6 || dia===0; // sáb ou dom
-  const diff=fim-agora;
-  // Fora da janela e sem pendência: não polui a home.
-  if(!janelaAberta && (completo || diff<0)) return null;
-  if(completo){
+  if(feitos>=num){
     return <div style={{fontSize:10,color:"#22c55e",marginTop:3,fontWeight:700}}>✓ Checagem da equipe concluída ({feitos}/{num})</div>;
   }
-  if(diff<=0){
-    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}>⚠️ Checagem de equipe pendente ({feitos}/{num})</div>;
-  }
-  const d=Math.floor(diff/86400000), h=Math.floor((diff%86400000)/3600000), m=Math.floor((diff%3600000)/60000);
-  return <div style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}>🗓️ Checagem equipe: {feitos}/{num} · fecha dom 23:59 ({d>0?`${d}d `:""}{h}h {m}min)</div>;
+  return <div style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}>🗓️ Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
 }
 
 export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted }) {
@@ -2170,8 +2160,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
   const [checagemModal, setChecagemModal] = useState(false); // modal de checagem de equipe (fim de semana)
   const [visaoEquipes, setVisaoEquipes] = useState(false); // alterna lista por turno x por equipe montada
   const [montarLiderId, setMontarLiderId] = useState(null); // líder cuja equipe está sendo montada
-  const [agoraChkEq, setAgoraChkEq] = useState(()=>Date.now());
-  useEffect(()=>{ const t=setInterval(()=>setAgoraChkEq(Date.now()),30000); return ()=>clearInterval(t); },[]);
+  useAtualizarAoVoltar(); // card do fim de semana: reavalia ao voltar à aba (sem relógio contínuo)
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [darkLocal, setDarkLocal] = useState(true);
@@ -2282,12 +2271,21 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     setEquipeData(base);
     setSelColab(prev=>prev?(base.colaboradores.find(c=>c.id===prev.id)||prev):prev);
   };
+  // Toda gravação da Equipe passa por aqui. Em conflito 409 traz a versão do servidor para a tela e troca a mensagem
+  // pela orientação correta (se não conseguir atualizar, diz isso em vez de afirmar que atualizou).
+  const recarregarDoServidor=async()=>{
+    const snap=await getDocFromServer(doc(db,"equipes",project.id));
+    if(!snap.exists())return false;
+    atualizarEquipeLocal(snap.data());
+    return true;
+  };
+  const gravar=(novosDados,antes)=>gravarComRecuperacao(()=>saveEquipe(project.id,novosDados,antes||equipeData),recarregarDoServidor);
   const gravarSolicitacoes=async(transformar)=>{
     if(isDemo())throw Error("Demonstração: solicitações não são gravadas.");
     const snap=await getDocFromServer(doc(db,"equipes",project.id));
     if(!snap.exists())throw Error("Equipe não encontrada no servidor.");
     const before=snap.data(),resultado=transformar(before);
-    resultado.base=await saveEquipe(project.id,resultado.base,before);
+    resultado.base=await gravar(resultado.base,before);
     return resultado;
   };
   const aprovarSolicitacoes = async (alvos, decisao, opcoes={})=>{
@@ -2328,7 +2326,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
 
   const save = async (newData) => {
     setSaving(true);
-    try{atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));}
+    try{atualizarEquipeLocal(await gravar(newData));}
     catch(e){alert(e.message||"Não foi possível salvar.");throw e;}
     finally{setSaving(false);}
   };
@@ -2341,10 +2339,10 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     const newData = { ...equipeData, perfilSeguranca: novoPerfil };
     setEquipeData(newData);
     try {
-      atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
+      atualizarEquipeLocal(await gravar(newData));
     } catch(err) {
       console.error("Erro ao salvar perfil de segurança:", err);
-      alert("Erro ao salvar perfil de segurança. Verifique a conexão.");
+      alert(err && err.status===409 ? err.message : "Erro ao salvar perfil de segurança. Verifique a conexão.");
     }
   };
 
@@ -2398,14 +2396,14 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         : equipeData.colaboradores.map(c=>c.id===form.id?formFinal:c);
       const newData = {...equipeData, colaboradores:newColabs};
       setEquipeData(newData);
-      atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
+      atualizarEquipeLocal(await gravar(newData));
       setSaving(false);
       setScreen("list");
       setForm(null);
     } catch(err) {
       console.error("Erro ao salvar colaborador:", err);
       setSaving(false);
-      setEquipeData(equipeData);
+      if(!(err && err.status===409)) setEquipeData(equipeData);   // em 409 a tela já foi atualizada com o servidor
       alert(err.message||"Não foi possível salvar. Os dados existentes foram preservados.");
     }
   };
@@ -2619,7 +2617,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     // Update selColab if it's the one being edited
     const updated = newColabs.find(c=>c.id===colabId);
     if(updated) setSelColab(updated);
-    atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
+    atualizarEquipeLocal(await gravar(newData));
     setEditHistItem(null);
     setScreen("view");
   };
@@ -2701,7 +2699,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
       onSave={async(ferias)=>{
         const newData = {...equipeData, ferias};
         setEquipeData(newData);
-        atualizarEquipeLocal(await saveEquipe(project.id, newData, equipeData));
+        atualizarEquipeLocal(await gravar(newData));
       }}
       ferias={equipeData.ferias||[]}
       dark={dark}
@@ -2859,35 +2857,24 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
             </div>
           ) : null}
 
-          {/* Painel de checagem de equipe (fim de semana) */}
-          {liderAuth && (()=>{
+          {/* Checagem de equipe (fim de semana): card só no sábado e no domingo, sem contagem regressiva */}
+          {liderAuth && janelaChecagemAberta() && (()=>{
             const chk = equipeData.checagemEquipe || null;
             const alvo = chkEqAlvoVigente(chk);
-            const fim = chkEqFimTimestamp(alvo);
             const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
             const feitos = (chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins : [];
             const completo = feitos.length>=num;
-            const dia = new Date().getDay();
-            const janelaAberta = dia===6 || dia===0;
-            const diff = fim - agoraChkEq;
-            const pendente = diff<=0 && !completo;
-            // Fora da janela e já concluído: mostra estado discreto.
-            const cor = completo ? "#22c55e" : pendente ? "#ef4444" : "#f59e0b";
-            const bg  = completo ? (dark?"#021a0d":"#f0fdf4") : pendente ? "#1a0202" : (dark?"#1a1000":"#fffbeb");
-            const d=Math.floor(Math.max(0,diff)/86400000), h=Math.floor((Math.max(0,diff)%86400000)/3600000), m=Math.floor((Math.max(0,diff)%3600000)/60000);
+            const cor = completo ? "#22c55e" : "#f59e0b";
+            const bg  = completo ? (dark?"#021a0d":"#f0fdf4") : (dark?"#1a1000":"#fffbeb");
             return (
               <div style={{ background:bg, border:`1px solid ${cor}44`, borderRadius:10, padding:"11px 14px" }}>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap" }}>
                   <div style={{ flex:1, minWidth:180 }}>
-                    <div style={{ fontSize:13, fontWeight:800, color:cor }}>🗓️ Checagem de equipe — fim de semana</div>
+                    <div style={{ fontSize:13, fontWeight:800, color:cor }}>🗓️ Checar a equipe — fim de semana</div>
                     {completo ? (
                       <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>✓ Concluída ({feitos.length}/{num}) · reabre no próximo sábado</div>
-                    ) : pendente ? (
-                      <div style={{ fontSize:11, color:"#f87171", fontWeight:600, marginTop:2 }}>⚠️ Pendente ({feitos.length}/{num}) — cada líder deve checar seu plantão.</div>
                     ) : (
-                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>
-                        {feitos.length}/{num} check-ins · {janelaAberta?`fecha domingo 23:59 (${d>0?d+"d ":""}${h}h ${m}min)`:`abre sábado`}
-                      </div>
+                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>{feitos.length}/{num} check-ins · fecha domingo 23:59</div>
                     )}
                     {feitos.length>0 && (
                       <div style={{ fontSize:9, color:"#64748b", marginTop:3 }}>
@@ -2897,7 +2884,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                   </div>
                   {!completo && (
                     <button onClick={()=>setChecagemModal(true)}
-                      style={{ background:pendente?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px 16px", fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>
+                      style={{ background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px 16px", fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>
                       ✓ Checar minha equipe
                     </button>
                   )}
