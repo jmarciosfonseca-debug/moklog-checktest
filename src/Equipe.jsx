@@ -1,5 +1,5 @@
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, where } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
@@ -41,6 +41,7 @@ import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
 import { fvNoEscopo } from "./fvConfig";
 import {situacaoSolicitacao, podeEnviarAoGrupo, envioPendente, enviadoAposAprovacao} from "./equipeAprovacao";
 import { gravarComRecuperacao } from "./equipeConflito";
+import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
 import {criarSolicitacoes, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
@@ -2281,21 +2282,32 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   };
   // Toda gravação da Equipe passa por aqui. Em conflito 409 traz a versão do servidor para a tela e troca a mensagem
   // pela orientação correta (se não conseguir atualizar, diz isso em vez de afirmar que atualizou).
+  // Fila: uma gravação por vez, na ordem das ações (evita a pessoa conflitar com a própria gravação anterior).
+  const filaRef=useRef(null);
+  if(!filaRef.current)filaRef.current=criarFila();
+  // Última versão CONFIRMADA pelo servidor (carga, gravação bem-sucedida ou releitura).
+  const confirmadaRef=useRef(null);
   const recarregarDoServidor=async()=>{
     const snap=await getDocFromServer(doc(db,"equipes",project.id));
     if(!snap.exists())return false;
+    confirmadaRef.current=snap.data();
     atualizarEquipeLocal(snap.data());
     return true;
   };
-  const gravar=async(novosDados,antes)=>{
-    const base=antes||equipeData;
-    try{return await gravarComRecuperacao(()=>saveEquipe(project.id,novosDados,base),recarregarDoServidor);}
-    catch(e){
-      // Uma edição otimista que não foi salva não pode virar a próxima base.
-      // Se a releitura confirmou dados novos, preserva essa versão do servidor.
-      if(!e?.baseAtualizada)atualizarEquipeLocal(base);
-      throw e;
-    }
+  const gravar=(novosDados,antes)=>{
+    const base=antes||equipeData;   // capturada no momento da ação: já inclui as edições anteriores ainda na fila
+    return filaRef.current(async()=>{
+      try{
+        const r=await gravarComRecuperacao(()=>saveEquipe(project.id,novosDados,base),recarregarDoServidor);
+        confirmadaRef.current=r;
+        return r;
+      }catch(e){
+        // Uma edição otimista que não foi salva não pode virar a próxima base: volta para a última versão CONFIRMADA.
+        // Se a releitura confirmou dados novos, preserva essa versão do servidor.
+        if(!e?.baseAtualizada)atualizarEquipeLocal(confirmadaRef.current||base);
+        throw e;
+      }
+    });
   };
   const gravarSolicitacoes=async(transformar)=>{
     if(isDemo())throw Error("Demonstração: solicitações não são gravadas.");
@@ -2336,6 +2348,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
   useEffect(() => {
     loadEquipe(project.id).then(data => {
+      confirmadaRef.current = data;
       setEquipeData(data || { colaboradores:[], desligados:[] });
       setLoading(false);
     });
