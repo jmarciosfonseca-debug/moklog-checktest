@@ -14,9 +14,12 @@ test.each([1,15])('S3: %i itens são persistidos em uma escrita e todos constam 
  const r=await relerEGravarEquipe('local',ler,setDoc,b=>({base:anexarSolicitacoes(b,'c',novas)}));
  expect(firebaseSetDoc).toHaveBeenCalledTimes(1);
  expect(r.base.colaboradores[0].uniforme.solicitacoes).toHaveLength(n);
- const msg=mensagemSolicitacoes('P260A','Teste',novas);
+ // a mensagem do grupo só existe depois da aprovação do gerencial
+ const aprovadas=aprovarNaEquipe(r.base,alvosAguardando(r.base.colaboradores,2026),'aprovado',{},agora).base.colaboradores[0].uniforme.solicitacoes;
+ const msg=mensagemSolicitacoes('P260A','Teste',aprovadas);
  expect(msg.match(/Protocolo:/g)).toHaveLength(n);
  novas.forEach(s=>expect(msg).toContain(s.item));
+ expect(msg).toContain('Aprovado pelo consultor Fonseca');
 });
 
 test('S5: fireGuard impede escrita demo nos cinco tipos de ação novos',async()=>{
@@ -24,9 +27,8 @@ test('S5: fireGuard impede escrita demo nos cinco tipos de ação novos',async()
  const novas=lote(3),b=anexarSolicitacoes(base(),'c',novas),alvos=alvosAguardando(b.colaboradores,2026);
  const transforms=[
   x=>({base:anexarSolicitacoes(x,'c',[{...novas[0],id:'extra'}])}),
-  x=>({base:marcarWhats(x,'c',novas.map(s=>s.id),agora,'evento')}),
+  x=>({base:marcarWhats(aprovarNaEquipe(x,alvos,'aprovado',{},agora).base,'c',novas.map(s=>s.id),agora,'evento')}),   // o toque só existe depois de aprovar
   x=>aprovarNaEquipe(x,alvos,'aprovado',{},agora),
-  x=>aprovarNaEquipe(x,alvos,'aprovado',{dispensarWhats:true},agora),
   x=>aprovarNaEquipe(x,alvos,'aprovado',{somenteAguardando:true},agora)
  ];
  for(const transformar of transforms)await relerEGravarEquipe('local',async()=>({exists:()=>true,data:()=>b}),setDoc,transformar);

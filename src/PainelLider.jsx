@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { statusReciclagem } from "./pendencias";
+import { envioPendente } from "./equipeAprovacao";
 import { gerarPDFSolicitacoesColaborador, gerarPDFSolicitacoesLote } from "./pdfSolicitacoes";
 import {
   QUALIDADE, detalharPendenciaEquip,
@@ -186,6 +187,8 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
   if (reciclAlerta.length > 0) alertas.push({ cor:"#f59e0b", icone:"🔄", txt:`${reciclAlerta.length} reciclagem(ns) a vencer` });
   if (retornos7.length > 0) alertas.push({ cor:"#0ea5e9", icone:"🏖️", txt:`${retornos7.length} retorno(s) de férias em 7 dias` });
   if (coberturaPendente > 0) alertas.push({ cor:"#f59e0b", icone:"🏖️", txt:`${coberturaPendente} cobertura(s) de férias pendente(s)` });
+  const aprovadasParaEnviar = cols.reduce((n, c) => n + ((c.uniforme && c.uniforme.solicitacoes) || []).filter(envioPendente).length, 0);
+  if (aprovadasParaEnviar > 0) alertas.push({ cor:"#22c55e", icone:"📲", txt:`${aprovadasParaEnviar} solicitação(ões) de material aprovada(s): envie ao grupo` });
   if (materialPendente.length > 0) alertas.push({ cor:"#f59e0b", icone:"📦", txt:`${materialPendente.length} solicitação(ões) de material pendente(s)` });
   const rotuloSit = (s) => s==="concluida" ? "Concluída" : s==="parcial" ? "Parcial" : "Pendente";
   const corSit = (s) => s==="concluida" ? "#22c55e" : s==="parcial" ? "#f59e0b" : "#f59e0b";

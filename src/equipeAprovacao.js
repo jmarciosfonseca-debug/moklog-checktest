@@ -13,8 +13,20 @@
 
 export const APROVACAO_STATUS = ["aguardando", "aprovado", "negado"];
 
-export function bloqueadaPorWhats(s) {
-  return s?.exigeWhats === true && !s.whatsEnviadoEm && !s.whatsDispensadoEm;
+// Fluxo (decisão do Marcio, 03/10/2026): o líder SOLICITA → status "aguardando" → o gerencial aprova/nega → SÓ ENTÃO o líder
+// envia a mensagem ao grupo, já assinada pelo aprovador. A aprovação nunca depende do envio.
+// (O campo exigeWhats continua sendo gravado nos pedidos do líder e significa "deve ser enviado ao grupo DEPOIS de aprovado".)
+export function podeEnviarAoGrupo(s) {
+  return situacaoSolicitacao(s) === 'aprovado' && s?.status === 'pendente';
+}
+// A mensagem que vale é a ASSINADA, enviada DEPOIS da aprovação. Um toque do fluxo antigo (anterior à aprovação) não conta.
+export function enviadoAposAprovacao(s) {
+  if (!s?.whatsEnviadoEm) return false;
+  if (!s.aprovadoEm) return true;
+  return new Date(s.whatsEnviadoEm).getTime() >= new Date(s.aprovadoEm).getTime();
+}
+export function envioPendente(s) {
+  return podeEnviarAoGrupo(s) && !enviadoAposAprovacao(s);
 }
 
 // Entregas antigas sem decisão não são solicitações aguardando aprovação.
@@ -67,7 +79,7 @@ export function aplicarAprovacao(colaboradores, alvos, decisao, agoraIso = new D
     mapa.get(a.colabId).add(a.solicId);
   });
   let alterados = 0;
-  const bloqueados = [];
+  const bloqueados = [];   // mantido por compatibilidade: a aprovação não é mais bloqueada pelo envio ao WhatsApp
   const aplicados = [];
   const lista = (colaboradores || []).map(c => {
     const ids = mapa.get(c.id);
@@ -77,10 +89,6 @@ export function aplicarAprovacao(colaboradores, alvos, decisao, agoraIso = new D
       if (!ids.has(s.id)) return s;
       if (opcoes.somenteAguardando && situacaoSolicitacao(s) !== 'aguardando') return s;
       if (c.uniforme.solicitacoes.filter(x=>x.id===s.id).length !== 1) throw new Error('Identificador duplicado: aprovação requer revisão do pedido.');
-      if (decisao === 'aprovado' && bloqueadaPorWhats(s)) {
-        if (!opcoes.dispensarWhats) { bloqueados.push({colabId:c.id, solicId:s.id}); return s; }
-        s = {...s, whatsDispensadoEm:agoraIso, whatsDispensadoPor:por};
-      }
       const anterior = statusAprovacao(s);
       if (anterior === decisao && s.aprovacao === decisao) return s; // sem mudança real
       mudou = true; alterados++;

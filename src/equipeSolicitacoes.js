@@ -1,4 +1,4 @@
-import {aplicarAprovacao, bloqueadaPorWhats, situacaoSolicitacao, solicitacoesPorAprovacao} from './equipeAprovacao';
+import {aplicarAprovacao, podeEnviarAoGrupo, situacaoSolicitacao, solicitacoesPorAprovacao} from './equipeAprovacao';
 
 export function criarSolicitacoes(itens, nivel, pid, agora = new Date().toISOString(), uuid = () => crypto.randomUUID()) {
   if (!['admin','lider'].includes(nivel)) throw Error('Acesso sem permissão para solicitar.');
@@ -18,6 +18,8 @@ export function anexarSolicitacoes(base,colabId,novas) {
 export function marcarWhats(base,colabId,ids,em,eventoId) {
   const colab=(base.colaboradores||[]).find(c=>c.id===colabId);
   if (!colab || ids.some(id=>(colab.uniforme?.solicitacoes||[]).filter(s=>s.id===id).length!==1)) throw Error('Pedido ausente ou protocolo duplicado. Reabra a ficha.');
+  // O envio ao grupo só vale para pedido APROVADO (relido do servidor): se o gerencial voltou a decisão, o registro é recusado.
+  if (ids.some(id=>!podeEnviarAoGrupo(colab.uniforme.solicitacoes.find(s=>s.id===id)))) throw Error('Só solicitações aprovadas podem ser enviadas ao grupo. Reabra a ficha.');
   return {...base,colaboradores:base.colaboradores.map(c=>c.id!==colabId?c:{...c,uniforme:{...c.uniforme,
     solicitacoes:c.uniforme.solicitacoes.map(s=>!ids.includes(s.id)||(s.whatsEventos||[]).includes(eventoId)?s:{...s,
       whatsEnviadoEm:em,whatsEnvios:(Number(s.whatsEnvios)||0)+1,whatsEventos:[...(s.whatsEventos||[]),eventoId]})}})};
@@ -39,18 +41,23 @@ export function alvosAguardando(colaboradores,ano) {
 export function resumoAprovacao(colaboradores,alvos,catalogo=[],fvAtivo=true) {
   const pedidos=(colaboradores||[]).flatMap(c=>(c.uniforme?.solicitacoes||[]).filter(s=>alvos.some(a=>a.colabId===c.id&&a.solicId===s.id)));
   const pendentes=pedidos.filter(s=>situacaoSolicitacao(s)==='aguardando');
-  const liberadas=pendentes.filter(s=>!bloqueadaPorWhats(s));
-  return {total:pendentes.length,aprovar:liberadas.length,bloqueadas:pendentes.length-liberadas.length,
-    semPreco:liberadas.filter(s=>!catalogo.some(i=>i.equipeItem===s.item)).length,previstos:fvAtivo?liberadas.length:0};
+  return {total:pendentes.length,aprovar:pendentes.length,bloqueadas:0,
+    semPreco:pendentes.filter(s=>!catalogo.some(i=>i.equipeItem===s.item)).length,previstos:fvAtivo?pendentes.length:0};
 }
 export function aprovarNaEquipe(base,alvos,decisao,opcoes,agora) {
   const r=aplicarAprovacao(base.colaboradores||[],alvos,decisao,agora,'Gerencial',opcoes);
   return {...r,base:{...base,colaboradores:r.colaboradores}};
 }
 
+// Assinatura da mensagem enviada ao grupo. Trocar aqui se mudar (a aprovação ainda é por PIN gerencial compartilhado).
+export const ASSINATURA_APROVADOR = 'consultor Fonseca';
+const quando = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`; };
+// Mensagem do grupo: SOMENTE de pedidos aprovados, já assinada por quem aprovou.
 export function mensagemSolicitacoes(projectNome,colabNome,solicitacoes) {
-  const linhas=['*SOLICITAÇÃO DE UNIFORME / MATERIAL* 📦',`*Unidade:* ${projectNome}`,`*Colaborador:* ${colabNome}`,'*Itens:*'];
-  solicitacoes.forEach(s=>linhas.push(`• ${s.item}${s.tamanho?` (tam ${s.tamanho})`:''}${s.marca?` — ${s.marca}`:''}\n  Motivo: ${s.motivo||'Não informado'}\n  Protocolo: ${s.id.slice(-6)}\n  Solicitante: ${s.solicitadoPor||'Não informado'}\n  Data: ${new Date(s.solicitadoEm).toLocaleDateString('pt-BR')}`));
+  if (!solicitacoes?.length || solicitacoes.some(s=>situacaoSolicitacao(s)!=='aprovado')) throw Error('Só solicitações aprovadas podem ser enviadas ao grupo.');
+  const linhas=['*SOLICITAÇÃO APROVADA — UNIFORME / MATERIAL* ✅',`*Unidade:* ${projectNome}`,`*Colaborador:* ${colabNome}`,'*Itens:*'];
+  solicitacoes.forEach(s=>linhas.push(`• ${s.item}${s.tamanho?` (tam ${s.tamanho})`:''}${s.marca?` — ${s.marca}`:''}\n  Motivo: ${s.motivo||'Não informado'}\n  Protocolo: ${s.id.slice(-6)}\n  Solicitante: ${s.solicitadoPor||'Não informado'}\n  Data: ${new Date(s.solicitadoEm).toLocaleDateString('pt-BR')}\n  Aprovada em: ${quando(s.aprovadoEm)}`));
+  linhas.push('',`✅ *Aprovado pelo ${ASSINATURA_APROVADOR}*`);
   return linhas.join('\n');
 }
 

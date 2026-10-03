@@ -39,7 +39,7 @@ import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, aplicarAprovacao
 
 import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
 import { fvNoEscopo } from "./fvConfig";
-import {bloqueadaPorWhats, situacaoSolicitacao} from "./equipeAprovacao";
+import {situacaoSolicitacao, podeEnviarAoGrupo, envioPendente, enviadoAposAprovacao} from "./equipeAprovacao";
 import { gravarComRecuperacao } from "./equipeConflito";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
@@ -635,7 +635,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
   const [histItem, setHistItem] = useState(null);
   const [whatsFolha,setWhatsFolha]=useState(null);
   const [solicBusy,setSolicBusy]=useState(false);
-  const [solicErro,setSolicErro]=useState("");
+  const [solicErro,setSolicErro]=useState("");const [solicAviso,setSolicAviso]=useState("");
 
   const unf = colab.uniforme || { itens:{}, solicitacoes:[], listaMontada:false };
   const pendentes = (unf.solicitacoes||[]).filter(s=>s.status==="pendente");
@@ -658,10 +658,12 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
 
   const registrarPedido=async(itens)=>{
     if(solicBusy)return;
-    setSolicBusy(true);setSolicErro("");
+    setSolicBusy(true);setSolicErro("");setSolicAviso("");
     try{
       const novas=await onSolicitar(colab.id,itens);
-      setWhatsFolha(Array.isArray(novas)?novas:[novas]);
+      const n=Array.isArray(novas)?novas.length:1;
+      // Fluxo novo: o pedido fica "aguardando"; o envio ao grupo só é liberado depois da aprovação do gerencial.
+      setSolicAviso(`Solicitação registrada (${n} item(ns)). Aguardando aprovação do gerencial. Quando for aprovada, o botão "Enviar no WhatsApp" aparece aqui para você enviar ao grupo, já assinado.`);
       setSolicForm(null);setModoSelMulti(false);setSelItens([]);
     }catch(e){setSolicErro(e.message||"Não foi possível registrar a solicitação. Tente novamente.");}
     finally{setSolicBusy(false);}
@@ -689,6 +691,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
       {aberto && (
         <div style={{ marginTop:12 }}>
           {canApprove&&onTodas&&<BotaoAprovarTodas alvos={alvosAguardando([colab],ano)} onTodas={onTodas} rotulo="Aprovar todas as pendentes deste colaborador"/>}
+          {canManage&&pendentes.filter(envioPendente).length>1&&<button onClick={()=>setWhatsFolha(pendentes.filter(envioPendente))} style={{marginBottom:8,width:"100%",padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>📲 Enviar aprovadas no WhatsApp ({pendentes.filter(envioPendente).length})</button>}
           {/* Solicitações pendentes com SLA */}
           {pendentes.map(s=>{
             const dias = uniformeDiasAberto(s.solicitadoEm);
@@ -698,7 +701,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
                 <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente</div>
                 <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
                 <SeloWhats solic={s}/>
-                {canManage&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{s.whatsEnviadoEm?"Reenviar no WhatsApp":"📲 Enviar no WhatsApp"}</button>}
+                {canManage&&podeEnviarAoGrupo(s)&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{enviadoAposAprovacao(s)?"Reenviar no WhatsApp":"📲 Enviar no WhatsApp"}</button>}
                 <AprovacaoInline solic={s} canApprove={canApprove} onAprovar={(dec,opts)=>onAprovar && onAprovar([{ colabId:colab.id, solicId:s.id }], dec,opts)} dark={dark}/>
                 {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>✓ Confirmar recebimento (zera SLA)</button>}
               </div>
@@ -808,6 +811,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
         </div>
       )}
 
+      {solicAviso&&<div role="status" style={{background:dark?"#04210f":"#f0fdf4",border:"1px solid #22c55e66",color:dark?"#86efac":"#166534",borderRadius:9,padding:"9px 12px",margin:"8px 0",fontSize:12}}>{solicAviso} <button onClick={()=>setSolicAviso("")} style={{marginLeft:6,fontSize:11}}>OK</button></div>}
       {solicErro&&<div role="alert" style={{color:"#ef4444",position:solicForm?"fixed":undefined,zIndex:240,bottom:20,background:dark?"#0b1220":"#fff",padding:10}}>{solicErro}</div>}
       {whatsFolha&&<FolhaWhats solicitacoes={whatsFolha} projectNome={projectNome} colab={colab} onRegistrar={onRegistrarWhats} onFechar={()=>setWhatsFolha(null)} dark={dark}/>}
       {/* Modal de solicitação única */}
@@ -845,7 +849,7 @@ function SeloAprovacao({ status }){
 }
 // Selo para todos; botões apenas para o gerencial.
 export function AprovacaoInline({solic,canApprove,onAprovar,dark}) {
-  const st=situacaoSolicitacao(solic),bloqueada=bloqueadaPorWhats(solic);
+  const st=situacaoSolicitacao(solic);
   const [busy,setBusy]=useState(false),[erro,setErro]=useState("");
   const decidir=async(dec,opts)=>{
     setBusy(true);setErro("");
@@ -855,13 +859,9 @@ export function AprovacaoInline({solic,canApprove,onAprovar,dark}) {
     <SeloAprovacao status={st}/>
     {solic.aprovadoEm&&<div style={{fontSize:10,color:dark?"#94a3b8":"#64748b"}}>{new Date(solic.aprovadoEm).toLocaleString("pt-BR")} · {solic.aprovadoPor||"Gerencial"}</div>}
     {canApprove&&<div style={{display:"flex",gap:6,marginTop:8}}>
-      {["aguardando","aprovado","negado"].map(k=><button key={k} disabled={busy||st===k||(k==="aprovado"&&bloqueada)}
-        title={k==="aprovado"&&bloqueada?"O líder ainda não enviou ao WhatsApp":undefined}
+      {["aguardando","aprovado","negado"].map(k=><button key={k} disabled={busy||st===k}
         onClick={()=>decidir(k)}>{APROV_CORES[k].rot}</button>)}
     </div>}
-    {canApprove&&bloqueada&&<button disabled={busy} onClick={()=>{
-      if(window.confirm("O líder não registrou o envio ao WhatsApp. Aprovar mesmo assim?")) decidir("aprovado",{dispensarWhats:true});
-    }} style={{marginTop:8,fontSize:11}}>Aprovar mesmo sem envio</button>}
     {erro&&<div role="alert">{erro}</div>}
   </div>;
 }
@@ -948,7 +948,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
   itens.sort((a,b)=>String(a.c.nome||"").localeCompare(String(b.c.nome||""),"pt-BR"));
   const cont = contadoresAprovacao(colaboradores, ano);
   const toggle = (k)=>setSel(p=>p.includes(k)?p.filter(x=>x!==k):[...p,k]);
-  const elegiveis=itens.filter(i=>!bloqueadaPorWhats(i.s)&&situacaoSolicitacao(i.s)!=="legado");
+  const elegiveis=itens.filter(i=>situacaoSolicitacao(i.s)!=="legado");
   const todosSel = elegiveis.length>0 && elegiveis.every(i=>sel.includes(i.key));
   const decidir = async (dec)=>{
     const alvos = elegiveis.filter(i=>sel.includes(i.key)).map(i=>({ colabId:i.c.id, solicId:i.s.id }));
@@ -967,7 +967,6 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
         </div>
         {fvControle}
         {aba==="aguardando"&&<BotaoAprovarTodas alvos={alvosAguardando(colaboradores,ano)} onTodas={onTodas}/>}
-        <div>{itens.filter(i=>bloqueadaPorWhats(i.s)).length} bloqueadas (sem envio ao WhatsApp)</div>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
           <span style={{ fontSize:11, color:txt2 }}>Ano da solicitação</span>
           <select value={ano} onChange={e=>{ onAno(Number(e.target.value)); setSel([]); }}
@@ -998,7 +997,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
         {itens.map(({c,s,key})=>{
           const on = sel.includes(key);
           return (
-            <div key={key} onClick={()=>{if(!bloqueadaPorWhats(s)&&situacaoSolicitacao(s)!=="legado")toggle(key);}} style={{ ...S.card, padding:"10px 12px", cursor:"pointer", border:`1px solid ${on?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}` }}>
+            <div key={key} onClick={()=>{if(situacaoSolicitacao(s)!=="legado")toggle(key);}} style={{ ...S.card, padding:"10px 12px", cursor:"pointer", border:`1px solid ${on?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}` }}>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                 <div style={{ width:20, height:20, borderRadius:5, flexShrink:0, border:`2px solid ${on?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:on?"#0ea5e9":"transparent", color:"#fff", fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{on?"✓":""}</div>
                 <div style={{ flex:1, minWidth:0 }}>
@@ -2329,10 +2328,10 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       catalogo=data.catalogo||[];
     }
     const resumo=resumoAprovacao(snap.data().colaboradores,alvos,catalogo,fvNoEscopo(project.id));
-    const mensagem=`Projeto ${project.id} · ${anoFiltro}\n${resumo.total} itens aguardando: aprovar ${resumo.aprovar}, bloqueadas ${resumo.bloqueadas}.\n${resumo.semPreco} sem preço no catálogo.\nEfeito no FV: ${resumo.previstos} previstos; o saldo real permanece igual.\nConfirmar?`;
+    const mensagem=`Projeto ${project.id} · ${anoFiltro}\n${resumo.total} itens aguardando: aprovar ${resumo.aprovar}.\n${resumo.semPreco} sem preço no catálogo.\nEfeito no FV: ${resumo.previstos} previstos; o saldo real permanece igual.\nConfirmar?`;
     if(!window.confirm(mensagem))return;
     const resultado=await aprovarSolicitacoes(alvos,"aprovado",{somenteAguardando:true});
-    alert(`${resultado.alterados} aprovada(s); ${resultado.bloqueados.length} bloqueada(s) aguardando WhatsApp.`);
+    alert(`${resultado.alterados} aprovada(s). Os líderes já podem enviar ao grupo, com a mensagem assinada.`);
   };
 
   useEffect(() => {
