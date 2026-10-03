@@ -36,6 +36,14 @@ test("janela da checagem: só sábado e domingo",()=>{
   expect(janelaChecagemAberta(new Date(2026,9,4,22))).toBe(true);
   [5,6,7,8,9].forEach(d=>expect(janelaChecagemAberta(new Date(2026,9,d,12))).toBe(false));
 });
+test("recuperação informa se a base realmente mudou para não conservar edição otimista não salva",async()=>{
+  for(const resposta of [false,undefined]){
+    const err=Object.assign(Error('conflito'),{status:409});
+    await expect(gravarComRecuperacao(async()=>{throw err;},async()=>resposta)).rejects.toMatchObject({baseAtualizada:false,message:MSG_CONFLITO_SEM_ATUALIZAR});
+  }
+  await expect(gravarComRecuperacao(async()=>{throw Object.assign(Error('conflito'),{status:409});},async()=>{throw Error('offline');})).rejects.toMatchObject({baseAtualizada:false});
+  await expect(gravarComRecuperacao(async()=>{throw Object.assign(Error('conflito'),{status:409});},async()=>true)).rejects.toMatchObject({baseAtualizada:true,message:MSG_CONFLITO});
+});
 test("a Equipe não cria mais relógios em segundo plano e usa os módulos novos",()=>{
   const src=fs.readFileSync("src/Equipe.jsx","utf8");
   expect(src).not.toMatch(/setInterval/);

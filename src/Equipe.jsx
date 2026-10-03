@@ -2279,7 +2279,16 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     atualizarEquipeLocal(snap.data());
     return true;
   };
-  const gravar=(novosDados,antes)=>gravarComRecuperacao(()=>saveEquipe(project.id,novosDados,antes||equipeData),recarregarDoServidor);
+  const gravar=async(novosDados,antes)=>{
+    const base=antes||equipeData;
+    try{return await gravarComRecuperacao(()=>saveEquipe(project.id,novosDados,base),recarregarDoServidor);}
+    catch(e){
+      // Uma edição otimista que não foi salva não pode virar a próxima base.
+      // Se a releitura confirmou dados novos, preserva essa versão do servidor.
+      if(!e?.baseAtualizada)atualizarEquipeLocal(base);
+      throw e;
+    }
+  };
   const gravarSolicitacoes=async(transformar)=>{
     if(isDemo())throw Error("Demonstração: solicitações não são gravadas.");
     const snap=await getDocFromServer(doc(db,"equipes",project.id));

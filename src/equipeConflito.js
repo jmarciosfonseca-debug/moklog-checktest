@@ -14,5 +14,12 @@ export async function tratarErroGravacao(err, recarregar) {
 // Executa a gravação e, em 409, atualiza a tela e troca a mensagem. Usado por TODAS as gravações da Equipe.
 export async function gravarComRecuperacao(salvar, recarregar) {
   try { return await salvar(); }
-  catch (e) { if (e && e.status === 409) e.message = await tratarErroGravacao(e, recarregar); throw e; }
+  catch (e) {
+    if (e && e.status === 409) {
+      let atualizou = false;
+      e.message = await tratarErroGravacao(e, async()=>{atualizou=(await recarregar())===true;return atualizou;});
+      e.baseAtualizada = atualizou;
+    }
+    throw e;
+  }
 }
