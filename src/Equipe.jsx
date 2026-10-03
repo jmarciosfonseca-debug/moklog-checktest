@@ -1,5 +1,5 @@
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, where } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
@@ -42,6 +42,7 @@ import { fvNoEscopo } from "./fvConfig";
 import {bloqueadaPorWhats, situacaoSolicitacao} from "./equipeAprovacao";
 import { gravarComRecuperacao } from "./equipeConflito";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
+import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe } from "./fotosEquipe";
 import {criarSolicitacoes, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 
@@ -608,11 +609,13 @@ function Header({ title, sub, onBack, saving, dark, onToggleTheme }) {
   );
 }
 
-function Avatar({ foto, size=52, border="#1e293b" }) {
+function Avatar({ colab, size=52, border="#1e293b" }) {
+  const mapa = useContext(FotosCtx);
+  const src = fotoDe(colab, mapa);
   return (
     <div style={{ width:size, height:size, borderRadius:size/4, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background:"#0f172a", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      {foto
-        ? <img src={foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+      {src
+        ? <img src={src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
         : <span style={{ fontSize:size*0.45 }}>👤</span>
       }
     </div>
@@ -1081,7 +1084,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             )}
           </div>
           <div style={{ display:"flex", gap:16, alignItems:"flex-start" }}>
-            <Avatar foto={colab.foto} size={78} border={tc.badge+"66"}/>
+            <Avatar colab={colab} size={78} border={tc.badge+"66"}/>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:18, fontWeight:800, ...S.txtPrimary, lineHeight:1.2 }}>{colab.nome || "—"}</div>
               <div style={{ fontSize:12, color:"#94a3b8", marginTop:3 }}>{colab.cargo}</div>
@@ -1549,7 +1552,7 @@ function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, o
                   background: meu ? "#0ea5e915" : "transparent",
                   border:`1px solid ${meu ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}`}}>
                 <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`2px solid ${meu?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`,background:meu?"#0ea5e9":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{meu?"✓":""}</div>
-                <Avatar foto={c.foto} size={30} border={dark?"#232b4a":"#e2e8f0"}/>
+                <Avatar colab={c} size={30} border={dark?"#232b4a":"#e2e8f0"}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12.5,fontWeight:600,color:txt}}>{c.nome}</div>
                   <div style={{fontSize:10,color:txt2}}>{c.cargo} · {c.turno}</div>
@@ -1789,6 +1792,7 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
 
 // ── Projeção de Férias
 function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, onSave, ferias, dark, onToggleTheme }) {
+  const mapaFotos = useContext(FotosCtx);
   const S = getStyles(dark);
   // Líder e Gerencial podem agendar férias e reordenar a equipe — é trabalho do líder no dia a dia.
   const podeEditar = adminAuth || liderAuth;
@@ -1953,7 +1957,7 @@ function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, onBack, 
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   {/* Foto */}
                   <div style={{width:44,height:44,borderRadius:10,overflow:"hidden",border:`2px solid ${tc.badge}44`,flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {item.foto?<img src={item.foto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20}}>👤</span>}
+                    {fotoDe((colaboradores||[]).find(c=>c.id===item.colabId),mapaFotos)?<img src={fotoDe((colaboradores||[]).find(c=>c.id===item.colabId),mapaFotos)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20}}>👤</span>}
                   </div>
                   {/* Info */}
                   <div style={{flex:1,minWidth:0}}>
@@ -2135,7 +2139,8 @@ export function ContadorEquipe({ projectId }){
   return <div style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}>🗓️ Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
 }
 
-export default function EquipeApp({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted }) {
+function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted, fotosApi }) {
+  const fotosMapa = fotosApi.mapa, definirFoto = fotosApi.definir;
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | add | edit | view | addHist
   // Keyframe do "piscar" de reciclagem — injeta uma vez no documento.
@@ -2364,7 +2369,10 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
     try {
       // Comprime foto para max 400px e qualidade 0.7 antes de salvar
       let fotoFinal = form.foto || "";
-      if(form.foto && form.foto.startsWith("data:")) {
+      const existente = equipeData.colaboradores.find(c=>c.id===form.id);
+      const fotoAtual = fotoDe(existente, fotosMapa);
+      const fotoNova = !!form.foto && form.foto.startsWith("data:") && form.foto !== fotoAtual;   // só reduz/envia quando a pessoa trocou a foto
+      if(fotoNova) {
         fotoFinal = await new Promise((resolve) => {
           const img = new Image();
           img.onload = () => {
@@ -2393,7 +2401,11 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
           img.src = form.foto;
         });
       }
-      const formFinal = { ...form, foto: fotoFinal };
+      // Foto nova: o servidor grava uma foto IMUTÁVEL e devolve a referência; o cadastro só aponta para ela na gravação abaixo
+      // (com revisão e 409). Se essa gravação falhar, sobra uma foto sem uso: nada é sobrescrito nem perdido.
+      let fotoRef = "";
+      if(fotoNova) { fotoRef = await enviarFoto(project.id, form.id, fotoFinal); definirFoto(fotoRef, fotoFinal); }
+      const formFinal = prepararColaborador({ form, fotoFinal: fotoNova ? fotoFinal : "", ref: fotoRef, existente });
       // Remove campos undefined para não quebrar Firestore
       Object.keys(formFinal).forEach(k => { if(formFinal[k]===undefined) formFinal[k]=""; });
       // Limpa campos de Falta que não existem em outros tipos
@@ -2752,7 +2764,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
         onToggleCesta={toggleCesta}
         onAprovar={aprovarSolicitacoes} onTodas={aprovarTodas} anoAprovacao={anoFiltro} onRegistrarWhats={registrarWhats}
         onBack={()=>{setScreen("list");setSelColab(null);}}
-        onEdit={()=>{setForm({...colab});setScreen("edit");}}
+        onEdit={()=>{setForm({...colab, foto: fotoDe(colab, fotosMapa)});setScreen("edit");}}
         onAddHist={()=>setScreen("addHist")}
         onEditHist={(colabId, item)=>{setEditHistItem(item);setScreen("editHist");}}
         onDesligar={desligarColab}
@@ -2836,7 +2848,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                         : selPDF.length===ativos.length
                         ? `Equipe Completa — ${project.id}`
                         : `Seleção — ${project.id}`;
-                      gerarMapaEquipePDF(project, cols, titulo, perfilSeg, pdfComDesligados ? desligados : []);
+                      gerarMapaEquipePDF(project, injetarFotos(cols, fotosMapa), titulo, perfilSeg, injetarFotos(pdfComDesligados ? desligados : [], fotosMapa));
                     }}
                       style={{ ...S.btnSm, fontSize:10, color:"#fff", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", border:"none", padding:"5px 14px", fontWeight:700 }}>
                       📄 Gerar PDF ({selPDF.length}{pdfComDesligados&&desligados.length?` +${desligados.length}`:""})
@@ -3117,7 +3129,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                         return (
                           <div key={lider.id} style={{ border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, borderRadius:12, padding:10, marginBottom:10, background:dark?"#0a1120":"#fff" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:9, padding:8, background:dark?"#0d1f2e":"#f0f9ff", borderRadius:8, border:"1px solid #0ea5e933" }}>
-                              <Avatar foto={lider.foto} size={34} border="#0ea5e9"/>
+                              <Avatar colab={lider} size={34} border="#0ea5e9"/>
                               <div style={{ flex:1, minWidth:0 }}>
                                 <div style={{ fontSize:13.5, fontWeight:700, ...S.txtPrimary }}>{lider.nome}</div>
                                 <div style={{ fontSize:10, color:"#0ea5e9" }}>{lider.cargo}</div>
@@ -3136,7 +3148,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                                 style={{ display:"flex", alignItems:"center", gap:9, padding:"7px 8px 7px 20px", marginTop:4, position:"relative", cursor:"pointer" }}>
                                 <div style={{ position:"absolute", left:8, top:0, bottom:"50%", width:2, background:dark?"#232b4a":"#cbd5e1" }}/>
                                 <div style={{ position:"absolute", left:8, top:"50%", width:9, height:2, background:dark?"#232b4a":"#cbd5e1" }}/>
-                                <Avatar foto={m.foto} size={28} border={dark?"#232b4a":"#e2e8f0"}/>
+                                <Avatar colab={m} size={28} border={dark?"#232b4a":"#e2e8f0"}/>
                                 <div style={{ flex:1, minWidth:0 }}>
                                   <div style={{ fontSize:12.5, fontWeight:600, ...S.txtPrimary }}>{m.nome}</div>
                                   <div style={{ fontSize:9.5, color:"#94a3b8" }}>{m.cargo}</div>
@@ -3207,7 +3219,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                               {selPDF.includes(c.id)&&"✓"}
                             </div>
                           )}
-                          <Avatar foto={c.foto} size={46} border={tc.badge+"44"}/>
+                          <Avatar colab={c} size={46} border={tc.badge+"44"}/>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
                             <div style={{ fontSize:11, ...S.txtSecondary, marginTop:1 }}>{c.cargo}</div>
@@ -3240,7 +3252,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
               {semTurno.map(c=>(
                 <div key={c.id} onClick={()=>{setSelColab(c);setScreen("view");}}
                   style={{ display:"flex", alignItems:"center", gap:10, background:"#020510", borderRadius:8, padding:"10px 12px", cursor:"pointer", marginBottom:6, border:"1px solid #0a0f1e" }}>
-                  <Avatar foto={c.foto} size={42}/>
+                  <Avatar colab={c} size={42}/>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>{c.nome}</div>
                     <div style={{ fontSize:11, ...S.txtSecondary }}>{c.cargo}</div>
@@ -3264,7 +3276,7 @@ export default function EquipeApp({ project, onBack, dark: darkProp, onToggleThe
                   {desligados.map((c,idx)=>(
                     <div key={`${c.id}-${idx}`} style={{ background:"#1a0202", borderRadius:10, padding:"10px 12px", border:"1px solid #ef444422", marginBottom:6 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                        <Avatar foto={c.foto} size={40} border="#ef444444"/>
+                        <Avatar colab={c} size={40} border="#ef444444"/>
                         <div style={{ flex:1 }}>
                           <div style={{ fontSize:12, fontWeight:700, color:"#94a3b8" }}>{c.nome}</div>
                           <div style={{ fontSize:10, color:"#475569" }}>{c.cargo}</div>
@@ -3339,4 +3351,10 @@ Esta ação não pode ser desfeita.`))
       })()}
     </div>
   );
+}
+
+// Carrega as fotos dos colaboradores à parte e as disponibiliza a toda a tela (ver fotosEquipe.js).
+export default function EquipeApp(props) {
+  const fotosApi = useFotosEquipe(props.project && props.project.id);
+  return <FotosCtx.Provider value={fotosApi.mapa}><EquipeAppInner {...props} fotosApi={fotosApi}/></FotosCtx.Provider>;
 }

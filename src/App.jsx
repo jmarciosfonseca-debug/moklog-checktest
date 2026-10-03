@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import AcessoApp from "./Acesso";
 import KeyAccessFalha from "./KeyAccessFalha";
 import EquipeApp, { ContadorEquipe } from "./Equipe";
+import { useFotosEquipe, fotoDe } from "./fotosEquipe";
 import AcessoCCO from "./AcessoCCO";
 import Ocorrencias from "./Ocorrencias";
 import EmpresaInfo from "./EmpresaInfo";
@@ -3119,6 +3120,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 }
 
 function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFull }) {
+  const fotosEq = useFotosEquipe(project.id);
   const [equipeData, setEquipeData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -3243,7 +3245,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
                         return (
                           <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", marginBottom:6, border:`1px solid ${tc.border}` }}>
                             <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${tc.badge}44`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                              {c.foto ? <img src={c.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
+                              {fotoDe(c, fotosEq.mapa) ? <img src={fotoDe(c, fotosEq.mapa)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
                             </div>
                             <div style={{ flex:1, minWidth:0 }}>
                               <div style={{ fontSize:13, fontWeight:700, color:txt, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
@@ -3269,7 +3271,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
               {ativos.filter(c=>!TURNOS.includes(c.turno)).map(c=>(
                 <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", border:`1px solid ${border}` }}>
                   <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    {c.foto ? <img src={c.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
+                    {fotoDe(c, fotosEq.mapa) ? <img src={fotoDe(c, fotosEq.mapa)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:txt }}>{c.nome}</div>
