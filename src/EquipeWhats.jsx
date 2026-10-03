@@ -6,12 +6,12 @@ export function SeloWhats({solic}) {
   const s=solic,st=situacaoSolicitacao(s),pend=s.status==='pendente';
   const quando=iso=>new Date(iso).toLocaleString('pt-BR');
   let texto,cor;
-  if(enviadoAposAprovacao(s)){texto=`Enviado ao grupo em ${quando(s.whatsEnviadoEm)} · ${s.whatsEnvios||1} toque(s)`;cor='#22c55e';}
-  else if(st==='aprovado'&&pend&&s.whatsEnviadoEm){texto='✅ Aprovada — falta enviar a mensagem assinada (o envio anterior foi antes da aprovação)';cor='#d97706';}
-  else if(st==='aprovado'&&pend){texto='✅ Aprovada — falta enviar ao grupo';cor='#d97706';}
-  else if(s.whatsEnviadoEm){texto=`Enviado ao grupo em ${quando(s.whatsEnviadoEm)} (antes da aprovação)`;cor='#94a3b8';}
+  if(st==='negado'){texto='Negada — não enviar ao grupo';cor='#ef4444';}
   else if(st==='aguardando'&&pend){texto='⏳ Aguardando aprovação do gerencial';cor='#94a3b8';}
-  else if(st==='negado'){texto='Negada — não enviar ao grupo';cor='#ef4444';}
+  else if(enviadoAposAprovacao(s)){texto=`Toque no WhatsApp registrado em ${quando(s.whatsEnviadoEm)} · ${s.whatsEnvios||1} toque(s)`;cor='#22c55e';}
+  else if(st==='aprovado'&&pend&&s.whatsEnviadoEm){texto='✅ Aprovada — falta enviar a mensagem assinada (sem toque posterior à aprovação comprovado)';cor='#d97706';}
+  else if(st==='aprovado'&&pend){texto='✅ Aprovada — falta enviar ao grupo';cor='#d97706';}
+  else if(s.whatsEnviadoEm){texto=`Toque anterior registrado em ${quando(s.whatsEnviadoEm)} (sem comprovação de envio após aprovação)`;cor='#94a3b8';}
   else if(s.whatsDispensadoEm){texto=`Dispensado por ${s.whatsDispensadoPor||'Gerencial'} em ${quando(s.whatsDispensadoEm)}`;cor='#22c55e';}
   else {texto='Sem registro de envio';cor='#94a3b8';}
   return <div style={{fontSize:11,marginTop:5,color:cor}}>{texto}</div>;

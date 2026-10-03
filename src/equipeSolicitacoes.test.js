@@ -2,9 +2,27 @@ import {criarSolicitacoes,anexarSolicitacoes,marcarWhats,relerEGravarEquipe,alvo
 import {podeEnviarAoGrupo,envioPendente,enviadoAposAprovacao,aplicarAprovacao} from './equipeAprovacao';
 const now='2026-10-02T12:00:00.000Z';
 const {synchronize}=require('../api/ai/lib/fvAprovacao');
+const {save,validateLeader}=require('../api/ai/lib/equipeMerge');
 const base=()=>({perfilSeguranca:{armada:'sim'},colaboradores:[{id:'c1',nome:'Ana',uniforme:{itens:{},solicitacoes:[]}},{id:'c2',nome:'Bia'}]});
 let id;
 beforeEach(()=>{id=0;});
+test('API recusa toque de tela antiga após retirada da aprovação, sem escrever',async()=>{
+ const doc=s=>({colaboradores:[{id:'c',uniforme:{solicitacoes:[s]}}]});
+ const s={id:'s',status:'pendente',aprovacao:'aprovado',aprovadoEm:now,exigeWhats:true};
+ const before=doc(s),after=doc({...s,whatsEnviadoEm:now,whatsEnvios:1,whatsEventos:['e']});
+ expect(()=>validateLeader(before,after)).not.toThrow();
+ for(const aprovacao of ['aguardando','negado']){
+  const current=doc({...s,aprovacao}),set=jest.fn();
+  const tx={get:async()=>({exists:true,data:()=>current}),set};
+  const db={collection:()=>({doc:()=>({})}),runTransaction:f=>f(tx)};
+  await expect(save(db,'P601',before,after,{nivel:'lider'})).rejects.toMatchObject({status:403});
+  expect(set).not.toHaveBeenCalled();
+  expect(()=>validateLeader(current,JSON.parse(JSON.stringify(current)))).not.toThrow();
+ }
+ expect(()=>validateLeader(doc({...s,status:'entregue'}),doc({...s,status:'entregue',whatsEnvios:1}))).toThrow(/aprovadas e pendentes/);
+ expect(()=>validateLeader({colaboradores:[]},doc({...s,aprovacao:'aguardando',aprovadoEm:null,whatsEnvios:0}))).not.toThrow();
+ expect(()=>validateLeader({colaboradores:[]},doc({...s,aprovacao:'aguardando',aprovadoEm:null,whatsEnvios:1}))).toThrow(/aprovadas e pendentes/);
+});
 const criar=(n=3,nivel='lider')=>criarSolicitacoes(Array.from({length:n},(_,i)=>({item:'Item '+i})),nivel,'P260A',now,()=>`uuid-${++id}`);
 
 test('um lote cria todos os cinco protocolos distintos e preserva dados anteriores',()=>{
@@ -112,7 +130,7 @@ test('pedidos do fluxo ANTIGO: toque anterior à aprovação não conta; ao reap
   expect(envioPendente({...base0,whatsEnviadoEm:ant})).toBe(true);          // enviado sem assinatura no fluxo antigo: ainda falta o assinado
   expect(envioPendente({...base0,whatsEnviadoEm:depois})).toBe(false);
   expect(envioPendente({...base0})).toBe(true);
-  expect(envioPendente({id:'x',status:'pendente',aprovacao:'aprovado',whatsEnviadoEm:ant})).toBe(false);   // sem data de aprovação gravada: tolerante
+  expect(envioPendente({id:'x',status:'pendente',aprovacao:'aprovado',whatsEnviadoEm:ant})).toBe(true);   // sem data não há prova de toque posterior
   // aprovado → aguardando → aprovado de novo: o toque antigo deixa de contar
   const b=anexarSolicitacoes(base(),'c1',criar(1)),alvos=alvosAguardando(b.colaboradores,2026);
   const a1=aprovarNaEquipe(b,alvos,'aprovado',{},'2026-10-02T12:00:00.000Z').base;

@@ -53,7 +53,9 @@ test('selo: aguardando, aprovada (falta enviar), negada, enviada e legado',async
  await render(<SeloWhats solic={s}/>);expect(host.textContent).toContain('Aguardando aprovação do gerencial');
  await render(<SeloWhats solic={ap}/>);expect(host.textContent).toContain('Aprovada — falta enviar ao grupo');
  await render(<SeloWhats solic={{...s,aprovacao:'negado'}}/>);expect(host.textContent).toContain('Negada');
- await render(<SeloWhats solic={{...ap,whatsEnviadoEm:'2026-10-02T22:00:00Z',whatsEnvios:1}}/>);expect(host.textContent).toContain('Enviado ao grupo em');
+ await render(<SeloWhats solic={{...ap,whatsEnviadoEm:'2026-10-02T22:00:00Z',whatsEnvios:1}}/>);expect(host.textContent).toContain('Toque no WhatsApp registrado em');
+ await render(<SeloWhats solic={{...ap,aprovacao:'negado',whatsEnviadoEm:'2026-10-02T22:00:00Z'}}/>);expect(host.textContent).toContain('Negada');
+ await render(<SeloWhats solic={{...ap,aprovacao:'aguardando',whatsEnviadoEm:'2026-10-02T22:00:00Z'}}/>);expect(host.textContent).toContain('Aguardando aprovação');
  await render(<SeloWhats solic={{...ap,whatsEnviadoEm:s.solicitadoEm,whatsEnvios:1}}/>);expect(host.textContent).toContain('falta enviar a mensagem assinada');   // toque do fluxo antigo, anterior à aprovação
 });
 

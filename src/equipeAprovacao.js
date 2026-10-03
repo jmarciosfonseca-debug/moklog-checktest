@@ -22,7 +22,7 @@ export function podeEnviarAoGrupo(s) {
 // A mensagem que vale é a ASSINADA, enviada DEPOIS da aprovação. Um toque do fluxo antigo (anterior à aprovação) não conta.
 export function enviadoAposAprovacao(s) {
   if (!s?.whatsEnviadoEm) return false;
-  if (!s.aprovadoEm) return true;
+  if (!s.aprovadoEm) return false;
   return new Date(s.whatsEnviadoEm).getTime() >= new Date(s.aprovadoEm).getTime();
 }
 export function envioPendente(s) {

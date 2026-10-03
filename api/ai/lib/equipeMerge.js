@@ -72,6 +72,11 @@ function validateLeader(before,after){
   const prev=old.find(x=>x.c===c.id&&x.s.id===s.id)?.s;
   if(!prev){if(s.exigeWhats!==true||s.aprovacao!=='aguardando'||restricted.filter(k=>k!=='aprovacao').some(k=>s[k]!=null)){const e=Error('Solicitação do líder inválida.');e.status=403;throw e;}}
   else if([...restricted,'exigeWhats'].some(k=>!equal(prev[k],s[k]))){const e=Error('Aprovação exclusivamente gerencial.');e.status=403;throw e;}
+  const mudouEnvio=['whatsEnviadoEm','whatsEnvios','whatsEventos'].some(k=>!equal(prev?.[k],s[k]));
+  const temEnvio=!!s.whatsEnviadoEm||Number(s.whatsEnvios)>0||(s.whatsEventos||[]).length>0;
+  if(mudouEnvio&&(!prev?temEnvio:prev.aprovacao!=='aprovado'||prev.status!=='pendente'||s.status!=='pendente')){
+   const e=Error('Só solicitações aprovadas e pendentes podem registrar envio ao grupo. Reabra a ficha.');e.status=403;throw e;
+  }
  }
 }
 async function save(db,pid,before,after,identity){
