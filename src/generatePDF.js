@@ -2,6 +2,7 @@
 // Relatórios com identidade visual por cliente
 // Logos e cores: Golgi (verde/branco) · Mega (laranja/preto) · Klog (azul/cinza)
 import { canonicalFollowupKey } from "./followups";
+import { itensDoEstado, resumo, porCategoria, falhasPorSistema, classificar, diasEntre, estadoTratativa, DIAS_FOLLOWUP_VENCIDO } from "./relatorios/metricas";
 
 const THEMES = {
   "P601": {
@@ -162,19 +163,7 @@ export function getTheme(projectId) {
 
 function calcHealthPct(project, state) {
   if(!project?.categories||!state) return 100;
-  let total=0, ok=0;
-  for(const cat of project.categories) {
-    const s = state[cat.id]; if(!s) continue;
-    if(cat.type==="maintenance"||cat.type==="notes") continue;
-    if(cat.type==="single") { total++; if(!s.status||s.status==="ok") ok++; }
-    else if(cat.type==="items"&&Array.isArray(s)) {
-      s.forEach(v=>{ total++; if(!v.status||v.status==="ok") ok++; });
-    } else if(cat.type==="count") {
-      const t=s.total??cat.total??0, inop=s.inoper??0;
-      total+=t; ok+=(t-inop);
-    }
-  }
-  return total>0?Math.round((ok/total)*100):100;
+  return Math.round(resumo(itensDoEstado(project, state)).saude);   // fórmula única (relatorios/metricas.js)
 }
 
 function stLabel(st) { return !st||st==="ok"?"OK":st==="partial"?"PARCIAL":"INOPERANTE"; }
@@ -343,6 +332,12 @@ export async function generatePDF(project, state, meta, photos, ctmkInfo, inquil
     dispRows.push({label:cat.label, ok:okCount, total, pct});
   }
 
+  // Totais e disponibilidade por categoria pela FONTE ÚNICA (mesma fórmula do consolidado).
+  const itensLaudo = itensDoEstado(project, state);
+  { const r = resumo(itensLaudo); totalAtivos = r.total; totalOK = r.ok; totalParcial = r.parcial; totalInop = r.inop; }
+  dispRows.length = 0;
+  porCategoria(itensLaudo).forEach(c => dispRows.push({ label:c.cat, ok:c.ok, total:c.total, pct:Math.round(c.saude) }));
+
   // ── 2. Deduplica problemas e enriquece com dias em aberto
   const seenItems = new Map();
   problemItems.forEach(p => seenItems.set(p.cat+"|"+p.item, p));
@@ -440,6 +435,32 @@ export async function generatePDF(project, state, meta, photos, ctmkInfo, inquil
 
   const contatoOk = meta.mokedContact;
 
+  // Visão geral: rosca com o total de ativos + onde estão as falhas (aprovado pelo Marcio em 04/10/2026)
+  const visaoHtml = (()=>{
+    const r=resumo(itensLaudo), C=2*Math.PI*56, seg=(q)=>r.total?q/r.total*C:0;
+    const pctTxt=(q)=>r.total?((q/r.total)*100).toFixed(1).replace(".",","):"0";
+    const fs=falhasPorSistema(itensLaudo), mx=Math.max(1,...fs.map(f=>f.inop+f.parcial));
+    const rosca=`<svg viewBox="0 0 160 160" width="150" height="150" role="img" aria-label="${r.total} ativos: ${r.ok} operacionais, ${r.parcial} parciais, ${r.inop} inoperantes">
+      <g transform="rotate(-90 80 80)" fill="none" stroke-width="18">
+        <circle cx="80" cy="80" r="56" stroke="#E5E7EB"/>
+        <circle cx="80" cy="80" r="56" stroke="#9CA3AF" stroke-dasharray="${seg(r.ok).toFixed(1)} ${C.toFixed(1)}"/>
+        <circle cx="80" cy="80" r="56" stroke="#F59E0B" stroke-dasharray="${seg(r.parcial).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-seg(r.ok)).toFixed(1)}"/>
+        <circle cx="80" cy="80" r="56" stroke="#DC2626" stroke-dasharray="${seg(r.inop).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-(seg(r.ok)+seg(r.parcial))).toFixed(1)}"/>
+      </g><text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">${r.total}</text><text x="80" y="97" text-anchor="middle" font-size="11" fill="#6B7280">ativos</text></svg>`;
+    const leg=`<div class="vg-leg"><div><i style="background:#9CA3AF"></i>Operacional <b>${r.ok}</b> <span>(${pctTxt(r.ok)}%)</span></div><div><i style="background:#F59E0B"></i>Parcial <b>${r.parcial}</b> <span>(${pctTxt(r.parcial)}%)</span></div><div><i style="background:#DC2626"></i>Inoperante <b>${r.inop}</b> <span>(${pctTxt(r.inop)}%)</span></div></div>`;
+    const barras=fs.length?fs.map(f=>`<div class="vg-br"><span class="vg-nm">${f.cat}</span><span class="vg-tr">${f.inop?`<span style="background:#DC2626;width:${(f.inop/mx*100).toFixed(1)}%"></span>`:""}${f.parcial?`<span style="background:#F59E0B;width:${(f.parcial/mx*100).toFixed(1)}%"></span>`:""}</span><b>${f.inop+f.parcial}</b></div>`).join(""):`<div class="vg-ok">Nenhuma falha nesta verificação.</div>`;
+    return `<section class="secao vg"><style>
+      .vg{display:grid;grid-template-columns:44% 1fr;gap:18px;align-items:start}.vg-box{display:flex;gap:14px;align-items:center}
+      .vg-leg{font-size:11px;color:#374151;display:grid;gap:5px}.vg-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.vg-leg span{color:#6B7280}
+      .vg-t{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6B7280;margin-bottom:6px}
+      .vg-br{display:grid;grid-template-columns:42% 1fr 22px;align-items:center;gap:8px;font-size:11px;margin:4px 0}.vg-nm{color:#374151}
+      .vg-tr{display:flex;gap:2px;height:10px}.vg-tr span{display:block;height:10px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.vg-br b{text-align:right}.vg-ok{font-size:11px;color:#15803D}
+    </style>
+      <div><div class="vg-t">Visão geral dos ativos</div><div class="vg-box">${rosca}${leg}</div></div>
+      <div><div class="vg-t">Onde estão as falhas${fs.length?` · ${r.parcial+r.inop} ${r.parcial+r.inop===1?"item":"itens"}`:""}</div>${barras}</div>
+    </section>`;
+  })();
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -475,6 +496,8 @@ export async function generatePDF(project, state, meta, photos, ctmkInfo, inquil
     ${ctmkCell}
   </div>
 
+  ${visaoHtml}
+
   <section class="secao">
     <div class="secao-cab"><span class="n">01</span><h2>Contexto da verificação</h2><span class="rule"></span></div>
     <p class="intro">
@@ -483,6 +506,7 @@ export async function generatePDF(project, state, meta, photos, ctmkInfo, inquil
       Security. Cada dispositivo é testado individualmente e seu estado registrado em tempo real pelo líder
       responsável, através da plataforma <b>MokLog CheckTest</b>. Classificação de status:
       <b>0% = Inoperante</b>, <b>1–99% = Parcial</b>, <b>100% = Operacional</b>.
+      Saúde = (operacionais + 0,5 × parciais) ÷ ativos testados; cada câmera do CFTV conta como um ativo.
     </p>
   </section>
 
@@ -662,190 +686,158 @@ function laudoCSS(pal) {
 
 
 // ── RELATÓRIO CONSOLIDADO (múltiplas semanas)
-export function generateConsolidatedPDF(project, reports) {
-  if(!project||!reports?.length) return;
+// ── RELATÓRIO CONSOLIDADO (padrão aprovado pelo Marcio em 04/10/2026)
+// opts: { followups: mapa de follow-ups do projeto, interno: true = versão interna com conferência automática }
+const escHTML = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt1 = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(".", ",");
+const FU_ROTULO = { aguardando: "Aguardando retorno", proposta: "Proposta enviada", aprovado: "Aprovado", execucao: "Em execução", resolvido: "Resolvido" };
+export function montarConsolidado(project, reports, opts = {}) {
+  const hoje = opts.hoje ? new Date(opts.hoje) : new Date();
   const theme = getTheme(project.id);
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const sorted = [...reports].sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||""));
+  const sorted = [...reports].sort((a, b) => (a.meta?.date || "").localeCompare(b.meta?.date || ""));
   const n = sorted.length;
-  const weekLabels = sorted.map(r=>getWeekLabel(r.meta?.date));
-  const period = n>0?`${fmtDate(sorted[0].meta?.date)} → ${fmtDate(sorted[n-1].meta?.date)}`:"";
-
-  const weekCols = weekLabels.map(w=>`<th>${w}</th>`).join("");
-  const dateCols = sorted.map(r=>`<th style="font-size:9px;font-weight:400;opacity:.8">${fmtDate(r.meta?.date)}</th>`).join("");
-
-  const equipeRows = [
-    ["Moked 24h",  sorted.map(r=>r.meta?.moked||"--")],
-    ["Líder",      sorted.map(r=>r.meta?.leader||"--")],
-    ["CCO",        sorted.map(r=>r.meta?.cco||"--")],
-    ["Horário",    sorted.map(r=>r.meta?.start&&r.meta?.end?`${r.meta.start}–${r.meta.end}`:"--")],
-    ["⏱️ Preench.", sorted.map(r=>r.meta?.tempoPreenchimentoSeg?`${Math.floor(r.meta.tempoPreenchimentoSeg/60)}min`:"--")],
-  ].map(([label,vals])=>`<tr><td style="font-weight:600">${label}</td>${vals.map(v=>`<td>${v}</td>`).join("")}</tr>`).join("");
-
-  // Comparative device rows
-  let compareRows="";
-  for(const cat of (project.categories||[])) {
-    if(cat.type==="maintenance"||cat.type==="notes") continue;
-    compareRows+=`<tr style="background:#f1f5f9"><td colspan="${n+1}" style="font-weight:700;font-size:11px;color:${theme.primary};padding:7px 10px;text-transform:uppercase">${cat.label}</td></tr>`;
-
-    if(cat.type==="items") {
-      (cat.itemLabels||[]).forEach((label,i)=>{
-        const statuses=sorted.map(r=>{const s=r.state?.[cat.id];if(!s||!Array.isArray(s))return"OK";const v=s[i];if(!v)return"OK";return stLabel(v.status);});
-        const hasProb=statuses.some(s=>s!=="OK");
-        compareRows+=`<tr ${hasProb?'style="background:#fff8f8"':""}>
-          <td style="padding-left:16px">${label}</td>
-          ${statuses.map(st=>`<td><span class="badge" style="background:${stBg(st==="OK"?"ok":st==="PARCIAL"?"partial":"inop")};color:${stColor(st==="OK"?"ok":st==="PARCIAL"?"partial":"inop")}">${st}</span></td>`).join("")}
-        </tr>`;
-      });
-    } else if(cat.type==="single") {
-      const statuses=sorted.map(r=>{const s=r.state?.[cat.id];if(!s)return"OK";return stLabel(s.status);});
-      const hasProb=statuses.some(s=>s!=="OK");
-      compareRows+=`<tr ${hasProb?'style="background:#fff8f8"':""}>
-        <td style="padding-left:16px">${cat.label}</td>
-        ${statuses.map(st=>`<td><span class="badge" style="background:${stBg(st==="OK"?"ok":st==="PARCIAL"?"partial":"inop")};color:${stColor(st==="OK"?"ok":st==="PARCIAL"?"partial":"inop")}">${st}</span></td>`).join("")}
-      </tr>`;
-    } else if(cat.type==="count") {
-      const statuses=sorted.map(r=>{const s=r.state?.[cat.id];if(!s)return"OK";const inop=s.inoper??0;if(inop===0)return"OK";const t=s.total??cat.total??1;return inop<t?"PARCIAL":"INOPERANTE";});
-      const hasProb=statuses.some(s=>s!=="OK");
-      compareRows+=`<tr ${hasProb?'style="background:#fff8f8"':""}>
-        <td style="padding-left:16px">${cat.label}</td>
-        ${statuses.map(st=>`<td><span class="badge" style="background:${stBg(st==="OK"?"ok":st==="PARCIAL"?"partial":"inop")};color:${stColor(st==="OK"?"ok":st==="PARCIAL"?"partial":"inop")}">${st}</span></td>`).join("")}
-      </tr>`;
-    }
-  }
-
-  // Problems across all reports
-  const allProblems=new Map();
-  sorted.forEach((r,idx)=>{
-    for(const cat of (project.categories||[])){
-      const s=r.state?.[cat.id];if(!s)continue;
-      if(cat.type==="items"&&Array.isArray(s)){
-        s.forEach((v,i)=>{if(v.status&&v.status!=="ok"){const key=`${cat.label}|${cat.itemLabels?.[i]||i}`;if(!allProblems.has(key))allProblems.set(key,{cat:cat.label,item:cat.itemLabels?.[i]||`Item ${i+1}`,weeks:new Array(n).fill("--")});allProblems.get(key).weeks[idx]=v.status==="inop"?"INOP":"PARC";}});
-      }else if(cat.type==="single"&&s.status&&s.status!=="ok"){const key=cat.label;if(!allProblems.has(key))allProblems.set(key,{cat:cat.label,item:cat.label,weeks:new Array(n).fill("--")});allProblems.get(key).weeks[idx]=s.status==="inop"?"INOP":"PARC";}
-    }
+  const rot = sorted.map(r => getWeekLabel(r.meta?.date).replace(/^(S\d) (\w{3})\w*/, "$1 $2"));
+  const datas = sorted.map(r => r.meta?.date || "");
+  const semanas = sorted.map(r => itensDoEstado(project, r.state));
+  const series = semanas.map(it => resumo(it).saude);
+  const atual = semanas[n - 1] || [];
+  // matriz: dispositivos com alguma ocorrência no período
+  const chaves = new Map();
+  semanas.forEach(it => it.forEach(x => { if (x.status !== "ok" && !chaves.has(x.key)) chaves.set(x.key, { key: x.key, cat: x.cat, catId: x.catId, item: x.item, unico: x.unico, camera: x.camera }); }));
+  const seqDe = (k) => semanas.map((it, w) => {
+    const hit = it.find(x => x.key === k.key); if (hit) return hit.status;
+    return sorted[w].state?.[k.catId] ? (k.camera ? "ok" : null) : null;   // câmera fora da lista de falhas = OK
   });
-
-  const problemRows=[...allProblems.values()].map(p=>{
-    const isRecurrent=p.weeks.filter(w=>w!=="--").length>1;
-    const curr=p.weeks[n-1]!=="--"?p.weeks[n-1]:"Resolvido";
-    return `<tr>
-      <td>${p.item}</td><td>${p.cat}</td>
-      <td><span class="badge" style="background:${stBg(curr==="INOP"?"inop":curr==="PARC"?"partial":"ok")};color:${stColor(curr==="INOP"?"inop":curr==="PARC"?"partial":"ok")}">${curr}</span></td>
-      <td style="font-size:11px">${isRecurrent?"🔴 Recorrente":"🟡 Nova ocorrência"}</td>
-    </tr>`;
-  }).join("");
-
-  const resolvedRows=[...allProblems.values()].filter(p=>{
-    const hadProb=p.weeks.some(w=>w!=="--");
-    const lastOK=p.weeks[n-1]==="--";
-    return hadProb&&lastOK;
-  }).map(p=>`<tr><td>${p.cat}</td><td>${p.item}</td><td><span class="badge" style="background:#dcfce7;color:#15803d">✔ Resolvido</span></td></tr>`).join("");
-
-  // KPI summary
-  const allStatuses=sorted.flatMap(r=>(project.categories||[]).flatMap(cat=>{
-    const s=r.state?.[cat.id];if(!s)return[];
-    if(cat.type==="items"&&Array.isArray(s))return s.map(v=>v.status||"ok");
-    if(cat.type==="single")return[s.status||"ok"];
-    return[];
-  }));
-  const totalOK=allStatuses.filter(s=>!s||s==="ok").length;
-  const totalInop=allStatuses.filter(s=>s==="inop").length;
-  const totalParcial=allStatuses.filter(s=>s==="partial").length;
-  const healthAvg=allStatuses.length>0?Math.round((totalOK/allStatuses.length)*100):100;
-  const barColor=healthAvg>=90?theme.barOk:healthAvg>=70?"#d97706":"#dc2626";
-
-  // Meta from sorted for header mock
-  const metaMock = {date: sorted[n-1]?.meta?.date, start:"", end:"", leader:"", cco:"", moked:"", mokedContact:false};
-
-  const html=`<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Comparativo — ${project.id} — ${period}</title>
-<style>${getCSS(theme)}
-table td,table th{font-size:11px}
-</style></head>
-<body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:${theme.headerBg};color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-
-<div class="header">
-  <div class="header-top">
-    <div>
-      <p style="font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-      <h1 style="font-size:19px;font-weight:700;color:#fff;margin-bottom:4px">Relatório Comparativo de Testes</h1>
-      <p style="font-size:12px;color:rgba(255,255,255,.8)">Sistemas Eletrônicos de Segurança</p>
-      <p style="font-size:11px;color:rgba(255,255,255,.75)">${project.id} — ${project.name||""} · ${theme.empresaNome}</p>
-      <p style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px">Período: ${period} · ${n} semana(s) · ${weekLabels.join(" · ")}</p>
-    </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <img src="${theme.mokedLogo}" style="height:52px;max-width:120px;object-fit:contain" alt="Moked"/>
-        <div style="width:1px;background:rgba(255,255,255,.2);height:40px;flex-shrink:0"></div>
-        <img src="${theme.empresaLogo}" style="height:52px;max-width:140px;object-fit:contain;background:rgba(255,255,255,.12);border-radius:8px;padding:4px 10px" alt="${theme.empresaNome}"/>
-      </div>
-      <div style="text-align:right;font-size:10px;color:rgba(255,255,255,.6)">
-        <div>Emissão: ${hoje}</div>
-        <div>José Fonseca · jose.fonseca@moked.com.br</div>
-      </div>
-    </div>
-  </div>
-  <div class="header-accent"></div>
-</div>
-
-<div class="kpi-row">
-  <div class="kpi"><div class="kpi-val" style="color:${barColor}">${healthAvg}%</div><div class="kpi-lbl">Saúde Média</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#15803d">${totalOK}</div><div class="kpi-lbl">OK Total</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#d97706">${totalParcial}</div><div class="kpi-lbl">Parciais</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#dc2626">${totalInop}</div><div class="kpi-lbl">Inoperantes</div></div>
-</div>
-
-<div class="section">
-  <div class="section-title">Equipe por Semana</div>
-  <table>
-    <thead>
-      <tr><th>Função</th>${weekCols}</tr>
-      <tr style="background:${theme.accent}"><td style="color:rgba(255,255,255,.7);font-size:9px;padding:5px 10px">Data</td>${dateCols}</tr>
-    </thead>
-    <tbody>${equipeRows}</tbody>
-  </table>
-</div>
-
-<div class="section">
-  <div class="section-title">Comparativo por Dispositivo</div>
-  <table>
-    <thead><tr><th>Dispositivo / Item</th>${weekCols}</tr></thead>
-    <tbody>${compareRows}</tbody>
-  </table>
-</div>
-
-${problemRows?`<div class="section">
-  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">Análise de Pendências e Tendências</div>
-  <table>
-    <thead><tr><th>Dispositivo</th><th>Sistema</th><th>Status Atual</th><th>Tendência</th></tr></thead>
-    <tbody>${problemRows}</tbody>
-  </table>
-</div>`:""}
-
-${resolvedRows?`<div class="section">
-  <div class="section-title" style="color:#15803d;border-left-color:#15803d">Itens Resolvidos no Período</div>
-  <table>
-    <thead><tr><th>Sistema</th><th>Item</th><th>Status</th></tr></thead>
-    <tbody>${resolvedRows}</tbody>
-  </table>
-</div>`:""}
-
-<div class="footer">
-  <div>Relatório Comparativo © Moked Consulting Security · ${theme.empresaNome}</div>
-  <div style="font-weight:600;margin-top:2px">José Fonseca — Moked Consulting Security</div>
-  <div>jose.fonseca@moked.com.br · ${project.id} · ${hoje}</div>
-</div>
+  const linhasMat = [...chaves.values()].map(k => ({ ...k, seq: seqDe(k) })).map(k => ({ ...k, sit: classificar(k.seq) }));
+  const nomeDe = (k) => k.unico ? k.cat : k.item;
+  // pendências atuais
+  const fu = opts.followups || {};
+  const pend = atual.filter(x => x.status !== "ok").map(x => {
+    const reg = fu[canonicalFollowupKey(project.id, x.cat, x.camera ? x.item : (x.unico ? "\u2014" : x.item))] || fu[canonicalFollowupKey(project.id, x.cat, x.item)];
+    const t = estadoTratativa(reg, hoje);
+    const lin = linhasMat.find(l => l.key === x.key);
+    const dias = diasEntre(x.since, hoje);
+    let div = false;
+    if (x.since && lin) div = lin.seq.some((s, w) => s === "ok" && datas[w] && datas[w] > x.since);
+    return { ...x, dias, t, sit: lin ? lin.sit : "Nova", div };
+  }).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
+  const conta = (s) => pend.filter(p => p.sit === s).length;
+  const sem = pend.filter(p => p.t.estado === "sem").length, venc = pend.filter(p => p.t.estado === "vencido").length, emdia = pend.length - sem - venc;
+  const resolvidas = linhasMat.filter(l => l.sit === "Resolvida").map(l => { const ult = l.seq.reduce((m, s, i) => s && s !== "ok" ? i : m, -1); return { ...l, quando: rot[ult + 1] || rot[n - 1] }; });
+  const maior = pend.find(p => p.dias != null);
+  // sem ocorrência no período (base: última semana)
+  const comOc = new Set(linhasMat.map(l => l.key));
+  const okCat = new Map();
+  atual.forEach(x => { if (x.agregado) {   // câmeras OK agora, menos as que falharam em alguma semana e se recuperaram
+      const falhandoAgora = new Set(atual.filter(y => y.catId === x.catId && !y.agregado).map(y => y.key));
+      const recuperadas = linhasMat.filter(l => l.catId === x.catId && !falhandoAgora.has(l.key)).length;
+      const q = Math.max(0, x.qtd - recuperadas); if (q) okCat.set(x.cat, (okCat.get(x.cat) || 0) + q); }
+    else if (!comOc.has(x.key) && x.status === "ok") okCat.set(x.cat, (okCat.get(x.cat) || 0) + 1); });
+  const nOk = [...okCat.values()].reduce((a, b) => a + b, 0);
+  // gráfico
+  const lo = Math.max(0, Math.floor((Math.min(...series) - 3) / 5) * 5), hi = Math.min(100, Math.ceil((Math.max(...series) + 2) / 5) * 5);
+  const W = 330, H = 118, pl = 26, pr = 12, pt = 16, pb = 24;
+  const X = i => pl + (n > 1 ? i * (W - pl - pr) / (n - 1) : (W - pl - pr) / 2), Y = v => pt + (hi - v) / ((hi - lo) || 1) * (H - pt - pb);
+  const grades = []; for (let g = lo; g <= hi; g += 5) grades.push(g);
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${grades.map(g => `<line x1="${pl}" x2="${W - pr}" y1="${Y(g).toFixed(1)}" y2="${Y(g).toFixed(1)}" class="gl"/><text x="${pl - 5}" y="${(Y(g) + 3).toFixed(1)}" class="ax" text-anchor="end">${g}%</text>`).join("")}
+    <polygon points="${X(0).toFixed(1)},${Y(lo).toFixed(1)} ${series.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")} ${X(n - 1).toFixed(1)},${Y(lo).toFixed(1)}" class="ar"/>
+    <polyline points="${series.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ")}" class="ln"/>
+    ${series.map((v, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="${i === n - 1 ? 4.2 : 2.6}" class="${i === n - 1 ? "pt5" : "pt"}"/><text x="${X(i).toFixed(1)}" y="${(Y(v) - 7).toFixed(1)}" class="${i === n - 1 ? "vl5" : "vl"}" text-anchor="middle">${fmt1(v)}</text><text x="${X(i).toFixed(1)}" y="${H - 7}" class="ax" text-anchor="middle">${escHTML(rot[i])}</text>`).join("")}</svg>`;
+  const delta = n > 1 ? series[n - 1] - series[n - 2] : 0;
+  const B_ST = { inop: '<span class="b bi">Inoperante</span>', partial: '<span class="b bp">Parcial</span>' };
+  const B_SIT = { Persistente: '<span class="s s-per">Persistente</span>', Reincidente: '<span class="s s-rei">Reincidente</span>', Nova: '<span class="s s-nov">Nova no período</span>', Resolvida: '<span class="s s-res">Resolvida</span>' };
+  const corDias = d => d == null ? "d-baixa" : d > 180 ? "d-alta" : d >= 30 ? "d-media" : "d-baixa";
+  const tratHtml = (p) => p.t.estado === "sem" ? '<span class="tr-sem">Sem tratativa</span>'
+    : `<span class="${p.t.estado === "vencido" ? "tr-venc" : "tr-ok"}">${escHTML(FU_ROTULO[p.t.status] || "Em acompanhamento")}</span><div class="mu">${p.t.quando ? new Date(p.t.quando).toLocaleDateString("pt-BR") : ""}${p.t.estado === "vencido" ? " · follow-up vencido" : " · em dia"}</div>`;
+  const nomePend = p => p.unico ? p.cat : (["CCO", "Portaria"].includes(p.item) ? `${p.cat} — ${p.item}` : p.item);
+  const linhasPend = pend.map(p => `<tr><td><div class="dv">${escHTML(nomePend(p))}${opts.interno && p.div ? ' <sup class="dvg">*</sup>' : ""}</div><div class="mu">${escHTML(p.cat)}${p.note && p.note !== "--" ? " · " + escHTML(p.note) : ""}</div></td>
+    <td>${B_ST[p.status]}</td><td>${B_SIT[p.sit] || ""}</td><td class="num"><span class="${corDias(p.dias)}">${p.dias != null ? p.dias + " d" : "—"}</span>${p.since ? `<div class="mu">desde ${fmtDate(p.since)}</div>` : ""}</td><td>${tratHtml(p)}</td></tr>`).join("");
+  const cel = { ok: '<td class="c c-o"></td>', partial: '<td class="c c-p">P</td>', inop: '<td class="c c-i">I</td>' };
+  const matHtml = linhasMat.filter(l => l.sit).map(l => `<tr><td class="hn"><b>${escHTML(nomeDe(l))}</b>${l.unico ? "" : `<span class="mu"> · ${escHTML(l.cat)}</span>`}</td>${l.seq.map(s => s ? cel[s] : '<td class="c c-n">—</td>').join("")}<td>${B_SIT[l.sit]}</td></tr>`).join("");
+  const divs = opts.interno ? pend.filter(p => p.div) : [];
+  const destaques = [
+    `Saúde de <b>${fmt1(series[n - 1])}%</b> na semana${n > 1 ? `, ${fmt1(Math.abs(delta))} pp ${delta < 0 ? "abaixo" : delta > 0 ? "acima" : "igual à"}${delta === 0 ? "" : " da"} anterior; no período variou entre ${fmt1(Math.min(...series))}% e ${fmt1(Math.max(...series))}%` : ""}.`,
+    pend.length ? (emdia === 0 ? `<b>Nenhuma das ${pend.length} pendências tem tratativa em dia</b>: ${sem} sem nenhum registro e ${venc} com o último follow-up há mais de ${DIAS_FOLLOWUP_VENCIDO} dias.` : `${emdia} de ${pend.length} pendências com tratativa em dia; ${sem} sem registro e ${venc} com follow-up vencido.`) : "Nenhuma pendência em aberto na última verificação.",
+    maior ? `Item há mais tempo em aberto: <b>${escHTML(nomePend(maior))}</b> (${escHTML(maior.cat)}), ${maior.dias} dias.` : "",
+    resolvidas.length ? `${resolvidas.length} ${resolvidas.length === 1 ? "item resolvido" : "itens resolvidos"} no período: ${resolvidas.slice(0, 4).map(r => escHTML(nomeDe(r))).join(", ")}${resolvidas.length > 4 ? "…" : ""}.` : "",
+  ].filter(Boolean);
+  const equipe = sorted.map((r, i) => `<tr><td><b>${escHTML(rot[i])}</b> <span class="mu">${fmtDate(r.meta?.date).slice(0, 5)}</span></td><td>${escHTML(r.meta?.leader || "--")}</td><td>${escHTML(r.meta?.cco || "--")}</td><td>${escHTML(r.meta?.moked || "--")}</td><td>${r.meta?.start && r.meta?.end ? `${escHTML(r.meta.start)}–${escHTML(r.meta.end)}` : "--"}</td><td class="num">${r.meta?.tempoPreenchimentoSeg ? Math.floor(r.meta.tempoPreenchimentoSeg / 60) + " min" : "--"}</td></tr>`).join("");
+  const docNum = `MK-${project.id}-RC-${(datas[n - 1] || "0000").replace(/-/g, "").slice(-4)}`;
+  const periodo = `${fmtDate(datas[0]).slice(0, 5)} a ${fmtDate(datas[n - 1])}`;
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Consolidado — ${escHTML(project.id)} — ${periodo}</title><style>${consolidadoNovoCSS()}</style></head><body>
+<div class="no-print" style="text-align:center;margin:0 0 16px"><button onclick="window.print()" class="bt-print">Imprimir / Salvar PDF</button></div>
+<div class="rodape-fixo">${docNum} · Relatório Consolidado · ${escHTML(project.id)} ${escHTML(project.name || "")} · Moked Consulting Security · MokLog CheckTest</div>
+<header class="topo"><div class="logos"><img src="${MOKED_LOGO}" class="lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="sep"></span><img src="${theme.empresaLogo}" class="lg" alt="${escHTML(theme.empresaNome || "")}">` : ""}</div>
+<div class="meta">${opts.interno ? '<div class="tag">VERSÃO INTERNA</div>' : ""}<div><b>Relatório Consolidado</b> · Nº ${docNum}</div><div>Emissão ${hoje.toLocaleDateString("pt-BR")} · José Fonseca</div></div></header>
+<div class="regua"></div>
+<h1>Relatório Consolidado de Operacionalidade</h1>
+<p class="sub"><b>${escHTML(project.id)} — ${escHTML(project.name || "")}</b>${theme.empresaNome ? ` · ${escHTML(theme.empresaNome)}` : ""} · ${periodo} · ${n} ${n === 1 ? "semana" : "semanas"} de teste</p>
+<section class="hero"><div><div class="lb">Saúde na semana atual (${escHTML(rot[n - 1])})</div><div class="big">${fmt1(series[n - 1])}%</div>
+${n > 1 ? `<div class="dl ${delta < 0 ? "dn" : "up"}">${delta < 0 ? "▼" : "▲"} ${fmt1(Math.abs(delta))} pp vs. semana anterior</div>` : ""}
+<div class="mu sm">Faixa no período: ${fmt1(Math.min(...series))}% a ${fmt1(Math.max(...series))}%</div></div><div><div class="lb">Evolução semanal da saúde</div>${svg}</div></section>
+<section class="kpis">
+<div class="k"><div class="kv">${pend.length}</div><div class="kl">pendências em aberto</div><div class="mu sm">${conta("Persistente")} persistentes · ${conta("Reincidente")} reincidentes · ${conta("Nova")} novas</div></div>
+<div class="k"><div class="kv ok">${resolvidas.length}</div><div class="kl">resolvidas no período</div></div>
+<div class="k"><div class="kv da">${maior ? maior.dias + " d" : "—"}</div><div class="kl">maior tempo em aberto</div><div class="mu sm">${maior ? escHTML(nomePend(maior)) : ""}</div></div>
+<div class="k"><div class="kv wa">${emdia} de ${pend.length}</div><div class="kl">com tratativa em dia</div><div class="mu sm">${sem} sem tratativa · ${venc} com follow-up vencido</div></div></section>
+<section class="dest"><div class="h2">Destaques do período</div><ul>${destaques.map(d => `<li>${d}</li>`).join("")}</ul></section>
+<section><div class="h2">Pendências em aberto <span class="mu">— ordenadas por tempo em aberto</span></div>
+${pend.length ? `<table class="tb pd"><colgroup><col style="width:41%"><col style="width:11%"><col style="width:16%"><col style="width:12%"><col style="width:20%"></colgroup><thead><tr><th>Dispositivo</th><th>Status</th><th>Situação no período</th><th class="num">Em aberto</th><th>Última tratativa</th></tr></thead><tbody>${linhasPend}</tbody></table>` : '<div class="okbox">Nenhuma pendência em aberto na última verificação.</div>'}
+${divs.length ? `<p class="nota"><sup class="dvg">*</sup> Conferência automática (versão interna): o registro da pendência é anterior a semanas em que o teste semanal marcou o item como OK (${divs.map(p => escHTML(nomePend(p))).join(", ")}). Confirmar a data de abertura.</p>` : ""}</section>
+<section><div class="h2">Evolução por dispositivo <span class="mu">— somente itens com ocorrência no período</span></div>
+${matHtml ? `<table class="hm"><thead><tr><th>Dispositivo</th>${rot.map((r, i) => `<th class="c">${escHTML(r)}<div class="mu">${fmtDate(datas[i]).slice(0, 5)}</div></th>`).join("")}<th>Tendência</th></tr></thead><tbody>${matHtml}</tbody></table>
+<div class="leg"><span class="c-o lg1"></span> Operacional <span class="c-p lg1">P</span> Parcial <span class="c-i lg1">I</span> Inoperante <span class="c-n lg1">—</span> Sem registro</div>` : '<div class="mu">Nenhuma ocorrência no período.</div>'}
+${nOk ? `<div class="okbox"><b>${nOk} dispositivos operacionais em ${n === 1 ? "toda a verificação" : `todas as ${n} semanas`}, sem nenhuma ocorrência:</b><div class="mu">${[...okCat.entries()].map(([c, q]) => `${escHTML(c)} <b>${q}</b>`).join(" · ")}</div></div>` : ""}</section>
+${resolvidas.length ? `<section class="bloco"><div class="h2">Resolvidas no período</div><ul class="res">${resolvidas.map(r => `<li><b>${escHTML(nomeDe(r))}</b> <span class="mu">(${escHTML(r.cat)})</span> — operacional desde ${escHTML(r.quando)}</li>`).join("")}</ul></section>` : ""}
+<section class="bloco"><div class="h2">Execução dos testes</div><table class="tb eq"><thead><tr><th>Semana</th><th>Líder VSPP</th><th>CCO</th><th>Moked 24h</th><th>Horário</th><th class="num">Preenchimento</th></tr></thead><tbody>${equipe}</tbody></table></section>
+<section class="fim"><div><div class="mu">Base de cálculo</div><div class="sm">Saúde = (operacionais + 0,5 × parciais) ÷ dispositivos testados; cada câmera do CFTV conta como um dispositivo. Mesma regra do laudo semanal. Pendências e tratativas conforme o registro da gestão Moked.</div></div>
+<div class="ass"><div class="linha"></div><b>José Fonseca</b><div class="mu">Consultor de Segurança · Moked Consulting Security</div><div class="mu">jose.fonseca@moked.com.br</div></div></section>
 </body></html>`;
-
-  const blob=new Blob([html],{type:"text/html"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download=`comparativo_${project.id}_${n}semanas.html`;
+  return { html, series, pend, linhasMat, resolvidas, nOk, docNum };
+}
+export function generateConsolidatedPDF(project, reports, opts = {}) {
+  if (!project || !reports?.length) return;
+  const { html } = montarConsolidado(project, reports, opts);
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `consolidado_${project.id}_${reports.length}semanas${opts.interno ? "_interno" : ""}.html`;
   a.click(); URL.revokeObjectURL(url);
+}
+function consolidadoNovoCSS() {
+  return `@page{size:A4;margin:14mm 14mm 18mm 14mm}*{box-sizing:border-box}
+body{font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;color:#1F2937;font-size:9.6pt;line-height:1.35;margin:0 auto;max-width:190mm;padding:8px}
+@media print{.no-print{display:none}body{padding:0;max-width:none}.rodape-fixo{display:block}}
+.bt-print{background:#111827;color:#fff;border:none;border-radius:6px;padding:10px 26px;font-size:14px;font-weight:700;cursor:pointer}
+.rodape-fixo{display:none;position:fixed;bottom:-10mm;left:0;right:0;font-size:7.5pt;color:#9CA3AF}
+.mu{color:#6B7280}.sm{font-size:8.4pt}
+.topo{display:flex;justify-content:space-between;align-items:center}.logos{display:flex;align-items:center;gap:12px}.lm{height:36px}.lg{height:34px;max-width:130px;object-fit:contain}.sep{width:1px;height:30px;background:#D1D5DB}
+.meta{text-align:right;font-size:8.6pt;color:#4B5563;line-height:1.45}.tag{display:inline-block;font-size:7.4pt;letter-spacing:.08em;font-weight:700;color:#B91C1C;border:1px solid #FCA5A5;border-radius:3px;padding:1px 6px;margin-bottom:3px}
+.regua{height:3px;background:linear-gradient(90deg,#111827 0 72%,#B91C1C 72% 100%);margin:9px 0 12px;border-radius:2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+h1{font-size:19pt;font-weight:700;margin:0;color:#111827}.sub{margin:2px 0 12px;color:#4B5563;font-size:10pt}
+.hero{display:grid;grid-template-columns:34% 1fr;gap:12px;border:1px solid #E5E7EB;border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.lb{font-size:8pt;text-transform:uppercase;letter-spacing:.07em;color:#6B7280;font-weight:700}.big{font-size:34pt;font-weight:700;color:#111827;line-height:1.05;margin:6px 0 3px}
+.dl{display:inline-block;font-size:8.6pt;font-weight:700;border-radius:999px;padding:2px 8px;margin-bottom:6px}.dn{background:#FEF3C7;color:#92400E}.up{background:#DCFCE7;color:#166534}
+.gl{stroke:#EEF0F3;stroke-width:1}.ax{font-size:7.5px;fill:#9CA3AF}.ar{fill:#111827;opacity:.05}.ln{fill:none;stroke:#111827;stroke-width:1.8}.pt{fill:#fff;stroke:#111827;stroke-width:1.4}.pt5{fill:#B91C1C}.vl{font-size:7.6px;fill:#4B5563}.vl5{font-size:9px;font-weight:700;fill:#B91C1C}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.k{border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px}
+.kv{font-size:18pt;font-weight:700;color:#111827;line-height:1.1}.kl{font-size:8.6pt;color:#374151;font-weight:600}.ok{color:#15803D}.da{color:#B91C1C}.wa{color:#B45309}
+.dest{background:#F9FAFB;border-left:3px solid #111827;border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:12px}.dest ul{margin:4px 0 0;padding-left:16px}.dest li{margin:2px 0}
+.h2{font-size:11pt;font-weight:700;color:#111827;margin:4px 0 6px;page-break-after:avoid}.h2 .mu{font-weight:400;font-size:9pt}
+table{width:100%;border-collapse:collapse}.tb th{font-size:7.8pt;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;text-align:left;font-weight:700;border-bottom:1.5px solid #111827;padding:5px 6px}
+.tb td{border-bottom:1px solid #EEF0F3;padding:4px 6px;vertical-align:top}.tb tr,.hm tr{page-break-inside:avoid}.pd .mu{font-size:8.2pt;line-height:1.25}
+.dv{font-weight:700;color:#111827}.num{text-align:right;white-space:nowrap}
+.b{display:inline-block;font-size:7.8pt;font-weight:700;border-radius:3px;padding:1px 6px;white-space:nowrap}.bi{background:#FEE2E2;color:#991B1B}.bp{background:#FEF3C7;color:#92400E}
+.s{display:inline-block;font-size:7.8pt;font-weight:600;border-radius:999px;padding:1px 7px;border:1px solid;white-space:nowrap}.s-per{color:#991B1B;border-color:#FCA5A5}.s-rei{color:#9A3412;border-color:#FDBA74}.s-nov{color:#1D4ED8;border-color:#93C5FD}.s-res{color:#166534;border-color:#86EFAC;background:#F0FDF4}
+.d-alta{color:#B91C1C;font-weight:700}.d-media{color:#B45309;font-weight:700}.d-baixa{color:#374151;font-weight:700}.tr-sem{color:#B91C1C;font-weight:700}.tr-venc{color:#B45309;font-weight:700}.tr-ok{color:#15803D;font-weight:700}
+.dvg{color:#B45309;font-weight:700}.nota{font-size:8pt;color:#6B7280;margin:5px 0 0}
+.hm th{font-size:7.8pt;color:#6B7280;font-weight:700;text-align:left;padding:4px;border-bottom:1.5px solid #111827}.hm th.c{text-align:center}.hm td{padding:3px 4px;border-bottom:1px solid #F3F4F6}.hn{font-size:8.8pt}
+.c{width:46px;text-align:center;font-weight:700;font-size:8pt}td.c-o{background:#F3F4F6;border:2px solid #fff}td.c-p{background:#FDE68A;color:#78350F;border:2px solid #fff}td.c-i{background:#FCA5A5;color:#7F1D1D;border:2px solid #fff}td.c-n{color:#9CA3AF;border:2px solid #fff}
+td.c-o,td.c-p,td.c-i,.lg1,.regua,.dl,.b,.s{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.leg{font-size:8pt;color:#6B7280;margin:6px 0 10px;display:flex;align-items:center;gap:6px}.lg1{display:inline-block;width:16px;height:12px;line-height:12px;border-radius:2px;font-size:7pt;text-align:center}
+span.c-o{background:#F3F4F6}span.c-p{background:#FDE68A;color:#78350F}span.c-i{background:#FCA5A5;color:#7F1D1D}span.c-n{color:#9CA3AF}
+.okbox{border:1px solid #BBF7D0;background:#F0FDF4;border-radius:8px;padding:8px 10px;margin:8px 0 12px;font-size:9pt}.okbox .mu{margin-top:3px;font-size:8.4pt;line-height:1.5}
+.res{margin:0 0 12px;padding-left:16px}.res li{margin:2px 0}.bloco{page-break-inside:avoid}section{margin-bottom:6px}
+.fim{display:grid;grid-template-columns:1fr 210px;gap:20px;margin-top:14px;border-top:1px solid #E5E7EB;padding-top:10px;page-break-inside:avoid}.ass{font-size:9pt;text-align:center}.linha{border-top:1px solid #111827;margin:28px 0 4px}`;
 }
 
 // ── Relatório Comparativo Interparques (Painel Gerencial — acesso restrito PIN)

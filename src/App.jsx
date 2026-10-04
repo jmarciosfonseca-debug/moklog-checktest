@@ -1911,9 +1911,13 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
               <button onClick={()=>navigator.clipboard.writeText(viewUrl)} style={{...S.sm,fontSize:11,width:"100%"}}>📋 Copiar Link</button>
             </div>}
           </div>
-          {sel.length>=2&&<button onClick={()=>generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")))}
-            style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:8,fontSize:14}}>
-            📊 Gerar Consolidado ({sel.length} semanas)</button>}
+          {sel.length>=2&&<>
+            <button onClick={async()=>{const fu=await loadFollowups(db,p.id).catch(()=>({}));generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")),{followups:fu});}}
+            style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:6,fontSize:14}}>
+            📊 Gerar Consolidado ({sel.length} semanas)</button>
+            <button onClick={async()=>{const fu=await loadFollowups(db,p.id).catch(()=>({}));generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")),{followups:fu,interno:true});}}
+            style={{...S.sm,width:"100%",marginBottom:8,fontSize:12}}>
+            🔎 Versão interna (com conferência de divergências)</button></>}
           {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#94a3b8",marginBottom:8}}>☑ Selecione 2 a 6 relatorios para consolidado</div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {hist.slice().reverse().map((r,revIdx)=>{
