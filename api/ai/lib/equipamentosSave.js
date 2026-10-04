@@ -1,4 +1,4 @@
-const CATS=['smartphones','radiosHT','armamento','municao','placas','lanternas','ztrax','bodycam'];
+const CATS=['smartphones','radiosHT','armamento','municao','placas','lanternas','ztrax','bodycam','outros'];
 const stable=x=>Array.isArray(x)?x.map(stable):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,stable(x[k])])):x;
 const equal=(a,b)=>JSON.stringify(stable(a??null))===JSON.stringify(stable(b??null));
 function fail(status,message){throw Object.assign(Error(message),{status});}

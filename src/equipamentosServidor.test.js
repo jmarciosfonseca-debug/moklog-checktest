@@ -7,6 +7,17 @@ const lider={nivel:'lider',pid:'P505'};
 const banco=current=>{const set=jest.fn(),ref={};return {set,collection:jest.fn(()=>({doc:jest.fn(()=>ref)})),runTransaction:fn=>fn({get:async()=>({exists:!!current,data:()=>current}),set,update:set})};};
 const res=()=>({setHeader:jest.fn(),status:jest.fn().mockReturnThis(),json:jest.fn()});
 beforeEach(()=>jest.clearAllMocks());
+test('item livre é aditivo, valida nome/quantidade e protege contra conflito',async()=>{
+ const novo={id:'guarda1',identificacao:'Guarda-chuva',qtd:3,status:'ok'};
+ const db=banco({armamento:[item]});
+ const result=await save(db,'P505','outros',null,[novo],lider);
+ expect(result.armamento).toEqual([item]);expect(result.outros).toEqual([novo]);
+ expect(db.set.mock.calls[0][1]).not.toHaveProperty('armamento');
+ for(const bad of [{...novo,identificacao:' '},{...novo,qtd:0},{...novo,qtd:1.5}])expect(()=>validate('outros',[],[bad],lider)).toThrow();
+ const changed=banco({outros:[{...novo,qtd:4}]});
+ await expect(save(changed,'P505','outros',[novo],[{...novo,qtd:5}],lider)).rejects.toMatchObject({status:409});
+ expect(changed.set).not.toHaveBeenCalled();
+});
 test.each([null,{nivel:'demo'},{nivel:'ronda'}, {nivel:'lider',pid:'P601'}])('API bloqueia identidade sem acesso ao P505: %j',async a=>{
  auth.verify.mockReturnValue(a);const r=res();await handler({method:'POST',headers:{},body:{pid:'P505',section:'armamento',before:[],after:[item]}},r);expect(r.status).toHaveBeenCalledWith(a?403:401);expect(getDb).not.toHaveBeenCalled();
 });

@@ -139,7 +139,7 @@ export async function conectorEquipamentos(pid, deps) {
     return { situacao: "sem-dado", cobertura: false, origem: "equipamentos/" + pid,
       resumo: "Sem dado de inventário de equipamentos.", itens: [] };
   }
-  const CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam"];
+  const CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam","outros"];
   const todos = [];
   CATS.forEach(k => { if (Array.isArray(data[k])) data[k].forEach(it => todos.push({ ...it, _cat: k })); });
   if (data.moto) todos.push({ ...data.moto, _cat: "moto" });

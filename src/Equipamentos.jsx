@@ -77,7 +77,7 @@ async function loadEquip(projectId) {
     const local = localStorage.getItem(`equipamentos_${projectId}`);
     if(local) return JSON.parse(local);
   } catch(e){}
-  return { smartphones:[], radiosHT:[], armamento:[], municao:[], placas:[], lanternas:[], moto:null, ztrax:[], bodycam:[] };
+  return { smartphones:[], radiosHT:[], armamento:[], municao:[], placas:[], lanternas:[], moto:null, ztrax:[], bodycam:[], outros:[] };
 }
 
 function getStyles(dark) {
@@ -310,11 +310,12 @@ function gerarPDFEquipamentos(project, data, segLogos) {
   ${seg.logo?`<img src="${seg.logo}" style="height:52px;max-width:120px;object-fit:contain" alt="${seg.empresa||""}"/>`:""}
 </div>
 <div class="kpis">
-  <div class="kpi"><div class="kpi-val" style="color:#ef4444">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].filter(i=>i.status==="inop"||i.status==="critico").length}</div><div class="kpi-lbl">Inop/Crítico</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#d97706">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].filter(i=>i.status==="parcial"||i.status==="baixo").length}</div><div class="kpi-lbl">Parcial</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#15803d">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].filter(i=>!i.status||i.status==="ok").length}</div><div class="kpi-lbl">OK</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.moto?[data.moto]:[])].length}</div><div class="kpi-lbl">Total</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#ef4444">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.outros||[]),...(data.moto?[data.moto]:[])].filter(i=>i.status==="inop"||i.status==="critico").length}</div><div class="kpi-lbl">Inop/Crítico</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#d97706">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.outros||[]),...(data.moto?[data.moto]:[])].filter(i=>i.status==="parcial"||i.status==="baixo").length}</div><div class="kpi-lbl">Parcial</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#15803d">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.outros||[]),...(data.moto?[data.moto]:[])].filter(i=>!i.status||i.status==="ok").length}</div><div class="kpi-lbl">OK</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${[...(data.smartphones||[]),...(data.radiosHT||[]),...(data.armamento||[]),...(data.municao||[]),...(data.placas||[]),...(data.lanternas||[]),...(data.ztrax||[]),...(data.bodycam||[]),...(data.outros||[]),...(data.moto?[data.moto]:[])].length}</div><div class="kpi-lbl">Total</div></div>
 </div>
+${section("Outros equipamentos","",["Quantidade"],(data.outros||[]).map(i=>({...i,identificacao:String(i.identificacao||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),justificativa:String(i.justificativa||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))})))}
 ${section("Smartphones","📱",[],[...data.smartphones||[]])}
 ${section("Rádios HT","📻",["Marca"],  [...data.radiosHT||[]])}
 ${section("Armamento","🔫",["Calibre","Nº Série","Armeiro","Últ. Manutenção"],[...data.armamento||[]])}
@@ -382,7 +383,7 @@ export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial })
     status:"ok", justificativa:"", dataProblem:"", historico:[],
     // Campos específicos
     identificacao:"", modelo:"", marca:"",
-    calibre:".38", nSerie:"", qtd:1,
+    calibre:tipo==="armamento"?".38":"", nSerie:"", qtd:1,
     validade:"", placa:"", km:"", proximaRevisao:"",
     bateria:"ok", carregador:"ok", ...initial,
   });
@@ -390,6 +391,9 @@ export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial })
 
   const renderFields = () => {
     switch(tipo) {
+      case "outros": return (
+        <div><label style={S.lbl}>Nome do equipamento</label><input aria-label="Nome do equipamento" maxLength={200} value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Ex: Guarda-chuva" style={S.inp}/></div>
+      );
       case "smartphones": return (
         <>
           <div><label style={S.lbl}>Identificação (ex: Smartphone 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Smartphone 01" style={S.inp}/></div>
@@ -498,7 +502,7 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, admin
             {items.length===0?"Nenhum item":`${items.length} ite${items.length!==1?"ns":"m"} · ${problemCount>0?`⚠ ${problemCount} problema${problemCount!==1?"s":""}`:"✅ tudo OK"}`}
           </div>
         </div>
-        {canEdit&&aberto&&<button onClick={(e)=>{e.stopPropagation();setShowForm(true);}} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:11,padding:"6px 12px",flexShrink:0}}>+ Adicionar</button>}
+        {canEdit&&<button aria-label={`Adicionar equipamento em ${titulo}`} onClick={(e)=>{e.stopPropagation();setAberto(true);setEditItem(null);setShowForm(true);}} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:11,padding:"6px 12px",flexShrink:0}}>{tipo==="outros"?"+ Equipamento":"+ Adicionar"}</button>}
         <span style={{color:dark?"#94a3b8":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
 
@@ -885,7 +889,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
     ...(data.smartphones||[]), ...(data.radiosHT||[]),
     ...(data.armamento||[]),   ...(data.municao||[]),
     ...(data.placas||[]),      ...(data.lanternas||[]),
-    ...(data.ztrax||[]),       ...(data.bodycam||[]),
+    ...(data.ztrax||[]),       ...(data.bodycam||[]), ...(data.outros||[]),
     ...(data.moto?[data.moto]:[])
   ];
   const totalProblemas = allItems.filter(it=>it.status&&it.status!=="ok").length;
@@ -978,6 +982,9 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
           })()}
 
           {/* Seções */}
+          <SecaoItens titulo="Outros equipamentos" icon="+" tipo="outros"
+            items={data.outros||[]} project={project}
+            onUpdate={v=>saveSection("outros",v)} adminAuth={adminAuth} dark={dark}/>
           <SecaoItens titulo="Smartphones" icon="📱" tipo="smartphones"
             items={data.smartphones||[]} project={project}
             onUpdate={v=>saveSection("smartphones",v)} adminAuth={adminAuth} dark={dark}/>

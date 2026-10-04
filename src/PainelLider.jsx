@@ -37,6 +37,7 @@ const db = getFirestore(app);
 
 // Categorias canônicas de equipamento (espelha Equipamentos.jsx).
 const EQUIP_CATS = [
+  { key: "outros", label: "Outros equipamentos" },
   { key: "radiosHT",    label: "Rádios HT" },
   { key: "smartphones", label: "Smartphones" },
   { key: "armamento",   label: "Armamento" },
