@@ -14,6 +14,8 @@
 
 import { getTheme } from "./generatePDF";
 import { solicitacoesPorAprovacao } from "./equipeAprovacao";
+import { fmtBRL } from './equipeAprovacao';
+import { CAMPANHAS, totalCampanha } from './campanhasEquipe';
 
 const SLA_ALERTA = 5; // dias em aberto para alertar (espelha Equipe.jsx)
 
@@ -267,7 +269,12 @@ export function gerarPDFAprovados(project, colaboradores, ano) {
 // ── PDF Cesta de Natal ────────────────────────────────────────────────
 // lista: [{ nome, cargo, turno }] — já filtrada pelos documentos
 // equipes/{pid}/cestaNatal do ano. Total de cestas no rodapé.
-export function gerarPDFCestaNatal(project, lista, ano) {
+export function gerarPDFCestaNatal(project, lista, ano, opcoes = {}) {
+  const tipo = opcoes.tipo || 'natal';
+  if(!CAMPANHAS[tipo]) throw Error('Campanha inválida.');
+  const nome = CAMPANHAS[tipo].nome;
+  const centavos = opcoes.valorCentavos ?? null;
+  if(centavos !== null && (!Number.isSafeInteger(centavos) || centavos < 0 || centavos > 100000000)) throw Error('Valor unitário inválido.');
   const projectId = project?.id || project;
   const theme = getTheme(projectId);
   const nomeProj = NOMES_PROJETO[projectId] || projectId;
@@ -278,27 +285,31 @@ export function gerarPDFCestaNatal(project, lista, ano) {
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${esc(c.cargo || "—")}</td>
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${esc(c.turno || "—")}</td>
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${esc(projectId)} · ${esc(nomeProj)}</td>
-      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;">✔</td>
+      <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;">1</td>
     </tr>`).join("");
 
   const corpo = ordenada.length ? `
-  <div class="bloco">
+  <style>@page{size:A4;} .campanha-lista tr{break-inside:avoid;} .campanha-lista thead{display:table-header-group;} .campanha-lista td{overflow-wrap:anywhere;} .campanha-lista td:nth-child(4),.campanha-lista th{white-space:nowrap;}</style>
+  <div class="campanha-lista">
     <table class="tbl">
-      <thead><tr><th>#</th><th>Colaborador</th><th>Cargo</th><th>Turno</th><th>Unidade</th><th>Cesta</th></tr></thead>
+      <thead><tr><th>#</th><th>Colaborador</th><th>Cargo</th><th>Turno</th><th>Unidade</th><th>Qtd.</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>
-  <div style="margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
-    <b>Total de cestas:</b> ${ordenada.length}
-  </div>` : `<div style="padding:24px;text-align:center;color:#64748b;">Nenhuma Cesta de Natal marcada em ${esc(ano)}.</div>`;
+  <div style="break-inside:avoid;margin-top:6px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;">
+    <b>Quantidade total:</b> ${ordenada.length} unidade(s)<br>
+    <b>Valor unitário:</b> ${centavos === null ? 'Não informado' : fmtBRL(centavos / 100)}<br>
+    <b>Total da solicitação:</b> ${centavos === null ? 'Não calculado (informe o valor unitário)' : fmtBRL(totalCampanha(ordenada.length,centavos))}<br>
+    <small>Uma unidade por colaborador. Valor estimado para solicitação à empresa; não comprova compra ou entrega.</small>
+  </div>` : `<div style="padding:24px;text-align:center;color:#64748b;">Nenhuma solicitação de ${esc(nome)} marcada em ${esc(ano)}.</div>`;
 
   const html = montarHTML({
     theme, projectId,
-    titulo: `Cesta de Natal ${ano}`,
-    subtitulo: "Relação de colaboradores para atendimento do lote de fim de ano",
-    metaTxt: `${ordenada.length} cesta(s)`,
+    titulo: `${nome} ${ano}`,
+    subtitulo: "Solicitação à empresa - relação de colaboradores e cálculo do lote",
+    metaTxt: `${ordenada.length} unidade(s)`,
     corpo, totalItens: ordenada.length,
   });
-  abrir(html, `cesta_natal_${projectId}_${ano}.html`);
+  abrir(html, `solicitacao_${tipo}_${projectId}_${ano}.html`);
   return ordenada.length;
 }

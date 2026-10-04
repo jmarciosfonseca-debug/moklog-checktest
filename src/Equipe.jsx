@@ -47,6 +47,8 @@ import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
 import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
+import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
+import CampanhaEquipeControle from './CampanhaEquipeControle';
 
 
 // Sem limite para desligados — ficam todos para consulta
@@ -849,7 +851,7 @@ export function AprovacaoInline({solic,canApprove,onAprovar,dark}) {
   </div>;
 }
 // Card Cesta de Natal na ficha — sem SLA, sem aprovação.
-function CestaNatalCard({ ano, registro, canManage, onToggle, dark }){
+function CestaNatalCard({ ano, registro, canManage, onToggle, dark, tipo = 'natal' }){
   const S = getStyles(dark);
   const txt2 = dark?"#94a3b8":"#64748b";
   const [busy, setBusy] = useState(false);
@@ -858,7 +860,7 @@ function CestaNatalCard({ ano, registro, canManage, onToggle, dark }){
     <div style={{ ...S.card, border:`1px solid ${marcado?"#22c55e55":(dark?"#0f172a":"#e2e8f0")}` }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
         <div>
-          <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>🎄 Cesta de Natal {ano}</div>
+          <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>{CAMPANHAS[tipo].nome} {ano}</div>
           <div style={{ fontSize:11, color:marcado?"#22c55e":txt2, marginTop:2 }}>
             {marcado ? `Solicitada em ${new Date(registro.solicitadoEm).toLocaleDateString("pt-BR")} · ${registro.solicitadoPor||"—"}` : "Não solicitada"}
           </div>
@@ -1000,7 +1002,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark }) {
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -1188,7 +1190,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
 
           {/* Cesta de Natal (adendo Equipe) */}
           {onToggleCesta && (
-            <CestaNatalCard ano={cestaAno} registro={cestaRegistro} canManage={adminAuth || liderAuth} onToggle={()=>onToggleCesta(colab)} dark={dark}/>
+            <CestaNatalCard ano={cestaAno} tipo={cestaTipo} registro={cestaRegistro} canManage={adminAuth || liderAuth} onToggle={()=>onToggleCesta(colab)} dark={dark}/>
           )}
 
           {/* Uniforme e Material Tático */}
@@ -2184,10 +2186,14 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const cargos = CARGOS_PROJETO[project.id] || ["Colaborador"];
 
   // ── ADENDO EQUIPE — FV / Cesta de Natal / Aprovação ─────────────────
-  const anoAtual = new Date().getFullYear();
+  // Reavalia ao abrir/voltar ao app (hook existente), sem relógio contínuo.
+  const campanha = campanhaDisponivel(new Date(), equipeData.campanhasSazonais);
+  const anoAtual = campanha.ano;
+  const [tipoCampanha, setTipoCampanha] = useState(() => calendarioCampanha().tipo || 'natal');
   const anosDisp = anosFiltro(anoAtual);
   const [anoFiltro, setAnoFiltro] = useState(anoAtual);
   const [filtroRapido, setFiltroRapido] = useState(null); // null | "cesta" | "aprovado" | "aguardando"
+  useEffect(() => { if(!adminAuth && !campanha.disponivel && filtroRapido === 'cesta') setFiltroRapido(null); }, [adminAuth,campanha.disponivel,filtroRapido]);
   const [fvDoc, setFvDoc] = useState(null);
   const [fvMsg,setFvMsg]=useState("");
   const [fvBusy,setFvBusy]=useState(false);
@@ -2236,11 +2242,12 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   useEffect(()=>{
     let vivo = true;
     const anosCarregar = [...new Set([anoAtual, anoFiltro])];
-    Promise.all(anosCarregar.map(a=>
-      getDocs(query(collection(db,"equipes",project.id,"cestaNatal"), where("ano","==",a)))
-        .then(qs=>{ const m={}; qs.forEach(d=>{ const v=d.data(); if(v && v.colabId) m[v.colabId]=v; }); return [a,m]; })
-        .catch(e=>{ console.warn("Cesta: falha na leitura", e); return [a,null]; })
-    )).then(res=>{
+    setCestaPorAno({});
+    Promise.all(Object.keys(CAMPANHAS).flatMap(tipo => anosCarregar.map(a=>
+      getDocs(query(collection(db,"equipes",project.id,CAMPANHAS[tipo].colecao), where("ano","==",a)))
+        .then(qs=>{ const m={}; qs.forEach(d=>{ const v=d.data(); if(v && v.colabId) m[v.colabId]=v; }); return [chaveCampanha(tipo,a),m]; })
+        .catch(e=>{ console.warn("Campanha: falha na leitura", e); return [chaveCampanha(tipo,a),null]; })
+    ))).then(res=>{
       if(!vivo) return;
       setCestaPorAno(prev=>{ const n={...prev}; res.forEach(([a,m])=>{ if(m) n[a]=m; }); return n; });
     });
@@ -2257,24 +2264,29 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   // Marca/desmarca a cesta do ANO ATUAL. Desmarcar exclui só o documento do colaborador.
   const toggleCesta = async (colab)=>{
     if(!liderAuth || !colab) return;
-    const ano = anoAtual;
+    const atualCalendario = campanhaDisponivel(new Date(), equipeData.campanhasSazonais);
+    if(!atualCalendario.disponivel) { alert('Solicitação fora do período ou oculta pelo gerencial.'); return; }
+    const tipo = atualCalendario.tipo;
+    const ano = atualCalendario.ano;
+    const chave = chaveCampanha(tipo,ano);
+    if(!cestaPorAno[chave]) { alert('Aguarde carregar a lista antes de solicitar.'); return; }
     const docId = cestaDocId(ano, colab.id);
     if(!docId){ alert("Colaborador sem identificador válido para a Cesta de Natal."); return; }
-    const ref = doc(db,"equipes",project.id,"cestaNatal",docId);
-    const atual = (cestaPorAno[ano]||{})[colab.id];
+    const ref = doc(db,"equipes",project.id,CAMPANHAS[tipo].colecao,docId);
+    const atual = (cestaPorAno[chave]||{})[colab.id];
     try {
       if(atual){
         await deleteDoc(ref);
-        setCestaPorAno(prev=>{ const m={...(prev[ano]||{})}; delete m[colab.id]; return { ...prev, [ano]:m }; });
+        setCestaPorAno(prev=>{ const m={...(prev[chave]||{})}; delete m[colab.id]; return { ...prev, [chave]:m }; });
       } else {
-        const reg = { ano, colabId:colab.id, nome:colab.nome||"", cargo:colab.cargo||"", turno:colab.turno||"",
+        const reg = { ano, tipo, colabId:colab.id, nome:colab.nome||"", cargo:colab.cargo||"", turno:colab.turno||"",
           solicitadoEm:new Date().toISOString(), solicitadoPor: adminAuth ? "Gerencial" : "Líder" };
         await setDoc(ref, reg);
-        setCestaPorAno(prev=>({ ...prev, [ano]:{ ...(prev[ano]||{}), [colab.id]:reg } }));
+        setCestaPorAno(prev=>({ ...prev, [chave]:{ ...(prev[chave]||{}), [colab.id]:reg } }));
       }
     } catch(e){
       console.error("Cesta de Natal: erro ao gravar", e);
-      alert("Erro ao gravar a Cesta de Natal. Verifique a conexão.");
+      alert("Erro ao gravar a solicitação da campanha. Verifique a conexão.");
     }
   };
 
@@ -2778,8 +2790,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
         onConfirmarUniforme={confirmarRecebimentoUniforme}
         onSalvarListaUniforme={salvarListaUniforme}
         cestaAno={anoAtual}
-        cestaRegistro={(cestaPorAno[anoAtual]||{})[colab.id]}
-        onToggleCesta={toggleCesta}
+        cestaTipo={campanha.tipo || 'natal'}
+        cestaRegistro={(cestaPorAno[chaveCampanha(campanha.tipo,anoAtual)]||{})[colab.id]}
+        onToggleCesta={campanha.disponivel ? toggleCesta : null}
         onAprovar={aprovarSolicitacoes} onTodas={aprovarTodas} anoAprovacao={anoFiltro} onRegistrarWhats={registrarWhats}
         onBack={()=>{setScreen("list");setSelColab(null);}}
         onEdit={()=>{setForm({...colab, foto: fotoDe(colab, fotosMapa)});setScreen("edit");}}
@@ -3077,11 +3090,12 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           {/* ADENDO EQUIPE — filtros rápidos + ano */}
           <div style={{ ...S.card, padding:"10px 12px" }}>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {[[null,"Todos"],["cesta","🎄 Cesta de Natal"],["aprovado","Aprovados"],["aguardando","Aguardando"]].map(([k,r])=>(
+              {[[null,"Todos"],...(adminAuth ? [["cesta","Campanhas / histórico"]] : campanha.disponivel ? [["cesta",CAMPANHAS[campanha.tipo].nome]] : []),["aprovado","Aprovados"],["aguardando","Aguardando"]].map(([k,r])=>(
                 <button key={String(k)} onClick={()=>setFiltroRapido(k)}
                   style={{ ...S.btnSm, fontSize:10.5, padding:"6px 10px", color:filtroRapido===k?"#fff":(dark?"#94a3b8":"#64748b"), background:filtroRapido===k?"#0ea5e9":"transparent", border:`1px solid ${filtroRapido===k?"#0ea5e9":(dark?"#1e293b":"#e2e8f0")}` }}>{r}</button>
               ))}
             </div>
+            {adminAuth && filtroRapido === 'cesta' && <label>Campanha <select value={tipoCampanha} onChange={e=>setTipoCampanha(e.target.value)}>{Object.entries(CAMPANHAS).map(([k,c])=><option key={k} value={k}>{c.nome}</option>)}</select></label>}
             {filtroRapido && (
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginTop:8 }}>
                 <span style={{ fontSize:11, color:dark?"#94a3b8":"#64748b" }}>Ano</span>
@@ -3097,18 +3111,21 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           {filtroRapido && (()=>{
             const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
             const porId = Object.fromEntries(ativos.map(c=>[c.id,c]));
+            const tipo = adminAuth ? tipoCampanha : (campanha.tipo || 'natal');
+            const chave = chaveCampanha(tipo,anoFiltro);
+            const config = equipeData.campanhasSazonais?.[chave] || {};
             let linhas = [];
             if(filtroRapido==="cesta"){
-              linhas = Object.values(cestaPorAno[anoFiltro]||{}).map(r=>{
+              linhas = Object.values(cestaPorAno[chave]||{}).map(r=>{
                 const c = porId[r.colabId];
-                return { id:r.colabId, colab:c||null, nome:c?.nome||r.nome, cargo:c?.cargo||r.cargo, turno:c?.turno||r.turno, extra:"🎄" };
+                return { id:r.colabId, colab:c||null, nome:c?.nome||r.nome, cargo:c?.cargo||r.cargo, turno:c?.turno||r.turno, extra:"1 unidade" };
               });
             } else {
               linhas = ativos.map(c=>({ c, n:solicitacoesPorAprovacao(c, filtroRapido, anoFiltro).length }))
                 .filter(x=>x.n>0).map(({c,n})=>({ id:c.id, colab:c, nome:c.nome, cargo:c.cargo, turno:c.turno, extra:`${n} item(ns)` }));
             }
             linhas.sort((a,b)=>String(a.nome||"").localeCompare(String(b.nome||""),"pt-BR"));
-            const carregando = filtroRapido==="cesta" && !cestaPorAno[anoFiltro];
+            const carregando = filtroRapido==="cesta" && !cestaPorAno[chave];
             return (
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                 <div style={{ fontSize:11.5, color:txt2 }}>{carregando ? "Carregando..." : `${linhas.length} colaborador(es) · ${anoFiltro}`}</div>
@@ -3124,8 +3141,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   </div>
                 ))}
                 {adminAuth && filtroRapido==="cesta" && (
-                  <button onClick={()=>gerarPDFCestaNatal(project, linhas, anoFiltro)}
-                    style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 PDF Cesta de Natal ({linhas.length}) — {anoFiltro}</button>
+                  <CampanhaEquipeControle key={`${project.id}_${chave}_${config.valorCentavos}`} tipo={tipo} ano={anoFiltro} config={config} quantidade={linhas.length} carregando={carregando}
+                    onSalvar={patch => save({...equipeData, campanhasSazonais:{...equipeData.campanhasSazonais,[chave]:{...config,...patch}}})}
+                    onPDF={()=>gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos:config.valorCentavos})}/>
                 )}
                 {adminAuth && filtroRapido==="aprovado" && (
                   <button onClick={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
