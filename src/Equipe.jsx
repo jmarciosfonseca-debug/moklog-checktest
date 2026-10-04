@@ -44,7 +44,7 @@ import { gravarComRecuperacao } from "./equipeConflito";
 import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
-import {criarSolicitacoes, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
+import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 
 
@@ -632,6 +632,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
   const [rascunho, setRascunho] = useState({});          // {nome:{usa,tamanho,marca}} durante montagem
   const [modoSelMulti, setModoSelMulti] = useState(false);
   const [selItens, setSelItens] = useState([]);          // nomes selecionados p/ envio múltiplo
+  const [qtdMulti,setQtdMulti]=useState({});
   const [solicForm, setSolicForm] = useState(null);      // {item, tamanho, marca, motivo} solicitação única
   const [histItem, setHistItem] = useState(null);
   const [whatsFolha,setWhatsFolha]=useState(null);
@@ -661,17 +662,18 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
     if(solicBusy)return;
     setSolicBusy(true);setSolicErro("");setSolicAviso("");
     try{
-      const novas=await onSolicitar(colab.id,itens);
+      const normalizar=i=>({...i,qtd:quantidadeSolicitada(i)});
+      const novas=await onSolicitar(colab.id,Array.isArray(itens)?itens.map(normalizar):normalizar(itens));
       const n=Array.isArray(novas)?novas.length:1;
       // Fluxo novo: o pedido fica "aguardando"; o envio ao grupo só é liberado depois da aprovação do gerencial.
       setSolicAviso(`Solicitação registrada (${n} item(ns)). Aguardando aprovação do gerencial. Quando for aprovada, o botão "Enviar no WhatsApp" aparece aqui para você enviar ao grupo, já assinado.`);
-      setSolicForm(null);setModoSelMulti(false);setSelItens([]);
+      setSolicForm(null);setModoSelMulti(false);setSelItens([]);setQtdMulti({});
     }catch(e){setSolicErro(e.message||"Não foi possível registrar a solicitação. Tente novamente.");}
     finally{setSolicBusy(false);}
   };
   const enviarWhatsMulti=()=>registrarPedido(selItens.map(nome=>{
     const d=unf.itens?.[nome]||{};
-    return {item:nome,marca:d.marca||"",tamanho:d.tamanho||"",motivo:"Solicitação múltipla"};
+    return {item:nome,qtd:qtdMulti[nome]??1,marca:d.marca||"",tamanho:d.tamanho||"",motivo:"Solicitação múltipla"};
   }));
 
   const cardStyle = (on)=>({ background:on?"#0d1f2e":(dark?"#0d1424":"#f8fafc"), border:`1px solid ${on?"#0ea5e9":(dark?"#1c2438":"#e2e8f0")}`, borderRadius:9, padding:"9px 11px", marginBottom:6 });
@@ -699,7 +701,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
             const alerta = dias>=UNIFORME_SLA_ALERTA;
             return (
               <div key={s.id} style={{ background:alerta?"#1a0202":(dark?"#1a1000":"#fffbeb"), border:`1px solid ${alerta?"#ef444455":"#f59e0b44"}`, borderRadius:10, padding:"10px 12px", marginBottom:8 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} — pendente</div>
+                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} · Qtd: {s.qtd??s.quantidade??1} — pendente</div>
                 <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
                 <SeloWhats solic={s}/>
                 {canManage&&podeEnviarAoGrupo(s)&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{enviadoAposAprovacao(s)?"Reenviar no WhatsApp":"📲 Enviar no WhatsApp"}</button>}
@@ -777,9 +779,12 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
                                   <div style={{ fontSize:10, color:txt2 }}>{ult?`Última troca: ${fmtDate(ult.slice(0,10))}`:"Sem registro de troca"}</div>
                                 </div>
                                 {canManage && (
-                                  <button onClick={()=>setSolicForm({ item:it.nome, marca:d.marca||"", tamanho:d.tamanho||"", motivo:"" })} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 12px", flexShrink:0 }}>Solicitar</button>
+                                  <button onClick={()=>setSolicForm({ item:it.nome, qtd:1, marca:d.marca||"", tamanho:d.tamanho||"", motivo:"" })} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 12px", flexShrink:0 }}>Solicitar</button>
                                 )}
                               </div>
+                              {canManage&&sel&&<label style={{display:"block",marginTop:8,fontSize:12,color:txt}}>Quantidade
+                                <input aria-label={`Quantidade de ${it.nome}`} type="number" min="1" max="100000" step="1" value={qtdMulti[it.nome]??1} onChange={e=>setQtdMulti(p=>({...p,[it.nome]:e.target.value}))} style={{...S.inp,width:90,marginLeft:8}}/>
+                              </label>}
                               {ult && d.historico?.length>0 && (
                                 <button onClick={()=>setHistItem(histItem===it.nome?null:it.nome)} style={{ background:"transparent", border:"none", color:"#64748b", fontSize:10, cursor:"pointer", padding:"4px 0 0", textDecoration:"underline" }}>{histItem===it.nome?"ocultar":`histórico (${d.historico.length})`}</button>
                               )}
@@ -821,6 +826,9 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
           <div style={{background:dark?"#0b1220":"#fff",borderRadius:14,padding:"18px 16px",width:"100%",maxWidth:400,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
             <div style={{fontSize:15,fontWeight:800,color:txt,marginBottom:2}}>Solicitar: {solicForm.item}</div>
             <div style={{fontSize:11,color:txt2,marginBottom:12}}>{colab.nome}{solicForm.tamanho?` · tam ${solicForm.tamanho}`:""}</div>
+            <label style={{display:"block",fontSize:12,color:txt,marginBottom:12}}>Quantidade
+              <input aria-label="Quantidade solicitada" type="number" min="1" max="100000" step="1" value={solicForm.qtd} onChange={e=>setSolicForm({...solicForm,qtd:e.target.value})} style={{...S.inp,width:90,marginLeft:8}}/>
+            </label>
             <div style={{fontSize:11,fontWeight:700,color:txt,marginBottom:4}}>Motivo</div>
             <input value={solicForm.motivo} onChange={e=>setSolicForm({...solicForm,motivo:e.target.value})} placeholder="Desgaste, extravio, troca de tamanho…"
               style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px",fontSize:13,color:txt,marginBottom:14,boxSizing:"border-box"}}/>
@@ -1003,7 +1011,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
                 <div style={{ width:20, height:20, borderRadius:5, flexShrink:0, border:`2px solid ${on?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:on?"#0ea5e9":"transparent", color:"#fff", fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{on?"✓":""}</div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:12.5, fontWeight:700, color:txt }}>{c.nome}</div>
-                  <div style={{ fontSize:11, color:txt2 }}>{s.item}{s.tamanho?` · ${s.tamanho}`:""} · {s.status==="entregue"?"entregue":"pendente"} · {s.solicitadoEm?new Date(s.solicitadoEm).toLocaleDateString("pt-BR"):"—"}</div>
+                  <div style={{ fontSize:11, color:txt2 }}>{s.item}{s.tamanho?` · ${s.tamanho}`:""} · Qtd: {s.qtd??s.quantidade??1} · {s.status==="entregue"?"entregue":"pendente"} · {s.solicitadoEm?new Date(s.solicitadoEm).toLocaleDateString("pt-BR"):"—"}</div>
                 </div>
                 <SeloAprovacao status={situacaoSolicitacao(s)}/>
                 <SeloWhats solic={s}/>

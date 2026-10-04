@@ -65,6 +65,18 @@ function merge(before,after,current,depth=0,path=''){
  conflict(path||'/');
 }
 const restricted=['aprovacao','aprovadoEm','aprovadoPor','aprovacaoHist','precoUnit','whatsDispensadoEm','whatsDispensadoPor'];
+function validateQuantities(before,after){
+ const pedidos=base=>[...(base.colaboradores||[]),...(base.desligados||[])].flatMap(c=>(c.uniforme?.solicitacoes||[]).map(s=>({c:c.id,s})));
+ const antigos=pedidos(before);
+ for(const {c,s} of pedidos(after)){
+  const prev=antigos.find(x=>x.c===c&&x.s.id===s.id)?.s;
+  if(prev&&equal(prev.qtd,s.qtd)&&equal(prev.quantidade,s.quantidade))continue;
+  const qtd=Number(s.qtd??s.quantidade??1);
+  if(!Number.isSafeInteger(qtd)||qtd<1||qtd>100000||(s.qtd!=null&&s.quantidade!=null&&Number(s.qtd)!==Number(s.quantidade))){
+   const e=Error('Quantidade da solicitação inválida. Informe um inteiro entre 1 e 100000.');e.status=400;throw e;
+  }
+ }
+}
 function validateLeader(before,after){
  for(const field of ['fv'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}
  const old=[...(before.colaboradores||[]),...(before.desligados||[])].flatMap(c=>(c.uniforme?.solicitacoes||[]).map(s=>({c:c.id,s})));
@@ -72,6 +84,9 @@ function validateLeader(before,after){
   const prev=old.find(x=>x.c===c.id&&x.s.id===s.id)?.s;
   if(!prev){if(s.exigeWhats!==true||s.aprovacao!=='aguardando'||restricted.filter(k=>k!=='aprovacao').some(k=>s[k]!=null)){const e=Error('Solicitação do líder inválida.');e.status=403;throw e;}}
   else if([...restricted,'exigeWhats'].some(k=>!equal(prev[k],s[k]))){const e=Error('Aprovação exclusivamente gerencial.');e.status=403;throw e;}
+  if(prev&&['qtd','quantidade'].some(k=>!equal(prev[k],s[k]))&&(prev.aprovacao!=='aguardando'||prev.status!=='pendente')){
+   const e=Error('Quantidade já decidida só pode ser corrigida pelo gerencial.');e.status=403;throw e;
+  }
   const mudouEnvio=['whatsEnviadoEm','whatsEnvios','whatsEventos'].some(k=>!equal(prev?.[k],s[k]));
   const temEnvio=!!s.whatsEnviadoEm||Number(s.whatsEnvios)>0||(s.whatsEventos||[]).length>0;
   if(mudouEnvio&&(!prev?temEnvio:prev.aprovacao!=='aprovado'||prev.status!=='pendente'||s.status!=='pendente')){
@@ -84,8 +99,9 @@ async function save(db,pid,before,after,identity){
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():{colaboradores:[],desligados:[]};
   const result=merge(before,after,current);
+  validateQuantities(current,result);
   if(identity.nivel==='lider')validateLeader(current,result);
   tx.set(ref,result);return result;
  });
 }
-module.exports={merge,save,validateLeader};
+module.exports={merge,save,validateLeader,validateQuantities};

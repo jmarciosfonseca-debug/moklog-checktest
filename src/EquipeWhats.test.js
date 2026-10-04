@@ -20,6 +20,23 @@ const click=async text=>{const b=btn(text);expect(b).toBeDefined();await act(asy
 const s={id:'solic-123456',item:'Camisa',solicitadoEm:'2026-10-02T12:00:00Z',solicitadoPor:'Líder P260A',exigeWhats:true,status:'pendente',aprovacao:'aguardando'};
 const ap={...s,aprovacao:'aprovado',aprovadoEm:'2026-10-02T21:18:57Z',aprovadoPor:'Gerencial'};
 
+test('formulários individual e múltiplo enviam a quantidade escolhida',async()=>{
+ const solicitar=jest.fn(async(id,itens)=>Array.isArray(itens)?itens:[itens]);
+ const colab={id:'c',nome:'Teste',uniforme:{listaMontada:true,itens:{'Camisa / Camisão':{usa:true,tamanho:'M'}},solicitacoes:[]}};
+ await render(<UniformeModulo colab={colab} canManage onSolicitar={solicitar}/>);
+ await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.startsWith('📦 Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
+ await click('Solicitar');
+ const preencher=async(label,valor)=>act(async()=>{
+  const input=host.querySelector(`[aria-label="${label}"]`);
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,valor);
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+ });
+ await preencher('Quantidade solicitada','2');await click('Confirmar solicitação');
+ expect(solicitar.mock.calls[0][1]).toMatchObject({item:'Camisa / Camisão',qtd:2});
+ await click('Uniforme completo');await preencher('Quantidade de Camisa / Camisão','3');await click('Registrar 1 itens');
+ expect(solicitar.mock.calls[1][1]).toEqual([expect.objectContaining({item:'Camisa / Camisão',qtd:3})]);
+});
+
 test('folha usa novo clique para abrir WhatsApp; falha mostra retry idempotente',async()=>{
  const registrar=jest.fn().mockRejectedValueOnce(Error('offline')).mockResolvedValueOnce({});
  await render(<FolhaWhats solicitacoes={[ap]} colab={{id:'c',nome:'Ana'}} projectNome="P260A" onRegistrar={registrar} onFechar={()=>{}}/>);

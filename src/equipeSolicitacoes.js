@@ -1,9 +1,15 @@
 import {aplicarAprovacao, podeEnviarAoGrupo, situacaoSolicitacao, solicitacoesPorAprovacao} from './equipeAprovacao';
 
+export function quantidadeSolicitada(s) {
+  const qtd=Number(s?.qtd??s?.quantidade??1);
+  if(!Number.isSafeInteger(qtd)||qtd<1||qtd>100000)throw Error('Quantidade deve ser um número inteiro entre 1 e 100000.');
+  return qtd;
+}
+
 export function criarSolicitacoes(itens, nivel, pid, agora = new Date().toISOString(), uuid = () => crypto.randomUUID()) {
   if (!['admin','lider'].includes(nivel)) throw Error('Acesso sem permissão para solicitar.');
   if (!Array.isArray(itens) || !itens.length || itens.some(i=>!i?.item?.trim())) throw Error('Selecione os itens da solicitação.');
-  return itens.map(i=>({id:uuid(), item:i.item.trim(), marca:i.marca||'', tamanho:i.tamanho||'', motivo:i.motivo||'',
+  return itens.map(i=>({id:uuid(), item:i.item.trim(), qtd:quantidadeSolicitada(i), marca:i.marca||'', tamanho:i.tamanho||'', motivo:i.motivo||'',
     status:'pendente', aprovacao:'aguardando', solicitadoEm:agora, solicitadoPor:nivel==='admin'?'Gerencial':`Líder ${pid}`,
     exigeWhats:nivel==='lider', whatsEnvios:0}));
 }
@@ -56,7 +62,7 @@ const quando = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()
 export function mensagemSolicitacoes(projectNome,colabNome,solicitacoes) {
   if (!solicitacoes?.length || solicitacoes.some(s=>situacaoSolicitacao(s)!=='aprovado')) throw Error('Só solicitações aprovadas podem ser enviadas ao grupo.');
   const linhas=['*SOLICITAÇÃO APROVADA — UNIFORME / MATERIAL* ✅',`*Unidade:* ${projectNome}`,`*Colaborador:* ${colabNome}`,'*Itens:*'];
-  solicitacoes.forEach(s=>linhas.push(`• ${s.item}${s.tamanho?` (tam ${s.tamanho})`:''}${s.marca?` — ${s.marca}`:''}\n  Motivo: ${s.motivo||'Não informado'}\n  Protocolo: ${s.id.slice(-6)}\n  Solicitante: ${s.solicitadoPor||'Não informado'}\n  Data: ${new Date(s.solicitadoEm).toLocaleDateString('pt-BR')}\n  Aprovada em: ${quando(s.aprovadoEm)}`));
+  solicitacoes.forEach(s=>linhas.push(`• ${s.item}${s.tamanho?` (tam ${s.tamanho})`:''}${s.marca?` — ${s.marca}`:''}\n  Quantidade: ${quantidadeSolicitada(s)}\n  Motivo: ${s.motivo||'Não informado'}\n  Protocolo: ${s.id.slice(-6)}\n  Solicitante: ${s.solicitadoPor||'Não informado'}\n  Data: ${new Date(s.solicitadoEm).toLocaleDateString('pt-BR')}\n  Aprovada em: ${quando(s.aprovadoEm)}`));
   linhas.push('',`✅ *Aprovado pelo ${ASSINATURA_APROVADOR}*`);
   return linhas.join('\n');
 }
