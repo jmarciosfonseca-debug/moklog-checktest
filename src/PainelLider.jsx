@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { statusReciclagem } from "./pendencias";
+import { chkEqNumCheckins } from "./checagemEquipeRegras";
 import { envioPendente } from "./equipeAprovacao";
 import { gerarPDFSolicitacoesColaborador, gerarPDFSolicitacoesLote } from "./pdfSolicitacoes";
 import {
@@ -72,15 +73,6 @@ const fazReciclagem = (cargo) => {
   return !!c && !NAO_RECICLA.includes(c);
 };
 
-// Nº de check-ins de equipe exigidos (espelha chkEqNumCheckins de Equipe.jsx).
-const CHK_EQUIPE_4X2 = ["P505","P260A","P260B","P260C"];
-function numCheckinsEquipe(projectId, colaboradores) {
-  if (CHK_EQUIPE_4X2.includes(projectId)) return 3;
-  const ativos = (colaboradores||[]).filter(c => (c.status||"ativo")==="ativo");
-  const n4x2 = ativos.filter(c => String(c.escala||"").includes("4x2")).length;
-  if (ativos.length>0 && n4x2/ativos.length>=0.5) return 3;
-  return 4;
-}
 
 export default function PainelLider({ projectId, dark, onBack, onToggleTheme, onEquipe, onEquipamentos }) {
   const bg = dark ? "#04080f" : "#f1f5f9";
@@ -174,13 +166,15 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
 
   // Card 6 — Checagens Semanais (estrutura real de cada módulo)
   const sitEquip = situacaoChecagemEquipamentos(equip?.checagemSemanal, chkAlvoTimestamp);
-  const sitEquipe = situacaoChecagemEquipe(equipe?.checagemEquipe, numCheckinsEquipe(projectId, cols));
+  const numEquipe = chkEqNumCheckins(projectId, cols);                       // 0 = projeto sem checagem de equipe (P260B)
+  const sitEquipe = numEquipe > 0 ? situacaoChecagemEquipe(equipe?.checagemEquipe, numEquipe) : { situacao: "nao_se_aplica", feitos: 0, exigidos: 0 };
+  if (numEquipe > 0) sitEquipe.feitos = Math.min(sitEquipe.feitos, numEquipe);
   const diasParaDomingo = (() => { const d = new Date(); return (7 - d.getDay()) % 7; })();
 
   // Card de Próximos Passos — consolida prazos e pendências que se aproximam.
   const alertas = [];
   const prazoDom = diasParaDomingo === 0 ? "hoje (domingo)" : `em ${diasParaDomingo} dia(s)`;
-  if (sitEquipe.situacao !== "concluida") alertas.push({ cor:"#f59e0b", icone:"👥", txt:`Checagem de equipe pendente — vence ${prazoDom}` });
+  if (numEquipe > 0 && sitEquipe.situacao !== "concluida") alertas.push({ cor:"#f59e0b", icone:"👥", txt:`Checagem de equipe pendente — vence ${prazoDom}` });
   if (sitEquip.situacao !== "concluida") alertas.push({ cor:"#f59e0b", icone:"🛡️", txt:`Checagem de equipamentos pendente — vence ${prazoDom}` });
   if (inop.length > 0) alertas.push({ cor:"#ef4444", icone:"⚠️", txt:`${inop.length} equipamento(s) inoperante(s)/crítico(s)` });
   if (reciclVencida.length > 0) alertas.push({ cor:"#ef4444", icone:"🔄", txt:`${reciclVencida.length} reciclagem(ns) vencida(s)` });
@@ -190,8 +184,8 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
   const aprovadasParaEnviar = cols.reduce((n, c) => n + ((c.uniforme && c.uniforme.solicitacoes) || []).filter(envioPendente).length, 0);
   if (aprovadasParaEnviar > 0) alertas.push({ cor:"#22c55e", icone:"📲", txt:`${aprovadasParaEnviar} solicitação(ões) de material aprovada(s): envie ao grupo` });
   if (materialPendente.length > 0) alertas.push({ cor:"#f59e0b", icone:"📦", txt:`${materialPendente.length} solicitação(ões) de material pendente(s)` });
-  const rotuloSit = (s) => s==="concluida" ? "Concluída" : s==="parcial" ? "Parcial" : "Pendente";
-  const corSit = (s) => s==="concluida" ? "#22c55e" : s==="parcial" ? "#f59e0b" : "#f59e0b";
+  const rotuloSit = (s) => s==="concluida" ? "Concluída" : s==="parcial" ? "Parcial" : s==="nao_se_aplica" ? "Não se aplica" : "Pendente";
+  const corSit = (s) => s==="concluida" ? "#22c55e" : s==="nao_se_aplica" ? "#64748b" : "#f59e0b";
 
   // ── Drill-down de equipamento (com marcador de qualidade) ─────────────
   const abrirDrillEquip = (lista, titulo) => {
