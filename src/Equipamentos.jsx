@@ -1,8 +1,8 @@
 import { checkPin } from "./session";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import { setDoc } from "./fireGuard";
+import { getFirestore, doc, getDoc, getDocFromServer } from "firebase/firestore";
+import { gravarSecaoEquipamentos } from "./equipamentosStore";
 
 
 const firebaseConfig = {
@@ -78,14 +78,6 @@ async function loadEquip(projectId) {
     if(local) return JSON.parse(local);
   } catch(e){}
   return { smartphones:[], radiosHT:[], armamento:[], municao:[], placas:[], lanternas:[], moto:null, ztrax:[], bodycam:[] };
-}
-
-async function saveEquip(projectId, data) {
-  // Carimba updatedAt em toda gravação (preserva todos os campos) — base da
-  // proteção de concorrência usada por leitores externos (ex.: Painel do Líder).
-  const payload = { ...data, updatedAt: new Date().toISOString() };
-  try { await setDoc(doc(db,"equipamentos",projectId), payload); } catch(e){ console.error(e); }
-  try { localStorage.setItem(`equipamentos_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 
 function getStyles(dark) {
@@ -383,7 +375,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 }
 
 // ── Formulário de novo item genérico
-function NovoItemForm({ tipo, project, onSave, onCancel, dark }) {
+export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial }) {
   const S = getStyles(dark);
   const [f, setF] = useState({
     id: Date.now().toString()+Math.random().toString(36).substring(2,5),
@@ -392,7 +384,7 @@ function NovoItemForm({ tipo, project, onSave, onCancel, dark }) {
     identificacao:"", modelo:"", marca:"",
     calibre:".38", nSerie:"", qtd:1,
     validade:"", placa:"", km:"", proximaRevisao:"",
-    bateria:"ok", carregador:"ok",
+    bateria:"ok", carregador:"ok", ...initial,
   });
   const upd = (k,v) => setF(p=>({...p,[k]:v}));
 
@@ -457,25 +449,28 @@ function NovoItemForm({ tipo, project, onSave, onCancel, dark }) {
 
   return (
     <div style={{...S.card, display:"flex", flexDirection:"column", gap:10}}>
-      <div style={{fontSize:13,fontWeight:700,...S.txt,marginBottom:4}}>+ Novo Item</div>
+      <div style={{fontSize:13,fontWeight:700,...S.txt,marginBottom:4}}>{initial?"Editar equipamento":"+ Novo Item"}</div>
       {renderFields()}
+      {!["radiosHT","municao"].includes(tipo)&&<div><label style={S.lbl}>Quantidade</label><input aria-label="Quantidade" type="number" min="1" step="1" value={f.qtd??1} onChange={e=>upd("qtd",e.target.value)} style={S.inp}/></div>}
       <div style={{display:"flex",gap:8,marginTop:4}}>
         <button onClick={onCancel} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-        <button onClick={()=>{ if(!f.identificacao.trim()){ alert("Informe a identificação"); return; } onSave(f); }}
-          style={{...S.btn,flex:1,fontSize:13}}>✓ Adicionar</button>
+        <button onClick={()=>{ if(!f.identificacao.trim()){ alert("Informe a identificação"); return; } const qtd=Number(f.qtd??1); if(!Number.isSafeInteger(qtd)||qtd<(tipo==="municao"?0:1)||qtd>100000){alert("Quantidade inválida");return;} onSave({...f,qtd}); }}
+          style={{...S.btn,flex:1,fontSize:13}}>{initial?"Salvar alterações":"✓ Adicionar"}</button>
       </div>
     </div>
   );
 }
 
 // ── Seção genérica de itens
-function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, dark, extraStatusTipos }) {
+export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, dark, extraStatusTipos }) {
   const S = getStyles(dark);
   const [showForm, setShowForm] = useState(false);
+  const [editItem,setEditItem]=useState(null);
+  const canEdit=adminAuth||getAccess(project.id)==="lider";
 
-  const updateItem = (id, patch) => {
+  const updateItem = async (id, patch) => {
     const updated = items.map(it=> it.id===id ? {...it,...patch} : it);
-    onUpdate(updated);
+    if(await onUpdate(updated)===false)return;
     // WhatsApp se problema
     if(patch.status && patch.status !== "ok" && patch.justificativa) {
       const item = items.find(it=>it.id===id);
@@ -484,7 +479,8 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
   };
 
   const removeItem = (id) => onUpdate(items.filter(it=>it.id!==id));
-  const addItem = (item) => { onUpdate([...items, item]); setShowForm(false); };
+  const addItem = async (item) => { if(await onUpdate([...items, item])!==false)setShowForm(false); };
+  const editSave=async item=>{if(await onUpdate(items.map(x=>x.id===item.id?item:x))!==false)setEditItem(null);};
 
   const problemCount = items.filter(it=>it.status&&it.status!=="ok").length;
   const [aberto, setAberto] = useState(false);
@@ -502,24 +498,27 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
             {items.length===0?"Nenhum item":`${items.length} ite${items.length!==1?"ns":"m"} · ${problemCount>0?`⚠ ${problemCount} problema${problemCount!==1?"s":""}`:"✅ tudo OK"}`}
           </div>
         </div>
-        {adminAuth&&aberto&&<button onClick={(e)=>{e.stopPropagation();setShowForm(true);}} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:11,padding:"6px 12px",flexShrink:0}}>+ Adicionar</button>}
+        {canEdit&&aberto&&<button onClick={(e)=>{e.stopPropagation();setShowForm(true);}} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:11,padding:"6px 12px",flexShrink:0}}>+ Adicionar</button>}
         <span style={{color:dark?"#94a3b8":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
 
       <div style={{display:"grid",gridTemplateRows:aberto?"1fr":"0fr",transition:"grid-template-rows .3s ease"}}><div style={{overflow:"hidden",minHeight:0}}>
         <div style={{padding:"0 12px 12px",display:"flex",flexDirection:"column",gap:8}}>
           {showForm && <NovoItemForm tipo={tipo} project={project} dark={dark} onSave={addItem} onCancel={()=>setShowForm(false)}/>}
+          {editItem&&<NovoItemForm key={editItem.id} tipo={tipo} project={project} dark={dark} initial={editItem} onSave={editSave} onCancel={()=>setEditItem(null)}/>}
 
           {items.length===0 && !showForm && (
             <div style={{textAlign:"center",padding:"10px",fontSize:13,...S.txt2}}>
-              Nenhum item cadastrado{adminAuth?" — toque em + Adicionar":""}
+              Nenhum item cadastrado{canEdit?" — toque em + Adicionar":""}
             </div>
           )}
 
-      {items.map(item => (
+      <fieldset disabled={showForm||!!editItem} style={{border:0,padding:0,margin:0,minWidth:0}}>{items.map(item => (
         <ItemCard key={item.id} item={item} icon={icon} title={item.identificacao||(item.tipo||tipo)}
           onRemove={adminAuth?()=>removeItem(item.id):null} adminAuth={adminAuth} dark={dark}>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {canEdit&&<button onClick={()=>setEditItem(item)} style={S.btnSm}>Editar equipamento</button>}
+            {!["municao","radiosHT"].includes(tipo)&&<span style={{fontSize:11,...S.txt2}}>Qtd: {item.qtd??1}</span>}
             {/* Campos específicos somente leitura */}
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {item.modelo && <span style={{fontSize:10,...S.txt2}}>📱 {item.modelo}</span>}
@@ -586,9 +585,6 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
                   value={{status:item.status||"ok"}}
                   onChange={(val)=>{
                     updateItem(item.id,{status:val.status,...(val.justificativa?{justificativa:val.justificativa,dataProblem:val.dataProblem}:{justificativa:"",dataProblem:""})});
-                    if(val.status!=="ok" && val.justificativa) {
-                      enviarWhatsApp(project,titulo,item.identificacao,val.status,val.justificativa,val.dataProblem);
-                    }
                   }}
                   tipos={extraStatusTipos||["ok","parcial","inop"]} dark={dark}/>
               </div>
@@ -603,7 +599,7 @@ function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, d
             )}
           </div>
         </ItemCard>
-      ))}
+      ))}</fieldset>
         </div>
       </div></div>
     </div>
@@ -618,12 +614,12 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
   const [novaManut, setNovaManut] = useState({ data:todayStr(), km:"", desc:"" });
   const [form, setForm] = useState(moto || { placa:"", km:"", proximaRevisao:"", status:"ok", historico:[] });
 
-  const save = (updated) => { onUpdate(updated); setEditing(false); };
+  const save = async (updated) => { if(await onUpdate(updated)!==false)setEditing(false); };
 
-  const addManut = () => {
+  const addManut = async () => {
     if(!novaManut.desc.trim()) { alert("Informe a descrição"); return; }
     const updated = {...form, historico:[{id:Date.now().toString(),...novaManut},...(form.historico||[])]};
-    setForm(updated); onUpdate(updated);
+    if(await onUpdate(updated)===false)return;setForm(updated);
     setNovaManut({data:todayStr(),km:"",desc:""});
     setShowHist(false);
   };
@@ -829,6 +825,10 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const gravando=useRef(false);
+  const confirmado=useRef(null);
+  const [saveError,setSaveError]=useState("");
+  const [reloadKey,setReloadKey]=useState(0);
   const [showChecagem, setShowChecagem] = useState(false);
   const [agoraChk, setAgoraChk] = useState(()=>Date.now());
   useEffect(()=>{ const t=setInterval(()=>setAgoraChk(Date.now()),30000); return ()=>clearInterval(t); },[]);
@@ -837,32 +837,39 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
   const liderAuth = authLevel==="lider" || authLevel==="admin";
 
   useEffect(()=>{
-    loadEquip(project.id).then(d=>{ setData(d||{smartphones:[],radiosHT:[],armamento:[],municao:[],placas:[],lanternas:[],moto:null,ztrax:[]}); setLoading(false); });
+    let ativo=true;
+    loadEquip(project.id).then(d=>{if(!ativo)return; confirmado.current=d;setData(d);setLoading(false);});
+    return()=>{ativo=false;};
   },[project.id]);
 
   const saveSection = async (section, val) => {
-    setSaving(true);
-    const updated = {...data,[section]:val};
-    setData(updated);
-    await saveEquip(project.id, updated);
-    setSaving(false);
+    if(gravando.current||!liderAuth)return false;
+    gravando.current=true;setSaving(true);setSaveError("");
+    const before=confirmado.current;
+    try{
+      const resposta=await gravarSecaoEquipamentos(project.id,section,before,val);
+      // Outras seções mantêm a base que esta tela realmente mostrou ao usuário.
+      // Reconsultar explicitamente fecha rascunhos e atualiza o documento completo.
+      const saved={...before,[section]:resposta[section],...(resposta.updatedAt?{updatedAt:resposta.updatedAt}:{})};
+      confirmado.current=saved;setData(saved);
+      try{localStorage.setItem(`equipamentos_${project.id}`,JSON.stringify(saved));}catch{}
+      return true;
+    }catch(e){
+      let copia=false;try{localStorage.setItem(`equipamentos_tentativa_${project.id}_${Date.now()}`,JSON.stringify({section,before:before[section]??null,after:val}));copia=true;}catch{}
+      setSaveError((e.message||"Não foi possível salvar.")+(copia?" Cópia da tentativa preservada neste aparelho.":" Não foi possível guardar a cópia local."));return false;
+    }finally{gravando.current=false;setSaving(false);}
   };
 
   // Conclui a checagem semanal: registra assinatura/resultado e crava o próximo
   // domingo. Aditivo — só grava o campo checagemSemanal, sem tocar no inventário.
   const concluirChecagem = async ({corrigidos,emAberto,assinatura}) => {
-    setSaving(true);
     const alvoVigente = chkAlvoVigente(data.checagemSemanal);
     const novoChk = {
       alvo: chkProximoAPartirDe(alvoVigente),
       ultimaChecagem: todayStr(),
       ultimoResultado: { corrigidos:!!corrigidos, emAberto:!!emAberto, por:assinatura, em:new Date().toISOString() }
     };
-    const updated = {...data, checagemSemanal: novoChk};
-    setData(updated);
-    await saveEquip(project.id, updated);
-    setSaving(false);
-    setShowChecagem(false);
+    if(await saveSection("checagemSemanal",novoChk))setShowChecagem(false);
   };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("main");onAuthGranted?.(l);}}/>;
@@ -900,7 +907,8 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
           </div>
         </div>
 
-        <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:14}}>
+        {saveError&&<div role="alert" style={{padding:14,color:"#ef4444"}}>{saveError}<button disabled={saving} onClick={async()=>{try{const snap=await getDocFromServer(doc(db,"equipamentos",project.id));const fresh=snap.exists()?snap.data():{};confirmado.current=fresh;setData(fresh);setReloadKey(k=>k+1);setSaveError("");}catch{setSaveError("Não foi possível reconsultar. Seus dados não foram sobrescritos.");}}}>Reconsultar servidor (fecha formulários abertos)</button></div>}
+        <fieldset key={reloadKey} disabled={saving||!liderAuth} style={{border:0,margin:0,minWidth:0,padding:"12px 16px",display:"flex",flexDirection:"column",gap:14}}>
           {/* KPIs */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
             {[
@@ -1009,16 +1017,16 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
 
           <SecMoto moto={data.moto} project={project}
             onUpdate={v=>saveSection("moto",v)} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}/>
-        </div>
+        </fieldset>
       </div>
 
       {showChecagem && (
-        <ModalChecagem
+        <fieldset disabled={saving} style={{border:0,padding:0,margin:0}}><ModalChecagem
           dark={dark}
           resumo={{inop, parcial, total:allItems.length}}
           onConfirm={concluirChecagem}
           onCancel={()=>setShowChecagem(false)}
-        />
+        /></fieldset>
       )}
     </div>
   );
