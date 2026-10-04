@@ -94,11 +94,33 @@ function validateLeader(before,after){
   }
  }
 }
+function protegerChecagem(current,result,identity){
+ const deny=()=>{throw Object.assign(Error('Plantão já checado. Somente o gerencial pode corrigir a assinatura.'),{status:403});};
+ if(!equal(current.checagemCorrecoes,result.checagemCorrecoes))throw Object.assign(Error('Histórico de correções é mantido pelo servidor.'),{status:403});
+ const old=current.checagemEquipe,next=result.checagemEquipe;
+ if(equal(old,next)||!old)return;
+ if(old.alvo!==next?.alvo){
+  if(identity.nivel==='lider'){
+   const hoje=new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
+   const d=new Date(hoje+'T12:00:00Z'),day=d.getUTCDay();d.setUTCDate(d.getUTCDate()+(day===0?-1:(6-day+7)%7));
+   if(!next||next.alvo!==d.toISOString().slice(0,10)||next.alvo<=old.alvo)deny();
+  }
+  return;
+ }
+ const changes=(old.checkins||[]).flatMap(prev=>{
+  const novo=(next.checkins||[]).find(c=>slotKey(c)===slotKey(prev));
+  if(equal(prev,novo))return [];
+  if(identity.nivel!=='admin')deny();
+  return [{alvo:old.alvo,slotId:slotKey(prev),anterior:prev,novo:novo||null,corrigidoEm:new Date().toISOString(),corrigidoPor:'Gerencial'}];
+ });
+ if(changes.length)result.checagemCorrecoes=[...(current.checagemCorrecoes||[]),...changes];
+}
 async function save(db,pid,before,after,identity){
  const ref=db.collection('equipes').doc(pid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():{colaboradores:[],desligados:[]};
   const result=merge(before,after,current);
+  protegerChecagem(current,result,identity);
   validateQuantities(current,result);
   if(identity.nivel==='lider')validateLeader(current,result);
   tx.set(ref,result);return result;

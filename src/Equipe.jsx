@@ -1424,7 +1424,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
 
 // ── Tela adicionar histórico (líder ou admin)
 // ── Modal: checagem de equipe do fim de semana (um líder assina seu plantão)
-function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel }) {
+export function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel, adminAuth=false }) {
   const S = getStyles(dark);
   const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
   const slots = chkEqSlots(num);
@@ -1442,11 +1442,21 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
   const [lider, setLider] = useState("");
   const [statusEquipe, setStatusEquipe] = useState("sem_alteracoes"); // sem_alteracoes | com_faltas
   const [nota, setNota] = useState("");
+  const [busy,setBusy]=useState(false),[erro,setErro]=useState('');
+  const enviando=useRef(false);
   if(semPlantoes) return null;
 
   const slotAtual = slots.find(s=>s.id===slotId);
   const jaFeito = feitosIds.includes(slotId);
-  const podeConfirmar = !!slotId && lider.trim().length>=3;
+  const anterior=feitos.find(c=>c.slotId===slotId);
+  const podeConfirmar = !!slotId && lider.trim().length>=3 && (!jaFeito||adminAuth) && !busy;
+  const confirmar=async()=>{
+    if(!podeConfirmar||enviando.current)return;
+    enviando.current=true;setBusy(true);setErro('');
+    try{await onConfirm({slotId,slotLabel:slotAtual?.label||slotId,lider:lider.trim(),statusEquipe,nota});}
+    catch(e){setErro(e.message||'Não foi possível salvar.');}
+    finally{enviando.current=false;setBusy(false);}
+  };
   const cardBg = dark?"#0b1220":"#fff", txt=dark?"#e2e8f0":"#0f172a", txt2=dark?"#94a3b8":"#64748b";
 
   return (
@@ -1461,14 +1471,16 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
             const done=feitosIds.includes(s.id);
             const sel=slotId===s.id;
             return (
-              <button key={s.id} onClick={()=>setSlotId(s.id)}
+              <button key={s.id} disabled={busy} onClick={()=>setSlotId(s.id)}
                 style={{flex:"1 1 45%",background:sel?"#0ea5e9":done?(dark?"#052e16":"#dcfce7"):"transparent",border:`1px solid ${sel?"#0ea5e9":done?"#22c55e55":(dark?"#1e293b":"#cbd5e1")}`,color:sel?"#fff":done?"#22c55e":txt2,borderRadius:8,padding:"9px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                 {done?"✓ ":""}{s.label}
               </button>
             );
           })}
         </div>
-        {jaFeito && <div style={{fontSize:10,color:"#f59e0b",marginBottom:12,marginTop:-6}}>Este plantão já foi checado — confirmar substitui o registro anterior.</div>}
+        {jaFeito && <div style={{fontSize:12,color:"#f59e0b",marginBottom:12}}>Já checado por {anterior?.lider||'líder'}{anterior?.em?` em ${new Date(anterior.em).toLocaleString('pt-BR')}`:''}. {adminAuth?'A correção preserva a assinatura anterior no histórico.':'Somente o gerencial pode corrigir.'}</div>}
+        {erro&&<div role="alert">{erro}</div>}
+        {adminAuth&&(equipeData.checagemCorrecoes||[]).some(c=>c.alvo===alvo&&c.slotId===slotId)&&<details style={{marginBottom:12,color:txt2}}><summary>Histórico de correções deste plantão</summary>{(equipeData.checagemCorrecoes||[]).filter(c=>c.alvo===alvo&&c.slotId===slotId).map((c,i)=><div key={i} style={{fontSize:12,marginTop:8}}>{c.anterior?.lider} → {c.novo?.lider||'removido'} · {new Date(c.corrigidoEm).toLocaleString('pt-BR')} · {c.corrigidoPor}<br/>Registro anterior: {c.anterior?.statusEquipe} · {c.anterior?.nota||'Sem observação'}</div>)}</details>}
 
         <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Status da equipe</div>
         <div style={{display:"flex",gap:8,marginBottom:14}}>
@@ -1496,9 +1508,9 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
           style={{width:"100%",background:dark?"#0f172a":"#f8fafc",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"9px 11px",fontSize:13,color:txt,marginBottom:16,boxSizing:"border-box"}}/>
 
         <div style={{display:"flex",gap:8}}>
-          <button onClick={onCancel} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
-          <button disabled={!podeConfirmar} onClick={()=>podeConfirmar&&onConfirm({slotId,slotLabel:slotAtual?.label||slotId,lider:lider.trim(),statusEquipe,nota})}
-            style={{flex:1,background:podeConfirmar?"linear-gradient(135deg,#16a34a,#15803d)":"#1e293b",border:"none",color:podeConfirmar?"#fff":"#475569",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:podeConfirmar?"pointer":"not-allowed"}}>Assinar checagem</button>
+          <button disabled={busy} onClick={onCancel} style={{flex:1,background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,color:txt2,borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Cancelar</button>
+          <button disabled={!podeConfirmar} onClick={confirmar}
+            style={{flex:1,background:podeConfirmar?"linear-gradient(135deg,#16a34a,#15803d)":"#1e293b",border:"none",color:podeConfirmar?"#fff":"#475569",borderRadius:8,padding:"11px",fontSize:13,fontWeight:700,cursor:podeConfirmar?"pointer":"not-allowed"}}>{busy?'Salvando…':jaFeito?(adminAuth?'Corrigir checagem':'Plantão já checado'):'Assinar checagem'}</button>
         </div>
       </div>
     </div>
@@ -2915,10 +2927,10 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                       </div>
                     )}
                   </div>
-                  {!completo && (
+                  {(!completo||adminAuth) && (
                     <button onClick={()=>setChecagemModal(true)}
                       style={{ background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px 16px", fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>
-                      ✓ Checar minha equipe
+                      {completo?'Revisar checagem (gerencial)':'✓ Checar minha equipe'}
                     </button>
                   )}
                 </div>
@@ -3344,6 +3356,7 @@ Esta ação não pode ser desfeita.`))
           equipeData={equipeData}
           dark={dark}
           onConfirm={registrarCheckinEquipe}
+          adminAuth={adminAuth}
           onCancel={()=>setChecagemModal(false)}
         />
       )}
