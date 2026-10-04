@@ -3,6 +3,7 @@ import { gerarPDFCestaNatal } from './pdfSolicitacoes';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
+import { LOGO_MOKED_30 } from './fvLogo';
 const {save}=require('../api/ai/lib/equipeMerge');
 
 test.each([
@@ -48,4 +49,15 @@ test('controle desabilita PDF com valor não salvo e carrega total salvo',async(
  await act(async()=>root.render(<CampanhaEquipeControle tipo="natal" ano={2026} quantidade={3} config={{valorCentavos:1001}} onSalvar={jest.fn()} onPDF={jest.fn()}/>));
  expect(host.textContent).toContain('30,03');expect([...host.querySelectorAll('button')].find(b=>b.textContent.startsWith('Gerar PDF')).disabled).toBe(false);
  await act(async()=>root.unmount());
+});
+test.each(['P601','P602','P604','P605','P606','P607','P505','P311A','P311B','P260A','P260B','P260C'])('relatório %s tem unidade e arquivo próprios, logo 30 anos e total exclusivo',pid=>{
+ const OldBlob=global.Blob;let html='',arquivo='';global.Blob=class{constructor(parts){html=parts.join('');}};
+ global.URL.createObjectURL=jest.fn(()=> 'blob:teste');global.URL.revokeObjectURL=jest.fn();
+ const click=jest.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(function(){arquivo=this.download;});
+ try{
+  gerarPDFCestaNatal({id:pid},[{nome:`TESTE exclusivo ${pid}`}],2026,{tipo:'natal',valorCentavos:12550});
+  expect(html).toContain(LOGO_MOKED_30);expect(html).toContain(`<b>${pid}</b>`);
+  expect(html).toContain(`TESTE exclusivo ${pid}`);expect(html).toContain('1 unidade(s)');expect(html).toContain('125,50');
+  expect(arquivo).toBe(`solicitacao_natal_${pid}_2026.html`);
+ }finally{global.Blob=OldBlob;click.mockRestore();}
 });

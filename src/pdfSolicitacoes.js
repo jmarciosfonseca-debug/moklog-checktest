@@ -16,6 +16,7 @@ import { getTheme } from "./generatePDF";
 import { solicitacoesPorAprovacao } from "./equipeAprovacao";
 import { fmtBRL } from './equipeAprovacao';
 import { CAMPANHAS, totalCampanha } from './campanhasEquipe';
+import { LOGO_MOKED_30 } from './fvLogo';
 
 const SLA_ALERTA = 5; // dias em aberto para alertar (espelha Equipe.jsx)
 
@@ -129,10 +130,10 @@ function css(theme) {
   @media print{ .no-print{display:none!important;} html{background:#fff;} .folha{box-shadow:none;margin:0;width:auto;min-height:auto;padding:12mm;} .bloco{page-break-inside:avoid;} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;} @page{margin:12mm;} }`;
 }
 
-function montarHTML({ theme, projectId, titulo, corpo, totalItens, subtitulo, metaTxt }) {
+function montarHTML({ theme, projectId, titulo, corpo, totalItens, subtitulo, metaTxt, campanha = false }) {
   const nomeProj = NOMES_PROJETO[projectId] || projectId;
   const hoje = new Date().toLocaleDateString("pt-BR");
-  const logo = theme.mokedLogo ? `<img src="${theme.mokedLogo}" alt="Moked"/>` : `<div style="font-weight:800;color:${theme.headerBg};font-size:18px;">MOKED</div>`;
+  const logo = campanha ? `<img src="${LOGO_MOKED_30}" alt="Moked - Mais de 30 anos de experiência e excelência" style="width:250px;max-width:46%;height:auto;object-fit:contain;"/>` : theme.mokedLogo ? `<img src="${theme.mokedLogo}" alt="Moked"/>` : `<div style="font-weight:800;color:${theme.headerBg};font-size:18px;">MOKED</div>`;
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -306,6 +307,7 @@ export function gerarPDFCestaNatal(project, lista, ano, opcoes = {}) {
   const html = montarHTML({
     theme, projectId,
     titulo: `${nome} ${ano}`,
+    campanha: true,
     subtitulo: "Solicitação à empresa - relação de colaboradores e cálculo do lote",
     metaTxt: `${ordenada.length} unidade(s)`,
     corpo, totalItens: ordenada.length,
