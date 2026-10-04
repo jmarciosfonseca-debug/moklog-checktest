@@ -43,6 +43,7 @@ import {situacaoSolicitacao, podeEnviarAoGrupo, envioPendente, enviadoAposAprova
 import { gravarComRecuperacao } from "./equipeConflito";
 import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
+import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
 import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
@@ -112,12 +113,7 @@ function fmtDate(d) {
 }
 
 // ── Checagem de equipe no fim de semana ──────────────────────────────────
-// Janela abre sábado 00:00 e fecha domingo 23:59. Cada líder de plantão
-// assina a checagem da SUA equipe. Nº de check-ins depende da escala
-// predominante do projeto: 12x36 → 4 (sáb-dia, sáb-noite, dom-dia, dom-noite);
-// 4x2 (P505/Jatinox) → 3 (líder pode estar de folga). Espelha a doutrina dos
-// demais contadores: trava no alvo e não avança sozinho até concluir.
-const CHK_EQUIPE_4X2 = ["P505","P260A","P260B","P260C"]; // 3 check-ins
+// Regras (quem participa, quantos check-ins e quais plantões) em checagemEquipeRegras.js.
 
 // ── Montagem de equipes por líder ────────────────────────────────────────
 // Disponível em projetos 12x36, exceto P260A/B/C e P505 (que são 4x2).
@@ -169,28 +165,6 @@ function chkEqParseISO(iso){ const [y,m,d]=String(iso).split("-").map(Number); r
 function chkEqISO(d){ return d.toLocaleDateString("sv-SE"); }
 // Sábado (>=) mais próximo à frente de uma data.
 function chkEqProxSabado(d){ const diff=(6-d.getDay()+7)%7; const nd=new Date(d); nd.setDate(nd.getDate()+diff); return nd; }
-// Nº de check-ins exigidos conforme a escala predominante do projeto.
-function chkEqNumCheckins(projectId, colaboradores){
-  if(CHK_EQUIPE_4X2.includes(projectId)) return 3;
-  // Se a maioria dos ativos é 4x2, também usa 3.
-  const ativos=(colaboradores||[]).filter(c=>(c.status||"ativo")==="ativo");
-  const n4x2=ativos.filter(c=>String(c.escala||"").includes("4x2")).length;
-  if(ativos.length>0 && n4x2/ativos.length>=0.5) return 3;
-  return 4;
-}
-// Slots nomeados (para 12x36). Para 4x2 usamos rótulos genéricos.
-const CHK_EQ_SLOTS_12x36 = [
-  { id:"sab_diurno",  label:"Sábado · Diurno",  turno:"Diurno"  },
-  { id:"sab_noturno", label:"Sábado · Noturno", turno:"Noturno" },
-  { id:"dom_diurno",  label:"Domingo · Diurno",  turno:"Diurno"  },
-  { id:"dom_noturno", label:"Domingo · Noturno", turno:"Noturno" },
-];
-const CHK_EQ_SLOTS_4x2 = [
-  { id:"check_1", label:"Check-in 1", turno:null },
-  { id:"check_2", label:"Check-in 2", turno:null },
-  { id:"check_3", label:"Check-in 3", turno:null },
-];
-function chkEqSlots(numCheckins){ return numCheckins===3 ? CHK_EQ_SLOTS_4x2 : CHK_EQ_SLOTS_12x36; }
 // Alvo vigente = sábado da semana corrente (ou próximo). Janela cobre sáb+dom.
 function chkEqAlvoVigente(){
   // O alvo vigente é SEMPRE derivado da data atual. Não recebe mais o ciclo
@@ -1458,15 +1432,17 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
   const alvo = chkEqAlvoVigente(chk);
   const feitos = (chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins : [];
   const feitosIds = feitos.map(c=>c.slotId);
+  const semPlantoes = slots.length===0;   // projeto sem checagem de equipe (ex.: P260B)
   // Líderes ativos do projeto para o seletor de assinatura.
   const lideres = (equipeData.colaboradores||[])
     .filter(c=>(c.status||"ativo")==="ativo" && /l[íi]der/i.test(c.cargo||""))
     .map(c=>c.nome);
 
-  const [slotId, setSlotId] = useState(slots.find(s=>!feitosIds.includes(s.id))?.id || slots[0].id);
+  const [slotId, setSlotId] = useState(slots.find(s=>!feitosIds.includes(s.id))?.id || slots[0]?.id || "");
   const [lider, setLider] = useState("");
   const [statusEquipe, setStatusEquipe] = useState("sem_alteracoes"); // sem_alteracoes | com_faltas
   const [nota, setNota] = useState("");
+  if(semPlantoes) return null;
 
   const slotAtual = slots.find(s=>s.id===slotId);
   const jaFeito = feitosIds.includes(slotId);
@@ -1477,7 +1453,7 @@ function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCancel })
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:cardBg,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:430,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,maxHeight:"90vh",overflowY:"auto"}}>
         <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:2}}>🗓️ Checar minha equipe</div>
-        <div style={{fontSize:12,color:txt2,marginBottom:14}}>Cada líder confirma o status do seu plantão. {feitos.length}/{num} já feitos neste fim de semana.</div>
+        <div style={{fontSize:12,color:txt2,marginBottom:14}}>Cada líder confirma o status do seu plantão. {chkEqFeitos(feitos,num)}/{num} já feitos neste fim de semana.</div>
 
         <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Qual plantão você está checando?</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:14}}>
@@ -2135,7 +2111,7 @@ export function ContadorEquipe({ projectId }){
   const [chk, setChk] = useState(undefined);
   const [colabs, setColabs] = useState([]);
   useAtualizarAoVoltar(); // reavalia ao voltar à aba; sem relógio em segundo plano
-  const janela = janelaChecagemAberta();
+  const janela = janelaChecagemAberta() && !CHK_EQ_SEM_CHECAGEM.includes(projectId);   // P260B não faz checagem
   useEffect(()=>{
     if(!janela) return;   // fora de sáb/dom não baixa o documento da equipe só para decidir não mostrar nada
     let vivo=true;
@@ -2145,7 +2121,8 @@ export function ContadorEquipe({ projectId }){
   if(!janela || chk===undefined) return null;
   const alvo=chkEqAlvoVigente(chk);
   const num=chkEqNumCheckins(projectId, colabs);
-  const feitos=(chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins.length : 0;
+  if(num===0) return null;
+  const feitos=(chk && chk.alvo===alvo) ? chkEqFeitos(chk.checkins, num) : 0;
   if(feitos>=num){
     return <div style={{fontSize:10,color:"#22c55e",marginTop:3,fontWeight:700}}>✓ Checagem da equipe concluída ({feitos}/{num})</div>;
   }
@@ -2502,7 +2479,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     const novoCheckin = { slotId, slotLabel, lider, statusEquipe, nota:nota||"", em:new Date().toISOString() };
     const novoChk = { ...atual, checkins:[...semSlot, novoCheckin] };
     const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
-    if(novoChk.checkins.length>=num){
+    if(num>0 && chkEqFeitos(novoChk.checkins, num)>=num){
       novoChk.concluidoEm = new Date().toISOString();
       novoChk.proximoAlvo = chkEqProximo(alvo);
     }
@@ -2913,12 +2890,13 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           ) : null}
 
           {/* Checagem de equipe (fim de semana): card só no sábado e no domingo, sem contagem regressiva */}
-          {liderAuth && janelaChecagemAberta() && (()=>{
+          {liderAuth && janelaChecagemAberta() && chkEqNumCheckins(project.id, equipeData.colaboradores)>0 && (()=>{
             const chk = equipeData.checagemEquipe || null;
             const alvo = chkEqAlvoVigente(chk);
             const num = chkEqNumCheckins(project.id, equipeData.colaboradores);
             const feitos = (chk && chk.alvo===alvo && Array.isArray(chk.checkins)) ? chk.checkins : [];
-            const completo = feitos.length>=num;
+            const nFeitos = chkEqFeitos(feitos, num);
+            const completo = nFeitos>=num;
             const cor = completo ? "#22c55e" : "#f59e0b";
             const bg  = completo ? (dark?"#021a0d":"#f0fdf4") : (dark?"#1a1000":"#fffbeb");
             return (
@@ -2927,9 +2905,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   <div style={{ flex:1, minWidth:180 }}>
                     <div style={{ fontSize:13, fontWeight:800, color:cor }}>🗓️ Checar a equipe — fim de semana</div>
                     {completo ? (
-                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>✓ Concluída ({feitos.length}/{num}) · reabre no próximo sábado</div>
+                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>✓ Concluída ({nFeitos}/{num}) · reabre no próximo sábado</div>
                     ) : (
-                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>{feitos.length}/{num} check-ins · fecha domingo 23:59</div>
+                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>{nFeitos}/{num} check-ins · fecha domingo 23:59</div>
                     )}
                     {feitos.length>0 && (
                       <div style={{ fontSize:9, color:"#64748b", marginTop:3 }}>

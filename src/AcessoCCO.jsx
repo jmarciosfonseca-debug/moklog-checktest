@@ -69,6 +69,7 @@ const TIPOS_INTERVALO = [
 ];
 // Categorias de equipamentos (coleção equipamentos/{pid}) para cruzar na supervisão
 const EQUIP_CATS = [
+  { key:"outros", label:"Outros equipamentos" },
   { key:"smartphones", label:"Smartphone" },
   { key:"radiosHT",    label:"Rádio HT" },
   { key:"armamento",   label:"Armamento" },

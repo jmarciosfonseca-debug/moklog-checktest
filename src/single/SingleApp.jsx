@@ -5,7 +5,7 @@ import {calcularInspecao,variacao,anteriorConcluida,fmtVariacao} from "./singleC
 import {draftKey,lerDraft,salvarDraft,hoje,novoId} from "./singleDraft";
 import {imprimirSingle} from "./pdfSingle";
 import "./single.css";
-export default function SingleApp({auth,profile,onBack,onDiagnostico}){
+export default function SingleApp({auth,profile,onBack,onDiagnostico, onInicio}){
  const store=useMemo(()=>criarStore(auth),[auth]);
  const [projects,setProjects]=useState([]),[catalog,setCatalog]=useState({familias,revisao:0});
  const [project,setProject]=useState(null),[assets,setAssets]=useState([]),[inspection,setInspection]=useState(null),[history,setHistory]=useState([]);
@@ -55,7 +55,7 @@ export default function SingleApp({auth,profile,onBack,onDiagnostico}){
  const changes=calculated?variacao(calculated,previous):[];
  const field=(key,label,type="text")=><label>{label}<input required={key==="nome"||key==="dataVistoria"} type={type} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/></label>;
  const updateFailure=(item,index,key,value)=>change(item.id,"falhas",item.falhas.map((f,n)=>n===index?{...f,[key]:value}:f));
- return <main className="single"><header><button onClick={onBack}>← Diagnóstico</button><h1>Single · Relatório Situacional</h1><p>Cliente avulso · famílias configuráveis · histórico preservado</p></header>
+ return <main className="single"><header><button onClick={onBack}>← Diagnóstico</button>{onInicio&&<button onClick={onInicio}>Início</button>}<h1>Single · Relatório Situacional</h1><p>Cliente avulso · famílias configuráveis · histórico preservado</p></header>
  {error&&<div role="alert" className="single-error">{error}<button disabled={busy} onClick={()=>run(refresh)}>Reconsultar servidor</button><p>Não sobrescrevemos seu rascunho ao reconsultar. Em conflito, abra novamente o registro após preservar sua versão.</p></div>}
  {notice&&<p role="status">{notice}</p>}{error&&project&&<button disabled={busy} onClick={()=>run(recarregar)}>Reabrir versão do servidor (preservar cópia local)</button>}
  {!project?<><section><h2>+ Novo projeto (Single)</h2><form onSubmit={e=>{e.preventDefault();run(async()=>{const r=await store.criarSingle(novoId(form.nome),form);setProjects(xs=>[r.data,...xs]);await open(r.data);setForm({nome:"",codigo:"",responsavel:"",dataVistoria:hoje()});});}}>{field("nome","Cliente")}{field("codigo","Código opcional")}{field("responsavel","Responsável")}{field("dataVistoria","Data da vistoria","date")}<button disabled={busy}>Criar projeto</button></form></section><section><h2>Projetos Single</h2>{projects.length===0&&<p>Nenhum Single listado.</p>}{projects.map(p=><button className="single-project" key={p.id} disabled={busy} onClick={()=>run(()=>open(p))}>{p.nome} · {p.estado}</button>)}</section>

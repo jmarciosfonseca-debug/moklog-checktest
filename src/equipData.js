@@ -56,7 +56,7 @@ export async function loadEquipData(pid, deps) {
 }
 
 // Categorias canônicas de equipamento (estrutura oficial).
-export const EQUIP_CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam"];
+export const EQUIP_CATS = ["smartphones","radiosHT","armamento","municao","placas","lanternas","ztrax","bodycam","outros"];
 
 // Conta itens de um documento de equipamentos, sem duplicar.
 // Retorna { total, inop, parcial }.

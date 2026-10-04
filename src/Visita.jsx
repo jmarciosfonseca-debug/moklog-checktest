@@ -364,6 +364,7 @@ export default function Visita({ project, onBack, dark, onToggleTheme, sharedAut
         ...(equip.placas||[]).map(i=>({...i,categoria:"Placas Balísticas"})),
         ...(equip.ztrax||[]).map(i=>({...i,categoria:"ZTRAX"})),
         ...(equip.bodycam||[]).map(i=>({...i,categoria:"Bodycam"})),
+        ...(equip.outros||[]).map(i=>({...i,categoria:"Outros equipamentos"})),
         ...(equip.moto?[{...equip.moto,identificacao:`Moto ${equip.moto.placa||""}`,categoria:"Motocicleta"}]:[]),
       ].filter(i=>i.status && i.status!=="ok");
 
