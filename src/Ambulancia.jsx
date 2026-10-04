@@ -3,6 +3,8 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
 import { gerarPdfAmbulancia } from "./ambulanciaPdf";
+import { montarConsolidadoAmbulancia } from "./relatorios/ambulanciaRelatorio";
+import { baixarHtml } from "./relatorios/padraoMoked";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -100,6 +102,10 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
 
   const [registros, setRegistros] = useState([]);
   const [inquilinosLista, setInquilinosLista] = useState([]);
+  // Consolidado do período (+ "Baixar todos": consolidado com os registros individuais em anexo)
+  const [relIni, setRelIni] = useState(() => { const d = new Date(); d.setDate(1); return d.toLocaleDateString("sv-SE"); });
+  const [relFim, setRelFim] = useState(() => new Date().toLocaleDateString("sv-SE"));
+  const [relInterno, setRelInterno] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [screen, setScreen] = useState("list"); // list | form
@@ -491,6 +497,26 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
 
         {/* Novo */}
         <button onClick={abrirNovo} style={{ ...S.btnPrimary, width:"100%" }}>+ Novo Registro de Ambulância</button>
+
+        {/* Relatórios do período */}
+        {registros.length > 0 && (
+          <div style={{ border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`, borderRadius:12, padding:12, display:"grid", gap:8 }}>
+            <div style={{ fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:.6, ...S.txt2 }}>Relatórios do período</div>
+            <div style={{ display:"flex", gap:8 }}>
+              <input type="date" value={relIni} max={relFim} onChange={e=>setRelIni(e.target.value)} style={{ ...S.input, flex:1 }} aria-label="Início do período"/>
+              <input type="date" value={relFim} min={relIni} onChange={e=>setRelFim(e.target.value)} style={{ ...S.input, flex:1 }} aria-label="Fim do período"/>
+            </div>
+            <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, cursor:"pointer", ...S.txt2 }}>
+              <input type="checkbox" checked={relInterno} onChange={e=>setRelInterno(e.target.checked)}/> Versão interna (com conferência do registro)
+            </label>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={()=>{ const { html } = montarConsolidadoAmbulancia(project, registros, { inicio:relIni, fim:relFim, interno:relInterno, inquilinosLista }); baixarHtml(html, `ambulancia_consolidado_${project.id}_${relIni}_a_${relFim}${relInterno?"_interno":""}.html`); }}
+                style={{ ...S.btnPrimary, flex:1, fontSize:13 }}>📊 Consolidado</button>
+              <button onClick={()=>{ const { html } = montarConsolidadoAmbulancia(project, registros, { inicio:relIni, fim:relFim, interno:relInterno, inquilinosLista, comAnexo:true }); baixarHtml(html, `ambulancia_todos_${project.id}_${relIni}_a_${relFim}${relInterno?"_interno":""}.html`); }}
+                style={{ ...S.btnPrimary, flex:1, fontSize:13 }}>📥 Baixar todos</button>
+            </div>
+          </div>
+        )}
 
         {/* Lista */}
         {registros.length === 0 ? (

@@ -204,3 +204,6 @@ export function gerarPdfAmbulancia(project, reg){
     URL.revokeObjectURL(url);
   }
 }
+
+// Reaproveitados no "Baixar todos" (anexo do consolidado de ambulância).
+export { getCSS as cssRegistroAmbulancia, buildHeader as cabecalhoRegistroAmbulancia, buildCard as cardRegistroAmbulancia };

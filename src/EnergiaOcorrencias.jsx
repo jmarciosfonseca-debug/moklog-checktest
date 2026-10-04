@@ -1,4 +1,5 @@
 import { checkPin } from "./session";
+import { montarRelatorioEnergia } from "./relatorios/energiaRelatorio";
 // ─────────────────────────────────────────────────────────────
 // EnergiaOcorrencias.jsx — Ocorrências de Energia (redesign v2)
 // Baseado no mockup + spec aprovados em 12/07/2026. Todos os projetos.
@@ -294,146 +295,7 @@ ${ev.foto?`<div class="card"><img src="${ev.foto}" style="width:100%;border-radi
 
 // Núcleo: monta o HTML profissional do relatório de energia a partir de uma
 // lista já filtrada de eventos. Reutilizado por período e por seleção manual.
-function montarHtmlEnergia(project, lista, subtitulo, label){
-  const doPeriodo = [...lista].sort((a,b)=>(b.inicioQueda||"").localeCompare(a.inicioQueda||""));
-  const tempoTotalMs = doPeriodo.reduce((a,e)=>a+(e.fimQueda?(new Date(e.fimQueda)-new Date(e.inicioQueda)):0),0);
-  const totH = Math.floor(tempoTotalMs/3600000), totM = Math.floor((tempoTotalMs%3600000)/60000);
-  const geradores = doPeriodo.filter(e=>e.gerador==="sim").length;
-  const manutencistas = doPeriodo.filter(e=>e.manutencista).length;
-  const comProtocolo = doPeriodo.filter(e=>e.protocolo).length;
-  const comImpacto = doPeriodo.filter(e=>e.impactoOperacao).length;
-  // Janela real: intervalo entre a queda mais antiga e a mais recente.
-  let janelaDias = 0, periodoCoberto = "—";
-  const comData = doPeriodo.filter(e=>e.inicioQueda);
-  if(comData.length){
-    const antiga = comData[comData.length-1].inicioQueda, recente = comData[0].inicioQueda;
-    janelaDias = Math.max(1, Math.round((new Date(recente)-new Date(antiga))/86400000));
-    periodoCoberto = `${fmtDataHora(antiga).split(" ")[0]} a ${fmtDataHora(recente).split(" ")[0]} (${janelaDias} dias)`;
-  }
-  const mediaDias = doPeriodo.length>1 ? Math.round((janelaDias/doPeriodo.length)*10)/10 : (janelaDias||"—");
-  // Ocorrência mais longa
-  let maisLonga = null, maxMs = 0;
-  doPeriodo.forEach(e=>{ if(e.fimQueda){ const ms=new Date(e.fimQueda)-new Date(e.inicioQueda); if(ms>maxMs){maxMs=ms;maisLonga=e;} } });
-  const maisLongaTxt = maisLonga ? `${fmtDataHora(maisLonga.inicioQueda).split(" ")[0]} · ${duracaoFmt(new Date(maisLonga.inicioQueda),new Date(maisLonga.fimQueda))}` : "—";
-  const pct = (n)=> doPeriodo.length? Math.round(n/doPeriodo.length*100) : 0;
-
-  const linhas = doPeriodo.map((e,i)=>{
-    const dur = e.fimQueda?duracaoFmt(new Date(e.inicioQueda),new Date(e.fimQueda)):"em aberto";
-    const medidas = [];
-    if(e.gerador==="sim") medidas.push(`Gerador acionado${e.obsGerador?` (${e.obsGerador})`:""}`);
-    if(e.manutencista) medidas.push("Manutencista acionado");
-    if(e.impactoOperacao) medidas.push(`Impacto na operação${e.obsImpacto?`: ${e.obsImpacto}`:""}`);
-    if(e.inquilinoImpactado) medidas.push(`Inquilino impactado${e.inquilinosAfetados?`: ${e.inquilinosAfetados}`:""}`);
-    if(e.operador) medidas.push(`Operador: ${e.operador}`);
-    if(e.obs) medidas.push(`Obs.: ${e.obs}`);
-    // Dados do abastecimento de diesel (quando houve acionamento)
-    let dieselCol = "—", dieselDetalhe = "";
-    if(e.diesel && e.diesel.acionado){
-      const dz = e.diesel;
-      let tempoResp = "—";
-      if(dz.contatoEfetuadoEm && dz.entregaChegouEm){
-        const ms = new Date(dz.entregaChegouEm)-new Date(dz.contatoEfetuadoEm);
-        const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
-        tempoResp = `${h>0?h+"h ":""}${m}min`;
-      }
-      dieselCol = `<span style="color:#16a34a;font-weight:800">✅</span>`;
-      const itens = [`<strong>Empresa:</strong> ${dz.fornecedor?.nome||"—"}`, `<strong>Tempo de resposta:</strong> ${tempoResp}`];
-      if(dz.litros) itens.push(`<strong>Litros:</strong> ${dz.litros}`);
-      if(dz.descricao) itens.push(`<strong>Detalhe:</strong> ${dz.descricao}`);
-      dieselDetalhe = `<tr class="det diesel"><td colspan="8">⛽ <strong style="color:#16a34a">Abastecimento de diesel solicitado</strong> · ${itens.join(" · ")}</td></tr>`;
-    }
-    const detalhe = medidas.length ? `<tr class="det"><td colspan="8"><strong>Medidas / observações:</strong> ${medidas.join(" · ")}</td></tr>` : "";
-    return `<tr class="main${i%2?" alt":""}">
-      <td>${fmtDataHora(e.inicioQueda)}</td>
-      <td>${dur}</td>
-      <td>${e.turnoInicio&&e.turnoFim&&e.turnoInicio!==e.turnoFim ? `${e.turnoInicio}→${e.turnoFim}` : (e.turno||e.turnoInicio||"—")}</td>
-      <td class="c">${e.gerador==="sim"?"✅":"—"}</td>
-      <td class="c">${e.manutencista?"✅":"—"}</td>
-      <td class="c">${e.impactoOperacao?"⚠️":"—"}</td>
-      <td class="c">${dieselCol}</td>
-      <td class="prot">${e.protocolo||"—"}</td>
-    </tr>${dieselDetalhe}${detalhe}`;
-  }).join("");
-
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Energia ${label} ${project.id}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:22px;max-width:900px;margin:0 auto;background:#fff}
-  .cab{background:linear-gradient(135deg,#111827 0%,#1e1b4b 55%,#312e81 100%);color:#fff;border-radius:16px;padding:22px 24px;position:relative;overflow:hidden}
-  .cab .marca{font-size:10px;letter-spacing:2px;text-transform:uppercase;opacity:.7;font-weight:600}
-  .cab h1{font-size:23px;font-weight:800;margin-top:6px;letter-spacing:-.4px}
-  .cab .sub{font-size:12.5px;opacity:.85;margin-top:4px}
-  .cab .logo{position:absolute;top:20px;right:22px;width:66px;height:66px;object-fit:contain;background:#fff;border-radius:12px;padding:6px;border:2px solid rgba(255,255,255,.2)}
-  .cab .meta{margin-top:14px;display:flex;gap:22px;flex-wrap:wrap;font-size:11px;opacity:.9;border-top:1px solid rgba(255,255,255,.15);padding-top:12px}
-  .cab .meta b{display:block;font-size:13px;font-weight:800;margin-top:2px}
-  .intro{background:#f8f7ff;border:1px solid #ede9fe;border-left:4px solid #6d28d9;border-radius:10px;padding:13px 16px;margin:16px 0;font-size:11.5px;line-height:1.6;color:#334155}
-  .intro b{color:#312e81}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:18px}
-  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:15px 10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-  .kpi-val{font-size:22px;font-weight:900;color:#312e81}
-  .kpi-lbl{font-size:8.5px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:4px;letter-spacing:.4px}
-  .kpi.alert .kpi-val{color:#dc2626}
-  .sec-title{font-size:12px;font-weight:800;color:#312e81;text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px}
-  table{width:100%;border-collapse:collapse;font-size:11px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
-  thead{display:table-header-group}
-  th{background:#1e293b;color:#fff;padding:9px 10px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.3px}
-  td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
-  td.c{text-align:center} td.prot{font-size:9px;color:#475569;font-family:monospace}
-  tr.main.alt td{background:#fafbfc}
-  tr.det td{background:#f8f7ff;font-size:10px;color:#475569;border-bottom:2px solid #ede9fe;padding:6px 10px 9px}
-  tr.det.diesel td{background:#f0fdf4;border-bottom:2px solid #bbf7d0;color:#166534}
-  tr{page-break-inside:avoid;break-inside:avoid}
-  .analise{margin-top:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px}
-  .analise h3{font-size:12px;color:#312e81;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
-  .analise .row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-bottom:1px solid #eef2f7}
-  .analise .row:last-child{border:none}
-  .assinatura{margin-top:20px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;border-top:2px solid #312e81;padding-top:14px}
-  .assinatura .resp{font-size:11px;color:#475569} .assinatura .resp b{font-size:13px;color:#0f172a}
-  .assinatura .selo{text-align:right;font-size:10px;color:#64748b}
-  .footer{text-align:center;margin-top:16px;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  table,p,div{orphans:3;widows:3}
-  @media print{body{padding:8px}@page{margin:9mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
-</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px"><button onclick="window.print()" style="background:#312e81;color:#fff;border:none;border-radius:8px;padding:11px 30px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button></div>
-<div class="cab">
-  <img class="logo" src="${MOKED_LOGO}" alt="Moked">
-  <div class="marca">Moked Consulting Security</div>
-  <h1>⚡ Ocorrências de Energia</h1>
-  <div class="sub">${project.id} — ${project.name||""} · ${label}</div>
-  <div class="meta">
-    <div>Gerado em<b>${new Date().toLocaleDateString("pt-BR")}</b></div>
-    <div>Escopo<b>${subtitulo}</b></div>
-    <div>Base<b>${doPeriodo.length} ocorrência(s)</b></div>
-    <div>Responsável<b>José Fonseca</b></div>
-  </div>
-</div>
-<div class="intro">
-  Este relatório consolida as <b>ocorrências de falta de energia</b> registradas no projeto pelas equipes de segurança, sob supervisão da Moked Consulting Security. Cada evento documenta início, duração, acionamento de gerador e manutencista, impacto operacional, número de protocolo junto à concessionária e as medidas tomadas. Os cálculos de tempo total sem energia e média de dias de estabilidade são gerados automaticamente pelo sistema <b>MokLog CheckTest</b>.
-</div>
-<div class="kpis">
-  <div class="kpi"><div class="kpi-val">${doPeriodo.length}</div><div class="kpi-lbl">Quedas no período</div></div>
-  <div class="kpi alert"><div class="kpi-val">${totH}h${String(totM).padStart(2,"0")}m</div><div class="kpi-lbl">Tempo total s/ energia</div></div>
-  <div class="kpi"><div class="kpi-val">${mediaDias}</div><div class="kpi-lbl">Média dias estabilidade</div></div>
-  <div class="kpi"><div class="kpi-val">${geradores}🔌 / ${manutencistas}🔧</div><div class="kpi-lbl">Gerador / Manutencista</div></div>
-</div>
-<div class="sec-title">📋 Registro detalhado — ${doPeriodo.length} ocorrência(s) · ${comProtocolo} com protocolo</div>
-<table><thead><tr><th>Início</th><th>Duração</th><th>Turno</th><th>Gerador</th><th>Manut.</th><th>Impacto</th><th>Diesel</th><th>Protocolo</th></tr></thead>
-<tbody>${linhas||'<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:16px">Sem ocorrências selecionadas</td></tr>'}</tbody></table>
-<div class="analise">
-  <h3>📊 Síntese analítica</h3>
-  <div class="row"><span>Ocorrência mais longa</span><b>${maisLongaTxt}</b></div>
-  <div class="row"><span>Ocorrências com impacto na operação</span><b>${comImpacto} (${pct(comImpacto)}%)</b></div>
-  <div class="row"><span>Taxa de acionamento de gerador</span><b>${geradores} de ${doPeriodo.length} (${pct(geradores)}%)</b></div>
-  <div class="row"><span>Ocorrências com protocolo registrado</span><b>${comProtocolo} de ${doPeriodo.length} (${pct(comProtocolo)}%)</b></div>
-  <div class="row"><span>Período coberto</span><b>${periodoCoberto}</b></div>
-</div>
-<div class="assinatura">
-  <div class="resp">Responsável pela extração<br><b>José Fonseca</b><br>Gestor de Divisão — MokLog</div>
-  <div class="selo"><b>Moked Consulting Security</b><br>30+ anos · ISO 9001:2015 · ISO 37001:2016</div>
-</div>
-<div class="footer">MokLog CheckTest © Moked Consulting Security · Ocorrências de Energia · ${project.id} — ${project.name||""}</div>
-</body></html>`;
-}
+// Relatório por período/seleção: padrão Moked em ./relatorios/energiaRelatorio.js
 
 function baixarHtml(html, nomeArquivo){
   const blob = new Blob([html],{type:"text/html"});
@@ -443,20 +305,20 @@ function baixarHtml(html, nomeArquivo){
 }
 
 // PDF por período (dias=null → completo)
-function gerarPdfPeriodo(project, eventos, dias, label){
+function gerarPdfPeriodo(project, eventos, dias, label, interno=false){
   const completo = dias==null;
   const corte = completo ? 0 : Date.now() - dias*86400000;
   const lista = eventos.filter(e=>e.inicioQueda && (completo || new Date(e.inicioQueda).getTime()>=corte));
   const subtitulo = completo ? "Histórico completo" : `Últimos ${dias} dias`;
-  const html = montarHtmlEnergia(project, lista, subtitulo, label);
+  const { html } = montarRelatorioEnergia(project, lista, { subtitulo, interno });
   baixarHtml(html, `energia_${label.toLowerCase().replace(/\s+/g,"_")}_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`);
 }
 
 // PDF por seleção manual de ocorrências
-function gerarPdfSelecao(project, eventos, ids){
+function gerarPdfSelecao(project, eventos, ids, interno=false){
   const lista = eventos.filter(e=>ids.includes(e.id));
   const subtitulo = `Seleção manual · ${lista.length} de ${eventos.length}`;
-  const html = montarHtmlEnergia(project, lista, subtitulo, "Seleção");
+  const { html } = montarRelatorioEnergia(project, lista, { subtitulo, interno });
   baixarHtml(html, `energia_selecao_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`);
 }
 
@@ -731,6 +593,7 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
 }
 
 export default function EnergiaOcorrencias({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }){
+  const [relInterno, setRelInterno] = useState(false);   // relatório com a conferência do registro (versão interna)
   const S = getStyles(dark);
   const [authLevel,setAuthLevel]=useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen,setScreen]=useState(()=>(sharedAuth||getAccess(project?.id))?"home":"pin"); // pin|home|concluir|detalhe
@@ -1298,7 +1161,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                   <button onClick={()=>setSelPDF(historicoVisivel.map(e=>e.id))} style={{flex:1,padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${COR.purple}44`,color:COR.purple,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>✓ Selecionar todos ({historicoVisivel.length})</button>
                   <button onClick={()=>setSelPDF([])} style={{flex:1,padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:S.txt2.color,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>✕ Limpar</button>
                 </div>
-                <button disabled={selPDF.length===0} onClick={()=>{gerarPdfSelecao(project,eventos,selPDF);}}
+                <button disabled={selPDF.length===0} onClick={()=>{gerarPdfSelecao(project,eventos,selPDF,relInterno);}}
                   style={{width:"100%",padding:"12px 4px",borderRadius:11,background:selPDF.length?`linear-gradient(135deg,${COR.purple},#6d28d9)`:(dark?"#151c36":"#e2e8f0"),border:"none",color:selPDF.length?"#fff":"#94a3b8",fontSize:13.5,fontWeight:800,cursor:selPDF.length?"pointer":"not-allowed",marginBottom:8}}>
                   📄 Gerar PDF da seleção ({selPDF.length})
                 </button>
@@ -1310,13 +1173,16 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                   style={{width:"100%",padding:"11px 4px",borderRadius:11,background:"transparent",border:`1.5px dashed ${COR.purple}66`,color:COR.purple,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>
                   ☑️ Selecionar ocorrências para PDF
                 </button>
+                <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:S.txt2.color,margin:"2px 0 10px",cursor:"pointer"}}>
+                  <input type="checkbox" checked={relInterno} onChange={ev=>setRelInterno(ev.target.checked)}/> Versão interna (com conferência do registro)
+                </label>
                 <div style={{fontSize:10,color:S.txt2.color,textTransform:"uppercase",letterSpacing:.6,marginBottom:6,fontWeight:700}}>Ou por período:</div>
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <button onClick={()=>gerarPdfPeriodo(project,eventos,7,"Semanal")} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Semanal</button>
-                  <button onClick={()=>gerarPdfPeriodo(project,eventos,15,"Quinzenal")} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Quinzenal</button>
-                  <button onClick={()=>gerarPdfPeriodo(project,eventos,30,"Mensal")} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Mensal</button>
+                  <button onClick={()=>gerarPdfPeriodo(project,eventos,7,"Semanal",relInterno)} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Semanal</button>
+                  <button onClick={()=>gerarPdfPeriodo(project,eventos,15,"Quinzenal",relInterno)} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Quinzenal</button>
+                  <button onClick={()=>gerarPdfPeriodo(project,eventos,30,"Mensal",relInterno)} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Mensal</button>
                 </div>
-                <button onClick={()=>gerarPdfPeriodo(project,eventos,null,"Histórico Completo")} style={{width:"100%",padding:"12px 4px",borderRadius:11,background:`linear-gradient(135deg,${COR.purple},#6d28d9)`,border:"none",color:"#fff",fontSize:13.5,fontWeight:800,cursor:"pointer"}}>📚 Histórico Completo ({eventos.length})</button>
+                <button onClick={()=>gerarPdfPeriodo(project,eventos,null,"Histórico Completo",relInterno)} style={{width:"100%",padding:"12px 4px",borderRadius:11,background:`linear-gradient(135deg,${COR.purple},#6d28d9)`,border:"none",color:"#fff",fontSize:13.5,fontWeight:800,cursor:"pointer"}}>📚 Histórico Completo ({eventos.length})</button>
               </>
             )}
           </div>
