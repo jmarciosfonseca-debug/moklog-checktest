@@ -28,3 +28,11 @@ test('falha não fecha edição, não troca cache confirmado e preserva cópia',
  mockGravar.mockRejectedValue(Object.assign(Error('Conflito de seção'),{status:409}));await click('Editar equipamento');await fill(host.querySelector('input[placeholder="Arma 01"]'),'Tentativa');await click('Salvar alterações');
  expect(host.querySelector('[role="alert"]').textContent).toContain('Conflito');expect(host.textContent).toContain('Salvar alterações');expect(JSON.parse(localStorage.getItem('equipamentos_P505')).armamento[0].identificacao).toBe('Arma 01');expect(Object.keys(localStorage).some(k=>k.startsWith('equipamentos_tentativa_P505'))).toBe(true);
 });
+test('quantidade fracionária não é arredondada nem enviada',async()=>{
+ const alert=jest.spyOn(window,'alert').mockImplementation(()=>{});
+ try{await click('+ Adicionar');await fill(host.querySelector('input[placeholder="Arma 01"]'),'Arma 02');await fill(host.querySelector('input[aria-label="Quantidade"]'),'1.5');await click('✓ Adicionar');expect(mockGravar).not.toHaveBeenCalled();expect(alert).toHaveBeenCalledWith('Quantidade inválida');}finally{alert.mockRestore();}
+});
+test('duplo clique não dispara duas gravações da mesma tela',async()=>{
+ let resolver;mockGravar.mockImplementation(()=>new Promise(r=>{resolver=r;}));await click('+ Adicionar');await fill(host.querySelector('input[placeholder="Arma 01"]'),'Arma 02');await click('✓ Adicionar');await click('✓ Adicionar');expect(mockGravar).toHaveBeenCalledTimes(1);
+ await act(async()=>resolver({armamento:mockGravar.mock.calls[0][3]}));
+});

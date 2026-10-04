@@ -401,7 +401,7 @@ export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial })
           <div><label style={S.lbl}>Identificação (ex: Rádio 01)</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Rádio 01" style={S.inp}/></div>
           <div><label style={S.lbl}>Marca</label><input value={f.marca} onChange={e=>upd("marca",e.target.value)} placeholder="Ex: Motorola..." style={S.inp}/></div>
           <div><label style={S.lbl}>Modelo</label><input value={f.modelo} onChange={e=>upd("modelo",e.target.value)} placeholder="Ex: DEP550..." style={S.inp}/></div>
-          <div><label style={S.lbl}>Quantidade</label><input type="number" min="1" value={f.qtd} onChange={e=>upd("qtd",parseInt(e.target.value)||1)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Quantidade</label><input type="number" min="1" step="1" value={f.qtd} onChange={e=>upd("qtd",e.target.value)} style={S.inp}/></div>
         </>
       );
       case "armamento": return (
@@ -424,7 +424,7 @@ export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial })
       case "municao": return (
         <>
           <div><label style={S.lbl}>Tipo / Calibre</label><input value={f.identificacao} onChange={e=>upd("identificacao",e.target.value)} placeholder="Ex: .38 / .380..." style={S.inp}/></div>
-          <div><label style={S.lbl}>Quantidade inicial</label><input type="number" min="0" value={f.qtd} onChange={e=>upd("qtd",parseInt(e.target.value)||0)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Quantidade inicial</label><input type="number" min="0" step="1" value={f.qtd} onChange={e=>upd("qtd",e.target.value)} style={S.inp}/></div>
         </>
       );
       case "placas": return (

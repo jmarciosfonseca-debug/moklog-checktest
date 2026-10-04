@@ -21,6 +21,7 @@ function validate(section,before,after,identity){
  }
 }
 async function save(db,pid,section,before,after,identity){
+ if(![...CATS,'moto','checagemSemanal'].includes(section))fail(400,'Seção inválida.');
  const ref=db.collection('equipamentos').doc(pid);
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():{};
