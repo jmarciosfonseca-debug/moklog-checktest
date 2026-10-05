@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 import { inicioTurnoHora } from "../rondaVirtualGrade";
 import { documentoMoked, barrasMoked, escHTML, dataBR } from "./padraoMoked";
+import { rotulosColaboradoras } from "./rondaVirtualRelatorio";
 
 export const MODO_DISCIPLINAR = "pendente";   // "A" omitir por expressão | "B" ocultar observação | "C" mostrar tudo | "pendente"
 const MMDD = (d) => `${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
@@ -90,29 +91,38 @@ const tokensNome = (s) => normalizar(s).split(/[^a-z]+/).filter((t) => t.length 
 const empresaChave = (s) => normalizar(s).replace(/\(.*?\)/g, " ").replace(/\bsaida\b.*$/, " ").replace(/\s+/g, " ").trim();
 const mesmaEmpresa = (x, y) => { const a = empresaChave(x), b = empresaChave(y); return a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a)); };
 export function correspondencia(acessos, manutencoes, de, ate) {
-  const cA = cobertura(acessos), cM = cobertura(manutencoes);
-  const verificavel = cA.disponivel && cM.disponivel && cA.n > 0 && cM.n > 0;
   const dentro = (lista) => filtrarPeriodo(lista || [], de, ate);
   const A = dentro(acessos), M = dentro(manutencoes);
+  const cA = cobertura(acessos ? A : null), cM = cobertura(manutencoes ? M : null);   // cobertura medida NO PERÍODO
+  const verificavel = cA.disponivel && cM.disponivel && cA.n > 0 && cM.n > 0;
   const casa = (m, a) => {
     if (a.data !== m.data) return false;
     const tn = new Set(tokensNome(a.nome));
     const porNome = tokensNome(m.tecnico).some((t) => tn.has(t));
     return porNome || mesmaEmpresa(m.empresa, a.empresa);
   };
-  const manutSemAcesso = verificavel ? M.filter((m) => !A.some((a) => casa(m, a))) : [];
-  const acessoSemManut = verificavel ? A.filter((a) => M.some((m) => mesmaEmpresa(m.empresa, a.empresa)) && !M.some((m) => casa(m, a))) : [];
-  return { verificavel, coberturaAcesso: cA, coberturaManut: cM, manutSemAcesso, acessoSemManut };
+  const naFaixa = (d, cob) => cob.de && cob.ate && d >= cob.de && d <= cob.ate;
+  const manutNaoLocalizada = [], manutForaFaixa = [], acessoNaoLocalizado = [], acessoForaFaixa = [];
+  if (verificavel) {
+    M.forEach((m) => { if (!naFaixa(m.data, cA)) manutForaFaixa.push(m); else if (!A.some((a) => casa(m, a))) manutNaoLocalizada.push(m); });
+    A.filter((a) => M.some((m) => mesmaEmpresa(m.empresa, a.empresa))).forEach((a) => {
+      if (!naFaixa(a.data, cM)) acessoForaFaixa.push(a); else if (!M.some((m) => casa(m, a))) acessoNaoLocalizado.push(a); });
+  }
+  return { verificavel, coberturaAcesso: cA, coberturaManut: cM, manutNaoLocalizada, manutForaFaixa, acessoNaoLocalizado, acessoForaFaixa,
+    manutSemAcesso: manutNaoLocalizada, acessoSemManut: acessoNaoLocalizado };   // nomes antigos mantidos como apelidos
 }
 function blocoCorrespondencia(c, foco) {
-  const cobTxt = (n, cob) => cob.disponivel ? `${n}: ${cob.n} registro(s) lidos${cob.de ? ` (${dataBR(cob.de)} a ${dataBR(cob.ate)})` : ""}` : `${n}: fonte não carregada`;
-  const crit = "Critério: mesmo dia e nome do técnico ou a mesma empresa (comparação sem acento, sem maiúsculas e sem anotações entre parênteses). É correspondência provável, não prova de ausência.";
+  const cobTxt = (n, cob) => !cob.disponivel ? `${n}: consulta não concluída (fonte indisponível)` : `${n}: ${cob.n} registro(s) no período${cob.de ? ` (${dataBR(cob.de)} a ${dataBR(cob.ate)})` : ""}`;
+  const crit = "Critério: mesmo dia e nome do técnico ou a mesma empresa (sem acento, sem maiúsculas e sem anotações entre parênteses). "
+    + "\"Não localizado\" significa apenas que nada correspondente foi encontrado nos registros consultados — não é ausência operacional comprovada. "
+    + "A faixa de datas lida não garante que todos os dias intermediários tenham registro.";
   if (!c.verificavel) return `<li><b>Acesso ↔ Manutenção: não verificado</b> — ${cobTxt("Acesso", c.coberturaAcesso)}; ${cobTxt("Manutenção", c.coberturaManut)}.</li>`;
-  const itens = foco === "manutencao"
-    ? c.manutSemAcesso.map((m) => `${dataBR(m.data)} — ${escHTML(m.tecnico || "—")} (${escHTML(m.empresa || "—")})`)
-    : c.acessoSemManut.map((a) => `${dataBR(a.data)} ${escHTML(a.horaEntrada || "")} — ${escHTML(a.nome || "—")} (${escHTML(a.empresa || "—")})`);
-  const titulo = foco === "manutencao" ? "Manutenção sem entrada correspondente provável no Acesso" : "Entrada de prestador sem manutenção correspondente provável";
-  return `<li><b>${titulo}:</b> ${itens.length ? itens.join("; ") : "nenhuma"}. <span class="mk-mu">${crit} ${cobTxt("Acesso", c.coberturaAcesso)}; ${cobTxt("Manutenção", c.coberturaManut)}.</span></li>`;
+  const fm = (m) => `${dataBR(m.data)} — ${escHTML(m.tecnico || "—")} (${escHTML(m.empresa || "—")})`;
+  const fa = (a) => `${dataBR(a.data)} ${escHTML(a.horaEntrada || "")} — ${escHTML(a.nome || "—")} (${escHTML(a.empresa || "—")})`;
+  const [nl, ff, f, titulo] = foco === "manutencao"
+    ? [c.manutNaoLocalizada, c.manutForaFaixa, fm, "Manutenção sem entrada correspondente localizada no Acesso"]
+    : [c.acessoNaoLocalizado, c.acessoForaFaixa, fa, "Entrada de prestador sem manutenção correspondente localizada"];
+  return `<li><b>${titulo}:</b> ${nl.length ? nl.map(f).join("; ") : "nenhuma"}.${ff.length ? ` <b>Não verificado</b> (fora da faixa de datas da outra fonte): ${ff.map(f).join("; ")}.` : ""} <span class="mk-mu">${crit} ${cobTxt("Acesso", c.coberturaAcesso)}; ${cobTxt("Manutenção", c.coberturaManut)}.</span></li>`;
 }
 
 const conferencia = (itens, notaCpf) => `<section class="mk-qual mk-bloco"><div class="mk-h2">Conferência do registro <span class="mk-mu">— versão interna</span></div>
@@ -145,7 +155,7 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       const saidaNaEmpresa = lista.filter((r) => /sa[ií]da/i.test(r.empresa || ""));
       if (saidaNaEmpresa.length) conf.push(`<li><b>Saída digitada no campo Empresa:</b> ${saidaNaEmpresa.length} registro(s) (ex.: ${escHTML(saidaNaEmpresa[0].empresa)}). Falta campo próprio de saída.</li>`);
       grafias(lista.map((r) => r.empresa)).forEach((g) => conf.push(`<li><b>Grafias da mesma empresa:</b> ${g.map((x) => `“${escHTML(x)}”`).join(", ")}.</li>`));
-      if (outros) conf.push(blocoCorrespondencia(correspondencia(registros, outros, de, ate), "acesso"));
+      conf.push(blocoCorrespondencia(correspondencia(registros, outros || null, de, ate), "acesso"));   // fonte null = consulta falhou → "não verificado"
     }
   }
 
@@ -153,8 +163,8 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
     const TIPOS = [["cafe1", "Café 1"], ["refeicao", "Refeição"], ["cafe2", "Café 2"]];
     const pessoas = new Map(), dup = new Map(), incons = [], divergTurno = [];
     lista.forEach((r) => (r.colaboradores || []).forEach((c) => {
-      const k = normalizar(c.nome) || "(sem nome)";
-      const p = pessoas.get(k) || { nome: c.nome || "Sem nome", cargo: c.cargo || "", dias: new Set(), n: 0, dur: { cafe1: [], refeicao: [], cafe2: [] } };
+      const k = c.id ? `id:${c.id}` : `nome:${normalizar(c.nome) || "(sem nome)"}`;
+      const p = pessoas.get(k) || { k, id: c.id || null, nome: c.nome || "Sem nome", cargo: c.cargo || "", dias: new Set(), n: 0, dur: { cafe1: [], refeicao: [], cafe2: [] } };
       p.dias.add(r.data);
       TIPOS.forEach(([t]) => { const iv = c.intervalos?.[t]; if (!iv || (!iv.saida && !iv.retorno)) return; p.n++;
         const d = duracaoMin(iv.saida, iv.retorno, r.turno); if (d.min != null) p.dur[t].push(d.min); if (d.inconsistente) incons.push(`${dataBR(r.data)} ${escHTML(c.nome || "")} — ${TIPOS.find((x) => x[0] === t)[1]}: retorno ${escHTML(iv.retorno)} antes da saída ${escHTML(iv.saida)}`); });
@@ -166,18 +176,20 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       if (tp && r.turno && tp !== r.turno) divergTurno.push(`${dataBR(r.data)} ${escHTML(c.nome || "")}: lançado ${TURNO_TXT[r.turno] || r.turno}, saída às ${escHTML(primeira)}`);
     }));
     const media = (a) => a.length ? `${Math.round(a.reduce((x, y) => x + y, 0) / a.length)} min` : "—";
-    const linhas = [...pessoas.values()].sort((a, b) => a.nome.localeCompare(b.nome));
+    const linhas = rotulosColaboradoras([...pessoas.values()]).sort((a, b) => a.rotulo.localeCompare(b.rotulo));
+    const semId = linhas.filter((p) => !p.id);
     corpo = !lista.length ? vazio : `<section class="mk-kpis"><div class="mk-k"><div class="mk-kv">${lista.length}</div><div class="mk-kl">registros de turno</div></div>
       <div class="mk-k"><div class="mk-kv">${linhas.length}</div><div class="mk-kl">colaboradores</div></div>
       <div class="mk-k"><div class="mk-kv">${linhas.reduce((s, p) => s + p.n, 0)}</div><div class="mk-kl">intervalos registrados</div></div>
       <div class="mk-k"><div class="mk-kv">${new Set(lista.map((r) => r.data)).size}</div><div class="mk-kl">dias com registro</div></div></section>
       <section><div class="mk-h2">Resumo por colaborador <span class="mk-mu">— duração média como dado, sem faixa de referência</span></div><table class="mk-tb"><thead><tr><th>Colaborador</th><th class="mk-num">Dias</th><th class="mk-num">Intervalos</th><th class="mk-num">Café 1</th><th class="mk-num">Refeição</th><th class="mk-num">Café 2</th></tr></thead><tbody>
-      ${linhas.map((p) => `<tr><td><b>${escHTML(p.nome)}</b>${p.cargo ? `<div class="mk-mu">${escHTML(p.cargo)}</div>` : ""}</td><td class="mk-num">${p.dias.size}</td><td class="mk-num">${p.n}</td><td class="mk-num">${media(p.dur.cafe1)}</td><td class="mk-num">${media(p.dur.refeicao)}</td><td class="mk-num">${media(p.dur.cafe2)}</td></tr>`).join("")}</tbody></table>
+      ${linhas.map((p) => `<tr><td><b>${escHTML(p.rotulo)}</b>${p.cargo ? `<div class="mk-mu">${escHTML(p.cargo)}</div>` : ""}${p.id ? "" : '<div class="mk-mu">agregado por nome (sem identificador)</div>'}</td><td class="mk-num">${p.dias.size}</td><td class="mk-num">${p.n}</td><td class="mk-num">${media(p.dur.cafe1)}</td><td class="mk-num">${media(p.dur.refeicao)}</td><td class="mk-num">${media(p.dur.cafe2)}</td></tr>`).join("")}</tbody></table>
       <p class="mk-nota">Duração considerada só com saída e retorno registrados; virada da meia-noite apenas em turno noturno.</p></section>
       ${comAnexo ? `<section style="page-break-before:always"><div class="mk-h2">Anexo — registros detalhados</div><table class="mk-tb"><thead><tr><th>Data</th><th>Turno</th><th>Colaborador</th><th>Café 1</th><th>Refeição</th><th>Café 2</th></tr></thead><tbody>
       ${lista.flatMap((r) => (r.colaboradores || []).map((c) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(TURNO_TXT[r.turno] || r.turno || "—")}</td><td>${escHTML(c.nome || "—")}</td>${TIPOS.map(([t]) => { const iv = c.intervalos?.[t]; return `<td>${iv && (iv.saida || iv.retorno) ? `${escHTML(iv.saida || "—")}–${escHTML(iv.retorno || "—")}` : "—"}</td>`; }).join("")}</tr>`)).join("")}</tbody></table></section>` : ""}`;
     if (interno) {
       const dups = [...dup.entries()].filter(([, ts]) => ts.length > 1);
+      if (semId.length) conf.push(`<li><b>Agregado por nome</b> (sem identificador no registro; homônimos não podem ser separados): ${semId.map((p) => escHTML(p.nome)).join(", ")}.</li>`);
       if (dups.length) conf.push(`<li><b>Registros duplicados</b> (mesmo dia, colaborador e horários): ${dups.length} caso(s)${dups.some(([, ts]) => new Set(ts).size > 1) ? ", inclusive lançados em turnos diferentes" : ""}.</li>`);
       if (divergTurno.length) conf.push(`<li><b>Turno lançado × hora da saída</b> (configuração do projeto): ${divergTurno.slice(0, 8).join("; ")}${divergTurno.length > 8 ? `; e mais ${divergTurno.length - 8}` : ""}.</li>`);
       if (incons.length) conf.push(`<li><b>Retorno antes da saída</b> fora de turno noturno (sem duração calculada): ${incons.slice(0, 8).join("; ")}.</li>`);
@@ -227,13 +239,13 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       <div class="mk-duas"><div class="mk-card"><div class="mk-lb">Por sistema</div>${barrasMoked(porSistema.slice(0, 8).map((e) => [e.rotulo, e.n]))}</div><div class="mk-card"><div class="mk-lb">Por empresa</div>${barrasMoked(porEmpresa.slice(0, 8).map((e) => [e.rotulo, e.n]))}</div></div>
       <section><div class="mk-h2">Registros <span class="mk-mu">— mais recentes primeiro</span></div><table class="mk-tb"><colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:43%"></colgroup>
       <thead><tr><th>Data</th><th>Empresa · técnico</th><th>Sistema</th><th>Status</th><th class="mk-num">Em aberto</th><th>Serviço</th></tr></thead><tbody>
-      ${[...lista].reverse().map((r) => { const [txt, cls] = STATUS_TXT[r.status] || [r.status || "—", "mk-b-in"]; const ab = (r.status === "pendente" || r.status === "parcial") ? `${diasEntreDatas(r.data, hoje)} d` : "—";
+      ${[...lista].reverse().map((r) => { const [txt, cls] = STATUS_TXT[r.status] || [escHTML(r.status || "—"), "mk-b-in"]; const ab = (r.status === "pendente" || r.status === "parcial") ? `${diasEntreDatas(r.data, hoje)} d` : "—";
         return `<tr><td>${dataBR(r.data)}</td><td><b>${escHTML(r.empresa || "—")}</b><div class="mk-mu">${escHTML(r.tecnico || "")}</div></td><td>${escHTML(r.sistema || "—")}</td><td><span class="mk-b ${cls}">${txt}</span>${r.arquivado ? '<div class="mk-mu">arquivado</div>' : ""}</td><td class="mk-num">${ab}</td><td class="mk-sm">${escHTML(mask([r.servico, r.obs].filter(Boolean).join(" · "))) || "—"}</td></tr>`; }).join("")}</tbody></table></section>`;
     if (interno) {
       const concAtivas = lista.filter((r) => r.status === "concluida" && !r.arquivado).length;
       if (concAtivas) conf.push(`<li><b>Concluídas ainda ativas</b> (não arquivadas): ${concAtivas} — informativo.</li>`);
       grafias(lista.map((r) => r.empresa)).forEach((g) => conf.push(`<li><b>Grafias da mesma empresa:</b> ${g.map((x) => `“${escHTML(x)}”`).join(", ")}.</li>`));
-      if (outros) conf.push(blocoCorrespondencia(correspondencia(outros, registros, de, ate), "manutencao"));
+      conf.push(blocoCorrespondencia(correspondencia(outros || null, registros, de, ate), "manutencao"));
     }
   }
 

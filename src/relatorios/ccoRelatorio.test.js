@@ -59,17 +59,37 @@ describe("1. Correspondência provável Acesso ↔ Manutenção", () => {
     expect(correspondencia(ACESSOS, null).verificavel).toBe(false);
     expect(correspondencia(ACESSOS, []).verificavel).toBe(false);
     const h = montarRelatorioCCO("manutencao", P, MANUT, { agora: AG, interno: true, outros: null }).html;
-    expect(h).not.toContain("Acesso ↔ Manutenção");
+    expect(h).toContain("Acesso ↔ Manutenção: não verificado"); expect(h).toContain("consulta não concluída (fonte indisponível)");   // falha não some do relatório
     const h2 = montarRelatorioCCO("manutencao", P, MANUT, { agora: AG, interno: true, outros: [] }).html;
     expect(h2).toContain("Acesso ↔ Manutenção: não verificado");
   });
   test("casa por dia + nome do técnico (sem acento) e lista as faltas prováveis com critério e cobertura", () => {
     const c = correspondencia(ACESSOS.filter((a) => !a.rascunho), MANUT);
     expect(c.verificavel).toBe(true);
-    expect(c.manutSemAcesso.map((m) => m.id)).toEqual(["m2"]);                 // 24/09 sem entrada provável
-    expect(c.acessoSemManut.map((a) => a.id)).toEqual(["a2"]);                 // 26/08 prestador sem manutenção
+    expect(c.manutNaoLocalizada.map((m) => m.id)).toEqual(["m2"]);            // 24/09: dentro da faixa do Acesso, não localizado
+    expect(c.acessoNaoLocalizado).toEqual([]);
+    expect(c.acessoForaFaixa.map((a) => a.id)).toEqual(["a2"]);              // 26/08: fora da faixa da Manutenção → não verificado
     const h = montarRelatorioCCO("manutencao", P, MANUT, { agora: AG, interno: true, outros: ACESSOS }).html;
-    expect(h).toContain("correspondência provável, não prova de ausência"); expect(h).toContain("registro(s) lidos");
+    expect(h).toContain("não é ausência operacional comprovada"); expect(h).toContain("registro(s) no período");
+    expect(h).not.toMatch(/ausente/i);
+  });
+});
+
+describe("revisão do Codex", () => {
+  test("outra fonte só com registros fora do período = não verificado (sem falsas faltas)", () => {
+    const c = correspondencia([{ data: "2026-07-01", nome: "X", empresa: "FM Security" }], MANUT, "2026-09-01", "2026-09-30");
+    expect(c.verificavel).toBe(false); expect(c.manutNaoLocalizada).toEqual([]);
+  });
+  test("status desconhecido com tags é escapado", () => {
+    const h = montarRelatorioCCO("manutencao", P, [{ data: "2026-09-01", empresa: "E", status: "<img src=x onerror=alert(1)>" }], { agora: AG }).html;
+    expect(h).not.toContain("<img src=x"); expect(h).toContain("&lt;img src=x onerror=alert(1)&gt;");
+  });
+  test("intervalo: homônimos com ids diferentes separados; sem id agregado por nome e declarado", () => {
+    const iv = { cafe1: { saida: "09:00", retorno: "09:15" } };
+    const INT = [{ data: "2026-10-01", turno: "diurno", colaboradores: [{ id: "c1", nome: "Ana", cargo: "Vig", intervalos: iv }, { id: "c2", nome: "Ana", cargo: "Vig", intervalos: iv }, { nome: "Bia", intervalos: iv }] }];
+    const h = montarRelatorioCCO("intervalo", P, INT, { agora: AG, interno: true }).html;
+    expect((h.match(/<b>Ana[^<]*<\/b>/g) || []).length).toBe(2);
+    expect(h).toContain("agregado por nome (sem identificador)"); expect(h).toContain("Agregado por nome</b>");
   });
 });
 
