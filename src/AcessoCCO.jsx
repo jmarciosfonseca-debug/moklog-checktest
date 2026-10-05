@@ -5,7 +5,10 @@ import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
 import RondaVirtual from "./RondaVirtual"; // ◀ NOVO — aba de ronda virtual CFTV
 import TempoGravacao from "./TempoGravacao"; // ◀ aba CFTV Tempo de Gravação
-import BodycamSection from "./BodycamSection"; // ◀ NOVO — descarregamento de bodycam (P311A)
+import BodycamSection from "./BodycamSection";
+import { montarRelatorioCCO } from "./relatorios/ccoRelatorio";
+import { periodoUltimosDias } from "./relatorios/rondaVirtualRelatorio";
+import { baixarHtml } from "./relatorios/padraoMoked"; // ◀ NOVO — descarregamento de bodycam (P311A)
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -275,88 +278,17 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 function statusLabel(key){ const s=STATUS_MANUT.find(x=>x.key===key); return s?s.label:key||"--"; }
 function turnoLabel(key){ const t=TURNOS.find(x=>x.key===key); return t?t.label:key||"--"; }
 
-function gerarPDFTema(tema, project, registros) {
-  const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const ativos = registros.filter(r=>!r.arquivado);
-  const arquivados = registros.filter(r=>r.arquivado);
+function gerarPDFTema(tema, project, registros, opts = {}) {
+  // Padrão Moked (F2-2): período inclusivo, versão interna com conferência; nada é gravado.
+  const { html } = montarRelatorioCCO(tema, project, registros, { agora: new Date(), interno: !!opts.interno, de: opts.de || null, ate: opts.ate || null,
+    outros: opts.outros || null, comAnexo: !!opts.comAnexo });
+  baixarHtml(html, `cco_${tema}_${project.id}_${opts.de || ""}_${opts.ate || ""}${opts.interno ? "_interno" : ""}.html`);
+}
 
-  // Cabeçalho de tabela e linhas por tema
-  let head = "", rowsAtivos = "", rowsArq = "";
-  const ivCell = (col,key)=>{ const iv=col.intervalos?.[key]; return iv&&(iv.saida||iv.retorno)?`${iv.saida||"--"}→${iv.retorno||"--"}`:"--"; };
-  const rowFn = {
-    acesso: (r)=>`<tr><td><strong>${r.nome||"--"}</strong></td><td>${r.empresa||"--"}</td><td>${fmtDate(r.data)}</td><td>${r.horaEntrada||"--"}</td><td>${r.obs||"--"}</td></tr>`,
-    intervalo: (r)=>(r.colaboradores||[]).map(col=>`<tr><td>${fmtDate(r.data)}</td><td>${turnoLabel(r.turno)}</td><td><strong>${col.nome||"--"}</strong><br><span style="font-size:10px;color:#94a3b8">${col.cargo||""}</span></td><td>${ivCell(col,"cafe1")}</td><td>${ivCell(col,"refeicao")}</td><td>${ivCell(col,"cafe2")}</td></tr>`).join(""),
-    supervisao: (r)=>{
-      const eqs=(r.equipamentos||[]).filter(e=>e.acao).map(e=>`${e.acao==="trocado"?"✔":"✗"} ${e.catLabel}${e.identificacao?` (${e.identificacao})`:""}`).join("<br>")||"--";
-      return `<tr><td><strong>${r.supervisor||"--"}</strong></td><td>${turnoLabel(r.turno)}</td><td>${fmtDate(r.data)}</td><td>${r.chegada||"--"}</td><td>${r.saida||"--"}</td><td>${r.resumo||"--"}</td><td style="font-size:10px">${eqs}</td></tr>`;
-    },
-    manutencao: (r)=>`<tr><td><strong>${r.empresa||"--"}</strong></td><td>${r.tecnico||"--"}</td><td>${r.sistema||"--"}</td><td>${turnoLabel(r.turno)}</td><td>${statusLabel(r.status)}</td><td>${fmtDate(r.data)}</td><td>${r.servico||"--"}</td></tr>`,
-  };
-  const heads = {
-    acesso: "<tr><th>Nome</th><th>Empresa/Setor</th><th>Data</th><th>Entrada</th><th>Observação</th></tr>",
-    intervalo: "<tr><th>Data</th><th>Turno</th><th>Colaborador</th><th>Café 1</th><th>Almoço/Janta</th><th>Café 2</th></tr>",
-    supervisao: "<tr><th>Supervisor</th><th>Turno</th><th>Data</th><th>Chegada</th><th>Saída</th><th>Observação</th><th>Equipamentos</th></tr>",
-    manutencao: "<tr><th>Empresa</th><th>Técnico</th><th>Sistema</th><th>Turno</th><th>Status</th><th>Data</th><th>Serviço</th></tr>",
-  };
-  head = heads[tema];
-  rowsAtivos = ativos.map(rowFn[tema]).join("");
-  rowsArq = arquivados.map(rowFn[tema]).join("");
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><title>${temaInfo.label} — ${project.id} ${hoje}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b}
-  .header{background:linear-gradient(135deg,#0c2340,#081626);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
-  .header h1{font-size:18px;margin-bottom:4px}
-  .header p{font-size:11px;opacity:.75}
-  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
-  .card h2{font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
-  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
-  tr:nth-child(even) td{background:#f8fafc}
-  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}
-  .kpi{display:flex;gap:10px;margin-bottom:14px}
-  .kpibox{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-  .kpibox .n{font-size:22px;font-weight:800;color:#0c2340}
-  .kpibox .l{font-size:10px;color:#94a3b8;font-weight:700}
-  @media print{body{padding:8px}@page{margin:12mm}.no-print{display:none}}
-</style></head>
-<body>
-<div class="no-print" style="text-align:center;margin-bottom:16px">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-<div class="header">
-  <div>
-    <h1>${temaInfo.icon} ${temaInfo.label} — CCO</h1>
-    <p>${project.id} — ${project.name||""}</p>
-    <p>Relatório gerado em ${hoje}</p>
-  </div>
-  <div style="text-align:right;font-size:11px;opacity:.75">
-    <div>Moked Consulting Security</div>
-    <div>MokLog CheckTest</div>
-  </div>
-</div>
-<div class="kpi">
-  <div class="kpibox"><div class="n">${registros.length}</div><div class="l">TOTAL</div></div>
-  <div class="kpibox"><div class="n">${ativos.length}</div><div class="l">ATIVOS</div></div>
-  <div class="kpibox"><div class="n">${arquivados.length}</div><div class="l">ARQUIVADOS</div></div>
-</div>
-${rowsAtivos ? `<div class="card"><h2>Registros Ativos</h2><table><thead>${head}</thead><tbody>${rowsAtivos}</tbody></table></div>` : `<div class="card"><h2>Registros Ativos</h2><div style="font-size:12px;color:#94a3b8">Nenhum registro ativo.</div></div>`}
-${rowsArq ? `<div class="card"><h2>Arquivados (mantidos para histórico)</h2><table><thead>${head}</thead><tbody>${rowsArq}</tbody></table></div>` : ""}
-<div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security</div>
-  <div>${temaInfo.label} · ${project.id} · ${hoje}</div>
-</div>
-</body></html>`;
-
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=`cco_${tema}_${project.id}_${todayStr()}.html`; a.click();
-  URL.revokeObjectURL(url);
+// Leitura só para a conferência cruzada: falha de leitura = null ("não verificado"), nunca lista vazia.
+async function carregarParaConferencia(tema, projectId) {
+  try { const snap = await getDoc(doc(db, COLLECTIONS[tema], projectId)); return snap.exists() ? (snap.data().registros || []) : null; }
+  catch (e) { return null; }
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -699,6 +631,11 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const temaInfo = TEMAS.find(t=>t.key===tema) || TEMAS[0];
   const isRonda = tema==="ronda"; // ◀ NOVO — a aba ronda tem fluxo próprio (não usa o CRUD genérico)
   const isCftv = tema==="cftv"; // ◀ aba CFTV Tempo de Gravação — fluxo próprio
+  // Relatórios (F2-2): período, versão interna e anexo do intervalo
+  const [relDe, setRelDe] = useState(() => periodoUltimosDias(30).de);
+  const [relAte, setRelAte] = useState(() => periodoUltimosDias(30).ate);
+  const [relInterno, setRelInterno] = useState(false);
+  const [relAnexo, setRelAnexo] = useState(false);
   const isBodycam = tema==="bodycam"; // ◀ NOVO — aba Bodycam (só P311A), fluxo próprio
 
   // Carrega dots de atividade de todas as abas (1x na entrada)
@@ -976,8 +913,19 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
               <div style={{display:"flex",gap:8}}>
                 <button onClick={novoLimpo} style={{...S.btn,flex:2}}>+ Registrar {temaInfo.label}</button>
-                <button onClick={()=>gerarPDFTema(tema, project, registros.filter(r=>!r.rascunho))} disabled={registros.filter(r=>!r.rascunho).length===0}
+                <button onClick={async()=>{ const outros = relInterno && (tema==="acesso"||tema==="manutencao") ? await carregarParaConferencia(tema==="acesso"?"manutencao":"acesso", project.id) : null;
+                    gerarPDFTema(tema, project, registros.filter(r=>!r.rascunho), { interno: relInterno, de: relDe, ate: relAte, outros, comAnexo: relAnexo }); }} disabled={registros.filter(r=>!r.rascunho).length===0}
                   style={{...S.btnSec,flex:1,color:"#a855f7",borderColor:"#a855f733",opacity:registros.filter(r=>!r.rascunho).length===0?0.5:1}}>📄 PDF</button>
+              </div>
+
+              {/* Relatório: período, atalhos e versão interna (F2-2) */}
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center",fontSize:11}}>
+                <span style={{...S.txt2,fontWeight:700}}>PDF do período:</span>
+                <input type="date" value={relDe} max={relAte} onChange={e=>setRelDe(e.target.value)} style={{...S.btnSm,padding:"4px 8px"}} aria-label="Início do período"/>
+                <input type="date" value={relAte} min={relDe} onChange={e=>setRelAte(e.target.value)} style={{...S.btnSm,padding:"4px 8px"}} aria-label="Fim do período"/>
+                {[7,15,30].map(n=>(<button key={n} onClick={()=>{ const p=periodoUltimosDias(n); setRelDe(p.de); setRelAte(p.ate); }} style={{...S.btnSm,padding:"4px 8px",color:temaInfo.color,border:`1px solid ${temaInfo.color}44`}}>{n} dias</button>))}
+                <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",...S.txt2}}><input type="checkbox" checked={relInterno} onChange={e=>setRelInterno(e.target.checked)}/> Versão interna</label>
+                {tema==="intervalo" && <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",...S.txt2}}><input type="checkbox" checked={relAnexo} onChange={e=>setRelAnexo(e.target.checked)}/> Anexo detalhado</label>}
               </div>
 
               {/* Toggle ativos / arquivados */}
