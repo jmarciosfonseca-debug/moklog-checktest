@@ -20,8 +20,10 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { setDoc as fgSetDoc } from "./fireGuard";
+import { TOLERANCIA_MIN, temGradeEspecial, buildSlots, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot } from "./rondaVirtualGrade";
+import { montarRelatorioTurno, montarConsolidadoRonda, chaveColaboradora } from "./relatorios/rondaVirtualRelatorio";
+import { baixarHtml } from "./relatorios/padraoMoked";
 
-const TOLERANCIA_MIN = 5;
 
 // ── Definição das grades (turnos)
 // Noturno (DIÁRIO): 18:00→22:00 a cada 1h, 23:00→05:30(+1) a cada 30min
@@ -31,10 +33,6 @@ export const RONDA_TURNOS = {
   diurno:  { key:"diurno",  label:"Diurno",  icon:"☀️", color:"#f59e0b", bg:"#1a1000", obs:"Apenas finais de semana e feriados" },
 };
 
-// Projetos com grade ESPECIAL no noturno (30min após as 23h até 05:30).
-// Também são os projetos com regra ESPECIAL de diurno: só domingo (+feriado).
-const PROJETOS_GRADE_ESPECIAL = ["P311A", "P311B"];
-function temGradeEspecial(projectId){ return PROJETOS_GRADE_ESPECIAL.includes(projectId); }
 
 // ── Calendário: o turno DIURNO só pode ser aberto em sábados, domingos e
 // feriados (federais + estaduais conforme a UF do projeto). O NOTURNO abre
@@ -102,70 +100,6 @@ function podeAbrirDiurno(dataISO, projectId, ehFolguista){
   return ehFimDeSemana(dataISO) || feriado;
 }
 
-// offsetMin = minutos desde o horário de início do turno (18:00 noturno / 06:00 diurno)
-// projectId define a cadência noturna: especial = 30min após 23h; demais = 1h até 05:00.
-function buildSlots(tipo, projectId) {
-  const slots = [];
-  const especial = temGradeEspecial(projectId);
-  // P606 (Duque de Caxias): janela deslocada +1h — diurno 07→19, noturno 19→07.
-  const desloc = (projectId === "P606") ? 1 : 0;
-  if (tipo === "noturno") {
-    const iniN = 18 + desloc; // 18 normal, 19 no P606
-    for (let h = iniN; h <= 22; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-iniN)*60 });
-    if (especial) {
-      // 23:00 → 05:30 a cada 30min (apenas P311A / P311B)
-      let off = (23-iniN)*60, cur = 23*60, fim = (24+5)*60+30; // 05:30 do dia seguinte
-      while (cur <= fim) {
-        const hh = Math.floor((cur%1440)/60), mm = cur%60;
-        slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
-        cur += 30; off += 30;
-      }
-    } else {
-      // 23:00 → 05:00 (ou 06:00 no P606) a cada 1h
-      let off = (23-iniN)*60, cur = 23*60, fim = (24+5+desloc)*60; // 05:00 normal, 06:00 P606... ajustado p/ fechar 12h
-      while (cur <= fim) {
-        const hh = Math.floor((cur%1440)/60), mm = cur%60;
-        slots.push({ label:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, offsetMin:off });
-        cur += 60; off += 60;
-      }
-    }
-  } else { // diurno: 06:00 → 17:00 (ou 07:00 → 18:00 no P606) de 1h
-    const iniD = 6 + desloc, fimD = 17 + desloc;
-    for (let h = iniD; h <= fimD; h++) slots.push({ label:`${String(h).padStart(2,"0")}:00`, offsetMin:(h-iniD)*60 });
-  }
-  return slots;
-}
-
-function inicioTurnoHora(tipo, projectId){
-  const desloc = (projectId === "P606") ? 1 : 0;
-  return (tipo==="noturno" ? 18 : 6) + desloc;
-}
-
-// Hora de ENCERRAMENTO da jornada de 12h (espelho de inicioTurnoHora).
-// Noturno: 06:00 (07:00 no P606). Diurno: 18:00 (19:00 no P606).
-// Usado para manter a janela do ÚLTIMO slot aberta até 1min antes do fim do
-// turno — a última ronda (~05h) e o botão "Concluir e arquivar" ficam
-// disponíveis até 05:59 (06:59 no P606), quando ainda é o turno da noite.
-function fimTurnoHora(tipo, projectId){
-  const desloc = (projectId === "P606") ? 1 : 0;
-  return (tipo==="noturno" ? 6 : 18) + desloc;
-}
-// Minutos, contados a partir do início do turno, do instante 1min antes do fim
-// da jornada (ex.: noturno normal = 18h→06h → 12h de janela → 05:59 = 719min).
-function limiteFinalTurnoMin(tipo, projectId){
-  const ini = inicioTurnoHora(tipo, projectId);
-  let fim = fimTurnoHora(tipo, projectId);
-  if (fim <= ini) fim += 24;                 // cruzou a meia-noite
-  return (fim - ini) * 60 - 1;               // 1 min antes do fim (ex.: 05:59)
-}
-
-// minutos decorridos desde o início do turno, considerando a data de início.
-// Trata a virada de meia-noite (turno noturno cruza para o dia seguinte).
-function minutosDesdeInicio(tipo, dataInicio, agora=new Date(), projectId) {
-  const [Y,M,D] = dataInicio.split("-").map(Number);
-  const ini = new Date(Y, M-1, D, inicioTurnoHora(tipo, projectId), 0, 0, 0);
-  return Math.floor((agora.getTime() - ini.getTime())/60000);
-}
 
 // Uma ronda (slot) "tem conteúdo" se qualquer campo de trabalho foi preenchido.
 // Usado pela proteção anti-perda no snapshot e pela checagem de turno vazio.
@@ -179,33 +113,6 @@ function rondaTemConteudo(r) {
             r.status || r.hora);
 }
 
-// Status de UM slot a partir do relógio (puro, testável).
-// registro = entrada salva em turnoObj.rondas[offset] (ou null)
-// Retorna: feita | feita_atrasada | em_andamento | naoexec | aguardando | aberto | atraso_aberto | bloqueado
-// limiteFinalMin (opcional): quando informado, define o limite do ÚLTIMO slot
-// (proximoOffset == null). Serve para manter a última ronda noturna registrável
-// e a conclusão liberada até 1min antes do fim do turno (05:59 / 06:59 P606),
-// em vez de bloquear em ini+30. Default null = comportamento original intacto
-// (usado nos PDFs/consolidado, que avaliam turnos já encerrados).
-function statusSlot(slot, proximoOffset, agoraMin, registro, limiteFinalMin=null) {
-  if (registro && registro.naoExec) return "naoexec";
-  // AUD-008: início SEM fim = ronda em andamento (não é "feita" ainda).
-  // Só vira "feita"/"feita_atrasada" quando o fim é registrado.
-  if (registro && registro.inicio && !registro.fim) return "em_andamento";
-  if (registro && registro.inicio)  return registro.atrasada ? "feita_atrasada" : "feita";
-  const ini = slot.offsetMin;
-  const fimTol = ini + TOLERANCIA_MIN;
-  const limitePadrao = (proximoOffset != null) ? proximoOffset : (ini + 30);
-  // Último slot com limite estendido do turno: usa o maior entre o padrão e o
-  // fim do turno, para não bloquear a última ronda antes do encerramento.
-  const limite = (proximoOffset == null && limiteFinalMin != null)
-    ? Math.max(limitePadrao, limiteFinalMin)
-    : limitePadrao;
-  if (agoraMin < ini)       return "aguardando";
-  if (agoraMin <= fimTol)   return "aberto";          // iniciar no horário
-  if (agoraMin < limite)    return "atraso_aberto";   // iniciar com atraso
-  return "bloqueado";                                  // estourou → não executada
-}
 
 const STATUS_META = {
   feita:          { label:"No horário",     color:"#22c55e", bg:"#021a0d", icon:"✅" },
@@ -262,6 +169,12 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [erroSalvar, setErroSalvar] = useState(false);
   const [listaPendente, setListaPendente] = useState(null); // última gravação que falhou, p/ retry
   const [selTurnos, setSelTurnos] = useState(new Set());
+  // Relatórios (F2-1): versão interna, período, colaboradoras e tipo de turno do consolidado por filtro
+  const [relInterno, setRelInterno] = useState(false);
+  const [relDe, setRelDe] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toLocaleDateString("sv-SE"); });
+  const [relAte, setRelAte] = useState(() => new Date().toLocaleDateString("sv-SE"));
+  const [relColabs, setRelColabs] = useState(new Set());
+  const [relTipo, setRelTipo] = useState("");
 
   // Relógio: recalcula status a cada 30s (e ao montar/abrir o app)
   useEffect(()=>{
@@ -657,11 +570,49 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
                 style={{...S.btnSm,padding:"4px 9px",fontSize:11,background:"transparent",border:`1px solid ${dark?"#334155":"#cbd5e1"}`,color:"#94a3b8",fontWeight:700}}>Limpar</button>
             )}
           </div>
+          {/* Consolidado por período / colaboradoras / tipo (F2-1) */}
+          {(()=>{
+            const pessoas=[]; const vistos=new Set();
+            arquivados.forEach(t=>{ const k=chaveColaboradora(t.plantonista); if(!vistos.has(k)){ vistos.add(k); pessoas.push({k, nome:t.plantonista?.nome||"Sem nome", cargo:t.plantonista?.cargo||""}); } });
+            const noFiltro = arquivados.filter(t=>t.dataInicio>=relDe && t.dataInicio<=relAte && (!relTipo || t.tipo===relTipo) && (!relColabs.size || relColabs.has(chaveColaboradora(t.plantonista))));
+            const atalho=(n)=>{ const d=new Date(); d.setDate(d.getDate()-n); setRelDe(d.toLocaleDateString("sv-SE")); setRelAte(new Date().toLocaleDateString("sv-SE")); };
+            const chip={...S.btnSm,padding:"4px 9px",fontSize:11,fontWeight:700};
+            return (
+              <div style={{display:"flex",flexDirection:"column",gap:6,borderTop:`1px dashed ${dark?"#334155":"#e2e8f0"}`,paddingTop:8}}>
+                <span style={{fontSize:10,color:"#a855f7",fontWeight:700,opacity:0.8}}>Consolidado por período:</span>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                  <input type="date" value={relDe} max={relAte} onChange={e=>setRelDe(e.target.value)} style={{...chip,fontWeight:400}} aria-label="Início do período"/>
+                  <input type="date" value={relAte} min={relDe} onChange={e=>setRelAte(e.target.value)} style={{...chip,fontWeight:400}} aria-label="Fim do período"/>
+                  {[7,15,30].map(n=>(<button key={n} onClick={()=>atalho(n)} style={{...chip,background:"#a855f71a",border:"1px solid #a855f744",color:"#a855f7"}}>{n} dias</button>))}
+                  <select value={relTipo} onChange={e=>setRelTipo(e.target.value)} style={{...chip,fontWeight:400}} aria-label="Tipo de turno">
+                    <option value="">Noturno e diurno</option><option value="noturno">Só noturno</option><option value="diurno">Só diurno</option>
+                  </select>
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {pessoas.map(p=>{ const on=relColabs.has(p.k); return (
+                    <button key={p.k} onClick={()=>setRelColabs(prev=>{const n=new Set(prev); n.has(p.k)?n.delete(p.k):n.add(p.k); return n;})}
+                      style={{...chip,background:on?"#a855f733":"transparent",border:`1px solid ${on?"#a855f7":(dark?"#334155":"#cbd5e1")}`,color:on?"#a855f7":"#94a3b8"}}>
+                      {on?"✓ ":""}{p.nome}{pessoas.filter(x=>x.nome===p.nome).length>1&&p.cargo?` (${p.cargo})`:""}
+                    </button>); })}
+                  {relColabs.size>0 && <button onClick={()=>setRelColabs(new Set())} style={{...chip,background:"transparent",border:"none",color:"#94a3b8"}}>todas</button>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+                  <label style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"#94a3b8",cursor:"pointer"}}>
+                    <input type="checkbox" checked={relInterno} onChange={e=>setRelInterno(e.target.checked)}/> Versão interna (conferência do registro)
+                  </label>
+                  <button disabled={!noFiltro.length} onClick={()=>gerarPDFConsolidadoRonda(project, arquivados, { interno: relInterno, de: relDe, ate: relAte, tipo: relTipo || null, colaboradores: relColabs.size ? [...relColabs] : null })}
+                    style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap",opacity:noFiltro.length?1:0.5}}>
+                    📊 Consolidado do filtro ({noFiltro.length} turno{noFiltro.length===1?"":"s"})
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
           {/* Contador + gerar */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
             <span style={{fontSize:11,color:"#a855f7",fontWeight:700}}>☑ {selTurnos.size} turno{selTurnos.size===1?"":"s"} selecionado{selTurnos.size===1?"":"s"} p/ consolidado</span>
             {selTurnos.size>=2 && (
-              <button onClick={()=>gerarPDFConsolidadoRonda(project, arquivados.filter(t=>selTurnos.has(t.id)))}
+              <button onClick={()=>gerarPDFConsolidadoRonda(project, arquivados.filter(t=>selTurnos.has(t.id)), { interno: relInterno })}
                 style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap"}}>
                 📊 Gerar Consolidado
               </button>
@@ -690,7 +641,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
               onEditando={marcarEditando}
               onUpd={updTurno} onArquivar={()=>arquivarTurno(t.id)} onDesarquivar={()=>desarquivarTurno(t.id)}
               onExcluir={(jaConfirmado)=>{ if(jaConfirmado===true || window.confirm("Excluir turno definitivamente?")) excluirTurno(t.id); }}
-              onPDF={()=>gerarPDFRonda(project, t)}/>
+              onPDF={()=>gerarPDFRonda(project, t, { interno: relInterno })}/>
           </div>
         </div>
       ))}
@@ -910,276 +861,22 @@ function SlotRow({ linha, dark, S, disabled, onIniciar, onFecharSem, onFecharCom
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// PDF do turno de ronda (mesmo padrão visual do gerarPDFTema do AcessoCCO)
+// PDF do turno de ronda — padrão Moked (F2-1, 05/10/2026)
 // ════════════════════════════════════════════════════════════════════════
-export function gerarPDFRonda(project, turno) {
-  const tinfo = RONDA_TURNOS[turno.tipo] || RONDA_TURNOS.noturno;
-  const slots = buildSlots(turno.tipo, project.id);
-  const hoje = new Date().toLocaleDateString("pt-BR");
-
-  const rows = slots.map((s,i)=>{
-    const prox = slots[i+1] ? slots[i+1].offsetMin : null;
-    const reg = turno.rondas?.[String(s.offsetMin)] || null;
-    const st = statusSlot(s, prox, minutosDesdeInicio(turno.tipo, turno.dataInicio, new Date(), project.id), reg);
-    const meta = STATUS_META[st] || STATUS_META.aguardando;
-    const inicio = reg?.inicio || "--";
-    const fim = reg?.fim || "--";
-    const result = (reg && reg.fim) ? (reg.anomalia ? "Com anomalias" : "Sem anomalias") : "--";
-    const just = reg?.justificativa || "";
-    const obs = reg?.obs || "";
-    const cor = meta.color;
-    return `<tr>
-      <td><strong>${s.label}</strong></td>
-      <td style="color:${cor};font-weight:700">${meta.label}</td>
-      <td>${inicio}</td><td>${fim}</td><td>${result}</td>
-      <td style="font-size:10px">${[just,obs].filter(Boolean).join(" — ")||"--"}</td>
-    </tr>`;
-  }).join("");
-
-  // AUD-008: uma ronda só é REALIZADA quando tem início E fim. Início sem fim = "em andamento".
-  const feitas = slots.filter((s,i)=>{ const reg=turno.rondas?.[String(s.offsetMin)]; return reg&&reg.inicio&&reg.fim; }).length;
-  const emAndamento = slots.filter((s,i)=>{ const reg=turno.rondas?.[String(s.offsetMin)]; return reg&&reg.inicio&&!reg.fim; }).length;
-  const naoexec = slots.filter((s,i)=>{
-    const prox = slots[i+1] ? slots[i+1].offsetMin : null;
-    const reg = turno.rondas?.[String(s.offsetMin)] || null;
-    const st = statusSlot(s, prox, minutosDesdeInicio(turno.tipo, turno.dataInicio, new Date(), project.id), reg);
-    return st==="naoexec"||st==="bloqueado";
-  }).length;
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><title>Ronda Virtual — ${project.id} ${hoje}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b}
-  .header{background:linear-gradient(135deg,#0c2340,#081626);color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
-  .header h1{font-size:18px;margin-bottom:4px}
-  .header p{font-size:11px;opacity:.75}
-  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px}
-  .card h2{font-size:13px;color:#475569;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:12px}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:11px}
-  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
-  tr:nth-child(even) td{background:#f8fafc}
-  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px}
-  .kpi{display:flex;gap:10px;margin-bottom:14px}
-  .kpibox{flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-  .kpibox .n{font-size:22px;font-weight:800;color:#0c2340}
-  .kpibox .l{font-size:10px;color:#64748b;font-weight:700}
-  .meta{display:flex;gap:16px;font-size:12px;margin-bottom:12px;flex-wrap:wrap}
-  .meta b{color:#0c2340}
-  @media print{body{padding:8px}@page{margin:12mm}.no-print{display:none}}
-</style></head>
-<body>
-<div class="no-print" style="text-align:center;margin-bottom:16px">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-<div class="header">
-  <div>
-    <h1>🎥 Ronda Virtual (CFTV) — CCO</h1>
-    <p>${project.id} — ${project.name||""}</p>
-    <p>Relatório gerado em ${hoje}</p>
-  </div>
-  <div style="text-align:right;font-size:11px;opacity:.75">
-    <div>Moked Consulting Security</div>
-    <div>MokLog CheckTest</div>
-  </div>
-</div>
-<div class="meta">
-  <div><b>Turno:</b> ${tinfo.label}</div>
-  <div><b>Plantonista:</b> ${turno.plantonista?.nome||"--"}${turno.plantonista?.cargo?` (${turno.plantonista.cargo})`:""}</div>
-  <div><b>Data de início:</b> ${fmtDataBR(turno.dataInicio)}</div>
-</div>
-<div class="kpi">
-  <div class="kpibox"><div class="n">${slots.length}</div><div class="l">RONDAS PREVISTAS</div></div>
-  <div class="kpibox"><div class="n">${feitas}</div><div class="l">REALIZADAS</div></div>
-  ${emAndamento>0?`<div class="kpibox"><div class="n" style="color:#f59e0b">${emAndamento}</div><div class="l">EM ANDAMENTO</div></div>`:""}
-  <div class="kpibox"><div class="n">${naoexec}</div><div class="l">NÃO EXECUTADAS</div></div>
-</div>
-<div class="card">
-  <h2>Rondas do turno</h2>
-  <table><thead><tr><th>Horário</th><th>Status</th><th>Início</th><th>Fim</th><th>Resultado</th><th>Justificativa / Observação</th></tr></thead>
-  <tbody>${rows}</tbody></table>
-</div>
-<div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security</div>
-  <div>Ronda Virtual · ${project.id} · ${tinfo.label} · ${fmtDataBR(turno.dataInicio)}</div>
-</div>
-</body></html>`;
-
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=`cco_ronda_${project.id}_${turno.tipo}_${turno.dataInicio}.html`; a.click();
-  URL.revokeObjectURL(url);
+export function gerarPDFRonda(project, turno, opts = {}) {
+  const { html } = montarRelatorioTurno(project, turno, { agora: new Date(), interno: !!opts.interno });
+  baixarHtml(html, `cco_ronda_${project.id}_${turno.tipo}_${turno.dataInicio}${opts.interno ? "_interno" : ""}.html`);
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// PDF CONSOLIDADO — múltiplos turnos, ranking de atrasos/não-execuções por
-// colaborador, separando ocorrências COM justificativa preenchida (possível
-// causa operacional legítima) das SEM justificativa (negligência aparente).
-// Nota: o sistema não classifica o CONTEÚDO da justificativa como "válida"
-// ou não — isso é uma decisão humana. Aqui apenas separa "foi justificado"
-// de "não foi justificado", que é o que os dados permitem com segurança.
-// ════════════════════════════════════════════════════════════════════════
-export function gerarPDFConsolidadoRonda(project, turnosSelecionados) {
-  if(!turnosSelecionados || turnosSelecionados.length<2) return;
-  const turnos = turnosSelecionados.slice().sort((a,b)=>(a.dataInicio||"").localeCompare(b.dataInicio||""));
-  const hoje = new Date().toLocaleDateString("pt-BR");
-
-  const porColaborador = {};
-  let totalPrevistas=0, totalRealizadas=0, totalAtrasos=0, totalNaoExec=0, totalSemJust=0;
-  const ocorrenciasSemJust = [];
-
-  turnos.forEach(t=>{
-    const tinfo = RONDA_TURNOS[t.tipo] || RONDA_TURNOS.noturno;
-    const slots = buildSlots(t.tipo, project.id);
-    const agoraMin = minutosDesdeInicio(t.tipo, t.dataInicio, new Date(), project.id);
-    const nome = t.plantonista?.nome || "—";
-    if(!porColaborador[nome]) porColaborador[nome]={nome,turnos:0,atrasos:0,naoexec:0,semJust:0,comJust:0};
-    porColaborador[nome].turnos++;
-    let realizadasTurno=0;
-
-    slots.forEach((s,i)=>{
-      const prox = slots[i+1] ? slots[i+1].offsetMin : null;
-      const reg = t.rondas?.[String(s.offsetMin)] || null;
-      const st = statusSlot(s, prox, agoraMin, reg);
-      if(reg && reg.inicio && reg.fim) realizadasTurno++; // AUD-008: só conta ronda concluída (início E fim)
-      const just = (reg?.justificativa||"").trim();
-      if(st==="feita_atrasada"){
-        totalAtrasos++; porColaborador[nome].atrasos++;
-        if(just){ porColaborador[nome].comJust++; }
-        else { totalSemJust++; porColaborador[nome].semJust++; ocorrenciasSemJust.push({nome,data:fmtDataBR(t.dataInicio),turno:tinfo.label,horario:s.label,tipo:"Atraso"}); }
-      } else if(st==="naoexec"||st==="bloqueado"){
-        totalNaoExec++; porColaborador[nome].naoexec++;
-        if(just){ porColaborador[nome].comJust++; }
-        else { totalSemJust++; porColaborador[nome].semJust++; ocorrenciasSemJust.push({nome,data:fmtDataBR(t.dataInicio),turno:tinfo.label,horario:s.label,tipo:"Não executada"}); }
-      }
-    });
-    totalPrevistas += slots.length;
-    totalRealizadas += realizadasTurno;
-  });
-
-  const ranking = Object.values(porColaborador).sort((a,b)=>(b.atrasos+b.naoexec)-(a.atrasos+a.naoexec));
-  const periodoIni = fmtDataBR(turnos[0]?.dataInicio), periodoFim = fmtDataBR(turnos[turnos.length-1]?.dataInicio);
-
-  const rankingRows = ranking.map((c,i)=>{
-    const totalProb = c.atrasos+c.naoexec;
-    const tier = c.semJust===0 ? {label:"REGULAR",color:"#15803d",bg:"#dcfce7"}
-               : c.semJust<=2 ? {label:"ATENÇÃO",color:"#d97706",bg:"#fef3c7"}
-               : {label:"CRÍTICO",color:"#dc2626",bg:"#fee2e2"};
-    return `<tr style="${i===0&&totalProb>0?'background:#fef2f2':''}">
-      <td style="font-weight:800;color:#1e293b">${c.nome}</td>
-      <td style="text-align:center">${c.turnos}</td>
-      <td style="text-align:center;font-weight:700;color:${c.atrasos>0?'#d97706':'#15803d'}">${c.atrasos}</td>
-      <td style="text-align:center;font-weight:700;color:${c.naoexec>0?'#dc2626':'#15803d'}">${c.naoexec}</td>
-      <td style="text-align:center;font-weight:700;color:#15803d">${c.comJust}</td>
-      <td style="text-align:center;font-weight:800;color:${c.semJust>0?'#dc2626':'#94a3b8'}">${c.semJust}</td>
-      <td style="text-align:center"><span class="badge" style="background:${tier.bg};color:${tier.color}">${tier.label}</span></td>
-    </tr>`;
-  }).join("");
-
-  const semJustRows = ocorrenciasSemJust.map(o=>`
-    <tr>
-      <td style="font-weight:700">${o.nome}</td>
-      <td>${o.data}</td>
-      <td>${o.turno}</td>
-      <td>${o.horario}</td>
-      <td style="color:${o.tipo==="Não executada"?"#dc2626":"#d97706"};font-weight:700">${o.tipo}</td>
-    </tr>`).join("");
-
-  const turnosListRows = turnos.map(t=>{
-    const tinfo = RONDA_TURNOS[t.tipo] || RONDA_TURNOS.noturno;
-    return `<tr><td>${fmtDataBR(t.dataInicio)}</td><td>${tinfo.label}</td><td>${t.plantonista?.nome||"—"}</td></tr>`;
-  }).join("");
-
-  const taxaExec = totalPrevistas>0 ? Math.round((totalRealizadas/totalPrevistas)*100) : 100;
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><title>Consolidado Ronda Virtual — ${project.id}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#0f172a;padding:24px;font-size:13px;line-height:1.5}
-  .section{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:20px 22px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-  .section-title{font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:1px;border-left:4px solid #7c3aed;padding-left:10px;margin-bottom:16px}
-  table{width:100%;border-collapse:collapse}
-  th{font-size:10px;text-transform:uppercase;color:#64748b;text-align:left;padding:9px 10px;border-bottom:2px solid #e2e8f0;letter-spacing:.5px}
-  td{padding:10px 10px;border-bottom:1px solid #f1f5f9;font-size:12px}
-  .badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:10px;font-weight:700}
-  .kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:#e2e8f0;margin-bottom:16px;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.08)}
-  .kpi{background:#fff;padding:16px 8px;text-align:center}
-  .kpi-val{font-size:23px;font-weight:800;line-height:1;letter-spacing:-1px}
-  .kpi-lbl{font-size:8.5px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:5px;letter-spacing:.3px}
-  .footer{text-align:center;font-size:10px;color:#94a3b8;padding:16px 0}
-  @media print{body{padding:10px}@page{margin:12mm}.no-print{display:none!important}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
-</style></head>
-<body>
-
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-
-<div class="section" style="background:linear-gradient(135deg,#4c1d95 0%,#7c3aed 55%,#8b5cf6 100%);color:#fff;box-shadow:0 8px 24px rgba(124,58,237,0.25)">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
-    <div>
-      <div style="font-size:10px;opacity:.85;letter-spacing:1.5px;text-transform:uppercase;font-weight:600">MOKED CONSULTING SECURITY</div>
-      <div style="font-size:23px;font-weight:800;margin-top:6px">🎥 Consolidado de Ronda Virtual (CFTV)</div>
-      <div style="font-size:14px;opacity:.95;margin-top:3px;font-weight:600">${project.id} — ${project.name||""} · ${turnos.length} turnos</div>
-      <div style="font-size:12px;opacity:.85;margin-top:6px;display:inline-block;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px">🗓 ${periodoIni} a ${periodoFim}</div>
-    </div>
-    <div style="text-align:right">
-      <div style="font-size:11px;opacity:.8">Gerado em ${hoje}</div>
-      <div style="font-size:11px;opacity:.8">José Fonseca · jose.fonseca@moked.com.br</div>
-    </div>
-  </div>
-</div>
-
-<div class="kpi-row">
-  <div class="kpi"><div class="kpi-val" style="color:#1e293b">${totalPrevistas}</div><div class="kpi-lbl">Rondas previstas</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${taxaExec>=90?'#15803d':taxaExec>=70?'#d97706':'#dc2626'}">${taxaExec}%</div><div class="kpi-lbl">Taxa de execução</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${totalAtrasos>0?'#d97706':'#15803d'}">${totalAtrasos}</div><div class="kpi-lbl">Atrasos</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${totalNaoExec>0?'#dc2626':'#15803d'}">${totalNaoExec}</div><div class="kpi-lbl">Não executadas</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${totalSemJust>0?'#dc2626':'#15803d'}">${totalSemJust}</div><div class="kpi-lbl">Sem justificativa</div></div>
-</div>
-
-<div class="section">
-  <div class="section-title">👤 Ranking de Desempenho por Colaborador</div>
-  <table>
-    <thead><tr><th>Colaborador</th><th style="text-align:center">Turnos</th><th style="text-align:center">Atrasos</th><th style="text-align:center">Não Exec.</th><th style="text-align:center">Com Justif.</th><th style="text-align:center">Sem Justif.</th><th style="text-align:center">Status</th></tr></thead>
-    <tbody>${rankingRows}</tbody>
-  </table>
-</div>
-
-${ocorrenciasSemJust.length?`<div class="section" style="border:1px solid #fecaca">
-  <div class="section-title" style="color:#dc2626;border-left-color:#dc2626">⚠ Ocorrências Sem Justificativa Registrada</div>
-  <div style="font-size:11px;color:#64748b;margin-bottom:10px">Atrasos e não execuções sem motivo informado pelo colaborador no momento — possível negligência operacional, recomenda-se follow-up.</div>
-  <table>
-    <thead><tr><th>Colaborador</th><th>Data</th><th>Turno</th><th>Horário</th><th>Ocorrência</th></tr></thead>
-    <tbody>${semJustRows}</tbody>
-  </table>
-</div>`:`<div class="section" style="border:1px solid #bbf7d0;background:#f0fdf4">
-  <div style="font-size:13px;color:#15803d;font-weight:700;text-align:center">✓ Todas as ocorrências do período foram devidamente justificadas pelos colaboradores.</div>
-</div>`}
-
-<div class="section">
-  <div class="section-title">📋 Turnos Incluídos no Consolidado</div>
-  <table>
-    <thead><tr><th>Data</th><th>Turno</th><th>Plantonista</th></tr></thead>
-    <tbody>${turnosListRows}</tbody>
-  </table>
-</div>
-
-<div class="footer">
-  <div>Consolidado de Ronda Virtual © Moked Consulting Security</div>
-  <div style="font-weight:600;margin-top:2px">José Fonseca — Moked Consulting Security</div>
-  <div>jose.fonseca@moked.com.br · ${project.id} · ${periodoIni} a ${periodoFim}</div>
-</div>
-</body></html>`;
-
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=`ronda_consolidado_${project.id}_${turnos[0]?.dataInicio}_${turnos[turnos.length-1]?.dataInicio}.html`; a.click();
-  URL.revokeObjectURL(url);
+// ─────────────────────────────────────────────────────────────
+// CONSOLIDADO — padrão Moked (F2-1): seleção manual de turnos (como antes) OU filtro por período, colaboradoras
+// e tipo de turno. Fatos por colaboradora, sem selo de classificação; conferência do registro só na versão interna.
+// ─────────────────────────────────────────────────────────────
+export function gerarPDFConsolidadoRonda(project, turnosSelecionados, opts = {}) {
+  if (!turnosSelecionados || !turnosSelecionados.length) return;
+  const { html, consolidado } = montarConsolidadoRonda(project, turnosSelecionados, { agora: new Date(), interno: !!opts.interno,
+    de: opts.de || null, ate: opts.ate || null, colaboradores: opts.colaboradores || null, tipo: opts.tipo || null });
+  baixarHtml(html, `ronda_consolidado_${project.id}_${consolidado.periodo.de || ""}_${consolidado.periodo.ate || ""}${opts.interno ? "_interno" : ""}.html`);
 }
 
 // Exporta utilitários puros para teste
