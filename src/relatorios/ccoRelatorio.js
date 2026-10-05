@@ -53,12 +53,31 @@ export function turnoPelaHora(hora, projectId) {
   const ini = inicioTurnoHora("diurno", projectId) * 60, fim = inicioTurnoHora("noturno", projectId) * 60;
   return m >= ini && m < fim ? "diurno" : "noturno";
 }
+export function textoJornada(projectId) {
+  const d = inicioTurnoHora("diurno", projectId), n = inicioTurnoHora("noturno", projectId), h = (x) => `${String(x).padStart(2, "0")}h`;
+  return `jornada configurada no app: diurno ${h(d)}–${h(n)}, noturno ${h(n)}–${h(d)}`;
+}
+const notaJornada = (pid) => `turno inferido pela ${textoJornada(pid)} — inferência a confirmar com a escala real, não erro comprovado do lançamento`;
+
+// Equipamentos da Supervisão (lista de origem = danificados): "trocado" resolve; "aberto" = pendência continua.
+export function acaoEquipamento(acao) {
+  if (acao === "trocado") return { rotulo: "Trocado (resolvido)", tipo: "trocado" };
+  if (acao === "aberto") return { rotulo: "Em aberto (pendente)", tipo: "aberto" };
+  return { rotulo: `Ação não reconhecida: «${escHTML(acao)}»`, tipo: "desconhecida" };
+}
+
 export function duracaoMin(inicio, fim, turno) {
   const a = hhmm(inicio), b = hhmm(fim);
   if (a == null || b == null) return { min: null, inconsistente: false };
   if (b >= a) return { min: b - a, inconsistente: false };
   if (turno === "noturno") return { min: b + 1440 - a, inconsistente: false };
   return { min: null, inconsistente: true };
+}
+
+export function validarPeriodo(de, ate) {
+  if (!de || !ate) return "Informe as datas do período.";
+  if (de > ate) return "A data inicial é posterior à final.";
+  return null;
 }
 
 export function filtrarPeriodo(registros, de, ate) {
@@ -125,6 +144,11 @@ function blocoCorrespondencia(c, foco) {
   return `<li><b>${titulo}:</b> ${nl.length ? nl.map(f).join("; ") : "nenhuma"}.${ff.length ? ` <b>Não verificado</b> (fora da faixa de datas da outra fonte): ${ff.map(f).join("; ")}.` : ""} <span class="mk-mu">${crit} ${cobTxt("Acesso", c.coberturaAcesso)}; ${cobTxt("Manutenção", c.coberturaManut)}.</span></li>`;
 }
 
+// Divide uma tabela: corpo + "cauda" (últimas linhas com o mesmo cabeçalho) que vai junto da assinatura.
+function tabelaComCauda(abre, linhas, fecha, cauda = 3) {
+  if (linhas.length <= cauda) return { principal: "", cauda: `${abre}${linhas.join("")}${fecha}` };
+  return { principal: `${abre}${linhas.slice(0, -cauda).join("")}${fecha}`, cauda: `${abre}${linhas.slice(-cauda).join("")}${fecha}` };
+}
 const conferencia = (itens, notaCpf) => `<section class="mk-qual mk-bloco"><div class="mk-h2">Conferência do registro <span class="mk-mu">— versão interna</span></div>
   ${itens.length ? `<ul>${itens.join("")}</ul>` : '<div class="mk-sm">Nenhuma inconsistência encontrada.</div>'}
   ${notaCpf ? `<p class="mk-nota">${notaCpf}</p>` : ""}</section>`;
@@ -138,7 +162,7 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
   const numero = `MK-${project.id}-${cfg[1]}-${MMDD(agora)}`;
   let cpfs = 0; const mask = (t) => { const r = mascararCPF(t); cpfs += r.mascarados; return r.texto; };
   const sit = (r) => r.arquivado ? '<span class="mk-mu">arquivado</span>' : "ativo";
-  let corpo = "", conf = [], sub = `<b>${escHTML(project.id)} — ${escHTML(project.name || "")}</b> · ${periodo} · ${lista.length} registro(s)`;
+  let corpo = "", conf = [], cauda = "", sub = `<b>${escHTML(project.id)} — ${escHTML(project.name || "")}</b> · ${periodo} · ${lista.length} registro(s)`;
   const vazio = '<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-kl">registros no período</div></div>';
 
   if (tema === "acesso") {
@@ -146,11 +170,11 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
     const tur = { diurno: 0, noturno: 0 }; lista.forEach((r) => { const t = turnoPelaHora(r.horaEntrada, project.id); if (t) tur[t]++; });
     corpo = !lista.length ? vazio : `<section class="mk-kpis"><div class="mk-k"><div class="mk-kv">${lista.length}</div><div class="mk-kl">acessos</div><div class="mk-mu mk-sm">em ${porDia} dia(s)</div></div>
       <div class="mk-k"><div class="mk-kv">${porEmpresa.length}</div><div class="mk-kl">empresas/setores</div></div>
-      <div class="mk-k"><div class="mk-kv">${tur.diurno}</div><div class="mk-kl">entradas no diurno</div><div class="mk-mu mk-sm">pela hora de entrada</div></div>
+      <div class="mk-k"><div class="mk-kv">${tur.diurno}</div><div class="mk-kl">entradas no diurno</div><div class="mk-mu mk-sm">inferido pela jornada do app</div></div>
       <div class="mk-k"><div class="mk-kv">${tur.noturno}</div><div class="mk-kl">entradas no noturno</div></div></section>
       <div class="mk-card" style="margin-bottom:10px"><div class="mk-lb">Acessos por empresa/setor</div>${barrasMoked(porEmpresa.slice(0, 10).map((e) => [e.rotulo, e.n]))}</div>
-      <section><div class="mk-h2">Registros</div><table class="mk-tb"><thead><tr><th>Data</th><th>Entrada</th><th>Nome</th><th>Empresa/setor</th><th>Observação</th><th>Situação</th></tr></thead><tbody>
-      ${lista.map((r) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(r.horaEntrada || "—")}</td><td><b>${escHTML(r.nome || "—")}</b></td><td>${escHTML(r.empresa || "—")}</td><td class="mk-sm">${escHTML(mask(r.obs || "")) || "—"}</td><td>${sit(r)}</td></tr>`).join("")}</tbody></table></section>`;
+      <section><div class="mk-h2">Registros</div>${(() => { const t = tabelaComCauda('<table class="mk-tb"><thead><tr><th>Data</th><th>Entrada</th><th>Nome</th><th>Empresa/setor</th><th>Observação</th><th>Situação</th></tr></thead><tbody>',
+        lista.map((r) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(r.horaEntrada || "—")}</td><td><b>${escHTML(r.nome || "—")}</b></td><td>${escHTML(r.empresa || "—")}</td><td class="mk-sm">${escHTML(mask(r.obs || "")) || "—"}</td><td>${sit(r)}</td></tr>`), "</tbody></table>"); cauda = `${t.cauda}<p class="mk-nota">Turnos inferidos pela ${textoJornada(project.id)} — inferência, a confirmar com a escala real.</p>`; return t.principal; })()}</section>`;
     if (interno) {
       const saidaNaEmpresa = lista.filter((r) => /sa[ií]da/i.test(r.empresa || ""));
       if (saidaNaEmpresa.length) conf.push(`<li><b>Saída digitada no campo Empresa:</b> ${saidaNaEmpresa.length} registro(s) (ex.: ${escHTML(saidaNaEmpresa[0].empresa)}). Falta campo próprio de saída.</li>`);
@@ -178,20 +202,20 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
     const media = (a) => a.length ? `${Math.round(a.reduce((x, y) => x + y, 0) / a.length)} min` : "—";
     const linhas = rotulosColaboradoras([...pessoas.values()]).sort((a, b) => a.rotulo.localeCompare(b.rotulo));
     const semId = linhas.filter((p) => !p.id);
-    corpo = !lista.length ? vazio : `<section class="mk-kpis"><div class="mk-k"><div class="mk-kv">${lista.length}</div><div class="mk-kl">registros de turno</div></div>
+    corpo = !lista.length ? vazio : `<section class="mk-kpis"><div class="mk-k"><div class="mk-kv">${lista.length}</div><div class="mk-kl">registros de turno</div><div class="mk-mu mk-sm">${lista.filter((r) => r.arquivado).length} arquivado(s) · ativos e arquivados somados</div></div>
       <div class="mk-k"><div class="mk-kv">${linhas.length}</div><div class="mk-kl">colaboradores</div></div>
       <div class="mk-k"><div class="mk-kv">${linhas.reduce((s, p) => s + p.n, 0)}</div><div class="mk-kl">intervalos registrados</div></div>
       <div class="mk-k"><div class="mk-kv">${new Set(lista.map((r) => r.data)).size}</div><div class="mk-kl">dias com registro</div></div></section>
       <section><div class="mk-h2">Resumo por colaborador <span class="mk-mu">— duração média como dado, sem faixa de referência</span></div><table class="mk-tb"><thead><tr><th>Colaborador</th><th class="mk-num">Dias</th><th class="mk-num">Intervalos</th><th class="mk-num">Café 1</th><th class="mk-num">Refeição</th><th class="mk-num">Café 2</th></tr></thead><tbody>
       ${linhas.map((p) => `<tr><td><b>${escHTML(p.rotulo)}</b>${p.cargo ? `<div class="mk-mu">${escHTML(p.cargo)}</div>` : ""}${p.id ? "" : '<div class="mk-mu">agregado por nome (sem identificador)</div>'}</td><td class="mk-num">${p.dias.size}</td><td class="mk-num">${p.n}</td><td class="mk-num">${media(p.dur.cafe1)}</td><td class="mk-num">${media(p.dur.refeicao)}</td><td class="mk-num">${media(p.dur.cafe2)}</td></tr>`).join("")}</tbody></table>
       <p class="mk-nota">Duração considerada só com saída e retorno registrados; virada da meia-noite apenas em turno noturno.</p></section>
-      ${comAnexo ? `<section style="page-break-before:always"><div class="mk-h2">Anexo — registros detalhados</div><table class="mk-tb"><thead><tr><th>Data</th><th>Turno</th><th>Colaborador</th><th>Café 1</th><th>Refeição</th><th>Café 2</th></tr></thead><tbody>
-      ${lista.flatMap((r) => (r.colaboradores || []).map((c) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(TURNO_TXT[r.turno] || r.turno || "—")}</td><td>${escHTML(c.nome || "—")}</td>${TIPOS.map(([t]) => { const iv = c.intervalos?.[t]; return `<td>${iv && (iv.saida || iv.retorno) ? `${escHTML(iv.saida || "—")}–${escHTML(iv.retorno || "—")}` : "—"}</td>`; }).join("")}</tr>`)).join("")}</tbody></table></section>` : ""}`;
+      ${comAnexo ? `<section style="page-break-before:always"><div class="mk-h2">Anexo — registros detalhados</div><table class="mk-tb"><thead><tr><th>Data</th><th>Turno</th><th>Colaborador</th><th>Café 1</th><th>Refeição</th><th>Café 2</th><th>Situação</th></tr></thead><tbody>
+      ${lista.flatMap((r) => (r.colaboradores || []).map((c) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(TURNO_TXT[r.turno] || r.turno || "—")}</td><td>${escHTML(c.nome || "—")}</td>${TIPOS.map(([t]) => { const iv = c.intervalos?.[t]; return `<td>${iv && (iv.saida || iv.retorno) ? `${escHTML(iv.saida || "—")}–${escHTML(iv.retorno || "—")}` : "—"}</td>`; }).join("")}<td>${sit(r)}</td></tr>`)).join("")}</tbody></table></section>` : ""}`;
     if (interno) {
       const dups = [...dup.entries()].filter(([, ts]) => ts.length > 1);
       if (semId.length) conf.push(`<li><b>Agregado por nome</b> (sem identificador no registro; homônimos não podem ser separados): ${semId.map((p) => escHTML(p.nome)).join(", ")}.</li>`);
       if (dups.length) conf.push(`<li><b>Registros duplicados</b> (mesmo dia, colaborador e horários): ${dups.length} caso(s)${dups.some(([, ts]) => new Set(ts).size > 1) ? ", inclusive lançados em turnos diferentes" : ""}.</li>`);
-      if (divergTurno.length) conf.push(`<li><b>Turno lançado × hora da saída</b> (configuração do projeto): ${divergTurno.slice(0, 8).join("; ")}${divergTurno.length > 8 ? `; e mais ${divergTurno.length - 8}` : ""}.</li>`);
+      if (divergTurno.length) conf.push(`<li><b>Turno lançado × ${notaJornada(project.id)}</b>: ${divergTurno.slice(0, 8).join("; ")}${divergTurno.length > 8 ? `; e mais ${divergTurno.length - 8}` : ""}.</li>`);
       if (incons.length) conf.push(`<li><b>Retorno antes da saída</b> fora de turno noturno (sem duração calculada): ${incons.slice(0, 8).join("; ")}.</li>`);
     }
   }
@@ -200,28 +224,31 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
     let omitidos = 0, ocultos = 0; const ondeOmitiu = [];
     const porSup = contagem(lista.map((r) => r.supervisor));
     const durs = [], divergencias = [], incons = [];
-    let trocados = 0, abertos = 0;
+    let trocados = 0, abertos = 0; const naoReconhecidas = [];
     const linhas = lista.map((r) => {
       const d = duracaoMin(r.chegada, r.saida, r.turno); if (d.min != null) durs.push(d.min); if (d.inconsistente) incons.push(`${dataBR(r.data)} ${escHTML(r.supervisor || "")}: saída ${escHTML(r.saida)} antes da chegada ${escHTML(r.chegada)}`);
       const tp = turnoPelaHora(r.chegada, project.id); if (tp && r.turno && tp !== r.turno) divergencias.push(`${dataBR(r.data)} ${escHTML(r.supervisor || "")}: lançado ${TURNO_TXT[r.turno] || r.turno}, chegada às ${escHTML(r.chegada)}`);
-      const eqs = (r.equipamentos || []).filter((e) => e.acao); trocados += eqs.filter((e) => e.acao === "trocado").length; abertos += eqs.filter((e) => e.acao !== "trocado").length;
+      const eqs = (r.equipamentos || []).filter((e) => e.acao); trocados += eqs.filter((e) => e.acao === "trocado").length; abertos += eqs.filter((e) => e.acao === "aberto").length;
+      eqs.filter((e) => acaoEquipamento(e.acao).tipo === "desconhecida").forEach((e) => naoReconhecidas.push(`${dataBR(r.data)} ${escHTML(e.catLabel || "")}: «${escHTML(e.acao)}»`));
       const disc = tratarDisciplinar(mask(r.resumo || ""), { interno, modo: modoDisciplinar });
       omitidos += disc.omitidos; if (disc.oculto && r.resumo) ocultos++;
       if (interno && temConteudoDisciplinar(r.resumo)) ondeOmitiu.push(`${dataBR(r.data)} ${escHTML(r.supervisor || "")}`);
-      return `<tr><td>${dataBR(r.data)}</td><td><b>${escHTML(r.supervisor || "—")}</b><div class="mk-mu">${escHTML(TURNO_TXT[r.turno] || r.turno || "")}</div></td><td>${escHTML(r.chegada || "—")}–${escHTML(r.saida || "—")}</td><td class="mk-num">${d.min != null ? `${d.min} min` : "—"}</td>
-        ${disc.oculto ? "" : `<td class="mk-sm">${escHTML(disc.texto) || "—"}</td>`}<td class="mk-sm">${eqs.map((e) => `${e.acao === "trocado" ? "Trocado" : "Conferido"}: ${escHTML(e.catLabel || "")}${e.identificacao ? ` (${escHTML(e.identificacao)})` : ""}`).join("<br>") || "—"}</td></tr>`;
+      return `<tr><td>${dataBR(r.data)}${r.arquivado ? '<div class="mk-mu">arquivado</div>' : ""}</td><td><b>${escHTML(r.supervisor || "—")}</b><div class="mk-mu">${escHTML(TURNO_TXT[r.turno] || r.turno || "")}</div></td><td>${escHTML(r.chegada || "—")}–${escHTML(r.saida || "—")}</td><td class="mk-num">${d.min != null ? `${d.min} min` : "—"}</td>
+        ${disc.oculto ? "" : `<td class="mk-sm">${escHTML(disc.texto) || "—"}</td>`}<td class="mk-sm">${eqs.map((e) => { const a = acaoEquipamento(e.acao); return `<span class="${a.tipo === "aberto" ? "mk-inv" : a.tipo === "trocado" ? "mk-sim" : ""}">${a.rotulo}</span>: ${escHTML(e.catLabel || "")}${e.identificacao ? ` (${escHTML(e.identificacao)})` : ""}`; }).join("<br>") || "—"}</td></tr>`;
     });
     const ocultaCol = !interno && (modoDisciplinar === "B" || modoDisciplinar === "pendente");
     corpo = !lista.length ? vazio : `<section class="mk-kpis"><div class="mk-k"><div class="mk-kv">${lista.length}</div><div class="mk-kl">visitas</div></div>
       <div class="mk-k"><div class="mk-kv">${porSup.length}</div><div class="mk-kl">supervisores</div></div>
       <div class="mk-k"><div class="mk-kv">${durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) + " min" : "—"}</div><div class="mk-kl">duração média</div><div class="mk-mu mk-sm">chegada → saída</div></div>
-      <div class="mk-k"><div class="mk-kv">${trocados}</div><div class="mk-kl">equipamentos trocados</div><div class="mk-mu mk-sm">${abertos} conferido(s)</div></div></section>
+      <div class="mk-k"><div class="mk-kv">${trocados}</div><div class="mk-kl">equipamentos trocados</div><div class="mk-sm ${abertos ? "mk-wa" : "mk-mu"}"><b>${abertos}</b> em aberto (pendente)</div></div></section>
+      ${abertos ? `<section class="mk-dest"><ul><li><b>${abertos}</b> equipamento(s) seguem em aberto após a visita de supervisão.</li></ul></section>` : ""}
       <div class="mk-card" style="margin-bottom:10px"><div class="mk-lb">Visitas por supervisor</div>${barrasMoked(porSup.map((e) => [e.rotulo, e.n]))}</div>
-      <section><div class="mk-h2">Visitas</div><table class="mk-tb"><thead><tr><th>Data</th><th>Supervisor</th><th>Chegada–saída</th><th class="mk-num">Duração</th>${ocultaCol ? "" : "<th>Observação</th>"}<th>Equipamentos</th></tr></thead><tbody>${linhas.join("")}</tbody></table>
+      <section><div class="mk-h2">Visitas</div>${(() => { const t = tabelaComCauda(`<table class="mk-tb"><thead><tr><th>Data</th><th>Supervisor</th><th>Chegada–saída</th><th class="mk-num">Duração</th>${ocultaCol ? "" : "<th>Observação</th>"}<th>Equipamentos</th></tr></thead><tbody>`, linhas, "</tbody></table>"); cauda = t.cauda; return t.principal; })()}
       ${ocultaCol ? `<p class="mk-nota">${modoDisciplinar === "pendente" ? "Observações da supervisão não exibidas nesta versão: decisão sobre conteúdo de uso interno pendente." : "Observações da supervisão disponíveis apenas na versão interna."}</p>` : ""}
       ${omitidos ? `<p class="mk-nota">${omitidos} trecho(s) de uso interno omitido(s) nesta versão.</p>` : ""}</section>`;
     if (interno) {
-      if (divergencias.length) conf.push(`<li><b>Turno lançado × hora da chegada</b> (configuração do projeto): ${divergencias.join("; ")}.</li>`);
+      if (divergencias.length) conf.push(`<li><b>Turno lançado × ${notaJornada(project.id)}</b>: ${divergencias.join("; ")}.</li>`);
+      if (naoReconhecidas.length) conf.push(`<li><b>Ação de equipamento não reconhecida</b> (dado mantido como registrado): ${naoReconhecidas.join("; ")}.</li>`);
       if (incons.length) conf.push(`<li><b>Saída antes da chegada</b> fora de turno noturno: ${incons.join("; ")}.</li>`);
       if (ondeOmitiu.length) conf.push(`<li><b>Conteúdo disciplinar</b> (expressões detectadas — detecção por texto, não revisão completa): ${ondeOmitiu.join("; ")}. Tratamento na versão cliente: ${{ A: "frases omitidas", B: "observação oculta", C: "exibido", pendente: "observação oculta — decisão pendente" }[modoDisciplinar]}.</li>`);
     }
@@ -237,10 +264,9 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       <div class="mk-k"><div class="mk-kv ${st.parcial ? "mk-wa" : ""}">${st.parcial}</div><div class="mk-kl">parciais</div></div>
       <div class="mk-k"><div class="mk-kv">${abertos.length ? abertos[0].dias + " d" : "—"}</div><div class="mk-kl">mais antigo em aberto</div><div class="mk-mu mk-sm">${abertos.length ? `${escHTML(abertos[0].r.sistema || "")} · desde ${dataBR(abertos[0].r.data)}` : ""}</div></div></section>
       <div class="mk-duas"><div class="mk-card"><div class="mk-lb">Por sistema</div>${barrasMoked(porSistema.slice(0, 8).map((e) => [e.rotulo, e.n]))}</div><div class="mk-card"><div class="mk-lb">Por empresa</div>${barrasMoked(porEmpresa.slice(0, 8).map((e) => [e.rotulo, e.n]))}</div></div>
-      <section><div class="mk-h2">Registros <span class="mk-mu">— mais recentes primeiro</span></div><table class="mk-tb"><colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:43%"></colgroup>
-      <thead><tr><th>Data</th><th>Empresa · técnico</th><th>Sistema</th><th>Status</th><th class="mk-num">Em aberto</th><th>Serviço</th></tr></thead><tbody>
-      ${[...lista].reverse().map((r) => { const [txt, cls] = STATUS_TXT[r.status] || [escHTML(r.status || "—"), "mk-b-in"]; const ab = (r.status === "pendente" || r.status === "parcial") ? `${diasEntreDatas(r.data, hoje)} d` : "—";
-        return `<tr><td>${dataBR(r.data)}</td><td><b>${escHTML(r.empresa || "—")}</b><div class="mk-mu">${escHTML(r.tecnico || "")}</div></td><td>${escHTML(r.sistema || "—")}</td><td><span class="mk-b ${cls}">${txt}</span>${r.arquivado ? '<div class="mk-mu">arquivado</div>' : ""}</td><td class="mk-num">${ab}</td><td class="mk-sm">${escHTML(mask([r.servico, r.obs].filter(Boolean).join(" · "))) || "—"}</td></tr>`; }).join("")}</tbody></table></section>`;
+      <section><div class="mk-h2">Registros <span class="mk-mu">— mais recentes primeiro</span></div>${(() => { const t = tabelaComCauda(`<table class="mk-tb"><colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:43%"></colgroup>
+      <thead><tr><th>Data</th><th>Empresa · técnico</th><th>Sistema</th><th>Status</th><th class="mk-num">Em aberto</th><th>Serviço</th></tr></thead><tbody>`, [...lista].reverse().map((r) => { const [txt, cls] = STATUS_TXT[r.status] || [escHTML(r.status || "—"), "mk-b-in"]; const ab = (r.status === "pendente" || r.status === "parcial") ? `${diasEntreDatas(r.data, hoje)} d` : "—";
+        return `<tr><td>${dataBR(r.data)}</td><td><b>${escHTML(r.empresa || "—")}</b><div class="mk-mu">${escHTML(r.tecnico || "")}</div></td><td>${escHTML(r.sistema || "—")}</td><td><span class="mk-b ${cls}">${txt}</span>${r.arquivado ? '<div class="mk-mu">arquivado</div>' : ""}</td><td class="mk-num">${ab}</td><td class="mk-sm">${escHTML(mask([r.servico, r.obs].filter(Boolean).join(" · "))) || "—"}</td></tr>`; }), "</tbody></table>"); cauda = t.cauda; return t.principal; })()}</section>`;
     if (interno) {
       const concAtivas = lista.filter((r) => r.status === "concluida" && !r.arquivado).length;
       if (concAtivas) conf.push(`<li><b>Concluídas ainda ativas</b> (não arquivadas): ${concAtivas} — informativo.</li>`);
@@ -249,6 +275,7 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
     }
   }
 
-  if (interno) corpo += conferencia(conf, cpfs ? notaCPF(cpfs) : "");
-  return { html: documentoMoked({ project, titulo: cfg[0], subtitulo: sub, numero, corpo, interno, hoje: agora }), numero, cpfsMascarados: cpfs, registros: lista.length };
+  // Fecho junto da assinatura: a cauda da tabela + (na interna) a conferência — nunca a assinatura sozinha.
+  const fecho = `${cauda}${interno ? conferencia(conf, cpfs ? notaCPF(cpfs) : "") : ""}`;
+  return { html: documentoMoked({ project, titulo: cfg[0], subtitulo: sub, numero, corpo, interno, hoje: agora, fecho }), numero, cpfsMascarados: cpfs, registros: lista.length };
 }

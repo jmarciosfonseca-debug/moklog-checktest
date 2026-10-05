@@ -1,4 +1,4 @@
-import { mascararCPF, tratarDisciplinar, turnoPelaHora, duracaoMin, correspondencia, montarRelatorioCCO, filtrarPeriodo } from "./ccoRelatorio";
+import { acaoEquipamento, textoJornada, validarPeriodo, mascararCPF, tratarDisciplinar, turnoPelaHora, duracaoMin, correspondencia, montarRelatorioCCO, filtrarPeriodo } from "./ccoRelatorio";
 const P = { id: "P601", name: "Golgi Cajamar" };
 const AG = new Date("2026-10-05T10:00:00");
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
@@ -93,6 +93,50 @@ describe("revisão do Codex", () => {
   });
 });
 
+describe("lote consolidado da revisão (Codex)", () => {
+  const SUP = (eqs, extra = {}) => [{ id: "s1", data: "2026-09-10", supervisor: "Israel", turno: "noturno", chegada: "19:42", saida: "20:10", resumo: "ok", equipamentos: eqs, ...extra }];
+  test("equipamento 'aberto' = Em aberto (pendente) nas duas versões, com KPI e destaque; 'trocado' = resolvido", () => {
+    for (const interno of [false, true]) {
+      const h = montarRelatorioCCO("supervisao", P, SUP([{ acao: "aberto", catLabel: "Rádio TESTE" }, { acao: "trocado", catLabel: "Lanterna" }]), { agora: AG, interno }).html;
+      expect(h).toContain("Em aberto (pendente)</span>: Rádio TESTE"); expect(h).not.toMatch(/Conferid/);
+      expect(h).toContain("Trocado (resolvido)</span>: Lanterna");
+      expect(h).toContain("<b>1</b> em aberto (pendente)"); expect(h).toContain("seguem em aberto após a visita");
+    }
+  });
+  test("ação desconhecida: rótulo explícito, escapado, listado na conferência interna; não vira pendência nem resolvido", () => {
+    expect(acaoEquipamento("xyz")).toEqual({ rotulo: "Ação não reconhecida: «xyz»", tipo: "desconhecida" });
+    const h = montarRelatorioCCO("supervisao", P, SUP([{ acao: "<b>x</b>", catLabel: "Rádio" }]), { agora: AG, interno: true }).html;
+    expect(h).not.toContain("<b>x</b>"); expect(h).toContain("Ação não reconhecida: «&lt;b&gt;x&lt;/b&gt;»"); expect(h).toContain("Ação de equipamento não reconhecida");
+    expect(h).toContain("<b>0</b> em aberto (pendente)");
+  });
+  test("jornada como inferência, com a configuração do projeto (P606 +1h)", () => {
+    expect(textoJornada("P606")).toBe("jornada configurada no app: diurno 07h–19h, noturno 19h–07h");
+    expect(montarRelatorioCCO("acesso", P, ACESSOS, { agora: AG }).html).toContain("inferência, a confirmar com a escala real");
+  });
+  test("situação arquivada visível na Supervisão e no anexo do Intervalo; agregados declarados", () => {
+    expect(montarRelatorioCCO("supervisao", P, SUP([], { arquivado: true }), { agora: AG }).html).toContain('<div class="mk-mu">arquivado</div>');
+    const INT = [{ data: "2026-10-01", turno: "diurno", arquivado: true, colaboradores: [{ id: "c1", nome: "Ana", intervalos: { cafe1: { saida: "09:00", retorno: "09:10" } } }] }];
+    const h = montarRelatorioCCO("intervalo", P, INT, { agora: AG, comAnexo: true }).html;
+    expect(h).toContain("1 arquivado(s) · ativos e arquivados somados"); expect(h).toMatch(/<td>09:00–09:10<\/td><td><td>|<td>09:00–09:10<\/td>(<td>—<\/td>)*<td><span class="mk-mu">arquivado<\/span><\/td>/);
+  });
+  test("fecho: assinatura nunca sozinha — conferência (interna) ou as últimas linhas da tabela vão junto", () => {
+    const muitos = Array.from({ length: 12 }, (_, i) => ({ id: "x" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, horaEntrada: "08:00", nome: "Pessoa " + i, empresa: "Empresa A" }));
+    const cli = montarRelatorioCCO("acesso", P, muitos, { agora: AG }).html;
+    const fecho = cli.slice(cli.indexOf('<div class="mk-fecho">'));
+    expect(fecho).toContain("Pessoa 11"); expect(fecho).toContain("Pessoa 9"); expect(fecho).not.toContain("Pessoa 8");
+    expect(fecho.indexOf("Pessoa 11")).toBeLessThan(fecho.indexOf('class="mk-fim"'));
+    const int = montarRelatorioCCO("acesso", P, muitos, { agora: AG, interno: true }).html;
+    const f2 = int.slice(int.indexOf('<div class="mk-fecho">'));
+    expect(f2).toContain("Conferência do registro"); expect(f2.indexOf("Conferência do registro")).toBeLessThan(f2.indexOf('class="mk-fim"'));
+    expect((cli.match(/Pessoa \d+</g) || []).length).toBe(12);   // nenhuma linha perdida ou duplicada
+  });
+  test("validação do período em execução", () => {
+    expect(validarPeriodo("2026-09-10", "2026-09-01")).toBe("A data inicial é posterior à final.");
+    expect(validarPeriodo("", "2026-09-01")).toBe("Informe as datas do período.");
+    expect(validarPeriodo("2026-09-01", "2026-09-01")).toBeNull();
+  });
+});
+
 describe("relatórios por tema", () => {
   test("Acesso: KPIs, turno pela hora, conferência (saída no campo empresa, grafias); rascunho fora", () => {
     const { html, registros } = montarRelatorioCCO("acesso", P, ACESSOS, { agora: AG, interno: true, outros: MANUT });
@@ -114,7 +158,7 @@ describe("relatórios por tema", () => {
     const cli = montarRelatorioCCO("supervisao", P, SUP, { agora: AG }).html;
     expect(cli).not.toContain("medida disciplinar"); expect(cli).toContain("decisão sobre conteúdo de uso interno pendente");
     const int = montarRelatorioCCO("supervisao", P, SUP, { agora: AG, interno: true }).html;
-    expect(int).toContain("medida disciplinar"); expect(int).toContain("Turno lançado × hora da chegada"); expect(int).toContain("observação oculta — decisão pendente");
+    expect(int).toContain("medida disciplinar"); expect(int).toContain("inferência a confirmar com a escala real, não erro comprovado"); expect(int).toContain("observação oculta — decisão pendente");
     const a = montarRelatorioCCO("supervisao", P, SUP, { agora: AG, modoDisciplinar: "A" }).html;
     expect(a).toContain("Ronda ok."); expect(a).toContain("1 trecho(s) de uso interno omitido(s)");
   });
@@ -127,7 +171,7 @@ describe("relatórios por tema", () => {
     ];
     const i = montarRelatorioCCO("intervalo", P, INT, { agora: AG, interno: true, comAnexo: true }).html;
     expect(i).toContain("Registros duplicados"); expect(i).toContain("inclusive lançados em turnos diferentes");
-    expect(i).toContain("Turno lançado × hora da saída"); expect(i).toContain("Anexo — registros detalhados");
+    expect(i).toContain("jornada configurada no app: diurno 06h–18h, noturno 18h–06h"); expect(i).toContain("Anexo — registros detalhados");
     expect(i).toContain("99 min");   // refeição 11:09→12:48, como dado
     expect(montarRelatorioCCO("intervalo", P, INT, { agora: AG }).html).not.toContain("Anexo — registros detalhados");
   });

@@ -6,7 +6,7 @@ import { setDoc } from "./fireGuard";
 import RondaVirtual from "./RondaVirtual"; // ◀ NOVO — aba de ronda virtual CFTV
 import TempoGravacao from "./TempoGravacao"; // ◀ aba CFTV Tempo de Gravação
 import BodycamSection from "./BodycamSection";
-import { montarRelatorioCCO } from "./relatorios/ccoRelatorio";
+import { montarRelatorioCCO, validarPeriodo } from "./relatorios/ccoRelatorio";
 import { periodoUltimosDias } from "./relatorios/rondaVirtualRelatorio";
 import { baixarHtml } from "./relatorios/padraoMoked"; // ◀ NOVO — descarregamento de bodycam (P311A)
 
@@ -636,6 +636,8 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const [relAte, setRelAte] = useState(() => periodoUltimosDias(30).ate);
   const [relInterno, setRelInterno] = useState(false);
   const [relAnexo, setRelAnexo] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [erroPdf, setErroPdf] = useState("");
   const isBodycam = tema==="bodycam"; // ◀ NOVO — aba Bodycam (só P311A), fluxo próprio
 
   // Carrega dots de atividade de todas as abas (1x na entrada)
@@ -913,9 +915,17 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
               <div style={{display:"flex",gap:8}}>
                 <button onClick={novoLimpo} style={{...S.btn,flex:2}}>+ Registrar {temaInfo.label}</button>
-                <button onClick={async()=>{ const outros = relInterno && (tema==="acesso"||tema==="manutencao") ? await carregarParaConferencia(tema==="acesso"?"manutencao":"acesso", project.id) : null;
-                    gerarPDFTema(tema, project, registros.filter(r=>!r.rascunho), { interno: relInterno, de: relDe, ate: relAte, outros, comAnexo: relAnexo }); }} disabled={registros.filter(r=>!r.rascunho).length===0}
-                  style={{...S.btnSec,flex:1,color:"#a855f7",borderColor:"#a855f733",opacity:registros.filter(r=>!r.rascunho).length===0?0.5:1}}>📄 PDF</button>
+                <button onClick={async()=>{
+                    if(gerandoPdf) return;
+                    const erroPer = validarPeriodo(relDe, relAte); if(erroPer){ setErroPdf(erroPer); return; }
+                    setErroPdf(""); setGerandoPdf(true);
+                    try {
+                      const outros = relInterno && (tema==="acesso"||tema==="manutencao") ? await carregarParaConferencia(tema==="acesso"?"manutencao":"acesso", project.id) : null;
+                      gerarPDFTema(tema, project, registros.filter(r=>!r.rascunho), { interno: relInterno, de: relDe, ate: relAte, outros, comAnexo: relAnexo });
+                    } catch(e){ setErroPdf("Não foi possível gerar o PDF. Tente novamente."); }
+                    finally { setGerandoPdf(false); }
+                  }} disabled={gerandoPdf || registros.filter(r=>!r.rascunho).length===0}
+                  style={{...S.btnSec,flex:1,color:"#a855f7",borderColor:"#a855f733",opacity:(gerandoPdf||registros.filter(r=>!r.rascunho).length===0)?0.5:1}}>{gerandoPdf?"Gerando…":<>📄 PDF</>}</button>
               </div>
 
               {/* Relatório: período, atalhos e versão interna (F2-2) */}
@@ -925,6 +935,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
                 <input type="date" value={relAte} min={relDe} onChange={e=>setRelAte(e.target.value)} style={{...S.btnSm,padding:"4px 8px"}} aria-label="Fim do período"/>
                 {[7,15,30].map(n=>(<button key={n} onClick={()=>{ const p=periodoUltimosDias(n); setRelDe(p.de); setRelAte(p.ate); }} style={{...S.btnSm,padding:"4px 8px",color:temaInfo.color,border:`1px solid ${temaInfo.color}44`}}>{n} dias</button>))}
                 <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",...S.txt2}}><input type="checkbox" checked={relInterno} onChange={e=>setRelInterno(e.target.checked)}/> Versão interna</label>
+                {erroPdf && <span role="alert" style={{color:"#ef4444",fontWeight:700,width:"100%"}}>{erroPdf}</span>}
                 {tema==="intervalo" && <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",...S.txt2}}><input type="checkbox" checked={relAnexo} onChange={e=>setRelAnexo(e.target.checked)}/> Anexo detalhado</label>}
               </div>
 

@@ -17,7 +17,8 @@ export function barrasMoked(itens, fmt = (v) => String(v)) {
   return `<div class="mk-bars">${itens.map(([k, v]) => `<div class="mk-bar"><span>${escHTML(k)}</span><span class="mk-tr"><span style="width:${(v / mx * 100).toFixed(1)}%"></span></span><span class="mk-v">${fmt(v)}</span></div>`).join("")}</div>`;
 }
 
-export function documentoMoked({ project, titulo, subtitulo, numero, corpo, interno = false, hoje = new Date(), rodape }) {
+// fecho (opcional): último bloco do relatório, impresso JUNTO da assinatura — evita folha só com assinatura.
+export function documentoMoked({ project, titulo, subtitulo, numero, corpo, interno = false, hoje = new Date(), rodape, fecho = "" }) {
   const theme = getTheme(project?.id) || {};
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escHTML(titulo)} — ${escHTML(project?.id || "")}</title><style>${cssMoked()}${rodapePagina(rodape || `${numero} · ${titulo} · ${project?.id || ""} ${project?.name || ""} · Moked Consulting Security · MokLog CheckTest`)}</style></head><body>
 <div class="mk-noprint"><button onclick="window.print()" class="mk-print">Imprimir / Salvar PDF</button></div>
@@ -25,8 +26,8 @@ export function documentoMoked({ project, titulo, subtitulo, numero, corpo, inte
 <div class="mk-meta">${interno ? '<div class="mk-tag">VERSÃO INTERNA</div>' : ""}<div><b>${escHTML(titulo)}</b> · Nº ${escHTML(numero)}</div><div>Emissão ${hoje.toLocaleDateString("pt-BR")} · José Fonseca</div></div></header>
 <div class="mk-regua"></div><h1 class="mk-h1">${escHTML(titulo)}</h1><p class="mk-sub">${subtitulo}</p>
 ${corpo}
-<section class="mk-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div></div>
-<div class="mk-ass"><div class="mk-linha"></div><b>José Fonseca</b><div class="mk-mu">Consultor de Segurança · Moked Consulting Security</div><div class="mk-mu">jose.fonseca@moked.com.br</div></div></section>
+${fecho ? `<div class="mk-fecho">${fecho}` : ""}<section class="mk-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div></div>
+<div class="mk-ass"><div class="mk-linha"></div><b>José Fonseca</b><div class="mk-mu">Consultor de Segurança · Moked Consulting Security</div><div class="mk-mu">jose.fonseca@moked.com.br</div></div></section>${fecho ? "</div>" : ""}
 </body></html>`;
 }
 
@@ -72,6 +73,6 @@ table.mk-tb{width:100%;border-collapse:collapse}.mk-tb th{font-size:7.8pt;text-t
 .mk-qual{border:1px solid #FDE68A;background:#FFFBEB;border-radius:8px;padding:8px 12px;margin:8px 0 12px}
 .mk-vazio{border:1px solid #BBF7D0;background:#F0FDF4;border-radius:10px;padding:18px 16px;margin:10px 0 12px;text-align:center}.mk-vazio .mk-big{color:#15803D}
 .mk-bloco{page-break-inside:avoid}section{margin-bottom:6px}
-.mk-fim{display:grid;grid-template-columns:1fr 210px;gap:20px;margin-top:14px;border-top:1px solid #E5E7EB;padding-top:10px;page-break-inside:avoid}.mk-ass{font-size:9pt;text-align:center}.mk-linha{border-top:1px solid #111827;margin:24px 0 4px}
+.mk-fecho{page-break-inside:avoid;break-inside:avoid}.mk-fim{display:grid;grid-template-columns:1fr 210px;gap:20px;margin-top:14px;border-top:1px solid #E5E7EB;padding-top:10px;page-break-inside:avoid}.mk-ass{font-size:9pt;text-align:center}.mk-linha{border-top:1px solid #111827;margin:24px 0 4px}
 .mk-regua,.mk-chip,.mk-b,.mk-tr span,.mk-qual,.mk-vazio{-webkit-print-color-adjust:exact;print-color-adjust:exact}`;
 }
