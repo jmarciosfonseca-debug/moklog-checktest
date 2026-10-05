@@ -7,9 +7,9 @@
 import { documentoMoked, barrasMoked, escHTML, num1, milhar, hm, dataBR, horaBR } from "./padraoMoked";
 
 const minutos = (e) => (e.inicioQueda && e.fimQueda) ? Math.max(0, Math.round((new Date(e.fimQueda) - new Date(e.inicioQueda)) / 60000)) : null;
-export const protocoloValido = (p) => { const s = String(p || "").trim(); return !!s && !/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s) && /^[\d\s/.\-]+$/.test(s) && s.replace(/\D/g, "").length >= 8; };   // data no lugar do nº não vale
+export const protocoloValido = (p) => { const s = String(p || "").trim(); return !!s && !/^(?:\d{1,2}([/.\-])\d{1,2}\1\d{2,4}|\d{4}([/.\-])\d{1,2}\2\d{1,2})$/.test(s) && /^[\d\s/.\-]+$/.test(s) && s.replace(/\D/g, "").length >= 8; };   // data no lugar do nº não vale
 export const turnoPelaHora = (iso) => { const h = new Date(iso).getHours(); return h >= 6 && h < 18 ? "Diurno" : "Noturno"; };
-export const ehTeste = (e) => e?.teste === true || (/\bteste\b/i.test(`${e?.obs || ""} ${e?.obsGerador || ""}`) && (minutos(e) ?? 0) < 1);
+export const ehTeste = (e) => e?.teste === true || (/\bteste\b/i.test(`${e?.obs || ""} ${e?.obsGerador || ""}`) && minutos(e) != null && minutos(e) < 1);
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export function analisarEnergia(eventos, hoje = new Date()) {

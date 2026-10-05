@@ -57,6 +57,14 @@ describe("energia — projeto com poucos dados (P604)", () => {
     ["Nao", "N/A", "", null, "123"].forEach(p => expect(protocoloValido(p)).toBe(false));
     expect(turnoPelaHora("2026-09-08T03:55:00")).toBe("Noturno"); expect(turnoPelaHora("2026-09-08T17:59:00")).toBe("Diurno"); expect(turnoPelaHora("2026-09-08T18:00:00")).toBe("Noturno");
   });
+  test("queda aberta não vira teste pela observação sem duração comprovada", () => {
+    const evento = { inicioQueda: "2026-10-04T10:00:00", obs: "teste do gerador durante a queda" };
+    expect(ehTeste(evento)).toBe(false);
+    expect(analisarEnergia([evento], HOJE).emAberto).toHaveLength(1);
+  });
+  test("datas com hífen ou ponto também não são protocolos", () => {
+    ["2026-10-04", "04-10-2026", "04.10.2026"].forEach(p => expect(protocoloValido(p)).toBe(false));
+  });
 });
 
 describe("ambulância — consolidado e 'Baixar todos' (registros do P311A)", () => {
