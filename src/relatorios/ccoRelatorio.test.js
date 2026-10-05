@@ -119,16 +119,18 @@ describe("lote consolidado da revisão (Codex)", () => {
     const h = montarRelatorioCCO("intervalo", P, INT, { agora: AG, comAnexo: true }).html;
     expect(h).toContain("1 arquivado(s) · ativos e arquivados somados"); expect(h).toMatch(/<td>09:00–09:10<\/td><td><td>|<td>09:00–09:10<\/td>(<td>—<\/td>)*<td><span class="mk-mu">arquivado<\/span><\/td>/);
   });
-  test("fecho: assinatura nunca sozinha — conferência (interna) ou as últimas linhas da tabela vão junto", () => {
+  test("fecho: assinatura nunca sozinha — últimas linhas + conferência (interna) + assinatura num tbody indivisível", () => {
     const muitos = Array.from({ length: 12 }, (_, i) => ({ id: "x" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, horaEntrada: "08:00", nome: "Pessoa " + i, empresa: "Empresa A" }));
     const cli = montarRelatorioCCO("acesso", P, muitos, { agora: AG }).html;
-    const fecho = cli.slice(cli.indexOf('<div class="mk-fecho">'));
+    const fecho = cli.slice(cli.indexOf('<tbody class="mk-fecho-linhas">'));
     expect(fecho).toContain("Pessoa 11"); expect(fecho).toContain("Pessoa 9"); expect(fecho).not.toContain("Pessoa 8");
     expect(fecho.indexOf("Pessoa 11")).toBeLessThan(fecho.indexOf('class="mk-fim"'));
+    expect(fecho.indexOf('class="mk-fim"')).toBeLessThan(fecho.indexOf("</table>"));
     const int = montarRelatorioCCO("acesso", P, muitos, { agora: AG, interno: true }).html;
-    const f2 = int.slice(int.indexOf('<div class="mk-fecho">'));
-    expect(f2).toContain("Conferência do registro"); expect(f2.indexOf("Conferência do registro")).toBeLessThan(f2.indexOf('class="mk-fim"'));
-    expect((cli.match(/Pessoa \d+</g) || []).length).toBe(12);   // nenhuma linha perdida ou duplicada
+    const f2 = int.slice(int.indexOf('<tbody class="mk-fecho-linhas">'));
+    expect(f2.indexOf("Conferência do registro")).toBeLessThan(f2.indexOf('class="mk-fim"'));
+    expect((cli.match(/Pessoa \d+</g) || []).length).toBe(12);
+    expect((cli.match(/class="mk-fim"/g) || []).length).toBe(1);   // assinatura uma única vez
   });
   test("validação do período em execução", () => {
     expect(validarPeriodo("2026-09-10", "2026-09-01")).toBe("A data inicial é posterior à final.");
@@ -188,27 +190,20 @@ describe("relatórios por tema", () => {
   });
 });
 
-describe("tabelas: só as longas são divididas (aceite real de 05/10)", () => {
+describe("tabelas: tabela única com bloco final indivisível (aceite real de 05/10 + caso-limite do Codex)", () => {
   const P2 = { id: "P601", name: "Golgi Cajamar" }; const AG2 = new Date("2026-10-05T10:00:00");
-  const ac = (n) => Array.from({ length: n }, (_, i) => ({ id: "a" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, horaEntrada: "08:00", nome: "Pessoa " + (i + 1), empresa: "Empresa A" }));
-  const sup = (n) => Array.from({ length: n }, (_, i) => ({ id: "s" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, supervisor: "Sup " + (i + 1), turno: "diurno", chegada: "08:00", saida: "08:30", resumo: "ok", equipamentos: [] }));
-  const man = (n) => Array.from({ length: n }, (_, i) => ({ id: "m" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, empresa: "E", tecnico: "Tec " + (i + 1), sistema: "CFTV", status: "concluida", servico: "s" }));
+  const ac = (n) => Array.from({ length: n }, (_, i) => ({ id: "a" + i, data: `2026-09-${String(1 + i).padStart(2, "0")}`, horaEntrada: "08:00", nome: "Pessoa " + (i + 1), empresa: "Empresa A" }));
+  const sup = (n) => Array.from({ length: n }, (_, i) => ({ id: "s" + i, data: `2026-09-${String(1 + i).padStart(2, "0")}`, supervisor: "Sup " + (i + 1), turno: "diurno", chegada: "08:00", saida: "08:30", resumo: "ok", equipamentos: [] }));
+  const man = (n) => Array.from({ length: n }, (_, i) => ({ id: "m" + i, data: `2026-09-${String(1 + i).padStart(2, "0")}`, empresa: "E", tecnico: "Tec " + (i + 1), sistema: "CFTV", status: "concluida", servico: "s" }));
   const conta = (h, re) => (h.match(re) || []).length;
-  test.each([["acesso", ac, /Pessoa \d+</g], ["supervisao", sup, /<b>Sup \d+</g], ["manutencao", man, /Tec \d+</g]])("%s: 5 linhas = 1 tabela, 1 cabeçalho, sem cauda", (tema, gen, re) => {
-    const h = montarRelatorioCCO(tema, P2, gen(5), { agora: AG2 }).html;
-    expect(conta(h, /<table class="mk-tb/g)).toBe(1); expect(conta(h, /<thead>/g)).toBe(1); expect(h).not.toContain('class="mk-tb mk-cauda'); expect(conta(h, re)).toBe(5);
-  });
-  test.each([["acesso", ac, /Pessoa \d+</g], ["supervisao", sup, /<b>Sup \d+</g], ["manutencao", man, /Tec \d+</g]])("%s: 12 linhas = 9 + 3, um único cabeçalho, mesmas larguras", (tema, gen, re) => {
-    const h = montarRelatorioCCO(tema, P2, gen(12), { agora: AG2 }).html;
-    expect(conta(h, /<table class="mk-tb/g)).toBe(2); expect(conta(h, /<thead>/g)).toBe(1);
-    const cauda = h.slice(h.indexOf('class="mk-tb mk-cauda'));
-    expect(cauda).toContain("<colgroup>"); expect(cauda).not.toContain("<thead>");
-    expect(conta(cauda.slice(0, cauda.indexOf("</table>")), /<tr>/g)).toBe(3);
-    expect(conta(h, re)).toBe(12);                                          // nenhuma linha perdida ou duplicada
-    expect(h.indexOf('class="mk-tb mk-cauda')).toBeGreaterThan(h.indexOf('<div class="mk-fecho">'));   // cauda vai com a assinatura
-  });
-  test("10 linhas ainda é tabela única (limite)", () => {
-    expect(montarRelatorioCCO("acesso", P2, ac(10), { agora: AG2 }).html).not.toContain('class="mk-tb mk-cauda');
-    expect(montarRelatorioCCO("acesso", P2, ac(11), { agora: AG2 }).html).toContain('class="mk-tb mk-cauda');
+  test.each([["acesso", ac, /Pessoa \d+</g, 6], ["supervisao", sup, /<b>Sup \d+</g, 6], ["manutencao", man, /Tec \d+</g, 6]])("%s: 1, 5, 12 e 30 linhas = sempre 1 tabela e 1 cabeçalho", (tema, gen, re, cols) => {
+    for (const n of [1, 5, 12, 30]) {
+      const h = montarRelatorioCCO(tema, P2, gen(n), { agora: AG2 }).html;
+      expect(conta(h, /<table class="mk-tb/g)).toBe(1); expect(conta(h, /<thead>/g)).toBe(1); expect(conta(h, re)).toBe(n);
+      const f = h.slice(h.indexOf('<tbody class="mk-fecho-linhas">'), h.indexOf("</table>"));
+      expect(conta(f, re)).toBe(Math.min(3, n));                        // últimas linhas no bloco final
+      expect(f).toContain(`<td colspan="${cols}">`); expect(f).toContain('class="mk-fim"');   // assinatura dentro do bloco
+      expect(h).not.toContain('class="mk-tb mk-cauda');
+    }
   });
 });
