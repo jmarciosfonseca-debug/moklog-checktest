@@ -263,6 +263,19 @@ export function gerarImpactosOperacionais({ vetores = [], geral = {} } = {}) {
     if (familia === "CFTV" && metricas.cftvInoperante) inop = Number(metricas.cftvInoperante);
     if (familia === "PERIMETRO_PRIMARIO" && metricas.alphaSenseInoperante != null) inop = Number(metricas.alphaSenseInoperante);
     if (familia === "PERIMETRO_SECUNDARIO" && metricas.cercaEletricaInoperante != null) inop = Number(metricas.cercaEletricaInoperante);
+    // Reconciliação com a memória de cálculo (auditoria 04/10/2026, caso P607): o perímetro é contado por ZONA FÍSICA
+    // distinta (metricas.zonasNomeadas, a mesma contagem da memória). Pontos da ronda sem zona identificada aparecem
+    // à parte — não se afirma que sejam uma zona a mais. Só texto do relatório: a classificação não usa esta função.
+    let complemento = "";
+    if (familia === "PERIMETRO" && Number(metricas.zonasNomeadas) > 0) {
+      const semZona = itens.filter((v) => v.pendenciaCadastro === true || v.zonaCanonica === "perimetro-sem-cadastro");
+      const nomeados = itens.filter((v) => !semZona.includes(v));
+      inop = Number(metricas.zonasNomeadas);
+      total = Math.max(...nomeados.map((v) => Number(v.total) || 0), 0);
+      const nSem = semZona.reduce((s, v) => s + (Number(v.inop) || 1), 0);
+      if (nSem) complemento += ` · mais ${nSem} ponto(s) da ronda sem identificação de zona`;
+    }
+    const parciais = itens.reduce((s, v) => s + (Number(v.parciais) || 0), 0);
     if (total > 0) inop = Math.min(inop, total);
     const faixa = faixaDaFamilia(familia, inop, total, itens);
     const texto = TEXTOS[familia]?.[faixa] || TEXTOS[familia]?.UNICA;
@@ -275,7 +288,7 @@ export function gerarImpactosOperacionais({ vetores = [], geral = {} } = {}) {
       peso,
       pesoLabel: PESO_LABEL[peso],
       nivel,
-      medida: medidaDoGrupo(familia, itens, inop, total),
+      medida: `${medidaDoGrupo(familia, itens, inop, total)}${parciais ? ` (inclui ${parciais} parcial(is), tratado(s) como indisponível(is))` : ""}${complemento}`,
       prioridade: prioridade(peso, nivel, itens.every((v) => v.observacaoManutencao)),
       fontes: [...new Set(itens.map((v) => v.fonteCredito).filter(Boolean))].join(" · "),
       ...texto,

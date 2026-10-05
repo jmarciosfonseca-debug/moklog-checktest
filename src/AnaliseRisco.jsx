@@ -708,6 +708,7 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
           bloqueadorCaido: !!rcZ.bloqueadorCaido, travaTipo: rcZ.travaTipo || null,
           observacaoManutencao: !!rcZ.observacaoManutencao,
           inop: 1, total: aggc.total, proporcao: aggc.total ? 1 / aggc.total : null,
+          parciais: item.status === "PARCIAL" ? 1 : 0,   // parcial entra como indisponível no risco (critério conservador, explícito no PDF)
           zonaCanonica: zona, barreiraFisica: barreiraPerimetral, camadaPerimetral,
           causaRaiz: null, coberturaAlternativa: "não informada", gravidade: "localizada",
           preponderante: g.preponderante, piorDias: item.dias ?? piorDias, qtd: 1,
@@ -733,6 +734,7 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
       bloqueadorCaido: !!rc.bloqueadorCaido,
       travaTipo: rc.travaTipo || null, observacaoManutencao: !!rc.observacaoManutencao,
       inop: aggc.inop, total: aggc.total, proporcao: aggc.total ? aggc.inop / aggc.total : null,
+      parciais: g.itens.filter((i) => i.status === "PARCIAL").length,
       // Fontes diferentes sem causa validada não provam falhas independentes.
       zonaCanonica, barreiraFisica: ehPerimetral ? barreiraPerimetral : null, camadaPerimetral,
       causaRaiz: null, coberturaAlternativa: "não informada", gravidade: ehPerimetral ? "localizada" : null,
@@ -1264,6 +1266,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     ctmkCalc ? "CTMK off-line" : null,
   ].filter(Boolean);
   if (!fatosCalculo.length) fatosCalculo.push("nenhuma falha determinante identificada");
+  const parciaisDet = vetores.filter((v) => (v.parciais || 0) > 0 && (v.bloqueadorCaido || v.nivel >= NIVEIS.ELEVADO)).reduce((t, v) => t + v.parciais, 0);
+  if (parciaisDet) fatosCalculo.push(`${parciaisDet} item(ns) parcial(is) contado(s) como indisponível(is) — critério conservador do motor`);
   const regraAplicada = narrativa.motivo;
   const respostaCalculo = nivelGeral === NIVEIS.BAIXO
     ? "Manter acompanhamento preventivo e executar eventuais manutenções conforme a programação operacional."
@@ -1549,7 +1553,11 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .ar-ok{color:#15803D;font-size:12.5px}.ar-acoes{margin:2px 0 0;padding-left:20px}.ar-acoes li{margin:4px 0}
   .ar-regua,.ar-b,.ar-lgd i,.ar-vt i,.regua div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .soma{gap:18px}.soma>span:first-child{flex-shrink:0}
-  @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.corpo{padding-bottom:0}.rodape{padding-top:8px;padding-bottom:8px;break-before:avoid;page-break-before:avoid}}
+  @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.corpo{padding-bottom:0}.rodape{display:none}}   /* o rodapé de página (@page) substitui o rodapé final */
+  .consultor{margin-top:16px;padding:14px 18px}.consultor p{margin:4px 0 0}.assina{margin-top:14px;padding-top:10px}
+  .consultor,.assina{page-break-inside:avoid;break-inside:avoid}
+  .ar-fecho{page-break-inside:avoid;break-inside:avoid}   /* pontos fortes + palavra do consultor + assinatura ficam juntos */
+  @page{@bottom-left{content:"${String(`${ref} · Análise de Risco · ${project.id} ${project.name || ""} · Moked Consulting Security · MokLog CheckTest`).replace(/[\\"]/g, "")}";font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}@bottom-right{content:"pág. " counter(page) " de " counter(pages);font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}}
 `;
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
@@ -1759,6 +1767,7 @@ ${novoCSS}</style></head><body>
 
     ${acoesHTML}
 
+    <div class="ar-fecho">
     <div class="bloco">
       <div class="eyebrow">O que sustenta a operação — pontos fortes</div>
       <div class="forca-grid">${forcaGrid}</div>
@@ -1777,6 +1786,7 @@ ${novoCSS}</style></head><body>
         <div class="cargo">Brasília/DF — ${esc(hoje)}</div>
       </div>
       <div class="selo"><b>Moked Consulting Security</b><br>30+ anos de consultoria · ISO 9001:2015 · ISO 37001:2016<br>Conforme ABNT NBR ISO 31000</div>
+    </div>
     </div>
   </div>
 

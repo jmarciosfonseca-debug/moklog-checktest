@@ -83,7 +83,9 @@ test("seções aprovadas continuam: memória de cálculo, matriz, território e 
   pos.forEach((p) => expect(p).toBeGreaterThan(-1));
   expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   expect(html).not.toContain("undefined");
-  expect(html).toContain(".corpo{padding-bottom:0}.rodape{padding-top:8px;padding-bottom:8px;break-before:avoid;page-break-before:avoid}");
+  // rodapé isolado: na impressão o rodapé final some e a paginação recorrente (@page) assume (auditoria 04/10)
+  expect(html).toContain(".corpo{padding-bottom:0}.rodape{display:none}");
+  expect(html).toContain('content:"pág. " counter(page) " de " counter(pages)');
 });
 
 test("zonas da mesma categoria preservam nome, status e tratativa de cada ponto", () => {
