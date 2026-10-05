@@ -21,7 +21,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { setDoc as fgSetDoc } from "./fireGuard";
 import { TOLERANCIA_MIN, temGradeEspecial, buildSlots, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot } from "./rondaVirtualGrade";
-import { montarRelatorioTurno, montarConsolidadoRonda, chaveColaboradora } from "./relatorios/rondaVirtualRelatorio";
+import { montarRelatorioTurno, montarConsolidadoRonda, chaveColaboradora, periodoUltimosDias, rotulosColaboradoras } from "./relatorios/rondaVirtualRelatorio";
 import { baixarHtml } from "./relatorios/padraoMoked";
 
 
@@ -171,7 +171,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [selTurnos, setSelTurnos] = useState(new Set());
   // Relatórios (F2-1): versão interna, período, colaboradoras e tipo de turno do consolidado por filtro
   const [relInterno, setRelInterno] = useState(false);
-  const [relDe, setRelDe] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toLocaleDateString("sv-SE"); });
+  const [relDe, setRelDe] = useState(() => periodoUltimosDias(30).de);
   const [relAte, setRelAte] = useState(() => new Date().toLocaleDateString("sv-SE"));
   const [relColabs, setRelColabs] = useState(new Set());
   const [relTipo, setRelTipo] = useState("");
@@ -573,9 +573,9 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           {/* Consolidado por período / colaboradoras / tipo (F2-1) */}
           {(()=>{
             const pessoas=[]; const vistos=new Set();
-            arquivados.forEach(t=>{ const k=chaveColaboradora(t.plantonista); if(!vistos.has(k)){ vistos.add(k); pessoas.push({k, nome:t.plantonista?.nome||"Sem nome", cargo:t.plantonista?.cargo||""}); } });
+            arquivados.forEach(t=>{ const k=chaveColaboradora(t.plantonista); if(!vistos.has(k)){ vistos.add(k); pessoas.push({k, id:t.plantonista?.id||null, nome:t.plantonista?.nome||"Sem nome", cargo:t.plantonista?.cargo||""}); } });
             const noFiltro = arquivados.filter(t=>t.dataInicio>=relDe && t.dataInicio<=relAte && (!relTipo || t.tipo===relTipo) && (!relColabs.size || relColabs.has(chaveColaboradora(t.plantonista))));
-            const atalho=(n)=>{ const d=new Date(); d.setDate(d.getDate()-n); setRelDe(d.toLocaleDateString("sv-SE")); setRelAte(new Date().toLocaleDateString("sv-SE")); };
+            const atalho=(n)=>{ const periodo=periodoUltimosDias(n); setRelDe(periodo.de); setRelAte(periodo.ate); };
             const chip={...S.btnSm,padding:"4px 9px",fontSize:11,fontWeight:700};
             return (
               <div style={{display:"flex",flexDirection:"column",gap:6,borderTop:`1px dashed ${dark?"#334155":"#e2e8f0"}`,paddingTop:8}}>
@@ -589,10 +589,10 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
                   </select>
                 </div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {pessoas.map(p=>{ const on=relColabs.has(p.k); return (
+                  {rotulosColaboradoras(pessoas).map(p=>{ const on=relColabs.has(p.k); return (
                     <button key={p.k} onClick={()=>setRelColabs(prev=>{const n=new Set(prev); n.has(p.k)?n.delete(p.k):n.add(p.k); return n;})}
                       style={{...chip,background:on?"#a855f733":"transparent",border:`1px solid ${on?"#a855f7":(dark?"#334155":"#cbd5e1")}`,color:on?"#a855f7":"#94a3b8"}}>
-                      {on?"✓ ":""}{p.nome}{pessoas.filter(x=>x.nome===p.nome).length>1&&p.cargo?` (${p.cargo})`:""}
+                      {on?"✓ ":""}{p.rotulo}
                     </button>); })}
                   {relColabs.size>0 && <button onClick={()=>setRelColabs(new Set())} style={{...chip,background:"transparent",border:"none",color:"#94a3b8"}}>todas</button>}
                 </div>

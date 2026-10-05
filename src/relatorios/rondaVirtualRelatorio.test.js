@@ -1,4 +1,4 @@
-import { analisarTurno, consolidarRondas, duracaoDaRonda, montarRelatorioTurno, montarConsolidadoRonda } from "./rondaVirtualRelatorio";
+import { analisarTurno, consolidarRondas, duracaoDaRonda, montarRelatorioTurno, montarConsolidadoRonda, periodoUltimosDias, rotulosColaboradoras } from "./rondaVirtualRelatorio";
 import { buildSlots, statusSlot, limiteFinalTurnoMin } from "../rondaVirtualGrade";
 const P601 = { id: "P601", name: "Golgi Cajamar" };
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
@@ -55,6 +55,35 @@ const TURNOS = [
   turno("x4", "2026-10-02", B, { "0": r("18:00", "18:05") }),
 ];
 const AGORA = new Date("2026-10-05T12:00:00");
+
+test('atalhos incluem exatamente 7, 15 ou 30 datas até hoje', () => {
+  expect(periodoUltimosDias(7, AGORA)).toEqual({ de: '2026-09-29', ate: '2026-10-05' });
+  expect(periodoUltimosDias(15, AGORA).de).toBe('2026-09-21');
+  expect(periodoUltimosDias(30, AGORA).de).toBe('2026-09-06');
+  const c = consolidarRondas(P601, TURNOS, {agora: AGORA, ...periodoUltimosDias(7, AGORA)});
+  expect(c.analises.map(a=>a.turno.id)).toEqual(['x2','x3','x4']);
+});
+
+test('homônimas com mesmo cargo têm rótulos distintos sem expor ID interno', () => {
+  const pessoas = [A, {...A, id:'id-interno-b'}];
+  const rotulos = rotulosColaboradoras(pessoas).map(p=>p.rotulo);
+  expect(new Set(rotulos).size).toBe(2);
+  expect(rotulos.join(' ')).not.toContain('id-interno');
+  expect(rotulosColaboradoras([...pessoas].reverse()).map(p=>p.rotulo).reverse()).toEqual(rotulos);
+  const c = consolidarRondas(P601, pessoas.map((p,i)=>turno(String(i),'2026-10-03',p,cheias)),{agora:AGORA});
+  expect(new Set(c.colaboradoras.map(p=>p.rotulo)).size).toBe(2);
+});
+
+test('card de não executadas não atribui atraso sem justificativa a não execução', () => {
+  const t = turno('atraso', '2026-10-03', A, {...cheias,'0':r('18:10','18:15',{atrasada:true})});
+  const resultado = montarRelatorioTurno(P601,t,{agora:AGORA});
+  expect(resultado.analise.naoExec).toBe(0);
+  expect(resultado.analise.semJust).toBe(1);
+  expect(resultado.analise.semJustAtraso).toBe(1);
+  expect(resultado.analise.semJustNaoExec).toBe(0);
+  expect(resultado.html).toContain('0 destas sem justificativa registrada');
+  expect(montarConsolidadoRonda(P601,[t],{agora:AGORA}).html).toContain('1 em atrasos · 0 em não executadas');
+});
 
 test("consolidado: por colaboradora com id estável; homônimas separadas; % só de turnos encerrados", () => {
   const c = consolidarRondas(P601, TURNOS, { agora: AGORA });

@@ -13,6 +13,26 @@ const TIPO_LABEL = { noturno: "Noturno", diurno: "Diurno" };
 const hhmm = (v) => /^\d{1,2}:\d{2}$/.test(String(v || "").trim()) ? String(v).trim().padStart(5, "0") : null;
 const minDoDia = (v) => { const h = hhmm(v); return h == null ? null : Number(h.slice(0, 2)) * 60 + Number(h.slice(3)); };
 
+export function periodoUltimosDias(dias, agora = new Date()) {
+  const inicio = new Date(agora);
+  inicio.setDate(inicio.getDate() - (dias - 1));
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { de: iso(inicio), ate: iso(agora) };
+}
+
+export function rotulosColaboradoras(pessoas) {
+  return pessoas.map((p) => {
+    const iguais = pessoas.filter(x => x.nome === p.nome);
+    const cargo = iguais.length > 1 && p.cargo ? ` (${p.cargo})` : "";
+    const ambiguo = iguais.length > 1 && iguais.filter(x => (x.cargo || "") === (p.cargo || "")).length > 1;
+    const pares = iguais.filter(x => (x.cargo || "") === (p.cargo || ""));
+    let tamanho = 4;
+    while (p.id && tamanho < String(p.id).length && pares.some(x => x.id && x.id !== p.id && String(x.id).slice(-tamanho) === String(p.id).slice(-tamanho))) tamanho++;
+    const identificador = p.id ? ` · id …${String(p.id).slice(-tamanho)}` : " · sem identificador";
+    return { ...p, rotulo: `${p.nome}${cargo}${ambiguo ? identificador : ""}` };
+  });
+}
+
 // Turno encerrado = arquivado ou já passou do último minuto da jornada.
 export function turnoEncerrado(project, turno, agora) {
   if (turno?.arquivado) return true;
@@ -47,7 +67,7 @@ export function analisarTurno(project, turno, agora = new Date()) {
   // turno aberto preserva o limite estendido do último slot (como a tela); encerrado usa o comportamento original
   const limite = (!encerrado && turno.tipo === "noturno") ? limiteFinalTurnoMin(turno.tipo, project.id) : null;
   const r = { turno, encerrado, previstas: slots.length, noHorario: 0, atraso: 0, naoExec: 0, emAndamento: 0, pendentes: 0,
-    comJust: 0, semJust: 0, anomalias: 0, duracoes: [], linhas: [], inconsistencias: [] };
+    comJust: 0, semJust: 0, semJustAtraso: 0, semJustNaoExec: 0, anomalias: 0, duracoes: [], linhas: [], inconsistencias: [] };
   slots.forEach((s, i) => {
     const prox = slots[i + 1] ? slots[i + 1].offsetMin : null;
     const reg = turno.rondas?.[String(s.offsetMin)] || null;
@@ -60,6 +80,8 @@ export function analisarTurno(project, turno, agora = new Date()) {
     else if (st === "naoexec" || st === "bloqueado") { grupo = "naoExec"; r.naoExec++; just ? r.comJust++ : r.semJust++; }
     else if (st === "em_andamento") { grupo = "emAndamento"; r.emAndamento++; }
     else { grupo = "pendente"; r.pendentes++; }
+    if (!just && grupo === "atraso") r.semJustAtraso++;
+    if (!just && grupo === "naoExec") r.semJustNaoExec++;
     if (reg?.fim && reg?.anomalia) r.anomalias++;
     if (d.duracao != null && !d.inconsistencia) r.duracoes.push(d.duracao);
     if (d.inconsistencia) r.inconsistencias.push({ horario: s.label, texto: d.inconsistencia });
@@ -92,19 +114,16 @@ export function consolidarRondas(project, turnos, { agora = new Date(), de = nul
     c.comJust += a.comJust; c.semJust += a.semJust; c.anomalias += a.anomalias; c.duracoes.push(...a.duracoes);
     if (a.encerrado) { c.encerrados++; c.previstasEnc += a.previstas; c.realizadasEnc += a.realizadas; }
   });
-  const lista = [...pessoas.values()].map((c) => ({ ...c,
+  const lista = rotulosColaboradoras([...pessoas.values()].map((c) => ({ ...c,
     execucao: c.previstasEnc ? (c.realizadasEnc / c.previstasEnc) * 100 : null,          // sem turno encerrado = não disponível
-    duracaoMedia: c.duracoes.length ? c.duracoes.reduce((x, y) => x + y, 0) / c.duracoes.length : null }));
-  // homônimos com ids diferentes ficam separados; o rótulo ganha o cargo para distinguir
-  const contaNome = {}; lista.forEach((c) => { contaNome[c.nome] = (contaNome[c.nome] || 0) + 1; });
-  lista.forEach((c) => { c.rotulo = contaNome[c.nome] > 1 ? `${c.nome}${c.cargo ? ` (${c.cargo})` : ` (${c.chave})`}` : c.nome; });
+    duracaoMedia: c.duracoes.length ? c.duracoes.reduce((x, y) => x + y, 0) / c.duracoes.length : null })));
   lista.sort((a, b) => a.rotulo.localeCompare(b.rotulo));
   const tot = (k) => analises.reduce((s, a) => s + a[k], 0);
   const enc = analises.filter((a) => a.encerrado);
   const previstasEnc = enc.reduce((s, a) => s + a.previstas, 0), realizadasEnc = enc.reduce((s, a) => s + a.realizadas, 0);
   return { analises, colaboradoras: lista,
     totais: { turnos: analises.length, encerrados: enc.length, previstas: tot("previstas"), noHorario: tot("noHorario"), atraso: tot("atraso"),
-      naoExec: tot("naoExec"), emAndamento: tot("emAndamento"), comJust: tot("comJust"), semJust: tot("semJust"), anomalias: tot("anomalias"),
+      naoExec: tot("naoExec"), emAndamento: tot("emAndamento"), comJust: tot("comJust"), semJust: tot("semJust"), semJustAtraso: tot("semJustAtraso"), semJustNaoExec: tot("semJustNaoExec"), anomalias: tot("anomalias"),
       execucao: previstasEnc ? (realizadasEnc / previstasEnc) * 100 : null },
     semId: analises.filter((a) => !a.turno.plantonista?.id).map((a) => a.turno),
     periodo: { de: de || sel[0]?.dataInicio || null, ate: ate || sel[sel.length - 1]?.dataInicio || null } };
@@ -128,7 +147,7 @@ export function montarRelatorioTurno(project, turno, { agora = new Date(), inter
   let corpo = `<section class="mk-kpis">
     <div class="mk-k"><div class="mk-kv">${a.previstas}</div><div class="mk-kl">rondas previstas</div></div>
     <div class="mk-k"><div class="mk-kv mk-ok">${a.realizadas}</div><div class="mk-kl">realizadas</div><div class="mk-mu mk-sm">${a.noHorario} no horário · ${a.atraso} com atraso</div></div>
-    <div class="mk-k"><div class="mk-kv ${a.naoExec ? "mk-da" : ""}">${a.naoExec}</div><div class="mk-kl">não executadas</div><div class="mk-mu mk-sm">${a.semJust} sem justificativa registrada</div></div>
+    <div class="mk-k"><div class="mk-kv ${a.naoExec ? "mk-da" : ""}">${a.naoExec}</div><div class="mk-kl">não executadas</div><div class="mk-mu mk-sm">${a.semJustNaoExec} destas sem justificativa registrada</div></div>
     <div class="mk-k"><div class="mk-kv">${a.encerrado ? minTxt(a.duracoes.length ? a.duracoes.reduce((x, y) => x + y, 0) / a.duracoes.length : null) : a.pendentes + a.emAndamento}</div><div class="mk-kl">${a.encerrado ? "duração média da ronda" : "aguardando ou em andamento"}</div>${a.encerrado ? "" : `<div class="mk-mu mk-sm">${a.emAndamento} em andamento · ${a.pendentes} aguardando</div>`}</div></section>
     <section><div class="mk-h2">Rondas do turno</div><table class="mk-tb"><thead><tr><th>Horário</th><th>Status</th><th>Início</th><th>Fim</th><th class="mk-num">Duração</th><th>Resultado</th><th>Justificativa / observação</th></tr></thead><tbody>${linhas}</tbody></table>
     ${a.encerrado ? "" : '<p class="mk-nota">Turno em andamento: rondas "aguardando" ainda estão dentro do horário e não contam como não executadas.</p>'}</section>`;
@@ -160,7 +179,7 @@ export function montarConsolidadoRonda(project, turnos, { agora = new Date(), in
       <div class="mk-k"><div class="mk-kv">${t.turnos}</div><div class="mk-kl">turnos</div><div class="mk-mu mk-sm">${t.encerrados} encerrados · ${t.previstas} rondas previstas</div></div>
       <div class="mk-k"><div class="mk-kv">${pct(t.execucao)}</div><div class="mk-kl">execução</div><div class="mk-mu mk-sm">realizadas ÷ previstas, só turnos encerrados</div></div>
       <div class="mk-k"><div class="mk-kv ${t.naoExec ? "mk-da" : ""}">${t.naoExec}</div><div class="mk-kl">não executadas</div><div class="mk-mu mk-sm">${t.atraso} com atraso</div></div>
-      <div class="mk-k"><div class="mk-kv ${t.semJust ? "mk-wa" : ""}">${t.semJust}</div><div class="mk-kl">sem justificativa registrada</div><div class="mk-mu mk-sm">${t.comJust} com justificativa</div></div></section>
+      <div class="mk-k"><div class="mk-kv ${t.semJust ? "mk-wa" : ""}">${t.semJust}</div><div class="mk-kl">sem justificativa registrada</div><div class="mk-mu mk-sm">${t.semJustAtraso} em atrasos · ${t.semJustNaoExec} em não executadas</div></div></section>
       ${comExec.length > 1 ? `<div class="mk-card" style="margin-bottom:10px"><div class="mk-lb">Execução por colaboradora (turnos encerrados)</div>${barrasMoked(comExec.map((p) => [p.rotulo, p.execucao]), (v) => `${Math.round(v)}%`)}</div>` : ""}
       <section><div class="mk-h2">Comparação por colaboradora</div><table class="mk-tb"><thead><tr><th>Colaboradora</th><th class="mk-num">Turnos</th><th class="mk-num">No horário</th><th class="mk-num">Atraso</th><th class="mk-num">Não exec.</th><th class="mk-num">Sem justif.</th><th class="mk-num">Execução</th><th class="mk-num">Duração média</th><th class="mk-num">Anomalias</th></tr></thead><tbody>${comp}</tbody></table>
       <p class="mk-nota">Execução = rondas realizadas (no horário ou com atraso) ÷ previstas, apenas em turnos encerrados; sem turno encerrado, "não disponível". Duração média considera só rondas com início e fim consistentes.</p></section>
