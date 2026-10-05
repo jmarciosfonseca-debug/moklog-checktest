@@ -31,6 +31,9 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { classificarVetor, consolidarSite, classificarRiscoOperacional, normalizarFracao, avaliarIluminacao, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
+import { loadFollowups, canonicalFollowupKey } from "./followups";
+import { itensDoEstado, resumo, falhasPorSistema, estadoTratativa } from "./relatorios/metricas";
+import { getTheme } from "./generatePDF";
 import { coletarRegional, moduladorRegional } from "./regionalConfig";
 import { gerarMapaCriticidadeHTML, gerarLeituraTerritorialHTML } from "./MapaCriticidade";
 import { gerarImpactosOperacionais } from "./riscoImpactoConfig";
@@ -59,7 +62,10 @@ function numeroProjeto(pid) {
 }
 function formatarRefAR(pid, seq) {
   const nnnn = String(seq).padStart(4, "0");
-  return `MK-${numeroProjeto(pid)}-AR-${nnnn}`;
+  return `MK-${pid}-AR-${nnnn}`;
+}
+export function normalizarRefAR(pid, ref) {
+  return String(ref || "").replace(/^MK-[A-Z]?\d+[A-C]?-AR-/, `MK-${pid}-AR-`);
 }
 async function obterRefSequencial(pid) {
   const projNum = numeroProjeto(pid);
@@ -68,7 +74,7 @@ async function obterRefSequencial(pid) {
     const cSnap = await getDoc(doc(db, "contadores", pid));
     if (cSnap.exists()) {
       const d = cSnap.data() || {};
-      if (d.arRef) return d.arRef;
+      if (d.arRef) return normalizarRefAR(pid, d.arRef);
       if (d.arSeq != null) return formatarRefAR(pid, d.arSeq);
     }
     return formatarRefAR(pid, 1);
@@ -208,9 +214,9 @@ function coletarTesteSemanal(project, stored) {
       inop.forEach((it) => { const p = mkPend(cat.id, cat.label, it.id || "?", it, "inop", prep); pend.push(p); agg(cat.id, cat.label, 0, 0, p.dias, it.id || "?"); });
     }
   }
-  const pct = totalItens ? Math.round((okItens / totalItens) * 100) : null;
+  const pct = totalItens ? Math.round(resumo(itensDoEstado(project, state)).saude) : null;   // mesma fórmula do laudo semanal
   return {
-    ok: true, temDado: true, pend, total: totalItens, okItens, pct, catAgg, pid,
+    ok: true, temDado: true, pend, total: totalItens, okItens, pct, catAgg, pid, estado: state,
     data: fmtDate(last.meta?.date), dataRaw: last.meta?.date || null,
     lider: last.meta?.lider || last.meta?.liderName || null,
   };
@@ -667,7 +673,7 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
     const it = piorItem;
     const outros = g.itens.length > 1 ? ` (+${g.itens.length - 1} ponto${g.itens.length - 1 > 1 ? "s" : ""} do mesmo conjunto)` : "";
     const propTxt = aggc.total ? ` — ${aggc.inop} de ${aggc.total}` : "";
-    const sinceTxt = it?.since ? `inoperante desde ${fmtDate(it.since)}` : null;
+    const sinceTxt = it?.since ? `${it?.status === "PARCIAL" ? "parcial" : "inoperante"} desde ${fmtDate(it.since)}` : null;
 
     // Perímetro nomeado: cada zona é uma evidência própria. Não agrupar
     // Z-04 e Z-07 em "+1 ponto", pois isso perde a rastreabilidade e a
@@ -695,7 +701,7 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
           pid: ts.pid, labelCategoria: g.catLabel, labelItem: item.itemLabel || "",
           inop: 1, total: aggc.total, dias: item.dias ?? piorDias, escopo: "moked",
         });
-        const sinceZ = item.since ? `inoperante desde ${fmtDate(item.since)}` : null;
+        const sinceZ = item.since ? `${item?.status === "PARCIAL" ? "parcial" : "inoperante"} desde ${fmtDate(item.since)}` : null;
         out.push({
           chave: `cat:${g.catLabel}:${zona}`, label: g.catLabel,
           nivel: rcZ.nivel, classeV2: rcZ.classe, incluirCliente: rcZ.incluir !== false,
@@ -1165,7 +1171,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     ts, ctmk, ilum, rondaVirtual, equipe, regional, contextos,
   } = ctx;
 
-  const ref = ctx.ref || `MK-${(project.id || "").replace(/\D/g, "") || "000"}-AR-0001`;
+  const ref = normalizarRefAR(project.id, ctx.ref || `MK-${project.id}-AR-0001`);
   const hoje = hojeBR();
   const periodo = ts?.dataRaw ? `até ${fmtDate(ts.dataRaw)}` : hoje;
   const nFontes = fontesUsadas.length;
@@ -1232,39 +1238,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   bloqComCad.forEach((v) => empurrar(v, "crit"));
   elevComCad.forEach((v) => empurrar(v, "elev"));
 
-  const vulnCardHTML = (item) => {
-    const { v, classe } = item;
-    const bd = classe === "crit" ? '<span class="bd bd-crit">Bloqueador</span>' : '<span class="bd bd-elev">Elevado</span>';
-    const nome = esc(v.label.replace(/ —.*/, "").replace(/^\d+\s*-\s*/, ""));
-    const fonte = esc(v.fonteCredito || "");
-    const desde = v.sinceTxt ? " · " + esc(v.sinceTxt) : "";
-    const rastreio = [
-      v.zonaCanonica ? `Área/zona: ${zonaParaRelatorio(v)}` : null,
-      v.barreiraFisica ? `Barreira: ${v.barreiraFisica}` : null,
-      v.pendenciaCadastro ? "Pendência de cadastro" : null,
-    ].filter(Boolean).map(esc).join(" · ");
-    // O executivo mostra apenas a síntese; a evidência completa permanece no
-    // Anexo Técnico separado. Isso impede listas longas no PDF principal.
-    const dadoCompleto = textoLimpo(v.descricao || "");
-    const dado = esc(dadoCompleto.length > 210 ? `${dadoCompleto.slice(0, 207)}...` : dadoCompleto);
-    // correção: contexto de campo se houver; senão texto padrão por classe.
-    const ctxTxt = contextos?.[v.chave];
-    const corr = ctxTxt && ctxTxt.trim()
-      ? esc(ctxTxt.trim())
-      : (classe === "crit"
-          ? "Restabelecer <b>imediatamente</b> o(s) ponto(s) inoperante(s); tratar como prioridade máxima."
-          : "Recuperar os pontos inoperantes em <b>até 15 dias</b>, priorizando cobertura crítica.");
-    return `<div class="vuln">
-      <div class="top"><div class="nome">${nome}<span>${fonte}${desde}</span></div>${bd}</div>
-      <div class="dado">${dado}</div><div class="dado"><small>${rastreio}</small></div>
-      <div class="fix"><span class="k">Correção</span><span>${corr}</span></div>
-    </div>`;
-  };
 
   const limiteApontamentos = 9;
-  const vulnsHTML = cardsAcao.length
-    ? cardsAcao.slice(0, limiteApontamentos).map(vulnCardHTML).join("")
-    : `<div class="vuln"><div class="top"><div class="nome">Sem vetores em ação necessária</div></div><div class="dado">Nenhum vetor bloqueador ou elevado apurado no período.</div></div>`;
 
   const somaR = `resulta em <em>${esc(labelGeral)}</em> &#183; ${esc(narrativa.complemento)}`;
 
@@ -1452,18 +1427,6 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     : "Essa solidez torna a correção dos vetores acima <b>rápida e viável</b>, com prioridade proporcional à classificação apurada.";
   const forcaTxt = `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} cobertura consistente. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b> e a ` : "A "}maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde de equipamentos)` : ""}. ${conclusaoForca}`;
 
-  // ── Introdução dinâmica ──
-  const saudePct = ts?.pct != null ? ts.pct : null;
-  const rondaPct = rv?.pct != null ? rv.pct : null;
-  const introSaude = (rondaPct != null || saudePct != null)
-    ? (nivelGeral === NIVEIS.BAIXO
-        ? `Os indicadores gerais de saúde permanecem elevados (${rondaPct != null ? `execução de rondas a ${rondaPct}%` : ""}${rondaPct != null && saudePct != null ? ", " : ""}${saudePct != null ? `${saudePct}% dos equipamentos operantes` : ""}), e não foram identificados vetores determinantes capazes de elevar a classificação no período.`
-        : `Ainda que os indicadores gerais de saúde sejam elevados (${rondaPct != null ? `execução de rondas a ${rondaPct}%` : ""}${rondaPct != null && saudePct != null ? ", " : ""}${saudePct != null ? `${saudePct}% dos equipamentos operantes` : ""}), <b>fatores específicos</b> — detalhados adiante — elevam a classificação ao nível de risco ora aplicado.`)
-    : `<b>Fatores específicos</b> — detalhados adiante — determinam a classificação de risco ora aplicada.`;
-
-  // ── Veredito (texto) ──
-  const veredTxt = `A operação foi classificada como <b>${esc(labelGeral)}</b> porque o motor de risco identificou <b>${esc(regraAplicada)}</b>. ${fatosCalculo.length ? `A decisão considera ${fatosCalculo.map(esc).join(", ")}.` : "Não foram identificados bloqueadores operacionais."}`;
-
   // ── Régua (marca o nível) ──
   const reguaCells = [
     { k: "r1", lb: "BAIXO", n: 1 },
@@ -1476,11 +1439,110 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     return `<div class="${c.k}${on ? "" : " off"}">${c.lb}${pin}</div>`;
   }).join("");
 
-  const alertaHTML = alerta ? `
-    <div class="alerta">
-      <span class="ai">&#9888;&#65039;</span>
-      <span class="at"><b>Alerta de perímetro.</b> Embora a classificação geral seja ${esc(labelGeral)}, há vetor <b>bloqueador</b> caído: sua indisponibilidade exige correção prioritária, independentemente da saúde do restante da operação.</span>
-    </div>` : "";
+  // ═════ PADRÃO MOKED (aprovado pelo Marcio em 04/10/2026) — só apresentação; o motor não muda ═════
+  const NIVEL_TXT = { 1: "BAIXO", 2: "MODERADO", 3: "ELEVADO", 4: "CRÍTICO" };
+  const NIVEL_CLS = { 1: "ar-b-ba", 2: "ar-b-mo", 3: "ar-b-el", 4: "ar-b-cr" };
+  const rotuloSistema = (lbl) => {
+    const t = String(lbl || "").replace(/^\d+\s*-\s*/, "").replace(/ —.*/, "").toLowerCase();
+    return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/\b(cco|cftv|qr|sdai|cda|ht|ga|adm|ctmk)\b/gi, (m) => m.toUpperCase()).replace(/\bas \(/i, "AS (");
+  };
+  const pendDo = (v) => (ts?.pend || []).filter((p) => p.catLabel === v.label).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
+  const fu = ctx.followups || {};
+  const agora = new Date();
+  const linhaDe = (v) => {
+    const pends = pendDo(v), p = pends[0] || null;
+    const sistema = rotuloSistema(v.label);
+    const nome = p
+      ? (p.itemLabel ? (["CCO", "Portaria"].includes(p.itemLabel) ? `${sistema} — ${p.itemLabel}` : p.itemLabel) : sistema)
+      : (textoLimpo((String(v.descricao || "").match(/<b>([^<]+)<\/b>/) || [])[1] || "") || sistema);
+    const reg = p ? fu[canonicalFollowupKey(project.id, p.catLabel, p.itemLabel || "\u2014")] : null;
+    const ctxTxt = contextos?.[v.chave] && String(contextos[v.chave]).trim();
+    return {
+      v, nome, sistema, extras: pends.length > 1 ? pends.length - 1 : 0,
+      status: p ? (p.status === "PARCIAL" ? "parcial" : "inoperante") : "",
+      dias: p?.dias ?? v.piorDias ?? null, desde: p?.since ? fmtDate(p.since) : null,
+      trat: p ? estadoTratativa(reg, agora) : null,
+      prazo: ctxTxt || (v.bloqueadorCaido ? "Imediata" : v.nivel >= NIVEIS.ELEVADO ? "Até 15 dias" : "Programar"),
+    };
+  };
+  const emCards = new Set(cardsAcao.map((c) => c.v));
+  const demais = vetores.filter((v) => !emCards.has(v) && !v.bloqueadorCaido && !(v.nivel >= NIVEIS.ELEVADO) && !v.observacaoManutencao)
+    .sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
+  const linhasVet = [...cardsAcao.map((c) => c.v), ...demais].map(linhaDe);
+  const linhasMan = vetores.filter((v) => v.observacaoManutencao && !emCards.has(v)).map(linhaDe);
+  const tratHTML = (t) => !t ? '<span class="ar-mu">—</span>'
+    : t.estado === "sem" ? '<span class="ar-tr-sem">Sem tratativa</span>'
+    : `<span class="${t.estado === "vencido" ? "ar-tr-venc" : "ar-tr-ok"}">${esc(({ aguardando: "Aguardando retorno", proposta: "Proposta enviada", aprovado: "Aprovado", execucao: "Em execução" })[t.status] || "Em acompanhamento")}</span>${t.quando ? `<div class="ar-mu">${esc(new Date(t.quando).toLocaleDateString("pt-BR").slice(0, 5))} · ${t.estado === "vencido" ? "follow-up vencido" : "em dia"}</div>` : ""}`;
+  const corDias = (d) => d == null ? "" : d > 180 ? "ar-d-alta" : d >= 30 ? "ar-d-media" : "ar-d-baixa";
+  const tabelaVetHTML = linhasVet.length ? `<table class="ar-tb"><colgroup><col style="width:30%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:19%"><col style="width:13%"></colgroup>
+    <thead><tr><th>Vetor</th><th>Classe</th><th>Nível</th><th class="ar-num">Em aberto</th><th>Tratativa</th><th>Correção</th></tr></thead><tbody>
+    ${linhasVet.slice(0, limiteApontamentos).map((l) => `<tr class="vt-linha"><td><div class="ar-dv">${esc(l.nome)}${l.extras ? ` <span class="ar-mu">e mais ${l.extras}</span>` : ""}</div><div class="ar-mu">${esc(l.sistema)}${l.status ? ` · ${l.status}` : ""}${l.v.travaTipo ? " · trava do site" : ""}${l.v.zonaCanonica ? ` · Área/zona: ${esc(zonaParaRelatorio(l.v))}` : ""}</div></td>
+      <td>${esc(l.v.classeV2 || (l.v.bloqueadorCaido ? "Bloqueador" : "—"))}</td><td><span class="ar-b ${NIVEL_CLS[l.v.nivel] || "ar-b-mo"}">${NIVEL_TXT[l.v.nivel] || ""}</span></td>
+      <td class="ar-num">${l.dias != null ? `<span class="${corDias(l.dias)}">${l.dias} d</span>` : "—"}${l.desde ? `<div class="ar-mu">desde ${esc(l.desde)}</div>` : ""}</td><td>${tratHTML(l.trat)}</td><td><b>${esc(l.prazo)}</b></td></tr>`).join("")}
+    </tbody></table>` : `<div class="ar-ok">Nenhum vetor de risco apurado no período.</div>`;
+  const restantesVet = Math.max(0, linhasVet.length - limiteApontamentos);
+  const manutHTML = linhasMan.length ? `<div class="bloco"><div class="eyebrow">Itens em manutenção — registrados, sem impacto direto na classificação</div>
+    <table class="ar-tb"><thead><tr><th>Item</th><th class="ar-num">Afetados</th><th class="ar-num">Em aberto</th><th>Tratativa</th></tr></thead><tbody>
+    ${linhasMan.map((l) => `<tr><td><b>${esc(l.nome)}</b>${l.extras ? ` e mais ${l.extras}` : ""}<span class="ar-mu"> · ${esc(l.sistema)}</span></td><td class="ar-num">${l.v.inop != null && l.v.total ? `${l.v.inop} de ${l.v.total}` : "—"}</td><td class="ar-num">${l.dias != null ? `${l.dias} d` : "—"}</td><td>${tratHTML(l.trat)}</td></tr>`).join("")}
+    </tbody></table></div>` : "";
+  const porQue = nivelGeral === NIVEIS.BAIXO ? [] : linhasVet.filter((l) => l.v.bloqueadorCaido || l.v.travaTipo || l.v.nivel >= NIVEIS.ELEVADO).slice(0, 3);   // BAIXO: nada eleva a classe (mesma leitura do relatório anterior)
+  const porQueHTML = `<p class="ar-pq">O motor de risco identificou <b>${esc(regraAplicada)}</b>${!porQue.length ? ", e não foram identificados vetores determinantes capazes de elevar a classificação no período" : ""}.</p>${porQue.length ? `<ul class="ar-pql">${porQue.map((l) => `<li><b>${esc(l.nome)}</b>${l.nome.startsWith(l.sistema) ? "" : `, ${esc(l.sistema)},`}${l.status ? ` ${l.status}` : ""}${l.dias != null ? ` há ${l.dias} dias` : ""} — ${esc((l.v.classeV2 || (l.v.bloqueadorCaido ? "Bloqueador" : NIVEL_TXT[l.v.nivel] || "")).toLowerCase())}${l.v.travaTipo ? ", trava do site" : ""}${l.trat?.estado === "sem" ? ", sem tratativa" : ""}.</li>`).join("")}</ul>` : ""}`;
+  const acoes = [...linhasVet, ...linhasMan.filter((l) => l.trat?.estado === "vencido")].slice(0, 5).map((l) => {
+    const t = l.trat;
+    const extra = !t ? "" : t.estado === "sem" ? `; abrir tratativa${l.dias != null ? ` (${l.dias} dias sem registro)` : ""}` : t.estado === "vencido" ? `; cobrar o retorno do follow-up${t.quando ? ` de ${new Date(t.quando).toLocaleDateString("pt-BR").slice(0, 5)}` : ""}` : "";
+    return `<li><b>Restabelecer ${esc(l.nome)}</b>${l.nome.startsWith(l.sistema) ? "" : `, ${esc(l.sistema)}`} — ${esc(l.prazo.toLowerCase())}${l.v.bloqueadorCaido ? " (bloqueador)" : ""}${extra}.</li>`;
+  });
+  const acoesHTML = acoes.length ? `<div class="bloco"><div class="eyebrow">Ações priorizadas</div><ol class="ar-acoes">${acoes.join("")}</ol></div>` : "";
+  // base operacional: a mesma do laudo semanal (mesma fórmula e mesmos números)
+  let baseHTML = "";
+  if (ts?.estado && project?.categories) {
+    const itensBase = itensDoEstado(project, ts.estado), rb = resumo(itensBase), fsb = falhasPorSistema(itensBase).slice(0, 9);
+    const C = 2 * Math.PI * 56, sg = (q) => rb.total ? q / rb.total * C : 0, mx = Math.max(1, ...fsb.map((f) => f.inop + f.parcial));
+    const rosca = `<svg viewBox="0 0 160 160" width="124" height="124" role="img" aria-label="${rb.total} ativos: ${rb.ok} operacionais, ${rb.parcial} parciais, ${rb.inop} inoperantes"><g transform="rotate(-90 80 80)" fill="none" stroke-width="18"><circle cx="80" cy="80" r="56" stroke="#E5E7EB"/>
+      <circle cx="80" cy="80" r="56" stroke="#9CA3AF" stroke-dasharray="${sg(rb.ok).toFixed(1)} ${C.toFixed(1)}"/><circle cx="80" cy="80" r="56" stroke="#F59E0B" stroke-dasharray="${sg(rb.parcial).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-sg(rb.ok)).toFixed(1)}"/>
+      <circle cx="80" cy="80" r="56" stroke="#DC2626" stroke-dasharray="${sg(rb.inop).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-(sg(rb.ok) + sg(rb.parcial))).toFixed(1)}"/></g>
+      <text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">${rb.total}</text><text x="80" y="97" text-anchor="middle" font-size="11" fill="#6B7280">ativos</text></svg>`;
+    const barras = fsb.length ? fsb.map((f) => `<div class="ar-vb"><span>${esc(rotuloSistema(f.cat))}</span><span class="ar-vt">${f.inop ? `<i style="background:#DC2626;width:${(f.inop / mx * 100).toFixed(0)}%"></i>` : ""}${f.parcial ? `<i style="background:#F59E0B;width:${(f.parcial / mx * 100).toFixed(0)}%"></i>` : ""}</span><b>${f.inop + f.parcial}</b></div>`).join("") : '<div class="ar-ok">Nenhuma falha no último laudo.</div>';
+    baseHTML = `<section class="ar-base"><div><div class="ar-lb">Base operacional · mesmo laudo de ${esc(ts.data || "")}</div><div class="ar-rw">${rosca}<div class="ar-lgd">
+      <div><i style="background:#9CA3AF"></i>Operacional <b>${rb.ok}</b></div><div><i style="background:#F59E0B"></i>Parcial <b>${rb.parcial}</b></div><div><i style="background:#DC2626"></i>Inoperante <b>${rb.inop}</b></div>
+      <div class="ar-sd">Saúde <b>${Math.round(rb.saude)}%</b> <span class="ar-mu">(igual ao laudo)</span></div></div></div></div>
+      <div><div class="ar-lb">Onde estão as falhas · ${rb.parcial + rb.inop} ${rb.parcial + rb.inop === 1 ? "item" : "itens"}</div>${barras}</div></section>`;
+  }
+  const theme = getTheme(project.id) || {};
+  const topoHTML = `<header class="ar-topo"><div class="ar-logos"><img src="${MOKED_LOGO}" class="ar-lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="ar-sep"></span><img src="${theme.empresaLogo}" class="ar-lg" alt="${esc(theme.empresaNome || "")}">` : ""}</div>
+    <div class="ar-meta"><div><b>Análise de Risco</b> · Nº ${esc(ref)}</div><div>Emissão ${esc(hoje)} · José Fonseca</div><div>Período ${esc(periodo)} · ${nFontes} ${nFontes === 1 ? "fonte" : "fontes"}</div></div></header>
+    <div class="ar-regua"></div>
+    <h1 class="ar-h1">Análise de Risco de Segurança</h1>
+    <p class="ar-sub"><b>${esc(project.id)} — ${esc(project.name || "")}</b>${ts?.ok ? ` · base: laudo semanal de ${esc(ts.data || "")}` : ""}${fontesUsadas.length ? ` · ${fontesUsadas.map((f) => esc(f.titulo)).join(" · ")}` : ""}</p>
+    <section class="ar-hero"><div><div class="ar-lb">Classificação do ativo</div><div class="ar-cls" style="color:${corVeredito}">${esc(labelGeral)}</div>
+      <div class="regua">${reguaCells}</div><div class="regualeg"><span>menor exposição</span><span>maior exposição</span></div></div>
+      <div><div class="ar-lb">Por que</div>${porQueHTML}</div></section>`;
+  const novoCSS = `
+  :root{--papel:#ffffff;--papel2:#F9FAFB}
+  body{background:#e9ebee;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;font-size:13.5px;line-height:1.45}
+  .folha{max-width:800px;box-shadow:0 2px 14px rgba(0,0,0,.08)}.corpo{padding:30px 38px 34px}.bloco{margin-top:22px}
+  .eyebrow{color:#111827;letter-spacing:.12em;font-size:10.5px}
+  .ar-topo{display:flex;justify-content:space-between;align-items:center}.ar-logos{display:flex;align-items:center;gap:12px}.ar-lm{height:42px}.ar-lg{height:38px;max-width:140px;object-fit:contain}.ar-sep{width:1px;height:32px;background:#D1D5DB}
+  .ar-meta{text-align:right;font-size:11.5px;color:#4B5563;line-height:1.5}
+  .ar-regua{height:3px;background:linear-gradient(90deg,#121212 0 72%,#B21E27 72% 100%);margin:10px 0 14px;border-radius:2px}
+  .ar-h1{font-size:25px;font-weight:700;color:#111827;margin:0}.ar-sub{margin:3px 0 14px;color:#4B5563;font-size:13px}
+  .ar-hero{display:grid;grid-template-columns:38% 1fr;gap:16px;border:1px solid #E5E7EB;border-radius:8px;padding:14px 16px;margin-bottom:12px}
+  .ar-lb{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:#6B7280;font-weight:700}
+  .ar-cls{font-size:38px;font-weight:700;line-height:1.05;margin:4px 0 2px}.ar-hero .regua{margin-top:12px}
+  .ar-pq{margin:5px 0}.ar-pql{margin:4px 0 0;padding-left:18px}.ar-pql li{margin:3px 0}
+  .ar-base{display:grid;grid-template-columns:46% 1fr;gap:16px;border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin-bottom:6px}
+  .ar-rw{display:flex;align-items:center;gap:12px;margin-top:4px}.ar-lgd{font-size:12px;display:grid;gap:4px}.ar-lgd i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}.ar-sd{margin-top:4px;font-size:13px}
+  .ar-vb{display:grid;grid-template-columns:44% 1fr 20px;gap:8px;align-items:center;font-size:11.5px;margin:4px 0}.ar-vt{display:flex;gap:2px;height:9px}.ar-vt i{display:block;height:9px;border-radius:2px}.ar-vb b{text-align:right}
+  table.ar-tb{width:100%;border-collapse:collapse}.ar-tb th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;text-align:left;font-weight:700;border-bottom:1.5px solid #111827;padding:6px}
+  .ar-tb td{border-bottom:1px solid #EEF0F3;padding:6px;vertical-align:top;font-size:12.5px}.ar-tb tr{page-break-inside:avoid}
+  .ar-num{text-align:right;white-space:nowrap}.ar-dv{font-weight:700;color:#111827}.ar-mu{color:#6B7280;font-size:11.5px}
+  .ar-b{display:inline-block;font-size:10.5px;font-weight:700;border-radius:3px;padding:1px 7px;white-space:nowrap}.ar-b-cr{background:#FEE2E2;color:#991B1B}.ar-b-el{background:#FFEDD5;color:#9A3412}.ar-b-mo{background:#FEF3C7;color:#92400E}.ar-b-ba{background:#EFF6FF;color:#1D4ED8}
+  .ar-d-alta{color:#B21E27;font-weight:700}.ar-d-media{color:#B45309;font-weight:700}.ar-d-baixa{color:#374151;font-weight:700}
+  .ar-tr-sem{color:#B21E27;font-weight:700}.ar-tr-venc{color:#B45309;font-weight:700}.ar-tr-ok{color:#15803D;font-weight:700}
+  .ar-ok{color:#15803D;font-size:12.5px}.ar-acoes{margin:2px 0 0;padding-left:20px}.ar-acoes li{margin:4px 0}
+  .ar-regua,.ar-b,.ar-lgd i,.ar-vt i,.regua div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}}
+`;
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1662,38 +1724,17 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     tr,thead{break-inside:avoid;page-break-inside:avoid}
     thead{display:table-header-group}
   }
-</style></head><body>
+${novoCSS}</style></head><body>
 <div class="folha">
-  <div class="cab">
-    <div>
-      <span class="marca">Moked Consulting Security</span>
-      <span class="logobox"><img class="logo" src="${MOKED_LOGO}" alt="Moked Consulting Security"></span>
-      <h1>Análise de Risco de Segurança</h1>
-      <div class="sub">${esc(project.id)} — ${esc(project.name || "")}${pacoteLabel ? " · " + esc(pacoteLabel) : ""}</div>
-    </div>
-    <div class="cod">Nº <b>${esc(ref)}</b><br>Período <b>${esc(periodo)}</b><br>Base <b>${nFontes} relatórios operacionais</b></div>
-  </div>
-  <div class="fita"></div>
-
   <div class="corpo">
-    <div class="intro">O documento a seguir apresenta uma <b>análise estruturada de segurança</b> do ativo, que cruza os <b>vetores operacionais</b> — apurados a partir dos relatórios do período — com o <b>diagnóstico territorial</b> da região onde o projeto se localiza. ${introSaude} Cada apontamento é rastreável à sua fonte, permitindo verificação independente.</div>
-    <div class="pergunta">Qual é o real estado de segurança deste ativo?</div>
-    <div class="veredito">
-      <div class="sel"><div class="lab">Risco Geral</div><div class="val">${esc(labelGeral)}</div></div>
-      <div class="txt">${veredTxt}</div>
-    </div>
-    ${alertaHTML}
-
+    ${topoHTML}
+    ${baseHTML}
     <div class="bloco">
-      <div class="regua">${reguaCells}</div>
-      <div class="regualeg"><span>menor exposição</span><span>maior exposição</span></div>
+      <div class="eyebrow">Vetores que definem o risco</div>
+      ${tabelaVetHTML}
+      ${restantesVet ? `<div class="mais-anexo">Mais ${restantesVet} apontamento(s) permanecem disponíveis no Anexo Técnico, sem alongar o documento executivo.</div>` : ""}
     </div>
-
-    <div class="bloco">
-      <div class="eyebrow">Vetores de vulnerabilidade — ação necessária</div>
-      <div class="apontamentos-grid">${vulnsHTML}</div>
-      ${apontamentosRestantes ? `<div class="mais-anexo">Mais ${apontamentosRestantes} apontamento(s) permanecem disponíveis no Anexo Técnico, sem alongar o documento executivo.</div>` : ""}
-    </div>
+    ${manutHTML}
 
     <div class="bloco">
       <div class="eyebrow">Como se chega à classificação — memória de cálculo</div>
@@ -1707,6 +1748,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       ${conexaoTerritorial}
     </div>
     ${territHTML}
+
+    ${acoesHTML}
 
     <div class="bloco">
       <div class="eyebrow">O que sustenta a operação — pontos fortes</div>
@@ -1805,6 +1848,7 @@ async function coletarFontes(project, stored, marcadas) {
     coletarMarcada(marcadas.energia, "energia", "Ocorrências de Energia", "energia", () => coletarEnergia(project.id)),
     coletarMarcada(marcadas.equipe, "equipe", "Mapa de Equipe", "equipe", () => coletarEquipe(project.id)),
     (async () => { dados.sinistros = await segura("sinistros", () => coletarSinistros(project.id)); })(),
+    (async () => { const fu = await segura("tratativas", () => loadFollowups(db, project.id)); dados.followups = fu && fu.ok === false ? {} : (fu || {}); })(),
   ]);
   { dados.regional = coletarRegional(project.id); }
   return { dados, faltantes };
@@ -1951,6 +1995,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     project, pacoteLabel, vetores, geral, geralCliente: geral, geralMoked: geral, recomendacoes, fontesUsadas,
     sinistros: dados.sinistros, regional: dados.regional,
     ts: dados.ts, ctmk: dados.ctmk, ilum: dados.ilum, rondaVirtual: dados.rondaVirtual, equipe: dados.equipe,
+    followups: dados.followups || {},
     contextos,
   };
 }

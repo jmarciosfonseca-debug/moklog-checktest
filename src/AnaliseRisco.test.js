@@ -52,7 +52,7 @@ test("PDF executivo usa três colunas, explica o cálculo e limita apontamentos"
   expect(html).toContain("memória de cálculo");
   expect(html).toContain("duas ou mais zonas perimetrais inoperantes");
   expect(html).toContain("Mais 3 apontamento(s)");
-  expect((html.match(/class=\"vuln\"/g) || [])).toHaveLength(9);
+  expect((html.match(/class="vt-linha"/g) || [])).toHaveLength(9);   // layout Moked: tabela de vetores (04/10/2026)
   expect(html).toContain("Anexo Técnico separado");
 });
 
@@ -179,7 +179,7 @@ test("P311A crítico por zona mais falha relevante mantém selo, texto e somató
 
   const html = gerarHTMLAnaliseRisco(dados);
 
-  expect(html).toContain("Risco Geral</div><div class=\"val\">CRÍTICO");
+  expect(html).toMatch(/Classificação do ativo<\/div><div class="ar-cls" style="color:[^"]+">CRÍTICO</);
   expect(html).toContain("resulta em <em>CRÍTICO</em>");
   expect(html).toContain("uma zona perimetral inoperante somada a outra falha relevante");
   expect(html).not.toContain("resulta em <em>ELEVADO</em>");
@@ -232,8 +232,8 @@ test("os nove projetos compartilham capa e a mesma estrutura institucional", () 
 
     expect(html).toContain("Moked Consulting Security");
     expect(html).toContain("Análise de Risco de Segurança");
-    expect(html).toContain("Risco Geral");
-    expect(html).toContain("Vetores de vulnerabilidade — ação necessária");
+    expect(html).toContain("Classificação do ativo");
+    expect(html).toContain("Vetores que definem o risco");
     expect(html).toContain("Como se chega à classificação — memória de cálculo");
     expect(html).toContain("Matriz de Impacto Operacional e Exposição ao Risco");
     expect(html).toContain("Diagnóstico territorial — por que a falha importa aqui");
