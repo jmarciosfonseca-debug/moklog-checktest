@@ -146,10 +146,14 @@ function blocoCorrespondencia(c, foco) {
   return `<li><b>${titulo}:</b> ${nl.length ? nl.map(f).join("; ") : "nenhuma"}.${ff.length ? ` <b>Não verificado</b> (fora da faixa de datas da outra fonte): ${ff.map(f).join("; ")}.` : ""} <span class="mk-mu">${crit} ${cobTxt("Acesso", c.coberturaAcesso)}; ${cobTxt("Manutenção", c.coberturaManut)}.</span></li>`;
 }
 
-// Divide uma tabela: corpo + "cauda" (últimas linhas com o mesmo cabeçalho) que vai junto da assinatura.
-function tabelaComCauda(abre, linhas, fecha, cauda = 3) {
-  if (linhas.length <= cauda) return { principal: "", cauda: `${abre}${linhas.join("")}${fecha}` };
-  return { principal: `${abre}${linhas.slice(0, -cauda).join("")}${fecha}`, cauda: `${abre}${linhas.slice(-cauda).join("")}${fecha}` };
+// Só tabelas LONGAS (mais de "minimo" linhas) são divididas: o corpo leva o cabeçalho; a cauda (últimas "cauda" linhas)
+// vai junto da assinatura SEM cabeçalho repetido e com as mesmas larguras de coluna (colgroup + layout fixo), para que,
+// na mesma página, pareça uma tabela só. Limitação declarada: se a cauda passar para a página seguinte, essas linhas
+// seguem sem cabeçalho. Tabelas curtas ficam inteiras (correção do aceite real de 05/10: cabeçalho repetido no Acesso).
+export function tabelaComCauda(abre, linhas, fecha, { cauda = 3, minimo = 10 } = {}) {
+  if (linhas.length <= minimo) return { principal: `${abre}${linhas.join("")}${fecha}`, cauda: "" };
+  const abreCauda = abre.replace(/<thead>[\s\S]*?<\/thead>/, "").replace('class="mk-tb', 'class="mk-tb mk-cauda');
+  return { principal: `${abre}${linhas.slice(0, -cauda).join("")}${fecha}`, cauda: `${abreCauda}${linhas.slice(-cauda).join("")}${fecha}` };
 }
 const conferencia = (itens, notaCpf) => `<section class="mk-qual mk-bloco"><div class="mk-h2">Conferência do registro <span class="mk-mu">— versão interna</span></div>
   ${itens.length ? `<ul>${itens.join("")}</ul>` : '<div class="mk-sm">Nenhuma inconsistência encontrada.</div>'}
@@ -175,7 +179,7 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       <div class="mk-k"><div class="mk-kv">${tur.diurno}</div><div class="mk-kl">entradas no diurno</div><div class="mk-mu mk-sm">pela jornada da CCO</div></div>
       <div class="mk-k"><div class="mk-kv">${tur.noturno}</div><div class="mk-kl">entradas no noturno</div></div></section>
       <div class="mk-card" style="margin-bottom:10px"><div class="mk-lb">Acessos por empresa/setor</div>${barrasMoked(porEmpresa.slice(0, 10).map((e) => [e.rotulo, e.n]))}</div>
-      <section><div class="mk-h2">Registros</div>${(() => { const t = tabelaComCauda('<table class="mk-tb"><thead><tr><th>Data</th><th>Entrada</th><th>Nome</th><th>Empresa/setor</th><th>Observação</th><th>Situação</th></tr></thead><tbody>',
+      <section><div class="mk-h2">Registros</div>${(() => { const t = tabelaComCauda('<table class="mk-tb mk-fixa"><colgroup><col style="width:12%"><col style="width:9%"><col style="width:22%"><col style="width:20%"><col style="width:27%"><col style="width:10%"></colgroup><thead><tr><th>Data</th><th>Entrada</th><th>Nome</th><th>Empresa/setor</th><th>Observação</th><th>Situação</th></tr></thead><tbody>',
         lista.map((r) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(r.horaEntrada || "—")}</td><td><b>${escHTML(r.nome || "—")}</b></td><td>${escHTML(r.empresa || "—")}</td><td class="mk-sm">${escHTML(mask(r.obs || "")) || "—"}</td><td>${sit(r)}</td></tr>`), "</tbody></table>"); cauda = `${t.cauda}<p class="mk-nota">Turnos pela ${textoJornada(project.id)}.</p>`; return t.principal; })()}</section>`;
     if (interno) {
       const saidaNaEmpresa = lista.filter((r) => /sa[ií]da/i.test(r.empresa || ""));
@@ -245,7 +249,7 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       <div class="mk-k"><div class="mk-kv">${trocados}</div><div class="mk-kl">equipamentos trocados</div><div class="mk-sm ${abertos ? "mk-wa" : "mk-mu"}"><b>${abertos}</b> em aberto (pendente)</div></div></section>
       ${abertos ? `<section class="mk-dest"><ul><li><b>${abertos}</b> equipamento(s) seguem em aberto após a visita de supervisão.</li></ul></section>` : ""}
       <div class="mk-card" style="margin-bottom:10px"><div class="mk-lb">Visitas por supervisor</div>${barrasMoked(porSup.map((e) => [e.rotulo, e.n]))}</div>
-      <section><div class="mk-h2">Visitas</div>${(() => { const t = tabelaComCauda(`<table class="mk-tb"><thead><tr><th>Data</th><th>Supervisor</th><th>Chegada–saída</th><th class="mk-num">Duração</th>${ocultaCol ? "" : "<th>Observação</th>"}<th>Equipamentos</th></tr></thead><tbody>`, linhas, "</tbody></table>"); cauda = t.cauda; return t.principal; })()}
+      <section><div class="mk-h2">Visitas</div>${(() => { const t = tabelaComCauda(`<table class="mk-tb mk-fixa"><colgroup>${ocultaCol ? '<col style="width:13%"><col style="width:20%"><col style="width:15%"><col style="width:10%"><col style="width:42%">' : '<col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:8%"><col style="width:30%"><col style="width:24%">'}</colgroup><thead><tr><th>Data</th><th>Supervisor</th><th>Chegada–saída</th><th class="mk-num">Duração</th>${ocultaCol ? "" : "<th>Observação</th>"}<th>Equipamentos</th></tr></thead><tbody>`, linhas, "</tbody></table>"); cauda = t.cauda; return t.principal; })()}
       ${ocultaCol ? `<p class="mk-nota">${modoDisciplinar === "pendente" ? "Observações da supervisão não exibidas nesta versão: decisão sobre conteúdo de uso interno pendente." : "Observações da supervisão disponíveis apenas na versão interna."}</p>` : ""}
       ${omitidos ? `<p class="mk-nota">${omitidos} trecho(s) de uso interno omitido(s) nesta versão.</p>` : ""}</section>`;
     if (interno) {
@@ -266,7 +270,7 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
       <div class="mk-k"><div class="mk-kv ${st.parcial ? "mk-wa" : ""}">${st.parcial}</div><div class="mk-kl">parciais</div></div>
       <div class="mk-k"><div class="mk-kv">${abertos.length ? abertos[0].dias + " d" : "—"}</div><div class="mk-kl">mais antigo em aberto</div><div class="mk-mu mk-sm">${abertos.length ? `${escHTML(abertos[0].r.sistema || "")} · desde ${dataBR(abertos[0].r.data)}` : ""}</div></div></section>
       <div class="mk-duas"><div class="mk-card"><div class="mk-lb">Por sistema</div>${barrasMoked(porSistema.slice(0, 8).map((e) => [e.rotulo, e.n]))}</div><div class="mk-card"><div class="mk-lb">Por empresa</div>${barrasMoked(porEmpresa.slice(0, 8).map((e) => [e.rotulo, e.n]))}</div></div>
-      <section><div class="mk-h2">Registros <span class="mk-mu">— mais recentes primeiro</span></div>${(() => { const t = tabelaComCauda(`<table class="mk-tb"><colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:43%"></colgroup>
+      <section><div class="mk-h2">Registros <span class="mk-mu">— mais recentes primeiro</span></div>${(() => { const t = tabelaComCauda(`<table class="mk-tb mk-fixa"><colgroup><col style="width:11%"><col style="width:15%"><col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:43%"></colgroup>
       <thead><tr><th>Data</th><th>Empresa · técnico</th><th>Sistema</th><th>Status</th><th class="mk-num">Em aberto</th><th>Serviço</th></tr></thead><tbody>`, [...lista].reverse().map((r) => { const [txt, cls] = STATUS_TXT[r.status] || [escHTML(r.status || "—"), "mk-b-in"]; const ab = (r.status === "pendente" || r.status === "parcial") ? `${diasEntreDatas(r.data, hoje)} d` : "—";
         return `<tr><td>${dataBR(r.data)}</td><td><b>${escHTML(r.empresa || "—")}</b><div class="mk-mu">${escHTML(r.tecnico || "")}</div></td><td>${escHTML(r.sistema || "—")}</td><td><span class="mk-b ${cls}">${txt}</span>${r.arquivado ? '<div class="mk-mu">arquivado</div>' : ""}</td><td class="mk-num">${ab}</td><td class="mk-sm">${escHTML(mask([r.servico, r.obs].filter(Boolean).join(" · "))) || "—"}</td></tr>`; }), "</tbody></table>"); cauda = t.cauda; return t.principal; })()}</section>`;
     if (interno) {

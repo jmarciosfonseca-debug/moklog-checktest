@@ -187,3 +187,28 @@ describe("relatórios por tema", () => {
     expect(montarRelatorioCCO("acesso", P, ACESSOS, { agora: AG }).registros).toBe(ACESSOS.filter((r) => !r.rascunho).length);
   });
 });
+
+describe("tabelas: só as longas são divididas (aceite real de 05/10)", () => {
+  const P2 = { id: "P601", name: "Golgi Cajamar" }; const AG2 = new Date("2026-10-05T10:00:00");
+  const ac = (n) => Array.from({ length: n }, (_, i) => ({ id: "a" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, horaEntrada: "08:00", nome: "Pessoa " + (i + 1), empresa: "Empresa A" }));
+  const sup = (n) => Array.from({ length: n }, (_, i) => ({ id: "s" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, supervisor: "Sup " + (i + 1), turno: "diurno", chegada: "08:00", saida: "08:30", resumo: "ok", equipamentos: [] }));
+  const man = (n) => Array.from({ length: n }, (_, i) => ({ id: "m" + i, data: `2026-09-${String(10 + i).padStart(2, "0")}`, empresa: "E", tecnico: "Tec " + (i + 1), sistema: "CFTV", status: "concluida", servico: "s" }));
+  const conta = (h, re) => (h.match(re) || []).length;
+  test.each([["acesso", ac, /Pessoa \d+</g], ["supervisao", sup, /<b>Sup \d+</g], ["manutencao", man, /Tec \d+</g]])("%s: 5 linhas = 1 tabela, 1 cabeçalho, sem cauda", (tema, gen, re) => {
+    const h = montarRelatorioCCO(tema, P2, gen(5), { agora: AG2 }).html;
+    expect(conta(h, /<table class="mk-tb/g)).toBe(1); expect(conta(h, /<thead>/g)).toBe(1); expect(h).not.toContain('class="mk-tb mk-cauda'); expect(conta(h, re)).toBe(5);
+  });
+  test.each([["acesso", ac, /Pessoa \d+</g], ["supervisao", sup, /<b>Sup \d+</g], ["manutencao", man, /Tec \d+</g]])("%s: 12 linhas = 9 + 3, um único cabeçalho, mesmas larguras", (tema, gen, re) => {
+    const h = montarRelatorioCCO(tema, P2, gen(12), { agora: AG2 }).html;
+    expect(conta(h, /<table class="mk-tb/g)).toBe(2); expect(conta(h, /<thead>/g)).toBe(1);
+    const cauda = h.slice(h.indexOf('class="mk-tb mk-cauda'));
+    expect(cauda).toContain("<colgroup>"); expect(cauda).not.toContain("<thead>");
+    expect(conta(cauda.slice(0, cauda.indexOf("</table>")), /<tr>/g)).toBe(3);
+    expect(conta(h, re)).toBe(12);                                          // nenhuma linha perdida ou duplicada
+    expect(h.indexOf('class="mk-tb mk-cauda')).toBeGreaterThan(h.indexOf('<div class="mk-fecho">'));   // cauda vai com a assinatura
+  });
+  test("10 linhas ainda é tabela única (limite)", () => {
+    expect(montarRelatorioCCO("acesso", P2, ac(10), { agora: AG2 }).html).not.toContain('class="mk-tb mk-cauda');
+    expect(montarRelatorioCCO("acesso", P2, ac(11), { agora: AG2 }).html).toContain('class="mk-tb mk-cauda');
+  });
+});
