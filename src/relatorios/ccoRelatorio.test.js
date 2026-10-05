@@ -109,9 +109,9 @@ describe("lote consolidado da revisão (Codex)", () => {
     expect(h).not.toContain("<b>x</b>"); expect(h).toContain("Ação não reconhecida: «&lt;b&gt;x&lt;/b&gt;»"); expect(h).toContain("Ação de equipamento não reconhecida");
     expect(h).toContain("<b>0</b> em aberto (pendente)");
   });
-  test("jornada como inferência, com a configuração do projeto (P606 +1h)", () => {
-    expect(textoJornada("P606")).toBe("jornada configurada no app: diurno 07h–19h, noturno 19h–07h");
-    expect(montarRelatorioCCO("acesso", P, ACESSOS, { agora: AG }).html).toContain("inferência, a confirmar com a escala real");
+  test("jornada da CCO confirmada pelo Marcio, com o deslocamento do P606", () => {
+    expect(textoJornada("P606")).toBe("jornada da CCO: diurno 07h–19h, noturno 19h–07h");
+    expect(montarRelatorioCCO("acesso", P, ACESSOS, { agora: AG }).html).toContain("Turnos pela jornada da CCO: diurno 06h–18h, noturno 18h–06h.");
   });
   test("situação arquivada visível na Supervisão e no anexo do Intervalo; agregados declarados", () => {
     expect(montarRelatorioCCO("supervisao", P, SUP([], { arquivado: true }), { agora: AG }).html).toContain('<div class="mk-mu">arquivado</div>');
@@ -153,12 +153,13 @@ describe("relatórios por tema", () => {
     expect(i.html).toContain("proteção parcial"); expect(c.html).not.toContain("proteção parcial");
     expect(i.html).toContain("Concluídas ainda ativas"); expect(c.html).toContain("20 d");   // 15/09 → 05/10
   });
-  test("Supervisão: modo pendente oculta a observação na versão cliente e declara; interna mostra e sinaliza", () => {
+  test("Supervisão: padrão C (decisão do Marcio) mostra a observação na versão cliente; modo pendente oculta e declara", () => {
     const SUP = [{ id: "s1", data: "2026-09-10", supervisor: "Israel", turno: "diurno", chegada: "19:42", saida: "20:10", resumo: "Ronda ok. Aplicada medida disciplinar ao vigilante X.", equipamentos: [{ acao: "trocado", catLabel: "Rádio HT" }] }];
-    const cli = montarRelatorioCCO("supervisao", P, SUP, { agora: AG }).html;
+    expect(montarRelatorioCCO("supervisao", P, SUP, { agora: AG }).html).toContain("Aplicada medida disciplinar ao vigilante X.");   // padrão = C
+    const cli = montarRelatorioCCO("supervisao", P, SUP, { agora: AG, modoDisciplinar: "pendente" }).html;
     expect(cli).not.toContain("medida disciplinar"); expect(cli).toContain("decisão sobre conteúdo de uso interno pendente");
     const int = montarRelatorioCCO("supervisao", P, SUP, { agora: AG, interno: true }).html;
-    expect(int).toContain("medida disciplinar"); expect(int).toContain("inferência a confirmar com a escala real, não erro comprovado"); expect(int).toContain("observação oculta — decisão pendente");
+    expect(int).toContain("medida disciplinar"); expect(int).toContain("confirmada pelo gerencial em 05/10/2026"); expect(int).toContain("Tratamento na versão cliente: exibido");
     const a = montarRelatorioCCO("supervisao", P, SUP, { agora: AG, modoDisciplinar: "A" }).html;
     expect(a).toContain("Ronda ok."); expect(a).toContain("1 trecho(s) de uso interno omitido(s)");
   });
@@ -171,7 +172,7 @@ describe("relatórios por tema", () => {
     ];
     const i = montarRelatorioCCO("intervalo", P, INT, { agora: AG, interno: true, comAnexo: true }).html;
     expect(i).toContain("Registros duplicados"); expect(i).toContain("inclusive lançados em turnos diferentes");
-    expect(i).toContain("jornada configurada no app: diurno 06h–18h, noturno 18h–06h"); expect(i).toContain("Anexo — registros detalhados");
+    expect(i).toContain("jornada da CCO: diurno 06h–18h, noturno 18h–06h"); expect(i).toContain("Anexo — registros detalhados");
     expect(i).toContain("99 min");   // refeição 11:09→12:48, como dado
     expect(montarRelatorioCCO("intervalo", P, INT, { agora: AG }).html).not.toContain("Anexo — registros detalhados");
   });

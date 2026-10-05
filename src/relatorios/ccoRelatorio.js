@@ -14,7 +14,8 @@ import { inicioTurnoHora } from "../rondaVirtualGrade";
 import { documentoMoked, barrasMoked, escHTML, dataBR } from "./padraoMoked";
 import { rotulosColaboradoras } from "./rondaVirtualRelatorio";
 
-export const MODO_DISCIPLINAR = "pendente";   // "A" omitir por expressão | "B" ocultar observação | "C" mostrar tudo | "pendente"
+// Decisão do Marcio em 05/10/2026: "C" — versão cliente mostra a observação completa, com nomes.
+export const MODO_DISCIPLINAR = "C";   // "A" omitir por expressão | "B" ocultar observação | "C" mostrar tudo | "pendente"
 const MMDD = (d) => `${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 const TURNO_TXT = { diurno: "Diurno", noturno: "Noturno" };
 const STATUS_TXT = { concluida: ["Concluída", "mk-b-ok"], parcial: ["Parcial", "mk-b-wa"], pendente: ["Pendente", "mk-b-da"] };
@@ -55,9 +56,10 @@ export function turnoPelaHora(hora, projectId) {
 }
 export function textoJornada(projectId) {
   const d = inicioTurnoHora("diurno", projectId), n = inicioTurnoHora("noturno", projectId), h = (x) => `${String(x).padStart(2, "0")}h`;
-  return `jornada configurada no app: diurno ${h(d)}–${h(n)}, noturno ${h(n)}–${h(d)}`;
+  return `jornada da CCO: diurno ${h(d)}–${h(n)}, noturno ${h(n)}–${h(d)}`;
 }
-const notaJornada = (pid) => `turno inferido pela ${textoJornada(pid)} — inferência a confirmar com a escala real, não erro comprovado do lançamento`;
+// Jornada confirmada pelo Marcio em 05/10/2026 (06h–18h / 18h–06h; P606 07h–19h). Divergência = dado a conferir, não juízo.
+const notaJornada = (pid) => `turno pela ${textoJornada(pid)} (confirmada pelo gerencial em 05/10/2026)`;
 
 // Equipamentos da Supervisão (lista de origem = danificados): "trocado" resolve; "aberto" = pendência continua.
 export function acaoEquipamento(acao) {
@@ -170,11 +172,11 @@ export function montarRelatorioCCO(tema, project, registros, { agora = new Date(
     const tur = { diurno: 0, noturno: 0 }; lista.forEach((r) => { const t = turnoPelaHora(r.horaEntrada, project.id); if (t) tur[t]++; });
     corpo = !lista.length ? vazio : `<section class="mk-kpis"><div class="mk-k"><div class="mk-kv">${lista.length}</div><div class="mk-kl">acessos</div><div class="mk-mu mk-sm">em ${porDia} dia(s)</div></div>
       <div class="mk-k"><div class="mk-kv">${porEmpresa.length}</div><div class="mk-kl">empresas/setores</div></div>
-      <div class="mk-k"><div class="mk-kv">${tur.diurno}</div><div class="mk-kl">entradas no diurno</div><div class="mk-mu mk-sm">inferido pela jornada do app</div></div>
+      <div class="mk-k"><div class="mk-kv">${tur.diurno}</div><div class="mk-kl">entradas no diurno</div><div class="mk-mu mk-sm">pela jornada da CCO</div></div>
       <div class="mk-k"><div class="mk-kv">${tur.noturno}</div><div class="mk-kl">entradas no noturno</div></div></section>
       <div class="mk-card" style="margin-bottom:10px"><div class="mk-lb">Acessos por empresa/setor</div>${barrasMoked(porEmpresa.slice(0, 10).map((e) => [e.rotulo, e.n]))}</div>
       <section><div class="mk-h2">Registros</div>${(() => { const t = tabelaComCauda('<table class="mk-tb"><thead><tr><th>Data</th><th>Entrada</th><th>Nome</th><th>Empresa/setor</th><th>Observação</th><th>Situação</th></tr></thead><tbody>',
-        lista.map((r) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(r.horaEntrada || "—")}</td><td><b>${escHTML(r.nome || "—")}</b></td><td>${escHTML(r.empresa || "—")}</td><td class="mk-sm">${escHTML(mask(r.obs || "")) || "—"}</td><td>${sit(r)}</td></tr>`), "</tbody></table>"); cauda = `${t.cauda}<p class="mk-nota">Turnos inferidos pela ${textoJornada(project.id)} — inferência, a confirmar com a escala real.</p>`; return t.principal; })()}</section>`;
+        lista.map((r) => `<tr><td>${dataBR(r.data)}</td><td>${escHTML(r.horaEntrada || "—")}</td><td><b>${escHTML(r.nome || "—")}</b></td><td>${escHTML(r.empresa || "—")}</td><td class="mk-sm">${escHTML(mask(r.obs || "")) || "—"}</td><td>${sit(r)}</td></tr>`), "</tbody></table>"); cauda = `${t.cauda}<p class="mk-nota">Turnos pela ${textoJornada(project.id)}.</p>`; return t.principal; })()}</section>`;
     if (interno) {
       const saidaNaEmpresa = lista.filter((r) => /sa[ií]da/i.test(r.empresa || ""));
       if (saidaNaEmpresa.length) conf.push(`<li><b>Saída digitada no campo Empresa:</b> ${saidaNaEmpresa.length} registro(s) (ex.: ${escHTML(saidaNaEmpresa[0].empresa)}). Falta campo próprio de saída.</li>`);
