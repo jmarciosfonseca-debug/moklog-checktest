@@ -83,4 +83,27 @@ test("seções aprovadas continuam: memória de cálculo, matriz, território e 
   pos.forEach((p) => expect(p).toBeGreaterThan(-1));
   expect([...pos].sort((a, b) => a - b)).toEqual(pos);
   expect(html).not.toContain("undefined");
+  expect(html).toContain(".corpo{padding-bottom:0}.rodape{padding-top:8px;padding-bottom:8px;break-before:avoid;page-break-before:avoid}");
+});
+
+test("zonas da mesma categoria preservam nome, status e tratativa de cada ponto", () => {
+  const label = "01 - ALARME PERIMETRAL";
+  const pend = [
+    { catLabel: label, itemLabel: "Zona 01", status: "INOPERANTE", dias: 100, since: "2026-06-26" },
+    { catLabel: label, itemLabel: "Zona 03", status: "PARCIAL", dias: 10, since: "2026-09-24" },
+  ];
+  const dados = ctx({
+    vetores: pend.map((p, i) => vet({ label, zonaCanonica: i ? "zona-03" : "zona-01", bloqueadorCaido: true, inop: 1, total: 4 })),
+    followups: { [canonicalFollowupKey("P605", label, "Zona 03")]: { entries: [{ status: "execucao", em: new Date().toISOString() }] } },
+  });
+  dados.ts.pend = pend;
+  const linhas = gerarHTMLAnaliseRisco(dados).match(/<tr class="vt-linha">[\s\S]*?<\/tr>/g);
+  expect(linhas).toHaveLength(2);
+  expect(linhas[0]).toContain("Zona 01");
+  expect(linhas[0]).toContain("Sem tratativa");
+  expect(linhas[1]).toContain("Zona 03");
+  expect(linhas[1]).toContain("parcial");
+  expect(linhas[1]).toContain("Em execução");
+  expect(linhas[1]).not.toContain("Zona 01");
+  expect(linhas[1]).not.toContain("e mais");
 });

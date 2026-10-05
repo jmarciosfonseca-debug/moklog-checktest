@@ -1446,7 +1446,14 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     const t = String(lbl || "").replace(/^\d+\s*-\s*/, "").replace(/ —.*/, "").toLowerCase();
     return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/\b(cco|cftv|qr|sdai|cda|ht|ga|adm|ctmk)\b/gi, (m) => m.toUpperCase()).replace(/\bas \(/i, "AS (");
   };
-  const pendDo = (v) => (ts?.pend || []).filter((p) => p.catLabel === v.label).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
+  const pendDo = (v) => {
+    const daCategoria = (ts?.pend || []).filter((p) => p.catLabel === v.label);
+    // Vetores por zona não podem herdar a pendência mais antiga de outra zona.
+    const zona = (valor) => normalizarZona(String(valor || "").replace(/^(primaria|secundaria)-/i, "").replace(/^zona-/i, "Zona "));
+    return (v.zonaCanonica
+      ? daCategoria.filter((p) => !v.pendenciaCadastro && zona(p.itemLabel) === zona(v.zonaCanonica))
+      : daCategoria).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
+  };
   const fu = ctx.followups || {};
   const agora = new Date();
   const linhaDe = (v) => {
@@ -1541,7 +1548,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .ar-tr-sem{color:#B21E27;font-weight:700}.ar-tr-venc{color:#B45309;font-weight:700}.ar-tr-ok{color:#15803D;font-weight:700}
   .ar-ok{color:#15803D;font-size:12.5px}.ar-acoes{margin:2px 0 0;padding-left:20px}.ar-acoes li{margin:4px 0}
   .ar-regua,.ar-b,.ar-lgd i,.ar-vt i,.regua div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}}
+  .soma{gap:18px}.soma>span:first-child{flex-shrink:0}
+  @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.corpo{padding-bottom:0}.rodape{padding-top:8px;padding-bottom:8px;break-before:avoid;page-break-before:avoid}}
 `;
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
