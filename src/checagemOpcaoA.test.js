@@ -28,7 +28,8 @@ test('gerencial mantém acesso à revisão mesmo com todos os plantões completo
 });
 global.IS_REACT_ACT_ENVIRONMENT=true;
 test('modal bloqueia ocupado para líder, libera admin e impede clique duplo',async()=>{
- jest.useFakeTimers({now:new Date('2026-10-04T15:00:00Z')});
+ jest.useFakeTimers('modern');
+ jest.setSystemTime(new Date('2026-10-04T15:00:00Z'));
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  let resolver;const confirm=jest.fn(()=>new Promise(r=>{resolver=r;}));
  const render=adminAuth=>act(async()=>root.render(<ChecagemEquipeModal project={{id:'P605'}} equipeData={base} dark onConfirm={confirm} onCancel={()=>{}} adminAuth={adminAuth}/>));
