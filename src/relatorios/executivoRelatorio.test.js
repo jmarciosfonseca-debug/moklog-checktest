@@ -42,6 +42,15 @@ test("ausências declaradas, escape de texto, sem emojis e sem fechar o script p
 });
 
 describe("nível 3 — resumo de cada relatório", () => {
+  test("todo resumo aponta o relatório específico do tema (exceto não aferido/sem registros)", () => {
+    const row = { id: "P601", name: "X", score: 72, base: 92, penalidades: [{ label: "Ronda VSPP 54% no último dia", val: 10, tipo: "ronda", qtd: 54 }], ilumDeficientes: 6, ilumTotal: 140, energiaTemDados: true, energiaQuedas7d: 1 };
+    const p = montarProjetos([row], { P601: { ultimo: { pct: 92, total: 1, ok: 1, partial: 0, inop: 0, data: "2026-10-04" }, keyaccess: null } })[0];
+    const c = (x) => p.cards.find((k) => k.titulo === x);
+    expect(c("Ronda VSPP").detalhe).toContain("Mais detalhes no relatório específico: <b>Ronda VSPP</b>");
+    expect(c("Checklist semanal").detalhe).toContain("Laudo semanal — Histórico de Relatórios do projeto");
+    expect(c("Energia").detalhe).toContain("Ocorrências de Energia");
+    expect(c("KeyAccess").detalhe || "").not.toContain("Mais detalhes");                 // não aferido
+  });
   test("iluminação: pontos checados, % operacionais, pior quadrante e tabela por quadrante", () => {
     const quads = [{ nome: "A1", total: 100, deficientes: 3, atualizadoEm: "2026-10-04T21:00:00" }, { nome: "B2", total: 80, deficientes: 12 }, { nome: "C3", total: 50, deficientes: null }];
     const c = montarProjetos([{ id: "P605", name: "X", score: 82, base: 92, penalidades: [], ilumDeficientes: 15, ilumTotal: 230 }], { P605: { iluminacao: quads } })[0].cards.filter((x) => x.titulo === "Iluminação");
@@ -97,7 +106,8 @@ describe("nível 3 — resumo de cada relatório", () => {
   test("cartões com resumo: laudo, consolidado, KeyAccess, energia, gravação e manutenção", () => {
     const p = ps(ex); const t = (x) => p.cards.find((c) => c.titulo === x);
     expect(t("Checklist semanal").detalhe).toContain("Pânico móvel &lt;x&gt;");
-    expect(t("Consolidado (tendência)").valor).toBe("-1 pp");
+    expect(t("Consolidado (tendência)").valor).toBe("Queda de 1 ponto");
+    expect(t("Consolidado (tendência)").texto).toBe("nos últimos 2 checklists semanais: de 93% para 92%");
     expect(t("KeyAccess").valor).toBe("0 abertas"); expect(t("KeyAccess").efeito).toBe("sem desconto na pontuação");   // valor da linha
     expect(t("KeyAccess").detalhe).toContain("Portaria 1"); expect(t("KeyAccess").detalhe).toContain("Leitura na emissão: 1 em aberto");
     expect(t("Energia").valor).toBe("2 quedas");   // 21/09 e 03/10 estão nos 30 dias antes de 06/10

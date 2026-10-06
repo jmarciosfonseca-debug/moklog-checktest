@@ -13,6 +13,22 @@ import { consolidarRondas, periodoUltimosDias } from "./rondaVirtualRelatorio";
 // Nível 3 (resumo de cada relatório): cada fonte chega já carregada pelo app no clique (só leitura).
 // Convenção das fontes em extras[pid]: undefined = não pedida; null = leitura falhou ("não aferido"); [] = sem registros.
 export const MODULOS_FUTUROS = ["Análise de risco", "Equipamentos críticos"];
+// Onde está o relatório completo de cada tema no MokLog CheckTest (nomes como aparecem no app).
+export const RELATORIO_COMPLETO = {
+  "Checklist semanal": "Laudo semanal — Histórico de Relatórios do projeto",
+  "Consolidado (tendência)": "Consolidado do período — Histórico de Relatórios do projeto",
+  "KeyAccess": "KeyAccess Falha",
+  "Monitor CTMK": "status do CTMK no painel do projeto",
+  "Bolsão": "Fiscalização de Bolsão",
+  "Perímetro": "Teste Perimetral",
+  "Ronda VSPP": "Ronda VSPP",
+  "Energia": "Ocorrências de Energia (relatório do período)",
+  "Iluminação": "Teste de Iluminação",
+  "Ronda virtual (CFTV)": "CCO → Ronda Virtual (consolidado)",
+  "Tempo de gravação (CFTV)": "CCO → CFTV Gravação",
+  "Manutenção técnica": "CCO → Manutenção",
+  "Acessos de ambulância": "Acesso de Ambulância (consolidado)",
+};
 const tab = (cab, linhas) => `<table><thead><tr>${cab.map((c) => `<th>${escHTML(c)}</th>`).join("")}</tr></thead><tbody>${linhas.map((l) => `<tr>${l.map((c) => `<td>${escHTML(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 const lis = (itens) => `<ul>${itens.map((t) => `<li>${escHTML(t)}</li>`).join("")}</ul>`;
 const naoAferido = (titulo, motivo = "a fonte não pôde ser lida no momento da emissão") => ({ titulo, valor: "—", texto: `Não aferido: ${motivo}`, nivel: "neutro", efeito: "não aferido", detalhe: "" });
@@ -27,7 +43,8 @@ function cartoesRelatorios(pid, nome, ex, agora) {
   // Consolidado: tendência semanal
   if (Array.isArray(ex.tendencia) && ex.tendencia.length > 1) {
     const t = ex.tendencia, d = t[t.length - 1].pct - t[0].pct;
-    out.push({ titulo: "Consolidado (tendência)", valor: `${d > 0 ? "+" : ""}${d} pp`, texto: `${t.length} checklists: de ${t[0].pct}% para ${t[t.length - 1].pct}%`, nivel: d < 0 ? "atencao" : "bom", efeito: "alimenta a análise de risco",
+    const pts = Math.abs(d), un = pts === 1 ? "ponto" : "pontos";
+    out.push({ titulo: "Consolidado (tendência)", valor: d < 0 ? `Queda de ${pts} ${un}` : d > 0 ? `Alta de ${pts} ${un}` : "Estável", texto: `nos últimos ${t.length} checklists semanais: de ${t[0].pct}% para ${t[t.length - 1].pct}%`, nivel: d < 0 ? "atencao" : "bom", efeito: "tendência do checklist semanal",
       detalhe: tab(["Checklist", "Resultado"], t.map((x) => [dataBR(x.data), `${x.pct}%`])) });
   }
   // KeyAccess: lista das falhas abertas lidas na emissão. Valor e desconto NÃO são recalculados aqui: o merge em
@@ -58,7 +75,7 @@ function cartoesRelatorios(pid, nome, ex, agora) {
   else if (Array.isArray(ex.rondaTurnos)) {
     const per = periodoUltimosDias(30, agora); const c = consolidarRondas({ id: pid, name: nome }, ex.rondaTurnos, { agora, de: per.de, ate: per.ate });
     if (!c.totais.turnos) out.push({ titulo: "Ronda virtual (CFTV)", valor: "—", texto: "Nenhum turno nos últimos 30 dias (há registros anteriores)", nivel: "neutro", efeito: "sem registros no período", detalhe: "" });
-    else out.push({ titulo: "Ronda virtual (CFTV)", valor: c.totais.execucao == null ? "—" : `${Math.round(c.totais.execucao)}%`, texto: `${c.totais.turnos} turnos em 30 dias · ${c.totais.naoExec} não executadas`, nivel: c.totais.execucao != null && c.totais.execucao < 90 ? "atencao" : "bom", efeito: "alimenta a análise de risco",
+    else out.push({ titulo: "Ronda virtual (CFTV)", valor: c.totais.execucao == null ? "—" : `${Math.round(c.totais.execucao)}%`, texto: `${c.totais.turnos} turnos em 30 dias · ${c.totais.naoExec} não executadas`, nivel: c.totais.execucao != null && c.totais.execucao < 90 ? "atencao" : "bom", efeito: "também lida pela análise de risco; sem pontuação aqui",
       detalhe: tab(["Colaboradora", "Turnos", "Execução", "Não exec.", "Sem justificativa"], c.colaboradoras.map((p) => [p.rotulo, String(p.turnos), p.execucao == null ? "não disponível" : `${Math.round(p.execucao)}%`, String(p.naoExec), String(p.semJust)])) });
   }
   // Tempo de gravação (CFTV): só o dado; o requisito de retenção do contrato ainda não foi definido
@@ -126,7 +143,8 @@ function cartoesPenalidade(row) {
     const pl = (um, varios) => (n === 1 ? um : varios);
     const valor = n == null ? `−${p.val}` : p.tipo === "ronda" ? `${n}%` : p.tipo === "keyaccess" ? `${n} ${pl("aberta", "abertas")}` : p.tipo === "ctmk" ? `${n} d off-line`
       : p.tipo === "bolsao" ? `${n} ${pl("placa", "placas")}` : p.tipo === "perimetro" ? `${n} ${pl("zona", "zonas")}` : `−${p.val}`;
-    return { titulo, valor, texto: l, nivel: p.val >= 10 ? "alerta" : "atencao", efeito: `−${p.val} na pontuação` };
+    return { titulo, valor, texto: l, nivel: p.val >= 10 ? "alerta" : "atencao", efeito: `−${p.val} na pontuação`,
+      detalhe: `<p>${escHTML(l)}. Este item desconta ${p.val} ponto(s) da pontuação do projeto na Visão 360.</p>` };
   });
 }
 
@@ -158,6 +176,10 @@ export function montarProjetos(rows, extras = {}, agora = new Date()) {
         return;
       }
       if (i >= 0) cards[i] = x; else cards.push(x);
+    });
+    cards.forEach((c) => {
+      const rel = RELATORIO_COMPLETO[c.titulo]; if (!rel || c.efeito === "não aferido" || c.efeito === "sem registros") return;
+      c.detalhe = `${c.detalhe || `<p>${escHTML(c.texto)}.</p>`}<p class="rel">Mais detalhes no relatório específico: <b>${escHTML(rel)}</b>, no MokLog CheckTest.</p>`;
     });
     return { id: r.id, nome: r.name, score: r.score, base: r.base, semChecklist: !!r.semChecklist, penalidades: r.penalidades || [], tendencia: ex.tendencia || [], cards };
   });
@@ -205,6 +227,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}th{font-size:11.5px;c
 .mod{background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;min-height:120px;text-align:left;font:inherit;color:inherit}
 button.mod{cursor:pointer}button.mod:hover,button.mod:focus-visible{border-color:var(--tinta2);outline:none}.mod .ver{font-size:12px;color:var(--moked);font-weight:700}
 .det{background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:16px 18px;margin-top:12px}.det h2{font-size:18px;margin:0 0 8px}.det table{margin:8px 0}.det ul{margin:6px 0;padding-left:18px}
+.det .rel{margin-top:12px;padding-top:10px;border-top:1px solid var(--linha);font-size:13.5px;color:var(--tinta2)}
 .fechar{font:inherit;font-size:13px;border:1px solid var(--linha);background:var(--papel);color:var(--tinta);padding:6px 12px;border-radius:6px;cursor:pointer;margin-top:8px}
 .mod .t{font-size:13px;color:var(--mu)}.mod .v{font-size:24px;font-weight:700;line-height:1.1}.mod .d{font-size:13px;color:var(--tinta2)}.mod .e{margin-top:auto;font-size:12px;color:var(--mu)}
 .alerta{border-left:4px solid var(--moked)}.atencao{border-left:4px solid var(--wa)}.bom{border-left:4px solid var(--ok)}.neutro{border-left:4px solid var(--linha)}
