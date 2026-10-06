@@ -27,7 +27,9 @@ import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrenci
 import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import GestaoFV from "./GestaoFV";
-import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF } from "./generatePDF";
+import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
+import { montarHTMLExecutivo } from "./relatorios/executivoRelatorio";
+import { baixarHtml } from "./relatorios/padraoMoked";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 
@@ -1698,6 +1700,24 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             </div>
             {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, mediaGrupo, grupoSel?grupoSel.label:null)}
               style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}>📄 PDF Executivo</button>}
+            {!loadingV&&rows.length>0&&grupoSel&&<button onClick={()=>{
+                // HTML Executivo (demo 05/10): mesmas linhas da Visão 360 + histórico de checklists em memória. Só leitura.
+                try {
+                  const extras = {};
+                  rows.forEach(r=>{
+                    const p = PROJECTS[r.id]; const hist = stored[r.id]?.history ?? [];
+                    if(!p || !hist.length) return;
+                    const ult = hist[hist.length-1]; const h = computeHealth(p, ult.state);
+                    extras[r.id] = { ultimo:{ pct:h.pct, total:h.total, ok:h.ok, partial:h.partial, inop:h.inop, data:ult.meta?.date||null },
+                      tendencia: hist.slice(-6).map(x=>({ pct: computeHealth(p, x.state).pct, data: x.meta?.date||null })) };
+                  });
+                  const c = SCORE360_CFG;
+                  const nota = `Como a pontuação é calculada: parte do % do último checklist semanal e desconta pendências ativas — CTMK off-line (−${c.ctmkPorDia}/dia, máx. −${c.ctmkMax}), falha de KeyAccess aberta (−${c.keyAccess} cada, máx. −${c.keyAccessMax}), placa crítica no bolsão (−${c.bolsaoCritico} cada, máx. −${c.bolsaoMax}), zona perimetral com problema (−${c.perimetralZona} cada, máx. −${c.perimetralMax}), Ronda VSPP abaixo de 90% (−${c.rondaMedia}) ou de 60% (−${c.rondaBaixa}). Iluminação e energia são exibidas, sem pontuação.`;
+                  const html = montarHTMLExecutivo({ rows, grupoLabel: grupoSel.label, agora: new Date(), extras, notaCalculo: nota, logoSrc: MOKED_LOGO });
+                  baixarHtml(html, `executivo_${grupoSel.label.toLowerCase()}_${new Date().toLocaleDateString("sv-SE")}.html`);
+                } catch(e){ alert("Não foi possível gerar o HTML Executivo. Tente novamente."); }
+              }}
+              style={{...S.secBtn,fontSize:12,color:"#e2e8f0",borderColor:"#b21e2766",padding:"8px 12px"}}>HTML Executivo</button>}
           </div>
 
           {!loadingV&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
