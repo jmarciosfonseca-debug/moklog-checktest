@@ -42,6 +42,17 @@ test("ausências declaradas, escape de texto, sem emojis e sem fechar o script p
 });
 
 describe("nível 3 — resumo de cada relatório", () => {
+  test("iluminação: pontos checados, % operacionais, pior quadrante e tabela por quadrante", () => {
+    const quads = [{ nome: "A1", total: 100, deficientes: 3, atualizadoEm: "2026-10-04T21:00:00" }, { nome: "B2", total: 80, deficientes: 12 }, { nome: "C3", total: 50, deficientes: null }];
+    const c = montarProjetos([{ id: "P605", name: "X", score: 82, base: 92, penalidades: [], ilumDeficientes: 15, ilumTotal: 230 }], { P605: { iluminacao: quads } })[0].cards.filter((x) => x.titulo === "Iluminação");
+    expect(c.length).toBe(1);                                                  // substitui o cartão simples da linha
+    expect(c[0].valor).toBe("15 deficientes");
+    expect(c[0].texto).toBe("180 de 230 pontos checados · 91,7% operacionais · pior quadrante: B2 (12 de 80)");
+    expect(c[0].detalhe).toContain("<td>B2</td><td>80</td><td>12</td><td>85%</td>"); expect(c[0].detalhe).toContain("não informado");
+    expect(c[0].detalhe).toContain("1 quadrante(s) sem deficientes informados");
+    const nulo = montarProjetos([{ id: "P605", name: "X", score: 82, base: 92, penalidades: [] }], { P605: { iluminacao: null } })[0].cards.find((x) => x.titulo === "Iluminação");
+    expect(nulo.efeito).toBe("não aferido");
+  });
   test("sem registros × não aferido × sem registros no período (estados explícitos)", () => {
     const base = { ultimo: { pct: 92, total: 1, ok: 1, partial: 0, inop: 0, data: "2026-10-04" } };
     const p = montarProjetos([{ id: "P601", name: "X", score: 90, base: 92, penalidades: [], energiaTemDados: true }], { P601: { ...base, keyaccess: [], rondaTurnos: [], cameras: [], manutencao: [], ambulancia: [] } }, new Date("2026-10-06T07:00:00"))[0];

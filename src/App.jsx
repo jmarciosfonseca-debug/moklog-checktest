@@ -1719,11 +1719,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                       try { ex.falhasSistemas = falhasPorSistema(itensDoEstado(p, ult.state)); } catch(e){ ex.falhasSistemas = []; }
                     }
                     const mega = r.id==="P311A"||r.id==="P311B";
-                    const [key, en, rv, cams, man, amb] = await Promise.all([
+                    const [key, en, rv, cams, man, ilum, amb] = await Promise.all([
                       ler("keyaccess_falhas", r.id, "registros"), ler("energia_ocorrencias", r.id, "eventos"), ler("cco_ronda", r.id, "turnos"),
-                      ler("cftv_gravacao", r.id, "cameras"), ler("cco_manutencao", r.id, "registros"), mega ? ler("ambulancias", r.id, "registros") : Promise.resolve(undefined),
+                      ler("cftv_gravacao", r.id, "cameras"), ler("cco_manutencao", r.id, "registros"), ler("iluminacao", r.id, "quadrantes"),
+                      mega ? ler("ambulancias", r.id, "registros") : Promise.resolve(undefined),
                     ]);
-                    Object.assign(ex, { keyaccess:key, energia:en, rondaTurnos:rv, cameras:cams, manutencao:man });
+                    Object.assign(ex, { keyaccess:key, energia:en, rondaTurnos:rv, cameras:cams, manutencao:man, iluminacao:ilum });
                     if(mega) ex.ambulancia = amb;
                     extras[r.id] = ex;
                   }));
