@@ -42,6 +42,27 @@ test("ausências declaradas, escape de texto, sem emojis e sem fechar o script p
 });
 
 describe("nível 3 — resumo de cada relatório", () => {
+  test("sem registros × não aferido × sem registros no período (estados explícitos)", () => {
+    const base = { ultimo: { pct: 92, total: 1, ok: 1, partial: 0, inop: 0, data: "2026-10-04" } };
+    const p = montarProjetos([{ id: "P601", name: "X", score: 90, base: 92, penalidades: [], energiaTemDados: true }], { P601: { ...base, keyaccess: [], rondaTurnos: [], cameras: [], manutencao: [], ambulancia: [] } }, new Date("2026-10-06T07:00:00"))[0];
+    const t = (x) => p.cards.find((c) => c.titulo === x);
+    for (const x of ["KeyAccess", "Ronda virtual (CFTV)", "Tempo de gravação (CFTV)", "Manutenção técnica", "Acessos de ambulância"]) { expect(t(x).valor).toBe("—"); expect(t(x).efeito).toBe("sem registros"); }
+    const antigo = [{ id: "t", tipo: "noturno", dataInicio: "2026-08-01", arquivado: true, plantonista: { id: "a", nome: "A" }, rondas: {} }];
+    const p2 = montarProjetos([{ id: "P601", name: "X", score: 90, base: 92, penalidades: [] }], { P601: { ...base, rondaTurnos: antigo } }, new Date("2026-10-06T07:00:00"))[0];
+    expect(p2.cards.find((c) => c.titulo === "Ronda virtual (CFTV)").efeito).toBe("sem registros no período");
+  });
+  test("KeyAccess: valor e desconto preservados da linha da Visão 360 (sem fórmula paralela)", () => {
+    const row = { id: "P601", name: "X", score: 82, base: 92, penalidades: [{ label: "2 falha(s) KeyAccess aberta(s)", val: 10, tipo: "keyaccess", qtd: 2 }] };
+    const lidas = [{ data: "2026-10-01" }, { data: "2026-10-02" }, { data: "2026-10-03" }];
+    const c = montarProjetos([row], { P601: { keyaccess: lidas } })[0].cards.find((x) => x.titulo === "KeyAccess");
+    expect([c.valor, c.efeito]).toEqual(["2 abertas", "−10 na pontuação"]);
+    expect(c.detalhe).toContain("Leitura na emissão: 3 em aberto. A pontuação usa a leitura da Visão 360 (2).");
+  });
+  test("tabela do grupo declara o período da energia", () => {
+    const html = montarHTMLExecutivo({ rows: [{ id: "P601", name: "X", score: 90, base: 92, penalidades: [], energiaTemDados: true, energiaQuedas7d: 1 }], grupoLabel: "Golgi", agora: new Date("2026-10-06T07:00:00"),
+      extras: { P601: { energia: [{ inicioQueda: "2026-10-01T10:00:00", fimQueda: "2026-10-01T11:00:00" }] } } });
+    expect(html).toContain("Energia (quedas)"); expect(html).toContain('"periodo":"30 dias"'); expect(html).not.toContain("Energia (7 dias)");
+  });
   const AG3 = new Date("2026-10-06T07:00:00");
   const row = { id: "P601", name: "Golgi Cajamar", score: 72, base: 92, penalidades: [], ilumDeficientes: 6, ilumTotal: 140, energiaQuedas7d: 1, energiaAberta: false, energiaTemDados: true };
   const ex = {
@@ -49,7 +70,7 @@ describe("nível 3 — resumo de cada relatório", () => {
     falhasSistemas: [{ cat: "Pânico móvel <x>", inop: 4, parcial: 0 }],
     keyaccess: [{ data: "2026-10-01", horaInicio: "08:00", portal: "Portaria 1" }, { data: "2026-09-20", horaInicio: "09:00", horaFim: "09:30" }],
     energia: [{ inicioQueda: "2026-09-21T18:08:00", fimQueda: "2026-09-21T23:08:00", gerador: "sim" }, { inicioQueda: "2026-10-03T10:00:00", fimQueda: "2026-10-03T10:30:00", gerador: "sim" }],
-    rondaTurnos: [], cameras: [{ diasGravacao: 19 }, { diasGravacao: 24 }, { diasGravacao: null }],
+    rondaTurnos: [], cameras: [{ diasGravacao: 19 }, { diasGravacao: 24 }, { diasGravacao: null }, { diasGravacao: "" }],
     manutencao: [{ data: "2026-09-15", sistema: "Perímetro", status: "parcial", servico: "Técnico CPF: 933.707.925-91" }, { data: "2026-09-24", sistema: "Torniquete", status: "concluida" }],
   };
   const ps = (e) => montarProjetos([row], { P601: e }, AG3)[0];
@@ -57,9 +78,11 @@ describe("nível 3 — resumo de cada relatório", () => {
     const p = ps(ex); const t = (x) => p.cards.find((c) => c.titulo === x);
     expect(t("Checklist semanal").detalhe).toContain("Pânico móvel &lt;x&gt;");
     expect(t("Consolidado (tendência)").valor).toBe("-1 pp");
-    expect(t("KeyAccess").valor).toBe("1 aberta"); expect(t("KeyAccess").detalhe).toContain("Portaria 1");
-    expect(t("Energia").valor).toBe("2 quedas");   // 21/09 e 03/10 estão nos 30 dias antes de 06/10 expect(t("Energia").detalhe).toContain("Gerador acionado em 2 de 2 quedas");
-    expect(t("Tempo de gravação (CFTV)").valor).toBe("19–24 dias"); expect(t("Tempo de gravação (CFTV)").texto).toContain("1 sem medição");
+    expect(t("KeyAccess").valor).toBe("0 abertas"); expect(t("KeyAccess").efeito).toBe("sem desconto na pontuação");   // valor da linha
+    expect(t("KeyAccess").detalhe).toContain("Portaria 1"); expect(t("KeyAccess").detalhe).toContain("Leitura na emissão: 1 em aberto");
+    expect(t("Energia").valor).toBe("2 quedas");   // 21/09 e 03/10 estão nos 30 dias antes de 06/10
+    expect(t("Energia").detalhe).toContain("Gerador acionado em 2 de 2 quedas");
+    expect(t("Tempo de gravação (CFTV)").valor).toBe("19–24 dias"); expect(t("Tempo de gravação (CFTV)").texto).toContain("2 sem medição");   // "" não vira 0
     expect(t("Manutenção técnica").valor).toBe("1 em aberto"); expect(t("Manutenção técnica").detalhe).not.toContain("933.707");   // sem texto livre/CPF
   });
   test("fonte que falhou = não aferido; documento inexistente = sem registros", () => {
