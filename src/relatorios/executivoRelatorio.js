@@ -85,17 +85,22 @@ function cartoesRelatorios(pid, nome, ex, agora) {
   if (ex.iluminacao === null) out.push(naoAferido("Iluminação"));
   else if (Array.isArray(ex.iluminacao) && !ex.iluminacao.length) out.push({ titulo: "Iluminação", valor: "—", texto: "Sem quadrantes de iluminação cadastrados no app", nivel: "neutro", efeito: "sem registros", detalhe: "" });
   else if (Array.isArray(ex.iluminacao)) {
-    const qs = ex.iluminacao.map((q) => { const total = Number(q.total) || 0; const def = q.deficientes == null || q.deficientes === "" ? null : Math.min(total, Number(q.deficientes) || 0);
-      return { nome: String(q.nome || "—"), total, def, em: q.atualizadoEm || null }; });
+    // deficientes válido = número finito ≥ 0 (número ou texto numérico); vazio, texto, negativo → não informado (null), nunca 0
+    const num = (v) => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN);
+    const qs = ex.iluminacao.map((q) => { const tRaw = num(q.total); const total = Number.isFinite(tRaw) && tRaw > 0 ? tRaw : 0; const dRaw = num(q.deficientes);
+      const valido = Number.isFinite(dRaw) && dRaw >= 0; const def = valido ? Math.min(total, dRaw) : null;
+      return { nome: String(q.nome || "—"), total, def, invalido: q.deficientes != null && q.deficientes !== "" && !valido, em: q.atualizadoEm || null }; });
     const cad = qs.reduce((a, q) => a + q.total, 0), chec = qs.filter((q) => q.def != null), pontosChec = chec.reduce((a, q) => a + q.total, 0), def = chec.reduce((a, q) => a + q.def, 0);
     const pior = [...chec].sort((a, b) => b.def - a.def || (b.def / (b.total || 1)) - (a.def / (a.total || 1)))[0];
     const pctOp = pontosChec ? Math.round(((pontosChec - def) / pontosChec) * 1000) / 10 : null;
     const ord = [...qs].sort((a, b) => (b.def ?? -1) - (a.def ?? -1) || a.nome.localeCompare(b.nome));
-    out.push({ titulo: "Iluminação", valor: `${def} ${def === 1 ? "deficiente" : "deficientes"}`,
+    const tabelaQ = () => tab(["Quadrante", "Pontos", "Deficientes", "Operacionais", "Atualizado em"], ord.map((q) => [q.nome, String(q.total), q.def == null ? (q.invalido ? "valor inválido" : "não informado") : String(q.def),
+        q.def == null || !q.total ? "—" : `${String(Math.round(((q.total - q.def) / q.total) * 1000) / 10).replace(".", ",")}%`, q.em ? dataBR(String(q.em).slice(0, 10)) : "—"]));
+    if (!chec.length) out.push({ titulo: "Iluminação", valor: "—", texto: `${qs.length} quadrante(s), ${cad} pontos cadastrados, sem deficientes informados`, nivel: "neutro", efeito: "não aferido", detalhe: tabelaQ() });
+    else out.push({ titulo: "Iluminação", valor: `${def} ${def === 1 ? "deficiente" : "deficientes"}`,
       texto: `${pontosChec} de ${cad} pontos checados${pctOp != null ? ` · ${String(pctOp).replace(".", ",")}% operacionais` : ""}${pior && pior.def ? ` · pior quadrante: ${pior.nome} (${pior.def} de ${pior.total})` : ""}`,
       nivel: def ? "atencao" : "bom", efeito: "exibido, sem pontuação",
-      detalhe: tab(["Quadrante", "Pontos", "Deficientes", "Operacionais", "Atualizado em"], ord.map((q) => [q.nome, String(q.total), q.def == null ? "não informado" : String(q.def),
-        q.def == null || !q.total ? "—" : `${String(Math.round(((q.total - q.def) / q.total) * 1000) / 10).replace(".", ",")}%`, q.em ? dataBR(String(q.em).slice(0, 10)) : "—"]))
+      detalhe: tabelaQ()
         + (qs.length - chec.length ? `<p>${qs.length - chec.length} quadrante(s) sem deficientes informados não entram na contagem de checados.</p>` : "") });
   }
   // Ambulância (Mega): últimos 30 dias, sem dado de vítima

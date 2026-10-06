@@ -53,6 +53,15 @@ describe("nível 3 — resumo de cada relatório", () => {
     const nulo = montarProjetos([{ id: "P605", name: "X", score: 82, base: 92, penalidades: [] }], { P605: { iluminacao: null } })[0].cards.find((x) => x.titulo === "Iluminação");
     expect(nulo.efeito).toBe("não aferido");
   });
+  test("iluminação: todos não informados = não aferido (nunca '0 deficientes'); texto e negativo não viram número", () => {
+    const ilu = (quads) => montarProjetos([{ id: "P605", name: "X", score: 82, base: 92, penalidades: [] }], { P605: { iluminacao: quads } })[0].cards.find((x) => x.titulo === "Iluminação");
+    const todos = ilu([{ nome: "A1", total: 100, deficientes: null }, { nome: "B2", total: 80 }]);
+    expect([todos.valor, todos.nivel, todos.efeito]).toEqual(["—", "neutro", "não aferido"]);
+    expect(todos.texto).toBe("2 quadrante(s), 180 pontos cadastrados, sem deficientes informados");
+    const inval = ilu([{ nome: "A1", total: 100, deficientes: "abc" }, { nome: "B2", total: 80, deficientes: -3 }, { nome: "C3", total: 50, deficientes: "4" }]);
+    expect(inval.valor).toBe("4 deficientes"); expect(inval.texto).toContain("50 de 230 pontos checados");
+    expect((inval.detalhe.match(/valor inválido/g) || []).length).toBe(2);
+  });
   test("sem registros × não aferido × sem registros no período (estados explícitos)", () => {
     const base = { ultimo: { pct: 92, total: 1, ok: 1, partial: 0, inop: 0, data: "2026-10-04" } };
     const p = montarProjetos([{ id: "P601", name: "X", score: 90, base: 92, penalidades: [], energiaTemDados: true }], { P601: { ...base, keyaccess: [], rondaTurnos: [], cameras: [], manutencao: [], ambulancia: [] } }, new Date("2026-10-06T07:00:00"))[0];
