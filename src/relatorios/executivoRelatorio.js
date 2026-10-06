@@ -13,11 +13,14 @@ export const MODULOS_FUTUROS = ["Análise de risco", "Ronda virtual (CFTV)", "Te
 function cartoesPenalidade(row) {
   return (row.penalidades || []).map((p) => {
     const l = String(p.label || "");
-    const titulo = /KeyAccess/i.test(l) ? "KeyAccess" : /CTMK/i.test(l) ? "Monitor CTMK" : /bols[aã]o/i.test(l) ? "Bolsão" : /perimetral/i.test(l) ? "Perímetro" : /Ronda VSPP/i.test(l) ? "Ronda VSPP" : "Pendência";
-    // número principal = o fato (quantidade ou %); o desconto vai no rodapé do cartão
-    const n = (l.match(/(\d+)/) || [])[1];
-    const valor = titulo === "Ronda VSPP" ? `${n}%` : titulo === "KeyAccess" ? `${n} ${n === "1" ? "aberta" : "abertas"}` : titulo === "Monitor CTMK" ? `${n} d off-line`
-      : titulo === "Bolsão" ? `${n} ${n === "1" ? "placa" : "placas"}` : titulo === "Perímetro" ? `${n} ${n === "1" ? "zona" : "zonas"}` : `−${p.val}`;
+    // tipo e quantidade vêm ESTRUTURADOS de computeScore360 (sem extrair número do rótulo). Sem eles: título genérico
+    // e o próprio rótulo, sem número inventado.
+    const TIT = { keyaccess: "KeyAccess", ctmk: "Monitor CTMK", bolsao: "Bolsão", perimetro: "Perímetro", ronda: "Ronda VSPP" };
+    const titulo = TIT[p.tipo] || "Pendência";
+    const n = Number.isFinite(p.qtd) ? p.qtd : null;
+    const pl = (um, varios) => (n === 1 ? um : varios);
+    const valor = n == null ? `−${p.val}` : p.tipo === "ronda" ? `${n}%` : p.tipo === "keyaccess" ? `${n} ${pl("aberta", "abertas")}` : p.tipo === "ctmk" ? `${n} d off-line`
+      : p.tipo === "bolsao" ? `${n} ${pl("placa", "placas")}` : p.tipo === "perimetro" ? `${n} ${pl("zona", "zonas")}` : `−${p.val}`;
     return { titulo, valor, texto: l, nivel: p.val >= 10 ? "alerta" : "atencao", efeito: `−${p.val} na pontuação` };
   });
 }
@@ -30,7 +33,8 @@ export function montarProjetos(rows, extras = {}) {
       nivel: ex.ultimo.pct >= 90 ? "bom" : ex.ultimo.pct >= 75 ? "atencao" : "alerta", efeito: "base da pontuação" });
     else cards.push({ titulo: "Checklist semanal", valor: "—", texto: "Nenhum checklist registrado", nivel: "neutro", efeito: "sem base para a pontuação" });
     cards.push(...cartoesPenalidade(r));
-    if (r.energiaQuedas7d || r.energiaAberta) cards.push({ titulo: "Energia", valor: `${r.energiaQuedas7d}`, texto: `${r.energiaQuedas7d === 1 ? "queda" : "quedas"} nos últimos 7 dias${r.energiaAberta ? " · ocorrência em aberto" : ""}`, nivel: r.energiaAberta ? "alerta" : "atencao", efeito: "exibido, sem pontuação" });
+    if (r.energiaTemDados === false) cards.push({ titulo: "Energia", valor: "—", texto: "Sem registros de energia no app para este projeto", nivel: "neutro", efeito: "não aferido" });
+    else if (r.energiaQuedas7d || r.energiaAberta) cards.push({ titulo: "Energia", valor: `${r.energiaQuedas7d}`, texto: `${r.energiaQuedas7d === 1 ? "queda" : "quedas"} nos últimos 7 dias${r.energiaAberta ? " · ocorrência em aberto" : ""}`, nivel: r.energiaAberta ? "alerta" : "atencao", efeito: "exibido, sem pontuação" });
     else cards.push({ titulo: "Energia", valor: "0", texto: "Nenhuma queda nos últimos 7 dias", nivel: "bom", efeito: "exibido, sem pontuação" });
     if (r.ilumTotal) cards.push({ titulo: "Iluminação", valor: `${r.ilumDeficientes}`, texto: `pontos deficientes de ${r.ilumTotal}`, nivel: r.ilumDeficientes ? "atencao" : "bom", efeito: "exibido, sem pontuação" });
     return { id: r.id, nome: r.name, score: r.score, base: r.base, semChecklist: !!r.semChecklist, penalidades: r.penalidades || [], tendencia: ex.tendencia || [], cards };

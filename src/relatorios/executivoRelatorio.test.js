@@ -1,9 +1,9 @@
 import { montarHTMLExecutivo, montarProjetos, MODULOS_FUTUROS } from "./executivoRelatorio";
 const AG = new Date("2026-10-05T22:30:00");
 const ROWS = [
-  { id: "P601", name: "Golgi Cajamar", score: 72, base: 92, penalidades: [{ label: "2 falha(s) KeyAccess aberta(s)", val: 10 }, { label: "Ronda VSPP 54% no último dia", val: 10 }], ilumDeficientes: 6, ilumTotal: 120, energiaQuedas7d: 1, energiaAberta: false },
+  { id: "P601", name: "Golgi Cajamar", score: 72, base: 92, penalidades: [{ label: "2 falha(s) KeyAccess aberta(s)", val: 10, tipo: "keyaccess", qtd: 2 }, { label: "Ronda VSPP 54% no último dia", val: 10, tipo: "ronda", qtd: 54 }], ilumDeficientes: 6, ilumTotal: 120, energiaQuedas7d: 1, energiaAberta: false, energiaTemDados: true },
   { id: "P605", name: "Golgi Dutra", score: 82, base: 92, penalidades: [{ label: "2 falha(s) KeyAccess aberta(s)", val: 10 }], ilumDeficientes: 19, ilumTotal: 200, energiaQuedas7d: 0, energiaAberta: false },
-  { id: "P604", name: "Golgi <b>Jundiaí</b>", score: 67, base: 82, penalidades: [], ilumDeficientes: 0, ilumTotal: 0, energiaQuedas7d: 0, energiaAberta: false, semChecklist: true },
+  { id: "P604", name: "Golgi <b>Jundiaí</b>", score: 67, base: 82, penalidades: [], ilumDeficientes: 0, ilumTotal: 0, energiaQuedas7d: 0, energiaAberta: false, energiaTemDados: false, semChecklist: true },
 ];
 const EX = { P601: { ultimo: { pct: 92, total: 182, ok: 166, partial: 1, inop: 15, data: "2026-10-04" }, tendencia: [{ pct: 91 }, { pct: 92 }, { pct: 92 }] } };
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
@@ -23,6 +23,11 @@ test("classificação por pontuação, média e cartões vindos só das linhas d
   const p604 = ps.find((p) => p.id === "P604");
   expect(p604.cards[0].valor).toBe("—");                                   // sem checklist: nunca vira zero
   expect(p604.cards.map((c) => c.titulo)).not.toContain("Iluminação");     // sem dado de iluminação: cartão omitido
+  const en604 = p604.cards.find((c) => c.titulo === "Energia");
+  expect([en604.valor, en604.efeito]).toEqual(["—", "não aferido"]);          // sem registros de energia ≠ "nenhuma queda"
+  // penalidade sem tipo/quantidade estruturados: nenhum número extraído do rótulo
+  const semTipo = montarProjetos([{ id: "X", name: "X", score: 90, base: 95, penalidades: [{ label: "3 algo 7", val: 5 }], energiaTemDados: true }])[0];
+  expect(semTipo.cards.find((c) => c.titulo === "Pendência").valor).toBe("−5");
   const html = montarHTMLExecutivo({ rows: ROWS, grupoLabel: "Golgi", agora: AG, extras: EX, notaCalculo: "Nota." });
   expect(html).toContain("var MEDIA=74;");                                  // (82 + 72 + 67) / 3 = 73,7 → 74
 });

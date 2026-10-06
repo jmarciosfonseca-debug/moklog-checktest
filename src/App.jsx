@@ -1429,11 +1429,11 @@ const SCORE360_CFG = {
 function computeScore360(base, ex) {
   const c = SCORE360_CFG;
   const pen = [];
-  if(ex.ctmkDias>0) pen.push({label:`CTMK ${ex.ctmkDias}d off-line`, val:Math.min(c.ctmkMax, ex.ctmkDias*c.ctmkPorDia)});
-  if(ex.keyAbertas>0) pen.push({label:`${ex.keyAbertas} falha(s) KeyAccess aberta(s)`, val:Math.min(c.keyAccessMax, ex.keyAbertas*c.keyAccess)});
-  if(ex.bolsaoCriticos>0) pen.push({label:`${ex.bolsaoCriticos} placa(s) crítica(s) no bolsão`, val:Math.min(c.bolsaoMax, ex.bolsaoCriticos*c.bolsaoCritico)});
-  if(ex.perimetralZonasRuins>0) pen.push({label:`${ex.perimetralZonasRuins} zona(s) perimetral(is) com problema`, val:Math.min(c.perimetralMax, ex.perimetralZonasRuins*c.perimetralZona)});
-  if(ex.rondaPct!==null && ex.rondaPct!==undefined && ex.rondaPct<90) pen.push({label:`Ronda VSPP ${ex.rondaPct}% no último dia`, val:ex.rondaPct<60?c.rondaBaixa:c.rondaMedia});
+  if(ex.ctmkDias>0) pen.push({label:`CTMK ${ex.ctmkDias}d off-line`, val:Math.min(c.ctmkMax, ex.ctmkDias*c.ctmkPorDia), tipo:"ctmk", qtd:ex.ctmkDias});
+  if(ex.keyAbertas>0) pen.push({label:`${ex.keyAbertas} falha(s) KeyAccess aberta(s)`, val:Math.min(c.keyAccessMax, ex.keyAbertas*c.keyAccess), tipo:"keyaccess", qtd:ex.keyAbertas});
+  if(ex.bolsaoCriticos>0) pen.push({label:`${ex.bolsaoCriticos} placa(s) crítica(s) no bolsão`, val:Math.min(c.bolsaoMax, ex.bolsaoCriticos*c.bolsaoCritico), tipo:"bolsao", qtd:ex.bolsaoCriticos});
+  if(ex.perimetralZonasRuins>0) pen.push({label:`${ex.perimetralZonasRuins} zona(s) perimetral(is) com problema`, val:Math.min(c.perimetralMax, ex.perimetralZonasRuins*c.perimetralZona), tipo:"perimetro", qtd:ex.perimetralZonasRuins});
+  if(ex.rondaPct!==null && ex.rondaPct!==undefined && ex.rondaPct<90) pen.push({label:`Ronda VSPP ${ex.rondaPct}% no último dia`, val:ex.rondaPct<60?c.rondaBaixa:c.rondaMedia, tipo:"ronda", qtd:ex.rondaPct});
   const totalPen = pen.reduce((a,p)=>a+p.val,0);
   return { score: Math.max(0, Math.round(base - totalPen)), base: Math.round(base), penalidades: pen };
 }
@@ -1573,7 +1573,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         const corte = Date.now()-7*86400000;
         const doPeriodo = eventos.filter(e=>e.inicioQueda && new Date(e.inicioQueda).getTime()>=corte);
         const aberto = eventos.some(e=>!e.concluido);
-        energiaBy[pid] = { quedas7d: doPeriodo.length, aberto };
+        energiaBy[pid] = { quedas7d: doPeriodo.length, aberto, temDados: !!energiaSnaps[i]?.exists() };
       });
       let rondaPct = null;
       if(rondaSnap?.exists()){ const regs=(rondaSnap.data().registros||[]).slice().sort((a,b)=>(b.data||"").localeCompare(a.data||"")); const ult=regs[0]; if(ult){ const slots=ult.slots||[]; const f=slots.filter(h=>ult.marcacoes?.[h]?.status==="feito").length; rondaPct = slots.length?Math.round((f/slots.length)*100):null; } }
@@ -1587,7 +1587,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           rondaPct: pid==="P601"?rondaPct:null,
         }, { stored, ctmkData });
         if (!r) return null;
-        return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0, energiaQuedas7d: energiaBy[pid]?.quedas7d||0, energiaAberta: energiaBy[pid]?.aberto||false };
+        return { id:pid, name:p.name, ...r, semChecklist: !last, ilumDeficientes: ilumBy[pid]?.def||0, ilumTotal: ilumBy[pid]?.total||0, energiaQuedas7d: energiaBy[pid]?.quedas7d||0, energiaAberta: energiaBy[pid]?.aberto||false, energiaTemDados: energiaBy[pid]?.temDados===true };
       }).filter(Boolean).sort((a,b)=>b.score-a.score);
       const media = rows.length?Math.round(rows.reduce((a,r)=>a+r.score,0)/rows.length):0;
       setV360({rows, media});
