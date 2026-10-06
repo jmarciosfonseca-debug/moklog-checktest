@@ -5,9 +5,85 @@
 // energia) + o histórico de checklists em memória. Nenhuma leitura nova, nenhuma fórmula nova, nenhuma escrita.
 // O que ainda não entra aparece como "não incluído nesta versão" — nunca como zero.
 // ─────────────────────────────────────────────────────────────
-import { escHTML, dataBR } from "./padraoMoked";
+import { escHTML, dataBR, hm } from "./padraoMoked";
+import { analisarEnergia } from "./energiaRelatorio";
+import { analisarAmbulancia } from "./ambulanciaRelatorio";
+import { consolidarRondas, periodoUltimosDias } from "./rondaVirtualRelatorio";
 
-export const MODULOS_FUTUROS = ["Análise de risco", "Ronda virtual (CFTV)", "Tempo de gravação (CFTV)", "Manutenção técnica", "Acessos de ambulância", "Equipamentos críticos"];
+// Nível 3 (resumo de cada relatório): cada fonte chega já carregada pelo app no clique (só leitura).
+// Convenção das fontes em extras[pid]: undefined = não pedida; null = leitura falhou ("não aferido"); [] = sem registros.
+export const MODULOS_FUTUROS = ["Análise de risco", "Equipamentos críticos"];
+const tab = (cab, linhas) => `<table><thead><tr>${cab.map((c) => `<th>${escHTML(c)}</th>`).join("")}</tr></thead><tbody>${linhas.map((l) => `<tr>${l.map((c) => `<td>${escHTML(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+const lis = (itens) => `<ul>${itens.map((t) => `<li>${escHTML(t)}</li>`).join("")}</ul>`;
+const naoAferido = (titulo, motivo = "a fonte não pôde ser lida no momento da emissão") => ({ titulo, valor: "—", texto: `Não aferido: ${motivo}`, nivel: "neutro", efeito: "não aferido", detalhe: "" });
+
+function cartoesRelatorios(pid, nome, ex, agora) {
+  const out = [];
+  // Laudo: falhas por sistema no último checklist
+  if (Array.isArray(ex.falhasSistemas) && ex.falhasSistemas.length) {
+    const linhas = ex.falhasSistemas.map((f) => [f.cat, String(f.inop), String(f.parcial)]);
+    out.push({ ancora: "laudo", detalhe: `<p>Onde estão as falhas no checklist de ${escHTML(dataBR(ex.ultimo?.data))}:</p>${tab(["Sistema", "Inoperantes", "Parciais"], linhas)}` });
+  }
+  // Consolidado: tendência semanal
+  if (Array.isArray(ex.tendencia) && ex.tendencia.length > 1) {
+    const t = ex.tendencia, d = t[t.length - 1].pct - t[0].pct;
+    out.push({ titulo: "Consolidado (tendência)", valor: `${d > 0 ? "+" : ""}${d} pp`, texto: `${t.length} checklists: de ${t[0].pct}% para ${t[t.length - 1].pct}%`, nivel: d < 0 ? "atencao" : "bom", efeito: "alimenta a análise de risco",
+      detalhe: tab(["Checklist", "Resultado"], t.map((x) => [dataBR(x.data), `${x.pct}%`])) });
+  }
+  // KeyAccess: falhas abertas
+  if (ex.keyaccess === null) out.push(naoAferido("KeyAccess"));
+  else if (Array.isArray(ex.keyaccess)) {
+    const ab = ex.keyaccess.filter((r) => !r.horaFim);
+    out.push({ titulo: "KeyAccess", valor: `${ab.length} ${ab.length === 1 ? "aberta" : "abertas"}`, texto: ab.length ? "falhas de acesso sem encerramento" : "Nenhuma falha de acesso em aberto", nivel: ab.length ? (ab.length >= 3 ? "alerta" : "atencao") : "bom", efeito: ab.length ? `−${Math.min(15, ab.length * 5)} na pontuação` : "sem desconto",
+      detalhe: ab.length ? tab(["Data", "Início", "Ponto"], ab.slice(0, 15).map((r) => [dataBR(r.data), r.horaInicio || r.hora || "—", r.portal || r.local || r.ponto || r.equipamento || "—"])) : "" });
+  }
+  // Energia: histórico e últimos 30 dias
+  if (ex.energia === null) out.push(naoAferido("Energia"));
+  else if (Array.isArray(ex.energia)) {
+    if (!ex.energia.length) out.push({ titulo: "Energia", valor: "—", texto: "Sem registros de energia no app para este projeto", nivel: "neutro", efeito: "não aferido", detalhe: "" });
+    else {
+      const a = analisarEnergia(ex.energia, agora); const corte = new Date(agora.getTime() - 30 * 86400000).toISOString();
+      const q30 = a.quedas.filter((e) => e.inicioQueda >= corte).length;
+      out.push({ titulo: "Energia", valor: `${q30} ${q30 === 1 ? "queda" : "quedas"}`, texto: `nos últimos 30 dias · ${a.quedas.length} no histórico`, nivel: q30 ? (q30 >= 3 ? "alerta" : "atencao") : "bom", efeito: "exibido, sem pontuação",
+        detalhe: lis([`${a.quedas.length} quedas desde ${dataBR(a.inicioRegistro)}; ${a.emAberto.length} em aberto.`, `Tempo total sem energia da rede (quedas encerradas): ${hm(a.tempoTotal)}.`,
+          a.maior ? `Maior queda: ${dataBR(a.maior.inicioQueda)}, ${hm(Math.round((new Date(a.maior.fimQueda) - new Date(a.maior.inicioQueda)) / 60000))}.` : "Sem queda encerrada registrada.",
+          `Gerador acionado em ${a.gerador} de ${a.quedas.length} quedas.`, `${a.abastecimentos.length} abastecimentos de diesel, ${a.litros.toLocaleString("pt-BR")} L.`,
+          a.diasDesdeUltima != null ? `Última queda há ${a.diasDesdeUltima} dia(s).` : "Nenhuma queda registrada."]) });
+    }
+  }
+  // Ronda virtual (CFTV): últimos 30 dias, por colaboradora (nomes liberados pelo Marcio)
+  if (ex.rondaTurnos === null) out.push(naoAferido("Ronda virtual (CFTV)"));
+  else if (Array.isArray(ex.rondaTurnos) && ex.rondaTurnos.length) {
+    const per = periodoUltimosDias(30, agora); const c = consolidarRondas({ id: pid, name: nome }, ex.rondaTurnos, { agora, de: per.de, ate: per.ate });
+    if (c.totais.turnos) out.push({ titulo: "Ronda virtual (CFTV)", valor: c.totais.execucao == null ? "—" : `${Math.round(c.totais.execucao)}%`, texto: `${c.totais.turnos} turnos em 30 dias · ${c.totais.naoExec} não executadas`, nivel: c.totais.execucao != null && c.totais.execucao < 90 ? "atencao" : "bom", efeito: "alimenta a análise de risco",
+      detalhe: tab(["Colaboradora", "Turnos", "Execução", "Não exec.", "Sem justificativa"], c.colaboradoras.map((p) => [p.rotulo, String(p.turnos), p.execucao == null ? "não disponível" : `${Math.round(p.execucao)}%`, String(p.naoExec), String(p.semJust)])) });
+  }
+  // Tempo de gravação (CFTV): só o dado; o requisito de retenção do contrato ainda não foi definido
+  if (ex.cameras === null) out.push(naoAferido("Tempo de gravação (CFTV)"));
+  else if (Array.isArray(ex.cameras) && ex.cameras.length) {
+    const d = ex.cameras.map((c) => c.diasGravacao).filter((x) => x != null && Number.isFinite(Number(x))).map(Number);
+    const faixa = (lo, hi) => d.filter((x) => x >= lo && x < hi).length;
+    out.push({ titulo: "Tempo de gravação (CFTV)", valor: d.length ? `${Math.min(...d)}–${Math.max(...d)} dias` : "—", texto: `${ex.cameras.length} câmeras${d.length < ex.cameras.length ? ` · ${ex.cameras.length - d.length} sem medição` : ""}`, nivel: "neutro", efeito: "evidência técnica, sem pontuação",
+      detalhe: tab(["Faixa de gravação", "Câmeras"], [["menos de 15 dias", String(faixa(0, 15))], ["15 a 29 dias", String(faixa(15, 30))], ["30 dias ou mais", String(faixa(30, 1e9))], ["sem medição", String(ex.cameras.length - d.length)]]) + "<p>O requisito de retenção do contrato será indicado quando definido.</p>" });
+  }
+  // Manutenção técnica: pendências abertas por sistema (sem nomes, sem CPF, sem texto livre)
+  if (ex.manutencao === null) out.push(naoAferido("Manutenção técnica"));
+  else if (Array.isArray(ex.manutencao) && ex.manutencao.length) {
+    const hoje = agora.toISOString().slice(0, 10);
+    const ab = ex.manutencao.filter((r) => !r.rascunho && (r.status === "pendente" || r.status === "parcial")).sort((a, b) => String(a.data).localeCompare(String(b.data)));
+    const dias = (d) => Math.max(0, Math.round((new Date(hoje + "T12:00:00") - new Date(String(d) + "T12:00:00")) / 86400000));
+    out.push({ titulo: "Manutenção técnica", valor: `${ab.length} em aberto`, texto: ab.length ? `mais antiga há ${dias(ab[0].data)} dias (${ab[0].sistema || "sistema não informado"})` : "Nenhuma pendência aberta", nivel: ab.length ? "atencao" : "bom", efeito: "pendências de reparo registradas pela CCO",
+      detalhe: ab.length ? tab(["Desde", "Sistema", "Situação", "Em aberto"], ab.slice(0, 15).map((r) => [dataBR(r.data), r.sistema || "—", r.status === "parcial" ? "Parcial" : "Pendente", `${dias(r.data)} d`])) : "" });
+  }
+  // Ambulância (Mega): últimos 30 dias, sem dado de vítima
+  if (ex.ambulancia === null) out.push(naoAferido("Acessos de ambulância"));
+  else if (Array.isArray(ex.ambulancia)) {
+    const per = periodoUltimosDias(30, agora); const a = analisarAmbulancia(ex.ambulancia, { inicio: per.de, fim: per.ate });
+    out.push({ titulo: "Acessos de ambulância", valor: `${a.n}`, texto: `nos últimos 30 dias${a.permMedia != null ? ` · permanência média ${Math.round(a.permMedia)} min` : ""}`, nivel: a.n ? "atencao" : "bom", efeito: "registro de atendimento",
+      detalhe: a.n ? tab(["Inquilino", "Atendimentos"], a.porInquilino.slice(0, 8).map((x) => [x[0], String(x[1])])) + tab(["Tipo de ocorrência", "Atendimentos"], a.porTipo.slice(0, 8).map((x) => [x[0], String(x[1])])) : "" });
+  }
+  return out;
+}
 
 // Converte as penalidades da Visão 360 em cartões legíveis (mesmos textos e valores calculados no app).
 function cartoesPenalidade(row) {
@@ -25,7 +101,7 @@ function cartoesPenalidade(row) {
   });
 }
 
-export function montarProjetos(rows, extras = {}) {
+export function montarProjetos(rows, extras = {}, agora = new Date()) {
   return (rows || []).map((r) => {
     const ex = extras[r.id] || {};
     const cards = [];
@@ -37,6 +113,13 @@ export function montarProjetos(rows, extras = {}) {
     else if (r.energiaQuedas7d || r.energiaAberta) cards.push({ titulo: "Energia", valor: `${r.energiaQuedas7d}`, texto: `${r.energiaQuedas7d === 1 ? "queda" : "quedas"} nos últimos 7 dias${r.energiaAberta ? " · ocorrência em aberto" : ""}`, nivel: r.energiaAberta ? "alerta" : "atencao", efeito: "exibido, sem pontuação" });
     else cards.push({ titulo: "Energia", valor: "0", texto: "Nenhuma queda nos últimos 7 dias", nivel: "bom", efeito: "exibido, sem pontuação" });
     if (r.ilumTotal) cards.push({ titulo: "Iluminação", valor: `${r.ilumDeficientes}`, texto: `pontos deficientes de ${r.ilumTotal}`, nivel: r.ilumDeficientes ? "atencao" : "bom", efeito: "exibido, sem pontuação" });
+    // Nível 3: relatórios com resumo (o laudo ganha o detalhe "onde estão as falhas"; energia completa substitui o resumo de 7 dias)
+    const rel = cartoesRelatorios(r.id, r.name, ex, agora);
+    const laudo = rel.find((x) => x.ancora === "laudo"); if (laudo && cards[0]) cards[0].detalhe = laudo.detalhe;
+    rel.filter((x) => !x.ancora).forEach((x) => {
+      const i = cards.findIndex((c) => c.titulo === x.titulo);
+      if (i >= 0) cards[i] = x; else cards.push(x);
+    });
     return { id: r.id, nome: r.name, score: r.score, base: r.base, semChecklist: !!r.semChecklist, penalidades: r.penalidades || [], tendencia: ex.tendencia || [], cards };
   });
 }
@@ -50,10 +133,10 @@ function sparkSVG(t) {
 
 export function montarHTMLExecutivo({ rows, grupoLabel, agora = new Date(), extras = {}, notaCalculo = "", logoSrc = "" }) {
   if (!grupoLabel) throw new Error("HTML Executivo é por cliente: selecione um grupo (a visão Todos é interna).");
-  const projetos = montarProjetos([...(rows || [])].sort((a, b) => b.score - a.score), extras);
+  const projetos = montarProjetos([...(rows || [])].sort((a, b) => b.score - a.score), extras, agora);
   const media = projetos.length ? Math.round(projetos.reduce((s, p) => s + p.score, 0) / projetos.length) : 0;
   const emissao = `${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
-  const dados = projetos.map((p) => ({ ...p, spark: sparkSVG(p.tendencia), cards: p.cards.map((c) => ({ ...c, titulo: escHTML(c.titulo), valor: escHTML(c.valor), texto: escHTML(c.texto), efeito: escHTML(c.efeito) })),
+  const dados = projetos.map((p) => ({ ...p, spark: sparkSVG(p.tendencia), cards: p.cards.map((c) => ({ titulo: escHTML(c.titulo), valor: escHTML(c.valor), texto: escHTML(c.texto), efeito: escHTML(c.efeito), nivel: c.nivel, detalhe: c.detalhe || "" })),
     nome: escHTML(p.nome), penalidades: p.penalidades.map((x) => ({ val: x.val, label: escHTML(x.label) })) }));
   const json = JSON.stringify(dados).replace(/</g, "\\u003c");
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -80,7 +163,10 @@ h1{font-size:26px;margin:2px 0 4px}.sub{color:var(--tinta2);margin:0 0 16px}
 table{width:100%;border-collapse:collapse;font-size:13.5px}th{font-size:11.5px;color:var(--mu);text-align:left;border-bottom:1.5px solid var(--tinta);padding:6px}td{border-bottom:1px solid var(--linha);padding:7px 6px}.rol{overflow-x:auto}
 .cab{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end}
 .cadeia{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
-.mod{background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;min-height:120px}
+.mod{background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:6px;min-height:120px;text-align:left;font:inherit;color:inherit}
+button.mod{cursor:pointer}button.mod:hover,button.mod:focus-visible{border-color:var(--tinta2);outline:none}.mod .ver{font-size:12px;color:var(--moked);font-weight:700}
+.det{background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:16px 18px;margin-top:12px}.det h2{font-size:18px;margin:0 0 8px}.det table{margin:8px 0}.det ul{margin:6px 0;padding-left:18px}
+.fechar{font:inherit;font-size:13px;border:1px solid var(--linha);background:var(--papel);color:var(--tinta);padding:6px 12px;border-radius:6px;cursor:pointer;margin-top:8px}
 .mod .t{font-size:13px;color:var(--mu)}.mod .v{font-size:24px;font-weight:700;line-height:1.1}.mod .d{font-size:13px;color:var(--tinta2)}.mod .e{margin-top:auto;font-size:12px;color:var(--mu)}
 .alerta{border-left:4px solid var(--moked)}.atencao{border-left:4px solid var(--wa)}.bom{border-left:4px solid var(--ok)}.neutro{border-left:4px solid var(--linha)}
 .fut{font-size:13px;color:var(--mu);margin-top:12px}.rodape{font-size:12px;color:var(--mu);margin-top:22px;border-top:1px solid var(--linha);padding-top:10px}
@@ -101,13 +187,18 @@ function grupo(){return '<div class="trilha">'+GRUPO+'</div><h1>'+GRUPO+': '+D.l
  D.map(function(p,i){return '<button class="lin" data-p="'+p.id+'"><span class="pos">'+(i+1)+'º</span><span class="nome"><b>'+p.id+' · '+p.nome+'</b><span>'+(p.semChecklist?'sem checklist registrado':'checklist '+p.base+'%')+'</span></span><span class="trilho"><i style="width:'+Math.max(0,Math.min(100,p.score))+'%"></i></span><span class="nota">'+p.score+'<small>/100</small></span><span class="fator">'+(p.penalidades.length?p.penalidades.map(function(x){return x.label+' (−'+x.val+')';}).join(' · '):'Sem pendências que descontem a pontuação')+'</span></button>';}).join('')+'</div></section>'+
  '<section class="painel"><h2 style="font-size:17px;margin:0 0 8px">Comparação</h2><div class="rol"><table><thead><tr><th>Projeto</th><th>Pontuação</th><th>Checklist</th><th>Pendências que descontam</th><th>Energia (7 dias)</th><th>Iluminação</th></tr></thead><tbody>'+
  D.map(function(p){var en=p.cards.filter(function(c){return c.titulo==='Energia';})[0];var il=p.cards.filter(function(c){return c.titulo==='Iluminação';})[0];return '<tr><td><b>'+p.id+'</b></td><td>'+p.score+'</td><td>'+(p.semChecklist?'—':p.base+'%')+'</td><td>'+p.penalidades.length+'</td><td>'+(en?en.valor:'—')+'</td><td>'+(il?il.valor+' deficientes':'—')+'</td></tr>';}).join('')+'</tbody></table></div></section>';}
+var abertoMod=null;
 function projeto(p){return '<div class="trilha"><a tabindex="0" data-voltar>'+GRUPO+'</a> › '+p.id+'</div><div class="cab"><div><h1>'+p.id+' · '+p.nome+'</h1><p class="sub">'+p.score+' de 100'+(p.penalidades.length?' · '+p.penalidades.length+(p.penalidades.length===1?' pendência desconta':' pendências descontam')+' a pontuação':' · sem pendências que descontem a pontuação')+'.</p></div>'+
  (p.spark?'<div>'+p.spark+'<div style="font-size:12px;color:var(--mu)">checklist nas últimas '+p.tendencia.length+' semanas</div></div>':'')+'</div>'+
- '<div class="cadeia">'+p.cards.map(function(c){return '<div class="mod '+c.nivel+'"><span class="t">'+c.titulo+'</span><span class="v">'+c.valor+'</span><span class="d">'+c.texto+'</span><span class="e">'+c.efeito+'</span></div>';}).join('')+'</div>'+
+ '<div class="cadeia">'+p.cards.map(function(c,i){var corpo='<span class="t">'+c.titulo+'</span><span class="v">'+c.valor+'</span><span class="d">'+c.texto+'</span><span class="e">'+c.efeito+'</span>';
+   return c.detalhe?'<button class="mod '+c.nivel+'" data-m="'+i+'">'+corpo+'<span class="ver">Ver resumo</span></button>':'<div class="mod '+c.nivel+'">'+corpo+'</div>';}).join('')+'</div>'+
+ (abertoMod!==null&&p.cards[abertoMod]?'<section class="det" id="det"><h2>'+p.cards[abertoMod].titulo+' — '+p.cards[abertoMod].valor+'</h2>'+p.cards[abertoMod].detalhe+'<button class="fechar" data-fechar>Fechar resumo</button></section>':'')+
  '<p class="fut">Não incluídos nesta versão: '+FUT.join(', ')+'.</p>';}
 function render(){app.innerHTML=est?projeto(D.filter(function(p){return p.id===est;})[0]):grupo();
- Array.prototype.forEach.call(app.querySelectorAll('[data-p]'),function(b){b.onclick=function(){est=b.getAttribute('data-p');render();window.scrollTo(0,0);};});
- Array.prototype.forEach.call(app.querySelectorAll('[data-voltar]'),function(a){a.onclick=function(){est=null;render();};a.onkeydown=function(e){if(e.key==='Enter')a.onclick();};});}
+ Array.prototype.forEach.call(app.querySelectorAll('[data-p]'),function(b){b.onclick=function(){est=b.getAttribute('data-p');abertoMod=null;render();window.scrollTo(0,0);};});
+ Array.prototype.forEach.call(app.querySelectorAll('[data-m]'),function(b){b.onclick=function(){abertoMod=Number(b.getAttribute('data-m'));render();var d=document.getElementById('det');if(d&&d.scrollIntoView)d.scrollIntoView({behavior:'smooth',block:'nearest'});};});
+ Array.prototype.forEach.call(app.querySelectorAll('[data-fechar]'),function(b){b.onclick=function(){abertoMod=null;render();};});
+ Array.prototype.forEach.call(app.querySelectorAll('[data-voltar]'),function(a){a.onclick=function(){est=null;abertoMod=null;render();};a.onkeydown=function(e){if(e.key==='Enter')a.onclick();};});}
 render();
 </script></body></html>`;
 }

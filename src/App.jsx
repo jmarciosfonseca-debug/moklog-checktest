@@ -29,6 +29,7 @@ import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
 import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
 import { montarHTMLExecutivo } from "./relatorios/executivoRelatorio";
+import { itensDoEstado, falhasPorSistema } from "./relatorios/metricas";
 import { baixarHtml } from "./relatorios/padraoMoked";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
@@ -1544,6 +1545,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
   const [showAuditoria,setShowAuditoria]=useState(false);
   const [analiseRiscoPacote, setAnaliseRiscoPacote] = useState(null); // "golgi" | "mega" | "klog" | null
+  const [gerandoExec, setGerandoExec] = useState(false); // HTML Executivo: leitura das fontes em andamento
   const [v360Grupo, setV360Grupo] = useState("todos"); // todos | golgi | mega | klog — "todos" é uso interno Moked; PDF por cliente nunca mistura
   const V360_GRUPOS = { golgi:{label:"Golgi",ids:["P601","P602","P604","P605","P606","P607"]}, mega:{label:"Mega",ids:["P311A","P311B"]}, klog:{label:"Klog",ids:["P505"]} };
   const carregarVisao360 = async () => {
@@ -1700,24 +1702,39 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             </div>
             {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, mediaGrupo, grupoSel?grupoSel.label:null)}
               style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}>📄 PDF Executivo</button>}
-            {!loadingV&&rows.length>0&&grupoSel&&<button onClick={()=>{
-                // HTML Executivo (demo 05/10): mesmas linhas da Visão 360 + histórico de checklists em memória. Só leitura.
+            {!loadingV&&rows.length>0&&grupoSel&&<button disabled={gerandoExec} onClick={async()=>{
+                // HTML Executivo: mesmas linhas da Visão 360 + resumos de cada relatório, lidos SÓ NO CLIQUE (somente leitura).
+                // Fonte que falhar = null ("não aferido" no arquivo); documento inexistente = [] (sem registros).
+                if(gerandoExec) return; setGerandoExec(true);
                 try {
+                  const ler = async (col, pid, campo) => { try { const sn = await getDoc(doc(db, col, pid)); return sn.exists() ? (sn.data()[campo] || []) : []; } catch(e){ return null; } };
                   const extras = {};
-                  rows.forEach(r=>{
+                  await Promise.all(rows.map(async r=>{
                     const p = PROJECTS[r.id]; const hist = stored[r.id]?.history ?? [];
-                    if(!p || !hist.length) return;
-                    const ult = hist[hist.length-1]; const h = computeHealth(p, ult.state);
-                    extras[r.id] = { ultimo:{ pct:h.pct, total:h.total, ok:h.ok, partial:h.partial, inop:h.inop, data:ult.meta?.date||null },
-                      tendencia: hist.slice(-6).map(x=>({ pct: computeHealth(p, x.state).pct, data: x.meta?.date||null })) };
-                  });
+                    const ex = {};
+                    if(p && hist.length){
+                      const ult = hist[hist.length-1]; const h = computeHealth(p, ult.state);
+                      ex.ultimo = { pct:h.pct, total:h.total, ok:h.ok, partial:h.partial, inop:h.inop, data:ult.meta?.date||null };
+                      ex.tendencia = hist.slice(-6).map(x=>({ pct: computeHealth(p, x.state).pct, data: x.meta?.date||null }));
+                      try { ex.falhasSistemas = falhasPorSistema(itensDoEstado(p, ult.state)); } catch(e){ ex.falhasSistemas = []; }
+                    }
+                    const mega = r.id==="P311A"||r.id==="P311B";
+                    const [key, en, rv, cams, man, amb] = await Promise.all([
+                      ler("keyaccess_falhas", r.id, "registros"), ler("energia_ocorrencias", r.id, "eventos"), ler("cco_ronda", r.id, "turnos"),
+                      ler("cftv_gravacao", r.id, "cameras"), ler("cco_manutencao", r.id, "registros"), mega ? ler("ambulancias", r.id, "registros") : Promise.resolve(undefined),
+                    ]);
+                    Object.assign(ex, { keyaccess:key, energia:en, rondaTurnos:rv, cameras:cams, manutencao:man });
+                    if(mega) ex.ambulancia = amb;
+                    extras[r.id] = ex;
+                  }));
                   const c = SCORE360_CFG;
-                  const nota = `Como a pontuação é calculada: parte do % do último checklist semanal e desconta pendências ativas — CTMK off-line (−${c.ctmkPorDia}/dia, máx. −${c.ctmkMax}), falha de KeyAccess aberta (−${c.keyAccess} cada, máx. −${c.keyAccessMax}), placa crítica no bolsão (−${c.bolsaoCritico} cada, máx. −${c.bolsaoMax}), zona perimetral com problema (−${c.perimetralZona} cada, máx. −${c.perimetralMax}), Ronda VSPP abaixo de 90% (−${c.rondaMedia}) ou de 60% (−${c.rondaBaixa}). Iluminação e energia são exibidas, sem pontuação.`;
+                  const nota = `Como a pontuação é calculada: parte do % do último checklist semanal e desconta pendências ativas — CTMK off-line (−${c.ctmkPorDia}/dia, máx. −${c.ctmkMax}), falha de KeyAccess aberta (−${c.keyAccess} cada, máx. −${c.keyAccessMax}), placa crítica no bolsão (−${c.bolsaoCritico} cada, máx. −${c.bolsaoMax}), zona perimetral com problema (−${c.perimetralZona} cada, máx. −${c.perimetralMax}), Ronda VSPP abaixo de 90% (−${c.rondaMedia}) ou de 60% (−${c.rondaBaixa}). Iluminação, energia, ronda virtual, gravação, manutenção e ambulância são exibidas, sem pontuação.`;
                   const html = montarHTMLExecutivo({ rows, grupoLabel: grupoSel.label, agora: new Date(), extras, notaCalculo: nota, logoSrc: MOKED_LOGO });
                   baixarHtml(html, `executivo_${grupoSel.label.toLowerCase()}_${new Date().toLocaleDateString("sv-SE")}.html`);
                 } catch(e){ alert("Não foi possível gerar o HTML Executivo. Tente novamente."); }
+                finally { setGerandoExec(false); }
               }}
-              style={{...S.secBtn,fontSize:12,color:"#e2e8f0",borderColor:"#b21e2766",padding:"8px 12px"}}>HTML Executivo</button>}
+              style={{...S.secBtn,fontSize:12,color:"#e2e8f0",borderColor:"#b21e2766",padding:"8px 12px",opacity:gerandoExec?0.6:1}}>{gerandoExec?"Gerando…":"HTML Executivo"}</button>}
           </div>
 
           {!loadingV&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
