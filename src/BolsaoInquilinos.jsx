@@ -1,3 +1,4 @@
+import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
 // BolsaoInquilinos.jsx — Checagem de Bolsão (P505), padrão Mega (P311A/B)
@@ -129,72 +130,7 @@ function upsertPlaca(placas, placaDigitadaBruta, inquilino, tipo, nowIso){
   return { ...placas, [placa]:entry };
 }
 
-function gerarPdfBolsao(project, placas, checagens){
-  const agora = new Date();
-  const lista = Object.values(placas).sort((a,b)=>b.diasConsecutivos-a.diasConsecutivos);
-  const datas = checagens.map(c=>c.data).filter(Boolean).sort();
-  const periodo = datas.length ? `${fmtData(datas[0])} a ${fmtData(datas[datas.length-1])}` : "—";
-  const linhasPlacas = lista.map(p=>{
-    const cor = STATUS_CFG[statusFromDias(p.diasConsecutivos)].color;
-    return `<tr>
-      <td style="font-weight:900;letter-spacing:1px">${p.placa}</td>
-      <td>${p.inquilino||"—"}</td>
-      <td>${p.tipo==="interno"?"Interno":"Externo"}</td>
-      <td style="text-align:center;font-weight:800;color:${cor}">${p.diasConsecutivos}</td>
-      <td>${fmtDateTime(p.ultimaVista)}</td>
-    </tr>`;
-  }).join("");
-  const linhasChecagens = [...checagens].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||"")).map(c=>{
-    const fotosHtml = (c.fotos||[]).length ? `<tr>
-      <td colspan="4" style="padding:8px 9px;background:#f8fafc">
-        <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:5px">📷 Fotos do local (${(c.fotos||[]).length})</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${(c.fotos||[]).map((f,i)=>`<img src="${f}" alt="Foto ${i+1}" style="width:132px;height:132px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0"/>`).join("")}</div>
-      </td>
-    </tr>` : "";
-    return `<tr>
-      <td>${fmtData(c.data)} ${c.hora||""}</td>
-      <td>${c.lider||"—"}</td>
-      <td>${c.tipo==="interno"?"Interno":"Externo"}</td>
-      <td>${(c.itens||[]).map(i=>`${i.placa} (${i.inquilino||"—"})`).join(", ")}</td>
-    </tr>${fotosHtml}`;
-  }).join("");
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="utf-8"><title>Bolsão ${project.id}</title>
-<style>
-  body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:20px;max-width:900px;margin:0 auto}
-  h1{font-size:19px;margin:0} .sub{font-size:12px;color:#64748b;margin-top:2px}
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
-  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-  .kpi-val{font-size:22px;font-weight:900} .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-  h2{font-size:13px;margin:18px 0 6px}
-  table{width:100%;border-collapse:collapse;font-size:11px} th{background:#1e293b;color:#fff;padding:6px 9px;text-align:left;font-size:10px}
-  td{padding:6px 9px;border-bottom:1px solid #f1f5f9}
-  .footer{text-align:center;margin-top:18px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  thead{display:table-header-group}
-  tr{page-break-inside:avoid}
-  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
-</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-<h1>🅿️ Checagem de Bolsão — ${project.id}</h1>
-<div class="sub">${project.name||""} · Período: ${periodo} · Gerado em ${agora.toLocaleDateString("pt-BR")}</div>
-<div class="kpis">
-  <div class="kpi"><div class="kpi-val">${lista.length}</div><div class="kpi-lbl">Placas Envolvidas</div></div>
-  <div class="kpi"><div class="kpi-val">${checagens.length}</div><div class="kpi-lbl">Rondas de Checagem</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#ef4444">${lista.filter(p=>statusFromDias(p.diasConsecutivos)!=="normal").length}</div><div class="kpi-lbl">Em Atenção/Crítico</div></div>
-</div>
-<h2>Placas no Bolsão (por dias consecutivos)</h2>
-<table><thead><tr><th>Placa</th><th>Inquilino</th><th>Tipo</th><th>Dias</th><th>Última vista</th></tr></thead><tbody>${linhasPlacas}</tbody></table>
-<h2>Histórico de Rondas de Checagem</h2>
-<table><thead><tr><th>Data/Hora</th><th>Líder</th><th>Tipo</th><th>Placas checadas</th></tr></thead><tbody>${linhasChecagens}</tbody></table>
-<div class="footer">MokLog CheckTest · Moked Consulting Security · Bolsão ${project.id}</div>
-</body></html>`;
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=`bolsao_${project.id}_${agora.toLocaleDateString("sv-SE")}.html`; a.click();
-}
+function gerarPdfBolsao(project, placas, checagens){ baixarBolsao({project, placas, checagens}); }
 
 function getStyles(dark){
   return {
