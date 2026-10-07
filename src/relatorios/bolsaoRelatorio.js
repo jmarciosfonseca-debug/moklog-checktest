@@ -1,5 +1,5 @@
 import { documentoMoked, escHTML as e, baixarHtml } from './padraoMoked';
-import { bolsaoTipo, placasObservadas, reguaOcupacao, internoExterno, dataLocal } from './bolsaoRegras';
+import { bolsaoTipo, placasObservadas, reguaOcupacao, internoExterno, dataLocal, topPlacas } from './bolsaoRegras';
 
 const dt = s => { const d = new Date(s); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit' }); };
 const status = p => ({critico:'Crítico',atencao:'Atenção',normal:'Normal'}[p.status] || 'Não informado');
@@ -18,7 +18,7 @@ export function gerarBolsaoHtml({ project, placas = {}, checagens = [], periodo,
   const fim = periodo?.to ? dataLocal(periodo.to) : datas[datas.length - 1] || inicio;
   const numero = `MK-BOLSAO-${project.id}-${inicio.replace(/-/g,'')}-${fim.replace(/-/g,'')}`;
   const label = periodo?.label || `${inicio.split('-').reverse().join('/')} a ${fim.split('-').reverse().join('/')}`;
-  let corpo = css;
+  let corpo = css + '<style>.bol-fotos-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.bol-fotos-grid .bol-foto{margin:0;min-width:0}.bol-fotos-grid .bol-foto img{width:100%;height:100px;object-fit:cover;border-radius:4px}.bol-foto figcaption{overflow-wrap:anywhere}.bol-top-item{padding:5px 7px;border-bottom:1px solid #ddd;break-inside:avoid;font-size:8.5pt}.bol-top-datas{font-size:7pt;line-height:1.4;color:#4b5563;overflow-wrap:anywhere}.bol-top-data{white-space:nowrap}</style>';
   if (interno) {
     const rondas = checagens.filter(c => { const d = c.data || dataLocal(c.criadoEm); return d >= inicio && d <= fim; });
     const lista = placasObservadas(placas, rondas).sort((a,b) => (b.diasConsecutivos || 0) - (a.diasConsecutivos || 0));
@@ -34,7 +34,7 @@ export function gerarBolsaoHtml({ project, placas = {}, checagens = [], periodo,
     corpo += titulo('Rondas de checagem');
     corpo += cards([...rondas].sort((a,b) => (b.criadoEm || '').localeCompare(a.criadoEm || '')).map(c => `<b>${e((c.data || '').split('-').reverse().join('/'))} ${e(c.hora || '')}</b><br>${e(c.lider || '—')} · ${tipoNome(c.tipo)}<br>${(c.itens || []).length} placas: ${e((c.itens || []).map(i => i.placa).join(', '))}`));
     const fotos = rondas.flatMap(c => (c.fotos || []).filter(fotoSegura).map((f,i) => `<figure class="bol-foto"><figcaption>${e(c.data)} ${e(c.hora || '')} · ${e(c.lider || '—')} · ${tipoNome(c.tipo)} · Foto ${i+1}</figcaption><img src="${e(f)}" alt="Foto do local, ronda ${e(c.data)} ${e(c.hora)}"></figure>`));
-    if (fotos.length) corpo += `<section class="bol-fotos">${titulo('Fotos do local - por ronda')}${fotos.join('')}</section>`;
+    if (fotos.length) corpo += `<section class="bol-fotos">${titulo('Fotos do local - por ronda')}<div class="bol-fotos-grid">${fotos.join('')}</div></section>`;
   } else {
     const todas = Object.values(placas);
     const from = periodo?.from ? new Date(periodo.from).getTime() : -Infinity;
@@ -47,6 +47,14 @@ export function gerarBolsaoHtml({ project, placas = {}, checagens = [], periodo,
     const bloqueados = todas.filter(p => p.bloqueado && new Date(p.dataBloqueio).getTime() >= from && new Date(p.dataBloqueio).getTime() <= to);
     corpo += '<div class="bol-externo">';
     corpo += kpis([[av.length,'Avistamentos'],[ranking.length,'Placas únicas'],[ranking.filter(p => status(p)==='Atenção').length,'Em atenção (atual)'],[ranking.filter(p => status(p)==='Crítico').length,'Em crítico (atual)'],[bloqueados.length,'Bloqueados']]);
+    corpo += titulo('Top 5 — placas mais recorrentes');
+    const top = topPlacas(av);
+    corpo += top.length ? top.map(p => `<div class="bol-top-item"><b>${e(p.placa)}</b> · ${p.total} avistamentos · ${p.diasConsec} dias consecutivos · ${status(p)}<div class="bol-top-datas">${p.ultimasDatas.map(s => {
+      const d = new Date(s);
+      const partes = new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);
+      const valor = tipo => partes.find(x => x.type === tipo)?.value;
+      return `<span class="bol-top-data">${valor('day')}/${valor('month')} ${valor('hour')}:${valor('minute')}</span>`;
+    }).join(' · ')}${p.total > p.ultimasDatas.length ? ` … (+${p.total-p.ultimasDatas.length})` : ''}</div></div>`).join('') : '<p class="mk-nota">Sem registros no período.</p>';
     corpo += titulo('Ranking de recorrência');
     corpo += cards(ranking.map(p => `<b>${e(p.placa)}</b><br>${p.count} avistamentos no período<br>${e(p.diasConsecutivos ?? '—')} dias consecutivos atuais · ${status(p)}`));
     corpo += titulo('Veículos bloqueados no período');

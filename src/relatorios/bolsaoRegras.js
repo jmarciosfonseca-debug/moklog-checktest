@@ -16,6 +16,21 @@ export function dataLocal(ts) {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 }
 export function placaDias(p) { return new Set(p.dias || []).size; }
+// Recebe somente os avistamentos já filtrados pelo período/turno do relatório.
+export function topPlacas(avistamentos, n = 5, datas = 15) {
+  const grupos = new Map();
+  avistamentos.forEach(a => {
+    if (!a.p?.placa || !Number.isFinite(new Date(a.ts).getTime())) return;
+    if (!grupos.has(a.p.placa)) grupos.set(a.p.placa, { placa: a.p.placa, total: 0, diasConsec: Number(a.p.diasConsecutivos) || 0, status: a.p.status, ultimasDatas: [] });
+    const g = grupos.get(a.p.placa);
+    g.total += 1;
+    g.ultimasDatas.push(a.ts);
+  });
+  const linhas = [...grupos.values()];
+  linhas.forEach(g => g.ultimasDatas.sort((a,b) => new Date(b) - new Date(a)));
+  return linhas.sort((a,b) => b.total-a.total || b.diasConsec-a.diasConsec || new Date(b.ultimasDatas[0])-new Date(a.ultimasDatas[0]) || a.placa.localeCompare(b.placa))
+    .slice(0, Math.max(0,n)).map(g => ({ ...g, ultimasDatas: g.ultimasDatas.slice(0,Math.max(0,datas)) }));
+}
 export function placasObservadas(placas = {}, checagens = []) {
   const mapa = new Map();
   const alias = new Map();
