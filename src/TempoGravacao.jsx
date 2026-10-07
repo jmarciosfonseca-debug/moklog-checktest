@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { montarRelatorioGravacao } from "./relatorios/gravacaoRelatorio";
+import { baixarHtml } from "./relatorios/padraoMoked";
 
 const COL = "cftv_gravacao";
 
@@ -40,74 +42,9 @@ function tqDiasRestantes(alvoISO){
 }
 
 function gerarPDFGravacao(project, cameras) {
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const sorted = [...cameras].sort((a,b)=>(a.diasGravacao||0)-(b.diasGravacao||0));
-  const abaixo30 = sorted.filter(c=>c.diasGravacao!==null && c.diasGravacao!==undefined && c.diasGravacao<30);
-
-  const rows = sorted.map((c,i)=>{
-    const dias = c.diasGravacao!==null&&c.diasGravacao!==undefined ? c.diasGravacao : null;
-    const cor = dias===null?"#94a3b8":dias<15?"#dc2626":dias<30?"#d97706":"#15803d";
-    const bg = dias===null?"":"style=\"background:"+(dias<15?"#fef2f2":dias<30?"#fffbeb":"")+"\"";
-    return `<tr ${bg}>
-      <td style="text-align:center;font-weight:800;color:#475569">${i+1}</td>
-      <td style="font-weight:700">${c.nome||"—"}</td>
-      <td style="font-size:11px;color:#64748b">${c.especificacao||"—"}</td>
-      <td style="text-align:center;font-weight:800;color:${cor}">${dias!==null?dias+"d":"—"}</td>
-      <td style="font-size:11px;color:#64748b">${fmtDateTime(c.ultimaChecagem)||"—"}</td>
-      <td style="font-size:11px;color:#64748b">${c.checadoPor||"—"}</td>
-    </tr>`;
-  }).join("");
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8">
-<title>CFTV Tempo de Gravação — ${project.id}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;font-size:13px}
-  .header{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
-  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-  .kpi-val{font-size:24px;font-weight:900}
-  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
-  th{background:#1e293b;color:#fff;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase}
-  td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
-  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
-</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-<div class="header">
-  <div>
-    <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">📹 CFTV — Tempo de Gravação</h1>
-    <p style="font-size:12px;opacity:.85">${project.id} — ${project.name||""}</p>
-  </div>
-  <div style="text-align:right;font-size:11px;opacity:.8">
-    <div>Gerado em ${hoje}</div>
-    <div style="margin-top:2px">José Fonseca — Moked Consulting</div>
-  </div>
-</div>
-<div class="kpis">
-  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${cameras.length}</div><div class="kpi-lbl">Total Câmeras</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#dc2626">${abaixo30.length}</div><div class="kpi-lbl">Abaixo de 30 dias</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#15803d">${cameras.filter(c=>c.diasGravacao>=30).length}</div><div class="kpi-lbl">≥ 30 dias OK</div></div>
-</div>
-<table>
-  <thead><tr><th>#</th><th>Câmera</th><th>Especificação</th><th style="text-align:center">Gravação</th><th>Última Checagem</th><th>Checado por</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · CFTV Tempo de Gravação</div>
-  <div style="margin-top:3px">${project.id} — ${project.name||""} · ${hoje}</div>
-</div></body></html>`;
-
-  const blob=new Blob([html],{type:"text/html"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download=`cftv_gravacao_${project.id}_${hoje.replace(/\//g,"-")}.html`;
-  a.click(); URL.revokeObjectURL(url);
+  const hoje = new Date();
+  const { html } = montarRelatorioGravacao(project, cameras, { hoje });
+  baixarHtml(html, `cftv_gravacao_${project.id}_${hoje.toLocaleDateString("pt-BR").replace(/\//g,"-")}.html`);
 }
 
 export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, setDoc, getDoc, loadEquipe }) {
