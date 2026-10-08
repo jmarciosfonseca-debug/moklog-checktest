@@ -1,5 +1,9 @@
 const {merge,save,validateLeader}=require('../api/ai/lib/equipeMerge');
 const clone=x=>JSON.parse(JSON.stringify(x));
+test.each(['historicoDesde','treinamentosEsperados'])('configuração %s é exclusiva do gerencial', campo => {
+ const before = {colaboradores:[]}, after = {...before,[campo]:campo==='historicoDesde'?'2026-01-01':[]};
+ expect(()=>validateLeader(before,after)).toThrow('exclusivamente gerencial');
+});
 const initial=()=>({colaboradores:[{id:'a',nome:'A',foto:'preservada',historico:[],uniforme:{solicitacoes:[]}},{id:'b',nome:'B',uniforme:{solicitacoes:[]}}],desligados:[]});
 const request=id=>({id,item:'Camisa',status:'pendente',aprovacao:'aguardando',exigeWhats:true});
 function banco(initial){let data=clone(initial),version=0;return {collection:()=>({doc:()=>({})}),get data(){return data;},runTransaction:async fn=>{for(;;){let pending;const v=version,snapshot=clone(data);const result=await fn({get:async()=>({exists:true,data:()=>snapshot}),set:(_,d)=>{pending=d;}});if(v!==version)continue;data=pending;version++;return result;}}};}
