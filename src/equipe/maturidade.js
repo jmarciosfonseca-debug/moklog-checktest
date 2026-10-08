@@ -118,6 +118,25 @@ export function calcularReciclagem(colaborador, hoje) {
   return { valor: estado === 'vencido' ? 0 : estado === 'alerta' ? 60 : 100, estado, diasRestantes, vencimento };
 }
 
+export function resumirTreinamentos(colaboradores, hoje) {
+  const fim = data(hoje);
+  if (fim === null) throw new Error('Data de referência inválida');
+  const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - 1);
+  const pessoas = colaboradores.map(c => {
+    const registros = (Array.isArray(c.historico) ? c.historico : []).filter(h => h.tipo === 'Treinamento' && String(h.detalhe || '').trim() && (data(h.data) === null || data(h.data) <= fim));
+    const recentes = registros.filter(h => data(h.data) !== null && data(h.data) >= +inicio);
+    return { id: c.id, registros: registros.length, recentes: recentes.length };
+  });
+  const comRegistro = pessoas.filter(p => p.registros > 0).length;
+  const comRegistro12m = pessoas.filter(p => p.recentes > 0).length;
+  return { pessoas, total: pessoas.length, comRegistro, comRegistro12m, percentual12m: pessoas.length && comRegistro ? 100 * comRegistro12m / pessoas.length : null };
+}
+
+export function rotuloTreinamentos(resumo) {
+  if (!resumo.comRegistro) return 'Não aferido — sem treinamento registrado';
+  return `${resumo.comRegistro12m}/${resumo.total} pessoas (${Math.round(resumo.percentual12m)}%) com treinamento registrado nos últimos 12 meses; ${resumo.comRegistro} com histórico`;
+}
+
 export function calcularMapaEquipe(equipe, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
@@ -142,5 +161,7 @@ export function calcularMapaEquipe(equipe, hoje) {
   }));
   const ordenados = elegiveis.filter(i => i.indice !== null).sort((a, b) => b.indice - a.indice || a.colaborador.nome.localeCompare(b.colaborador.nome));
   const corte = ordenados[Math.min(2, ordenados.length - 1)]?.indice;
-  return { hoje, individuos, eixos, ...estabilidade, ...agregarEquipe(individuos, estabilidade.estabilidade), top: ordenados.filter(i => i.indice >= corte), alertas: individuos.flatMap(i => i.alertas.map(texto => ({ colabId: i.colaborador.id, nome: i.colaborador.nome, texto }))) };
+  const treinamentos = resumirTreinamentos(individuos.map(i => i.colaborador), hoje);
+  individuos.forEach(i => { i.treinamentosRegistrados = treinamentos.pessoas.find(p => p.id === i.colaborador.id); });
+  return { hoje, individuos, eixos, treinamentos, ...estabilidade, ...agregarEquipe(individuos, estabilidade.estabilidade), top: ordenados.filter(i => i.indice >= corte), alertas: individuos.flatMap(i => i.alertas.map(texto => ({ colabId: i.colaborador.id, nome: i.colaborador.nome, texto }))) };
 }

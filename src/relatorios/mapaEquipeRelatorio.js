@@ -1,11 +1,11 @@
 import { documentoMoked, escHTML as esc, dataBR } from './padraoMoked';
-import { calcularMapaEquipe } from '../equipe/maturidade';
+import { calcularMapaEquipe, rotuloTreinamentos } from '../equipe/maturidade';
 
-const rotulos = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Treinamento', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
+const rotulos = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Obrigatórios', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
 const nota = n => n === null ? 'Não aferido' : Math.round(n);
 const foto = c => c.foto ? `<img class="eq-foto" src="${esc(c.foto)}" alt="Foto de ${esc(c.nome)}">` : '<div class="eq-foto">Foto não cadastrada</div>';
 function barras(eixos) {
-  return Object.entries(rotulos).map(([k, label]) => `<div class="eq-eixo"><span>${label}</span><span class="eq-trilho"><i style="width:${eixos[k] ?? 0}%"></i></span><b>${nota(eixos[k])}</b></div>`).join('');
+  return Object.entries(rotulos).map(([k, label]) => `<div class="eq-eixo"><span>${k === 'treinamento' ? 'Obrigatórios' : label}</span><span class="eq-trilho"><i style="width:${eixos[k] ?? 0}%"></i></span><b>${k === 'treinamento' && eixos[k] === null ? 'Sem catálogo' : nota(eixos[k])}</b></div>`).join('');
 }
 export function radarEquipe(eixos) {
   const pontos = (raio, valores = null) => Object.keys(rotulos).map((k, i) => {
@@ -35,7 +35,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const desligados = incluirDesligados ? (equipe.desligados || []).filter(c => c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
   const corpo = `<style>.eq-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.eq-card{border:1px solid #ddd;border-radius:6px;padding:9px;break-inside:avoid;overflow-wrap:anywhere;font-size:8pt}.eq-card h3{font-size:10pt;margin:4px 0}.eq-foto{width:60px;height:64px;object-fit:cover;float:left;margin:0 7px 7px 0;font-size:7pt}.eq-nota{display:block;clear:both;font-size:18pt;margin-top:8px}.eq-eixo{display:grid;grid-template-columns:74px 1fr 55px;align-items:center;gap:3px;font-size:7pt;margin-top:4px}.eq-trilho{background:#eee;height:6px}.eq-trilho i{display:block;background:#334155;height:6px}.eq-radar{width:260px;max-width:100%}.eq-empresa{height:35px;max-width:160px;object-fit:contain}</style>
   ${empresa.logo ? `<img class="eq-empresa" src="${esc(empresa.logo)}" alt="${esc(empresa.empresa)}">` : ''}
-  <div class="mk-kpis"><div class="mk-k">Efetivo ativo<strong class="eq-nota">${modelo.individuos.length}</strong></div><div class="mk-k">Treinamento<strong class="eq-nota">${nota(modelo.eixos.treinamento)}</strong></div><div class="mk-k">Turnover 12 meses<strong class="eq-nota">${nota(modelo.turnover)}</strong></div><div class="mk-k">Aferidos<strong class="eq-nota">${modelo.quantidadeAferida}</strong></div></div>
+  <div class="mk-kpis"><div class="mk-k">Efetivo ativo<strong class="eq-nota">${modelo.individuos.length}</strong></div><div class="mk-k">Treinamentos aplicados<strong class="eq-nota">${modelo.treinamentos.comRegistro ? `${Math.round(modelo.treinamentos.percentual12m)}%` : 'Não aferido'}</strong><div class="mk-nota">${esc(rotuloTreinamentos(modelo.treinamentos))}</div></div><div class="mk-k">Turnover 12 meses<strong class="eq-nota">${nota(modelo.turnover)}</strong></div><div class="mk-k">Aferidos<strong class="eq-nota">${modelo.quantidadeAferida}</strong></div></div>
   <section class="mk-hero"><div><div class="mk-lb">Maturidade da equipe</div><div class="mk-big">${nota(modelo.indice)}</div><b>${esc(modelo.classe)}</b><p>Estabilidade: ${nota(modelo.estabilidade)}</p><p class="mk-nota">Índice descritivo dos registros disponíveis; não mede diretamente o conhecimento do posto.</p></div><div class="eq-radar">${radarEquipe(modelo.eixos)}</div></section>
   <div class="mk-duas"><section><h2 class="mk-h2">Top 3 (com empates)</h2><div class="mk-nota">${modelo.top.map(i => `${esc(i.colaborador.nome)} (${nota(i.indice)})`).join('; ') || 'Sem índices aferidos'}. Fotos nas fichas abaixo.</div></section><section><h2 class="mk-h2">Alertas</h2>${modelo.alertas.map(a => `<div class="mk-nota"><b>${esc(a.nome)}</b>: ${esc(a.texto)}</div>`).join('') || 'Nenhum alerta nos dados aferidos'}</section></div>
   ${treinamento}<h2 class="mk-h2">Equipe - fichas individuais</h2><div class="eq-grade">${cards}</div>
