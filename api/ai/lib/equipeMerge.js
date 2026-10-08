@@ -78,7 +78,7 @@ function validateQuantities(before,after){
  }
 }
 function validateLeader(before,after){
- for(const field of ['fv','campanhasSazonais'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}
+ for(const field of ['fv','campanhasSazonais','historicoDesde','treinamentosEsperados'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}
  const old=[...(before.colaboradores||[]),...(before.desligados||[])].flatMap(c=>(c.uniforme?.solicitacoes||[]).map(s=>({c:c.id,s})));
  for(const c of [...(after.colaboradores||[]),...(after.desligados||[])])for(const s of c.uniforme?.solicitacoes||[]){
   const prev=old.find(x=>x.c===c.id&&x.s.id===s.id)?.s;

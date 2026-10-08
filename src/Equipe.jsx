@@ -45,6 +45,10 @@ import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
+import MaturidadeResumo from './equipe/MaturidadeResumo';
+import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
+import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
+import { baixarHtml } from './relatorios/padraoMoked';
 import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
@@ -77,7 +81,7 @@ function getTurnos(projectId) {
   if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno","Ferista"];
   return ["Diurno","Noturno","Folguista","Ferista"];
 }
-const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento"];
+const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento","Atraso"];
 // ── Cobertura temporária de liderança: quando um Apoio/outro cargo assume
 // a função de líder por um período (ex: férias do titular). Não substitui
 // o cargo cadastrado — só "promove" durante a janela de datas.
@@ -93,6 +97,7 @@ function cargoEfetivo(colab){
   return coberturaAtiva(colab) ? "VSPP Líder (cobertura)" : colab.cargo;
 }
 const HIST_COLORS = {
+  "Atraso": { bg: '#451a03', color: '#f59e0b', icon: '⏱' },
   "Falta":             { color:"#ef4444", bg:"#1a0202", badge:"#fee2e2" },
   "FT":                { color:"#f59e0b", bg:"#1a1000", badge:"#fef3c7" },
   "Medida Disciplinar":{ color:"#a855f7", bg:"#120a2e", badge:"#f3e8ff" },
@@ -1640,7 +1645,7 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
             </div>
             {/* Row 2: Férias, Treinamento */}
             <div style={{ display:"flex", gap:6, marginBottom:14 }}>
-              {["Férias","Treinamento"].map(tipo=>{
+              {["Férias","Treinamento","Atraso"].map(tipo=>{
                 const tc = HIST_COLORS[tipo];
                 const isSel = histForm.tipo===tipo;
                 return (
@@ -1653,6 +1658,7 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
             </div>
 
             {/* Data — Falta tem lógica especial */}
+            {histForm.tipo === 'Falta' && <label><input type="checkbox" checked={histForm.justificada === true} onChange={e => setHistForm(h => ({ ...h, justificada: e.target.checked }))} /> Falta justificada (confirmação explícita)</label>}
             {histForm.tipo==="Falta" ? (
               <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
                 <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginBottom:4 }}>Tipo de Falta</div>
@@ -2834,6 +2840,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
 
+          {adminAuth && <MaturidadeResumo equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} />}
+          {adminAuth && <ConfiguracaoMaturidade key={project.id} equipe={equipeData} onSave={patch => save({ ...equipeData, ...patch })} />}
           {/* Barra de auth */}
           {adminAuth ? (
             <div style={{ background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"10px 14px" }}>
@@ -2884,10 +2892,12 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                         : selPDF.length===ativos.length
                         ? `Equipe Completa — ${project.id}`
                         : `Seleção — ${project.id}`;
-                      gerarMapaEquipePDF(project, injetarFotos(cols, fotosMapa), titulo, perfilSeg, injetarFotos(pdfComDesligados ? desligados : [], fotosMapa));
+                      const referencia = new Date().toLocaleDateString('sv-SE');
+                      const dadosMapa = { ...equipeData, colaboradores: injetarFotos(ativos, fotosMapa) };
+                      baixarHtml(gerarMapaEquipeHTML({ project, equipe: dadosMapa, hoje: referencia, empresa: SEG_LOGOS[project.id], selecionados: selPDF, incluirDesligados: pdfComDesligados }), `mapa_equipe_${project.id}_${referencia}.html`);
                     }}
                       style={{ ...S.btnSm, fontSize:10, color:"#fff", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", border:"none", padding:"5px 14px", fontWeight:700 }}>
-                      📄 Gerar PDF ({selPDF.length}{pdfComDesligados&&desligados.length?` +${desligados.length}`:""})
+                      Mapa de Equipe (PDF) ({selPDF.length}{pdfComDesligados&&desligados.length?` +${desligados.length}`:""})
                     </button>
                   )}
                   {desligados.length>0&&(
