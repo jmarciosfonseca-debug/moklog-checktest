@@ -31,8 +31,12 @@
 //   • zona "em obra/instalação" → observação "em implantação" (fora do score)
 //
 // PÂNICO:
-//   • móvel → peso 4 (teto MODERADO, sem trava; coberto pelo fixo)
-//   • fixo  → Bloqueador 10 + trava
+//   • móvel → Tático, peso 4 (teto MODERADO, sem trava); 0/N → piso MODERADO (v2)
+//   • fixo  → Bloqueador 10 + trava (sem comunicação / "não reportou" = CRÍTICO)
+//
+// DOUTRINA v2 (08/10/2026): perfil de barreiras por projeto, CFTV graduado,
+// consolidado >= maior vetor e "por quê" pelo vetor de maior classe vivem em
+// riscoMotorV2.js, camada aditiva aplicada sobre o resultado deste arquivo.
 //
 // DOIS ESCOPOS:
 //   • CLIENTE → só vetores de segurança; teto ELEVADO no consolidado
@@ -130,7 +134,9 @@ export const MAPA_NOMEBASE = [
   // ── Pânico: distinguir fixo vs móvel (item interno decide) ──
   // IMPORTANTE: exige "panico" ou "botao" — NÃO casar "telefone fixo" etc.
   { match: ["panico fixo", "botao de panico fixo", "botao fixo", "panico ztrax"], classe: "BLOQUEADOR", flags: { panicoFixo: true } },
-  { match: ["panico movel", "panico móvel", "panico mov"], classe: "AUTOMACAO", flags: { panicoMovel: true, peso: 4 } },
+  // v2 (08/10/2026): pânico móvel é TÁTICO (não automação). Peso 4 mantém o
+  // teto MODERADO aqui; o piso 0/N → MODERADO é aplicado em riscoMotorV2.
+  { match: ["panico movel", "panico móvel", "panico mov"], classe: "TATICO", flags: { panicoMovel: true, peso: 4 } },
   { match: ["botoes de panico", "botao de panico", "panico"], classe: "BLOQUEADOR", flags: { panicoFixo: true } }, // pânico genérico em categoria própria = fixo (conservador p/ trava)
 
   // ── Perímetro (regra especial) ──

@@ -25,6 +25,7 @@ function familiaDoVetor(vetor = {}) {
   if (/cftv|camera|dvr|nvr/.test(texto)) return "CFTV";
   if (/bollard|bolard|dilacerador|garra/.test(texto)) return "BARREIRA_VEICULAR";
   if (/cancela|portao|eclusa veicular/.test(texto)) return "CANCELA";
+  if (/panico mov/.test(texto)) return "PANICO_MOVEL";   // v2: móvel é tático, não bloqueador
   if (/panico/.test(texto)) return "PANICO";
   if (/ilumin/.test(texto)) return "ILUMINACAO";
   if (/catraca|leitor|qr|controle de acesso|torniquete/.test(texto)) return "CONTROLE_ACESSO";
@@ -34,7 +35,7 @@ function familiaDoVetor(vetor = {}) {
 function pesoDoVetor(vetor, familia) {
   if (vetor.reclassificadoComposto) return "TATICO";
   if (vetor.bloqueadorCaido || ["PERIMETRO", "PERIMETRO_PRIMARIO", "BARREIRA_VEICULAR", "CANCELA", "PANICO"].includes(familia)) return "BLOQUEADOR";
-  if (["CFTV", "CTMK", "RONDA_VIRTUAL"].includes(familia) || vetor.contribuicao === "tatico") return "TATICO";
+  if (["CFTV", "CTMK", "RONDA_VIRTUAL", "PANICO_MOVEL"].includes(familia) || vetor.contribuicao === "tatico") return "TATICO";
   if (["ILUMINACAO", "CONTROLE_ACESSO", "ENERGIA"].includes(familia)) return "SOMA";
   return "REGISTRA";
 }
@@ -156,6 +157,14 @@ const TEXTOS = {
       exposicao: "A indisponibilidade retira do posto um canal dedicado de acionamento silencioso em situação de ameaça.",
       consequencia: "A falha pode atrasar o pedido de apoio, reduzir a capacidade de resposta coordenada e ampliar a exposição do colaborador durante uma crise.",
       impacto: "Exige meio alternativo formalmente testado e restabelecimento prioritário do dispositivo fixo.",
+    },
+  },
+  PANICO_MOVEL: {
+    UNICA: {
+      titulo: "Pânico móvel — acionamento em deslocamento",
+      exposicao: "Sem os dispositivos móveis, o vigilante em ronda perde o canal silencioso de acionamento fora do posto fixo.",
+      consequencia: "Um evento durante a ronda pode ser comunicado com atraso, reduzindo a coordenação da resposta enquanto o pânico fixo cobre apenas o posto.",
+      impacto: "Requer reposição das baterias/dispositivos e teste de comunicação com a central; o pânico fixo segue como cobertura do posto.",
     },
   },
   CTMK: {

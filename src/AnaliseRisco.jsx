@@ -30,6 +30,7 @@ import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { classificarVetor, consolidarSite, classificarRiscoOperacional, normalizarFracao, avaliarIluminacao, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
+import { aplicarMotorV2, classificarCFTVGraduado, contarPerimetraisAntigas } from "./riscoMotorV2";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
 import { loadFollowups, canonicalFollowupKey } from "./followups";
 import { itensDoEstado, resumo, falhasPorSistema, estadoTratativa } from "./relatorios/metricas";
@@ -665,8 +666,11 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
       pid: ts.pid, labelCategoria: g.catLabel, labelItem: piorItem?.itemLabel || "",
       inop: aggc.inop, total: aggc.total, dias: piorDias, escopo: "moked",
     });
-    const nivelOperacional = /c[âa]mera|cftv/i.test(g.catLabel || "") && aggc.inop > 5
-      ? NIVEIS.ELEVADO
+    // v2 (08/10/2026): CFTV graduado — > 5 câmeras é piso MODERADO; sobe a
+    // ELEVADO só com aging > 15 d, >= 10 % do parque ou >= 2 perimetrais > 7 d.
+    const ehCFTV = /c[âa]mera|cftv/i.test(g.catLabel || "");
+    const nivelOperacional = ehCFTV
+      ? classificarCFTVGraduado({ inop: aggc.inop, total: aggc.total, piorDias, perimetraisAntigas: contarPerimetraisAntigas(g.itens.map((i) => ({ ...i, catLabel: g.catLabel }))), nivelBase: rc.nivel }).nivel
       : rc.nivel;
     if (rc.incluir === false && rc.nivel <= RC_NIVEL.SEMDADOS) continue; // fora do score
 
@@ -727,10 +731,11 @@ export function vetoresDoTesteSemanal(ts, dataUlt) {
       : camadaPerimetral && piorItem?.itemLabel
         ? `${camadaPerimetral}-${normalizarZona(piorItem.itemLabel)}`
         : null;
-    const ehPerimetral = catEhPerimetral || /per[ií]metr|cerca|alpha sense|fibra|sensor ir/i.test(textoPerimetral);
+    // Câmera batizada "Perímetro 14" é CFTV, não zona perimetral (v2).
+    const ehPerimetral = !ehCFTV && (catEhPerimetral || /per[ií]metr|cerca|alpha sense|fibra|sensor ir/i.test(textoPerimetral));
     out.push({
       chave: `cat:${g.catLabel}`, label: g.catLabel,
-      nivel: nivelOperacional, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
+      nivel: nivelOperacional, nivelBaseCFTV: ehCFTV ? rc.nivel : undefined, classeV2: rc.classe, incluirCliente: rc.incluir !== false,
       bloqueadorCaido: !!rc.bloqueadorCaido,
       travaTipo: rc.travaTipo || null, observacaoManutencao: !!rc.observacaoManutencao,
       inop: aggc.inop, total: aggc.total, proporcao: aggc.total ? aggc.inop / aggc.total : null,
@@ -1134,6 +1139,7 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "
 const escAttr = (s) => esc(s).replace(/["']/g, (c) => c === '"' ? "&quot;" : "&#39;");
 
 const NIVEL_PILL_CLASS = { 4: "b-crit", 3: "b-elev", 2: "b-mod", 1: "b-baixo" };
+const NIVEL_PILL_CLASS_CALC = { 4: "ar-b-cr", 3: "ar-b-el", 2: "ar-b-mo", 1: "ar-b-ba" };
 
 export function formatarPlantoes(valor, { prefixo = "" } = {}) {
   const quantidade = Number(valor);
@@ -1272,7 +1278,16 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   const respostaCalculo = nivelGeral === NIVEIS.BAIXO
     ? "Manter acompanhamento preventivo e executar eventuais manutenções conforme a programação operacional."
     : "Priorizar manutenção dos bloqueadores e restabelecer a cobertura antes da próxima revisão.";
-  const calculoHTML = `
+  // v2 (08/10/2026): memória de cálculo em SOMA — uma linha por vetor que
+  // pesou (fonte, item, aging, nível e regra) e a linha final "= NÍVEL".
+  const memoria = geral.memoria && Array.isArray(geral.memoria.linhas) ? geral.memoria : null;
+  const calculoHTML = memoria ? `
+    <ol class="calc-soma">${memoria.linhas.map((l) => `<li class="${l.determinante ? "det" : ""}"><span class="cs-fato">${esc(l.fato)}</span> <span class="cs-regra">→ ${esc(l.regra)}</span> <span class="ar-b ${NIVEL_PILL_CLASS_CALC[l.nivel] || "ar-b-mo"}">${esc(l.nivelLabel)}</span></li>`).join("")}
+      ${memoria.semAgravante.length ? `<li class="sem"><span class="cs-fato">${memoria.semAgravante.slice(0, 6).map((x) => esc(x.item)).join(" · ")}</span> <span class="cs-regra">→ sem agravante${memoria.semAgravante.some((x) => /segue bloqueando|continua bloqueando/.test(x.motivo)) ? " (" + esc(memoria.semAgravante.filter((x) => /bloqueando/.test(x.motivo)).map((x) => x.motivo).join("; ")) + ")" : ""}</span></li>` : ""}
+      ${!memoria.linhas.length ? `<li><span class="cs-fato">nenhuma falha determinante identificada</span></li>` : ""}
+    </ol>
+    <div class="calc-resultado" style="border-color:${corVeredito}"><b>${esc(memoria.resultado)}</b><span class="ar-mu"> · fonte: ${esc(memoria.fonte)}${memoria.matrizMotivo && memoria.matrizNivel === nivelGeral ? ` · matriz: ${esc(memoria.matrizMotivo)}` : ""}</span></div>
+    ${parciaisDet ? `<div class="nota">${parciaisDet} item(ns) parcial(is) contado(s) como indisponível(is) — critério conservador do motor.</div>` : ""}` : `
     <div class="calc-card"><div class="calc-k">1 · Evidências</div><div class="calc-v">${fatosCalculo.map((x) => `<span>${esc(x)}</span>`).join("")}</div></div>
     <div class="calc-card"><div class="calc-k">2 · Regra aplicada</div><div class="calc-v"><b>${esc(regraAplicada)}</b><span>${fontesUsadas.length} fonte(s) operacional(is) cruzada(s), sem transformar manutenção isolada em risco crítico.</span></div></div>
     <div class="calc-card calc-result"><div class="calc-k">3 · Conclusão e resposta</div><div class="calc-v"><b>${esc(labelGeral)}</b><span>${esc(narrativa.motivo)}.</span><span>${esc(respostaCalculo)}</span></div></div>`;
@@ -1480,7 +1495,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   const demais = vetores.filter((v) => !emCards.has(v) && !v.bloqueadorCaido && !(v.nivel >= NIVEIS.ELEVADO) && !v.observacaoManutencao)
     .sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
   const linhasVet = [...cardsAcao.map((c) => c.v), ...demais].map(linhaDe);
-  const linhasMan = vetores.filter((v) => v.observacaoManutencao && !emCards.has(v)).map(linhaDe);
+  // v2: nenhum item marcado como Bloqueador pode cair em "sem impacto".
+  const linhasMan = vetores.filter((v) => v.observacaoManutencao && !emCards.has(v) && v.classeV2 !== "Bloqueador" && !v.bloqueadorCaido).map(linhaDe);
   const tratHTML = (t) => !t ? '<span class="ar-mu">—</span>'
     : t.estado === "sem" ? '<span class="ar-tr-sem">Sem tratativa</span>'
     : `<span class="${t.estado === "vencido" ? "ar-tr-venc" : "ar-tr-ok"}">${esc(({ aguardando: "Aguardando retorno", proposta: "Proposta enviada", aprovado: "Aprovado", execucao: "Em execução" })[t.status] || "Em acompanhamento")}</span>${t.quando ? `<div class="ar-mu">${esc(new Date(t.quando).toLocaleDateString("pt-BR").slice(0, 5))} · ${t.estado === "vencido" ? "follow-up vencido" : "em dia"}</div>` : ""}`;
@@ -1497,7 +1513,10 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     ${linhasMan.map((l) => `<tr><td><b>${esc(l.nome)}</b>${l.extras ? ` e mais ${l.extras}` : ""}<span class="ar-mu"> · ${esc(l.sistema)}</span></td><td class="ar-num">${l.v.inop != null && l.v.total ? `${l.v.inop} de ${l.v.total}` : "—"}</td><td class="ar-num">${l.dias != null ? `${l.dias} d` : "—"}</td><td>${tratHTML(l.trat)}</td></tr>`).join("")}
     </tbody></table></div>` : "";
   const porQue = nivelGeral === NIVEIS.BAIXO ? [] : linhasVet.filter((l) => l.v.bloqueadorCaido || l.v.travaTipo || l.v.nivel >= NIVEIS.ELEVADO).slice(0, 3);   // BAIXO: nada eleva a classe (mesma leitura do relatório anterior)
-  const porQueHTML = `<p class="ar-pq">O motor de risco identificou <b>${esc(regraAplicada)}</b>${!porQue.length ? ", e não foram identificados vetores determinantes capazes de elevar a classificação no período" : ""}.</p>${porQue.length ? `<ul class="ar-pql">${porQue.map((l) => `<li><b>${esc(l.nome)}</b>${l.nome.startsWith(l.sistema) ? "" : `, ${esc(l.sistema)},`}${l.status ? ` ${l.status}` : ""}${l.dias != null ? ` há ${l.dias} dias` : ""} — ${esc((l.v.classeV2 || (l.v.bloqueadorCaido ? "Bloqueador" : NIVEL_TXT[l.v.nivel] || "")).toLowerCase())}${l.v.travaTipo ? ", trava do site" : ""}${l.trat?.estado === "sem" ? ", sem tratativa" : ""}.</li>`).join("")}</ul>` : ""}`;
+  // v2: o "por quê" cita o vetor de maior classe (Bloqueador > Tático > Automação); empate → maior aging.
+  const porQueHTML = memoria
+    ? `<p class="ar-pq">O motor de risco identificou <b>${esc(regraAplicada)}</b>${!memoria.linhas.length ? ", e não foram identificados vetores determinantes capazes de elevar a classificação no período" : ""}.</p>${memoria.linhas.length ? `<ul class="ar-pql">${memoria.linhas.slice(0, 3).map((l) => `<li><b>${esc(l.fato)}</b> — ${esc(l.regra)}${l.determinante ? " (vetor determinante)" : ""}.</li>`).join("")}</ul>` : ""}`
+    : `<p class="ar-pq">O motor de risco identificou <b>${esc(regraAplicada)}</b>${!porQue.length ? ", e não foram identificados vetores determinantes capazes de elevar a classificação no período" : ""}.</p>${porQue.length ? `<ul class="ar-pql">${porQue.map((l) => `<li><b>${esc(l.nome)}</b>${l.nome.startsWith(l.sistema) ? "" : `, ${esc(l.sistema)},`}${l.status ? ` ${l.status}` : ""}${l.dias != null ? ` há ${l.dias} dias` : ""} — ${esc((l.v.classeV2 || (l.v.bloqueadorCaido ? "Bloqueador" : NIVEL_TXT[l.v.nivel] || "")).toLowerCase())}${l.v.travaTipo ? ", trava do site" : ""}${l.trat?.estado === "sem" ? ", sem tratativa" : ""}.</li>`).join("")}</ul>` : ""}`;
   const acoes = [...linhasVet, ...linhasMan.filter((l) => l.trat?.estado === "vencido")].slice(0, 5).map((l) => {
     const t = l.trat;
     const extra = !t ? "" : t.estado === "sem" ? `; abrir tratativa${l.dias != null ? ` (${l.dias} dias sem registro)` : ""}` : t.estado === "vencido" ? `; cobrar o retorno do follow-up${t.quando ? ` de ${new Date(t.quando).toLocaleDateString("pt-BR").slice(0, 5)}` : ""}` : "";
@@ -1553,6 +1572,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .ar-ok{color:#15803D;font-size:12.5px}.ar-acoes{margin:2px 0 0;padding-left:20px}.ar-acoes li{margin:4px 0}
   .ar-regua,.ar-b,.ar-lgd i,.ar-vt i,.regua div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .soma{gap:18px}.soma>span:first-child{flex-shrink:0}
+  .calc-soma{margin:6px 0 0;padding-left:22px;font-size:12.5px}.calc-soma li{margin:5px 0;line-height:1.4;page-break-inside:avoid}.calc-soma li.det .cs-fato{font-weight:700}.calc-soma li.sem{color:#6B7280;list-style:"– "}
+  .cs-regra{color:#4B5563}.calc-resultado{margin-top:10px;padding:8px 12px;border-left:4px solid #121212;background:#F9FAFB;font-size:13.5px}
   @media print{body{background:#fff}.folha{box-shadow:none;max-width:none}.corpo{padding-bottom:0}.rodape{display:none}}   /* o rodapé de página (@page) substitui o rodapé final */
   .consultor{margin-top:16px;padding:14px 18px}.consultor p{margin:4px 0 0}.assina{margin-top:14px;padding-top:10px}
   .consultor,.assina{page-break-inside:avoid;break-inside:avoid}
@@ -1754,8 +1775,8 @@ ${novoCSS}</style></head><body>
 
     <div class="bloco">
       <div class="eyebrow">Como se chega à classificação — memória de cálculo</div>
-      <div class="calc-grid">${calculoHTML}</div>
-      <div class="soma"><span class="l">Somatório dos vetores</span><span class="r">${somaR}</span></div>
+      ${memoria ? calculoHTML : `<div class="calc-grid">${calculoHTML}</div>`}
+      ${memoria ? "" : `<div class="soma"><span class="l">Somatório dos vetores</span><span class="r">${somaR}</span></div>`}
       <div class="nota">O documento executivo mostra os fatores que alteram a classe de risco. A relação integral de itens, fontes e evidências permanece no Anexo Técnico separado.</div>
     </div>
     <div class="bloco">
@@ -1872,39 +1893,21 @@ async function coletarFontes(project, stored, marcadas) {
   return { dados, faltantes };
 }
 
-// Monta a lista de vetores + base documental a partir dos dados coletados.
-function montarAnalise(project, pacoteLabel, dados, contextos) {
-  let vetores = [];
-  const dataUlt = dados.ts?.ok ? dados.ts.data : hojeBR();
 
-  if (dados.ts?.ok) vetores.push(...vetoresDoTesteSemanal(dados.ts, dataUlt));
-  const vC = vetorCTMK(dados.ctmk); if (vC) vetores.push(vC);
-  const vI = vetorIluminacao(dados.ilum); if (vI) vetores.push(vI);
-  vetores.push(...vetoresPerimetrais(dados.peri));
-  const vRV = vetorRondaVirtual(dados.rondaVirtual); if (vRV) vetores.push(vRV);
-  // Energia e equipe permanecem nas fontes, métricas e pontos fortes do PDF,
-  // mas não são convertidas em vetores de risco físico.
-
-  aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual, peri: dados.peri });
-  aplicarRecenciaPerimetro(vetores, dados.peri, dados.ts?.dataRaw);
+// ═════════════════════════════════════════════════════════════
+// CLASSIFICAÇÃO DO PROJETO (pura — sem Firestore). Recebe os vetores já
+// montados e os dados coletados; devolve vetores ajustados pela doutrina
+// v2 e o objeto `geral` usado pelo PDF. Exportada para os testes dos 9
+// laudos de 04/10/2026.
+// ═════════════════════════════════════════════════════════════
+export function classificarProjeto(project, vetoresEntrada, dados = {}) {
+  let vetores = vetoresEntrada;
   const doutrinaCamadas = aplicarDoutrinaCamadasP311A(vetores, project);
   vetores = doutrinaCamadas.vetores;
-  const cftvPendente = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
-  const dilaceradorAusentePersistente = vetores.some((v) => /dilacerador/i.test(`${v.label} ${textoLimpo(v.descricao)}`) && (v.piorDias || 0) >= 365);
-  const portaoDanificado = vetores.some((v) => /port[aã]o/i.test(`${v.label} ${textoLimpo(v.descricao)}`) && !v.observacaoManutencao);
-  const falhaCompostaModerada = project.id === "P311B" && dilaceradorAusentePersistente && cftvPendente > 0 && portaoDanificado;
-  if (falhaCompostaModerada) {
-    vetores = vetores.map((v) => /dilacerador/i.test(`${v.label} ${textoLimpo(v.descricao)}`)
-      ? {
-          ...v,
-          nivel: NIVEIS.MODERADO,
-          bloqueadorCaido: false,
-          contribuicao: "tatico",
-          reclassificadoComposto: true,
-          descricao: `${v.descricao} <i>Classificado no gatilho composto do P311B com CFTV e portão.</i>`,
-        }
-      : v);
-  }
+  // v2 (08/10/2026): o gatilho composto do P311B (dilacerador ausente +
+  // CFTV + portão → MODERADO) foi retirado. No Mega a cancela é transponível
+  // e o DILACERADOR é a barreira: ausente = 1 via transponível = ELEVADO.
+  const falhaCompostaModerada = false;
   vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
   // Consolidação por grupos canônicos. Não colapsa todo o perímetro por
@@ -1929,9 +1932,13 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     .map((v) => normalizarZona(v.zonaCanonica))).size;
   const cftvInoperante = (dados.ts?.pend || []).filter((p) => /c[âa]mera|cftv/i.test(`${p.catLabel} ${p.itemLabel}`)).length;
   const barreirasCriticas = vetores.filter((v) => /bollard|bolard|garra|dilacerador/i.test(v.label || "") && v.bloqueadorCaido && !v.observacaoManutencao).length;
+  // v2: a matriz histórica só recebe o CFTV como "falha relevante" quando a
+  // régua graduada o classificou ELEVADO (> 5 câmeras com aging/proporção/
+  // perimetrais). 6 câmeras de 140 há 4 dias não pulam dois níveis.
+  const cftvElevado = vetores.some((v) => v.grupo === "teste" && /c[âa]mera|cftv/i.test(v.label || "") && (v.nivel || 0) >= RC_NIVEL.ELEVADO);
   const matriz = classificarRiscoOperacional({
     zonasPerimetrais: zonasNomeadas,
-    cftvInoperante,
+    cftvInoperante: cftvElevado ? cftvInoperante : 0,
     barreirasCriticas,
     panicoFixoInoperante: vetores.some((v) => v.travaTipo === "panicoFixoInoperante"),
     ctmkOffline: vetores.some((v) => v.travaTipo === "ctmkOffline"),
@@ -1940,17 +1947,20 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     falhaCompostaModerada,
   });
 
-  // Moduladores (sinistro + regional) — somados como delta CONTEXTUAL.
-  // Equipe/capacitação NÃO pondera na v3 (fora do score).
+  // ── DOUTRINA v2 (08/10/2026) ──────────────────────────────
+  // Perfil de barreiras (vias transponíveis), CFTV graduado, pânico móvel
+  // tático, consolidado >= maior vetor, "por quê" pelo vetor de maior classe
+  // e memória de cálculo em soma. A matriz histórica entra como um dos
+  // insumos; o resultado nunca fica abaixo dela nem do maior vetor.
+  const v2 = aplicarMotorV2({ pid: project.id, vetores, pend: dados.ts?.pend || [], matriz, dataTeste: dados.ts?.data || "" });
+  vetores = v2.vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
+
+  // Moduladores (sinistro + regional) — contexto, nunca alteram a classe.
   const modSin = moduladorSinistro(dados.sinistros, vetores);
   const modReg = moduladorRegional(dados.regional, vetores);
-  const deltaTot = (modSin?.delta || 0) + (modReg?.delta || 0);
   const motivosMod = [modSin?.motivo, modReg?.motivo].filter(Boolean).join(" · ");
 
-  // OPÇÃO B (decidida 11/08): moduladores/território sobem no máximo até
-  // ELEVADO. NUNCA cruzam para CRÍTICO sozinhos — CRÍTICO só com 2+ bloqueadores.
-  // Se a consolidação já é CRÍTICA (2+ bloq), o delta não rebaixa.
-  const nivelBase = matriz.nivel || cons.nivel || RC_NIVEL.BAIXO;
+  const nivelBase = v2.nivel || matriz.nivel || cons.nivel || RC_NIVEL.BAIXO;
   // Territorial é contextual: não altera a classe operacional.
   const nivelAjustado = nivelBase;
   const labelAjustado = RC_LABEL[nivelAjustado];
@@ -1965,7 +1975,12 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     nivelMoked: nivelAjustado, nivelCliente: nivelAjustado,
     labelMoked: labelAjustado, labelCliente: labelAjustado,
     nivel: nivelAjustado,
-    motivoMatriz: matriz.motivo,
+    motivoMatriz: v2.motivo || matriz.motivo,
+    motivoMatrizLegado: matriz.motivo,
+    nivelMatrizLegado: matriz.nivel,
+    determinante: v2.determinante ? { label: v2.determinante.label, classe: v2.determinante.classeV2, nivel: v2.determinante.nivel } : null,
+    memoria: v2.memoria,
+    vias: { n: v2.vias.n, nivel: v2.vias.nivel, naoAferido: v2.vias.naoAferido, itens: v2.vias.vias },
     modulador: motivosMod ? { delta: 0, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
     metricas: {
       zonasNomeadas,
@@ -1975,6 +1990,27 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
       cercaEletricaInoperante: doutrinaCamadas.camadasPerimetrais?.secundariaInop || 0,
     },
   };
+  return { vetores, geral, matriz, cons };
+}
+
+// Monta a lista de vetores + base documental a partir dos dados coletados.
+function montarAnalise(project, pacoteLabel, dados, contextos) {
+  let vetores = [];
+  const dataUlt = dados.ts?.ok ? dados.ts.data : hojeBR();
+
+  if (dados.ts?.ok) vetores.push(...vetoresDoTesteSemanal(dados.ts, dataUlt));
+  const vC = vetorCTMK(dados.ctmk); if (vC) vetores.push(vC);
+  const vI = vetorIluminacao(dados.ilum); if (vI) vetores.push(vI);
+  vetores.push(...vetoresPerimetrais(dados.peri));
+  const vRV = vetorRondaVirtual(dados.rondaVirtual); if (vRV) vetores.push(vRV);
+  // Energia e equipe permanecem nas fontes, métricas e pontos fortes do PDF,
+  // mas não são convertidas em vetores de risco físico.
+
+  aplicarCruzamentos(vetores, { rondaVirtual: dados.rondaVirtual, peri: dados.peri });
+  aplicarRecenciaPerimetro(vetores, dados.peri, dados.ts?.dataRaw);
+  const classificado = classificarProjeto(project, vetores, dados);
+  vetores = classificado.vetores;
+  const { geral } = classificado;
   const recomendacoes = gerarRecomendacoes(vetores);
 
   // base documental — só fontes que trouxeram dado
