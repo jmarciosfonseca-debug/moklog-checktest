@@ -1,4 +1,6 @@
 import { checkPin } from "./session";
+import { gerarConsolidadoPerimetralHTML } from "./relatorios/perimetralConsolidado";
+import { baixarHtml } from "./relatorios/padraoMoked";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -403,201 +405,11 @@ ${statsRows ? `
   URL.revokeObjectURL(url);
 }
 
-// ── PDF CONSOLIDADO do período
-function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true) {
+// ── PDF CONSOLIDADO do período (padrão Moked — ver relatorios/perimetralConsolidado.js)
+function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true, escopo="selecionados") {
   if(!testes?.length) return;
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const sorted = [...testes].sort((a,b)=>b.data.localeCompare(a.data));
-  const totalZonas = pcfg.zonas.length;
-
-  // Stats per zone
-  const zoneStats = pcfg.zonas.map(z=>{
-    const total = sorted.length;
-    const falhas = sorted.filter(t=>(t.zonas[z]?.status||"ok")!=="ok").length;
-    const pct = total>0?Math.round((falhas/total)*100):0;
-    const crit = pct>=60?"ALTA":pct>=30?"MÉDIA":"BAIXA";
-    const color = pct>=60?"#dc2626":pct>=30?"#d97706":"#15803d";
-    return {zona:z, total, falhas, ok:total-falhas, pct, crit, color};
-  });
-
-  const totalAcion = sorted.length*totalZonas;
-  const totalFalhas = zoneStats.reduce((s,z)=>s+z.falhas,0);
-  const totalOK = totalAcion-totalFalhas;
-  const pctGeral = totalAcion>0 ? Math.round((totalOK/totalAcion)*100) : 100;
-
-  // Chart bars
-  const chartRows = zoneStats.map(zs=>`
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-      <span style="font-size:11px;font-weight:700;width:42px;flex-shrink:0">${zs.zona.replace("Zona ","Z-")}</span>
-      <div style="flex:1;background:#f1f5f9;border-radius:3px;height:14px;overflow:hidden">
-        <div style="width:${Math.max(zs.pct,1)}%;background:${zs.color};height:100%;border-radius:3px"></div>
-      </div>
-      <span style="font-size:11px;font-weight:700;color:${zs.color};width:34px;text-align:right">${zs.pct}%</span>
-      <span style="font-size:9px;padding:1px 6px;border-radius:3px;background:${zs.pct>=60?"#fee2e2":zs.pct>=30?"#fef3c7":"#dcfce7"};color:${zs.color};font-weight:700;width:42px;text-align:center">${zs.crit}</span>
-    </div>`).join("");
-
-  // SVG map markers (use last test for reference)
-  const lastTeste = sorted[0];
-  const svgMarkers = lastTeste ? pcfg.zonas.map(zona=>{
-    const pos = pcfg.zonaPos[zona]; if(!pos) return "";
-    // Use aggregate fail rate to color
-    const zs = zoneStats.find(z=>z.zona===zona);
-    const dotColor = !zs||zs.pct===0?"#22c55e":zs.pct>=60?"#ef4444":zs.pct>=30?"#f59e0b":"#22c55e";
-    const label = zona.replace("Zona ","Z");
-    return `<g>
-      <circle cx="${pos.x}%" cy="${pos.y}%" r="3%" fill="${dotColor}" fill-opacity="0.22" stroke="none"/>
-      <circle cx="${pos.x}%" cy="${pos.y}%" r="1.4%" fill="${dotColor}" fill-opacity="0.95" stroke="white" stroke-width="0.5%"/>
-      <text x="${pos.x}%" y="calc(${pos.y}% - 2%)" text-anchor="middle"
-        style="font-size:2.2%;font-weight:700;fill:white;paint-order:stroke;stroke:#000;stroke-width:0.6%;stroke-linejoin:round">${label}</text>
-    </g>`;
-  }).join("") : "";
-
-  // Test table rows (compact — line per test)
-  const testRows = sorted.map(t=>{
-    const probs = pcfg.zonas.filter(z=>(t.zonas[z]?.status||"ok")!=="ok").length;
-    const zoneCells = pcfg.zonas.map(z=>{
-      const st = t.zonas[z]?.status||"ok";
-      return `<td style="text-align:center;font-size:11px;color:${st==="ok"?"#22c55e":st==="parcial"?"#f59e0b":"#ef4444"};font-weight:700">${st==="ok"?"✓":st==="parcial"?"~":"✗"}</td>`;
-    }).join("");
-    return `<tr style="background:${probs>0?"#fff8f8":"#fff"}">
-      <td style="font-size:11px;font-weight:700">${fmtDate(t.data)}</td>
-      <td style="font-size:11px">${t.turno==="Diurno"?"☀️":"🌙"} ${t.turno}</td>
-      <td style="font-size:11px">${t.quemFez||"—"}</td>
-      ${zoneCells}
-    </tr>`;
-  }).join("");
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8">
-<title>Consolidado Perimetral ${project.id} — ${periodo}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b}
-  .header{background:linear-gradient(135deg,#1a1040,#0f0820);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
-  .section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px}
-  .section-title{font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid #f1f5f9;padding-bottom:7px;margin-bottom:10px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
-  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-  .kpi-val{font-size:24px;font-weight:900}
-  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-  table{width:100%;border-collapse:collapse;font-size:11px}
-  th{background:#1e293b;color:#fff;padding:6px 8px;text-align:left;font-size:10px}
-  td{padding:5px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-  .map-wrap{position:relative;width:100%;max-width:520px;margin:0 auto;border-radius:8px;overflow:hidden}
-  .map-wrap img{width:100%;height:240px;object-fit:cover;display:block;filter:brightness(.82)}
-  .grid-2{display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:start}
-  .footer{text-align:center;margin-top:10px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
-  thead{display:table-header-group}
-  tr{page-break-inside:avoid}
-  .grid-2{page-break-inside:avoid;page-break-after:avoid}
-  table,p,div{orphans:3;widows:3}
-  @media print{body{padding:6px}@page{margin:8mm;size:A4 landscape}.no-print{display:none}.section{margin-bottom:8px;padding:10px 12px;page-break-inside:auto}.grid-2{page-break-inside:avoid}.grid-2 .section{page-break-inside:avoid}.kpis{margin-bottom:8px;page-break-inside:avoid}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
-</style></head>
-<body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-
-<div class="header">
-  <div>
-    <p style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">Consolidado — Teste Perimetral</h1>
-    <p style="font-size:12px;opacity:.8">${project.id} — ${pcfg.clienteNome||project.name} · ${periodo}</p>
-  </div>
-  <div style="text-align:right;font-size:11px;opacity:.75">
-    <div>${sorted.length} teste(s) no período</div>
-    <div style="margin-top:3px">Gerado em ${hoje}</div>
-    <div style="margin-top:2px">José Fonseca — Moked Consulting</div>
-  </div>
-</div>
-
-<div class="kpis">
-  <div class="kpi"><div class="kpi-val" style="color:${pctGeral>=90?"#22c55e":pctGeral>=70?"#f59e0b":"#ef4444"}">${pctGeral}%</div><div class="kpi-lbl">Taxa OK</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#22c55e">${totalOK}</div><div class="kpi-lbl">Acionamentos OK</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#ef4444">${totalFalhas}</div><div class="kpi-lbl">Falhas</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:#0ea5e9">${sorted.length}</div><div class="kpi-lbl">Testes</div></div>
-</div>
-
-${incluirPerim?`
-<!-- MAPA + GRÁFICO LADO A LADO -->
-<div class="grid-2">
-  ${pcfg.mapaB64?`<div class="section" style="margin-bottom:0">
-    <div class="section-title">Mapa Perimetral — Zonas com Maior Taxa de Falha</div>
-    <div class="map-wrap">
-      <img src="data:image/jpeg;base64,${pcfg.mapaB64}" alt="Mapa ${project.id}"/>
-      <svg style="position:absolute;top:0;left:0;width:100%;height:100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-        ${svgMarkers}
-      </svg>
-      <div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.65);border-radius:5px;padding:4px 8px;display:flex;gap:10px">
-        <span style="font-size:9px;color:#22c55e;font-weight:700">● &lt;30% falha</span>
-        <span style="font-size:9px;color:#f59e0b;font-weight:700">● 30–59%</span>
-        <span style="font-size:9px;color:#ef4444;font-weight:700">● ≥60% falha</span>
-      </div>
-    </div>
-  </div>`:`<div class="section" style="margin-bottom:0"><div class="section-title">Mapa Perimetral</div><div style="font-size:12px;color:#94a3b8;text-align:center;padding:30px 0">Mapa ainda não cadastrado para este projeto</div></div>`}
-
-  <div class="section" style="margin-bottom:0">
-    <div class="section-title">Taxa de Falha por Zona</div>
-    <div style="margin-bottom:8px;display:flex;gap:14px;font-size:9px">
-      <span style="color:#15803d;font-weight:700">■ BAIXA (&lt;30%)</span>
-      <span style="color:#d97706;font-weight:700">■ MÉDIA (30–59%)</span>
-      <span style="color:#dc2626;font-weight:700">■ ALTA (≥60%)</span>
-    </div>
-    ${chartRows}
-  </div>
-</div>
-<div style="height:12px"></div>
-
-<!-- TABELA COMPLETA DE TESTES -->
-<div class="section">
-  <div class="section-title">Registro Detalhado — ${sorted.length} Teste(s)</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Data</th><th>Turno</th><th>Responsável</th>
-        ${pcfg.zonas.map(z=>`<th style="text-align:center">${z.replace("Zona ","Z")}</th>`).join("")}
-      </tr>
-    </thead>
-    <tbody>${testRows}</tbody>
-  </table>
-  <div style="margin-top:8px;font-size:10px;color:#64748b">✓ = OK &nbsp; ✗ = Inoperante &nbsp; ~ = Parcial</div>
-</div>
-`:""}
-
-${incluirRondas ? `
-<!-- CONTINUIDADE DA RONDA POR PLANTÃO -->
-<div class="section">
-  <div class="section-title">🚶 Rondas Adicionais — ${sorted.reduce((a,t)=>a+((t.rondas||[]).length),0)} registro(s)</div>
-  ${sorted.filter(t=>(t.rondas||[]).length).map(t=>`
-    <div style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px">
-        ${fmtDate(t.data)} · ${t.turno} · ${String(t.quemFez||"—").replace(/</g,"&lt;")} — ${(t.rondas||[]).length} ronda(s)
-      </div>
-      <table>
-        <thead><tr><th>#</th><th>Hora</th><th>Executante</th><th>Observação</th></tr></thead>
-        <tbody>${(t.rondas||[]).map((r,i)=>`<tr>
-          <td style="font-weight:700">${i+1}</td>
-          <td>${r.hora||"—"}</td>
-          <td>${String(r.executante||"—").replace(/</g,"&lt;")}</td>
-          <td style="font-size:11px;color:#64748b">${String(r.obs||"—").replace(/</g,"&lt;")}</td>
-        </tr>`).join("")}</tbody>
-      </table>
-    </div>`).join("") || `<div style="font-size:12px;color:#94a3b8;text-align:center;padding:20px 0">Nenhuma ronda adicional registrada no período</div>`}
-</div>` : ""}
-
-<div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · ${project.id} — ${pcfg.clienteNome||project.name}</div>
-  <div style="margin-top:3px">José Fonseca · jose.fonseca@moked.com.br · ${hoje}</div>
-</div>
-</body></html>`;
-
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url;
-  a.download=`consolidado_perimetral_${project.id}_${hoje.replace(/\//g,"-")}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const html = gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo, incluirPerim, incluirRondas });
+  baixarHtml(html, `consolidado_perimetral_${project.id}_${new Date().toLocaleDateString("pt-BR").replace(/\//g,"-")}.html`);
 }
 
 function emptyTeste(turnoDefault, pcfg) {
@@ -828,7 +640,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             onClick={()=>{
               const sel=pdfSel; setPdfSel(null);
               if(sel.modo==="teste") gerarPDFTeste(sel.teste,testes,project,pcfg,sel.rondas,sel.perim);
-              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim);
+              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim,sel.escopo);
             }}
             style={{...S.btnSm,flex:1,fontSize:13,padding:"11px 0",justifyContent:"center",
               opacity:podeGerar?1:0.4,cursor:podeGerar?"pointer":"not-allowed",
@@ -1159,7 +971,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                         return;
                       }
                       const totRondas = testsSelected.reduce((acc,t)=>acc+((t.rondas||[]).length),0);
-                      setPdfSel({modo:"consolidado",testes:testsSelected,periodo,perim:true,rondas:totRondas>0});
+                      setPdfSel({modo:"consolidado",testes:testsSelected,periodo,escopo:"selecionados",perim:true,rondas:totRondas>0});
                     }
                     setModoSelecao(false); setSelecionados([]);
                   } else {
@@ -1172,6 +984,14 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                       : "📄 Selecione ao menos 1"
                     : `☐ Selecionar para PDF Consolidado`}
                 </button>
+                {!modoSelecao && testesFiltrados.length>0 && (
+                  <button onClick={()=>{
+                    const totRondas = testesFiltrados.reduce((acc,t)=>acc+((t.rondas||[]).length),0);
+                    setPdfSel({modo:"consolidado",testes:testesFiltrados,periodo:`${testesFiltrados.length} teste(s)`,escopo:"periodo",perim:true,rondas:totRondas>0});
+                  }} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:12,padding:"8px 12px",display:"flex",alignItems:"center",gap:6,flex:1,justifyContent:"center"}}>
+                    {`📄 Todos do filtro (${testesFiltrados.length})`}
+                  </button>
+                )}
                 {modoSelecao && (
                   <button onClick={()=>{setModoSelecao(false);setSelecionados([]);}}
                     style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11,padding:"8px 10px"}}>✕</button>
