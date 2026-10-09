@@ -35,7 +35,7 @@ const horasDesde = iso => { const t = iso ? new Date(iso).getTime() : NaN; retur
 // Definido fora do componente para não remontar a cada render (evita perder o foco do input).
 function Page({ bg, children }) {
   return (
-    <div style={{ minHeight:"100vh", background:bg, fontFamily:"'Segoe UI',system-ui,sans-serif", display:"flex", justifyContent:"center" }}>
+    <div style={{ minHeight:"100vh", background:bg, fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif", display:"flex", justifyContent:"center" }}>
       <div style={{ width:"100%", maxWidth:520, padding:"14px 14px 80px", display:"flex", flexDirection:"column", gap:10 }}>{children}</div>
     </div>
   );

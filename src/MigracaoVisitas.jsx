@@ -191,7 +191,7 @@ export default function MigracaoVisitas({ dark=true, onBack }){
 
   // ── PIN gate
   if(!auth) return (
-    <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+    <div style={{minHeight:"100vh",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"}}>
       <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <div style={{fontSize:32,marginBottom:8}}>🔄</div>
         <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Migração de Visitas</div>
@@ -211,7 +211,7 @@ export default function MigracaoVisitas({ dark=true, onBack }){
   );
 
   return (
-    <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:60}}>
+    <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif",paddingBottom:60}}>
       <div style={{width:"100%",maxWidth:520}}>
         <div style={{position:"sticky",top:0,zIndex:10,background:bg,borderBottom:`1px solid ${border}`,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>

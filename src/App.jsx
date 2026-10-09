@@ -119,7 +119,7 @@ class ErrorBoundary extends React.Component {
       }
 
       return (
-        <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",padding:24}}>
+        <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif",padding:24}}>
           <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",textAlign:"center"}}>
             <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
             <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Algo deu errado</div>
@@ -2564,7 +2564,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const countProblemas = (data) => contarEquip(data);
 
   return (
-    <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif",paddingBottom:60}}>
+    <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif",paddingBottom:60}}>
       <div style={{width:"100%",maxWidth:480}}>
         <div style={{position:"sticky",top:0,zIndex:10,background:hdrBg,borderBottom:`1px solid ${hdrBorder}`,padding:"14px 16px"}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -2779,7 +2779,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     const txt2=dark?"#64748b":"#94a3b8";
     const tentar=async ()=>{ const r=await checkPinAnyProject(entradaPin); if(r){ setEntradaPin(""); setEntradaErr(false); setLiderNonce(n=>n+1); } else setEntradaErr(true); };
     return (
-      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
           <div style={{fontSize:32,marginBottom:8}}>🔐</div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Registros</div>
@@ -2823,7 +2823,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     const txt=dark?"#f1f5f9":"#0f172a";
     const txt2=dark?"#64748b":"#94a3b8";
     return (
-      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
           <div style={{fontSize:32,marginBottom:8}}>🛡️</div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Equipamentos</div>
@@ -2856,7 +2856,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 
   if(subScreen==="colaboradores" && !pinAuth && !hasGerencial()) {
     return (
-      <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
         <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
           <div style={{ fontSize:32, marginBottom:8 }}>🔐</div>
           <div style={{ fontSize:16, fontWeight:800, color:txt, marginBottom:4 }}>Área Restrita</div>
@@ -2883,7 +2883,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 
   if(subScreen==="colaboradores") {
     return (
-      <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+      <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
         <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
           <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -2923,7 +2923,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   }
 
   return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
       <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
         <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -3229,7 +3229,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
   const fmtDate = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
 
   return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif", paddingBottom:60 }}>
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif", paddingBottom:60 }}>
       <div style={{ width:"100%", maxWidth:480 }}>
         <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${hdrBorder}`, padding:"14px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
@@ -4663,12 +4663,12 @@ export default function App(){
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const S={
-  page:{minHeight:"100vh",background:"radial-gradient(ellipse at 50% -5%, #0a1628 0%, #04080f 55%)",display:"flex",justifyContent:"center",padding:"0 0 60px",fontFamily:"'Segoe UI',system-ui,sans-serif"},
+  page:{minHeight:"100vh",background:"radial-gradient(ellipse at 50% -5%, #0a1628 0%, #04080f 55%)",display:"flex",justifyContent:"center",padding:"0 0 60px",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"},
   homeWrap:{width:"100%",maxWidth:440,padding:"40px 16px 40px",display:"flex",flexDirection:"column",gap:14},
   formWrap:{width:"100%",maxWidth:720,padding:"16px 12px 40px",display:"flex",flexDirection:"column",gap:8},
   primaryBtn:{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:12,padding:"14px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 4px 20px rgba(29,78,216,.3), inset 0 1px 0 rgba(255,255,255,.08)"},
   secBtn:{background:"linear-gradient(165deg,#0c1526,#060c18)",color:"#94a3b8",border:"1px solid #1e293b",borderRadius:12,padding:"14px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"},
-  backBtn:{background:"transparent",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",fontWeight:600},
+  backBtn:{minHeight:44, minWidth:44, background:"transparent",border:"1px solid #1e293b",color:"#94a3b8",borderRadius:8,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",fontWeight:600},
   projCard:{display:"flex",alignItems:"center",justifyContent:"space-between",background:"linear-gradient(165deg,#0c1526,#060c18)",border:"1px solid #1e293b",borderRadius:14,padding:"12px 14px",cursor:"pointer",width:"100%",textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"},
   metaCard:{background:"linear-gradient(165deg,#0c1526,#060c18)",borderRadius:14,padding:"14px 16px",border:"1px solid #1e293b",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"},
   lbl:{display:"block",fontSize:11,color:"#94a3b8",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:.5},

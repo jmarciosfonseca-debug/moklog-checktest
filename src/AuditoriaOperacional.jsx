@@ -117,7 +117,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
   useEffect(() => { carregar(); }, [carregar]);
 
   return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
       <div style={{ width:"100%", maxWidth:640, padding:"14px 16px" }}>
         {/* Cabeçalho */}
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>

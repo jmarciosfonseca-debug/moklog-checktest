@@ -218,7 +218,7 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
   const secBtn = { background:dark?"#020510":"#f8fafc", border:`1px solid ${border}`, color:txt, borderRadius:10, padding:"12px", fontSize:12, fontWeight:600, cursor:"pointer" };
 
   return (
-    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"'Segoe UI',system-ui,sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
       <div style={{ width:"100%", maxWidth:480, display:"flex", flexDirection:"column" }}>
         {/* Header */}
         <div style={{ position:"sticky", top:0, zIndex:10, background:hdrBg, borderBottom:`1px solid ${border}`, padding:"14px 16px" }}>

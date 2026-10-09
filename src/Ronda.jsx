@@ -97,13 +97,13 @@ async function loadRondasFirebase(projectId) {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const S = {
-  page: {minHeight:"100vh",background:"#04080f",display:"flex",justifyContent:"center",padding:"0 0 60px",fontFamily:"'Segoe UI',system-ui,sans-serif"},
+  page: {minHeight:"100vh",background:"#04080f",display:"flex",justifyContent:"center",padding:"0 0 60px",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"},
   wrap: {width:"100%",maxWidth:440,padding:"20px 16px 40px",display:"flex",flexDirection:"column",gap:10},
   card: {background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"12px 14px"},
   btn: {background:"linear-gradient(135deg,#0369a1,#075985)",color:"#fff",border:"none",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%"},
   btnDanger: {background:"linear-gradient(135deg,#b91c1c,#991b1b)",color:"#fff",border:"none",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,width:"100%"},
   btnSec: {background:"#060c18",color:"#64748b",border:"1px solid #0f172a",borderRadius:10,padding:"13px 16px",fontSize:14,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5,width:"100%"},
-  backBtn: {background:"transparent",border:"1px solid #0f172a",color:"#334155",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0},
+  backBtn: {minHeight:44, minWidth:44, background:"transparent",border:"1px solid #0f172a",color:"#334155",borderRadius:7,padding:"6px 10px",fontSize:11,cursor:"pointer",flexShrink:0},
   inp: {width:"100%",background:"#020510",border:"1px solid #0f172a",borderRadius:7,color:"#e2e8f0",padding:"10px 12px",fontSize:13,boxSizing:"border-box",outline:"none"},
   lbl: {display:"block",fontSize:10,color:"#334155",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:.5},
 };

@@ -324,7 +324,7 @@ function gerarPdfSelecao(project, eventos, ids, interno=false){
 
 function getStyles(dark){
   return {
-    page:{minHeight:"100vh",background:dark?"#05070f":"#f1f5f9",display:"flex",justifyContent:"center",padding:"0 0 90px",fontFamily:"'Segoe UI',system-ui,sans-serif"},
+    page:{minHeight:"100vh",background:dark?"#05070f":"#f1f5f9",display:"flex",justifyContent:"center",padding:"0 0 90px",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"},
     wrap:{width:"100%",maxWidth:480,display:"flex",flexDirection:"column",position:"relative"},
     card:{background:dark?"#10162b":"#fff",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,borderRadius:16,padding:"14px 16px"},
     btn:{background:`linear-gradient(135deg,${COR.red},#c23a37)`,color:"#fff",border:"none",borderRadius:14,padding:"15px 16px",fontSize:15,fontWeight:800,cursor:"pointer",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8},
