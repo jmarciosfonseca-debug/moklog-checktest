@@ -45,10 +45,11 @@ import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
-import MaturidadeResumo from './equipe/MaturidadeResumo';
+import MaturidadeResumo, { IndiceIndividual } from './equipe/MaturidadeResumo';
+import { calcularMapaEquipe } from './equipe/maturidade';
 import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
 import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
-import { baixarHtml } from './relatorios/padraoMoked';
+import { abrirParaImpressao } from './relatorios/padraoMoked';
 import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
@@ -1007,7 +1008,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark }) {
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -1088,6 +1089,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
                   {colab.status==="ativo"?"🟢 ATIVO":"🔴 DESLIGADO"}
                 </span>
               </div>
+              {maturidade && <div style={{ marginTop:6, fontSize:11, color:"#cbd5e1" }}><IndiceIndividual resultado={maturidade} /></div>}
             </div>
           </div>
         </div>
@@ -2791,6 +2793,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       <>
       {fvControle}
       <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}
+        maturidade={(()=>{ try { return calcularMapaEquipe(equipeData, new Date().toLocaleDateString('sv-SE')).individuos.find(i=>i.colaborador.id===colab.id) || null; } catch { return null; } })()}
         projectNome={`${project.id} · ${project.name||""}`}
         onSolicitarUniforme={solicitarUniforme}
         onConfirmarUniforme={confirmarRecebimentoUniforme}
@@ -2894,7 +2897,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                         : `Seleção — ${project.id}`;
                       const referencia = new Date().toLocaleDateString('sv-SE');
                       const dadosMapa = { ...equipeData, colaboradores: injetarFotos(ativos, fotosMapa) };
-                      baixarHtml(gerarMapaEquipeHTML({ project, equipe: dadosMapa, hoje: referencia, empresa: SEG_LOGOS[project.id], selecionados: selPDF, incluirDesligados: pdfComDesligados }), `mapa_equipe_${project.id}_${referencia}.html`);
+                      // Abre em nova aba já com o diálogo "Salvar como PDF"; se o popup for bloqueado, baixa o HTML com o botão de impressão.
+                      const modo = abrirParaImpressao(gerarMapaEquipeHTML({ project, equipe: dadosMapa, hoje: referencia, empresa: SEG_LOGOS[project.id], selecionados: selPDF, incluirDesligados: pdfComDesligados }), `mapa_equipe_${project.id}_${referencia}.html`);
+                      if (modo === "download") alert("O navegador bloqueou a nova aba. O Mapa de Equipe foi baixado como HTML: abra o arquivo e toque em \"Imprimir / Salvar PDF\".");
                     }}
                       style={{ ...S.btnSm, fontSize:10, color:"#fff", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", border:"none", padding:"5px 14px", fontWeight:700 }}>
                       Mapa de Equipe (PDF) ({selPDF.length}{pdfComDesligados&&desligados.length?` +${desligados.length}`:""})

@@ -78,7 +78,7 @@ export function calcularEstabilidade(equipe, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
   const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - 1);
-  const ativos = (equipe.colaboradores || []).filter(c => c.status === 'ativo');
+  const ativos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo');
   const desligados = equipe.desligados || [];
   const naJanela = d => d !== null && d >= +inicio && d <= fim;
   const saidas = desligados.filter(c => naJanela(data(c.desligadoEm))).length;
@@ -118,29 +118,65 @@ export function calcularReciclagem(colaborador, hoje) {
   return { valor: estado === 'vencido' ? 0 : estado === 'alerta' ? 60 : 100, estado, diasRestantes, vencimento };
 }
 
-export function resumirTreinamentos(colaboradores, hoje) {
+// Cobertura de treinamentos REGISTRADOS nas fichas (historico[].tipo === 'Treinamento').
+// Indicador distinto da conclusão de obrigatórios (calcularTreinamento, que depende de catálogo).
+// Conta PESSOAS distintas, não cursos; janela = últimos 12 meses até `hoje`.
+//  - registro vazio (sem detalhe) é descartado;
+//  - registro futuro (data > hoje) não conta como realizado;
+//  - registro antigo (< 12 meses atrás) ou sem data válida fica como histórico, sem inflar a cobertura.
+export function classificarTreinamentos(colaborador, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
   const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - 1);
-  const pessoas = colaboradores.map(c => {
-    const registros = (Array.isArray(c.historico) ? c.historico : []).filter(h => h.tipo === 'Treinamento' && String(h.detalhe || '').trim() && (data(h.data) === null || data(h.data) <= fim));
-    const recentes = registros.filter(h => data(h.data) !== null && data(h.data) >= +inicio);
-    return { id: c.id, registros: registros.length, recentes: recentes.length };
-  });
-  const comRegistro = pessoas.filter(p => p.registros > 0).length;
-  const comRegistro12m = pessoas.filter(p => p.recentes > 0).length;
-  return { pessoas, total: pessoas.length, comRegistro, comRegistro12m, percentual12m: pessoas.length && comRegistro ? 100 * comRegistro12m / pessoas.length : null };
+  const registros = (Array.isArray(colaborador.historico) ? colaborador.historico : [])
+    .filter(h => h && h.tipo === 'Treinamento' && String(h.detalhe || '').trim());
+  const recentes = [], antigos = [], semData = [], futuros = [];
+  for (const h of registros) {
+    const d = data(h.data);
+    if (d === null) semData.push(h);
+    else if (d > fim) futuros.push(h);
+    else if (d >= +inicio) recentes.push(h);
+    else antigos.push(h);
+  }
+  const ordenar = lista => [...lista].sort((x, y) => String(y.data || '').localeCompare(String(x.data || '')));
+  return { recentes: ordenar(recentes), antigos: ordenar(antigos), semData, futuros: ordenar(futuros), registros: recentes.length + antigos.length + semData.length };
 }
 
+export function resumirTreinamentos(colaboradores, hoje) {
+  const pessoas = colaboradores.map(c => {
+    const t = classificarTreinamentos(c, hoje);
+    return { id: c.id, registros: t.registros, recentes: t.recentes.length, antigos: t.antigos.length, semData: t.semData.length, futuros: t.futuros.length };
+  });
+  const total = pessoas.length;
+  const comRegistro = pessoas.filter(p => p.registros > 0).length;
+  const comRegistro12m = pessoas.filter(p => p.recentes > 0).length;
+  const somenteHistorico = pessoas.filter(p => p.recentes === 0 && (p.antigos > 0 || p.semData > 0)).length;
+  const comFuturo = pessoas.filter(p => p.futuros > 0).length;
+  return { pessoas, total, comRegistro, comRegistro12m, somenteHistorico, comFuturo, janelaMeses: 12,
+    percentual12m: total && comRegistro ? 100 * comRegistro12m / total : null };
+}
+
+export const TITULO_TREINAMENTOS = 'Treinamentos aplicados — últimos 12 meses';
+export const SEM_TREINAMENTO = 'Não aferido — sem treinamento registrado nas fichas';
+
+// Linha principal do indicador ("8 de 16 colaboradores com registro — 50%") e nota complementar.
 export function rotuloTreinamentos(resumo) {
-  if (!resumo.comRegistro) return 'Não aferido — sem treinamento registrado';
-  return `${resumo.comRegistro12m}/${resumo.total} pessoas (${Math.round(resumo.percentual12m)}%) com treinamento registrado nos últimos 12 meses; ${resumo.comRegistro} com histórico`;
+  if (!resumo || !resumo.comRegistro) return SEM_TREINAMENTO;
+  return `${resumo.comRegistro12m} de ${resumo.total} colaboradores com registro — ${Math.round(resumo.percentual12m)}%`;
+}
+export function notaTreinamentos(resumo) {
+  if (!resumo || !resumo.comRegistro) return 'Ausência de registro não prova que a pessoa nunca recebeu treinamento.';
+  const partes = [];
+  if (resumo.somenteHistorico) partes.push(`${resumo.somenteHistorico} só com registro antigo ou sem data (histórico, fora da janela)`);
+  if (resumo.comFuturo) partes.push(`${resumo.comFuturo} com treinamento agendado (não contado)`);
+  if (!resumo.comRegistro12m) partes.unshift('nenhum registro dentro dos últimos 12 meses');
+  return partes.length ? partes.join('; ') + '.' : `${resumo.comRegistro} de ${resumo.total} com algum registro na ficha.`;
 }
 
 export function calcularMapaEquipe(equipe, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
-  const individuos = (equipe.colaboradores || []).filter(c => c.status === 'ativo').map(c => {
+  const individuos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo').map(c => {
     const rh = calcularRH(c, equipe.historicoDesde, hoje);
     const reciclagem = calcularReciclagem(c, hoje);
     const resultado = agregarEixos({ assiduidade: rh.assiduidade, ft: rh.ft, treinamento: calcularTreinamento(c, equipe.treinamentosEsperados, hoje), reciclagem: reciclagem.valor, tempoCasa: calcularTempoCasa(c.dataContratacao, hoje) });
@@ -162,6 +198,6 @@ export function calcularMapaEquipe(equipe, hoje) {
   const ordenados = elegiveis.filter(i => i.indice !== null).sort((a, b) => b.indice - a.indice || a.colaborador.nome.localeCompare(b.colaborador.nome));
   const corte = ordenados[Math.min(2, ordenados.length - 1)]?.indice;
   const treinamentos = resumirTreinamentos(individuos.map(i => i.colaborador), hoje);
-  individuos.forEach(i => { i.treinamentosRegistrados = treinamentos.pessoas.find(p => p.id === i.colaborador.id); });
+  individuos.forEach(i => { i.treinamentosRegistrados = treinamentos.pessoas.find(p => p.id === i.colaborador.id); i.treinamentosFicha = classificarTreinamentos(i.colaborador, hoje); });
   return { hoje, individuos, eixos, treinamentos, ...estabilidade, ...agregarEquipe(individuos, estabilidade.estabilidade), top: ordenados.filter(i => i.indice >= corte), alertas: individuos.flatMap(i => i.alertas.map(texto => ({ colabId: i.colaborador.id, nome: i.colaborador.nome, texto }))) };
 }

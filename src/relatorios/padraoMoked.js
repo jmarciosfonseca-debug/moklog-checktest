@@ -43,6 +43,21 @@ export function rodapePagina(texto) {
   return `@page{@bottom-left{content:"${t}";font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}@bottom-right{content:"pág. " counter(page) " de " counter(pages);font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}}`;
 }
 
+// Abre o relatório em nova aba com o botão "Imprimir / Salvar PDF" e dispara o diálogo de impressão.
+// Se o navegador bloquear a aba (popup), cai no download do HTML (que traz o mesmo botão).
+export function abrirParaImpressao(html, nome, { autoPrint = true } = {}) {
+  const conteudo = autoPrint ? html.replace("</body>", '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.print()}catch(e){}},500)});</script></body>') : html;
+  try {
+    const blob = new Blob([conteudo], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (w) { setTimeout(() => URL.revokeObjectURL(url), 60000); return "aba"; }
+    URL.revokeObjectURL(url);
+  } catch (e) { /* cai no download */ }
+  baixarHtml(conteudo, nome);
+  return "download";
+}
+
 export function baixarHtml(html, nome) {
   const blob = new Blob([html], { type: "text/html" });
   const url = URL.createObjectURL(blob);

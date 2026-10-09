@@ -1,5 +1,5 @@
 import React from 'react';
-import { calcularMapaEquipe, rotuloTreinamentos } from './maturidade';
+import { calcularMapaEquipe, rotuloTreinamentos, notaTreinamentos, TITULO_TREINAMENTOS } from './maturidade';
 import { radarEquipe } from '../relatorios/mapaEquipeRelatorio';
 
 export const ROTULOS_EIXOS = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Treinamento', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
@@ -14,7 +14,7 @@ export function IndiceIndividual({ resultado }) {
       <span>{k === 'treinamento' ? 'Obrigatórios' : label}: {k === 'treinamento' && resultado.eixos[k] === null ? 'Sem catálogo para aferir conclusão' : nota(resultado.eixos[k])}</span>
       {resultado.eixos[k] !== null && <meter aria-label={label} min="0" max="100" value={resultado.eixos[k]} style={{ display: 'block', width: '100%' }} />}
     </div>)}
-    {resultado.treinamentosRegistrados?.registros > 0 && <p>Treinamentos registrados: {resultado.treinamentosRegistrados.registros} ({resultado.treinamentosRegistrados.recentes} nos últimos 12 meses).</p>}
+    {resultado.treinamentosRegistrados?.registros > 0 && <p style={{ fontSize: 11 }}>Treinamentos registrados na ficha: {resultado.treinamentosRegistrados.registros} ({resultado.treinamentosRegistrados.recentes} nos últimos 12 meses{resultado.treinamentosRegistrados.futuros ? `, ${resultado.treinamentosRegistrados.futuros} agendado(s)` : ''}).</p>}
   </details>;
 }
 
@@ -22,9 +22,9 @@ export default function MaturidadeResumo({ equipe, hoje }) {
   const modelo = calcularMapaEquipe(equipe, hoje);
   return <details style={{ border: '1px solid #94a3b8', borderRadius: 10, padding: 12 }}>
     <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Maturidade da equipe: {nota(modelo.indice)} · {modelo.classe}</summary>
-    <p style={{ fontSize: 12 }}>Base: {hoje} · {modelo.quantidadeAferida} colaboradores aferidos · Estabilidade: {nota(modelo.estabilidade)}</p>
+    <p style={{ fontSize: 12 }}>Referência: {hoje} · {modelo.individuos.length} ativos · {modelo.quantidadeAferida} colaboradores aferidos · Turnover 12 meses: {modelo.turnover === null ? 'Não aferido' : `${Math.round(modelo.turnover)}%`} · Estabilidade: {nota(modelo.estabilidade)}</p>
     <p style={{ fontSize: 12 }}>Indicador descritivo dos registros disponíveis. Não substitui avaliação individual ou de conhecimento do posto.</p>
-    <p><strong>Treinamentos aplicados:</strong> {rotuloTreinamentos(modelo.treinamentos)}</p>
+    <p><strong>{TITULO_TREINAMENTOS}:</strong> {rotuloTreinamentos(modelo.treinamentos)}<br /><span style={{ fontSize: 11, color: '#94a3b8' }}>{notaTreinamentos(modelo.treinamentos)}</span></p>
     <div style={{ maxWidth: 320, background: '#fff', color: '#111827' }} dangerouslySetInnerHTML={{ __html: radarEquipe(modelo.eixos) }} />
     {Object.entries(ROTULOS_EIXOS).map(([k, label]) => <div key={k}>{k === 'treinamento' ? 'Conclusão dos obrigatórios' : label}: {k === 'treinamento' && modelo.eixos[k] === null ? 'Sem catálogo para aferir' : nota(modelo.eixos[k])}</div>)}
     <h4>Destaques por índice (inclui empates)</h4>
