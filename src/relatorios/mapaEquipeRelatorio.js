@@ -63,7 +63,32 @@ const tempoCasaTxt = (admissao, hoje) => {
 };
 const reciclagemTxt = r => ({ ok: 'Reciclagem em dia', alerta: `Reciclagem vence em ${r.diasRestantes} d`, vencido: `Reciclagem vencida há ${Math.abs(r.diasRestantes)} d`, 'sem-data': 'Reciclagem sem data', 'não se aplica': 'Reciclagem não se aplica' }[r.estado] || '');
 
-function fichaHTML(i, hoje) {
+// Textos longos de treinamento (ex.: descrição completa de um estágio de tiro) aparecem resumidos na
+// ficha com uma referência [Tn] e por extenso, uma única vez, na seção "Treinamentos — descrições
+// completas" do mesmo relatório. Nada é omitido; só deixa de se repetir ficha a ficha.
+export const LIMITE_RESUMO_TREINAMENTO = 110;
+const chaveTexto = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+export function indexarTextosLongos(individuos) {
+  const refs = new Map();
+  individuos.forEach(i => {
+    const t = i.treinamentosFicha || { recentes: [], antigos: [], semData: [], futuros: [] };
+    [...t.recentes, ...t.antigos, ...t.semData, ...t.futuros].forEach(h => {
+      const texto = String(h.detalhe || '').trim();
+      if (texto.length <= LIMITE_RESUMO_TREINAMENTO) return;
+      const k = chaveTexto(texto);
+      if (!refs.has(k)) refs.set(k, { ref: `T${refs.size + 1}`, texto, usos: [] });
+      refs.get(k).usos.push({ nome: i.colaborador.nome, data: h.data });
+    });
+  });
+  return refs;
+}
+const resumoTexto = texto => {
+  const corte = texto.slice(0, LIMITE_RESUMO_TREINAMENTO - 10);
+  const fim = Math.max(corte.lastIndexOf(' '), corte.lastIndexOf(',') , corte.lastIndexOf('.'));
+  return (fim > 50 ? corte.slice(0, fim) : corte).trim() + '…';
+};
+
+function fichaHTML(i, hoje, refs = new Map()) {
   const c = i.colaborador;
   const t = i.treinamentosFicha || { recentes: [], antigos: [], semData: [], futuros: [] };
   const cursos = [
@@ -72,7 +97,12 @@ function fichaHTML(i, hoje) {
     ...t.semData.map(h => ({ h, tag: 'sem data' })),
     ...t.futuros.map(h => ({ h, tag: 'agendado' })),
   ];
-  const linhaCurso = ({ h, tag }) => `<li>${h.data && /^\d{4}-\d{2}-\d{2}$/.test(h.data) ? `<b>${dataBR(h.data)}</b> — ` : ''}${esc(String(h.detalhe).trim())}${tag ? ` <span class="eq-tag">${tag}</span>` : ''}</li>`;
+  const linhaCurso = ({ h, tag }) => {
+    const texto = String(h.detalhe).trim();
+    const ref = texto.length > LIMITE_RESUMO_TREINAMENTO ? refs.get(chaveTexto(texto)) : null;
+    const corpo = ref ? `${esc(resumoTexto(texto))} <span class="eq-ref">[${ref.ref}]</span>` : esc(texto);
+    return `<li>${h.data && /^\d{4}-\d{2}-\d{2}$/.test(h.data) ? `<b>${dataBR(h.data)}</b> — ` : ''}${corpo}${tag ? ` <span class="eq-tag">${tag}</span>` : ''}</li>`;
+  };
   const tempo = tempoCasaTxt(c.dataContratacao, hoje);
   const aviso = i.afastado ? '<span class="eq-tag eq-tag-wa">afastado · fora da média</span>' : '';
   return `<article class="eq-card">
@@ -117,9 +147,11 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
 
   // Linhas de 3 fichas: a quebra de página acontece ENTRE linhas, nunca dentro de uma ficha
   // (grid único não fragmenta bem na impressão e deixa página meio vazia).
+  const refs = indexarTextosLongos(fichas);
   const linhas = [];
   for (let n = 0; n < fichas.length; n += 3) linhas.push(fichas.slice(n, n + 3));
-  const grade = `<h2 class="mk-h2">Fichas individuais <span class="mk-mu">· ${fichas.length} colaborador(es) · referência ${dataBR(hoje)}</span></h2>${linhas.map(l => `<div class="eq-grade">${l.map(i => fichaHTML(i, hoje)).join('')}</div>`).join('')}`;
+  const grade = `<h2 class="mk-h2">Fichas individuais <span class="mk-mu">· ${fichas.length} colaborador(es) · referência ${dataBR(hoje)}${refs.size ? ' · descrições longas resumidas com referência [T] — texto completo ao final' : ''}</span></h2>${linhas.map(l => `<div class="eq-grade">${l.map(i => fichaHTML(i, hoje, refs)).join('')}</div>`).join('')}`;
+  const descricoesHTML = refs.size ? `<h2 class="mk-h2">Treinamentos — descrições completas <span class="mk-mu">· ${refs.size} texto(s) referenciado(s) nas fichas</span></h2><div class="eq-descr">${[...refs.values()].map(r => `<div class="eq-descr-item"><b>[${r.ref}]</b> ${esc(r.texto)}<div class="mk-mu">Registrado para: ${r.usos.map(u => `${esc(u.nome)}${u.data ? ` (${dataBR(u.data)})` : ''}`).join('; ')}</div></div>`).join('')}</div>` : '';
 
   const desligadosHTML = desligados.length ? `<h2 class="mk-h2">Desligados nos últimos 12 meses <span class="mk-mu">· ${desligados.length}</span></h2><div class="eq-deslig">${desligados.map(c => `<div><b>${esc(c.nome)}</b> <span class="mk-mu">${esc(c.cargo || '')} · ${dataBR(c.desligadoEm)}</span></div>`).join('')}</div>` : '';
 
@@ -141,6 +173,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   .eq-trilho{display:block;height:3.5px;background:#F3F4F6;border-radius:2px;overflow:hidden}.eq-trilho i{display:block;height:3.5px;background:#111827;border-radius:2px}.eq-eixo b{text-align:right;font-size:6.6pt}.eq-na b{color:#9CA3AF;font-weight:600}
   .eq-cursos{border-top:1px solid #EEF0F3;margin-top:3px;padding-top:2px;font-size:6.5pt;line-height:1.18}.eq-cursos ul{margin:1px 0 0;padding-left:10px}.eq-cursos li{margin:0}
   .eq-deslig{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 10px;font-size:7.8pt;margin-bottom:3px}
+  .eq-ref{font-weight:700;color:#B91C1C}.eq-descr{columns:2;column-gap:12px;font-size:7.4pt;line-height:1.3;margin-bottom:6px}.eq-descr-item{break-inside:avoid;margin-bottom:5px;overflow-wrap:anywhere}.eq-descr-item .mk-mu{font-size:6.8pt}
   .eq-comoler{margin:2px 0 0;line-height:1.22;font-size:7.1pt}.eq-fim{display:grid;grid-template-columns:1fr 1.2fr;gap:16px;margin-top:4px;border-top:1px solid #E5E7EB;padding-top:4px;page-break-inside:avoid;break-inside:avoid;font-size:8pt}.eq-ass{text-align:center;font-size:8pt}.eq-ass .mk-linha{margin:8px 0 3px}
   .eq-gauge circle,.eq-trilho i,.eq-tag{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   </style>`;
@@ -150,7 +183,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const fim = `<section class="eq-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div></div>
     <div class="eq-ass"><div class="mk-linha"></div><b>José Fonseca</b> · Consultor de Segurança · Moked Consulting Security · jose.fonseca@moked.com.br</div></section>`;
   // "Como ler" + assinatura formam um bloco indivisível (~25 mm): a assinatura nunca fica sozinha numa folha.
-  const corpo = `${css}${empresa.logo ? `<img class="eq-empresa" src="${esc(empresa.logo)}" alt="${esc(empresa.empresa || '')}">` : ''}${kpis}${resumo}${grade}${desligadosHTML}<div class="mk-fecho">${comoLer}${fim}</div>`;
+  const corpo = `${css}${empresa.logo ? `<img class="eq-empresa" src="${esc(empresa.logo)}" alt="${esc(empresa.empresa || '')}">` : ''}${kpis}${resumo}${grade}${descricoesHTML}${desligadosHTML}<div class="mk-fecho">${comoLer}${fim}</div>`;
   return documentoMoked({
     project, titulo: 'Mapa de Equipe',
     subtitulo: `${esc(project.id)} · ${esc(project.name || '')} · referência ${dataBR(hoje)} · motor de maturidade v1`,

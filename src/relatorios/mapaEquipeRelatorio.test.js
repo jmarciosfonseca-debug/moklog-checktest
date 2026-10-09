@@ -77,3 +77,14 @@ test('17 pessoas com registros curtos: uma ficha por pessoa, sem blocos repetido
   expect((html.match(/class="eq-card"/g) || []).length).toBe(17);
   expect((html.match(/class="eq-foto"/g) || []).length).toBe(17);   // fotos só nas fichas
 });
+test('texto longo repetido: ficha mostra resumo + [T1]; texto integral aparece uma única vez no apêndice (nada se perde)', () => {
+  const longo = 'ESTANDE DE TIRO FICTÍCIO — instrução prática com técnicas em pé, agachado e sob estresse; 120 disparos por participante e avaliação individual final.';
+  const mk = (id, nome) => ({ ...colaborador, id, nome, historico: [{ tipo: 'Treinamento', detalhe: longo, data: '2026-08-18' }] });
+  const html = gerar({ colaboradores: [mk('1', 'Pessoa A'), mk('2', 'Pessoa B'), mk('3', 'Pessoa C')] });
+  expect((html.match(/class="eq-ref">\[T1\]/g) || []).length).toBe(3);
+  expect(html.split(longo).length - 1).toBe(1);
+  expect(html).toContain('Treinamentos — descrições completas');
+  expect(html).toContain('Pessoa A (18/08/2026); Pessoa B (18/08/2026); Pessoa C (18/08/2026)');
+  const curto = gerar({ colaboradores: [{ ...colaborador, historico: [{ tipo: 'Treinamento', detalhe: 'DDS fictício', data: '2026-09-01' }] }] });
+  expect(curto).not.toContain('Treinamentos — descrições completas');
+});
