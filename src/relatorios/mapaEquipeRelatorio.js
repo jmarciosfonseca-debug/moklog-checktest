@@ -150,7 +150,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const refs = indexarTextosLongos(fichas);
   const linhas = [];
   for (let n = 0; n < fichas.length; n += 3) linhas.push(fichas.slice(n, n + 3));
-  const grade = `<h2 class="mk-h2">Fichas individuais <span class="mk-mu">· ${fichas.length} colaborador(es) · referência ${dataBR(hoje)}${refs.size ? ' · descrições longas resumidas com referência [T] — texto completo ao final' : ''}</span></h2>${linhas.map(l => `<div class="eq-grade">${l.map(i => fichaHTML(i, hoje, refs)).join('')}</div>`).join('')}`;
+  const grade = `<h2 class="mk-h2">Fichas individuais <span class="mk-mu">· ${fichas.length} colaborador(es) · referência ${dataBR(hoje)}${refs.size ? ' · [T] = texto completo ao final' : ''}</span></h2>${linhas.map(l => `<div class="eq-grade">${l.map(i => fichaHTML(i, hoje, refs)).join('')}</div>`).join('')}`;
   const descricoesHTML = refs.size ? `<h2 class="mk-h2">Treinamentos — descrições completas <span class="mk-mu">· ${refs.size} texto(s) referenciado(s) nas fichas</span></h2><div class="eq-descr">${[...refs.values()].map(r => `<div class="eq-descr-item"><b>[${r.ref}]</b> ${esc(r.texto)}<div class="mk-mu">Registrado para: ${r.usos.map(u => `${esc(u.nome)}${u.data ? ` (${dataBR(u.data)})` : ''}`).join('; ')}</div></div>`).join('')}</div>` : '';
 
   const desligadosHTML = desligados.length ? `<h2 class="mk-h2">Desligados nos últimos 12 meses <span class="mk-mu">· ${desligados.length}</span></h2><div class="eq-deslig">${desligados.map(c => `<div><b>${esc(c.nome)}</b> <span class="mk-mu">${esc(c.cargo || '')} · ${dataBR(c.desligadoEm)}</span></div>`).join('')}</div>` : '';
@@ -161,6 +161,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   .eq-empresa{height:32px;max-width:150px;object-fit:contain;margin:0 0 6px}
   .eq-kpis{grid-template-columns:1.1fr 1.9fr 1.1fr 1.3fr;gap:6px;margin-bottom:6px}.eq-kpis .mk-k{padding:5px 9px}.eq-kpis .mk-kv{font-size:14pt}.eq-kpis .mk-nota{margin-top:2px;line-height:1.25}
   .eq-resumo{display:grid;grid-template-columns:210px 1fr 1fr;gap:10px;border:1px solid #E5E7EB;border-radius:8px;padding:5px 10px;margin-bottom:5px;page-break-inside:avoid}
+  .eq-resumo svg{max-height:112px;width:auto;max-width:100%}
   .eq-top{margin:3px 0 0;padding-left:16px;font-size:8.4pt}.eq-top li{margin:1px 0}.eq-alertas{margin:3px 0 0;padding-left:14px;font-size:7.8pt;line-height:1.3}.eq-alertas li{margin:1px 0}
   .eq-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:4px;break-inside:avoid;page-break-inside:avoid}
   .eq-card{border:1px solid #E5E7EB;border-radius:6px;padding:4px 6px;break-inside:avoid;page-break-inside:avoid;overflow-wrap:anywhere;font-size:7.4pt;line-height:1.22}
@@ -169,12 +170,12 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   .eq-nome{font-weight:700;font-size:8.2pt;color:#111827;line-height:1.15}.eq-cargo{font-size:7.4pt;color:#374151}.eq-meta{font-size:6.8pt;line-height:1.2}
   .eq-ind{text-align:center}.eq-gauge{width:33px;height:33px;display:block;margin:0 auto}.eq-classe{font-size:6pt;color:#374151;line-height:1.1;margin-top:1px;white-space:nowrap}
   .eq-tag{display:inline-block;font-size:6.3pt;font-weight:700;color:#6B7280;background:#F3F4F6;border-radius:3px;padding:0 4px;margin-left:3px;vertical-align:middle}.eq-tag-wa{color:#92400E;background:#FEF3C7}
-  .eq-eixos{margin-top:3px;display:grid;gap:0}.eq-eixo{display:grid;grid-template-columns:48px 1fr 38px;gap:4px;align-items:center;font-size:6.3pt;line-height:1.18;color:#374151;white-space:nowrap}
+  .eq-eixos{margin-top:3px;display:grid;gap:0}.eq-eixo{display:grid;grid-template-columns:48px 1fr 38px;gap:4px;align-items:center;font-size:6.3pt;line-height:1.02;color:#374151;white-space:nowrap}
   .eq-trilho{display:block;height:3.5px;background:#F3F4F6;border-radius:2px;overflow:hidden}.eq-trilho i{display:block;height:3.5px;background:#111827;border-radius:2px}.eq-eixo b{text-align:right;font-size:6.6pt}.eq-na b{color:#9CA3AF;font-weight:600}
-  .eq-cursos{border-top:1px solid #EEF0F3;margin-top:3px;padding-top:2px;font-size:6.5pt;line-height:1.18}.eq-cursos ul{margin:1px 0 0;padding-left:10px}.eq-cursos li{margin:0}
+  .eq-cursos{border-top:1px solid #EEF0F3;margin-top:2px;padding-top:1px;font-size:6.4pt;line-height:1.14}.eq-cursos ul{margin:1px 0 0;padding-left:10px}.eq-cursos li{margin:0}
   .eq-deslig{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 10px;font-size:7.8pt;margin-bottom:3px}
-  .eq-ref{font-weight:700;color:#B91C1C}.eq-descr{columns:2;column-gap:12px;font-size:7.4pt;line-height:1.3;margin-bottom:6px}.eq-descr-item{break-inside:avoid;margin-bottom:5px;overflow-wrap:anywhere}.eq-descr-item .mk-mu{font-size:6.8pt}
-  .eq-comoler{margin:2px 0 0;line-height:1.22;font-size:7.1pt}.eq-fim{display:grid;grid-template-columns:1fr 1.2fr;gap:16px;margin-top:4px;border-top:1px solid #E5E7EB;padding-top:4px;page-break-inside:avoid;break-inside:avoid;font-size:8pt}.eq-ass{text-align:center;font-size:8pt}.eq-ass .mk-linha{margin:8px 0 3px}
+  .eq-ref{font-weight:700;color:#B91C1C}.eq-descr{columns:2;column-gap:12px;font-size:7.4pt;line-height:1.3;margin-bottom:6px}.eq-descr-item{break-inside:avoid;margin-bottom:5px;overflow-wrap:anywhere}.eq-descr-item .mk-mu{font-size:6.4pt;line-height:1.2}
+  .eq-comoler{margin:1px 0 0;line-height:1.18;font-size:6.7pt}.eq-fim{display:grid;grid-template-columns:1fr 1.2fr;gap:16px;margin-top:2px;border-top:1px solid #E5E7EB;padding-top:2px;page-break-inside:avoid;break-inside:avoid;font-size:8pt}.eq-ass{text-align:center;font-size:8pt}.eq-ass .mk-linha{margin:3px 0 2px}
   .eq-gauge circle,.eq-trilho i,.eq-tag{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   </style>`;
 
