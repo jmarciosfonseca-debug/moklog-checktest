@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
+import { paleta } from './MaturidadeResumo';
 
-export default function ConfiguracaoMaturidade({ equipe, onSave }) {
+export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) {
+  const c = paleta(dark);
+  const mu = { fontSize: 12, color: c.mu, lineHeight: 1.4, margin: '4px 0' };
+  const campo = { width: '100%', boxSizing: 'border-box', padding: '8px', marginTop: 4, background: c.sub, color: c.fg, border: `1px solid ${c.bd}`, borderRadius: 6, fontSize: 14 };
+  const botao = { padding: '9px 12px', margin: '6px 6px 0 0', background: c.sub, color: c.fg, border: `1px solid ${c.bd}`, borderRadius: 6, fontSize: 13, cursor: 'pointer' };
   const [desde, setDesde] = useState(equipe.historicoDesde || '');
   const [catalogo, setCatalogo] = useState(equipe.treinamentosEsperados || []);
   const [salvando, setSalvando] = useState(false);
@@ -14,13 +19,21 @@ export default function ConfiguracaoMaturidade({ equipe, onSave }) {
     catch (e) { setErro(e.message || 'Não foi possível salvar.'); }
     finally { setSalvando(false); }
   };
-  return <details style={{ border: '1px solid #94a3b8', borderRadius: 8, padding: 10 }}><summary>Configuração gerencial da maturidade</summary>
-    <p>Defina somente a cobertura efetivamente conhecida. Sem cobertura de pelo menos 90 dias, faltas e FT ficam não aferidos.</p>
-    <label>Histórico registrado desde <input type="date" value={desde} onChange={e => setDesde(e.target.value)} /></label>
-    <h4>Catálogo de treinamentos esperados</h4>
-    {catalogo.map((t, n) => <fieldset key={n}><label>Nome <input value={t.nome} onChange={e => mudar(n, { nome: e.target.value })} /></label><label><input type="checkbox" checked={!!t.obrigatorio} onChange={e => mudar(n, { obrigatorio: e.target.checked })} />Obrigatório</label><label>Validade (meses, vazio = não expira) <input type="number" min="1" step="1" value={t.validadeMeses ?? ''} onChange={e => mudar(n, { validadeMeses: e.target.value === '' ? undefined : Number(e.target.value) })} /></label><button type="button" onClick={() => setCatalogo(lista => lista.filter((_, i) => i !== n))}>Retirar do catálogo</button></fieldset>)}
-    <button type="button" onClick={() => setCatalogo(lista => [...lista, { nome: '', obrigatorio: true }])}>Adicionar treinamento</button>
-    <button type="button" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar configuração'}</button>
-    {erro && <p role="alert">{erro}</p>}
+  return <details style={{ border: `1px solid ${c.bd}`, borderRadius: 10, padding: 12, background: c.bg, color: c.fg }}><summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Configuração gerencial da maturidade</summary>
+    <p style={mu}><b>Para que serve:</b> informa ao cálculo o que ele não consegue saber sozinho. Nada aqui altera fichas ou registros dos colaboradores; só muda como a maturidade é calculada.</p>
+    <label style={{ display: 'block', fontSize: 13, marginTop: 8 }}>Histórico registrado desde
+      <input type="date" value={desde} onChange={e => setDesde(e.target.value)} style={campo} /></label>
+    <p style={mu}>A data a partir da qual faltas, atrasos e folgas trabalhadas passaram a ser lançados no MokLog. Sem ao menos 90 dias de cobertura, esses eixos ficam "não aferidos" (em vez de parecerem 100%).</p>
+    <h4 style={{ margin: '12px 0 4px', fontSize: 13 }}>Catálogo de treinamentos esperados</h4>
+    <p style={mu}>Lista dos cursos que o posto exige. Com catálogo, o eixo "Obrigatórios" mede quantos o colaborador concluiu. Sem catálogo, aparece "Sem catálogo para aferir conclusão". Para lançar um treinamento a uma pessoa, use a ficha dela; aqui só se define o que é esperado. "Retirar do catálogo" remove apenas o item da lista, nenhum registro de colaborador é apagado.</p>
+    {catalogo.map((t, n) => <fieldset key={n} style={{ border: `1px solid ${c.bd}`, borderRadius: 8, margin: '8px 0', padding: 10 }}>
+      <label style={{ display: 'block', fontSize: 13 }}>Nome do treinamento <input value={t.nome} onChange={e => mudar(n, { nome: e.target.value })} style={campo} /></label>
+      <label style={{ display: 'block', fontSize: 13, marginTop: 8 }}><input type="checkbox" checked={!!t.obrigatorio} onChange={e => mudar(n, { obrigatorio: e.target.checked })} /> Obrigatório</label>
+      <label style={{ display: 'block', fontSize: 13, marginTop: 8 }}>Validade em meses (vazio = não expira) <input type="number" min="1" step="1" value={t.validadeMeses ?? ''} onChange={e => mudar(n, { validadeMeses: e.target.value === '' ? undefined : Number(e.target.value) })} style={campo} /></label>
+      <button type="button" style={botao} onClick={() => setCatalogo(lista => lista.filter((_, i) => i !== n))}>Retirar do catálogo</button>
+    </fieldset>)}
+    <button type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, { nome: '', obrigatorio: true }])}>Adicionar ao catálogo</button>
+    <button type="button" style={{ ...botao, background: '#1d4ed8', color: '#fff', borderColor: '#1d4ed8' }} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar configuração'}</button>
+    {erro && <p role="alert" style={{ color: '#ef4444', fontSize: 13 }}>{erro}</p>}
   </details>;
 }

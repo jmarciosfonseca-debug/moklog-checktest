@@ -2843,8 +2843,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
 
-          {adminAuth && <MaturidadeResumo equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} />}
-          {adminAuth && <ConfiguracaoMaturidade key={project.id} equipe={equipeData} onSave={patch => save({ ...equipeData, ...patch })} />}
+          {adminAuth && <MaturidadeResumo dark={dark} equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} />}
+          {adminAuth && <ConfiguracaoMaturidade key={project.id} dark={dark} equipe={equipeData} onSave={patch => save({ ...equipeData, ...patch })} />}
           {/* Barra de auth */}
           {adminAuth ? (
             <div style={{ background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"10px 14px" }}>
