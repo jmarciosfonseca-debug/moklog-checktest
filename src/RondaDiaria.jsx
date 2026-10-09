@@ -1,4 +1,6 @@
 import { checkPin } from "./session";
+import { gerarConsolidadoPlantoesHTML } from "./relatorios/perimetralPlantao";
+import { baixarHtml } from "./relatorios/padraoMoked";
 // ─────────────────────────────────────────────────────────────
 // RondaDiaria.jsx — Ronda Perimetral Diária (v3)
 // Novidades desta versão:
@@ -412,6 +414,12 @@ function montarSecaoPerimetral(project, plantoes){
 }
 
 function gerarPdfConsolidado(project, plantoes, modo="ambos"){
+  if(ZONA_MAPA[project.id] && (modo==="perim"||modo==="ambos")){
+    // padrão Moked (paisagem, matriz por teste, observações, cobertura 1 teste/turno/dia)
+    const htmlM = gerarConsolidadoPlantoesHTML({ project, plantoes, zonaMapa:ZONA_MAPA[project.id], mapa:MAPA_PDF[project.id], modo });
+    baixarHtml(htmlM, `consolidado_perimetral_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`);
+    return;
+  }
   const incluirRondas = modo!=="perim";
   const incluirPerim = ZONA_MAPA[project.id] && (modo==="perim"||modo==="ambos");
   const secaoPerim = incluirPerim ? montarSecaoPerimetral(project, plantoes) : "";

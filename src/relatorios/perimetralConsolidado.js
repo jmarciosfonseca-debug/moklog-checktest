@@ -184,7 +184,7 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
 
   const mapaCard = pcfg?.mapaB64
     ? `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Mapa perimetral <span class="mk-mu">· frequência de resultados adversos por zona</span></div>
-<div class="pe-map"><img src="data:image/jpeg;base64,${pcfg.mapaB64}" alt="Mapa ${escHTML(project.id)}"><svg>${marcadores(pcfg, calc)}</svg></div>
+<div class="pe-map"><img src="${/^data:/.test(pcfg.mapaB64) ? pcfg.mapaB64 : `data:image/jpeg;base64,${pcfg.mapaB64}`}" alt="Mapa ${escHTML(project.id)}"><svg>${marcadores(pcfg, calc)}</svg></div>
 <div class="pe-leg"><b>●</b> verde &lt;30% · <b>●</b> âmbar 30–59% · <b>●</b> vermelho ≥60% · cinza = sem registro. Cada marcador traz a zona e o percentual de parciais + inoperantes.</div></div>`
     : `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Mapa perimetral</div><div class="mk-mu" style="padding:24px 0;text-align:center">Mapa ainda não cadastrado para este projeto.</div></div>`;
   const graficoCard = `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Frequência de resultados adversos por zona</div>${graficoZonas(calc)}${destaque(calc)}</div>`;
