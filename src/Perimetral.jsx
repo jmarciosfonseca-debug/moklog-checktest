@@ -406,9 +406,9 @@ ${statsRows ? `
 }
 
 // ── PDF CONSOLIDADO do período (padrão Moked — ver relatorios/perimetralConsolidado.js)
-function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true, escopo="selecionados") {
+function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true, escopo="selecionados", janela={}) {
   if(!testes?.length) return;
-  const html = gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo, incluirPerim, incluirRondas });
+  const html = gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo, incluirPerim, incluirRondas, periodoDe:janela.de||null, periodoAte:janela.ate||null });
   baixarHtml(html, `consolidado_perimetral_${project.id}_${new Date().toLocaleDateString("pt-BR").replace(/\//g,"-")}.html`);
 }
 
@@ -640,7 +640,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             onClick={()=>{
               const sel=pdfSel; setPdfSel(null);
               if(sel.modo==="teste") gerarPDFTeste(sel.teste,testes,project,pcfg,sel.rondas,sel.perim);
-              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim,sel.escopo);
+              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim,sel.escopo,sel.janela);
             }}
             style={{...S.btnSm,flex:1,fontSize:13,padding:"11px 0",justifyContent:"center",
               opacity:podeGerar?1:0.4,cursor:podeGerar?"pointer":"not-allowed",
@@ -987,7 +987,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 {!modoSelecao && testesFiltrados.length>0 && (
                   <button onClick={()=>{
                     const totRondas = testesFiltrados.reduce((acc,t)=>acc+((t.rondas||[]).length),0);
-                    setPdfSel({modo:"consolidado",testes:testesFiltrados,periodo:`${testesFiltrados.length} teste(s)`,escopo:"periodo",perim:true,rondas:totRondas>0});
+                    setPdfSel({modo:"consolidado",testes:testesFiltrados,periodo:`${testesFiltrados.length} teste(s)`,escopo:"periodo",janela:{ de: filtroPeriodo==="all" ? null : new Date(Date.now()-parseInt(filtroPeriodo)*86400000).toLocaleDateString("sv-SE"), ate: new Date(Date.now()-86400000).toLocaleDateString("sv-SE") },perim:true,rondas:totRondas>0});
                   }} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:12,padding:"8px 12px",display:"flex",alignItems:"center",gap:6,flex:1,justifyContent:"center"}}>
                     {`📄 Todos do filtro (${testesFiltrados.length})`}
                   </button>

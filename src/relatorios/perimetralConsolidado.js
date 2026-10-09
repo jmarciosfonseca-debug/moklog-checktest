@@ -49,6 +49,29 @@ export function calcularConsolidado(testes, zonas) {
   };
 }
 
+export const TURNOS_ESPERADOS = ['Diurno', 'Noturno'];
+const addDia = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+// Regra operacional (Marcio, 09/10/2026): todo dia deve ter ao menos 1 teste por turno (Diurno e Noturno).
+// Dia de emissão ainda em andamento não é cobrado. Mais de um teste por turno é aceito.
+export function calcularCobertura(testes, emissaoISO, periodoDe = null, periodoAte = null) {
+  const datas = testes.map(t => t.data).filter(Boolean).sort();
+  if (!datas.length) return { dias: 0, esperados: 0, cumpridos: 0, completos: 0, incompletos: [], porDia: {}, extras: 0, de: null, ate: null };
+  const de = periodoDe && periodoDe < datas[0] ? periodoDe : datas[0];
+  const ate = periodoAte && periodoAte > datas[datas.length - 1] ? periodoAte : datas[datas.length - 1];
+  const porDia = {};
+  for (const t of testes) { if (!t.data) continue; (porDia[t.data] ||= new Set()).add(t.turno); }
+  const incompletos = []; let dias = 0, cumpridos = 0, completos = 0;
+  for (let d = de; d <= ate; d = addDia(d, 1)) {
+    if (d === emissaoISO) continue;
+    dias++;
+    const tem = porDia[d] || new Set();
+    const faltam = TURNOS_ESPERADOS.filter(tn => !tem.has(tn));
+    cumpridos += TURNOS_ESPERADOS.length - faltam.length;
+    if (faltam.length) incompletos.push({ data: d, faltam, nenhum: faltam.length === TURNOS_ESPERADOS.length }); else completos++;
+  }
+  return { dias, esperados: dias * TURNOS_ESPERADOS.length, cumpridos, completos, incompletos, porDia, extras: Math.max(0, testes.length - cumpridos), de, ate };
+}
+
 export function rotuloIntervalo(de, ate) {
   if (!de) return 'sem data';
   return de === ate ? dataBR(de) : `${dataBR(de)} a ${dataBR(ate)}`;
@@ -57,7 +80,7 @@ export function rotuloIntervalo(de, ate) {
 const CSS = `<style>
 @page{size:A4 landscape;margin:10mm 10mm 14mm 10mm}
 @media screen{body{max-width:277mm}}
-.pe-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(34mm,1fr));gap:6px;margin-bottom:8px}.pe-kpis .mk-k{padding:5px 9px}.pe-kpis .mk-kv{font-size:15pt}.pe-kpis .mk-kl{font-size:8pt}.pe-nota-k{font-size:7pt;color:#6B7280;line-height:1.2}
+.pe-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(27mm,1fr));gap:6px;margin-bottom:8px}.pe-kpis .mk-k{padding:5px 9px}.pe-kpis .mk-kv{font-size:14pt}.pe-kpis .mk-kl{font-size:7.6pt}.pe-nota-k{font-size:7pt;color:#6B7280;line-height:1.2}
 .pe-duas{display:grid;grid-template-columns:1.15fr 1fr;gap:10px;align-items:start;margin-bottom:6px}.pe-card{border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;break-inside:avoid}
 .pe-map{position:relative;display:inline-block;max-width:100%;line-height:0}.pe-map img{display:block;max-width:100%;max-height:100mm;width:auto;height:auto;border-radius:4px}.pe-map svg{position:absolute;left:0;top:0;width:100%;height:100%}
 .pe-leg{font-size:7.6pt;color:#4B5563;line-height:1.3;margin-top:4px}.pe-leg b{color:#111827}
@@ -73,11 +96,13 @@ table.pe-mx{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt
 .pe-mx tr.pe-nd td{border-top:1.4px solid #9CA3AF}
 .pe-mx .pe-legrow th{text-transform:none;font-weight:400;text-align:left;font-size:7.2pt;color:#4B5563;border-bottom:none;padding:0 0 3px}
 .pe-c{text-align:center;font-size:7.3pt;font-weight:700;letter-spacing:.01em}.pe-c-ok{color:#6B7280;font-weight:600}.pe-c-pa{background:#FEF3C7;color:#92400E}.pe-c-in{background:#FEE2E2;color:#991B1B}.pe-c-sem{background:#F3F4F6;color:#6B7280;font-weight:600}
+.pe-mx tr.pe-gap td{background:#FFFBEB;color:#92400E;font-weight:600;border-bottom:1px solid #FDE68A}.pe-mx td.pe-gap-t{text-align:left}
 .pe-c sup{font-size:6pt;font-weight:700;margin-left:1px}.pe-id{color:#6B7280;font-size:6.8pt;white-space:nowrap}
 .pe-obs{font-size:8pt;line-height:1.25}.pe-obs li{margin:0 0 2px;break-inside:avoid}.pe-obs b{color:#111827}
 .pe-h2{font-size:10.5pt;font-weight:700;color:#111827;margin:6px 0 4px;break-after:avoid}.pe-h2 .mk-mu{font-weight:400;font-size:8.4pt}
 .pe-matriz{break-before:page}.pe-fim{display:grid;grid-template-columns:1fr 1.2fr;gap:16px;margin-top:6px;border-top:1px solid #E5E7EB;padding-top:3px;font-size:7.6pt;break-inside:avoid;page-break-inside:avoid}.pe-ass{text-align:center}.pe-ass .mk-linha{margin:4px 0 2px}
 .pe-trilho,.pe-pa,.pe-in,.pe-c-pa,.pe-c-in,.pe-c-sem{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.pe-gap td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style>`;
 
 function celula(st, ref) {
@@ -117,10 +142,12 @@ function destaque(calc) {
   return `<div class="pe-top"><b>Maior recorrência de resultados adversos:</b> ${top.map(z => `${escHTML(codigoZona(z.zona))} (${z.adversos} de ${z.aferidas}${z.pct !== null ? ` · ${Math.round(z.pct)}%` : ''})`).join('; ')}.</div>`;
 }
 
-export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo = 'selecionados', incluirPerim = true, incluirRondas = false, hoje = new Date() }) {
+export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo = 'selecionados', incluirPerim = true, incluirRondas = false, hoje = new Date(), periodoDe = null, periodoAte = null }) {
   const lista = ordenarTestes(Array.isArray(testes) ? testes : []);
   const zonas = pcfg?.zonas || [];
   const calc = calcularConsolidado(lista, zonas);
+  const emissaoISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+  const cob = calcularCobertura(lista, emissaoISO, periodoDe, periodoAte);
   const intervalo = rotuloIntervalo(calc.de, calc.ate);
   const escopoTxt = escopo === 'periodo' ? 'todos os testes do período' : 'testes selecionados';
   const soRondas = !incluirPerim && incluirRondas;
@@ -150,6 +177,7 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
   <div class="mk-k"><div class="mk-kv mk-wa">${calc.parcial}</div><div class="mk-kl">Parciais</div></div>
   <div class="mk-k"><div class="mk-kv mk-da">${calc.inop}</div><div class="mk-kl">Inoperantes</div></div>
   <div class="mk-k"><div class="mk-kv">${calc.sem}</div><div class="mk-kl">Sem registro</div><div class="pe-nota-k">fora da taxa</div></div>
+  <div class="mk-k"><div class="mk-kv ${cob.incompletos.length ? 'mk-da' : 'mk-ok'}">${cob.cumpridos}/${cob.esperados}</div><div class="mk-kl">Cobertura de turnos</div><div class="pe-nota-k">${cob.incompletos.length ? `${cob.incompletos.length} dia(s) incompleto(s)` : 'todos os dias completos'}</div></div>
   <div class="mk-k"><div class="mk-kv">${calc.taxaOk === null ? '—' : `${num1(calc.taxaOk)}%`}</div><div class="mk-kl">Taxa OK</div><div class="pe-nota-k">${calc.ok} OK ÷ ${calc.aferidas} aferidas</div></div>
 </div>`
     : `<div class="pe-kpis"><div class="mk-k"><div class="mk-kv">${calc.nTestes}</div><div class="mk-kl">Testes com rondas</div></div><div class="mk-k"><div class="mk-kv">${nRondas}</div><div class="mk-kl">Rondas adicionais</div></div></div>`;
@@ -160,19 +188,31 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
 <div class="pe-leg"><b>●</b> verde &lt;30% · <b>●</b> âmbar 30–59% · <b>●</b> vermelho ≥60% · cinza = sem registro. Cada marcador traz a zona e o percentual de parciais + inoperantes.</div></div>`
     : `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Mapa perimetral</div><div class="mk-mu" style="padding:24px 0;text-align:center">Mapa ainda não cadastrado para este projeto.</div></div>`;
   const graficoCard = `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Frequência de resultados adversos por zona</div>${graficoZonas(calc)}${destaque(calc)}</div>`;
-  const criterios = `<div class="pe-crit"><b>Critérios.</b> Teste = um registro do sistema; avaliação = resultado de uma zona em um teste. Taxa OK = OK ÷ avaliações aferidas; "sem registro" não entra no denominador nem conta como OK. As faixas baixa (&lt;30%), média (30–59%) e alta (≥60%) classificam a <b>frequência</b> de resultados parciais + inoperantes no período; não representam nível de risco operacional nem disponibilidade contínua do sistema. A matriz lista os acionamentos registrados; dia sem registro não indica teste não executado nem descumprimento de escala.</div>`;
+  const criterios = `<div class="pe-crit"><b>Critérios.</b> Teste = um registro do sistema; avaliação = resultado de uma zona em um teste. Taxa OK = OK ÷ avaliações aferidas; "sem registro" não entra no denominador nem conta como OK. As faixas baixa (&lt;30%), média (30–59%) e alta (≥60%) classificam a <b>frequência</b> de resultados parciais + inoperantes no período; não representam nível de risco operacional nem disponibilidade contínua do sistema. <b>Cobertura:</b> a regra é no mínimo 1 teste por turno (Diurno e Noturno), 2 por dia; mais de um por turno é aceito. Dias e turnos sem registro são apontados na matriz${escopo === 'periodo' ? '' : ' (nesta emissão a verificação vale apenas dentro da seleção; ausências podem refletir a seleção parcial)'}. Ausência de registro indica falta de lançamento no sistema, não prova por si só que o teste deixou de ser feito.</div>`;
 
   const resumo = incluirPerim ? `${kpis}<div class="pe-duas">${mapaCard}${graficoCard}</div>${criterios}` : kpis;
 
   const colgroup = `<colgroup><col style="width:18mm">${comHora ? '<col style="width:11mm">' : ''}<col style="width:19mm"><col style="width:${zonas.length > 14 ? 40 : 54}mm">${zonas.map(() => '<col>').join('')}</colgroup>`;
   const colunas = 3 + (comHora ? 1 : 0) + zonas.length;
-  const linhas = lista.map((t, i) => {
-    const novoDia = i > 0 && lista[i - 1].data !== t.data;
+  const avisoLinha = (txt) => `<tr class="pe-gap"><td class="pe-l"><b>${txt.data}</b></td><td class="pe-gap-t" colspan="${colunas - 1}">${txt.msg}</td></tr>`;
+  const linhasArr = [];
+  const lacunas = (de, ate) => { for (let d = de; d > ate; d = addDia(d, -1)) if (d !== emissaoISO) linhasArr.push(avisoLinha({ data: dataBR(d), msg: `Nenhum teste registrado (esperado: ${TURNOS_ESPERADOS.join(' e ')})` })); };
+  if (lista.length && cob.ate > lista[0].data) lacunas(cob.ate, lista[0].data);
+  lista.forEach((t, i) => {
+    const anterior = i > 0 ? lista[i - 1].data : null;
+    const novoDia = anterior !== null && anterior !== t.data;
+    if (novoDia) {   // dia anterior terminou: avisa turno faltante; dias vazios entre os dois
+      const ultimo = cob.incompletos.find(x => x.data === anterior && !x.nenhum);
+      if (ultimo) linhasArr.push(avisoLinha({ data: dataBR(anterior), msg: `Sem registro de teste do turno ${ultimo.faltam.join(' e ')}` }));
+      lacunas(addDia(anterior, -1), t.data);
+    }
     const dup = contagemDia[`${t.data}|${t.turno}`] > 1 && t.id ? `<br><span class="pe-id">reg. #${escHTML(String(t.id).replace(/[^A-Za-z0-9]/g, '').slice(-4))}</span>` : '';
-    return `<tr${novoDia ? ' class="pe-nd"' : ''}><td class="pe-l"><b>${dataBR(t.data)}</b></td>${comHora ? `<td>${escHTML(horaValida(t) || '—')}</td>` : ''}<td class="pe-l">${escHTML(t.turno || '—')}${dup}</td><td class="pe-l">${escHTML(t.quemFez || '—')}</td>${zonas.map(z => celula(normalizarStatus(t.zonas?.[z]), refs.get(`${i}|${z}`))).join('')}</tr>`;
-  }).join('');
+    linhasArr.push(`<tr${novoDia ? ' class="pe-nd"' : ''}><td class="pe-l"><b>${dataBR(t.data)}</b></td>${comHora ? `<td>${escHTML(horaValida(t) || '—')}</td>` : ''}<td class="pe-l">${escHTML(t.turno || '—')}${dup}</td><td class="pe-l">${escHTML(t.quemFez || '—')}</td>${zonas.map(z => celula(normalizarStatus(t.zonas?.[z]), refs.get(`${i}|${z}`))).join('')}</tr>`);
+  });
+  if (lista.length) { const u = cob.incompletos.find(x => x.data === lista[lista.length - 1].data && !x.nenhum); if (u) linhasArr.push(avisoLinha({ data: dataBR(u.data), msg: `Sem registro de teste do turno ${u.faltam.join(' e ')}` })); lacunas(addDia(lista[lista.length - 1].data, -1), addDia(cob.de, -1)); }
+  const linhas = linhasArr.join('');
   const matriz = incluirPerim ? `<section class="pe-matriz"><table class="pe-mx">${colgroup}<thead>
-<tr class="pe-legrow"><th colspan="${colunas}">${escHTML(project.id)} · ${escHTML(intervalo)} · ${escopoTxt} · <b>OK</b> = ok · <b>PARC</b> = parcial · <b>INOP</b> = inoperante · <b>S/R</b> = sem registro · número sobrescrito = observação (ver seção Observações)</th></tr>
+<tr class="pe-legrow"><th colspan="${colunas}">${escHTML(project.id)} · ${escHTML(intervalo)} · ${escopoTxt} · <b>OK</b> = ok · <b>PARC</b> = parcial · <b>INOP</b> = inoperante · <b>S/R</b> = sem registro · número sobrescrito = observação · linha âmbar = turno/dia sem registro</th></tr>
 <tr><th class="pe-l">Data</th>${comHora ? '<th>Hora</th>' : ''}<th class="pe-l">Turno</th><th class="pe-l">Responsável</th>${zonas.map(z => `<th>${escHTML(codigoZona(z))}</th>`).join('')}</tr></thead>
 <tbody>${linhas || `<tr><td colspan="${colunas}" class="mk-mu" style="text-align:center;padding:14px">Nenhum teste registrado.</td></tr>`}</tbody></table></section>` : '';
 

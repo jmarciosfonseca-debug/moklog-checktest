@@ -143,3 +143,33 @@ test('indicadores coerentes com a matriz: cabeçalho = linhas; OK+parc+inop+s/r 
   expect(c.nTestes).toBe(linhasMatriz(html)); expect(c.ok + c.parcial + c.inop + c.sem).toBe(c.avaliacoes);
   expect(html).toContain(`${c.ok} OK ÷ ${c.aferidas} aferidas`); expect(html).toContain('7 × 12 zonas'.replace('7 × 12', '7 × 12'));
 });
+import { calcularCobertura } from './perimetralConsolidado';
+test('cobertura: mínimo 1 teste por turno por dia — dia sem teste e turno faltante são apontados', () => {
+  const t = [mk('a', '2026-10-01', 'Diurno'), mk('b', '2026-10-01', 'Noturno'), mk('c', '2026-10-02', 'Diurno'), mk('d', '2026-10-04', 'Diurno'), mk('e', '2026-10-04', 'Noturno')];
+  const c = calcularCobertura(t, '2026-10-09');
+  expect(c).toMatchObject({ dias: 4, esperados: 8, cumpridos: 5, completos: 2 });
+  expect(c.incompletos).toEqual([{ data: '2026-10-02', faltam: ['Noturno'], nenhum: false }, { data: '2026-10-03', faltam: ['Diurno', 'Noturno'], nenhum: true }]);
+  const html = g(t);
+  expect(html).toContain('Sem registro de teste do turno Noturno'); expect(html).toContain('Nenhum teste registrado (esperado: Diurno e Noturno)');
+  expect(html).toContain('5/8'); expect(html).toContain('2 dia(s) incompleto(s)'); expect(linhasMatriz(html)).toBe(5);
+  expect((html.match(/class="pe-gap"/g) || []).length).toBe(2);
+});
+test('cobertura: mais de um teste por turno é aceito; todos os dias completos', () => {
+  const t = [mk('a', '2026-10-01', 'Diurno'), mk('b', '2026-10-01', 'Diurno'), mk('c', '2026-10-01', 'Noturno')];
+  const c = calcularCobertura(t, '2026-10-09');
+  expect(c).toMatchObject({ dias: 1, esperados: 2, cumpridos: 2, incompletos: [], extras: 1 });
+  expect(g(t)).toContain('todos os dias completos'); expect(g(t)).not.toContain('class="pe-gap"');
+});
+test('cobertura: dia da emissão (em andamento) não é cobrado; janela do período cobra dias antes/depois dos registros', () => {
+  expect(calcularCobertura([mk('a', '2026-10-09', 'Diurno')], '2026-10-09').incompletos).toEqual([]);
+  const t = [mk('a', '2026-10-03', 'Diurno'), mk('b', '2026-10-03', 'Noturno')];
+  const c = calcularCobertura(t, '2026-10-09', '2026-10-01', '2026-10-05');
+  expect(c.incompletos.map(x => x.data)).toEqual(['2026-10-01', '2026-10-02', '2026-10-04', '2026-10-05']);
+  const html = g(t, { periodoDe: '2026-10-01', periodoAte: '2026-10-05' });
+  expect((html.match(/class="pe-gap"/g) || []).length).toBe(4);
+  expect(html.indexOf('05/10/2026')).toBeLessThan(html.indexOf('>03/10/2026')); expect(html.lastIndexOf('01/10/2026')).toBeGreaterThan(html.indexOf('>03/10/2026'));
+});
+test('cobertura: sem registros não quebra; seleção parcial ganha ressalva', () => {
+  expect(calcularCobertura([], '2026-10-09').esperados).toBe(0); expect(g([])).not.toMatch(/NaN%|>NaN<|Infinity/);
+  expect(g([mk('a', '2026-10-01')])).toContain('apenas dentro da seleção'); expect(g([mk('a', '2026-10-01')], { escopo: 'periodo' })).not.toContain('apenas dentro da seleção');
+});
