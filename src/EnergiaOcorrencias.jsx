@@ -991,7 +991,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
         ) : liderAuth ? (
           <div style={{...S.card,border:"1px solid #f5b94255",background:dark?"#1a1000":"#fffbeb"}}>
             <div style={{fontSize:13,fontWeight:800,color:COR.amber}}>⚠️ Cadastro pendente</div>
-            <div style={{fontSize:12,...S.txt2,marginTop:2,marginBottom:10}}>Configure a concessionária uma única vez antes de registrar ocorrências.</div>
+            <div style={{fontSize:12,...S.txt2,marginTop:2,marginBottom:10}}>Configure a concessionária uma única vez. O registro de ocorrências continua liberado enquanto isso.</div>
             <button onClick={abrirSheet} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar agora</button>
           </div>
         ) : null}
