@@ -339,10 +339,12 @@ export async function generatePDF(project, state, meta, photos, ctmkInfo, inquil
   porCategoria(itensLaudo).forEach(c => dispRows.push({ label:c.cat, ok:c.ok, total:c.total, pct:Math.round(c.saude) }));
 
   // ── 2. Deduplica problemas e enriquece com dias em aberto
+  // Aging relativo à data de referência do laudo (não a "hoje"), para reemissões não envelhecerem o documento.
+  const _refAging = meta.date ? new Date(meta.date+"T12:00:00").getTime() : Date.now();
   const seenItems = new Map();
   problemItems.forEach(p => seenItems.set(p.cat+"|"+p.item, p));
   const uniqueProblems = [...seenItems.values()].map(p => {
-    const dias = p.since ? Math.floor((Date.now()-new Date(p.since+"T12:00:00").getTime())/86400000) : null;
+    const dias = p.since ? Math.max(0, Math.floor((_refAging-new Date(p.since+"T12:00:00").getTime())/86400000)) : null;
     return {...p, dias};
   }).sort((a,b)=>(b.dias??-1)-(a.dias??-1));  // maior aging primeiro
 

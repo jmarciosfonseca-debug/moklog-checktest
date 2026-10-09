@@ -313,7 +313,16 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
   const [cfgUrl, setCfgUrl] = useState("");
   const [confirmLimpar, setConfirmLimpar] = useState(0);
 
-  useEffect(()=>{ loadIluminacao(project.id).then(d=>{ setData(d); setLoading(false); }); },[project.id]);
+  const [loadErro, setLoadErro] = useState(false);
+  const [loadTick, setLoadTick] = useState(0);
+  useEffect(()=>{
+    let vivo = true; setLoadErro(false); setLoading(true);
+    const to = setTimeout(()=>{ if(vivo) setLoadErro(true); }, 10000);   // 10 s sem resposta: oferece "Tentar de novo"
+    loadIluminacao(project.id)
+      .then(d=>{ if(vivo){ clearTimeout(to); setData(d); setLoading(false); setLoadErro(false); } })
+      .catch(()=>{ if(vivo){ clearTimeout(to); setLoadErro(true); } });
+    return ()=>{ vivo = false; clearTimeout(to); };
+  },[project.id, loadTick]);
 
   const g = calcGeral(data.quadrantes);
   const temQuadrantes = (data.quadrantes||[]).length>0;
@@ -401,7 +410,11 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{...S.txt2,fontSize:13}}>Carregando iluminação…</div>
+      <button onClick={onBack} style={{...S.backBtn,position:"absolute",top:14,left:16}} aria-label="Voltar">←</button>
+      <div style={{...S.txt2,fontSize:13,textAlign:"center",padding:"0 24px"}}>
+        {loadErro ? "A iluminação demorou para carregar ou falhou." : "Carregando iluminação…"}
+        {loadErro && <div style={{marginTop:12}}><button onClick={()=>setLoadTick(t=>t+1)} style={S.btnSm}>Tentar de novo</button></div>}
+      </div>
     </div>
   );
 
@@ -592,7 +605,15 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
                       ? <span style={{color:"#f59e0b",fontWeight:800}}>deficientes pendentes</span>
                       : <span style={{color:c.def>0?"#ef4444":"#22c55e",fontWeight:800}}>{c.def} deficiente{c.def===1?"":"s"}</span>}
                   </div>
-                  <div style={{fontSize:9,...S.txt2,marginTop:1}}>{q.atualizadoEm?`atualizado em ${fmtDataHora(q.atualizadoEm)}`:""}</div>
+                  <div style={{fontSize:9,...S.txt2,marginTop:1}}>{(()=>{
+                    if(!q.atualizadoEm) return "";
+                    const ult = data.testeQuinzenal?.ultimoRegistro?.data;   // YYYY-MM-DD do último teste concluído
+                    const dq = new Date(q.atualizadoEm);
+                    const dqIso = isNaN(dq) ? "" : dq.toLocaleDateString("sv-SE");
+                    // Quadrante não editado desde o último teste quinzenal: não afirmar que foi conferido.
+                    if(ult && dqIso && dqIso < ult) return `não conferido neste teste · última atualização ${fmtDataHora(q.atualizadoEm)}`;
+                    return `atualizado em ${fmtDataHora(q.atualizadoEm)}`;
+                  })()}</div>
                 </div>
                 {c.def!=null && <div style={{width:64,flexShrink:0,textAlign:"right",fontSize:13,fontWeight:900,color:cor}}>{c.pct}%</div>}
               </div>
