@@ -14,6 +14,7 @@ const { get_keyaccess_failures } = require("./keyAccess");
 const { get_weekly_report_items } = require("./weeklyReports");
 const { get_staffing_and_vacation_gaps } = require("./staffing");
 const { get_project_status, get_operational_overview } = require("./overview");
+const { query_module, QUERY_MODULE_SCHEMA } = require("./modules");
 const { fail } = require("../lib/shape");
 
 const HANDLERS = {
@@ -26,6 +27,7 @@ const HANDLERS = {
   get_keyaccess_failures,
   get_weekly_report_items,
   get_staffing_and_vacation_gaps,
+  query_module,
 };
 
 const projectIdParam = { type: "string", description: "ID do projeto (P601, P602, P604, P605, P606, P607, P311A, P311B, P505, P260A). Omitir = todos." };
@@ -107,6 +109,8 @@ const TOOL_SCHEMAS = [
     },
   },
 ];
+
+TOOL_SCHEMAS.push(QUERY_MODULE_SCHEMA);
 
 // Dispatcher seguro: só executa handlers conhecidos; nunca eval/consulta livre.
 async function runTool(name, args) {
