@@ -62,15 +62,15 @@ function marcadoresMapa(project, data, a) {
 }
 
 // Gráfico de barras (HTML/CSS, imprime igual em qualquer navegador): pontos deficientes por quadrante.
-function graficoAtencao(a) {
+// Compacto de propósito: cabe ao lado do mapa (retrato) ou em largura total (paisagem).
+function graficoAtencao(a, { lado = false } = {}) {
   const itens = a.atencao;
-  if (!itens.length) return "";
+  if (!itens.length) return `<div class="mk-vazio" style="margin:0"><div class="mk-big" style="font-size:22pt">0</div><div class="mk-kl">pontos deficientes</div></div>`;
   const mx = Math.max(1, ...itens.map((q) => q.def));
-  const linhas = itens.map((q, i) => `<div class="il-gr"><span class="il-gq">${i < 3 ? `<span class="il-rk">${i + 1}</span>` : ""}<b>${escHTML(q.nome)}</b> <span class="mk-mu">${q.total} pts</span></span>
+  const linhas = itens.map((q, i) => `<div class="il-gr"><span class="il-gq">${i < 3 ? `<span class="il-rk">${i + 1}</span>` : ""}<b>${escHTML(q.nome)}</b></span>
     <span class="il-gt"><span style="width:${(q.def / mx * 100).toFixed(1)}%;background:${COR[q.faixa]}"></span></span>
-    <span class="il-gv"><b>${q.def}</b> <span class="mk-mu">deficientes</span></span><span class="mk-b mk-b-${q.faixa}">${num1(q.pct)}% operante</span></div>`).join("");
-  return `<section class="mk-card il-card"><div class="mk-h2">Pontos que requerem atenção <span class="mk-mu">· pontos deficientes por quadrante, do maior para o menor</span></div>${linhas}
-  <div class="mk-nota">Numeração 1–3 = ordem de prioridade (mais pontos apagados primeiro; empate decidido pelo menor % operante). Cor da barra = faixa do quadrante: vermelho abaixo de ${FAIXA_ATENCAO}% operante, âmbar entre ${FAIXA_ATENCAO}% e ${FAIXA_OK}%, grafite a partir de ${FAIXA_OK}%.</div></section>`;
+    <span class="il-gv"><b>${q.def}</b><span class="mk-mu"> / ${q.total}</span></span><span class="mk-b mk-b-${q.faixa}">${num1(q.pct)}%</span></div>`).join("");
+  return `<div class="il-graf${lado ? " il-graf-lado" : ""}"><div class="mk-h2" style="margin-top:0">Pontos que requerem atenção</div><div class="mk-mu mk-sm" style="margin:-4px 0 6px">Pontos deficientes por quadrante (deficientes / total), do maior para o menor. ①–③ = ordem de prioridade.</div>${linhas}</div>`;
 }
 
 function planoAcao(a) {
@@ -85,7 +85,10 @@ function planoAcao(a) {
   <thead><tr><th>#</th><th>Quadrante</th><th class="mk-num">Deficientes</th><th>Situação</th><th>Ação</th><th>Prazo</th></tr></thead><tbody>${linhas}</tbody></table></section>`;
 }
 
-export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, hoje = new Date() } = {}) {
+// mapaDim {w,h} (opcional): com o mapa em retrato (cabe em ~100 mm de altura sem passar de 100 mm de largura),
+// o gráfico vai ao lado do mapa; em paisagem, o mapa ocupa a largura e o gráfico vem abaixo.
+export const MAPA_ALTURA_MM = 100;
+export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, mapaDim = null, hoje = new Date() } = {}) {
   const a = analisarIluminacao(data);
   const numero = `MK-${project.id}-IL-${String(hoje.getMonth() + 1).padStart(2, "0")}${String(hoje.getDate()).padStart(2, "0")}`;
   const base = a.baseEm || a.ultimoTeste;
@@ -98,15 +101,24 @@ export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, h
     <div class="mk-k"><div class="mk-kv ${pior ? (pior.faixa === "da" ? "mk-da" : pior.faixa === "wa" ? "mk-wa" : "") : ""}">${pior ? escHTML(pior.nome) : "—"}</div><div class="mk-kl">quadrante prioritário</div><div class="mk-mu mk-sm">${pior ? `${pior.def} deficientes · ${num1(pior.pct)}% operante` : "sem pontos deficientes"}</div></div>
     <div class="mk-k"><div class="mk-kv">${a.ultimoTeste ? dataBR(a.ultimoTeste) : "—"}</div><div class="mk-kl">último teste quinzenal</div><div class="mk-mu mk-sm">${a.assinadoPor ? "assinado por " + escHTML(a.assinadoPor) : a.proximoAlvo ? "próximo " + dataBR(a.proximoAlvo) : "sem assinatura registrada"}</div></div></section>`;
 
+  const legenda = `<div class="il-leg"><span><i style="background:${COR.da}"></i>crítico (&lt; ${FAIXA_ATENCAO}%)</span><span><i style="background:${COR.wa}"></i>atenção (${FAIXA_ATENCAO}–${FAIXA_OK}%)</span><span><i style="background:${COR.ok}"></i>adequado (≥ ${FAIXA_OK}%)</span><span><i style="background:${COR.in}"></i>não aferido</span><span><span class="il-rk">1</span>prioridade</span></div>`;
   let mapa;
   if (mapaDataUrl) {
     const m = marcadoresMapa(project, data, a);
-    const legenda = `<div class="il-leg"><span><i style="background:${COR.da}"></i>crítico (&lt; ${FAIXA_ATENCAO}%)</span><span><i style="background:${COR.wa}"></i>atenção (${FAIXA_ATENCAO}–${FAIXA_OK}%)</span><span><i style="background:${COR.ok}"></i>adequado (≥ ${FAIXA_OK}%)</span><span><i style="background:${COR.in}"></i>não aferido</span><span><span class="il-rk">1</span>prioridade</span></div>`;
-    mapa = `<figure class="mk-card il-fig"><div class="mk-lb" style="margin-bottom:6px">Mapa do projeto, divisão por quadrante e pontos deficientes</div>
-       <div class="il-wrap"><div class="il-map"><img src="${mapaDataUrl}" alt="Mapa de quadrantes ${escHTML(project.id)}">${m.html}</div></div>${legenda}
-       <figcaption class="mk-mu mk-sm">${m.semPosicao ? "Posição dos quadrantes ainda não cadastrada para este projeto: os marcadores aparecem quando a posição for configurada (Teste de Iluminação → Configuração)." : "Cada marcador mostra o quadrante, os pontos deficientes e o % operante; a cor segue a faixa da tabela."}</figcaption></figure>`;
+    const larguraMm = mapaDim?.w && mapaDim?.h ? MAPA_ALTURA_MM * mapaDim.w / mapaDim.h : null;
+    const lado = larguraMm != null && larguraMm <= 100; // retrato: mapa à esquerda (100 mm de altura), gráfico à direita
+    const legendaTxt = m.semPosicao
+      ? "Posição dos quadrantes ainda não cadastrada para este projeto: os marcadores aparecem quando a posição for configurada (Teste de Iluminação → Configuração)."
+      : "Cada marcador mostra o quadrante, os pontos deficientes e o % operante; a cor segue a faixa da tabela.";
+    const img = `<div class="il-map${lado ? " il-map-lado" : ""}"><img src="${mapaDataUrl}" alt="Mapa de quadrantes ${escHTML(project.id)}">${m.html}</div>`;
+    mapa = lado
+      ? `<section class="mk-card il-fig"><div class="mk-lb" style="margin-bottom:6px">Mapa do projeto, divisão por quadrante e pontos deficientes</div>
+         <div class="il-duo"><div>${img}</div><div>${graficoAtencao(a, { lado: true })}${legenda}<div class="mk-mu mk-sm" style="margin-top:4px">${legendaTxt}</div></div></div></section>`
+      : `<section class="mk-card il-fig"><div class="mk-lb" style="margin-bottom:6px">Mapa do projeto, divisão por quadrante e pontos deficientes</div>
+         <div class="il-wrap">${img}</div>${legenda}<div class="mk-mu mk-sm" style="margin-top:2px">${legendaTxt}</div></section>
+         <section class="mk-card il-card">${graficoAtencao(a)}</section>`;
   } else {
-    mapa = `<div class="mk-dest"><b>Mapa não configurado.</b> Cadastre a imagem com os quadrantes em Teste de Iluminação → Configuração.</div>`;
+    mapa = `<div class="mk-dest"><b>Mapa não configurado.</b> Cadastre a imagem com os quadrantes em Teste de Iluminação → Configuração.</div><section class="mk-card il-card">${graficoAtencao(a)}</section>`;
   }
 
   const dest = [];
@@ -131,20 +143,37 @@ export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, h
     : `<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-kl">quadrantes cadastrados</div></div>`;
 
   const css = `<style>
-.il-fig{margin:0 0 10px;padding:8px;page-break-inside:avoid}.il-wrap{text-align:center}.il-map{position:relative;display:inline-block;max-width:100%;text-align:left}.il-map img{max-width:100%;max-height:150mm;width:auto;height:auto;border-radius:4px;display:block}
-.il-mk{position:absolute;transform:translate(-50%,-100%);margin-top:-3px;display:flex;flex-direction:column;align-items:center;white-space:nowrap}
-.il-pin{width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);order:2}
-.il-tag{order:1;background:rgba(255,255,255,.96);border:1.5px solid;border-radius:4px;padding:1px 5px;font-size:8pt;line-height:1.3;color:#111827;margin-bottom:2px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.il-fig{margin:0 0 10px;padding:8px 10px;page-break-inside:avoid}.il-wrap{text-align:center}
+.il-map{position:relative;display:inline-block;max-width:100%;text-align:left;line-height:0}.il-map img{max-width:100%;max-height:${MAPA_ALTURA_MM - 5}mm;width:auto;height:auto;border:1px solid #D1D5DB;border-radius:4px;display:block;image-rendering:auto}
+.il-map-lado img{height:${MAPA_ALTURA_MM}mm;max-height:none}
+.il-duo{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+.il-mk{position:absolute;transform:translate(-50%,-100%);margin-top:-3px;display:flex;flex-direction:column;align-items:center;white-space:nowrap;line-height:1.3}
+.il-pin{width:11px;height:11px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4);order:2}
+.il-tag{order:1;background:rgba(255,255,255,.97);border:1.5px solid;border-radius:4px;padding:1px 5px;font-size:7.8pt;color:#111827;margin-bottom:2px;box-shadow:0 1px 2px rgba(0,0,0,.3)}
 .il-da .il-tag{background:#FEE2E2}.il-wa .il-tag{background:#FEF3C7}.il-in .il-tag{background:#EFF6FF}
-.il-rk{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:#111827;color:#fff;font-size:7pt;font-weight:700;margin-right:3px;vertical-align:middle}
-.il-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:7.8pt;color:#374151;margin:6px 0 2px}.il-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
-.il-card{margin-bottom:10px;page-break-inside:avoid}.il-gr{display:grid;grid-template-columns:110px 1fr 92px 92px;gap:8px;align-items:center;font-size:8.8pt;margin:3px 0}
+.il-rk{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:#111827;color:#fff;font-size:7pt;font-weight:700;margin-right:3px;vertical-align:middle;line-height:1}
+.il-leg{display:flex;gap:10px;flex-wrap:wrap;font-size:7.8pt;color:#374151;margin:6px 0 0}.il-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.il-card{margin-bottom:10px;page-break-inside:avoid}.il-graf{page-break-inside:avoid}
+.il-gr{display:grid;grid-template-columns:52px 1fr 48px 52px;gap:7px;align-items:center;font-size:8.8pt;margin:4px 0}.il-gq{white-space:nowrap}
 .il-gt{height:12px;background:#F3F4F6;border-radius:2px;overflow:hidden;display:block}.il-gt span{display:block;height:12px;border-radius:2px}.il-gv{text-align:right;white-space:nowrap}
+.il-graf-lado .il-gr{grid-template-columns:48px 1fr 44px 50px;font-size:8.6pt}
 .il-tot td{border-top:1.5px solid #111827;border-bottom:none}
-.il-tag,.il-pin,.il-rk,.il-gt span,.il-leg i,.il-da .il-tag,.il-wa .il-tag{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media screen and (max-width:640px){.il-duo{grid-template-columns:1fr}.il-map-lado img{height:auto;max-height:${MAPA_ALTURA_MM}mm;max-width:100%}.il-wrap,.il-duo>div:first-child{text-align:center}}
+.il-tag,.il-pin,.il-rk,.il-gt span,.il-leg i,.il-da .il-tag,.il-wa .il-tag,.il-in .il-tag{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style>`;
 
-  return documentoMoked({ project, titulo: "Relatório de Iluminação", subtitulo: sub, numero, hoje, corpo: css + kpis + mapa + graficoAtencao(a) + destaques + planoAcao(a), fecho: tabela });
+  return documentoMoked({ project, titulo: "Relatório de Iluminação", subtitulo: sub, numero, hoje, corpo: css + kpis + mapa + destaques + planoAcao(a), fecho: tabela });
+}
+
+// Carrega o mapa (URL do próprio app) como data URL + dimensões. Os bytes originais são mantidos (sem recompressão).
+export async function carregarMapa(url) {
+  const dataUrl = await mapaParaDataUrl(url);
+  if (!dataUrl) return null;
+  const dim = await new Promise((ok) => {
+    try { const im = new Image(); im.onload = () => ok({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => ok(null); im.src = dataUrl; }
+    catch (e) { ok(null); }
+  });
+  return { dataUrl, dim };
 }
 
 // Converte a imagem do mapa (URL do próprio app) em data URL, para embutir no arquivo.

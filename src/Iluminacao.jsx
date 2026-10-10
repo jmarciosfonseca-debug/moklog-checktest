@@ -20,7 +20,7 @@ import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
-import { montarRelatorioIluminacao, mapaParaDataUrl } from "./relatorios/iluminacaoRelatorio";
+import { montarRelatorioIluminacao, carregarMapa } from "./relatorios/iluminacaoRelatorio";
 import { abrirParaImpressao } from "./relatorios/padraoMoked";
 import { getAccess, grantSession } from "./session";
 
@@ -162,9 +162,9 @@ async function saveIluminacao(projectId, data){
 async function gerarPdfIluminacao(project, data){
   // Padrão Moked: mapa do projeto embutido (data URL) para aparecer também fora do app.
   const url = data.mapa?.url || `/mapas/${project.id}.jpg`;
-  const mapaDataUrl = await mapaParaDataUrl(url);
+  const mapa = await carregarMapa(url);   // { dataUrl, dim:{w,h} } — as dimensões decidem o layout (retrato: gráfico ao lado)
   const hoje = new Date();
-  const html = montarRelatorioIluminacao(project, data, { mapaDataUrl, hoje });
+  const html = montarRelatorioIluminacao(project, data, { mapaDataUrl: mapa?.dataUrl || null, mapaDim: mapa?.dim || null, hoje });
   abrirParaImpressao(html, `iluminacao_${project.id}_${hoje.toLocaleDateString("sv-SE")}.html`);
 }
 
