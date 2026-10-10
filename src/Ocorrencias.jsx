@@ -436,7 +436,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 export default function Ocorrencias({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
-  const S = getStyles(dark||true);
+  const S = getStyles(dark!==false);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"registrar":"pin"); // pin | registrar | historico | recorrencia
   const [registros, setRegistros] = useState([]);
@@ -725,7 +725,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
 
   // ── Tela: PIN ──
   if(screen==="pin") {
-    return <PinGate project={project||{}} dark={dark||true} onBack={onBack} onSuccess={onPinOk}/>;
+    return <PinGate project={project||{}} dark={dark!==false} onBack={onBack} onSuccess={onPinOk}/>;
   }
 
   // ── Cabeçalho comum ──

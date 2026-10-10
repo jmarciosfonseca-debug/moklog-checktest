@@ -2614,19 +2614,19 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           {/* Barra de auth */}
           {adminAuth ? (
             <div style={{ background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"10px 14px" }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: modoSel?8:0 }}>
-                <div style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>🔓 Modo Gerencial Ativo</div>
-                <div style={{ display:"flex", gap:6 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom: modoSel?8:0 }}>
+                <div style={{ fontSize:12, color:"#22c55e", fontWeight:700, whiteSpace:"nowrap" }}>🔓 Modo Gerencial Ativo</div>
+                <div style={{ display:"flex", gap:6, flexWrap:"wrap", justifyContent:"flex-end" }}>
                   <button onClick={()=>{ setModoSel(!modoSel); setSelPDF([]); }}
-                    style={{ ...S.btnSm, color: modoSel?"#f59e0b":"#22c55e", border:`1px solid ${modoSel?"#f59e0b44":"#22c55e44"}`, fontSize:10, padding:"4px 10px" }}>
+                    style={{ ...S.btnSm, color: modoSel?"#f59e0b":"#22c55e", border:`1px solid ${modoSel?"#f59e0b44":"#22c55e44"}`, fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
                     {modoSel?"✕ Cancelar":"📄 Exportar PDF"}
                   </button>
                   <button onClick={()=>setScreen("ferias")}
-                    style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
+                    style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
                     🏖️ Férias
                   </button>
                   <button onClick={()=>setScreen("aprovacoes")}
-                    style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px" }}>
+                    style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
                     ✅ Aprovações
                   </button>
                   <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>

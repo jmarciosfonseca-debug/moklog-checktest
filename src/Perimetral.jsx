@@ -163,7 +163,7 @@ async function loadEquipe(projectId) {
 }
 
 function getStyles(dark) {
-  const d = dark||true;
+  const d = dark!==false;
   return {
     page:    {minHeight:"100vh",background:d?"#04080f":"#f1f5f9",display:"flex",justifyContent:"center",padding:"0 0 80px",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"},
     wrap:    {width:"100%",maxWidth:480,display:"flex",flexDirection:"column"},
@@ -455,7 +455,7 @@ function PinGate({ onSuccess, onBack, dark, project, pcfg }) {
 }
 
 export default function Perimetral({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
-  const S = getStyles(dark||true);
+  const S = getStyles(dark!==false);
   const pcfg = getPerimetralConfig(project.id);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin");
@@ -569,7 +569,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
   });
   const sortedDates = Object.keys(grouped).sort((a,b)=>b.localeCompare(a));
 
-  if(screen==="pin") return <PinGate project={project} pcfg={pcfg} dark={dark||true} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
+  if(screen==="pin") return <PinGate project={project} pcfg={pcfg} dark={dark!==false} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
 
   // ── Projeto ainda sem zonas/mapa cadastrados — aguardando configuração
   if(pcfg.zonas.length===0) return (
@@ -719,7 +719,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 {saving && <span style={{fontSize:9,...S.txt2}}>salvando…</span>}
               </div>
               {(viewTeste.rondas||[]).map((r,i)=>(
-                <div key={r.id} style={{border:`1px solid ${(dark||true)?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"10px 12px",marginBottom:8}}>
+                <div key={r.id} style={{border:`1px solid ${(dark!==false)?"#0f172a":"#e2e8f0"}`,borderRadius:8,padding:"10px 12px",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     <span style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",flexShrink:0}}/>
                     <div style={{fontSize:12,fontWeight:800,...S.txt,minWidth:62}}>Ronda {i+1}</div>

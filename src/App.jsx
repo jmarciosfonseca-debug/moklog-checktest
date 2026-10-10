@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { aplicarTemaClaro } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
 import AcessoApp from "./Acesso";
@@ -1354,9 +1355,9 @@ function ProjectPinGate({project, onSuccess, onBack}) {
   const try_ = async () => { const lv = await checkPin(pin, { projectId: project?.id }); if(lv) onSuccess(lv==="lider"?"lider":lv==="demo"?"demo":"admin"); else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
+      <div style={{background:_themeDark?"#060c18":"#ffffff",border:`1px solid ${_themeDark?"#1e293b":"#e2e8f0"}`,boxShadow:_themeDark?"none":"0 4px 16px rgba(15,23,42,.08)",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
-        <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+        <div style={{fontSize:17,fontWeight:800,color:_themeDark?"#f1f5f9":"#0f172a",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#94a3b8",marginBottom:4}}>{project.id} - {project.name}</div>
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Insira o PIN do projeto</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
@@ -1611,10 +1612,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   };
   if(!auth) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSess}>
-      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
+      <div style={{background:_themeDark?"#060c18":"#ffffff",border:`1px solid ${_themeDark?"#1e293b":"#e2e8f0"}`,boxShadow:_themeDark?"none":"0 4px 16px rgba(15,23,42,.08)",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
         <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Painel Gerencial</h1>
-        <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+        <div style={{fontSize:17,fontWeight:800,color:_themeDark?"#f1f5f9":"#0f172a",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
@@ -3325,6 +3326,7 @@ export default function App(){
   const [acessoScreen,setAcessoScreen]=useState("menu");
   const [dark,setDark]=useState(true);
   applyTheme(dark);
+  useEffect(()=>{ aplicarTemaClaro(!dark); },[dark]);
   const T=themeTokens(dark);
   const [showRegistros,setShowRegistros]=useState(false);
   const [showDiagnostico,setShowDiagnostico]=useState(false);
