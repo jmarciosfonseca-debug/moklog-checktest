@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { avisarFalhaServidor } from "./avisoSalvar";
+import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
 import AcessoApp from "./Acesso";
 import KeyAccessFalha from "./KeyAccessFalha";
 import EquipeApp, { ContadorEquipe } from "./Equipe";
@@ -1478,15 +1479,15 @@ async function computeScore360Projeto(pid, ctx) {
   try {
     const { stored, ctmkData } = ctx;
     const p = PROJECTS[pid]; if(!p) return null;
-    const [keySnap, bolsaoSnap, periSnap] = await Promise.all([
+    const [keySnap, bolsaoSnap, periSnap, rondasSnap] = await Promise.all([
       getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null),
       (pid==="P311A"||pid==="P311B") ? getDoc(doc(db,"bolsao",pid)).catch(()=>null) : Promise.resolve(null),
       getDoc(doc(db,"perimetral",pid)).catch(()=>null),
+      PERIMETRAL_VIA_RONDAS.includes(pid) ? getDoc(doc(db,"rondas",pid)).catch(()=>null) : Promise.resolve(null),
     ]);
     const keyAbertas = keySnap?.exists() ? (keySnap.data().registros||[]).filter(r=>!r.horaFim).length : 0;
     const bolsaoCriticos = bolsaoSnap?.exists() ? Object.values(bolsaoSnap.data().placas||{}).filter(x=>x.status==="critico").length : 0;
-    let perimetralZonasRuins = 0;
-    if(periSnap?.exists()){ const testes=periSnap.data().testes||[]; if(testes.length){ const ult=[...testes].sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0]; perimetralZonasRuins=Object.values(ult.zonas||{}).filter(z=>(z?.status||"ok")!=="ok").length; } }
+    const perimetralZonasRuins = zonasRuinsProjeto(pid, periSnap?.exists()?periSnap.data():null, rondasSnap?.exists()?rondasSnap.data():null);
     const r = score360Calcular(pid, { keyAbertas, bolsaoCriticos, perimetralZonasRuins, rondaPct:null }, { stored, ctmkData });
     if (!r) return null;
     // vulnerabilidades = as próprias penalidades (o que derruba a nota).
@@ -1507,17 +1508,18 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     try {
       const ids = Object.keys(PROJECTS);
       // Busca em paralelo os módulos que não estão em memória (KeyAccess, Bolsão, Perimetral, Ronda VSPP)
-      const [keySnaps, bolsaoSnaps, periSnaps, rondaSnap, ilumSnaps, energiaSnaps] = await Promise.all([
+      const [keySnaps, bolsaoSnaps, periSnaps, rondasIdxSnaps, rondaSnap, ilumSnaps, energiaSnaps] = await Promise.all([
         Promise.all(ids.map(pid=>getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null))),
         Promise.all(["P311A","P311B"].map(pid=>getDoc(doc(db,"bolsao",pid)).catch(()=>null))),
         Promise.all(ids.map(pid=>getDoc(doc(db,"perimetral",pid)).catch(()=>null))),
+        Promise.all(ids.map(pid=>PERIMETRAL_VIA_RONDAS.includes(pid)?getDoc(doc(db,"rondas",pid)).catch(()=>null):Promise.resolve(null))),
         getDoc(doc(db,"ronda_vspp","P601")).catch(()=>null),
         Promise.all(ids.map(pid=>getDoc(doc(db,"iluminacao",pid)).catch(()=>null))),
         Promise.all(ids.map(pid=>getDoc(doc(db,"energia_ocorrencias",pid)).catch(()=>null))),
       ]);
       const keyAbertasBy = {}; ids.forEach((pid,i)=>{ const regs=keySnaps[i]?.exists()?(keySnaps[i].data().registros||[]):[]; keyAbertasBy[pid]=regs.filter(r=>!r.horaFim).length; });
       const bolsaoBy = {}; ["P311A","P311B"].forEach((pid,i)=>{ const placas=bolsaoSnaps[i]?.exists()?(bolsaoSnaps[i].data().placas||{}):{}; bolsaoBy[pid]=Object.values(placas).filter(p=>p.status==="critico").length; });
-      const periBy = {}; ids.forEach((pid,i)=>{ const testes=periSnaps[i]?.exists()?(periSnaps[i].data().testes||[]):[]; if(!testes.length){periBy[pid]=0;return;} const ult=[...testes].sort((a,b)=>(b.data||"").localeCompare(a.data||""))[0]; periBy[pid]=Object.values(ult.zonas||{}).filter(z=>(z?.status||"ok")!=="ok").length; });
+      const periBy = {}; ids.forEach((pid,i)=>{ periBy[pid]=zonasRuinsProjeto(pid, periSnaps[i]?.exists()?periSnaps[i].data():null, rondasIdxSnaps[i]?.exists()?rondasIdxSnaps[i].data():null); });
       const ilumBy = {}; ids.forEach((pid,i)=>{
         const quads = ilumSnaps[i]?.exists()?(ilumSnaps[i].data().quadrantes||[]):[];
         const total = quads.reduce((a,q)=>a+(Number(q.total)||0),0);
