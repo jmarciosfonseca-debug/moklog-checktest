@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
@@ -568,7 +569,7 @@ function Header({ S, onBack, onToggleTheme, project, dark, titulo }){
         <div style={{ fontSize:15, fontWeight:800, ...S.txt }}>🚑 {titulo || "Acesso de Ambulância"}</div>
         <div style={{ fontSize:11, ...S.txt2 }}>{project.id} · {project.name}</div>
       </div>
-      <button onClick={onToggleTheme} style={S.btnVoltar}>{dark ? "☀️" : "🌙"}</button>
+      <button onClick={onToggleTheme} style={S.btnVoltar}>{iconeTema()}</button>
     </div>
   );
 }

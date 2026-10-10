@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
 // Ocorrencias.jsx — Módulo de Registro Situacional (RS) do MokLog CheckTest
@@ -436,7 +437,7 @@ function PinGate({ project, onSuccess, onBack, dark }) {
 // COMPONENTE PRINCIPAL
 // ════════════════════════════════════════════════════════════════
 export default function Ocorrencias({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted }) {
-  const S = getStyles(dark||true);
+  const S = getStyles(dark!==false);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"registrar":"pin"); // pin | registrar | historico | recorrencia
   const [registros, setRegistros] = useState([]);
@@ -725,7 +726,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
 
   // ── Tela: PIN ──
   if(screen==="pin") {
-    return <PinGate project={project||{}} dark={dark||true} onBack={onBack} onSuccess={onPinOk}/>;
+    return <PinGate project={project||{}} dark={dark!==false} onBack={onBack} onSuccess={onPinOk}/>;
   }
 
   // ── Cabeçalho comum ──
@@ -738,7 +739,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         <div style={{fontSize:11, ...S.txt2}}>{project?.id} · {project?.name}</div>
       </div>
       {onToggleTheme
-        ? <button onClick={onToggleTheme} style={S.backBtn}>{dark?"☀️":"🌙"}</button>
+        ? <button onClick={onToggleTheme} style={S.backBtn}>{iconeTema()}</button>
         : <div style={{width:36}}/>}
     </div>
   );

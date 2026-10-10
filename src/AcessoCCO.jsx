@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -599,7 +600,7 @@ function validarForm(tema, form) {
 // MÓDULO PRINCIPAL
 // ════════════════════════════════════════════════════════════════════════
 export default function AcessoCCO({ project, onBack, dark, onToggleTheme, sharedAuth, onAuthGranted, abasPermitidas }) {
-  const S = getStyles(dark||true);
+  const S = getStyles(dark!==false);
   const [authLevel, setAuthLevel] = useState(()=>sharedAuth||getAccess(project?.id)||null);
   const [tema, setTema] = useState(()=>{
     const permitidas = temasDoProjeto(project?.id, abasPermitidas);
@@ -787,7 +788,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const continuarRegistro = (r) => { formTocado.current=false; setForm(seedForm({...emptyForm(tema), ...r})); setScreen("form"); };
 
   if(screen==="pin") return (
-    <PinGate project={project||{}} dark={dark||true} onBack={onBack}
+    <PinGate project={project||{}} dark={dark!==false} onBack={onBack}
       onSuccess={(level)=>{ grantSession(level, project.id); setAuthLevel(level); setScreen("list"); onAuthGranted?.(level); }}/>
   );
 
@@ -835,7 +836,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>{temaInfo.icon} Novo — {temaInfo.label}</div>
               <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {project?.name||""}</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{iconeTema()}</button>
           </div>
         </div>
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
@@ -870,7 +871,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚪 CCO / Vig CCO</div>
               <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {project?.name||""}</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{iconeTema()}</button>
           </div>
           <TabBar/>
         </div>
@@ -879,15 +880,15 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
           {/* ◀ NOVO: aba ronda renderiza o componente próprio */}
           {isRonda ? (
             <RondaVirtual
-              project={project} dark={dark||true} S={S} adminAuth={adminAuth}
+              project={project} dark={dark!==false} S={S} adminAuth={adminAuth}
               loadEquipe={loadEquipe} db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
           ) : isCftv ? (
             <TempoGravacao
-              project={project} dark={dark||true} S={S} adminAuth={adminAuth}
+              project={project} dark={dark!==false} S={S} adminAuth={adminAuth}
               loadEquipe={loadEquipe} db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
           ) : isBodycam ? (
             <BodycamSection
-              project={project} dark={dark||true} S={S} adminAuth={adminAuth}
+              project={project} dark={dark!==false} S={S} adminAuth={adminAuth}
               db={db} doc={doc} setDoc={setDoc} getDoc={getDoc}/>
           ) : loadingTema ? (
             <div style={{textAlign:"center",padding:"40px 0"}}>
@@ -954,14 +955,14 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
               {hoje.length>0 && (<>
                 <div style={{fontSize:11,color:temaInfo.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
-                {hoje.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
+                {hoje.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark!==false} S={S} adminAuth={adminAuth}
                   onContinuar={()=>continuarRegistro(r)}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
                   onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
               </>)}
               {anteriores.length>0 && (<>
                 <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
-                {anteriores.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark||true} S={S} adminAuth={adminAuth}
+                {anteriores.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark!==false} S={S} adminAuth={adminAuth}
                   onContinuar={()=>continuarRegistro(r)}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
                   onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}

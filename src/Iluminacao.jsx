@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
 // ─────────────────────────────────────────────────────────────
@@ -383,7 +384,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
         <div style={{fontSize:15,fontWeight:800,...S.txt}}>💡 Teste de Iluminação</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
       </div>
-      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{dark?"☀️":"🌙"}</button>}
+      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
     </div>
   );
 

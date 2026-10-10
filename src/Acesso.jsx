@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { useState, useEffect } from "react";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { initializeApp, getApps } from "firebase/app";
@@ -390,7 +391,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
               <div style={{ fontSize:15, fontWeight:800, color:dark?"#f1f5f9":"#0f172a" }}>🚛 Acesso — P260A</div>
               <div style={{ fontSize:11, color:"#475569" }}>Controle de Transportadoras</div>
             </div>
-            <button onClick={toggleDark} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:dark?"#94a3b8":"#475569"}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={toggleDark} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:dark?"#94a3b8":"#475569"}}>{iconeTema()}</button>
           </div>
         </div>
 

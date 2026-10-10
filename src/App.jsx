@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
 import AcessoApp from "./Acesso";
@@ -1354,9 +1355,9 @@ function ProjectPinGate({project, onSuccess, onBack}) {
   const try_ = async () => { const lv = await checkPin(pin, { projectId: project?.id }); if(lv) onSuccess(lv==="lider"?"lider":lv==="demo"?"demo":"admin"); else setErr(true); };
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
+      <div style={{background:_themeDark?"#060c18":"#ffffff",border:`1px solid ${_themeDark?"#1e293b":"#e2e8f0"}`,boxShadow:_themeDark?"none":"0 4px 16px rgba(15,23,42,.08)",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
-        <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+        <div style={{fontSize:17,fontWeight:800,color:_themeDark?"#f1f5f9":"#0f172a",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#94a3b8",marginBottom:4}}>{project.id} - {project.name}</div>
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Insira o PIN do projeto</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
@@ -1611,10 +1612,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   };
   if(!auth) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSess}>
-      <div style={{background:"#060c18",border:"1px solid #1e293b",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
+      <div style={{background:_themeDark?"#060c18":"#ffffff",border:`1px solid ${_themeDark?"#1e293b":"#e2e8f0"}`,boxShadow:_themeDark?"none":"0 4px 16px rgba(15,23,42,.08)",borderRadius:16,padding:"32px 28px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
         <MoklogLogo size={48}/>
         <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Painel Gerencial</h1>
-        <div style={{fontSize:17,fontWeight:800,color:"#f1f5f9",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+        <div style={{fontSize:17,fontWeight:800,color:_themeDark?"#f1f5f9":"#0f172a",marginTop:10,marginBottom:2}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
         <div style={{fontSize:13,color:"#cc2222",fontWeight:700,marginBottom:4}}>Painel Gerencial</div>
         <div style={{fontSize:12,color:"#64748b",marginBottom:20}}>Acesso restrito</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
@@ -2536,7 +2537,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
               <div style={{fontSize:15,fontWeight:800,color:txt}}>🛡️ Equipamentos</div>
               <div style={{fontSize:11,color:txt2}}>Todos os projetos</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
@@ -2855,7 +2856,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 Colaboradores</div>
                 <div style={{ fontSize:11, color:txt2 }}>Selecione o projeto</div>
               </div>
-              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
             </div>
           </div>
           <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
@@ -2895,7 +2896,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Registros</div>
               <div style={{ fontSize:11, color:txt2 }}>Colaboradores e Acessos</div>
             </div>
-            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
@@ -3201,7 +3202,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 {project.id}</div>
               <div style={{ fontSize:11, color:txt2 }}>{project.name} · {ativos.length} ativo(s)</div>
             </div>
-            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
@@ -3323,8 +3324,12 @@ export default function App(){
   const isOnline = useOnlineStatus();
   const [showAcesso,setShowAcesso]=useState(false);
   const [acessoScreen,setAcessoScreen]=useState("menu");
-  const [dark,setDark]=useState(true);
+  const [tema,setTema]=useState(temaSalvo); // "lua" | "nuvem" | "sol"
+  const dark=tema==="lua";
+  const setDark=()=>setTema(proximoTema); // todos os botões de tema avançam: Lua → Nuvem → Sol
+  definirTema(tema);
   applyTheme(dark);
+  useEffect(()=>{ aplicarTema(tema); },[tema]);
   const T=themeTokens(dark);
   const [showRegistros,setShowRegistros]=useState(false);
   const [showDiagnostico,setShowDiagnostico]=useState(false);
@@ -4503,7 +4508,7 @@ export default function App(){
               {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
             </button>
             <button onClick={()=>setScreen("dashboard")} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:T.hdrTxt,fontWeight:600}} aria-label="Abrir painel gerencial">📊 Painel</button>
-            <button onClick={()=>setDark(!dark)} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:T.hdrTxt}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={()=>setDark(!dark)} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:T.hdrTxt}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
