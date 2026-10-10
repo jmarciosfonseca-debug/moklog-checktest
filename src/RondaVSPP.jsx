@@ -454,7 +454,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
                     <div style={{flex:1}}><label style={S.lbl}>De</label><input type="date" value={consolDe} onChange={e=>setConsolDe(e.target.value)} style={S.inp}/></div>
                     <div style={{flex:1}}><label style={S.lbl}>Até</label><input type="date" value={consolAte} onChange={e=>setConsolAte(e.target.value)} style={S.inp}/></div>
                   </div>
-                  <button onClick={()=>{const {html}=montarConsolidadoVSPP(project,registros,{de:consolDe,ate:consolAte});abrirParaImpressao(html,`ronda_vspp_consolidado_${project.id}_${todayStr()}.html`);}} style={{...S.btnSec,fontSize:13}}>Gerar consolidado</button>
+                  <button onClick={()=>{const {html}=montarConsolidadoVSPP(project,registros,{de:consolDe,ate:consolAte,mapaB64:MAPA_B64});abrirParaImpressao(html,`ronda_vspp_consolidado_${project.id}_${todayStr()}.html`);}} style={{...S.btnSec,fontSize:13}}>Gerar consolidado</button>
                 </div>
               )}
             </div>

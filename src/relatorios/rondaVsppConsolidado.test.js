@@ -18,3 +18,8 @@ test("monta HTML com executor e período", () => {
   const { html } = montarConsolidadoVSPP({ id:"P601", name:"Golgi Cajamar" }, regs, { de:"2026-10-01" });
   expect(html).toContain("Ronda VSPP — Consolidado"); expect(html).toContain("Luciano"); expect(html).toContain("chuva"); expect(html).not.toContain("01/09/2026");
 });
+test("inclui o mapa da rota quando informado", () => {
+  const com = montarConsolidadoVSPP({ id:"P601", name:"x" }, regs, { mapaB64:"AAAA" }).html;
+  expect(com).toContain("data:image/jpeg;base64,AAAA"); expect(com).toContain("Rota de ronda VSPP");
+  expect(montarConsolidadoVSPP({ id:"P601", name:"x" }, regs).html).not.toContain("base64,AAAA");
+});

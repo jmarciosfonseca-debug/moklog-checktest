@@ -47,7 +47,7 @@ export function analisarConsolidado(registros) {
 
 const clsPct = (p) => (p >= 90 ? "mk-ok" : p >= 60 ? "mk-wa" : "mk-da");
 
-export function montarConsolidadoVSPP(project, registros, { de = "", ate = "", hoje = new Date() } = {}) {
+export function montarConsolidadoVSPP(project, registros, { de = "", ate = "", hoje = new Date(), mapaB64 = "" } = {}) {
   const lista = filtrarPeriodo(registros, de, ate);
   const a = analisarConsolidado(lista);
   const numero = `MK-${project.id}-RVSPP-${hoje.getFullYear()}${String(hoje.getMonth() + 1).padStart(2, "0")}${String(hoje.getDate()).padStart(2, "0")}`;
@@ -57,6 +57,7 @@ export function montarConsolidadoVSPP(project, registros, { de = "", ate = "", h
 <div class="mk-k"><div class="mk-kv ${clsPct(a.pct)}">${a.pct}%</div><div class="mk-kl">execução (${a.feitas} de ${a.totSlots} horários)</div></div>
 <div class="mk-k"><div class="mk-kv${a.naoFeitas ? " mk-da" : ""}">${a.naoFeitas}</div><div class="mk-kl">rondas não feitas</div></div>
 <div class="mk-k"><div class="mk-kv">${num1(a.km)}</div><div class="mk-kl">km percorridos</div></div></div>`;
+  const mapa = mapaB64 ? `<div class="mk-bloco" style="margin:0 0 10px"><h2 class="mk-h2">Rota de ronda VSPP</h2><img src="data:image/jpeg;base64,${mapaB64}" alt="Rota de ronda VSPP" style="width:100%;max-height:78mm;object-fit:cover;border:1px solid #E5E7EB;border-radius:8px"/></div>` : "";
   const exec = a.executores.length ? `<h2 class="mk-h2">Por executor</h2><table class="mk-tb"><thead><tr><th>Executor</th><th class="mk-num">Dias</th><th class="mk-num">Feitas</th><th class="mk-num">Não feitas</th><th class="mk-num">Execução</th><th class="mk-num">Km</th></tr></thead><tbody>${a.executores.map((e) => {
     const p = e.slots ? Math.round((e.feitas / e.slots) * 100) : 0;
     return `<tr><td><b>${escHTML(e.nome)}</b></td><td class="mk-num">${e.dias}</td><td class="mk-num">${e.feitas}</td><td class="mk-num">${e.naoFeitas}</td><td class="mk-num ${clsPct(p)}"><b>${p}%</b></td><td class="mk-num">${num1(e.km)}</td></tr>`;
@@ -65,7 +66,7 @@ export function montarConsolidadoVSPP(project, registros, { de = "", ate = "", h
     `<tr><td class="mk-dv">${dataBR(r.data)}</td><td>${escHTML(r.executor || "—")}</td><td class="mk-num">${s.feitas}</td><td class="mk-num${s.naoFeitas ? " mk-da" : ""}">${s.naoFeitas}</td><td class="mk-num mk-mu">${s.pendentes}</td><td class="mk-num ${clsPct(s.pct)}"><b>${s.pct}%</b></td><td class="mk-num">${escHTML(r.kmInicial || "—")}</td><td class="mk-num">${escHTML(r.kmFinal || "—")}</td><td class="mk-num">${s.km == null ? "—" : num1(s.km)}</td></tr>`).join("")}</tbody></table>` : `<div class="mk-vazio"><div class="mk-lb">Nenhuma ronda registrada no período</div></div>`;
   const pend = a.pendencias.length ? `<h2 class="mk-h2" style="margin-top:12px">Rondas não feitas <span class="mk-mu">(${a.pendencias.length})</span></h2><table class="mk-tb"><thead><tr><th>Data</th><th>Horário</th><th>Executor</th><th>Observação</th></tr></thead><tbody>${a.pendencias.map((p) =>
     `<tr><td class="mk-dv">${dataBR(p.data)}</td><td>${escHTML(p.hora)}</td><td>${escHTML(p.exec || "—")}</td><td class="mk-mu">${escHTML(p.obs || "—")}</td></tr>`).join("")}</tbody></table>` : "";
-  const corpo = `${kpis}${exec}${dias}${pend}<p class="mk-nota">Execução = horários feitos ÷ horários previstos de cada dia. Km = km final − km inicial informados em cada dia.</p>`;
+  const corpo = `${kpis}${mapa}${exec}${dias}${pend}<p class="mk-nota">Execução = horários feitos ÷ horários previstos de cada dia. Km = km final − km inicial informados em cada dia.</p>`;
   const html = documentoMoked({ project, titulo: "Ronda VSPP — Consolidado", subtitulo: `${escHTML(project.id)} — ${escHTML(project.name || "")} · ${periodo}`, numero, corpo, hoje });
   return { html, numero, analise: a };
 }
