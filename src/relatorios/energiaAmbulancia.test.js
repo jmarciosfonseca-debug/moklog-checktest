@@ -89,12 +89,13 @@ describe("ambulância — consolidado e 'Baixar todos' (registros do P311A)", ()
     const { html } = montarConsolidadoAmbulancia(P, R, { inicio: "2026-09-28", fim: "2026-10-03", interno: true, comAnexo: true, hoje: HOJE });
     expect(html).not.toMatch(/NOME DA VITIMA/);
   });
-  test("Baixar todos: consolidado + um registro por página, com CSS do anexo isolado", () => {
+  test("Baixar todos: consolidado + um registro por página, no mesmo padrão Moked (sem CSS extra)", () => {
     const { html } = montarConsolidadoAmbulancia(P, R, { inicio: "2026-09-28", fim: "2026-10-03", comAnexo: true, hoje: HOJE });
     expect(html.match(/class="mk-anexo"/g)).toHaveLength(5);
     expect(html).toContain("Rudnei Portela"); expect(html.split(FOTO).length - 1).toBe(3);
-    const css = html.slice(html.indexOf("<style>"), html.indexOf("</style>"));
-    expect(css).toContain(".mk-anexo .header"); expect(css).not.toMatch(/}\s*body\{background:#f4f4f4/); expect(css).not.toMatch(/(^|})\*\{box-sizing/);
+    expect(html.split("<style>").length - 1).toBe(1);
+    expect(html).not.toMatch(/background:#f4f4f4|box-sizing:border-box/);
+    expect(html).not.toMatch(EMOJI);
   });
   test("consolidado sem anexo, versão cliente: sem conferência e sem emojis", () => {
     const { html } = montarConsolidadoAmbulancia(P, R, { inicio: "2026-09-28", fim: "2026-10-03", hoje: HOJE });
