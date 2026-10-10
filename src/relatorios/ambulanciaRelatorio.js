@@ -2,7 +2,7 @@
 // LGPD: o nome da vítima (campo "paciente") NUNCA entra no consolidado; os registros individuais do anexo
 // já não o mostram. Condição de saúde aparece só como tipo de ocorrência, sem identificar a pessoa.
 import { documentoMoked, barrasMoked, escHTML, dataBR } from "./padraoMoked";
-import { cssRegistroAmbulancia, cabecalhoRegistroAmbulancia, cardRegistroAmbulancia } from "../ambulanciaPdf";
+import { cabecalhoRegistroAmbulancia, cardRegistroAmbulancia } from "../ambulanciaPdf";
 
 export const permanencia = (r) => {
   const p = (h) => /^\d{1,2}:\d{2}$/.test(h || "") ? Number(h.split(":")[0]) * 60 + Number(h.split(":")[1]) : null;
@@ -71,8 +71,9 @@ export function montarConsolidadoAmbulancia(project, registros, { inicio, fim, i
   }
   let html = documentoMoked({ project, titulo: "Acessos de Ambulância — Consolidado", subtitulo: sub, numero, corpo, interno, hoje });
   if (comAnexo && a.n) {
-    const anexo = a.lista.map(r => `<div class="mk-anexo" style="page-break-before:always">${cabecalhoRegistroAmbulancia(project, r)}${cardRegistroAmbulancia(project, r)}<div class="footer"><b>MOKED SECURITY CONSULTING</b> · Registro de Acesso de Ambulância · Documento de Uso Interno e Confidencial</div></div>`).join("");
-    html = html.replace("</style>", `${prefixarCSS(cssRegistroAmbulancia(), ".mk-anexo")}.mk-anexo{font-size:14px;line-height:1.5}</style>`).replace("</body></html>", `${anexo}</body></html>`);
+    // Anexo: um registro por página, no mesmo padrão Moked (classes mk-* já vêm do cabeçalho do documento).
+    const anexo = a.lista.map(r => `<section class="mk-anexo" style="page-break-before:always">${cabecalhoRegistroAmbulancia(project, r)}${cardRegistroAmbulancia(project, r)}</section>`).join("");
+    html = html.replace("</body></html>", `${anexo}</body></html>`);
   }
   return { html, analise: a, numero };
 }
