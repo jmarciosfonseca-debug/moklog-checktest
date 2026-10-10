@@ -73,6 +73,53 @@ function graficoAtencao(a, { lado = false } = {}) {
   return `<div class="il-graf${lado ? " il-graf-lado" : ""}"><div class="mk-h2" style="margin-top:0">Pontos que requerem atenção</div><div class="mk-mu mk-sm" style="margin:-4px 0 6px">Pontos deficientes por quadrante (deficientes / total), do maior para o menor. ①–③ = ordem de prioridade.</div>${linhas}</div>`;
 }
 
+// Histórico de aferições: testes quinzenais assinados (testeQuinzenal.registros, com a foto dos números),
+// o último registro legado (só data e assinatura) e os testes v2/v3 (history) — mais recente primeiro.
+export function historicoAfericoes(data) {
+  const del = new Set(data?.deletedIds || []);
+  const regs = [];
+  const n = (v) => (v == null || v === "" ? null : Number(v));
+  for (const r of data?.testeQuinzenal?.registros || []) {
+    if (!r?.data) continue;
+    regs.push({ data: String(r.data).slice(0, 10), por: r.assinadoPor || null, total: n(r.total), def: n(r.deficientes), ts: r.ts || null, origem: "quinzenal" });
+  }
+  const u = data?.testeQuinzenal?.ultimoRegistro;
+  if (u?.data && !regs.some((r) => r.data === String(u.data).slice(0, 10))) regs.push({ data: String(u.data).slice(0, 10), por: u.assinadoPor || null, total: n(u.total), def: n(u.deficientes), ts: u.ts || null, origem: "quinzenal" });
+  for (const h of data?.history || []) {
+    if (!h || del.has(h.id)) continue;
+    const d = String(h.date || h.criadoEm || "").slice(0, 10);
+    if (!d || regs.some((r) => r.data === d)) continue;
+    const quads = h.quads || [];
+    const total = quads.reduce((a, q) => a + (Number(q.total) || 0), 0);
+    const def = quads.reduce((a, q) => a + (q.inoperantes != null ? Number(q.inoperantes) || 0 : q.acesas != null ? Math.max(0, (Number(q.total) || 0) - (Number(q.acesas) || 0)) : 0), 0);
+    regs.push({ data: d, por: h.assinadoPor || h.responsavel || h.autor || h.por || null, total: total || null, def: total ? def : null, ts: h.criadoEm || null, origem: "legado" });
+  }
+  regs.sort((a, b) => b.data.localeCompare(a.data) || String(b.ts || "").localeCompare(String(a.ts || "")));
+  return regs.map((r) => ({ ...r, pct: r.total && r.def != null ? Math.round(((r.total - r.def) / r.total) * 1000) / 10 : null }));
+}
+
+// Seção "Aferições": quem assinou, quando e com que resultado — pelo menos os 3 últimos testes (até 6).
+function secaoAfericoes(hist, a) {
+  const linhas = hist.slice(0, 6);
+  if (!linhas.length) return `<section><div class="mk-h2">Aferições <span class="mk-mu">· testes quinzenais assinados</span></div><div class="mk-dest">Nenhum teste quinzenal concluído e assinado no app até a emissão. A partir do primeiro "Concluir teste realizado", este quadro passa a listar data, responsável e resultado de cada aferição (mínimo das 3 últimas).</div></section>`;
+  const tr = linhas.map((r, i) => {
+    const ant = linhas[i + 1];
+    const delta = r.pct != null && ant?.pct != null ? Math.round((r.pct - ant.pct) * 10) / 10 : null;
+    const varTxt = delta == null ? '<span class="mk-nao">—</span>' : delta === 0 ? "estável" : `<span class="${delta > 0 ? "mk-ok" : "mk-da"}" style="font-weight:700">${delta > 0 ? "▲ +" : "▼ "}${num1(delta)} pp</span>`;
+    const f = r.pct == null ? "in" : faixa(r.pct);
+    return `<tr><td><b>${dataBR(r.data)}</b>${i === 0 ? ' <span class="mk-b mk-b-ok" style="margin-left:4px">atual</span>' : ""}</td><td>${r.por ? escHTML(r.por) : '<span class="mk-nao">sem assinatura</span>'}</td>
+      <td class="mk-num">${r.total ?? '<span class="mk-nao">—</span>'}</td><td class="mk-num">${r.def ?? '<span class="mk-nao">—</span>'}</td>
+      <td>${r.pct == null ? '<span class="mk-nao">—</span>' : `<div style="display:flex;align-items:center;gap:6px"><span style="flex:1;height:7px;background:#EEF0F3;border-radius:4px;overflow:hidden"><span style="display:block;height:100%;width:${r.pct}%;background:${COR[f]}"></span></span><span class="mk-b mk-b-${f}">${num1(r.pct)}%</span></div>`}</td>
+      <td class="mk-num">${varTxt}</td></tr>`;
+  }).join("");
+  const nota = hist.length < 3
+    ? `<div class="mk-nota">${hist.length === 1 ? "Há 1 aferição registrada" : `Há ${hist.length} aferições registradas`}; o quadro passa a mostrar as 3 últimas conforme os testes quinzenais forem concluídos e assinados no app (ciclo de 14 dias, domingo 21h).</div>`
+    : `<div class="mk-nota">Cada linha é um teste quinzenal concluído e assinado no app, com os números no momento da assinatura. Variação = pontos percentuais em relação à aferição anterior.</div>`;
+  return `<section class="il-afer"><div class="mk-h2">Aferições <span class="mk-mu">· quem aferiu, quando e o resultado (${hist.length >= 6 ? "6 últimas" : hist.length === 1 ? "1 registrada" : hist.length + " últimas"})</span></div>
+  <table class="mk-tb"><colgroup><col style="width:17%"><col style="width:27%"><col style="width:9%"><col style="width:12%"><col style="width:23%"><col style="width:12%"></colgroup>
+  <thead><tr><th>Data</th><th>Aferido / assinado por</th><th class="mk-num">Pontos</th><th class="mk-num">Deficientes</th><th>% operante</th><th class="mk-num">Variação</th></tr></thead><tbody>${tr}</tbody></table>${nota}</section>`;
+}
+
 function planoAcao(a) {
   const itens = a.atencao.filter((q) => q.faixa !== "ok").slice(0, 5);
   if (!itens.length) return "";
@@ -121,6 +168,7 @@ export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, m
     mapa = `<div class="mk-dest"><b>Mapa não configurado.</b> Cadastre a imagem com os quadrantes em Teste de Iluminação → Configuração.</div><section class="mk-card il-card">${graficoAtencao(a)}</section>`;
   }
 
+  const hist = historicoAfericoes(data);
   const dest = [];
   if (a.qs.length && !a.atencao.length) dest.push(`<li>Nenhum ponto deficiente nos quadrantes aferidos.</li>`);
   if (pior) dest.push(`<li><b>${escHTML(pior.nome)}</b> concentra <b>${pior.def} dos ${a.def}</b> pontos deficientes (${a.concentracao}% do total) e opera com ${num1(pior.pct)}%: é o quadrante prioritário.</li>`);
@@ -129,6 +177,10 @@ export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, m
   if (a.zerados.length) dest.push(`<li><b>Sem iluminação operante:</b> ${a.zerados.map((q) => escHTML(q.nome)).join(", ")}. Risco de ponto cego para CFTV e ronda.</li>`);
   if (a.naoAferidos.length) dest.push(`<li><b>Não aferidos</b> (sem número de deficientes): ${a.naoAferidos.map((q) => escHTML(q.nome)).join(", ")}. Entram no total, mas não no percentual.</li>`);
   if (a.desatualizados.length) dest.push(`<li><b>${a.desatualizados.length} quadrante(s)</b> sem atualização desde o último teste quinzenal (${dataBR(a.ultimoTeste)}): ${a.desatualizados.slice(0, 6).map((q) => `${escHTML(q.nome)} (${dataBR(String(q.atualizadoEm).slice(0, 10))})`).join(", ")}${a.desatualizados.length > 6 ? "…" : ""}.</li>`);
+  if (hist.length >= 2 && hist[0].pct != null && hist[1].pct != null) {
+    const d = Math.round((hist[0].pct - hist[1].pct) * 10) / 10;
+    dest.push(`<li><b>Evolução:</b> ${d === 0 ? "sem variação" : (d > 0 ? "melhora de " : "piora de ") + num1(Math.abs(d)) + " pp"} entre a aferição de ${dataBR(hist[1].data)} (${num1(hist[1].pct)}%) e a de ${dataBR(hist[0].data)} (${num1(hist[0].pct)}%)${hist[0].por ? `, assinada por ${escHTML(hist[0].por)}` : ""}.</li>`);
+  }
   if (a.total && a.faixaGeral !== "ok") dest.push(`<li>Para o projeto voltar à faixa adequada (≥ ${FAIXA_OK}%), é preciso reparar pelo menos <b>${Math.max(0, Math.ceil(a.total * FAIXA_OK / 100) - a.ops)}</b> dos ${a.def} pontos deficientes.</li>`);
   const destaques = dest.length ? `<section class="mk-dest"><div class="mk-h2">Análise</div><ul>${dest.join("")}</ul></section>` : "";
 
@@ -157,12 +209,12 @@ export function montarRelatorioIluminacao(project, data, { mapaDataUrl = null, m
 .il-gr{display:grid;grid-template-columns:52px 1fr 48px 52px;gap:7px;align-items:center;font-size:8.8pt;margin:4px 0}.il-gq{white-space:nowrap}
 .il-gt{height:12px;background:#F3F4F6;border-radius:2px;overflow:hidden;display:block}.il-gt span{display:block;height:12px;border-radius:2px}.il-gv{text-align:right;white-space:nowrap}
 .il-graf-lado .il-gr{grid-template-columns:48px 1fr 44px 50px;font-size:8.6pt}
-.il-tot td{border-top:1.5px solid #111827;border-bottom:none}
+.il-tot td{border-top:1.5px solid #111827;border-bottom:none}.il-afer{page-break-inside:avoid}
 @media screen and (max-width:640px){.il-duo{grid-template-columns:1fr}.il-map-lado img{height:auto;max-height:${MAPA_ALTURA_MM}mm;max-width:100%}.il-wrap,.il-duo>div:first-child{text-align:center}}
 .il-tag,.il-pin,.il-rk,.il-gt span,.il-leg i,.il-da .il-tag,.il-wa .il-tag,.il-in .il-tag{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 </style>`;
 
-  return documentoMoked({ project, titulo: "Relatório de Iluminação", subtitulo: sub, numero, hoje, corpo: css + kpis + mapa + destaques + planoAcao(a), fecho: tabela });
+  return documentoMoked({ project, titulo: "Relatório de Iluminação", subtitulo: sub, numero, hoje, corpo: css + kpis + mapa + destaques + secaoAfericoes(hist, a) + planoAcao(a), fecho: tabela });
 }
 
 // Carrega o mapa (URL do próprio app) como data URL + dimensões. Os bytes originais são mantidos (sem recompressão).

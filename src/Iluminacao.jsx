@@ -278,9 +278,22 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     // Próximo alvo é calculado a partir do ALVO VIGENTE (não de hoje), para manter
     // o ciclo ancorado nos domingos mesmo se a conclusão ocorrer com atraso.
     const alvoVigente = tqAlvoVigente(data.testeQuinzenal);
+    // Registro do teste com a foto dos números no momento da assinatura (quem, quando, quanto).
+    // Fica em testeQuinzenal.registros (mais recente por último) e alimenta o histórico do relatório.
+    const qs = (data.quadrantes||[]).map(q=>({ nome:q.nome, ...calcQuad(q) }));
+    const total = qs.reduce((a,q)=>a+q.total,0);
+    const deficientes = qs.reduce((a,q)=>a+(q.def||0),0);
+    const registro = {
+      id: newId(), data: hojeISO, assinadoPor: assinatura, ts: new Date().toISOString(),
+      alvo: alvoVigente, total, deficientes, operantesPct: total ? Math.round(((total-deficientes)/total)*1000)/10 : null,
+      quadrantes: qs.map(q=>({ nome:q.nome, total:q.total, deficientes:q.def })),
+    };
+    const anteriores = data.testeQuinzenal?.registros
+      || (data.testeQuinzenal?.ultimoRegistro ? [{ id:newId(), ...data.testeQuinzenal.ultimoRegistro }] : []);  // legado: só o último
     const novoTq = {
       alvo: tqProximoAPartirDe(alvoVigente),
-      ultimoRegistro: { data: hojeISO, assinadoPor: assinatura, ts: new Date().toISOString() },
+      ultimoRegistro: { data: hojeISO, assinadoPor: assinatura, ts: registro.ts },
+      registros: [...anteriores, registro].slice(-40),
     };
     setTqAssinando(false);
     setTqAssinatura("");
@@ -464,6 +477,13 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
               {ultimo && (
                 <div style={{fontSize:10, ...S.txt2}}>
                   Último: {tqFmtDate(ultimo.data)} · assinado por <strong>{ultimo.assinadoPor}</strong>
+                </div>
+              )}
+              {(tq?.registros||[]).length>1 && (
+                <div style={{fontSize:10, ...S.txt2, display:"flex", flexDirection:"column", gap:2}}>
+                  {[...tq.registros].slice(-4,-1).reverse().map(r=>(
+                    <div key={r.id||r.ts||r.data}>Anterior: {tqFmtDate(r.data)} · {r.assinadoPor}{r.operantesPct!=null?` · ${String(r.operantesPct).replace(".",",")}% operante`:""}</div>
+                  ))}
                 </div>
               )}
               {!tqAssinando ? (
