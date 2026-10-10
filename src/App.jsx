@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { aplicarTemaClaro } from "./temaClaro";
+import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
 import AcessoApp from "./Acesso";
@@ -2537,7 +2537,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
               <div style={{fontSize:15,fontWeight:800,color:txt}}>🛡️ Equipamentos</div>
               <div style={{fontSize:11,color:txt2}}>Todos os projetos</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
@@ -2856,7 +2856,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 Colaboradores</div>
                 <div style={{ fontSize:11, color:txt2 }}>Selecione o projeto</div>
               </div>
-              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+              <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
             </div>
           </div>
           <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:8 }}>
@@ -2896,7 +2896,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Registros</div>
               <div style={{ fontSize:11, color:txt2 }}>Colaboradores e Acessos</div>
             </div>
-            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
@@ -3202,7 +3202,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 {project.id}</div>
               <div style={{ fontSize:11, color:txt2 }}>{project.name} · {ativos.length} ativo(s)</div>
             </div>
-            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
@@ -3324,9 +3324,12 @@ export default function App(){
   const isOnline = useOnlineStatus();
   const [showAcesso,setShowAcesso]=useState(false);
   const [acessoScreen,setAcessoScreen]=useState("menu");
-  const [dark,setDark]=useState(true);
+  const [tema,setTema]=useState(temaSalvo); // "lua" | "nuvem" | "sol"
+  const dark=tema==="lua";
+  const setDark=()=>setTema(proximoTema); // todos os botões de tema avançam: Lua → Nuvem → Sol
+  definirTema(tema);
   applyTheme(dark);
-  useEffect(()=>{ aplicarTemaClaro(!dark); },[dark]);
+  useEffect(()=>{ aplicarTema(tema); },[tema]);
   const T=themeTokens(dark);
   const [showRegistros,setShowRegistros]=useState(false);
   const [showDiagnostico,setShowDiagnostico]=useState(false);
@@ -4505,7 +4508,7 @@ export default function App(){
               {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
             </button>
             <button onClick={()=>setScreen("dashboard")} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:T.hdrTxt,fontWeight:600}} aria-label="Abrir painel gerencial">📊 Painel</button>
-            <button onClick={()=>setDark(!dark)} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:T.hdrTxt}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={()=>setDark(!dark)} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:T.hdrTxt}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 

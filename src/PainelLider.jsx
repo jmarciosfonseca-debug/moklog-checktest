@@ -14,6 +14,7 @@
 // gerencial. Este painel apenas consolida e detalha.
 // ─────────────────────────────────────────────────────────────
 
+import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -228,7 +229,7 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
               <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Painel do Líder</div>
               <div style={{ fontSize:11, color:txt2 }}>{projectId} — {nomeProjeto} · Sessão de líder ativa</div>
             </div>
-            {onToggleTheme && <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{dark?"☀️":"🌙"}</button>}
+            {onToggleTheme && <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{iconeTema()}</button>}
           </div>
         </div>
 

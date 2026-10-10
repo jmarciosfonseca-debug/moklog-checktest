@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { checkPin } from "./session";
@@ -274,7 +275,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
         <div style={{fontSize:15,fontWeight:800,...S.txt}}>🅿️ Checagem de Bolsão</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
       </div>
-      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{dark?"☀️":"🌙"}</button>}
+      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
     </div>
   );
 

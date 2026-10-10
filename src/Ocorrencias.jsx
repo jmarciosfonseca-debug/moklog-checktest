@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
 // Ocorrencias.jsx — Módulo de Registro Situacional (RS) do MokLog CheckTest
@@ -738,7 +739,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         <div style={{fontSize:11, ...S.txt2}}>{project?.id} · {project?.name}</div>
       </div>
       {onToggleTheme
-        ? <button onClick={onToggleTheme} style={S.backBtn}>{dark?"☀️":"🌙"}</button>
+        ? <button onClick={onToggleTheme} style={S.backBtn}>{iconeTema()}</button>
         : <div style={{width:36}}/>}
     </div>
   );

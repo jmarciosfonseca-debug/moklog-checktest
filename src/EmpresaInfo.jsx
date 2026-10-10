@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { useState, useEffect } from "react";
@@ -769,7 +770,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
               <div style={{fontSize:11, ...S.txt2}}>{project.id} · {project.name}</div>
             </div>
             {saving && <div style={{fontSize:10, color:"#0ea5e9", fontWeight:700}}>⟳</div>}
-            <button onClick={onToggleTheme} style={{background:"transparent", border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, ...S.txt2}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent", border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, ...S.txt2}}>{iconeTema()}</button>
           </div>
         </div>
 

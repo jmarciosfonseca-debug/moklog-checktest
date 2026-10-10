@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { montarRelatorioEnergia } from "./relatorios/energiaRelatorio";
@@ -785,7 +786,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
         <div style={{fontSize:19,fontWeight:700,...S.txt}}>⚡ Ocorrências de Energia</div>
         <div style={{fontSize:12.5,...S.txt2,fontWeight:500}}>{project.id} · {project.name}</div>
       </div>
-      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{dark?"☀️":"🌙"}</button>}
+      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
     </div>
   );
 

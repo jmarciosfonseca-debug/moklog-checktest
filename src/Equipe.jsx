@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
 import { useState, useEffect, useContext, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -339,7 +340,7 @@ function Header({ title, sub, onBack, saving, dark, onToggleTheme }) {
         {saving && <div style={{ fontSize:10, color:"#0ea5e9", fontWeight:700 }}>⟳</div>}
         <button onClick={onToggleTheme}
           style={{ background:"transparent", border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color: dark?"#94a3b8":"#475569" }}>
-          {dark?"☀️":"🌙"}
+          {iconeTema()}
         </button>
       </div>
     </div>
@@ -1708,7 +1709,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
               <div style={{fontSize:11,...S.txtSecondary}}>{project.id} · {lista.length} colaborador(es)</div>
             </div>
             <button onClick={gerarPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}>📄 PDF</button>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:13,...S.txtSecondary}}>{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:13,...S.txtSecondary}}>{iconeTema()}</button>
           </div>
         </div>
 

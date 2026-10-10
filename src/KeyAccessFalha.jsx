@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ════════════════════════════════════════════════════════════════════════
 // KeyAccessFalha.jsx — Registro de falhas do sistema KeyAccess
@@ -258,7 +259,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
               <div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>🚨 KeyAccess Falha</div>
               <div style={{fontSize:11,...S.txt2}}>Escolha o projeto</div>
             </div>
-            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>
+            <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:8}}>

@@ -1,3 +1,4 @@
+import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { gerarConsolidadoPlantoesHTML } from "./relatorios/perimetralPlantao";
 import { baixarHtml } from "./relatorios/padraoMoked";
@@ -754,7 +755,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
         <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚶 Ronda Perimetral Diária</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
       </div>
-      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{dark?"☀️":"🌙"}</button>}
+      {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
     </div>
   );
 
