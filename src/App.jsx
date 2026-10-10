@@ -2611,7 +2611,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const [dashStats, setDashStats] = useState(null);
   const [colabCounts, setColabCounts] = useState({});
   // Controla quais listas expansíveis da Central de Recursos estão abertas.
-  const [rhExpand, setRhExpand] = useState({});
+  const [rhExpand, setRhExpand] = useState({ mat:true }); // cascata de pendências já abre ao entrar
   const toggleRh = (k)=> setRhExpand(o=>({...o, [k]:!o[k]}));
   useEffect(()=>{
     let alive = true;
@@ -3029,7 +3029,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 {st.materialPendente>0&&<div style={{borderBottom:rowBorder}}>
                   <div onClick={()=>toggleRh("mat")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
                     <span style={{width:7,height:7,borderRadius:"50%",background:"#f59e0b",flexShrink:0}}/><div style={{flex:1,fontSize:12,color:txt}}><b>Material tático pendente</b><div style={{fontSize:10,color:txt2,marginTop:1}}>{st.materialPendente} solicitação(ões) de uniforme/material em aberto</div></div>{chev(rhExpand.mat)}<span style={{fontSize:13,fontWeight:800,color:"#f59e0b",marginLeft:6}}>{st.materialPendente}</span></div>
-                  {rhExpand.mat&&<div style={{paddingBottom:6}}>{Object.entries(st.materialDetalhe||{}).sort((a,b)=>b[1]-a[1]).map(([pid,q],i)=>(<div key={i} onClick={()=>setGerVerProjeto(pid)} style={{cursor:"pointer"}}>{subItem(pid,"",q+" solicitação(ões) ›")}</div>))}</div>}
+                  {rhExpand.mat&&<div style={{paddingBottom:6}}>{Object.entries(st.materialDetalhe||{}).sort((a,b)=>b[1]-a[1]).map(([pid,q],i)=>(<div key={i} onClick={()=>onEquipe({...(PROJECTS[pid]||{id:pid}),abrirEm:"aprovacoes"})} style={{cursor:"pointer"}}>{subItem(pid,"",q+" solicitação(ões) ›")}</div>))}</div>}
                 </div>}
 
                 {st.projsSemEquipe>0&&<div style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0"}}>

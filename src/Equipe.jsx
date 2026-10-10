@@ -1925,7 +1925,13 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   useEffect(() => {
     referenciarFotos(referenciasFotos([...(equipeData.colaboradores || []), ...(equipeData.desligados || [])]));
   }, [equipeData, referenciarFotos]);
-  const [screen, setScreen] = useState(()=>(sharedAuth||getAccess(project?.id))?"list":"pin"); // pin | list | add | edit | view | addHist
+  const [screen, setScreen] = useState(()=>{
+    const nivel = sharedAuth||getAccess(project?.id);
+    if(!nivel) return "pin";
+    // Vindo da lista de pendências do gerencial: abre direto nas Aprovações do projeto.
+    if(project?.abrirEm==="aprovacoes" && nivel==="admin") return "aprovacoes";
+    return "list";
+  }); // pin | list | add | edit | view | addHist | aprovacoes
   // Keyframe do "piscar" de reciclagem — injeta uma vez no documento.
   useEffect(()=>{
     if(typeof document==="undefined") return;
