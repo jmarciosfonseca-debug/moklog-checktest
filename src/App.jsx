@@ -7,12 +7,10 @@ import AcessoCCO from "./AcessoCCO";
 import Ocorrencias from "./Ocorrencias";
 import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos, { ContadorEquipamentos } from "./Equipamentos";
-import Visita from "./Visita";
 import Bolsao from "./Bolsao";
 import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
-import Intervalos from "./Intervalos";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
 import PainelLider from "./PainelLider";
@@ -20,8 +18,7 @@ import AuditoriaOperacional from "./AuditoriaOperacional";
 
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import { recursosHabilitados } from "./gerenciaisConfig";
-import CCO from "./CCO";
-import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp, TQ_HORA } from "./Iluminacao";
+import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
 import RondaDiaria from "./RondaDiaria";
@@ -148,13 +145,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function SafeBlock({ name, children }) {
-  return (
-    <ErrorBoundary moduleName={name} inline={true}>
-      {children}
-    </ErrorBoundary>
-  );
-}
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
@@ -274,11 +264,6 @@ function sendNotification(title, body, icon="") {
   catch(e){}
 }
 
-function scheduleWeeklyNotifications(projectName, projectId) {
-  const schedules = JSON.parse(localStorage.getItem("moklog_notif_schedule")||"{}");
-  schedules[projectId] = { projectName, scheduledAt: Date.now() };
-  localStorage.setItem("moklog_notif_schedule", JSON.stringify(schedules));
-}
 
 function checkPendingNotifications(stored) {
   try {
@@ -309,8 +294,6 @@ function checkPendingNotifications(stored) {
 
 // Projetos elegíveis ao módulo de Fiscalização de Bolsão Externo — por ora só Mega CL (P311A/B)
 const BOLSAO_ELIGIBLE = ["P311A","P311B"];
-// Projetos elegíveis ao Teste Perimetral universal — todos os centros logísticos, exceto Jatinox (P260A/B/C)
-const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505"];
 const PROJECTS = {
   P601: {
     id:"P601", name:"Golgi Cajamar", short:"Cajamar",
@@ -609,13 +592,6 @@ function getProjectScore(project, history) {
   return {grade:"D", color:"#ef4444", label:"Cr\u00edtico"};
 }
 
-function isLastSundayOfMonth() {
-  const now = new Date();
-  if(now.getDay() !== 0) return false;
-  const nextSunday = new Date(now);
-  nextSunday.setDate(now.getDate() + 7);
-  return nextSunday.getMonth() !== now.getMonth();
-}
 
 function getAllPendencies(stored) {
   const result = [];
@@ -1393,29 +1369,6 @@ function ProjectPinGate({project, onSuccess, onBack}) {
   );
 }
 
-function MiniChart({data, width=200, height=60}) {
-  if(!data || data.length < 2) return null;
-  const min = Math.min(...data) - 5;
-  const max = Math.max(...data) + 5;
-  const range = max - min || 1;
-  const pts = data.map((v, i) => {
-    const x = (i / (data.length-1)) * width;
-    const y = height - ((v - min) / range) * height;
-    return `${x},${y}`;
-  }).join(" ");
-  const last = data[data.length-1];
-  const color = last >= 90 ? "#22c55e" : last >= 70 ? "#f59e0b" : "#ef4444";
-  return(
-    <svg width={width} height={height} style={{overflow:"visible"}}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      {data.map((v,i)=>{
-        const x=(i/(data.length-1))*width;
-        const y=height-((v-min)/range)*height;
-        return <circle key={i} cx={x} cy={y} r="3" fill={color}/>;
-      })}
-    </svg>
-  );
-}
 
 // ── VISÃO 360 — score composto de saúde operacional por planta, cruzando todos os módulos.
 // Pesos transparentes e calibráveis:
@@ -3412,13 +3365,11 @@ export default function App(){
   const [empresaInfoProject,setEmpresaInfoProject]=useState(null);
   const [showEquipamentos,setShowEquipamentos]=useState(false);
   const [equipamentosProject,setEquipamentosProject]=useState(null);
-  const [showVisita,setShowVisita]=useState(false);
   const [showBolsao,setShowBolsao]=useState(false);
   const [bolsaoProject,setBolsaoProject]=useState(null);
   const [showRondaVSPP,setShowRondaVSPP]=useState(false);
   const [showInquilinos,setShowInquilinos]=useState(false);
   const [inquilinosProject,setInquilinosProject]=useState(null);
-  const [visitaProject,setVisitaProject]=useState(null);
   const [showPerimetral,setShowPerimetral]=useState(false);
   const [showIluminacao,setShowIluminacao]=useState(false);
   const [iluminacaoProject,setIluminacaoProject]=useState(null);
@@ -3430,10 +3381,6 @@ export default function App(){
   const [energiaProject,setEnergiaProject]=useState(null);
   const [perimetralProject,setPerimetralProject]=useState(null);
   const [showKeyAccess,setShowKeyAccess]=useState(false); // 🚨 KeyAccess Falha (em construção)
-  const [showIntervalos,setShowIntervalos]=useState(false);
-  const [intervalosProject,setIntervalosProject]=useState(null);
-  const [showCCO,setShowCCO]=useState(false);
-  const [ccoProject,setCcoProject]=useState(null);
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
@@ -3686,7 +3633,7 @@ export default function App(){
   const clearDraft=()=>{localStorage.removeItem("moklog_draft");setDraft(null);};
   const checkAuth=(pid)=>!!getAccess(pid);
   const grantAuth=(pid,mode="lider")=>{grantSession(mode,pid);setProjectAuth(prev=>({...prev,[pid]:{mode,ts:Date.now()}}));};
-  // modo já liberado para o projeto (null se sessão expirada/inexistente) — usado pelos módulos CCO/Equipe/Equipamentos/Empresas/Visita
+  // modo já liberado para o projeto (null se sessão expirada/inexistente) — usado pelos módulos CCO/Equipe/Equipamentos/Empresas
   const getProjectAuthMode=(pid)=>getAccess(pid);
   const lastForProject=stored[project.id]?.history?.slice(-1)[0]??null;
   const recurrence=analyzeRecurrence(project,stored[project.id]?.history??[]);
@@ -3812,13 +3759,6 @@ export default function App(){
     setScreen("form");
   };
 
-  const startNew=()=>{
-    if(draft&&draft.projectId===project.id){setShowDraftPrompt(true);return;}
-    const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);
-    setState(base);
-    setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
-    setPhotos([]);setScreen("form");setActive(null);
-  };
 
   const continueDraft=()=>{
     // MIGRAÇÃO: um rascunho salvo antes de uma atualização de checklist pode não
@@ -3964,7 +3904,6 @@ export default function App(){
   if(showAmbulancia&&ambulanciaProject) return <ErrorBoundary moduleName="Acesso de Ambulância"><Ambulancia project={ambulanciaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAmbulancia(false);setAmbulanciaProject(null);}} sharedAuth={getProjectAuthMode(ambulanciaProject.id)} onAuthGranted={(mode)=>grantAuth(ambulanciaProject.id,mode)}/></ErrorBoundary>;
   if(showEmpresaInfo&&empresaInfoProject) return <ErrorBoundary moduleName="Empresas"><EmpresaInfo project={empresaInfoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEmpresaInfo(false);setEmpresaInfoProject(null);}} sharedAuth={getProjectAuthMode(empresaInfoProject.id)} onAuthGranted={(mode)=>grantAuth(empresaInfoProject.id,mode)}/></ErrorBoundary>;
   if(showEquipamentos&&equipamentosProject) return <ErrorBoundary moduleName="Equipamentos"><Equipamentos project={equipamentosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipamentos(false);setEquipamentosProject(null);}} sharedAuth={getProjectAuthMode(equipamentosProject.id)} onAuthGranted={(mode)=>grantAuth(equipamentosProject.id,mode)}/></ErrorBoundary>;
-  // Visita Diária removida a pedido — componente Visita.jsx permanece no repo por histórico
   if(showBolsao&&bolsaoProject) return <ErrorBoundary moduleName="Fiscalização de Bolsão"><Bolsao project={bolsaoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowBolsao(false);setBolsaoProject(null);}} sharedAuth={getProjectAuthMode(bolsaoProject.id)} onAuthGranted={(mode)=>grantAuth(bolsaoProject.id,mode)}/></ErrorBoundary>;
   if(showRondaVSPP) return <ErrorBoundary moduleName="Ronda VSPP"><RondaVSPP project={PROJECTS["P601"]} dark={dark} onBack={()=>setShowRondaVSPP(false)} sharedAuth={getProjectAuthMode("P601")} onAuthGranted={(mode)=>grantAuth("P601",mode)}/></ErrorBoundary>;
   if(showInquilinos&&inquilinosProject) return <ErrorBoundary moduleName="Inquilinos"><Inquilinos project={inquilinosProject} dark={dark} onBack={()=>{setShowInquilinos(false);setInquilinosProject(null);}} sharedAuth={getProjectAuthMode(inquilinosProject.id)} onAuthGranted={(mode)=>grantAuth(inquilinosProject.id,mode)}/></ErrorBoundary>;
@@ -3974,8 +3913,6 @@ export default function App(){
   if(showBolsaoInq&&bolsaoInqProject) return <ErrorBoundary moduleName="Checagem de Bolsão"><BolsaoInquilinos project={bolsaoInqProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowBolsaoInq(false);setBolsaoInqProject(null);}} sharedAuth={getProjectAuthMode(bolsaoInqProject.id)} onAuthGranted={(mode)=>grantAuth(bolsaoInqProject.id,mode)}/></ErrorBoundary>;
   if(showEnergia&&energiaProject) return <ErrorBoundary moduleName="Ocorrências de Energia"><EnergiaOcorrencias project={energiaProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEnergia(false);setEnergiaProject(null);}} sharedAuth={getProjectAuthMode(energiaProject.id)} onAuthGranted={(mode)=>grantAuth(energiaProject.id,mode)}/></ErrorBoundary>;
   if(showKeyAccess) return <ErrorBoundary moduleName="KeyAccess Falha"><KeyAccessFalha dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>setShowKeyAccess(false)}/></ErrorBoundary>;
-  if(showIntervalos&&intervalosProject) return <ErrorBoundary moduleName="Intervalos"><Intervalos project={intervalosProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowIntervalos(false);setIntervalosProject(null);}}/></ErrorBoundary>;
-  if(showCCO&&ccoProject) return <ErrorBoundary moduleName="CCO"><CCO project={ccoProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowCCO(false);setCcoProject(null);}}/></ErrorBoundary>;
   if(viewParams) return <ViewScreen projectId={viewParams.projectId} token={viewParams.token} stored={stored}/>;
 
   if(showMonthlyPrompt) return(
