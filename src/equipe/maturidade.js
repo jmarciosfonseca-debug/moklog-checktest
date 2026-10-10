@@ -201,3 +201,25 @@ export function calcularMapaEquipe(equipe, hoje) {
   individuos.forEach(i => { i.treinamentosRegistrados = treinamentos.pessoas.find(p => p.id === i.colaborador.id); i.treinamentosFicha = classificarTreinamentos(i.colaborador, hoje); });
   return { hoje, individuos, eixos, treinamentos, ...estabilidade, ...agregarEquipe(individuos, estabilidade.estabilidade), top: ordenados.filter(i => i.indice >= corte), alertas: individuos.flatMap(i => i.alertas.map(texto => ({ colabId: i.colaborador.id, nome: i.colaborador.nome, texto }))) };
 }
+
+// Data do 1º lançamento de falta/FT/atraso na equipe (ativos e desligados) — ponto de partida SUGERIDO
+// para "Histórico registrado desde". É só sugestão: o gerencial confirma que tudo desde então foi lançado.
+export function primeiroRegistro(equipe) {
+  const todos = [...(equipe?.colaboradores || []), ...(equipe?.desligados || [])];
+  let menor = null;
+  for (const c of todos) for (const h of (Array.isArray(c.historico) ? c.historico : [])) {
+    if (!h || !['Falta', 'FT', 'Atraso'].includes(h.tipo)) continue;
+    const d = data(h.data);
+    if (d !== null && (menor === null || d < menor)) menor = d;
+  }
+  return menor === null ? null : new Date(menor).toISOString().slice(0, 10);
+}
+export function diasEntre(inicioISO, fimISO) {
+  const a = data(inicioISO), b = data(fimISO);
+  return a === null || b === null ? null : Math.floor((b - a) / DIA);
+}
+export const SUGESTOES_TREINAMENTO = Object.freeze([
+  { nome: 'Brigada de incêndio', obrigatorio: true, validadeMeses: 12 },
+  { nome: 'Tiro defensivo / armamento', obrigatorio: true, validadeMeses: 12 },
+  { nome: 'Primeiros socorros', obrigatorio: true, validadeMeses: 24 },
+]);
