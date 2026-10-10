@@ -1,4 +1,5 @@
 import { checkPin } from "./session";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -87,7 +88,7 @@ async function loadInfo(projectId) {
 }
 
 async function saveInfo(projectId, data) {
-  try { await setDoc(doc(db,"empresa_info",projectId), data); } catch(e){ console.error(e); }
+  try { await setDoc(doc(db,"empresa_info",projectId), data); } catch(e){ avisarFalhaServidor("Empresas", e); }
   try { localStorage.setItem(`empresa_info_${projectId}`, JSON.stringify(data)); } catch(e){}
 }
 

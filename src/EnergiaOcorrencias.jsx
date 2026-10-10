@@ -1,4 +1,5 @@
 import { checkPin } from "./session";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { montarRelatorioEnergia } from "./relatorios/energiaRelatorio";
 // ─────────────────────────────────────────────────────────────
 // EnergiaOcorrencias.jsx — Ocorrências de Energia (redesign v2)
@@ -115,7 +116,7 @@ async function loadEnergia(projectId){
 }
 async function saveEnergia(projectId, data){
   const payload = { ...data, updatedAt:new Date().toISOString() };
-  try { await setDoc(doc(db,"energia_ocorrencias",projectId), payload); } catch(e){ console.error("energia save:", e); }
+  try { await setDoc(doc(db,"energia_ocorrencias",projectId), payload); } catch(e){ avisarFalhaServidor("Ocorrências de Energia", e); }
   try { localStorage.setItem(`energia_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 

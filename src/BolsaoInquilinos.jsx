@@ -1,4 +1,5 @@
 import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
 // BolsaoInquilinos.jsx — Checagem de Bolsão (P505), padrão Mega (P311A/B)
@@ -79,7 +80,7 @@ async function loadDados(projectId){
 }
 async function saveDados(projectId, data){
   const payload = { ...data, updatedAt:new Date().toISOString() };
-  try { await setDoc(doc(db,"bolsao_inquilinos",projectId), payload); } catch(e){ console.error("bolsao_inquilinos save:", e); }
+  try { await setDoc(doc(db,"bolsao_inquilinos",projectId), payload); } catch(e){ avisarFalhaServidor("Checagem de Bolsão", e); }
   try { localStorage.setItem(`bolsao_inq_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 

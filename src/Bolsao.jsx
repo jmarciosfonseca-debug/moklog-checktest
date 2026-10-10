@@ -1,4 +1,5 @@
 import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { checkPin } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -96,7 +97,7 @@ async function loadBolsao(projectId) {
 
 async function saveBolsao(projectId, placas) {
   const data = { placas, updatedAt: new Date().toISOString() };
-  try { await setDoc(doc(db,"bolsao",projectId), data); } catch(e){ console.error(e); }
+  try { await setDoc(doc(db,"bolsao",projectId), data); } catch(e){ avisarFalhaServidor("Fiscalização de Bolsão", e); }
   try { localStorage.setItem(`bolsao_${projectId}`, JSON.stringify(data)); } catch(e){}
 }
 

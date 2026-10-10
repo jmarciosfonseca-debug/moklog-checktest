@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
@@ -31,7 +32,7 @@ async function loadRondas(projectId){
   return { slots: SLOTS_DEFAULT, registros: [] };
 }
 async function saveRondas(projectId, data){
-  try{ await setDoc(doc(db,COL,projectId),{...data,updatedAt:new Date().toISOString()}); }catch(e){ console.error(e); }
+  try{ await setDoc(doc(db,COL,projectId),{...data,updatedAt:new Date().toISOString()}); }catch(e){ avisarFalhaServidor("Ronda VSPP", e); }
   try{ localStorage.setItem("ronda_vspp_"+projectId,JSON.stringify(data)); }catch(e){}
 }
 async function loadEquipe(projectId){

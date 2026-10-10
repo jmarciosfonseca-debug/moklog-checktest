@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
@@ -51,7 +52,7 @@ async function loadRegistros(projectId) {
 }
 
 async function saveRegistros(projectId, registros) {
-  try { await setDoc(doc(db,"acesso",projectId), { registros, updatedAt: new Date().toISOString() }); } catch(e){}
+  try { await setDoc(doc(db,"acesso",projectId), { registros, updatedAt: new Date().toISOString() }); } catch(e){ avisarFalhaServidor("Acesso Transportadoras", e); }
   try { localStorage.setItem(`acesso_${projectId}`, JSON.stringify(registros)); } catch(e){}
 }
 
