@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
+import { montarConsolidadoVSPP } from "./relatorios/rondaVsppConsolidado";
+import { abrirParaImpressao } from "./relatorios/padraoMoked";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -187,6 +189,10 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
   const [diaAtual,setDiaAtual]=useState(null);
   const [screen,setScreen]=useState("list");
   const [confirmDelSlot,setConfirmDelSlot]=useState(null);
+  const [verTodas,setVerTodas]=useState(false);
+  const [consolOpen,setConsolOpen]=useState(false);
+  const [consolDe,setConsolDe]=useState("");
+  const [consolAte,setConsolAte]=useState("");
   const adminAuth=sharedAuth==="admin";
 
   useEffect(()=>{
@@ -413,9 +419,9 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
             </div>
           )}
 
-          <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Histórico ({registros.length})</div>
+          <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>{verTodas?`Histórico (${registros.length})`:"Última ronda"}</div>
           {registros.length===0&&<div style={{textAlign:"center",padding:"30px 0",...S.txt2,fontSize:13}}>Nenhuma ronda registrada ainda.</div>}
-          {registros.map(r=>{
+          {(verTodas?registros:registros.slice(0,1)).map(r=>{
             const slts=r.slots||data.slots||SLOTS_DEFAULT;
             const f=slts.filter(h=>r.marcacoes?.[h]?.status==="feito").length;
             const nf=slts.filter(h=>r.marcacoes?.[h]?.status==="nao_feito").length;
@@ -437,6 +443,22 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
               </div>
             );
           })}
+          {registros.length>1&&<button onClick={()=>setVerTodas(v=>!v)} style={{...S.btnSec,fontSize:13}}>{verTodas?"Mostrar só a última ronda":`Ver todas as rondas (${registros.length})`}</button>}
+          {registros.length>0&&(
+            <div style={S.card}>
+              <button onClick={()=>setConsolOpen(v=>!v)} style={{...S.btn,fontSize:13}}>📑 Consolidado geral (PDF)</button>
+              {consolOpen&&(
+                <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{fontSize:11,...S.txt2}}>Deixe as datas em branco para incluir todas as rondas.</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <div style={{flex:1}}><label style={S.lbl}>De</label><input type="date" value={consolDe} onChange={e=>setConsolDe(e.target.value)} style={S.inp}/></div>
+                    <div style={{flex:1}}><label style={S.lbl}>Até</label><input type="date" value={consolAte} onChange={e=>setConsolAte(e.target.value)} style={S.inp}/></div>
+                  </div>
+                  <button onClick={()=>{const {html}=montarConsolidadoVSPP(project,registros,{de:consolDe,ate:consolAte});abrirParaImpressao(html,`ronda_vspp_consolidado_${project.id}_${todayStr()}.html`);}} style={{...S.btnSec,fontSize:13}}>Gerar consolidado</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {confirmDelSlot&&(
