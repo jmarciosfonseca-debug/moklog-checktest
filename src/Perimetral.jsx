@@ -911,7 +911,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:15,fontWeight:800,...S.txt}}>🔒 Teste Perimetral</div>
-              <div style={{fontSize:11,...S.txt2}}>P505 · {testes.length} teste(s) no total</div>
+              <div style={{fontSize:11,...S.txt2}}>{project?.id || "—"} · {testes.length} teste(s) no total</div>
             </div>
             <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{dark?"☀️":"🌙"}</button>
           </div>

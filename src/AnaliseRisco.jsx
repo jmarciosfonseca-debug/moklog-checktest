@@ -273,6 +273,16 @@ async function coletarIluminacao(pid) {
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler iluminação" }; }
 }
 
+// KeyAccess — apenas informativo: não entra em vetores nem no nível.
+async function coletarKeyAccessInfo(pid) {
+  try {
+    const snap = await getDoc(doc(db, "keyaccess_falhas", pid));
+    const regs = snap.exists() ? (snap.data().registros || []) : [];
+    if (!regs.length) return { ok: false, temDado: false, motivo: "sem registros de KeyAccess" };
+    return { ok: true, temDado: true, total: regs.length, abertas: regs.filter((r) => !r.horaFim).length };
+  } catch { return { ok: false, temDado: false, motivo: "KeyAccess indisponível" }; }
+}
+
 // ── FONTE 4: Perimetral (roteada por projeto) ────────────────
 async function coletarPerimetral(pid) {
   if (PERIMETRAL_RONDAS.includes(pid)) return coletarPerimetralRondas(pid);
@@ -1886,6 +1896,7 @@ async function coletarFontes(project, stored, marcadas) {
     coletarMarcada(marcadas.rondaVirtual, "rondaVirtual", "Ronda Virtual", "ronda virtual", () => coletarRondaVirtual(project.id)),
     coletarMarcada(marcadas.energia, "energia", "Ocorrências de Energia", "energia", () => coletarEnergia(project.id)),
     coletarMarcada(marcadas.equipe, "equipe", "Mapa de Equipe", "equipe", () => coletarEquipe(project.id)),
+    (async () => { dados.keyaccess = await segura("keyaccess", () => coletarKeyAccessInfo(project.id)); })(),
     (async () => { dados.sinistros = await segura("sinistros", () => coletarSinistros(project.id)); })(),
     (async () => { const fu = await segura("tratativas", () => loadFollowups(db, project.id)); dados.followups = fu && fu.ok === false ? {} : (fu || {}); })(),
   ]);
@@ -2040,6 +2051,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     const perfilTxt = perfilPartes.length ? ` · ${perfilPartes.join(" · ")}` : "";
     fontesUsadas.push({ titulo: "Mapa de Equipe", detalhe: `${dados.equipe.total} colaboradores${perfilTxt}` });
   }
+  if (dados.keyaccess?.ok) fontesUsadas.push({ titulo: "KeyAccess (informativo)", detalhe: `${dados.keyaccess.total} registro(s) de falha · ${dados.keyaccess.abertas} em aberto · não altera o nível` });
   if (dados.sinistros?.ok) fontesUsadas.push({ titulo: "Histórico de Sinistros", detalhe: dados.sinistros.houve ? "Sinistro registrado" : "Sem sinistro recente" });
   if (dados.regional?.ok) {
     fontesUsadas.push({ titulo: "Diagnóstico Regional", detalhe: `${dados.regional.codigo} · ${(dados.regional.quadrantes||[]).map(q=>q.grau).join("/")}` });
