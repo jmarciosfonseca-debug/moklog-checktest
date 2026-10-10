@@ -20,6 +20,8 @@ import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
+import { montarRelatorioIluminacao, mapaParaDataUrl } from "./relatorios/iluminacaoRelatorio";
+import { abrirParaImpressao } from "./relatorios/padraoMoked";
 import { getAccess, grantSession } from "./session";
 
 const firebaseConfig = {
@@ -157,71 +159,13 @@ async function saveIluminacao(projectId, data){
 }
 
 // ── PDF (padrão Perimetral: HTML com botão de impressão, baixado via Blob)
-function gerarPdfIluminacao(project, data){
-  const g = calcGeral(data.quadrantes);
-  const gCor = STATUS_CFG[statusFromPct(g.pct)].color;
-  const agora = new Date();
-  const mapaAbs = data.mapa?.url ? (window.location.origin + data.mapa.url) : null;
-  const linhas = (data.quadrantes||[]).map(q=>{
-    const c = calcQuad(q);
-    const cor = STATUS_CFG[statusFromPct(c.pct)].color;
-    return `<tr>
-      <td style="font-weight:800">${q.nome}</td>
-      <td style="text-align:center">${c.total}</td>
-      <td style="text-align:center;font-weight:700;color:${c.def>0?"#ef4444":"#22c55e"}">${c.def==null?"—":c.def}</td>
-      <td style="text-align:center">${c.ops}</td>
-      <td style="width:34%">
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="flex:1;height:9px;border-radius:5px;background:#e2e8f0;overflow:hidden"><div style="height:100%;width:${c.pct}%;background:${cor}"></div></div>
-          <span style="font-weight:800;color:${cor};font-size:12px">${c.pct}%</span>
-        </div>
-      </td>
-    </tr>`;
-  }).join("");
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="utf-8"><title>Iluminação ${project.id}</title>
-<style>
-  body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:20px;max-width:820px;margin:0 auto}
-  h1{font-size:19px;margin:0}
-  .sub{font-size:12px;color:#64748b;margin-top:2px}
-  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
-  .kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
-  .kpi-val{font-size:24px;font-weight:900}
-  .kpi-lbl{font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:3px}
-  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
-  th{background:#1e293b;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
-  td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-  .mapa img{width:100%;border-radius:8px;margin:12px 0;display:block}
-  .barraG{height:14px;border-radius:7px;background:#e2e8f0;overflow:hidden;margin-top:6px}
-  .footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
-</style></head>
-<body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-<h1>💡 Relatório de Iluminação — ${project.id}</h1>
-<div class="sub">${project.name||""} · Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
-${mapaAbs?`<div class="mapa"><img src="${mapaAbs}" alt="Mapa"/></div>`:""}
-<div class="kpis">
-  <div class="kpi"><div class="kpi-val">${g.total}</div><div class="kpi-lbl">Pontos totais</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${g.def>0?"#ef4444":"#22c55e"}">${g.def}</div><div class="kpi-lbl">Deficientes</div></div>
-  <div class="kpi"><div class="kpi-val">${g.ops}</div><div class="kpi-lbl">Operantes</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${gCor}">${g.pct}%</div><div class="kpi-lbl">Geral</div></div>
-</div>
-<div class="barraG"><div style="height:100%;width:${g.pct}%;background:${gCor}"></div></div>
-<table style="margin-top:16px">
-  <thead><tr><th>Quadrante</th><th style="text-align:center">Pontos</th><th style="text-align:center">Deficientes</th><th style="text-align:center">Operantes</th><th>% Operante</th></tr></thead>
-  <tbody>${linhas}</tbody>
-</table>
-<div class="footer">MokLog CheckTest · Moked Consulting Security · Teste de Iluminação ${project.id}</div>
-</body></html>`;
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `iluminacao_${project.id}_${agora.toLocaleDateString("sv-SE")}.html`;
-  a.click();
+async function gerarPdfIluminacao(project, data){
+  // Padrão Moked: mapa do projeto embutido (data URL) para aparecer também fora do app.
+  const url = data.mapa?.url || `/mapas/${project.id}.jpg`;
+  const mapaDataUrl = await mapaParaDataUrl(url);
+  const hoje = new Date();
+  const html = montarRelatorioIluminacao(project, data, { mapaDataUrl, hoje });
+  abrirParaImpressao(html, `iluminacao_${project.id}_${hoje.toLocaleDateString("sv-SE")}.html`);
 }
 
 function getStyles(dark) {
