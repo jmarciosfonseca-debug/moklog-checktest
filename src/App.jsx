@@ -3853,7 +3853,13 @@ export default function App(){
     savingRef.current = true;
     setShowConfirmModal(false);
     // Gravar cronômetro e timestamps automáticos no meta
-    const tempoPreenchimento = formTimerRef.current ? Math.floor((Date.now()-formTimerRef.current)/1000) : null;
+    // Duração: prioriza INÍCIO/TÉRMINO informados (HH:MM, aceita virada de dia). O cronômetro do rascunho só serve de
+    // reserva e é descartado se passar de 12h (rascunho deixado aberto por dias gerava "4941min" para 17 min reais).
+    const _hm = v => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v||"").trim()); return m ? (+m[1])*60 + (+m[2]) : null; };
+    const _ini = _hm(meta.start), _fim = _hm(meta.end);
+    let tempoPreenchimento = null;
+    if(_ini!=null && _fim!=null){ let d = _fim - _ini; if(d < 0) d += 1440; tempoPreenchimento = d*60; }
+    else if(formTimerRef.current){ const sg = Math.floor((Date.now()-formTimerRef.current)/1000); tempoPreenchimento = sg <= 43200 ? sg : null; }
     const metaComTempo = {
       ...meta,
       formAberturaAuto: formTimerRef.current ? new Date(formTimerRef.current).toISOString() : null,
