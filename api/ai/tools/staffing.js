@@ -55,14 +55,20 @@ async function get_staffing_and_vacation_gaps(args = {}) {
     if (!colaboradores.length) { warnings.push(`${pid}: equipe sem colaboradores cadastrados.`); continue; }
 
     let temCampoFerias = false;
+    // Projeção de Férias do módulo Equipe: equipe.ferias[] = { colabId, nome, cargo, turno, dataInicio, dataRetorno, dias, cobertura }
+    const feriasPorColab = new Map();
+    for (const f of (Array.isArray(data.ferias) ? data.ferias : [])) {
+      if (f && f.colabId != null && (f.dataInicio || f.dataRetorno)) feriasPorColab.set(String(f.colabId), f);
+    }
 
     for (const c of colaboradores) {
       if (!c || typeof c !== "object") continue;
       if ((c.status || "").toLowerCase() === "desligado") continue;
 
       // Detecta férias/afastamento por campos comuns, sem inventar.
-      const iniF = c.feriasInicio || c.inicioFerias || (c.ferias && c.ferias.inicio);
-      const fimF = c.feriasFim || c.fimFerias || (c.ferias && c.ferias.fim);
+      const fp = feriasPorColab.get(String(c.id));
+      const iniF = (fp && fp.dataInicio) || c.feriasInicio || c.inicioFerias || (c.ferias && c.ferias.inicio);
+      const fimF = (fp && fp.dataRetorno) || c.feriasFim || c.fimFerias || (c.ferias && c.ferias.fim);
       const afast = c.afastamento || c.afastado;
 
       if (iniF || fimF || afast) {
@@ -77,7 +83,7 @@ async function get_staffing_and_vacation_gaps(args = {}) {
         else if (iniMs != null && iniMs <= now && (fimMs == null || fimMs >= now)) estado = "em andamento";
         else if (iniMs != null && iniMs > now) estado = "futura";
 
-        const cobertura = c.cobertura || c.substituto || (c.ferias && c.ferias.cobertura) || null;
+        const cobertura = (fp && fp.cobertura) || c.cobertura || c.substituto || (c.ferias && c.ferias.cobertura) || null;
         const semCobertura = !cobertura;
 
         records.push(record({

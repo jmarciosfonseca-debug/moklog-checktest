@@ -1,4 +1,5 @@
 import { checkPin } from "./session";
+import { avisarFalhaServidor } from "./avisoSalvar";
 // ─────────────────────────────────────────────────────────────
 // Iluminacao.jsx — Teste de Iluminação v4 (modelo simples)
 // Conceito espelhado no Teste Perimetral do P505, aplicado à iluminação:
@@ -154,7 +155,7 @@ export async function loadIluminacao(projectId){
 }
 async function saveIluminacao(projectId, data){
   const payload = { ...data, updatedAt: new Date().toISOString() };
-  try { await setDoc(doc(db,"iluminacao",projectId), payload); } catch(e){ console.error("Iluminacao save:", e); }
+  try { await setDoc(doc(db,"iluminacao",projectId), payload); } catch(e){ avisarFalhaServidor("Teste de Iluminação", e); }
   try { localStorage.setItem(`iluminacao_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 

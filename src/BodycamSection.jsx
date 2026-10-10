@@ -12,6 +12,7 @@
 // • Horário é sempre capturado na hora do toque — nunca digitado à mão.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from "react";
+import { avisarFalhaServidor } from "./avisoSalvar";
 
 const GRACE_HOUR = 6; // troca de turno: prazo final de tolerância (06:00)
 
@@ -48,13 +49,13 @@ async function loadBodycam(db, doc, getDoc, projectId){
   } catch(e){}
   try {
     const l = localStorage.getItem(`cco_bodycam_${projectId}`);
-    if(l) return JSON.parse(l)||[];
+    if(l){ const v=JSON.parse(l); return Array.isArray(v)?v:(v?.registros||[]); }
   } catch(e){}
   return [];
 }
 async function saveBodycam(db, doc, setDoc, projectId, registros){
   const payload = { registros, updatedAt:new Date().toISOString() };
-  try { await setDoc(doc(db,"cco_bodycam",projectId), payload); } catch(e){ console.error("bodycam save:", e); }
+  try { await setDoc(doc(db,"cco_bodycam",projectId), payload); } catch(e){ avisarFalhaServidor("Bodycam", e); }
   try { localStorage.setItem(`cco_bodycam_${projectId}`, JSON.stringify(payload)); } catch(e){}
 }
 

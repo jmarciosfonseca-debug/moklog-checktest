@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import AcessoApp from "./Acesso";
 import KeyAccessFalha from "./KeyAccessFalha";
 import EquipeApp, { ContadorEquipe } from "./Equipe";
@@ -1604,7 +1605,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     if(cur) delete next[pid]; else next[pid]=generateViewToken(pid);
     setViewLinks(next);
     localStorage.setItem("moklog_viewlinks",JSON.stringify(next));
-    try { await setDoc(doc(db,"config","viewlinks"), next); } catch(e){}
+    try { await setDoc(doc(db,"config","viewlinks"), next); } catch(e){ avisarFalhaServidor("Link de Manutenção", e); }
   };
   if(!auth) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}} onClick={resetSess}>
@@ -1661,6 +1662,13 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                 if(gerandoExec) return; setGerandoExec(true);
                 try {
                   const ler = async (col, pid, campo) => { try { const sn = await getDoc(doc(db, col, pid)); return sn.exists() ? (sn.data()[campo] || []) : []; } catch(e){ return null; } };
+                  // Ambulâncias: formato antigo (array no doc) + formato novo (subcoleção registros/), sem duplicar por id
+                  const lerAmbulancias = async (pid) => { try {
+                    const sn = await getDoc(doc(db, "ambulancias", pid)); const mapa = new Map();
+                    for(const r of (sn.exists() ? (sn.data().registros||[]) : [])) mapa.set(r.id, r);
+                    try { const sub = await getDocs(collection(db, "ambulancias", pid, "registros")); sub.docs.forEach(d=>mapa.set(d.id, {...d.data(), id:d.id})); } catch(e){}
+                    return [...mapa.values()];
+                  } catch(e){ return null; } };
                   const extras = {};
                   await Promise.all(rows.map(async r=>{
                     const p = PROJECTS[r.id]; const hist = stored[r.id]?.history ?? [];
@@ -1675,7 +1683,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                     const [key, en, rv, cams, man, ilum, amb] = await Promise.all([
                       ler("keyaccess_falhas", r.id, "registros"), ler("energia_ocorrencias", r.id, "eventos"), ler("cco_ronda", r.id, "turnos"),
                       ler("cftv_gravacao", r.id, "cameras"), ler("cco_manutencao", r.id, "registros"), ler("iluminacao", r.id, "quadrantes"),
-                      mega ? ler("ambulancias", r.id, "registros") : Promise.resolve(undefined),
+                      mega ? lerAmbulancias(r.id) : Promise.resolve(undefined),
                     ]);
                     Object.assign(ex, { keyaccess:key, energia:en, rondaTurnos:rv, cameras:cams, manutencao:man, iluminacao:ilum });
                     if(mega) ex.ambulancia = amb;
@@ -3586,7 +3594,7 @@ export default function App(){
       try{ localStorage.setItem("seccheck_ctmk_v1",JSON.stringify(up)); }catch(e){}
       return up;
     });
-    try{ await setDoc(doc(db,"ctmk",pid), next); }catch(e){}
+    try{ await setDoc(doc(db,"ctmk",pid), next); }catch(e){ avisarFalhaServidor("CTMK", e); }
   };
 
   // ── Confirmação antes de alternar o CTMK (evita perder o histórico por toque acidental)
@@ -4316,7 +4324,7 @@ export default function App(){
               <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{groupNames[homeGroup]}</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.join(" · ")}</div>
             </div>
-            {(()=>{const tp=groupProjects.reduce((a,pid)=>a+((rsCounts[pid]&&rsCounts[pid].naoVistas)||0),0);return tp>0?(
+            {(()=>{if(RS_TRANCADO&&!hasGerencial())return null;const tp=groupProjects.reduce((a,pid)=>a+((rsCounts[pid]&&rsCounts[pid].naoVistas)||0),0);return tp>0?(
               <div title="RS pendentes de visualização no grupo" style={{display:"flex",alignItems:"center",gap:6,background:"#B21E27",color:"#fff",borderRadius:8,padding:"5px 10px",fontWeight:800,fontSize:12,boxShadow:"0 2px 8px rgba(178,30,39,.4)"}}>
                 <span style={{fontSize:14}}>🛡️</span>Total RS Pendentes: {tp}
               </div>
@@ -4443,6 +4451,7 @@ export default function App(){
     );
   }
 
+  const totalInopHome=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);
   // ── HOME — Main cards
   return(
     <div style={{...S.page, background:dark?"radial-gradient(ellipse at 50% -5%, #0a1628 0%, #04080f 55%)":"#f1f5f9", minHeight:"100vh"}}>
@@ -4475,9 +4484,9 @@ export default function App(){
             <div style={{fontSize:11,color:"#94a3b8",marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:"mkPulse 2.2s infinite"}} aria-label="Ver pendências">🔴 Inop</button>
+            <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:totalInopHome>0?"mkPulse 2.2s infinite":"none"}} aria-label="Ver pendências">🔴 Inop</button>
             <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700,position:"relative"}} aria-label="Ver registros">📋 Registros
-              {(()=>{const t=Object.values(stored).reduce((a,p)=>{const h=p.history||[];const last=h[h.length-1];if(!last)return a;const inop=Object.values(last.state||{}).reduce((s,cat)=>{if(cat.count!==undefined)return s+(cat.count===0?1:0);return s+Object.values(cat).filter(v=>v==="inop").length;},0);return a+inop;},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
+              {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
             </button>
             <button onClick={()=>setScreen("dashboard")} style={{background:"rgba(148,163,184,.06)",border:"1px solid #263248",borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:"#a8b6c8",fontWeight:600}} aria-label="Abrir painel gerencial">📊 Painel</button>
             <button onClick={()=>setDark(!dark)} style={{background:"rgba(148,163,184,.06)",border:"1px solid #263248",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:"#a8b6c8"}} aria-label="Alternar tema claro/escuro">{dark?"☀️":"🌙"}</button>

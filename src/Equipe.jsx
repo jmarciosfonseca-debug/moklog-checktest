@@ -1563,6 +1563,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
     return colaboradores.map(c => {
       const existing = (ferias||[]).find(f=>f.colabId===c.id);
       return {
+        id: existing?.id || ("fer_"+String(c.id)),
         colabId: c.id,
         nome: c.nome,
         cargo: c.cargo,

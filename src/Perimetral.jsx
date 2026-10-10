@@ -1,4 +1,5 @@
 import { checkPin } from "./session";
+import { avisarFalhaServidor } from "./avisoSalvar";
 import { gerarConsolidadoPerimetralHTML } from "./relatorios/perimetralConsolidado";
 import { baixarHtml } from "./relatorios/padraoMoked";
 import { useState, useEffect, useRef } from "react";
@@ -120,7 +121,7 @@ async function loadTestes(projectId) {
 }
 
 async function saveTestes(projectId, testes) {
-  try { await setDoc(doc(db,"perimetral",projectId),{testes,updatedAt:new Date().toISOString()}); } catch(e){ console.error(e); }
+  try { await setDoc(doc(db,"perimetral",projectId),{testes,updatedAt:new Date().toISOString()}); } catch(e){ avisarFalhaServidor("Teste Perimetral", e); }
   try { localStorage.setItem(`perimetral_${projectId}`, JSON.stringify(testes)); } catch(e){}
 }
 
