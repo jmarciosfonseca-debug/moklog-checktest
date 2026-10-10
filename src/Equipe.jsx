@@ -35,7 +35,7 @@ const db = getFirestore(fbApp);
 import { getAccess, grantSession, clearSession, isDemo } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
 import { gerarPDFSolicitacoesColaborador, gerarPDFAprovados, gerarPDFCestaNatal } from "./pdfSolicitacoes";
-import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, aplicarAprovacao, contadoresAprovacao, cestaDocId, novoFV, parseValorBR, fmtBRL } from "./equipeAprovacao";
+import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, contadoresAprovacao, cestaDocId, novoFV, parseValorBR, fmtBRL } from "./equipeAprovacao";
 
 import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
 import { fvNoEscopo } from "./fvConfig";
@@ -50,7 +50,7 @@ import { calcularMapaEquipe } from './equipe/maturidade';
 import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
 import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
 import { abrirParaImpressao } from './relatorios/padraoMoked';
-import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, relerEGravarEquipe, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
+import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
@@ -93,9 +93,6 @@ function coberturaAtiva(colab){
   const ini = new Date(colab.coberturaInicio+"T00:00:00");
   const fim = new Date(colab.coberturaFim+"T23:59:59");
   return hoje>=ini && hoje<=fim;
-}
-function cargoEfetivo(colab){
-  return coberturaAtiva(colab) ? "VSPP Líder (cobertura)" : colab.cargo;
 }
 const HIST_COLORS = {
   "Atraso": { bg: '#451a03', color: '#f59e0b', icon: '⏱' },
@@ -157,18 +154,6 @@ function uniformeDiasAberto(desdeIso){
   return Math.floor((Date.now()-new Date(desdeIso).getTime())/86400000);
 }
 // Monta a mensagem de WhatsApp da solicitação.
-function uniformeMsgWhats(projectNome, colabNome, item, marca, tamanho, motivo){
-  const linhas = [
-    "*SOLICITAÇÃO DE UNIFORME / MATERIAL* 📦",
-    `*Unidade:* ${projectNome||"—"}`,
-    `*Colaborador:* ${colabNome||"—"}`,
-    `*Item:* ${item}${marca?` (${marca})`:""}`,
-  ];
-  if(tamanho) linhas.push(`*Tamanho:* ${tamanho}`);
-  if(motivo) linhas.push(`*Motivo:* ${motivo}`);
-  linhas.push(`*Data:* ${new Date().toLocaleDateString("pt-BR")}`);
-  return linhas.join("\n");
-}
 function chkEqParseISO(iso){ const [y,m,d]=String(iso).split("-").map(Number); return new Date(y,(m||1)-1,d||1); }
 function chkEqISO(d){ return d.toLocaleDateString("sv-SE"); }
 // Sábado (>=) mais próximo à frente de uma data.
@@ -323,237 +308,6 @@ function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
 }
 
 // ── Gerar PDF de Mapa de Equipe
-function gerarMapaEquipePDF(project, colaboradores, titulo, perfilSeg, desligadosIncluir) {
-  const seg = SEG_LOGOS[project.id] || { empresa:"Moked Consulting Security", logo:"" };
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const fmtD = (d) => { if(!d) return "--"; try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; } };
-
-  const TURNO_COLORS = {
-    "Diurno":    { bg:"#e8f5e9", border:"#4caf50", badge:"#2e7d32", icon:"☀️" },
-    "Noturno":   { bg:"#e8eaf6", border:"#5c6bc0", badge:"#283593", icon:"🌙" },
-    "Folguista": { bg:"#fff8e1", border:"#ffa000", badge:"#e65100", icon:"☀️🌙" },
-  };
-
-  const moklogSVG = `<svg width="52" height="52" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <radialGradient id="bg2" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2a2a2a"/><stop offset="100%" stop-color="#111"/></radialGradient>
-      <linearGradient id="metal2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#d0d0d0"/><stop offset="40%" stop-color="#888"/><stop offset="100%" stop-color="#555"/></linearGradient>
-      <linearGradient id="red2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#cc2222"/><stop offset="50%" stop-color="#991111"/><stop offset="100%" stop-color="#7a0e0e"/></linearGradient>
-    </defs>
-    <rect width="100" height="100" rx="14" fill="url(#bg2)"/>
-    <circle cx="50" cy="50" r="38" fill="none" stroke="url(#metal2)" stroke-width="7"/>
-    <circle cx="50" cy="50" r="26" fill="none" stroke="url(#red2)" stroke-width="8"/>
-    <circle cx="50" cy="50" r="7" fill="#111"/>
-    <rect x="47.5" y="8" width="5" height="18" rx="2" fill="url(#red2)"/>
-    <rect x="47.5" y="74" width="5" height="18" rx="2" fill="url(#red2)"/>
-    <rect x="8" y="47.5" width="18" height="5" rx="2" fill="url(#metal2)"/>
-    <rect x="74" y="47.5" width="18" height="5" rx="2" fill="url(#metal2)"/>
-  </svg>`;
-
-  // Group by turno - detect from collaborators (don't force Folguista)
-  const turnosPresentes = ["Diurno","Noturno","Folguista"].filter(t=>colaboradores.some(c=>c.turno===t));
-  const byTurno = {};
-  turnosPresentes.forEach(t => { byTurno[t] = colaboradores.filter(c=>c.turno===t); });
-  const semTurno = colaboradores.filter(c=>!["Diurno","Noturno","Folguista"].includes(c.turno));
-
-  const renderColab = (c) => {
-    const faltas  = (c.historico||[]).filter(h=>h.tipo==="Falta").length;
-    const fts     = (c.historico||[]).filter(h=>h.tipo==="FT").length;
-    const mds     = (c.historico||[]).filter(h=>h.tipo==="Medida Disciplinar");
-    const adv     = mds.filter(m=>m.detalhe==="Advertência").length;
-    const susp    = mds.filter(m=>m.detalhe==="Suspensão").length;
-    const ferias  = (c.historico||[]).filter(h=>h.tipo==="Férias").length;
-    const treinos = (c.historico||[]).filter(h=>h.tipo==="Treinamento").length;
-    const hist   = (c.historico||[]).slice().reverse();
-    const fotoHtml = c.foto
-      ? `<img src="${c.foto}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:2px solid #e2e8f0;"/>`
-      : `<div style="width:64px;height:64px;border-radius:8px;border:2px solid #e2e8f0;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:28px;">👤</div>`;
-
-    return `
-      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:10px;page-break-inside:avoid;">
-        <div style="display:flex;gap:14px;align-items:flex-start;">
-          ${fotoHtml}
-          <div style="flex:1;">
-            <div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:2px;">${c.nome||"—"}</div>
-            <div style="font-size:12px;color:#475569;margin-bottom:6px;">${c.cargo||"—"}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
-              ${c.escala?`<span style="font-size:10px;font-weight:700;color:#0369a1;background:#e0f2fe;padding:2px 8px;border-radius:4px;">${c.escala}</span>`:""}
-              ${c.telefone?`<span style="font-size:10px;color:#64748b;">📱 ${c.telefone}</span>`:""}
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;color:#64748b;">
-              <div>📅 Contratação: <strong>${fmtD(c.dataContratacao)}</strong></div>
-              <div>🔄 Reciclagem: <strong style="color:${c.ultimaReciclagem?"#16a34a":"#dc2626"}">${fmtD(c.ultimaReciclagem)}</strong></div>
-            </div>
-          </div>
-          <div style="text-align:center;min-width:70px;">
-            <div style="display:flex;gap:5px;justify-content:center;flex-wrap:wrap;">
-              ${faltas>0?`<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#dc2626;">${faltas}</div><div style="font-size:8px;color:#dc2626;font-weight:700;">FALTAS</div></div>`:""}
-              ${fts>0?`<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#d97706;">${fts}</div><div style="font-size:8px;color:#d97706;font-weight:700;">FT</div></div>`:""}
-              ${adv>0?`<div style="background:#f3e8ff;border:1px solid #d8b4fe;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#7c3aed;">${adv}</div><div style="font-size:8px;color:#7c3aed;font-weight:700;">ADV</div></div>`:""}
-              ${susp>0?`<div style="background:#ffe4e6;border:1px solid #fda4af;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#be123c;">${susp}</div><div style="font-size:8px;color:#be123c;font-weight:700;">SUSP</div></div>`:""}
-              ${ferias>0?`<div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#0369a1;">${ferias}</div><div style="font-size:8px;color:#0369a1;font-weight:700;">FÉRIAS</div></div>`:""}
-              ${treinos>0?`<div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:4px 8px;text-align:center;"><div style="font-size:16px;font-weight:900;color:#15803d;">${treinos}</div><div style="font-size:8px;color:#15803d;font-weight:700;">TREIN.</div></div>`:""}
-            </div>
-          </div>
-        </div>
-        ${hist.length>0?`
-        <div style="margin-top:10px;border-top:1px solid #f1f5f9;padding-top:8px;">
-          <div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:5px;">Histórico</div>
-          ${hist.slice(0,5).map(h=>{
-            const PDF_HIST_COLORS = {
-              "Falta":{"c":"#dc2626","b":"#fee2e2"},
-              "FT":{"c":"#d97706","b":"#fef3c7"},
-              "Medida Disciplinar":{"c":"#7c3aed","b":"#f3e8ff"},
-              "Férias":{"c":"#0369a1","b":"#e0f2fe"},
-              "Treinamento":{"c":"#15803d","b":"#dcfce7"},
-            };
-            const hColors = PDF_HIST_COLORS[h.tipo] || PDF_HIST_COLORS["Medida Disciplinar"];
-            const hColor = hColors.c;
-            const hBg    = hColors.b;
-            return `<div style="display:inline-flex;align-items:center;gap:5px;background:${hBg};border-radius:5px;padding:3px 8px;margin:2px;font-size:10px;">
-              <span style="font-weight:700;color:${hColor}">${h.tipo}</span>
-              <span style="color:#64748b">${fmtD(h.data)}</span>
-              ${h.detalhe?`<span style="color:#94a3b8">· ${h.detalhe}</span>`:""}
-            </div>`;
-          }).join("")}
-          ${hist.length>5?`<div style="font-size:9px;color:#94a3b8;margin-top:3px;">+${hist.length-5} mais registros</div>`:""}
-        </div>
-        `:""}
-      </div>`;
-  };
-
-  const turnoSections = turnosPresentes.map(t => {
-    const cols = byTurno[t];
-    if(!cols || cols.length===0) return "";
-    const tc = TURNO_COLORS[t];
-    return `
-      <div style="margin-bottom:20px;">
-        <div style="background:${tc.bg};border-left:4px solid ${tc.border};padding:8px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">${tc.icon}</span>
-          <span style="font-size:14px;font-weight:800;color:${tc.badge};">${t}</span>
-          <span style="font-size:12px;color:#64748b;margin-left:4px;">${cols.length} colaborador(es)</span>
-        </div>
-        ${cols.map(renderColab).join("")}
-      </div>`;
-  }).join("");
-
-  const semTurnoSection = semTurno.length>0 ? `
-    <div style="margin-bottom:20px;">
-      <div style="background:#f8fafc;border-left:4px solid #94a3b8;padding:8px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;">
-        <span style="font-size:14px;font-weight:700;color:#475569;">Sem turno definido</span>
-      </div>
-      ${semTurno.map(renderColab).join("")}
-    </div>` : "";
-
-  // Seção de DESLIGADOS (opcional — só quando o gestor liga o toggle no PDF).
-  const _desl = Array.isArray(desligadosIncluir) ? desligadosIncluir : [];
-  const desligadosSection = _desl.length>0 ? `
-    <div style="margin-bottom:20px;page-break-before:auto;">
-      <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:8px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
-        <span style="font-size:18px;">🔴</span>
-        <span style="font-size:14px;font-weight:800;color:#b91c1c;">Desligados</span>
-        <span style="font-size:12px;color:#64748b;margin-left:4px;">${_desl.length} colaborador(es)</span>
-      </div>
-      ${_desl.map(c=>{
-        const cardHtml = renderColab(c);
-        const tipo = c.tipoDesligamento || "Desligamento";
-        const dataD = fmtD(c.desligadoEm);
-        const motivo = c.motivoDesligamento ? ` · ${c.motivoDesligamento}` : "";
-        const faixa = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:6px 10px;margin-bottom:6px;font-size:11px;color:#b91c1c;font-weight:700;">🔴 ${tipo} em ${dataD}${motivo}</div>`;
-        return `<div style="opacity:.92;">${faixa}${cardHtml}</div>`;
-      }).join("")}
-    </div>` : "";
-
-  // Faixa do Perfil de Segurança (só aparece se ao menos um campo estiver preenchido).
-  const _ps = perfilSeg || {};
-  const _rotTipo = { vspp:"VSPP", vigilantes:"Vigilantes", mista:"Mista (VSPP + Vigilantes)" }[_ps.tipoEquipe] || null;
-  const _snCor = (v) => v === "sim" ? "#16a34a" : v === "nao" ? "#dc2626" : "#94a3b8";
-  const _snTxt = (v) => v === "sim" ? "SIM" : v === "nao" ? "NÃO" : "—";
-  const _chip = (label, valorHTML) =>
-    `<div style="display:flex;align-items:center;gap:6px;">
-       <span style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">${label}</span>
-       <span style="font-size:12px;font-weight:800;">${valorHTML}</span>
-     </div>`;
-  const _temPerfil = _rotTipo || _ps.armada || _ps.ccoDedicada;
-  const perfilSegHTML = _temPerfil
-    ? `<div style="background:#fff;border:1px solid #e2e8f0;border-left:4px solid #B21E27;border-radius:8px;padding:12px 20px;margin-bottom:20px;display:flex;align-items:center;gap:28px;flex-wrap:wrap;">
-         <span style="font-size:12px;font-weight:900;color:#B21E27;text-transform:uppercase;letter-spacing:.5px;">🛡️ Perfil de Segurança</span>
-         ${_chip("Tipo de Equipe", `<span style="color:#0f172a;">${_rotTipo || "—"}</span>`)}
-         ${_chip("Equipe Armada", `<span style="color:${_snCor(_ps.armada)};">${_snTxt(_ps.armada)}</span>`)}
-         ${_chip("CCO Dedicada", `<span style="color:${_snCor(_ps.ccoDedicada)};">${_snTxt(_ps.ccoDedicada)}</span>`)}
-       </div>`
-    : "";
-
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mapa de Equipe — ${project.id}</title>
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Segoe UI',Arial,sans-serif; background:#f8fafc; padding:20px; color:#1e293b; }
-  @media print {
-    body { padding:0; background:#fff; }
-    .no-print { display:none !important; }
-    @page { margin:15mm; }
-  }
-</style>
-</head>
-<body>
-
-<!-- Botão imprimir -->
-<div class="no-print" style="text-align:center;margin-bottom:16px;">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>
-</div>
-
-<!-- Cabeçalho -->
-<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
-  <div style="display:flex;align-items:center;gap:14px;">
-    ${moklogSVG}
-    <div>
-      <div style="font-size:11px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Moked Consulting Security</div>
-      <div style="font-size:20px;font-weight:900;color:#0f172a;">Mapa de Equipe</div>
-      <div style="font-size:13px;color:#475569;">${titulo||`${project.id} — ${project.name||""}`}</div>
-    </div>
-  </div>
-  <div style="text-align:center;">
-    ${seg.logo?`<img src="${seg.logo}" style="height:56px;max-width:120px;object-fit:contain;" alt="${seg.empresa}"/>`:""}
-    <div style="font-size:10px;color:#64748b;margin-top:4px;">${seg.empresa}</div>
-  </div>
-</div>
-
-<!-- Info linha -->
-<div style="background:#1e293b;color:#fff;border-radius:8px;padding:10px 20px;margin-bottom:${perfilSegHTML?"10px":"20px"};display:flex;align-items:center;justify-content:space-between;font-size:12px;">
-  <span>📋 Projeto: <strong>${project.id}</strong></span>
-  <span>👥 Total: <strong>${colaboradores.length} ativo(s)${_desl.length?` + ${_desl.length} desligado(s)`:""}</strong></span>
-  <span>📅 Emitido em: <strong>${hoje}</strong></span>
-</div>
-
-<!-- Perfil de Segurança -->
-${perfilSegHTML}
-
-<!-- Colaboradores -->
-${turnoSections}
-${semTurnoSection}
-${desligadosSection}
-
-<!-- Rodapé -->
-<div style="border-top:1px solid #e2e8f0;margin-top:20px;padding-top:12px;text-align:center;font-size:10px;color:#94a3b8;">
-  MokLog CheckTest © Moked Consulting Security · ${seg.empresa} · Documento gerado em ${hoje}
-</div>
-
-</body>
-</html>`;
-
-  const blob = new Blob([html], {type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `mapa_equipe_${project.id}_${new Date().toLocaleDateString("sv-SE")}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 function getStyles(dark) {
   return {
@@ -1816,6 +1570,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
         foto: c.foto||"",
         dataContratacao: c.dataContratacao||"",
         dataInicio: existing?.dataInicio||"",
+        dias: existing?.dias===20?20:30,
         dataRetorno: existing?.dataRetorno||"",
         cobertura: existing?.cobertura||"",
         ordem: existing?.ordem ?? colaboradores.indexOf(c),
@@ -1826,11 +1581,11 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  function calcRetorno(inicio) {
+  function calcRetorno(inicio, dias=30) {
     if(!inicio) return "";
     try {
       const d = new Date(inicio+"T12:00:00");
-      d.setDate(d.getDate()+30);
+      d.setDate(d.getDate()+(dias===20?20:30));
       return d.toISOString().split("T")[0];
     } catch { return ""; }
   }
@@ -1866,8 +1621,8 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
     setLista(prev => prev.map(item => {
       if(item.colabId !== colabId) return item;
       const updated = {...item, ...fields};
-      if(fields.dataInicio !== undefined) {
-        updated.dataRetorno = calcRetorno(fields.dataInicio);
+      if(fields.dataInicio !== undefined || fields.dias !== undefined) {
+        updated.dataRetorno = calcRetorno(updated.dataInicio, updated.dias);
       }
       return updated;
     }));
@@ -1910,7 +1665,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
       return `<tr>
         <td><strong>${item.nome}</strong><br><span style="font-size:11px;color:#64748b">${item.cargo}</span></td>
         <td>${item.dataInicio?fmtD(item.dataInicio):"—"}</td>
-        <td>${item.dataRetorno?fmtD(item.dataRetorno):"—"}</td>
+        <td>${item.dataRetorno?fmtD(item.dataRetorno):"—"}${item.dataInicio?` <span style="font-size:11px;color:#64748b">(${item.dias===20?20:30}d)</span>`:""}</td>
         <td>${item.cobertura||"—"}</td>
         <td>${pa?`${pa.meses}m ${pa.completo?"✅":"⏳"}`:"—"}</td>
         <td style="color:${alerta?.tipo==="urgente"?"#dc2626":"#d97706"}">${alerta?.msg||"—"}</td>
@@ -2007,7 +1762,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                           <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>{fmtD(item.dataInicio)}</div>
                         </div>
                         <div>
-                          <div style={{fontSize:9,...S.txtSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Retorno (30d)</div>
+                          <div style={{fontSize:9,...S.txtSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Retorno ({item.dias===20?20:30}d)</div>
                           <div style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>{fmtD(item.dataRetorno)}</div>
                         </div>
                         <div style={{gridColumn:"1/-1"}}>
@@ -2038,7 +1793,17 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                         style={S.inp}/>
                     </div>
                     <div>
-                      <label style={S.lbl}>Data de Retorno (sugestão automática: 30 dias — pode ajustar)</label>
+                      <label style={S.lbl}>Duração das Férias</label>
+                      <div style={{display:"flex",gap:8}}>
+                        {[30,20].map(d=>{const on=(item.dias===20?20:30)===d;return(
+                          <button key={d} type="button" onClick={()=>updateItem(item.colabId,{dias:d})}
+                            style={{flex:1,padding:"10px",borderRadius:9,fontSize:13,fontWeight:800,cursor:"pointer",
+                              background:on?"#0ea5e9":(dark?"#020510":"#fff"),color:on?"#fff":(dark?"#94a3b8":"#475569"),
+                              border:`1px solid ${on?"#0ea5e9":(dark?"#1e293b":"#cbd5e1")}`}}>{d} dias</button>);})}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={S.lbl}>Data de Retorno (calculada — pode ajustar)</label>
                       <input type="date" value={item.dataRetorno}
                         onChange={e=>updateItem(item.colabId,{dataRetorno:e.target.value})}
                         style={S.inp}/>
