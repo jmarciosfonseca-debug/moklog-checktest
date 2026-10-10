@@ -25,12 +25,14 @@ export function blocoFimMoked() {
 }
 
 // fecho (opcional): bloco impresso junto da assinatura. fimEmbutido = o chamador já colocou o bloco de assinatura no corpo.
-export function documentoMoked({ project, titulo, subtitulo, numero, corpo, interno = false, hoje = new Date(), rodape, fecho = "", fimEmbutido = false }) {
-  const theme = getTheme(project?.id) || {};
+// tag (opcional): etiqueta no cabeçalho (ex.: "ACESSO GERENCIAL"); interno = tag "VERSÃO INTERNA".
+// empresaLogo=false: só o logo Moked (documentos de grupo/gerenciais, sem empresa de segurança única).
+export function documentoMoked({ project, titulo, subtitulo, numero, corpo, interno = false, tag = "", hoje = new Date(), rodape, fecho = "", fimEmbutido = false, empresaLogo = true }) {
+  const theme = empresaLogo && project?.id ? (getTheme(project.id) || {}) : {};
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escHTML(titulo)} — ${escHTML(project?.id || "")}</title><style>${cssMoked()}${rodapePagina(rodape || `${numero} · ${titulo} · ${project?.id || ""} ${project?.name || ""} · Moked Consulting Security · MokLog CheckTest`)}</style></head><body>
 <div class="mk-noprint"><button onclick="window.print()" class="mk-print">Imprimir / Salvar PDF</button></div>
 <header class="mk-topo"><div class="mk-logos"><img src="${MOKED_LOGO}" class="mk-lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="mk-sep"></span><img src="${theme.empresaLogo}" class="mk-lg" alt="${escHTML(theme.empresaNome || "")}">` : ""}</div>
-<div class="mk-meta">${interno ? '<div class="mk-tag">VERSÃO INTERNA</div>' : ""}<div><b>${escHTML(titulo)}</b> · Nº ${escHTML(numero)}</div><div>Emissão ${hoje.toLocaleDateString("pt-BR")} · José Fonseca</div></div></header>
+<div class="mk-meta">${interno ? '<div class="mk-tag">VERSÃO INTERNA</div>' : tag ? `<div class="mk-tag">${escHTML(tag)}</div>` : ""}<div><b>${escHTML(titulo)}</b> · Nº ${escHTML(numero)}</div><div>Emissão ${hoje.toLocaleDateString("pt-BR")} · José Fonseca</div></div></header>
 <div class="mk-regua"></div><h1 class="mk-h1">${escHTML(titulo)}</h1><p class="mk-sub">${subtitulo}</p>
 ${corpo}
 ${fecho ? `<div class="mk-fecho">${fecho}` : ""}${fimEmbutido ? "" : blocoFimMoked()}${fecho ? "</div>" : ""}
