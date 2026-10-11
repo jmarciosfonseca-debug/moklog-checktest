@@ -2792,7 +2792,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     return (
       <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
-          <div style={{fontSize:32,marginBottom:8}}><Ico n="chave"/></div>
+          <div style={{marginBottom:8,display:"flex",justifyContent:"center"}}><img src="/icones/modulos/pin.svg" alt="" width={72} height={72} draggable={false}/></div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Registros</div>
           <div style={{fontSize:12,color:txt2,marginBottom:20}}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={entradaPin}
@@ -2869,7 +2869,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     return (
       <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
         <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
-          <div style={{ fontSize:32, marginBottom:8 }}><Ico n="chave"/></div>
+          <div style={{ marginBottom:8, display:"flex", justifyContent:"center" }}><img src="/icones/modulos/pin.svg" alt="" width={72} height={72} draggable={false}/></div>
           <div style={{ fontSize:16, fontWeight:800, color:txt, marginBottom:4 }}>Área Restrita</div>
           <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
