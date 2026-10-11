@@ -141,17 +141,18 @@ test("material: item novo fora do cadastro e voltar para Disponível limpa a exc
 test("sem cadastro de equipamentos a tela avisa e ainda deixa registrar anomalia", async () => {
   await montar({ loadEquipamentos: jest.fn(async () => null) });
   await clicar(q('button[aria-label="Conferir material"]'));
-  expect(host.textContent).toContain("Sem equipamentos cadastrados neste projeto");
+  expect(host.textContent).toContain("Lista do projeto: Armamento 2 · Munição 1 · Placas balísticas 4");
+  expect(q('button[aria-label="Revólver .38 1 de 2: Anomalia"]')).not.toBeNull();
   expect(botao("+ Outro item")).toBeDefined();
 });
 
 test("tudo ok: conclui sem observação e o texto diz o que foi conferido; sem cadastro avisa", async () => {
   await montar();
   await clicar(botao("Concluir mapa"));
-  expect(q('pre[aria-label="Texto do mapa"]').textContent).toContain("Sem alteração — conferido e disponível (Armamento 1 · Munição 1)");
-  expect(salvos[0].material.conferidos).toBe("Armamento 1 · Munição 1");
+  expect(q('pre[aria-label="Texto do mapa"]').textContent).toContain("Sem alteração — conferido e disponível (Armamento 1 · Munição 1 · Placas balísticas 4)");
+  expect(salvos[0].material.conferidos).toBe("Armamento 1 · Munição 1 · Placas balísticas 4");
 });
-test("projeto sem equipamentos cadastrados mostra aviso no cabeçalho do material", async () => {
+test("sem cadastro, a lista de referência do projeto (base do Codex) aparece no cabeçalho do material", async () => {
   await montar({ loadEquipamentos: jest.fn(async () => null) });
-  expect(host.textContent).toContain("Nenhum equipamento cadastrado neste projeto: complete em Equipamentos");
+  expect(host.textContent).toContain("Lista do projeto: Armamento 2 · Munição 1 · Placas balísticas 4");
 });

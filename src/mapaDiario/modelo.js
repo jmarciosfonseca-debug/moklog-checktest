@@ -8,6 +8,7 @@
 //  - material/armamento/munição: uma linha "sem alteração" já marcada;
 //  - quilometragem rodada = odômetro atual − anterior.
 
+import { itensDaBase } from "./materialBase";
 import { chaveMapa } from "./regras";
 
 export const SITUACOES = [
@@ -80,20 +81,26 @@ const CATEGORIAS_MATERIAL = [
 // Lista conferível a partir do cadastro de Equipamentos do projeto (somente leitura).
 // Bodycam e ZTRAX só existem no P311A/P311B (mesma regra do módulo Equipamentos).
 const SO_NO_MEGA_CURITIBA_ITAJAI = { bodycam: ["P311A", "P311B"], ztrax: ["P311A", "P311B"] };
-export function itensDeEquipamento(data, projetoId = null) {
-  if (!data) return [];
-  const out = [];
-  CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
-    const restrito = SO_NO_MEGA_CURITIBA_ITAJAI[cat];
-    if (restrito && projetoId && !restrito.includes(projetoId)) return;
-    (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => {
-      if (!it || typeof it !== "object") return;
-      const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
-      const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
-      out.push({ id: `${cat}:${it.id || i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok" });
+export function itensDeEquipamento(data, projetoId = null, turno = null) {
+  const rotulos = Object.fromEntries(CATEGORIAS_MATERIAL);
+  const cad = [];
+  if (data) {
+    CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
+      const restrito = SO_NO_MEGA_CURITIBA_ITAJAI[cat];
+      if (restrito && projetoId && !restrito.includes(projetoId)) return;
+      (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => {
+        if (!it || typeof it !== "object") return;
+        const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
+        const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
+        cad.push({ id: `${cat}:${it.id || i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok" });
+      });
     });
-  });
-  return out;
+  }
+  // Base do Codex (o que o projeto declara nos mapas) + cadastro: o cadastro vence por categoria.
+  const comCadastro = new Set(cad.map((i) => i.categoria));
+  const base = itensDaBase(projetoId, turno, rotulos).filter((i) => !comCadastro.has(i.categoria));
+  const ordem = CATEGORIAS_MATERIAL.map(([c]) => c);
+  return [...cad, ...base].sort((a, b) => ordem.indexOf(a.categoria) - ordem.indexOf(b.categoria));
 }
 
 // "Armamento 2 · Munição 1 · Rádios HT 3": o que existe neste projeto para conferir.

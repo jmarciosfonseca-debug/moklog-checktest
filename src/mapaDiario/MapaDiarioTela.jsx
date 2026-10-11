@@ -55,7 +55,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         }
         const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
         if (!vivo) return;
-        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid));
+        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid, turno));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
