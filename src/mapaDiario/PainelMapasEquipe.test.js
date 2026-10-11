@@ -49,6 +49,6 @@ test("em implantação: sem contador, sem brilho e sem lista, mesmo com mapas pe
   expect(host.textContent).not.toContain("Pendente");
   expect(card().style.animation).toBe("none");
 });
-test("o interruptor padrão está desligado até existir o envio do mapa", () => {
-  expect(require("./ativo").MAPA_DIARIO_ATIVO).toBe(false);
+test("o interruptor está ligado (o envio do mapa já existe)", () => {
+  expect(require("./ativo").MAPA_DIARIO_ATIVO).toBe(true);
 });

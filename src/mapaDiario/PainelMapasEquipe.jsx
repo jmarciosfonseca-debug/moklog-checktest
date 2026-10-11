@@ -1,12 +1,11 @@
 // Barra "Mapa de Equipe diário" em Registros (só gerencial).
 // Mostra "n de N" do turno em vigor e faz brilhar quem ainda não enviou.
-// Somente leitura: não grava nada. Se a leitura falhar, diz que não leu — nunca mostra "0 de 12" no escuro.
+// Somente leitura (equipes/{pid}/mapas/{id}): não grava nada. Se a leitura falhar, diz que não leu — nunca mostra "0 de 12" no escuro.
 import { useEffect, useState } from "react";
-import { getApps } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
 import { Ico } from "../Icones";
-import { resumoDoPainel, dataBrasilia } from "./painel";
-import { somarDias } from "./regras";
+import { resumoDoPainel, turnoVigente, PROJETOS_DO_MAPA } from "./painel";
+import { chaveMapa } from "./regras";
+import { loadEnviosDoTurno } from "./dados";
 import { MAPA_DIARIO_ATIVO } from "./ativo";
 
 const COR = { enviado: "#16a34a", aguardando: "#64748b", cobranca: "#f59e0b", pendente: "#dc2626", "sem-horario": "#64748b" };
@@ -64,17 +63,14 @@ export default function PainelMapasEquipe({ dark, nomeProj, ativo = MAPA_DIARIO_
     let vivo = true;
     const ler = async () => {
       try {
-        const app = getApps()[0];
-        if (!app) throw new Error("sem app");
-        const db = getFirestore(app);
-        const hoje = dataBrasilia(new Date());
-        const snap = await getDocs(query(collection(db, "mapasEquipe"), where("data", "in", [somarDias(hoje, -1), hoje])));
+        const agora = new Date();
+        const itens = PROJETOS_DO_MAPA.map((projetoId) => {
+          const v = turnoVigente(projetoId, agora);
+          return v ? { projetoId, data: v.data, turno: v.turno, chave: chaveMapa(projetoId, v.data, v.turno) } : null;
+        }).filter(Boolean);
+        const lidos = await loadEnviosDoTurno(itens);
         if (!vivo) return;
-        setMapas(snap.docs.map((d) => {
-          const x = d.data();
-          const env = x.enviadoEm && x.enviadoEm.toDate ? x.enviadoEm.toDate() : x.enviadoEm || null;
-          return { projetoId: x.projetoId, data: x.data, turno: x.turno, enviadoEm: env };
-        }));
+        setMapas(lidos);
         setErro(false);
       } catch (e) { if (vivo) setErro(true); }
       finally { if (vivo) setCarregando(false); }
