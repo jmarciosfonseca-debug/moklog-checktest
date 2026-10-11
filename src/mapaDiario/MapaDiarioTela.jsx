@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, definirSituacaoMaterial, materialNovo, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
 
@@ -55,7 +55,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         }
         const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
         if (!vivo) return;
-        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq));
+        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -89,7 +89,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     setAvisos(erros);
     if (erros.length) return;
     const agora = agoraFn().toISOString();
-    const final = { ...mapa, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
+    const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); }
     catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); }
   };
@@ -220,6 +220,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                   <div style={{ flex: 1 }}>
                     <div style={{ ...S.h, marginBottom: 2 }}>Material, armamento e munição</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: corRes }}>{resumo}</div>
+                    <div style={{ fontSize: 11, color: cor.txt2, marginTop: 2 }}>{itensMat.length ? `Lista do projeto: ${resumoItens(itensMat)}` : "Nenhum equipamento cadastrado neste projeto: complete em Equipamentos"}</div>
                   </div>
                   <button aria-expanded={matAberto} aria-label="Conferir material" onClick={() => setMatAberto((v) => !v)} style={S.btn}>{matAberto ? "Recolher ▴" : "Conferir ▾"}</button>
                 </div>

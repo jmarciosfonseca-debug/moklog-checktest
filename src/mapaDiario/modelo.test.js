@@ -1,4 +1,4 @@
-import { novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, definirSituacaoMaterial, materialNovo } from "./modelo";
+import { novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 const H = { inicio: "06:00", fim: "18:00" };
@@ -156,5 +156,24 @@ describe("material, armamento e munição", () => {
     expect(t).toContain("• Munição .38 (24 un.) — INDISPONÍVEL: Faltam 6 munições");
     expect(t).toContain("↳ Acionado o armeiro");
     expect(t).not.toContain("Sem alteração — conferido");
+  });
+});
+
+describe("lista de material por projeto", () => {
+  const eq = { armamento: [{ id: "a1", identificacao: "Arma 01" }, { id: "a2", identificacao: "Arma 02" }], municao: [{ id: "m1", identificacao: "Munição" }], bodycam: [{ id: "b1", identificacao: "Bodycam 01" }], ztrax: [{ id: "z1", identificacao: "ZTRAX 1" }] };
+  test("bodycam e ZTRAX só aparecem no P311A/P311B", () => {
+    expect(itensDeEquipamento(eq, "P311A").map((i) => i.nome)).toContain("Bodycam 01");
+    expect(itensDeEquipamento(eq, "P311B").map((i) => i.nome)).toContain("ZTRAX 1");
+    const p601 = itensDeEquipamento(eq, "P601").map((i) => i.nome);
+    expect(p601).not.toContain("Bodycam 01");
+    expect(p601).not.toContain("ZTRAX 1");
+    expect(p601).toEqual(["Arma 01", "Arma 02", "Munição"]);
+  });
+  test("resumo mostra o que existe no projeto; vai no texto do WhatsApp quando está tudo ok", () => {
+    expect(resumoItens(itensDeEquipamento(eq, "P601"))).toBe("Armamento 2 · Munição 1");
+    expect(resumoItens([])).toBe("");
+    const m = preencher(mapa(), ["A", "B", "C"]);
+    const t = montarTextoWhatsApp({ ...m, material: { ...materialNovo(), conferidos: "Armamento 2 · Munição 1" } });
+    expect(t).toContain("Sem alteração — conferido e disponível (Armamento 2 · Munição 1)");
   });
 });

@@ -110,6 +110,7 @@ test("material: botão Conferir expande a lista do cadastro e anomalia exige obs
   await montar();
   expect(host.textContent).toContain("Sem alteração · tudo disponível");
   expect(host.textContent).not.toContain("Arma 01");
+  expect(host.textContent).toContain("Lista do projeto: Armamento 1 · Munição 1");
   await clicar(q('button[aria-label="Conferir material"]'));
   expect(host.textContent).toContain("Arma 01");
   expect(host.textContent).toContain(".38 · nº 123");
@@ -142,4 +143,15 @@ test("sem cadastro de equipamentos a tela avisa e ainda deixa registrar anomalia
   await clicar(q('button[aria-label="Conferir material"]'));
   expect(host.textContent).toContain("Sem equipamentos cadastrados neste projeto");
   expect(botao("+ Outro item")).toBeDefined();
+});
+
+test("tudo ok: conclui sem observação e o texto diz o que foi conferido; sem cadastro avisa", async () => {
+  await montar();
+  await clicar(botao("Concluir mapa"));
+  expect(q('pre[aria-label="Texto do mapa"]').textContent).toContain("Sem alteração — conferido e disponível (Armamento 1 · Munição 1)");
+  expect(salvos[0].material.conferidos).toBe("Armamento 1 · Munição 1");
+});
+test("projeto sem equipamentos cadastrados mostra aviso no cabeçalho do material", async () => {
+  await montar({ loadEquipamentos: jest.fn(async () => null) });
+  expect(host.textContent).toContain("Nenhum equipamento cadastrado neste projeto: complete em Equipamentos");
 });

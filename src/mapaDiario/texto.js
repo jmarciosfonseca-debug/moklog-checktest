@@ -44,7 +44,7 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
   const mat = mapa.material || { semAlteracao: true };
   const exc = (mat.excecoes || []);
   if (mat.semAlteracao && !exc.length) {
-    L.push("*Material (armamento, munição, rádios):* Sem alteração — conferido e disponível");
+    L.push(`*Material (armamento, munição, rádios):* Sem alteração — conferido e disponível${mat.conferidos ? ` (${mat.conferidos})` : ""}`);
   } else {
     L.push("*Material (armamento, munição, rádios):* COM ALTERAÇÃO");
     exc.forEach((e) => L.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — ${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}: ${(e.obs || "").trim()}`));

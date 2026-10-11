@@ -78,10 +78,14 @@ const CATEGORIAS_MATERIAL = [
   ["smartphones", "Smartphones"], ["lanternas", "Lanternas"], ["bodycam", "Bodycam"], ["ztrax", "ZTRAX"], ["outros", "Outros"],
 ];
 // Lista conferível a partir do cadastro de Equipamentos do projeto (somente leitura).
-export function itensDeEquipamento(data) {
+// Bodycam e ZTRAX só existem no P311A/P311B (mesma regra do módulo Equipamentos).
+const SO_NO_MEGA_CURITIBA_ITAJAI = { bodycam: ["P311A", "P311B"], ztrax: ["P311A", "P311B"] };
+export function itensDeEquipamento(data, projetoId = null) {
   if (!data) return [];
   const out = [];
   CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
+    const restrito = SO_NO_MEGA_CURITIBA_ITAJAI[cat];
+    if (restrito && projetoId && !restrito.includes(projetoId)) return;
     (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => {
       if (!it || typeof it !== "object") return;
       const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
@@ -90,6 +94,13 @@ export function itensDeEquipamento(data) {
     });
   });
   return out;
+}
+
+// "Armamento 2 · Munição 1 · Rádios HT 3": o que existe neste projeto para conferir.
+export function resumoItens(itens) {
+  const cont = new Map();
+  (itens || []).forEach((i) => cont.set(i.rotuloCategoria, (cont.get(i.rotuloCategoria) || 0) + 1));
+  return [...cont.entries()].map(([k, n]) => `${k} ${n}`).join(" · ");
 }
 
 // Atualiza a situação de um item (ok remove a exceção). Mantém `semAlteracao` coerente.
