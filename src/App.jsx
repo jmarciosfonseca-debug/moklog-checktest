@@ -159,10 +159,11 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 // sem o arquivo, volta ao ícone de linha dentro da caixa atual.
 const _semArte = new Set();
 function IconeModulo({ n, cor, arq, bg, txt }) {
-  const [falhou, setFalhou] = useState(()=>!arq || _semArte.has(arq));
+  const [ext, setExt] = useState(()=>!arq || _semArte.has(arq) ? null : "svg");
+  const falhou = ext === null;
   if (!falhou) return (
     <div className="module-icon-container" style={{ width:48, height:48, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, background:"transparent", filter:`drop-shadow(0 0 8px ${cor}88)` }}>
-      <img src={`/icones/modulos/${arq}.png`} alt="" draggable={false} onError={()=>{ _semArte.add(arq); setFalhou(true); }} style={{ width:"100%", height:"100%", objectFit:"contain" }}/>
+      <img src={`/icones/modulos/${arq}.${ext}`} alt="" draggable={false} onError={()=>{ if(ext==="svg") setExt("png"); else { _semArte.add(arq); setExt(null); } }} style={{ width:"100%", height:"100%", objectFit:"contain" }}/>
     </div>
   );
   return (

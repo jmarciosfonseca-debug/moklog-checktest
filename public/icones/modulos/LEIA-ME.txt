@@ -1,4 +1,4 @@
-Arte 3D dos módulos (PNG, 1024x1024, fundo transparente fora da placa de vidro).
+Arte 3D dos módulos (SVG de preferência, ou PNG 1024x1024, fundo transparente fora da placa de vidro).
 Nomes dos arquivos: equipe, cco, registro, equipamentos, empresas, iluminacao,
 ronda-perimetral, energia, ronda-vspp, inquilinos  (ex.: equipe.png).
 Sem o arquivo, o app mostra o ícone de linha padrão.
