@@ -22,7 +22,7 @@ export async function loadColaboradores(pid, hojeISO) {
     .map((f) => f.colabId));
   return (d.colaboradores || [])
     .filter((c) => c.status === "ativo")
-    .map((c) => ({ id: c.id, nome: c.nome || "", cargo: c.cargo || "", turno: c.turno || "", emFerias: ferias.has(c.id), equipeLiderId: c.equipeLiderId || null }))
+    .map((c) => ({ id: c.id, nome: c.nome || "", cargo: c.cargo || "", turno: c.turno || "", emFerias: ferias.has(c.id), equipeLiderId: c.equipeLiderId || null, equipeLideresExtra: Array.isArray(c.equipeLideresExtra) ? c.equipeLideresExtra : [] }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 

@@ -3,6 +3,7 @@
 // Equipe cabem no posto (para puxar a equipe montada pelo líder). `legado` = rótulos antigos, só para
 // aproveitar mapas já gravados.
 import { diaDaSemana } from "./regras";
+import { pertenceA } from "../equipe/vinculos";
 
 const LIDER = ["VSPP Líder", "Vigilante Líder"];
 const CCO = ["Vig CCO", "Porteiro CCO"];
@@ -22,11 +23,11 @@ export const POSTOS = {
   },
   P602: { D: GENERICO, N: GENERICO },
   P604: {
-    D: [lider("Líder"), P("VSPP 1", APOIO), P("VSPP 2", APOIO), P("CCO", CCO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"])],
+    D: [lider("Líder"), P("VSPP 1", APOIO), P("VSPP 2", APOIO), P("CCO", CCO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"], { dias: [1, 2, 3, 4, 5] })],
     N: [lider("Líder"), P("VSPP 1", APOIO), P("VSPP 2", APOIO), P("CCO", CCO)],
   },
   P605: {
-    D: [lider("Líder/CCO", [...LIDER, ...CCO]), P("VSPP", APOIO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"])],
+    D: [lider("Líder/CCO", [...LIDER, ...CCO]), P("VSPP", APOIO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"], { dias: [1, 2, 3, 4, 5] })],
     N: [lider("Líder/CCO", [...LIDER, ...CCO]), P("VSPP", APOIO)],
   },
   P606: { D: GENERICO, N: GENERICO },
@@ -82,14 +83,15 @@ export function defDoPosto(pid, turno, rotulo) {
 export const cargoCabe = (def, cargo) => !!def && (def.cargos || []).some((c) => norm(c) === norm(cargo));
 
 // Puxa a equipe montada pelo líder (Equipe → equipeLiderId) para os postos. Só mexe nos postos sem exceção e sem
-// nome digitado; quem já estava (de outro líder) sai. Devolve { postos, puxados, semEquipe }.
-export function puxarEquipe({ postos, lider: lid, colabs, pid, turno, limparSeSemEquipe = false }) {
-  const membros = (colabs || []).filter((c) => lid && c.equipeLiderId === lid.id && c.id !== lid.id && !c.emFerias);
+// nome digitado (e, com `soVazios`, quem já está no posto — usado ao reabrir um rascunho); quem já estava (de outro líder) sai. Devolve { postos, puxados, semEquipe }.
+export function puxarEquipe({ postos, lider: lid, colabs, pid, turno, limparSeSemEquipe = false, soVazios = false }) {
+  const membros = (colabs || []).filter((c) => lid && pertenceA(c, lid.id) && c.id !== lid.id && !c.emFerias);
   if (!membros.length && !limparSeSemEquipe) return { postos, puxados: 0, semEquipe: true };
-  const usados = new Set();
+  const usados = new Set(soVazios ? postos.filter((p) => p.pessoaId).map((p) => p.pessoaId) : []);
   let puxados = 0;
   const novos = postos.map((p) => {
     if (p.lider || p.situacao !== "presente" || (p.detalhe && p.detalhe.livre)) return p;
+    if (soVazios && p.pessoaId) return p;
     const def = defDoPosto(pid, turno, p.rotulo) || { cargos: p.cargos || [] };
     const m = membros.find((c) => !usados.has(c.id) && cargoCabe(def, c.cargo));
     if (!m) return { ...p, pessoaId: "", pessoaNome: "" };

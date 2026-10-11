@@ -225,3 +225,16 @@ test("se a ficha falhar, o mapa e o WhatsApp continuam liberados e o líder é a
   expect(q('pre[aria-label="Texto do mapa"]')).not.toBeNull();
   expect(host.textContent).toContain("Falta/FT/Atraso NÃO entraram na ficha (Sessão expirada)");
 });
+
+test("rascunho reaberto: não troca o que o líder já escolheu; 'Puxar de novo' preenche só o que falta depois de montar a equipe", async () => {
+  const existente = { id: "P311B_2026-10-11_D", projetoId: "P311B", data: "2026-10-11", turno: "D", status: "rascunho", horario: null, material: { semAlteracao: true, obs: "", excecoes: [] }, veiculos: [], resumo: "", observacoes: "",
+    postos: [{ id: "p1", rotulo: "L1 · Vigilante Líder", lider: true, pessoaId: "a", pessoaNome: "Luiz D.", situacao: "presente", detalhe: {}, obs: "" }, { id: "p2", rotulo: "P1 · Vigilante CCO", pessoaId: "d", pessoaNome: "Joao V.", situacao: "presente", detalhe: {}, obs: "" }, { id: "p3", rotulo: "P2 · Vigilante Honda", pessoaId: "", pessoaNome: "", situacao: "presente", detalhe: {}, obs: "" }] };
+  let lista = colabs; // ainda sem equipe montada
+  await montar({ loadMapa: jest.fn(async () => existente), loadColaboradores: jest.fn(async () => lista) });
+  expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("d"); // escolha manual preservada
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("");
+  lista = colabsEq; // o líder montou a equipe em Equipe
+  await clicar(botao("Puxar de novo"));
+  expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("d"); // continua o manual
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c"); // preencheu o vazio
+});
