@@ -1,7 +1,7 @@
 // Tela × PDF: mesmo motor, mesma referência de data (dados fictícios).
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import MaturidadeResumo, { IndiceIndividual } from './MaturidadeResumo';
+import MaturidadeResumo, { IndiceIndividual, dataBR } from './MaturidadeResumo';
 import { calcularMapaEquipe, rotuloTreinamentos } from './maturidade';
 import { gerarMapaEquipeHTML } from '../relatorios/mapaEquipeRelatorio';
 const HOJE = '2026-10-09';
@@ -31,4 +31,12 @@ test('equivalência tela × PDF: mesmos números', () => {
   expect(pdf).toContain(`${m.treinamentos.comRegistro12m} de ${m.treinamentos.total} · ${Math.round(m.treinamentos.percentual12m)}%`);
   expect(tela).toContain(`${Math.round(m.indice)}/100`); expect(pdf).toContain(`>${Math.round(m.indice)}<`);
   expect(tela).toContain(m.classe); expect(pdf).toContain(m.classe);
+});
+
+test('data de referência da maturidade em dd/mm/aaaa (sem ISO na tela)', () => {
+  const html = renderToStaticMarkup(<MaturidadeResumo equipe={[]} hoje="2026-10-11" />);
+  expect(html).toContain('Referência 11/10/2026');
+  expect(html).not.toContain('2026-10-11');
+  expect(dataBR('2026-01-05')).toBe('05/01/2026');
+  expect(dataBR('')).toBe('');
 });
