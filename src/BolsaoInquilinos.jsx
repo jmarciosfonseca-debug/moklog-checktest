@@ -1,4 +1,4 @@
-import { Ico } from "./Icones";
+import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -158,7 +158,7 @@ function PinGate({ project, onSuccess, onBack, dark }){
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>🅿️</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="estacionamento"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Checagem de Bolsão</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
@@ -273,7 +273,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px 10px"}}>
       <button onClick={()=>{ if(screen==="list") onBack(); else setScreen("list"); }} style={S.backBtn}>←</button>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:15,fontWeight:800,...S.txt}}>🅿️ Checagem de Bolsão</div>
+        <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="estacionamento"/> Checagem de Bolsão</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
       </div>
       {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
@@ -291,7 +291,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
             {[["interno","🏠 Interno"],["externo","🌐 Externo"]].map(([v,l])=>(
               <button key={v} onClick={()=>setTipo(v)} style={{flex:1,padding:"11px",borderRadius:8,fontWeight:800,fontSize:13,cursor:"pointer",
                 border:`1px solid ${tipo===v?"#f59e0b":(dark?"#0f172a":"#e2e8f0")}`,background:tipo===v?"#f59e0b22":(dark?"#020510":"#fff"),
-                color:tipo===v?"#f59e0b":(dark?"#64748b":"#94a3b8")}}>{l}</button>
+                color:tipo===v?"#f59e0b":(dark?"#64748b":"#94a3b8")}}><IcoTxt>{l}</IcoTxt></button>
             ))}
           </div>
           <label style={S.lbl}>Líder responsável pela checagem</label>

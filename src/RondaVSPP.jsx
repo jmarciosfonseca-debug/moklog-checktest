@@ -124,12 +124,12 @@ function gerarPDFRondaVSPP(project, reg, todosRegistros){
   @media print{body{padding:8px}@page{margin:10mm;size:A4 landscape}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
 </style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+  <button onclick="window.print()" style="background:#0f6e56;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">Imprimir / Salvar PDF</button>
 </div>
 <div class="header">
   <div>
     <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">🚗 Ronda VSPP — Turno Diurno</h1>
+    <h1 style="font-size:18px;font-weight:900;margin-bottom:3px">Ronda VSPP — Turno Diurno</h1>
     <p style="font-size:12px;opacity:.85">${project.id} — Golgi Cajamar · ${fmtDate(reg.data)}</p>
   </div>
   <div style="text-align:right;font-size:11px;opacity:.8">
@@ -154,18 +154,18 @@ ${(reg.kmInicial||reg.kmFinal)?`<div class="km-box">
 
 <div class="grid-2">
   <div class="section" style="margin-bottom:0">
-    <div class="section-title">🗺️ Rota de Ronda VSPP — P601 Golgi Cajamar</div>
+    <div class="section-title">Rota de Ronda VSPP — P601 Golgi Cajamar</div>
     <img src="data:image/jpeg;base64,${MAPA_B64}" alt="Rota de Ronda VSPP" style="width:100%;border-radius:6px"/>
   </div>
   <div class="section" style="margin-bottom:0">
-    <div class="section-title">📋 Registro por Horário</div>
+    <div class="section-title">Registro por Horário</div>
     <table><thead><tr><th>Horário</th><th>Status</th><th>Observação</th><th>Hora real</th></tr></thead>
     <tbody>${zoneRows}</tbody></table>
   </div>
 </div>
 
 ${historico.length?`<div class="section" style="margin-top:12px">
-  <div class="section-title">📈 Histórico — Últimos ${historico.length} Dia(s)</div>
+  <div class="section-title">Histórico — Últimos ${historico.length} Dia(s)</div>
   <table><thead><tr><th>Data</th><th>Executor</th><th style="text-align:center">✓ Feitas</th><th style="text-align:center">✗ Não feitas</th><th style="text-align:center">Pendentes</th><th>KM</th></tr></thead>
   <tbody>${histRows}</tbody></table>
 </div>`:""}
