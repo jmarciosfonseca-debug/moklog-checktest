@@ -31,18 +31,30 @@ import {
 } from "firebase/firestore";
 import { isDemo } from "./session";
 
+// Offline: o Firestore (cache persistente) guarda a escrita numa fila local e
+// sobe quando a conexão volta, mas a Promise só resolve com o servidor. Para a
+// tela não ficar "salvando…" para sempre, offline devolvemos já — o dado está
+// na fila do aparelho e sincroniza sozinho ao reconectar.
+const _offline = () => typeof navigator !== "undefined" && navigator.onLine === false;
+function _viaFila(p) {
+  p.catch((e) => { try { console.error("[offline] escrita pendente falhou:", e); } catch {} });
+}
+
 export async function setDoc(...args) {
   if (isDemo()) return;            // 🎭 demo: simula sucesso sem gravar
+  if (_offline()) { _viaFila(_setDoc(...args)); return; }
   return _setDoc(...args);
 }
 
 export async function updateDoc(...args) {
   if (isDemo()) return;
+  if (_offline()) { _viaFila(_updateDoc(...args)); return; }
   return _updateDoc(...args);
 }
 
 export async function deleteDoc(...args) {
   if (isDemo()) return;
+  if (_offline()) { _viaFila(_deleteDoc(...args)); return; }
   return _deleteDoc(...args);
 }
 
