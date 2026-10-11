@@ -120,7 +120,7 @@ const STATUS_META = {
   feita_atrasada: { label:"Feita c/ atraso",color:"#f59e0b", bg:"#1a1000", icon:<><Ico n="cronometro"/></> },
   em_andamento:   { label:"Em andamento",   color:"#38bdf8", bg:"#04141f", icon:<><Ico n="ampulheta"/></> },
   naoexec:        { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:<><Ico n="xCirculo"/></> },
-  aguardando:     { label:"Aguardando",     color:"#64748b", bg:"transparent", icon:"🕓" },
+  aguardando:     { label:"Aguardando",     color:"#64748b", bg:"transparent", icon:<><Ico n="relogio"/></> },
   aberto:         { label:"Iniciar agora",  color:"#22c55e", bg:"#021a0d", icon:"▶" },
   atraso_aberto:  { label:"Atrasada",       color:"#f59e0b", bg:"#1a1000", icon:<><Ico n="alerta"/></> },
   bloqueado:      { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:<><Ico n="cadeado"/></> },
