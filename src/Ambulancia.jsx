@@ -209,14 +209,14 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   const salvarRascunho = () => {
     const ok = salvarRascunhoLocal(project.id, form);
     alert(ok
-      ? "📝 Rascunho salvo neste aparelho. Você pode continuar depois pelo botão Novo Registro.\n\n(As fotos não ficam no rascunho — anexe ao finalizar.)"
+      ? "Rascunho salvo neste aparelho. Você pode continuar depois pelo botão Novo Registro.\n\n(As fotos não ficam no rascunho — anexe ao finalizar.)"
       : "Não foi possível salvar o rascunho neste aparelho.");
   };
 
   const abrirEdicao = (reg) => {
     // Edição pós-salvo só para gerencial
     if(!adminAuth){
-      alert("✏️ A edição de um registro já salvo é exclusiva da gerência.\n\nVocê pode criar um novo registro normalmente.");
+      alert("A edição de um registro já salvo é exclusiva da gerência.\n\nVocê pode criar um novo registro normalmente.");
       return;
     }
     setForm({ ...blankReg(), ...reg });

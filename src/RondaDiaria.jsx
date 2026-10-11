@@ -1,4 +1,4 @@
-import { Ico } from "./Icones";
+import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { gerarConsolidadoPlantoesHTML } from "./relatorios/perimetralPlantao";
@@ -275,7 +275,7 @@ async function loadColaboradores(projectId){
   if(filtrados.length===0) filtrados = ativos; // cadastro só com cargos excluídos: não trava a operação
   return filtrados
     .sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)))
-    .map(c=>({ nome:c.nome, cargo: coberturaAtiva(c) ? `${c.cargo} 🔁 cobertura líder` : (c.cargo||"") }));
+    .map(c=>({ nome:c.nome, cargo: coberturaAtiva(c) ? `${c.cargo} (cobertura líder)` : (c.cargo||"") }));
 }
 
 function getStyles(dark) {
@@ -398,7 +398,7 @@ function montarSecaoPerimetral(project, plantoes){
 
   return `<div style="margin-bottom:20px">
     <div class="perim-head">
-    <h2 style="font-size:15px;margin:0 0 10px">🔒 Teste Perimetral — ${project.name||project.id}</h2>
+    <h2 style="font-size:15px;margin:0 0 10px">Teste Perimetral — ${project.name||project.id}</h2>
     <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
       <div class="kpi"><div class="kpi-val" style="color:#16a34a">${taxaOk}%</div><div class="kpi-lbl">Taxa OK</div></div>
       <div class="kpi"><div class="kpi-val" style="color:#2563eb">${acionOk}</div><div class="kpi-lbl">Acionamentos OK</div></div>
@@ -444,14 +444,14 @@ function gerarPdfConsolidado(project, plantoes, modo="ambos"){
         return `<span style="color:${st.corPdf};font-weight:700">${nomeZona(zi)} ${st.mark}</span>`;
       }).join(" · ");
       const probs = zonas.map((z,zi)=>({z,zi})).filter(o=>{const s=o.z.status||"ok";return s!=="ok"&&o.z.obs;});
-      return `<div style="font-size:11px;margin-bottom:6px">🔒 Teste Perimetral: ${zonas.length?marks:"realizado (sem zonas detalhadas)"}${per.obs?`<br><span style="color:#64748b">Obs: ${String(per.obs).replace(/</g,"&lt;")}</span>`:""}${probs.map(o=>`<br><span style="color:${(STATUS_ZONA[o.z.status]||STATUS_ZONA.ok).corPdf}">${nomeZona(o.zi)}: ${String(o.z.obs).replace(/</g,"&lt;")}</span>`).join("")}</div>`;
+      return `<div style="font-size:11px;margin-bottom:6px">Teste Perimetral: ${zonas.length?marks:"realizado (sem zonas detalhadas)"}${per.obs?`<br><span style="color:#64748b">Obs: ${String(per.obs).replace(/</g,"&lt;")}</span>`:""}${probs.map(o=>`<br><span style="color:${(STATUS_ZONA[o.z.status]||STATUS_ZONA.ok).corPdf}">${nomeZona(o.zi)}: ${String(o.z.obs).replace(/</g,"&lt;")}</span>`).join("")}</div>`;
     })() : "";
     return `<div class="plantao">
       <div class="plantao-head">
         <div><b>${t.icon} ${t.label}</b> · ${fmtData(p.dataPlantao)} · Responsável: ${p.lider||"—"}</div>
         <div class="badge ${p.enviado?"ok":"pend"}">${p.enviado?"Enviado":"Pendente"}</div>
       </div>
-      ${p.vestiario?.feito!=null?`<div style="font-size:11px;margin-bottom:6px;color:${p.vestiario.status==="anomalia"?"#dc2626":"#16a34a"}">🚿 Vestiário: ${p.vestiario.feito?(p.vestiario.status==="anomalia"?`⚠️ Anomalia — ${(p.vestiario.obs||"").replace(/</g,"&lt;")}`:"✅ OK"):"Não realizado"}</div>`:""}
+      ${p.vestiario?.feito!=null?`<div style="font-size:11px;margin-bottom:6px;color:${p.vestiario.status==="anomalia"?"#dc2626":"#16a34a"}">Vestiário: ${p.vestiario.feito?(p.vestiario.status==="anomalia"?`⚠️ Anomalia — ${(p.vestiario.obs||"").replace(/</g,"&lt;")}`:"✅ OK"):"Não realizado"}</div>`:""}
       ${perHtml}
       <table><thead><tr><th>#</th><th>Horário</th><th>Executante</th><th>Externa</th><th>Observação</th></tr></thead>
       <tbody>${linhas||'<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sem rondas registradas</td></tr>'}</tbody></table>
@@ -485,9 +485,9 @@ function gerarPdfConsolidado(project, plantoes, modo="ambos"){
 </style></head>
 <body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
+  <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">Imprimir / Salvar PDF</button>
 </div>
-<h1>${modo==="perim"?"🔒 Teste Perimetral":"🚶 Ronda Perimetral Diária"} — Consolidado ${project.id}</h1>
+<h1>${modo==="perim"?"Teste Perimetral":"Ronda Perimetral Diária"} — Consolidado ${project.id}</h1>
 <div class="sub">${project.name||""} · Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>
 ${incluirRondas?`<div class="kpis">
   <div class="kpi"><div class="kpi-val">${plantoes.length}</div><div class="kpi-lbl">Plantões</div></div>
@@ -1033,7 +1033,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           return (
             <div style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <label style={S.lbl}>🚿 Ronda Vestiário</label>
+                <label style={S.lbl}><IcoTxt>{"🚿 Ronda Vestiário"}</IcoTxt></label>
                 <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",!marcado)}
                   style={{...S.btnSm,fontSize:12,padding:"7px 14px",color:marcado?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:marcado?"#22c55e44":undefined,opacity:travado?.6:1}}>
                   {marcado?<><Ico n="check"/>{" Feita"}</>:"Marcar como feita"}
