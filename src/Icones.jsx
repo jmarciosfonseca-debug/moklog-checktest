@@ -79,7 +79,7 @@ const T = {
 };
 
 // Pontos de status coloridos (substituem as bolinhas 🔴🟢🟡…) — cor fixa de semáforo.
-const PONTOS = { pontoVermelho: "#ef4444", pontoVerde: "#22c55e", pontoAmarelo: "#eab308", pontoLaranja: "#f97316", pontoAzul: "#3b82f6", pontoRoxo: "#a855f7", pontoPreto: "#475569" };
+const PONTOS = { pontoVermelho: "#ef4444", pontoVerde: "#22c55e", pontoAmarelo: "#eab308", pontoLaranja: "#f97316", pontoAzul: "#3b82f6", pontoRoxo: "#a855f7", pontoPreto: "#94a3b8" };
 
 export function Ico({ n, size = "1.1em", style, title }) {
   const base = { verticalAlign: "-0.2em", flexShrink: 0, display: "inline-block", ...style };
