@@ -5,7 +5,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado } from "./modelo";
 import { resumoLancamento } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
@@ -34,6 +34,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [itensMat, setItensMat] = useState([]);
   const [avisoEquipe, setAvisoEquipe] = useState("");
   const [fichaMsg, setFichaMsg] = useState(null);
+  const [confirmouResumo, setConfirmouResumo] = useState(false);
   const [matAberto, setMatAberto] = useState(false);
   const carregadoRef = useRef(false);
   const timer = useRef(null);
@@ -122,6 +123,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     const erros = validarParaConcluir(mapa, contaveis);
     setAvisos(erros);
     if (erros.length) return;
+    // Resumo cita extra/FT/falta/atraso sem exceção marcada: avisa uma vez; tocando de novo, envia assim mesmo.
+    const aviso = avisoResumoSemExcecao(mapa);
+    if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
     const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapa.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapa.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); }
@@ -354,7 +358,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
           <div style={S.card}>
             <div style={S.h}>Resumo da passagem</div>
-            <textarea aria-label="Resumo da passagem" rows={3} placeholder="Preleção, ocorrências, pendências para o próximo turno" value={mapa.resumo} onChange={(e) => alterar((m) => ({ ...m, resumo: e.target.value }))} style={S.in} />
+            <textarea aria-label="Resumo da passagem" rows={3} placeholder="Preleção, ocorrências, pendências para o próximo turno" value={mapa.resumo} onChange={(e) => { setConfirmouResumo(false); alterar((m) => ({ ...m, resumo: e.target.value })); }} style={S.in} />
           </div>
 
           {avisos.length > 0 && <div role="alert" style={{ ...S.card, borderColor: "#dc2626" }}>{avisos.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#dc2626", marginBottom: 4 }}>{a}</div>)}</div>}

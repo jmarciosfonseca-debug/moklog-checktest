@@ -1,4 +1,4 @@
-import { novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
+import { avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 const H = { inicio: "06:00", fim: "18:00" };
@@ -222,5 +222,33 @@ describe("base do Codex por projeto", () => {
   });
   test("projeto fora da base e sem cadastro continua vazio", () => {
     expect(itensDeEquipamento(null, "P999", "D")).toEqual([]);
+  });
+});
+
+describe("texto do WhatsApp: um bloco por assunto", () => {
+  test("linha em branco entre equipe, faltas, material, veículo, supervisão e resumo", () => {
+    let m = preencher(mapa({ supervisao: { ultimaData: "2026-10-09", supervisor: "Marcio", turno: "Diurno" }, resumo: "Sem novidades." }), ["A", "B", "C"]);
+    m = { ...m, veiculos: [{ rotulo: "Moto", kmAnterior: 1200, kmAtual: 1262 }] };
+    const blocos = montarTextoWhatsApp(m).split("\n\n");
+    expect(blocos.map((b) => b.split("\n")[0].replace(/\*/g, "").split(":")[0])).toEqual(["MAPA DE EQUIPE", "Equipe", "Faltas/atrasos/FT/trocas", "Material (armamento, munição, rádios)", "Moto", "Última visita da supervisão", "Resumo da passagem"]);
+    expect(blocos[1].split("\n")).toHaveLength(4); // título + 3 postos
+  });
+  test("veículo sem nenhuma leitura não vira linha 'Veículo 2: —'", () => {
+    const m = { ...preencher(mapa(), ["A", "B", "C"]), veiculos: [{ rotulo: "Moto", kmAtual: 27854 }, { rotulo: "Veículo 2" }] };
+    const t = montarTextoWhatsApp(m);
+    expect(t).toContain("*Moto:* atual 27854");
+    expect(t).not.toContain("Veículo 2");
+  });
+});
+describe("resumo que fala de exceção sem posto marcado", () => {
+  const base = preencher(mapa(), ["A", "B", "C"]);
+  test("avisa quando cita extra/FT/falta/atraso e nenhum posto é exceção", () => {
+    expect(avisoResumoSemExcecao({ ...base, resumo: "Informo que a vigilante Rosemeire está trabalhando em caráter de extra." })).toMatch(/"extra"/);
+    expect(avisoResumoSemExcecao({ ...base, resumo: "Houve atraso do CCO." })).toMatch(/"atraso"/);
+  });
+  test("não avisa sem palavra de exceção, nem quando já há posto marcado, nem em palavra parecida", () => {
+    expect(avisoResumoSemExcecao({ ...base, resumo: "Pneu da moto furado. Extrato conferido." })).toBe("");
+    const comFt = { ...base, resumo: "Rosemeire de extra", postos: base.postos.map((p, i) => (i === 0 ? { ...p, situacao: "ft" } : p)) };
+    expect(avisoResumoSemExcecao(comFt)).toBe("");
   });
 });

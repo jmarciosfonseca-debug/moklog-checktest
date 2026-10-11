@@ -163,6 +163,17 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
   return erros;
 }
 
+// O resumo (texto livre) fala de extra/FT/falta/atraso/cobertura/troca, mas nenhum posto foi marcado como exceção:
+// o mapa sairia "Sem ocorrências" e a ficha não receberia nada. Devolve o aviso (ou "") para o líder conferir.
+const PALAVRAS_EXCECAO = /(^|[^a-zà-ú])(extra|ft|folga trabalhada|falta|faltas|faltou|atraso|atrasou|atrasada|cobrindo|cobertura|troca|permuta)(?![a-zà-ú])/i;
+export function avisoResumoSemExcecao(mapa) {
+  const texto = `${mapa.resumo || ""} ${mapa.observacoes || ""}`;
+  const m = PALAVRAS_EXCECAO.exec(texto);
+  if (!m) return "";
+  if ((mapa.postos || []).some((p) => p.situacao && p.situacao !== "presente")) return "";
+  return `O resumo fala de "${m[2]}", mas nenhum posto está marcado como Falta, FT, Atraso, Cobertura ou Troca. Marque no posto (botão Exceção): é isso que vai para "Faltas/atrasos/FT/trocas" e para a ficha.`;
+}
+
 // Exceções do turno (o que o gerencial e o líder precisam enxergar rápido).
 export function excecoesDoMapa(mapa) {
   return (mapa.postos || []).filter((p) => p.situacao && p.situacao !== "presente");
