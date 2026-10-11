@@ -4,6 +4,7 @@
 import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { setDoc } from "../fireGuard";
+import { diasEntre } from "./regras";
 
 const db = () => {
   const app = getApps()[0];
@@ -19,7 +20,7 @@ export async function loadColaboradores(pid, hojeISO) {
     .map((f) => f.colabId));
   return (d.colaboradores || [])
     .filter((c) => c.status === "ativo")
-    .map((c) => ({ id: c.id, nome: c.nome || "", cargo: c.cargo || "", turno: c.turno || "", emFerias: ferias.has(c.id) }))
+    .map((c) => ({ id: c.id, nome: c.nome || "", cargo: c.cargo || "", turno: c.turno || "", emFerias: ferias.has(c.id), equipeLiderId: c.equipeLiderId || null }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
@@ -35,10 +36,12 @@ export async function loadMapa(pid, chave) {
 }
 
 // Último mapa já enviado do mesmo turno, anterior a `antesDe` (serve de base para pré-preencher).
+// 12x36 (`gapPar`): a turma só volta a cada 2 dias, então só vale mapa com número PAR de dias de diferença
+// (o de ontem é da outra turma).
 // Ordena só por data (sem índice composto) e filtra no cliente.
-export async function loadUltimoMapa(pid, turno, antesDe) {
+export async function loadUltimoMapa(pid, turno, antesDe, { gapPar = false } = {}) {
   const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(14)));
-  const lista = snap.docs.map((d) => d.data()).filter((m) => m.turno === turno && m.status === "enviado" && m.data < antesDe);
+  const lista = snap.docs.map((d) => d.data()).filter((m) => m.turno === turno && m.status === "enviado" && m.data < antesDe && (!gapPar || Math.abs(diasEntre(m.data, antesDe)) % 2 === 0));
   return lista[0] || null;
 }
 

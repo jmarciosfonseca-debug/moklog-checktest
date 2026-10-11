@@ -14,6 +14,7 @@ const colabs = [
   { id: "c", nome: "Ari A.", cargo: "Vigilante Ronda", turno: "Diurno", emFerias: false },
   { id: "d", nome: "Joao V.", cargo: "Vigilante Ronda", turno: "Folguista", emFerias: false },
 ];
+const BASE601 = { postos: [["Líder", "a"], ["VSPP Apoio", "b"], ["VSPP P1", "c"], ["CCO", "d"], ["CDA", "a2"]].map(([rotulo, id]) => ({ rotulo, pessoaId: id, pessoaNome: id })), veiculos: [] };
 let host, root, io, salvos;
 const montar = async (extraTodo = {}) => {
   const { __pid, ...extra } = extraTodo;
@@ -42,8 +43,8 @@ test("abre pré-preenchido do último mapa, com cabeçalho pela data e supervis�
   await montar();
   expect(host.textContent).toContain("Domingo, 11/10/2026");
   expect(host.textContent).toContain("Diurno 06h00–18h00");
-  expect(q('select[aria-label="Quem está no posto L1"]').value).toBe("a");
-  expect(q('select[aria-label="Quem está no posto P2"]').value).toBe("c");
+  expect(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]').value).toBe("a");
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c");
   expect(host.textContent).toContain("09/10/2026 — Marcio (Diurno)");
   expect(host.textContent).toContain("anterior 1200");
   expect(q('input[type="checkbox"]').checked).toBe(true); // material sem alteração já marcado
@@ -51,7 +52,7 @@ test("abre pré-preenchido do último mapa, com cabeçalho pela data e supervis�
 });
 test("concluir só grava depois de validar; atraso exige hora ou minutos", async () => {
   await montar();
-  await abrirExc("L1");
+  await abrirExc("L1 · Vigilante Líder");
   await clicar(botao("Atraso")); // primeiro posto (L1)
   await clicar(botao("Concluir mapa"));
   expect(q('[role="alert"]').textContent).toContain("informe a hora de chegada ou os minutos");
@@ -76,20 +77,20 @@ test("depois de gravar mostra o texto e o link do WhatsApp", async () => {
   expect(host.textContent).toContain("Mapa gravado");
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
   expect(t).toContain("*MAPA DE EQUIPE*");
-  expect(t).toContain("• L1: Luiz D.");
+  expect(t).toContain("• L1 · Vigilante Líder: Luiz D.");
   expect(t).toContain("Sem ocorrências");
   expect(q('a[href^="https://wa.me/?text="]')).not.toBeNull();
 });
 test("troca não é FT e exige 'no lugar de quem'", async () => {
   await montar();
-  await abrirExc("P1");
+  await abrirExc("P1 · Vigilante CCO");
   await clicar(botao("Troca")); // P1
   await clicar(botao("Concluir mapa"));
-  expect(q('[role="alert"]').textContent).toContain("P1: troca no lugar de quem?");
+  expect(q('[role="alert"]').textContent).toContain("P1 · Vigilante CCO: troca no lugar de quem?");
   await digitar(q('select[aria-label="Troca no lugar de quem"]'), "d");
   await clicar(botao("Concluir mapa"));
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("• P1: Marta A. — troca de plantão, no lugar de Joao V.");
+  expect(t).toContain("• P1 · Vigilante CCO: Marta A. — troca de plantão, no lugar de Joao V.");
   expect(t).not.toContain("FT (folga trabalhada)");
 });
 test("autosalva o rascunho depois de alterar", async () => {
@@ -159,7 +160,7 @@ test("sem cadastro, a lista de referência do projeto (base do Codex) aparece no
 });
 
 test("P601: placas sem quantidade na base — líder informa, não conclui sem, e vai no WhatsApp", async () => {
-  await montar({ __pid: "P601", loadEquipamentos: jest.fn(async () => null) });
+  await montar({ __pid: "P601", loadEquipamentos: jest.fn(async () => null), loadUltimoMapa: jest.fn(async () => BASE601) });
   expect(q('input[aria-label="Quantidade: Par de placas balísticas"]')).not.toBeNull();
   await clicar(botao("Concluir mapa"));
   expect(q('[role="alert"]').textContent).toContain("Material — informe a quantidade de Par de placas balísticas");
@@ -170,10 +171,35 @@ test("P601: placas sem quantidade na base — líder informa, não conclui sem, 
   expect(salvos[0].material.quantidades["placas:Par de placas balísticas"]).toEqual({ nome: "Par de placas balísticas", qtd: "3" });
 });
 test("P601: a quantidade informada abre preenchida no próximo mapa", async () => {
-  await montar({ __pid: "P601", loadEquipamentos: jest.fn(async () => null), loadUltimoMapa: jest.fn(async () => ({ postos: [], veiculos: [], material: { quantidades: { "placas:Par de placas balísticas": { nome: "Par de placas balísticas", qtd: "3" } } } })) });
+  await montar({ __pid: "P601", loadEquipamentos: jest.fn(async () => null), loadUltimoMapa: jest.fn(async () => ({ postos: BASE601.postos, veiculos: [], material: { quantidades: { "placas:Par de placas balísticas": { nome: "Par de placas balísticas", qtd: "3" } } } })) });
   expect(q('input[aria-label="Quantidade: Par de placas balísticas"]').value).toBe("3");
 });
 test("P311B: sem item de quantidade desconhecida não aparece o bloco de contagem", async () => {
   await montar();
   expect(host.textContent).not.toContain("CONTE E INFORME A QUANTIDADE");
+});
+
+const colabsEq = colabs.map((c) => ({ ...c, equipeLiderId: c.id === "b" || c.id === "c" ? "a" : null }));
+test("12x36: escolher o líder puxa a equipe montada em Equipes, automaticamente", async () => {
+  await montar({ loadUltimoMapa: jest.fn(async () => null), loadColaboradores: jest.fn(async () => colabsEq) });
+  expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("");
+  await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
+  expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("b");
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c");
+  expect(host.textContent).toContain("Equipe de Luiz D. puxada da montagem em Equipes (2 postos)");
+});
+test("12x36: líder sem equipe montada avisa e deixa escolher à mão", async () => {
+  await montar({ loadUltimoMapa: jest.fn(async () => null) });
+  await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
+  expect(host.textContent).toContain("Luiz D. ainda não tem equipe montada em Equipes");
+});
+test("12x36: a base é buscada só de turma par (mesma turma)", async () => {
+  await montar();
+  expect(io.loadUltimoMapa).toHaveBeenCalledWith("P311B", "D", "2026-10-11", { gapPar: true });
+});
+test("P505 (4x2): não puxa nem repete ninguém e avisa o líder", async () => {
+  await montar({ __pid: "P505", loadEquipamentos: jest.fn(async () => null) });
+  expect(host.textContent).toContain("a equipe muda a cada plantão e não é puxada sozinha");
+  expect(q('select[aria-label="Quem está no posto VSPP Líder"]').value).toBe("");
+  expect(io.loadUltimoMapa).toHaveBeenCalledWith("P505", "D", "2026-10-11", { gapPar: false });
 });

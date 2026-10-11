@@ -1,6 +1,7 @@
 // Tela "Mapa de Equipe diário" do projeto: o líder preenche as exceções e conclui; sai o texto do WhatsApp.
 // O mapa abre pré-preenchido (último mapa enviado do mesmo turno). Autosalva o rascunho.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
@@ -30,6 +31,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [copiado, setCopiado] = useState(false);
   const [abertos, setAbertos] = useState({});
   const [itensMat, setItensMat] = useState([]);
+  const [avisoEquipe, setAvisoEquipe] = useState("");
   const [matAberto, setMatAberto] = useState(false);
   const carregadoRef = useRef(false);
   const timer = useRef(null);
@@ -46,7 +48,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         const [cs, existente] = await Promise.all([io.loadColaboradores(pid, data), io.loadMapa(pid, chaveMapa(pid, data, turno))]);
         let m = existente;
         if (!m) {
-          const base = await io.loadUltimoMapa(pid, turno, data).catch(() => null);
+          const base = await io.loadUltimoMapa(pid, turno, data, { gapPar: projetoPuxaEquipe(pid) }).catch(() => null);
           m = novoMapa({ projetoId: pid, data, turno, horario: horario ? { inicio: horario.inicio, fim: horario.fim } : null, base, agora: agoraFn() });
         }
         if (m.status !== "enviado") {
@@ -55,6 +57,13 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         }
         const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
         if (!vivo) return;
+        let aviso = "";
+        if (m.status !== "enviado" && projetoPuxaEquipe(pid)) {
+          const lp = (m.postos || []).find((p) => p.lider && p.pessoaId);
+          const lc = lp && cs.find((c) => c.id === lp.pessoaId);
+          if (lc) { const r = puxarEquipe({ postos: m.postos, lider: lc, colabs: cs, pid, turno }); m = { ...m, postos: r.postos }; aviso = r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${lc.nome} puxada da montagem em Equipes. Ajuste só o que mudou.`; }
+        }
+        setAvisoEquipe(aviso);
         setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid, turno));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
@@ -81,6 +90,13 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const escolherPessoa = (id, valor) => {
     if (valor === "__outro") return setPosto(id, { pessoaId: "", pessoaNome: "", detalhe: { livre: true } });
     const c = colabs.find((x) => x.id === valor);
+    const alvo = mapa.postos.find((p) => p.id === id);
+    // Escolheu o líder: a equipe montada por ele (Equipe → Montagem) entra sozinha nos demais postos.
+    if (alvo && alvo.lider && c && projetoPuxaEquipe(pid)) {
+      const r = puxarEquipe({ postos: mapa.postos.map((p) => (p.id === id ? { ...p, pessoaId: c.id, pessoaNome: c.nome, detalhe: {} } : p)), lider: c, colabs, pid, turno, limparSeSemEquipe: true });
+      setAvisoEquipe(r.semEquipe ? `${c.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${c.nome} puxada da montagem em Equipes (${r.puxados} ${r.puxados === 1 ? "posto" : "postos"}). Ajuste só o que mudou.`);
+      return alterar((m) => ({ ...m, postos: r.postos }));
+    }
     setPosto(id, { pessoaId: c ? c.id : "", pessoaNome: c ? c.nome : "", detalhe: {} });
   };
 
@@ -156,6 +172,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         {mapa && !carregando && (<>
           <div style={S.card}>
             <div style={S.h}>Equipe do turno</div>
+            {!projetoPuxaEquipe(pid) && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Projeto 4x2/5x2: a equipe muda a cada plantão e não é puxada sozinha. Escolha quem está em cada posto.</div>}
+            {projetoPuxaEquipe(pid) && avisoEquipe && <div role="status" style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>{avisoEquipe}</div>}
+            {projetoPuxaEquipe(pid) && !avisoEquipe && mapa.preenchidoDe && mapa.status !== "enviado" && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Pré-preenchido com o mapa de {mapa.preenchidoDe.data ? dataBR(mapa.preenchidoDe.data) : "dias atrás"} ({mapa.preenchidoDe.turno === "N" ? "noturno" : "diurno"}), mesma turma. Confira.</div>}
             {repetidas.length > 0 && <div role="alert" style={{ fontSize: 12, color: "#f59e0b", marginBottom: 8 }}>Atenção: {repetidas.map((r) => `${r.pessoa} em ${r.postos.join(" e ")}`).join("; ")}</div>}
             {mapa.postos.map((p) => (
               <div key={p.id} style={{ borderTop: `1px solid ${cor.line}`, padding: "10px 0" }}>

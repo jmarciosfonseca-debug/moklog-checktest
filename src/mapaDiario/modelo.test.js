@@ -6,12 +6,22 @@ const mapa = (extra = {}) => ({ ...novoMapa({ projetoId: "P311B", data: "2026-10
 const preencher = (m, nomes) => ({ ...m, postos: m.postos.map((p, i) => ({ ...p, pessoaId: `c${i}`, pessoaNome: nomes[i] })) });
 
 test("postos de partida seguem o mapeamento confirmado", () => {
-  expect(postosPadrao("P311B", "D").map((p) => p.rotulo)).toEqual(["L1", "P1", "P2"]);
-  expect(postosPadrao("P311A", "D").map((p) => p.rotulo)).toEqual(["Líder", "Tático", "Apoio", "Portaria"]);
-  expect(postosPadrao("P311A", "N").map((p) => p.rotulo)).toEqual(["Líder", "Tático", "Portaria"]);
+  expect(postosPadrao("P311B", "D").map((p) => p.rotulo)).toEqual(["L1 · Vigilante Líder", "P1 · Vigilante CCO", "P2 · Vigilante Honda"]);
+  expect(postosPadrao("P311A", "D").map((p) => p.rotulo)).toEqual(["Vigilante Líder", "Vigilante Apoio", "Vigilante Tático", "Porteiro CCO"]);
+  expect(postosPadrao("P311A", "N").map((p) => p.rotulo)).toEqual(["Vigilante Líder", "Vigilante Tático", "Porteiro CCO"]);
   expect(postosPadrao("P605", "D")[0].rotulo).toBe("Líder/CCO");
-  expect(postosPadrao("P601", "D").find((p) => p.rotulo === "VSPP Apoio").horario).toEqual({ inicio: "08:00", fim: "20:00" });
+  expect(postosPadrao("P601", "D").find((p) => p.rotulo === "VSPP Apoio/Ronda").horario).toEqual({ inicio: "08:00", fim: "20:00" });
   expect(postosPadrao("P999", "D").length).toBe(3);
+  expect(postosPadrao("P607", "D").map((p) => p.rotulo)).toEqual(["Vigilante Honda", "AGP CCO", "Vigilante Pista", "AGP Portaria"]);
+  expect(postosPadrao("P607", "N").map((p) => p.rotulo)).toEqual(["Vigilante Honda", "AGP CCO", "Vigilante Pista"]);
+  expect(postosPadrao("P505", "D").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO", "VSPP Ronda", "CDA"]);
+  expect(postosPadrao("P505", "N").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO", "CDA"]);
+  expect(postosPadrao("P260B", "D").map((p) => p.rotulo)).toEqual(["VSPP"]);
+  expect(postosPadrao("P260C", "N").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante"]);
+  expect(postosPadrao("P604", "D").map((p) => p.rotulo)).toContain("Recepção");
+  expect(postosPadrao("P605", "D").map((p) => p.rotulo)).toContain("Recepção");
+  expect(postosPadrao("P260A", "D", "2026-10-12").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio 1", "VSPP Apoio 2", "Vigilante CCO"]);
+  expect(postosPadrao("P260A", "D", "2026-10-11").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante CCO"]);
 });
 test("mapa novo: rascunho, material sem alteração já marcado, todos presentes", () => {
   const m = mapa();
@@ -23,7 +33,7 @@ test("mapa novo: rascunho, material sem alteração já marcado, todos presentes
 test("pré-preenche do mapa anterior: mesmas pessoas, situação zerada e km anterior = km atual do último", () => {
   const ant = { postos: [{ rotulo: "L1", pessoaId: "a", pessoaNome: "Ana", situacao: "falta" }, { rotulo: "P1", pessoaId: "b", pessoaNome: "Bia" }], veiculos: [{ id: "moto", rotulo: "Moto", kmAtual: 1200 }] };
   const m = novoMapa({ projetoId: "P311B", data: "2026-10-13", turno: "D", horario: H, base: ant });
-  expect(m.postos.map((p) => [p.rotulo, p.pessoaNome, p.situacao])).toEqual([["L1", "Ana", "presente"], ["P1", "Bia", "presente"]]);
+  expect(m.postos.map((p) => [p.rotulo, p.pessoaNome, p.situacao])).toEqual([["L1 · Vigilante Líder", "Ana", "presente"], ["P1 · Vigilante CCO", "Bia", "presente"], ["P2 · Vigilante Honda", "", "presente"]]);
   expect(m.veiculos[0]).toMatchObject({ kmAnterior: 1200, kmAtual: null });
 });
 test("pode concluir quando todos os postos têm pessoa e nada pendente", () => {
@@ -58,9 +68,9 @@ test("quilometragem: rodado = atual − anterior; negativo bloqueia", () => {
 test("exceções e pessoas repetidas", () => {
   const m = preencher(mapa(), ["A", "B", "C"]);
   const x = { ...m, postos: m.postos.map((p, i) => (i === 1 ? { ...p, situacao: "falta" } : p)) };
-  expect(excecoesDoMapa(x).map((p) => p.rotulo)).toEqual(["P1"]);
+  expect(excecoesDoMapa(x).map((p) => p.rotulo)).toEqual(["P1 · Vigilante CCO"]);
   const dup = { ...m, postos: m.postos.map((p, i) => (i === 2 ? { ...p, pessoaId: "c0", pessoaNome: "A" } : p)) };
-  expect(pessoasRepetidas(dup)).toEqual([{ pessoa: "A", postos: ["L1", "P2"] }]);
+  expect(pessoasRepetidas(dup)).toEqual([{ pessoa: "A", postos: ["L1 · Vigilante Líder", "P2 · Vigilante Honda"] }]);
   expect(pessoasRepetidas(m)).toEqual([]);
 });
 
@@ -73,7 +83,7 @@ describe("texto do WhatsApp", () => {
     expect(t).toContain("*Projeto:* P311B — Mega Itajaí B");
     expect(t).toContain("*Turno:* Diurno 06h00–18h00");
     expect(t).toContain("*Data:* Domingo, 11/10/2026");
-    expect(t).toContain("• L1: Luiz D.");
+    expect(t).toContain("• L1 · Vigilante Líder: Luiz D.");
     expect(t).toContain("*Faltas/atrasos/FT/trocas:* Sem ocorrências");
     expect(t).toContain("*Material (armamento, munição, rádios):* Sem alteração");
     expect(t).toContain("*Moto:* anterior 1200 · atual 1262 · rodado 62 km");
@@ -88,11 +98,11 @@ describe("texto do WhatsApp", () => {
       { ...m.postos[2], situacao: "cobertura", detalhe: { deQuem: "Edu", base: true } },
     ] };
     const t = montarTextoWhatsApp(x);
-    expect(t).toContain("• L1: Ana — atraso, chegou às 06h20 (20 min)");
-    expect(t).toContain("• P1: Bia — troca de plantão, no lugar de Dani");
-    expect(t).toContain("• P2: Caio (Base) — cobertura de Edu");
+    expect(t).toContain("• L1 · Vigilante Líder: Ana — atraso, chegou às 06h20 (20 min)");
+    expect(t).toContain("• P1 · Vigilante CCO: Bia — troca de plantão, no lugar de Dani");
+    expect(t).toContain("• P2 · Vigilante Honda: Caio (Base) — cobertura de Edu");
     expect(t).not.toMatch(/Bia.*FT/);
-    expect(t).toContain("L1 — Atraso; P1 — Troca; P2 — Cobertura");
+    expect(t).toContain("L1 · Vigilante Líder — Atraso; P1 · Vigilante CCO — Troca; P2 · Vigilante Honda — Cobertura");
   });
   test("P260B/C saem com cabeçalho P260-B/C; noturno e posto com horário próprio", () => {
     expect(cabecalhoProjeto("P260B")).toBe("P260-B");
@@ -103,7 +113,7 @@ describe("texto do WhatsApp", () => {
     expect(t).toContain("*Projeto:* P260-B");
     expect(t).toContain("*Turno:* Noturno 18h00–06h00");
     const p601 = preencher(novoMapa({ projetoId: "P601", data: "2026-10-11", turno: "D", horario: H }), ["a", "b", "c", "d", "e"]);
-    expect(montarTextoWhatsApp(p601)).toContain("• VSPP Apoio (08h00–20h00): b");
+    expect(montarTextoWhatsApp(p601)).toContain("• VSPP Apoio/Ronda (08h00–20h00): b");
   });
   test("link do WhatsApp codifica o texto", () => {
     expect(linkWhatsApp("a b\n*c*")).toBe("https://wa.me/?text=a%20b%0A*c*");
