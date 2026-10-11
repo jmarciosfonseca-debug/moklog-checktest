@@ -1,0 +1,113 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="golgi3-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-8" dy="16" stdDeviation="15" flood-color="#02141A" flood-opacity="0.9"/>
+    </filter>
+    <filter id="golgi3-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#559BA4" flood-opacity="0.75"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#84CC16" flood-opacity="0.5"/>
+    </filter>
+
+    <linearGradient id="golgi3-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#081E24" stop-opacity="0.96"/>
+      <stop offset="45%" stop-color="#041419" stop-opacity="0.94"/>
+      <stop offset="100%" stop-color="#010A0C" stop-opacity="0.98"/>
+    </linearGradient>
+    <radialGradient id="golgi3-glass-glow" cx="22%" cy="18%" r="75%">
+      <stop offset="0%" stop-color="#559BA4" stop-opacity="0.28"/>
+      <stop offset="40%" stop-color="#65A30D" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#081E24" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="golgi3-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#E6FFFA" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#559BA4" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#15803D" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#064E3B" stop-opacity="0.15"/>
+    </linearGradient>
+    <linearGradient id="golgi3-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="35%" stop-color="#99F6E4" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Cores Oficiais Golgi -->
+    <linearGradient id="golgi3-teal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8AC5CD"/>
+      <stop offset="40%" stop-color="#559BA4"/>
+      <stop offset="100%" stop-color="#285C64"/>
+    </linearGradient>
+    <linearGradient id="golgi3-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A3E635"/>
+      <stop offset="40%" stop-color="#84CC16"/>
+      <stop offset="100%" stop-color="#4D7C0F"/>
+    </linearGradient>
+
+    <clipPath id="golgi3-plaque-clip">
+      <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#golgi3-plaque-clip)">
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#golgi3-glass-base)"/>
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#golgi3-glass-glow)"/>
+    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#golgi3-specular-top)"/>
+<g transform="translate(512 512) scale(1.28) translate(-512 -455)">
+
+    <!-- Retícula Tática Moked ao fundo -->
+    <circle cx="512" cy="380" r="230" fill="none" stroke="#285C64" stroke-width="1.5" stroke-dasharray="10 8" opacity="0.35"/>
+    <line x1="512" y1="160" x2="512" y2="600" stroke="#559BA4" stroke-width="1.5" stroke-opacity="0.25"/>
+    <line x1="262" y1="380" x2="762" y2="380" stroke="#559BA4" stroke-width="1.5" stroke-opacity="0.25"/>
+
+    <!-- SÍMBOLO ORIGINAL DO INFINITO GOLGI EM ALTO RELEVO 3D -->
+    <g filter="url(#golgi3-shadow)">
+      <!-- Elo Esquerdo Teal (Azul-Petróleo da Marca) -->
+      <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M 512 380 
+               C 475 300, 385 270, 310 305 
+               C 235 340, 205 430, 240 505 
+               C 275 580, 365 610, 440 575 
+               C 475 560, 498 530, 512 495 
+               L 512 435 
+               C 498 460, 470 480, 420 495 
+               C 370 510, 310 490, 285 440 
+               C 260 390, 280 330, 330 305 
+               C 380 280, 440 300, 475 350 Z" 
+            fill="url(#golgi3-teal)" stroke="#CCFBF1" stroke-width="4" stroke-linejoin="round"/>
+
+      <!-- Elo Direito Lime Green (Verde-Limão da Marca) -->
+      <path fill-rule="evenodd" clip-rule="evenodd"
+            d="M 512 380 
+               C 549 300, 639 270, 714 305 
+               C 789 340, 819 430, 784 505 
+               C 749 580, 659 610, 584 575 
+               C 549 560, 526 530, 512 495 
+               L 512 435 
+               C 526 460, 554 480, 604 495 
+               C 654 510, 714 490, 739 440 
+               C 764 390, 744 330, 694 305 
+               C 644 280, 584 300, 549 350 Z" 
+            fill="url(#golgi3-green)" stroke="#ECFCCB" stroke-width="4" stroke-linejoin="round"/>
+
+      <!-- Riscas de Cruzamento Oficiais do Logotipo Golgi -->
+      <line x1="500" y1="355" x2="524" y2="355" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+      <line x1="495" y1="380" x2="529" y2="380" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+      <line x1="500" y1="405" x2="524" y2="405" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+    </g>
+
+    <!-- NOME OFICIAL GOLGI COM A TIPOGRAFIA EXATA DA MARCA -->
+    <text x="512" y="635" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" 
+          fill="#8AC5CD" letter-spacing="16" text-anchor="middle">GOLGI</text>
+
+    <!-- Ponto Focal Laser Moked Central -->
+    <circle cx="512" cy="380" r="10" fill="#FFFFFF" filter="url(#golgi3-glow)"/>
+
+    </g>
+<!-- Friso Interno -->
+    <rect x="55.2" y="55.2" width="913.6" height="913.6" rx="198.75" ry="198.75" 
+          fill="none" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.25"/>
+  </g>
+
+  <!-- Borda Externa Rim Light Completa -->
+  <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75" 
+        fill="none" stroke="url(#golgi3-rim-border)" stroke-width="7"/>
+</svg>
