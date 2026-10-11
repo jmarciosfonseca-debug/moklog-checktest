@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { getTheme } from "./generatePDF";
-import { solicitacoesPorAprovacao } from "./equipeAprovacao";
+import { solicitacoesPorAprovacao, situacaoSolicitacao } from "./equipeAprovacao";
 import { fmtBRL } from './equipeAprovacao';
 import { CAMPANHAS, totalCampanha } from './campanhasEquipe';
 import { LOGO_MOKED_30 } from './fvLogo';
@@ -265,6 +265,77 @@ export function gerarPDFAprovados(project, colaboradores, ano) {
   });
   abrir(html, `aprovados_${projectId}_${ano}.html`);
   return { colaboradores: grupos.length, itens: totalItens };
+}
+
+// ── Linhas de tabela com situação (aprovação/negação) ─────────────────
+const ROT_SIT = { aprovado: "Aprovado", negado: "Negado", aguardando: "Aguardando", legado: "Anterior" };
+function tabelaComSituacao(itens) {
+  const td = "padding:7px 9px;border-bottom:1px solid #e5e7eb;";
+  const linhas = itens.map(s => {
+    const sit = situacaoSolicitacao(s);
+    const cor = sit === "aprovado" ? "#15803d" : sit === "negado" ? "#b91c1c" : "#92400e";
+    const detalhe = [s.tamanho ? `Tam ${esc(s.tamanho)}` : "", s.marca ? esc(s.marca) : ""].filter(Boolean).join(" · ");
+    return `<tr>
+      <td style="${td}font-weight:600;">${esc(s.item || s.nome || "Material")}</td>
+      <td style="${td}">${detalhe || "—"} · Qtd ${esc(s.qtd ?? s.quantidade ?? 1)}</td>
+      <td style="${td}">${fmtBR(s.solicitadoEm)}</td>
+      <td style="${td}text-align:center;font-weight:700;color:${cor};">${ROT_SIT[sit] || sit}</td>
+      <td style="${td}text-align:center;">${s.aprovadoEm ? fmtBR(s.aprovadoEm) : "—"}${s.aprovadoPor ? ` · ${esc(s.aprovadoPor)}` : ""}</td>
+    </tr>`;
+  }).join("");
+  return `<table class="tbl"><thead><tr><th>Item</th><th>Detalhe</th><th>Solicitado em</th><th>Situação</th><th>Decisão</th></tr></thead><tbody>${linhas}</tbody></table>`;
+}
+function blocosPorColaborador(grupos) {
+  return grupos.map(x => `
+  <div class="bloco">
+    <div class="colab-hdr">
+      <div class="colab-nome">${esc(x.colab.nome || "Colaborador")}</div>
+      <div class="colab-func">${esc(x.colab.cargo || x.colab.funcao || "")}${x.colab.turno ? ` · ${esc(x.colab.turno)}` : ""} · ${x.itens.length} item(ns)</div>
+    </div>
+    ${tabelaComSituacao(x.itens)}
+  </div>`).join("");
+}
+
+// ── PDF de APROVAÇÃO do líder: só os itens selecionados para envio ────
+// grupos: [{ colab, solicitacoes }]
+export function gerarPDFAprovacaoLider(project, grupos) {
+  const projectId = project?.id || project;
+  const theme = getTheme(projectId);
+  const gs = (grupos || []).map(g => ({ colab: g.colab, itens: g.solicitacoes || [] })).filter(g => g.itens.length);
+  const totalItens = gs.reduce((n, g) => n + g.itens.length, 0);
+  const html = montarHTML({
+    theme, projectId,
+    titulo: "Aprovação de Material",
+    subtitulo: "Itens aprovados pelo gerencial",
+    metaTxt: `${totalItens} item(ns) · ${gs.length} colaborador(es)`,
+    corpo: gs.length ? blocosPorColaborador(gs) : `<div style="padding:24px;text-align:center;color:#64748b;">Nada selecionado.</div>`,
+    totalItens,
+  });
+  abrir(html, `aprovacao_${projectId}_${new Date().toLocaleDateString("sv-SE")}.html`);
+  return totalItens;
+}
+
+// ── PDF HISTÓRICO completo da lista (aprovadas, negadas e aguardando) ──
+export function gerarPDFHistoricoAprovacoes(project, colaboradores, ano) {
+  const projectId = project?.id || project;
+  const theme = getTheme(projectId);
+  const gs = (colaboradores || [])
+    .filter(c => (c.status || "ativo") === "ativo")
+    .map(c => ({ colab: c, itens: solicitacoesPorAprovacao(c, null, ano).filter(s => situacaoSolicitacao(s) !== "legado") }))
+    .filter(g => g.itens.length)
+    .sort((a, b) => String(a.colab.nome || "").localeCompare(String(b.colab.nome || ""), "pt-BR"));
+  const totalItens = gs.reduce((n, g) => n + g.itens.length, 0);
+  const cont = k => gs.reduce((n, g) => n + g.itens.filter(s => situacaoSolicitacao(s) === k).length, 0);
+  const html = montarHTML({
+    theme, projectId,
+    titulo: "Histórico de Aprovações",
+    subtitulo: `Lista completa · ${ano}`,
+    metaTxt: `${cont("aprovado")} aprovado(s) · ${cont("negado")} negado(s) · ${cont("aguardando")} aguardando`,
+    corpo: gs.length ? blocosPorColaborador(gs) : `<div style="padding:24px;text-align:center;color:#64748b;">Nenhuma solicitação em ${esc(ano)}.</div>`,
+    totalItens,
+  });
+  abrir(html, `historico_aprovacoes_${projectId}_${ano}.html`);
+  return totalItens;
 }
 
 // ── PDF Cesta de Natal ────────────────────────────────────────────────

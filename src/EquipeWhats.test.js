@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import {FolhaWhats,SeloWhats} from './EquipeWhats';
 import {ASSINATURA_APROVADOR} from './equipeSolicitacoes';
 import {UniformeModulo,AprovacaoInline,AprovacoesScreen} from './Equipe';
+import {PainelAprovacoesLider} from './EquipeWhats';
 jest.mock('firebase/app',()=>({getApps:()=>[{}],initializeApp:()=>({})}));
 jest.mock('firebase/firestore',()=>({getFirestore:()=>({})}));
 jest.mock('./session',()=>({isDemo:()=>false,getAccess:()=>null,getSession:()=>null}));
@@ -96,7 +97,7 @@ test('múltiplo registra uma vez e AVISA que aguarda aprovação: nada de WhatsA
  expect(solicitar).toHaveBeenCalledTimes(1);expect(solicitar.mock.calls[0][1]).toHaveLength(5);
  expect(host.textContent).toContain('Aguardando aprovação do gerencial');expect(host.querySelector('[role="dialog"]')).toBeNull();
  expect(window.open).not.toHaveBeenCalled();expect(btn('Enviar no WhatsApp')).toBeUndefined();
- const cartao=sol=><UniformeModulo colab={{...colab,uniforme:{...colab.uniforme,solicitacoes:sol}}} canManage projectNome="P260A"/>;
+ const cartao=sol=><UniformeModulo colab={{...colab,uniforme:{...colab.uniforme,solicitacoes:sol}}} canManage podeWhats projectNome="P260A"/>;
  await render(cartao([s]));                                                                  // seção já aberta; aguardando: sem botão
  expect(host.textContent).toContain('Aguardando aprovação do gerencial');expect(btn('Enviar no WhatsApp')).toBeUndefined();
  await render(cartao([{...s,aprovacao:'negado'}]));expect(btn('Enviar no WhatsApp')).toBeUndefined();expect(host.textContent).toContain('Negada');
@@ -110,7 +111,7 @@ test('múltiplo registra uma vez e AVISA que aguarda aprovação: nada de WhatsA
 
 test('várias aprovadas pendentes de envio: um botão só envia todas numa mensagem assinada',async()=>{
  const colab={id:'c',nome:'Ana',uniforme:{listaMontada:true,itens:{},solicitacoes:[{...ap,id:'a1-111111',item:'Boné'},{...ap,id:'a2-222222',item:'Calça'},{...s,id:'a3-333333',item:'Galocha'}]}};
- await render(<UniformeModulo colab={colab} projectNome="P260A" canManage onRegistrarWhats={jest.fn()}/>);
+ await render(<UniformeModulo colab={colab} projectNome="P260A" canManage podeWhats onRegistrarWhats={jest.fn()}/>);
  await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.includes('Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
  expect(btn('Enviar aprovadas no WhatsApp (2)')).toBeDefined();                              // a aguardando fica de fora
  await click('Enviar aprovadas no WhatsApp (2)');
@@ -123,4 +124,24 @@ test('Aprovar todas da aba Aguardando exclui entregue legado e não fala mais em
  await render(<AprovacoesScreen colaboradores={[colab]} ano={2026} anos={[2026]} onTodas={todas}/>);
  expect(host.textContent).toContain('Aprovar todas (2)');expect(host.textContent).not.toContain('bloqueada');
  await click('Aprovar todas (2)');expect(todas).toHaveBeenCalledWith([{colabId:'c',solicId:s.id},{colabId:'c',solicId:'livre'}]);
+});
+
+test('consultor (gerencial) NÃO vê botão do WhatsApp; só o líder',async()=>{
+ const colab={id:'c',nome:'Ana',uniforme:{listaMontada:true,itens:{},solicitacoes:[{...ap,id:'x1-111111'}]}};
+ await render(<UniformeModulo colab={colab} projectNome="P260A" canManage canApprove onRegistrarWhats={jest.fn()}/>);
+ await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.includes('Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
+ expect(btn('Enviar no WhatsApp')).toBeUndefined();expect(btn('Reenviar no WhatsApp')).toBeUndefined();
+});
+
+test('painel do líder: aviso, seleção em lote e envio único',async()=>{
+ const cs=[{id:'c1',nome:'Ana',uniforme:{solicitacoes:[{...ap,id:'p1-111111',item:'Boné'}]}},{id:'c2',nome:'Bia',uniforme:{solicitacoes:[{...ap,id:'p2-222222',item:'Calça'},{...s,id:'p3-333333'}]}}];
+ const reg=jest.fn(async()=>{});
+ await render(<PainelAprovacoesLider project={{id:'P260A'}} projectNome="P260A" colaboradores={cs} onRegistrar={reg} dark/>);
+ expect(host.textContent).toContain('2 aprovação(ões) liberada(s) para enviar');
+ await click('2 aprovação(ões) liberada(s) para enviar');
+ await act(async()=>host.querySelector('input[type=checkbox]').click());          // selecionar todas
+ expect(btn('Enviar selecionadas no WhatsApp (2)')).toBeDefined();
+ await click('Enviar selecionadas no WhatsApp (2)');
+ expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+ expect(host.textContent).toContain('mensagem única, 2 colaborador(es)');
 });

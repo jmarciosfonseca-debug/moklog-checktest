@@ -67,6 +67,20 @@ export function mensagemSolicitacoes(projectNome,colabNome,solicitacoes) {
   return linhas.join('\n');
 }
 
+// Mensagem única com várias aprovações (uma por colaborador). grupos: [{ colabNome, solicitacoes }]
+export function mensagemAprovacoesLote(projectNome,grupos) {
+  const g=(grupos||[]).filter(x=>x.solicitacoes?.length);
+  if (!g.length || g.some(x=>x.solicitacoes.some(s=>situacaoSolicitacao(s)!=='aprovado'))) throw Error('Só solicitações aprovadas podem ser enviadas ao grupo.');
+  const total=g.reduce((n,x)=>n+x.solicitacoes.length,0);
+  const linhas=['*APROVAÇÕES — UNIFORME / MATERIAL* ✅',`*Unidade:* ${projectNome}`,`*Total:* ${total} item(ns) · ${g.length} colaborador(es)`];
+  g.forEach(x=>{
+    linhas.push('',`*${x.colabNome}*`);
+    x.solicitacoes.forEach(s=>linhas.push(`• ${s.item}${s.tamanho?` (tam ${s.tamanho})`:''}${s.marca?` — ${s.marca}`:''} — Qtd ${quantidadeSolicitada(s)}`));
+  });
+  linhas.push('',`✅ *Aprovado pelo ${ASSINATURA_APROVADOR}*`);
+  return linhas.join('\n');
+}
+
 export function auditarSolicitacoes(equipes) {
   let idsDuplicados=0,colaboradoresSuspeitos=0,totalPedidos=0;
   for(const base of equipes){

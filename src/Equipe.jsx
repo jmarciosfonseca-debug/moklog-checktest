@@ -37,7 +37,7 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession, clearSession, isDemo } from "./session";
 import { statusReciclagem, reciclagemPisca, reciclagemLabel } from "./pendencias";
-import { gerarPDFSolicitacoesColaborador, gerarPDFAprovados, gerarPDFCestaNatal } from "./pdfSolicitacoes";
+import { gerarPDFSolicitacoesColaborador, gerarPDFAprovados, gerarPDFCestaNatal, gerarPDFHistoricoAprovacoes } from "./pdfSolicitacoes";
 import { statusAprovacao, anosFiltro, solicitacoesPorAprovacao, contadoresAprovacao, cestaDocId, novoFV, parseValorBR, fmtBRL } from "./equipeAprovacao";
 
 import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
@@ -54,7 +54,7 @@ import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
 import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
 import { abrirParaImpressao } from './relatorios/padraoMoked';
 import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
-import {SeloWhats, FolhaWhats, BotaoAprovarTodas} from "./EquipeWhats";
+import {SeloWhats, FolhaWhats, BotaoAprovarTodas, PainelAprovacoesLider} from "./EquipeWhats";
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
 
@@ -373,7 +373,7 @@ function Avatar({ colab, size=52, border="#1e293b" }) {
 
 // ── Tela de ficha completa
 // ── Módulo Uniforme e Material Tático (card expansível na ficha) ─────────
-export function UniformeModulo({ colab, projectNome, projectId, canManage, canApprove, onAprovar, onTodas, ano, onRegistrarWhats, dark, onSolicitar, onConfirmar, onSalvarLista }){
+export function UniformeModulo({ colab, projectNome, projectId, canManage, podeWhats, canApprove, onAprovar, onTodas, ano, onRegistrarWhats, dark, onSolicitar, onConfirmar, onSalvarLista }){
   const S = getStyles(dark);
   const [aberto, setAberto] = useState(false);
   const [modoMontar, setModoMontar] = useState(false); // Fase 1: montar lista
@@ -442,7 +442,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
       {aberto && (
         <div style={{ marginTop:12 }}>
           {canApprove&&onTodas&&<BotaoAprovarTodas alvos={alvosAguardando([colab],ano)} onTodas={onTodas} rotulo="Aprovar todas as pendentes deste colaborador"/>}
-          {canManage&&pendentes.filter(envioPendente).length>1&&<button onClick={()=>setWhatsFolha(pendentes.filter(envioPendente))} style={{marginBottom:8,width:"100%",padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}><Ico n="celular"/> Enviar aprovadas no WhatsApp ({pendentes.filter(envioPendente).length})</button>}
+          {podeWhats&&pendentes.filter(envioPendente).length>1&&<button onClick={()=>setWhatsFolha(pendentes.filter(envioPendente))} style={{marginBottom:8,width:"100%",padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}><Ico n="celular"/> Enviar aprovadas no WhatsApp ({pendentes.filter(envioPendente).length})</button>}
           {/* Solicitações pendentes com SLA */}
           {pendentes.map(s=>{
             const dias = uniformeDiasAberto(s.solicitadoEm);
@@ -452,7 +452,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
                 <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?<><Ico n="pontoVermelho"/></>:<><Ico n="ampulheta"/></>} {s.item}{s.tamanho?` · ${s.tamanho}`:""} · Qtd: {s.qtd??s.quantidade??1} — pendente</div>
                 <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
                 <SeloWhats solic={s}/>
-                {canManage&&podeEnviarAoGrupo(s)&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{enviadoAposAprovacao(s)?"Reenviar no WhatsApp":<><Ico n="celular"/>{" Enviar no WhatsApp"}</>}</button>}
+                {podeWhats&&podeEnviarAoGrupo(s)&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{enviadoAposAprovacao(s)?"Reenviar no WhatsApp":<><Ico n="celular"/>{" Enviar no WhatsApp"}</>}</button>}
                 <AprovacaoInline solic={s} canApprove={canApprove} onAprovar={(dec,opts)=>onAprovar && onAprovar([{ colabId:colab.id, solicId:s.id }], dec,opts)} dark={dark}/>
                 {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}><Ico n="check"/> Confirmar recebimento (zera SLA)</button>}
               </div>
@@ -972,6 +972,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             projectNome={projectNome}
             projectId={(projectNome||"").split(" · ")[0]}
             canManage={adminAuth || liderAuth}
+            podeWhats={liderAuth && !adminAuth}
             canApprove={adminAuth}
             onAprovar={onAprovar}
             onTodas={onTodas} ano={anoAprovacao} onRegistrarWhats={onRegistrarWhats}
@@ -2885,6 +2886,18 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           {adminAuth && (
             <FVCard fv={fvDoc} projectLabel={`${project.id} ${project.name||""}`.trim()}
               contadores={contadoresAprovacao(ativos, anoFiltro)} ano={anoFiltro} onSalvar={salvarFV} dark={dark}/>
+          )}
+
+          {/* Aprovações liberadas ao LÍDER (aviso pulsando, lote, PDF) */}
+          {liderAuth && !adminAuth && (
+            <PainelAprovacoesLider project={project} projectNome={projectNome} colaboradores={equipeData.colaboradores} onRegistrar={registrarWhats} dark={dark}/>
+          )}
+          {/* Consultor: PDFs consolidados (aprovados e histórico completo) */}
+          {adminAuth && (
+            <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+              <button onClick={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)} style={{ ...S.btnSm, flex:1, fontSize:11.5, padding:"10px" }}><Ico n="arquivo"/> PDF Aprovados {anoFiltro}</button>
+              <button onClick={()=>gerarPDFHistoricoAprovacoes(project, equipeData.colaboradores, anoFiltro)} style={{ ...S.btnSm, flex:1, fontSize:11.5, padding:"10px" }}><Ico n="arquivo"/> Histórico completo {anoFiltro}</button>
+            </div>
           )}
 
           {/* ADENDO EQUIPE — filtros rápidos + ano */}
