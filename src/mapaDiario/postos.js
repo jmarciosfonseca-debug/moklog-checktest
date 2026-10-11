@@ -17,7 +17,7 @@ const GENERICO = [lider("Líder"), P("CCO", CCO), P("Vigilante", VIG)];
 
 export const POSTOS = {
   P601: {
-    D: [lider("Líder"), P("VSPP Apoio", APOIO, { horario: h0820 }), P("VSPP P1", APOIO), P("CCO", CCO), P("CDA", ["CDA"])],
+    D: [lider("Líder"), P("VSPP Apoio/Ronda", APOIO, { horario: h0820, legado: ["VSPP Apoio"] }), P("VSPP P1", APOIO), P("CCO", CCO), P("CDA", ["CDA"])],
     N: [lider("Líder"), P("CCO", CCO), P("CDA", ["CDA"])],
   },
   P602: { D: GENERICO, N: GENERICO },

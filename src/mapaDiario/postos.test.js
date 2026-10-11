@@ -23,7 +23,7 @@ test("escolher o líder puxa quem ele montou, por cargo, sem repetir e sem quem 
   const por = Object.fromEntries(r.postos.map((p) => [p.rotulo, p.pessoaNome]));
   expect(por["CCO"]).toBe("Monica C.");
   expect(por["CDA"]).toBe("Davi D.");
-  expect(por["VSPP Apoio"]).toBe("Ana A.");
+  expect(por["VSPP Apoio/Ronda"]).toBe("Ana A.");
   expect(por["VSPP P1"]).toBe(""); // Aline está de férias: não entra
   expect(r.puxados).toBe(3);
   expect(r.semEquipe).toBe(false);
@@ -31,12 +31,12 @@ test("escolher o líder puxa quem ele montou, por cargo, sem repetir e sem quem 
 test("trocar de líder troca a equipe; exceção e nome digitado não são mexidos", () => {
   const m = mapa601();
   const com = puxarEquipe({ postos: m.postos, lider: colabs[0], colabs, pid: "P601", turno: "D" }).postos;
-  const edit = com.map((p) => (p.rotulo === "CDA" ? { ...p, situacao: "falta" } : p.rotulo === "VSPP Apoio" ? { ...p, pessoaNome: "Fulano da Base", detalhe: { livre: true } } : p));
+  const edit = com.map((p) => (p.rotulo === "CDA" ? { ...p, situacao: "falta" } : p.rotulo === "VSPP Apoio/Ronda" ? { ...p, pessoaNome: "Fulano da Base", detalhe: { livre: true } } : p));
   const r = puxarEquipe({ postos: edit, lider: colabs[5], colabs, pid: "P601", turno: "D" });
   const por = Object.fromEntries(r.postos.map((p) => [p.rotulo, p]));
   expect(por["CCO"].pessoaNome).toBe("Carla C.");
   expect(por["CDA"].pessoaNome).toBe("Davi D."); // em falta: preservado
-  expect(por["VSPP Apoio"].pessoaNome).toBe("Fulano da Base");
+  expect(por["VSPP Apoio/Ronda"].pessoaNome).toBe("Fulano da Base");
 });
 test("líder sem equipe montada: não mexe ao abrir; ao trocar manualmente limpa a equipe do líder anterior", () => {
   const m = mapa601();
