@@ -2958,7 +2958,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               return (
                 <div style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#334155":"#e2e8f0"}`, borderRadius:16, padding:"14px 18px", animation:"mkFadeIn .35s ease both" }}>
                   <div onClick={()=>toggleRh("projetos")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
-                    <div style={{ fontSize:22 }}><Ico n="pasta"/></div>
+                    <div style={{ fontSize:22, color:dark?"#94a3b8":"#475569", display:"flex" }}><Ico n="pasta"/></div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:15, fontWeight:800, color:txt }}>Projetos</div>
                       <div style={{ fontSize:11, color:txt2, marginTop:1 }}>Abrir o painel de um projeto (visão do líder)</div>
@@ -2990,9 +2990,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
                 boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
               <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{ width:54, height:54, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e955":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #0ea5e922":"none" }}>
-                  <span style={{ fontSize:25 }}><Ico n="usuarios"/></span>
-                </div>
+                <IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={dark?"#001a2e":"#e0f2fe"} txt={dark?"#38bdf8":"#0369a1"}/>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
                   <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsColab} projeto(s) com equipe cadastrada`:"Carregando equipes..."}</div>
@@ -3115,8 +3113,8 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
                 boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none"), animation:"mkFadeIn .35s ease both", animationDelay:"60ms" }}>
               <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{ width:54, height:54, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b55":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #f59e0b22":"none", position:"relative" }}>
-                  <span style={{ fontSize:25 }}><Ico n="escudo"/></span>
+                <div style={{ width:48, height:48, borderRadius:14, background:"transparent", border:"none", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"none", position:"relative" }}>
+                  <IconeModulo n="escudo" cor="#f59e0b" arq="equipamentos" bg={dark?"#1a1000":"#fffbeb"} txt={dark?"#fbbf24":"#b45309"}/>
                   {st&&st.inop>0&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444",animation:"regPulse 1.4s ease-in-out infinite"}}/>}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
@@ -4049,7 +4047,7 @@ export default function App(){
             <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
               style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
                 animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
-              <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}><Ico n="prancheta"/></span></div>
+              <IconeModulo n="prancheta" cor="#60a5fa" arq="relatorio-semanal" bg="rgba(255,255,255,.16)" txt="#fff"/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
                 <div style={{fontSize:11,color:"#bfdbfe",fontWeight:700}}>P260A</div>
@@ -4444,7 +4442,7 @@ export default function App(){
                   <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
                     style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
                       animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
-                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}><Ico n="prancheta"/></span></div>
+                    <IconeModulo n="prancheta" cor="#60a5fa" arq="relatorio-semanal" bg="rgba(255,255,255,.16)" txt="#fff"/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
                       <div style={{fontSize:11,color:"#bfdbfe",fontWeight:700}}>{project.id}</div>

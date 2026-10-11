@@ -113,6 +113,15 @@ const TURNO_CONFIG = {
   "Ferista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:<><Ico n="atualizar"/></> },
 };
 
+// Ícone 3D do turno (arte em /icones/modulos/turno-*.svg); cai no ícone de linha se a arte não carregar
+function TurnoIcone({ turno, tc, size=44 }) {
+  const [falhou, setFalhou] = useState(false);
+  const slug = String(turno||"").toLowerCase();
+  if (falhou) return <span style={{ fontSize:Math.round(size*0.55), display:"inline-flex", color:tc.badge }}>{tc.icon}</span>;
+  return <img src={`/icones/modulos/turno-${slug}.svg`} alt="" width={size} height={size} draggable={false}
+    onError={()=>setFalhou(true)} style={{ display:"block", filter:`drop-shadow(0 0 8px ${tc.badge}66)` }}/>;
+}
+
 function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
 function fmtDate(d) {
   if(!d) return "--";
@@ -2842,10 +2851,11 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 const tc = TURNO_CONFIG[t];
                 const count = ativos.filter(c=>c.turno===t).length;
                 return (
-                  <div key={t} style={{ background:tc.bg, border:`1px solid ${tc.border}`, borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
-                    <div style={{ fontSize:18, marginBottom:3 }}>{tc.icon}</div>
-                    <div style={{ fontSize:12, fontWeight:700, color:tc.badge }}>{t}</div>
-                    <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{count}</div>
+                  <div key={t} style={{ background:`linear-gradient(160deg, ${tc.badge}22, ${tc.bg} 55%, #050a14)`, border:`1px solid ${tc.badge}55`, borderRadius:16, padding:"12px 8px 10px", textAlign:"center",
+                    boxShadow:`0 0 18px ${tc.badge}22, inset 0 1px 0 ${tc.badge}33`, display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+                    <TurnoIcone turno={t} tc={tc} size={46}/>
+                    <div style={{ fontSize:22, fontWeight:900, color:tc.badge, lineHeight:1.1, marginTop:4, textShadow:`0 0 12px ${tc.badge}66` }}>{count}</div>
+                    <div style={{ fontSize:11, fontWeight:800, color:tc.badge, letterSpacing:.8, textTransform:"uppercase" }}>{t}</div>
                   </div>
                 );
               })}
@@ -2954,7 +2964,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   const lideresTurno = lideres.filter(l=>l.turno===turno);
                   return (
                     <div key={turno}>
-                      <div style={{ fontSize:12, fontWeight:700, color:tc.badge, marginBottom:8, letterSpacing:.5 }}>{tc.icon} {turno.toUpperCase()}</div>
+                      <div style={{ fontSize:12, fontWeight:700, color:tc.badge, marginBottom:8, letterSpacing:.5, display:"flex", alignItems:"center", gap:8 }}><TurnoIcone turno={turno} tc={tc} size={26}/> {turno.toUpperCase()}</div>
                       {lideresTurno.map(lider=>{
                         const membros = ativos.filter(c=>c.equipeLiderId===lider.id);
                         return (
@@ -3013,9 +3023,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             if(colabsDoTurno.length===0 && !adminAuth) return null;
             return (
               <div key={turno} style={{ borderRadius:12, overflow:"hidden", border:`1px solid ${tc.border}` }}>
-                <div style={{ background:tc.bg, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <span style={{ fontSize:16 }}>{tc.icon}</span>
+                <div style={{ background:`linear-gradient(90deg, ${tc.badge}1f, ${tc.bg} 60%)`, padding:"8px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <TurnoIcone turno={turno} tc={tc} size={32}/>
                     <span style={{ fontSize:13, fontWeight:700, color:tc.badge }}>{turno}</span>
                     <span style={{ fontSize:10, color:"#64748b", background:"#0a0f1e", padding:"2px 8px", borderRadius:10 }}>{colabsDoTurno.length}</span>
                   </div>
