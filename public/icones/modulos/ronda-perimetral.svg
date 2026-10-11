@@ -1,31 +1,31 @@
 <svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <!-- Filtros de relevo 3D e profundidade -->
-    <filter id="peri-shadow-fence" x="-20%" y="-20%" width="140%" height="140%">
+    <filter id="peri2-shadow-fence" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="-8" dy="16" stdDeviation="15" flood-color="#021B18" flood-opacity="0.88"/>
     </filter>
 
-    <filter id="peri-shadow-runner" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="-8" dy="14" stdDeviation="12" flood-color="#01100E" flood-opacity="0.9"/>
-      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#2DD4BF" flood-opacity="0.5"/>
+    <filter id="peri2-shadow-body" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-10" dy="18" stdDeviation="15" flood-color="#01100E" flood-opacity="0.95"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#2DD4BF" flood-opacity="0.55"/>
     </filter>
 
     <!-- Base de vidro fosco escuro com matiz turquesa -->
-    <linearGradient id="peri-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="peri2-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0A1D1A" stop-opacity="0.95"/>
       <stop offset="40%" stop-color="#051714" stop-opacity="0.92"/>
       <stop offset="100%" stop-color="#020B0A" stop-opacity="0.97"/>
     </linearGradient>
 
-    <!-- Brilho volumétrico interno turquesa da placa -->
-    <radialGradient id="peri-glass-glow" cx="25%" cy="20%" r="75%">
+    <!-- Brilho volumétrico interno turquesa -->
+    <radialGradient id="peri2-glass-glow" cx="25%" cy="20%" r="75%">
       <stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.28"/>
       <stop offset="45%" stop-color="#0F766E" stop-opacity="0.10"/>
       <stop offset="100%" stop-color="#2DD4BF" stop-opacity="0"/>
     </radialGradient>
 
     <!-- Rim light chanfrado da borda externa -->
-    <linearGradient id="peri-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
+    <linearGradient id="peri2-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
       <stop offset="0%" stop-color="#CCFBF1" stop-opacity="0.95"/>
       <stop offset="25%" stop-color="#2DD4BF" stop-opacity="0.85"/>
       <stop offset="60%" stop-color="#0F766E" stop-opacity="0.4"/>
@@ -33,94 +33,101 @@
     </linearGradient>
 
     <!-- Reflexo especular superior do vidro -->
-    <linearGradient id="peri-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="peri2-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
       <stop offset="35%" stop-color="#99F6E4" stop-opacity="0.06"/>
       <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
 
-    <!-- Gradientes 3D do Traçado Perimetral (Cerca/Muralha) -->
-    <linearGradient id="peri-fence-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+    <!-- Gradientes do Hexágono Perimetral -->
+    <linearGradient id="peri2-fence-grad" x1="20%" y1="0%" x2="80%" y2="100%">
       <stop offset="0%" stop-color="#14B8A6"/>
       <stop offset="50%" stop-color="#0F766E"/>
       <stop offset="100%" stop-color="#134E4A"/>
     </linearGradient>
 
-    <linearGradient id="peri-fence-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+    <linearGradient id="peri2-fence-rim" x1="10%" y1="0%" x2="90%" y2="100%">
       <stop offset="0%" stop-color="#F0FDFA" stop-opacity="0.95"/>
       <stop offset="35%" stop-color="#5EEAD4" stop-opacity="0.75"/>
       <stop offset="100%" stop-color="#115E59" stop-opacity="0.2"/>
     </linearGradient>
 
-    <!-- Gradientes 3D da Figura Humana Tática em Movimento -->
-    <linearGradient id="peri-runner-grad" x1="15%" y1="0%" x2="85%" y2="100%">
-      <stop offset="0%" stop-color="#F0FDFA"/>
-      <stop offset="30%" stop-color="#5EEAD4"/>
-      <stop offset="70%" stop-color="#2DD4BF"/>
+    <!-- Gradientes do Vigilante Maciço (Corpo Sólido 3D) -->
+    <linearGradient id="peri2-operator-grad" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#99F6E4"/>
+      <stop offset="65%" stop-color="#2DD4BF"/>
       <stop offset="100%" stop-color="#0F766E"/>
     </linearGradient>
 
+    <linearGradient id="peri2-operator-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#5EEAD4" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#115E59" stop-opacity="0.3"/>
+    </linearGradient>
+
     <!-- Máscara estrita para confinar 100% de luz dentro da placa -->
-    <clipPath id="peri-plaque-clip">
+    <clipPath id="peri2-plaque-clip">
       <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/>
     </clipPath>
   </defs>
 
   <!-- GRUPO PRINCIPAL CONFINADO NA PLACA -->
-  <g clip-path="url(#peri-plaque-clip)">
+  <g clip-path="url(#peri2-plaque-clip)">
     <!-- Fundo de vidro fosco escuro -->
-    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#peri-glass-base)"/>
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#peri2-glass-base)"/>
 
     <!-- Brilho volumétrico interno turquesa -->
-    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#peri-glass-glow)"/>
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#peri2-glass-glow)"/>
 
     <!-- Reflexo especular diagonal superior -->
-    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#peri-specular-top)"/>
+    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#peri2-specular-top)"/>
 
-    <!-- SÍMBOLO RELEVO 3D: RONDA PERIMETRAL -->
-    <g id="peri-symbol-group">
-      <!-- 1. CONTORNO DO PERÍMETRO (CERCA TÁTICA ISOMÉTRICA EM RELEVO 3D) -->
-      <g filter="url(#peri-shadow-fence)">
-        <!-- Linha Perimetral Contínua com Chanfro -->
-        <polygon points="512,185 780,335 780,685 512,835 244,685 244,335" 
-                 fill="none" stroke="url(#peri-fence-grad)" stroke-width="26" stroke-linejoin="round"/>
-        <polygon points="512,185 780,335 780,685 512,835 244,685 244,335" 
-                 fill="none" stroke="url(#peri-fence-rim)" stroke-width="8" stroke-linejoin="round"/>
+    <!-- SÍMBOLO RELEVO 3D: RONDA PERIMETRAL MACIÇA -->
+    <g id="peri2-symbol-group">
+      <!-- 1. HEXÁGONO DO PERÍMETRO COM POSTES/TORRES NOS VÉRTICES -->
+      <g filter="url(#peri2-shadow-fence)">
+        <polygon points="512,175 795,335 795,685 512,845 229,685 229,335" 
+                 fill="none" stroke="url(#peri2-fence-grad)" stroke-width="26" stroke-linejoin="round"/>
+        <polygon points="512,175 795,335 795,685 512,845 229,685 229,335" 
+                 fill="none" stroke="url(#peri2-fence-rim)" stroke-width="8" stroke-linejoin="round"/>
       </g>
 
-      <!-- Postes/Sensores do Perímetro nos Vértices (Detalhes Secundários em Cinza-Azulado) -->
-      <circle cx="512" cy="185" r="14" fill="#334155" stroke="#94A3B8" stroke-width="4"/>
-      <circle cx="780" cy="335" r="14" fill="#334155" stroke="#94A3B8" stroke-width="4"/>
-      <circle cx="780" cy="685" r="14" fill="#334155" stroke="#94A3B8" stroke-width="4"/>
-      <circle cx="512" cy="835" r="14" fill="#334155" stroke="#94A3B8" stroke-width="4"/>
-      <circle cx="244" cy="685" r="14" fill="#334155" stroke="#94A3B8" stroke-width="4"/>
-      <circle cx="244" cy="335" r="14" fill="#334155" stroke="#94A3B8" stroke-width="4"/>
+      <!-- Postes Sensores nos Vértices (Detalhe Secundário em Cinza-Azulado) -->
+      <circle cx="512" cy="175" r="16" fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
+      <circle cx="795" cy="335" r="16" fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
+      <circle cx="795" cy="685" r="16" fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
+      <circle cx="512" cy="845" r="16" fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
+      <circle cx="229" cy="685" r="16" fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
+      <circle cx="229" cy="335" r="16" fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
 
-      <!-- 2. FIGURA HUMANA EM MOVIMENTO (TOTALMENTE CONTIDA DENTRO DO PERÍMETRO) -->
-      <g filter="url(#peri-shadow-runner)">
-        <!-- Cabeça com capacete/boné tático -->
-        <circle cx="535" cy="365" r="46" fill="url(#peri-runner-grad)" stroke="#FFFFFF" stroke-width="4"/>
+      <!-- 2. OPERADOR TÁTICO COM CORPO MACIÇO E MEMBROS LARGOS (ALTO RELEVO 3D) -->
+      <g filter="url(#peri2-shadow-body)">
+        <g transform="translate(530 520) scale(0.82) translate(-530 -520)">
+        <!-- Cabeça com Capacete/Boné Tático em Relevo Sólido -->
+        <circle cx="530" cy="335" r="54" fill="url(#peri2-operator-grad)" stroke="url(#peri2-operator-rim)" stroke-width="6"/>
+        <ellipse cx="515" cy="318" rx="20" ry="10" fill="#FFFFFF" opacity="0.4" transform="rotate(-30 515 318)"/>
 
-        <!-- Tronco e Membros em Silhueta Dinâmica de Ronda (Passo Largo) -->
-        <!-- Braço Traseiro -->
-        <path d="M 495 440 L 440 480 L 420 535" 
-              fill="none" stroke="url(#peri-runner-grad)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Braço Traseiro Largo com Ombreira -->
+        <path d="M 465 425 C 440 455, 400 480, 375 540 C 365 565, 395 580, 415 565 C 445 520, 475 490, 500 455 Z" 
+              fill="url(#peri2-operator-grad)" stroke="url(#peri2-operator-rim)" stroke-width="5" stroke-linejoin="round"/>
 
-        <!-- Tronco Inclinado -->
-        <path d="M 525 420 L 490 560" 
-              fill="none" stroke="url(#peri-runner-grad)" stroke-width="32" stroke-linecap="round"/>
+        <!-- Perna Traseira Maciça em Passo Firme -->
+        <path d="M 480 565 L 415 675 C 400 700, 370 725, 345 745 C 330 758, 350 780, 375 770 C 415 750, 455 705, 515 630 Z" 
+              fill="url(#peri2-operator-grad)" stroke="url(#peri2-operator-rim)" stroke-width="5" stroke-linejoin="round"/>
 
-        <!-- Perna Traseira -->
-        <path d="M 490 560 L 430 635 L 395 700" 
-              fill="none" stroke="url(#peri-runner-grad)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Tronco Tático Robusto (Colete Balístico/Jaqueta) -->
+        <path d="M 480 395 C 505 385, 565 385, 585 395 C 605 450, 595 530, 565 590 C 530 600, 480 595, 465 570 C 455 510, 460 445, 480 395 Z" 
+              fill="url(#peri2-operator-grad)" stroke="url(#peri2-operator-rim)" stroke-width="7" stroke-linejoin="round"/>
 
-        <!-- Braço Dianteiro -->
-        <path d="M 525 440 L 580 475 L 630 455" 
-              fill="none" stroke="url(#peri-runner-grad)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Perna Dianteira em Avanço Largo e Espesso -->
+        <path d="M 545 580 L 610 655 C 630 680, 665 725, 685 765 C 695 785, 725 775, 720 750 C 700 705, 660 645, 600 585 Z" 
+              fill="url(#peri2-operator-grad)" stroke="url(#peri2-operator-rim)" stroke-width="5" stroke-linejoin="round"/>
 
-        <!-- Perna Dianteira em Avanço -->
-        <path d="M 490 560 L 565 625 L 610 705" 
-              fill="none" stroke="url(#peri-runner-grad)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Braço Dianteiro Dinâmico -->
+        <path d="M 565 425 C 605 450, 645 470, 680 475 C 700 478, 710 450, 690 440 C 655 425, 615 405, 580 405 Z" 
+              fill="url(#peri2-operator-grad)" stroke="url(#peri2-operator-rim)" stroke-width="5" stroke-linejoin="round"/>
+        </g>
       </g>
     </g>
 
@@ -131,5 +138,5 @@
 
   <!-- BORDA DE LUZ EXTERNA (RIM LIGHT DA PLACA) - ZERO VAZAMENTO -->
   <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75" 
-        fill="none" stroke="url(#peri-rim-border)" stroke-width="7"/>
+        fill="none" stroke="url(#peri2-rim-border)" stroke-width="7"/>
 </svg>
