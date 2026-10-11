@@ -152,6 +152,7 @@ class ErrorBoundary extends React.Component {
 
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
+import PainelMapasEquipe from "./mapaDiario/PainelMapasEquipe";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -2993,6 +2994,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               </div>
             );
             return (<>
+            {hasGerencial() && <PainelMapasEquipe dark={dark} nomeProj={(pid)=>PROJECTS[pid]?.name?`${pid} · ${PROJECTS[pid].name}`:pid}/>}
             {hasGerencial() && (()=>{
               const GRUPOS_PROJ = [
                 { key:"golgi",   label:"Golgi",   cor:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"] },
