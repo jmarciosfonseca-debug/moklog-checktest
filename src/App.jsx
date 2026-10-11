@@ -3410,7 +3410,7 @@ export default function App(){
   applyTheme(dark);
   useEffect(()=>{ aplicarTema(tema); },[tema]);
   const T=themeTokens(dark);
-  const botaoMapaDiario=(proj)=>(<button onClick={()=>setMapaDiarioProject({id:proj.id,name:proj.name})} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"14px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="mapa-equipe" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Mapa de Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Mapa diário do turno</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>);
+  const botaoMapaDiario=(proj)=>(<button onClick={()=>comPin(proj.id,()=>setMapaDiarioProject({id:proj.id,name:proj.name}))} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"14px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="mapa-equipe" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Mapa de Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Mapa diário do turno</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>);
   const [showRegistros,setShowRegistros]=useState(false);
   const [showDiagnostico,setShowDiagnostico]=useState(false);
   const [showAcessoCCO,setShowAcessoCCO]=useState(false);
