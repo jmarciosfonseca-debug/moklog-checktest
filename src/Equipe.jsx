@@ -1965,6 +1965,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const [checagemModal, setChecagemModal] = useState(false); // modal de checagem de equipe (fim de semana)
   const [visaoEquipes, setVisaoEquipes] = useState(false); // alterna lista por turno x por equipe montada
   const [montarLiderId, setMontarLiderId] = useState(null); // líder cuja equipe está sendo montada
+  const [editPerfil, setEditPerfil] = useState(false); // Perfil de Segurança: recolhido em uma linha quando completo
+  useEffect(() => { setEditPerfil(false); }, [project.id]);
   useAtualizarAoVoltar(); // card do fim de semana: reavalia ao voltar à aba (sem relógio contínuo)
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -2780,9 +2782,13 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 {children}
               </button>
             );
+            // Completo (os três campos definidos) = recolhido em uma linha; o gerencial reabre em "Editar".
+            const completo = !!(perfilSeg.tipoEquipe && perfilSeg.armada && perfilSeg.ccoDedicada);
+            const mostrarEditor = adminAuth && (!completo || editPerfil);
+            const btnPerfil = { ...S.btnSm, fontSize:11, color:"#f59e0b", border:"1px solid #f59e0b55", padding:"6px 12px" };
             return (
-              <div style={{ ...S.card, display:"flex", flexDirection:"column", gap:12 }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ ...S.card, display:"flex", flexDirection:"column", gap: mostrarEditor ? 12 : 8 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
                   <div style={{ fontSize:13, fontWeight:800, color: dark?"#f8fafc":"#0f172a" }}>
                     <Ico n="escudo"/> Perfil de Segurança
                   </div>
@@ -2791,9 +2797,15 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                       Somente leitura
                     </span>
                   )}
+                  {adminAuth && completo && !editPerfil && (
+                    <button onClick={()=>setEditPerfil(true)} style={btnPerfil}><Ico n="editar"/> Editar</button>
+                  )}
+                  {adminAuth && completo && editPerfil && (
+                    <button onClick={()=>setEditPerfil(false)} style={btnPerfil}>Pronto</button>
+                  )}
                 </div>
 
-                {adminAuth ? (
+                {mostrarEditor ? (
                   <>
                     <div>
                       <label style={S.lbl}>Tipo de Equipe</label>
