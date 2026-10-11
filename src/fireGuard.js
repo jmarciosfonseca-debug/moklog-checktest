@@ -30,6 +30,7 @@ import {
   addDoc as _addDoc,
 } from "firebase/firestore";
 import { isDemo } from "./session";
+import { arquivarDoc } from "./lixeira";
 
 // Offline: o Firestore (cache persistente) guarda a escrita numa fila local e
 // sobe quando a conexão volta, mas a Promise só resolve com o servidor. Para a
@@ -54,6 +55,8 @@ export async function updateDoc(...args) {
 
 export async function deleteDoc(...args) {
   if (isDemo()) return;
+  // Cópia na lixeira ANTES de apagar (documentos fora da própria lixeira).
+  if (!_offline() && args[0] && args[0].path && !String(args[0].path).startsWith("lixeira/")) await arquivarDoc(args[0]);
   if (_offline()) { _viaFila(_deleteDoc(...args)); return; }
   return _deleteDoc(...args);
 }

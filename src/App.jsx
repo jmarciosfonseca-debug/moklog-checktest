@@ -1,5 +1,7 @@
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
 import { getDocsSeguro } from "./lerServidor";
+import BotaoBackup from "./BotaoBackup";
+import { arquivarItem } from "./lixeira";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -2083,6 +2085,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <BtnVidro cor={[16,185,129]} arq="analise-risco" fb="prancheta" label="Análise de Risco Klog" sub="Pacote do grupo" onClick={()=>setAnaliseRiscoPacote("klog")}/>
           <BtnVidro cor={[56,189,248]} arq="gestao-fv" fb="moeda" label="Gestão FV" sub="Financeiro e faturamento" onClick={onGestaoFV} style={{marginTop:8}}/>
         </div>}
+        <BotaoBackup/>
         {/* Recursos gerenciais renderizados a partir do registro único
             (gerenciaisConfig.js). Evita que um recurso — como a Visão 360 —
             fique órfão por remoção acidental do botão. */}
@@ -3805,6 +3808,7 @@ export default function App(){
     if(deletedDate){
       deletedTombstoneRef.current[projectId] = new Set([...(deletedTombstoneRef.current[projectId]||[]), deletedDate]);
     }
+    if(prev[idx]) arquivarItem("relatorio",`projects/${projectId}/history[${idx}]`,prev[idx],{projectId});
     const next=prev.filter((_,i)=>i!==idx);
     const up={...stored,[projectId]:{...stored[projectId],history:next,updatedAt:new Date().toISOString()}};
     setStored(up);localStorage.setItem("seccheck_v4",JSON.stringify(up));
