@@ -772,7 +772,7 @@ export function ContadorEquipamentos({ projectId }){
   const limite = chkAlvoTimestamp(alvo);
   const diff = limite - agora;
   if(diff <= 0){
-    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}><Ico n="alerta"/> Checagem pendente — concluir</div>;
+    return <div data-pendente="1" style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}><Ico n="alerta"/> Checagem pendente — concluir</div>;
   }
   const dias = Math.floor(diff/86400000);
   const horas = Math.floor((diff%86400000)/3600000);

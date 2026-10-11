@@ -1916,7 +1916,7 @@ export function ContadorEquipe({ projectId }){
   if(feitos>=num){
     return <div style={{fontSize:10,color:"#22c55e",marginTop:3,fontWeight:700}}><Ico n="check"/> Checagem da equipe concluída ({feitos}/{num})</div>;
   }
-  return <div style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}><Ico n="calendario"/> Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
+  return <div data-pendente="1" style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}><Ico n="calendario"/> Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
 }
 
 function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted, fotosApi }) {

@@ -158,11 +158,22 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
 // sem o arquivo, volta ao ícone de linha dentro da caixa atual.
 const _semArte = new Set();
+// Brilho ao tocar/passar o mouse e "respiração" nos módulos com pendência (respeita prefers-reduced-motion).
+if (typeof document !== "undefined" && !document.getElementById("mk-modulos-css")) {
+  const st = document.createElement("style"); st.id = "mk-modulos-css";
+  st.textContent = `
+.module-icon-container{filter:drop-shadow(0 0 8px var(--cor-modulo-soft));transition:filter .25s ease-in-out,transform .25s ease-in-out}
+button:hover .module-icon-container,button:focus-visible .module-icon-container,button:active .module-icon-container{filter:drop-shadow(0 0 14px var(--cor-modulo));transform:scale(1.03)}
+@keyframes mk-neon-pulse{0%,100%{filter:drop-shadow(0 0 6px var(--cor-modulo-soft))}50%{filter:drop-shadow(0 0 16px var(--cor-modulo))}}
+button:has([data-pendente]) .module-icon-container{animation:mk-neon-pulse 3s infinite ease-in-out}
+@media (prefers-reduced-motion:reduce){button:has([data-pendente]) .module-icon-container{animation:none}.module-icon-container{transition:none}}`;
+  document.head.appendChild(st);
+}
 function IconeModulo({ n, cor, arq, bg, txt }) {
   const [ext, setExt] = useState(()=>!arq || _semArte.has(arq) ? null : "svg");
   const falhou = ext === null;
   if (!falhou) return (
-    <div className="module-icon-container" style={{ width:48, height:48, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, background:"transparent", filter:`drop-shadow(0 0 8px ${cor}88)` }}>
+    <div className="module-icon-container" style={{ width:48, height:48, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, background:"transparent", "--cor-modulo":cor, "--cor-modulo-soft":`${cor}88` }}>
       <img src={`/icones/modulos/${arq}.${ext}`} alt="" draggable={false} onError={()=>{ if(ext==="svg") setExt("png"); else { _semArte.add(arq); setExt(null); } }} style={{ width:"100%", height:"100%", objectFit:"contain" }}/>
     </div>
   );
@@ -700,7 +711,7 @@ function ContadorIluminacao({ projectId }){
   const diff = limite - agora;
   const pendente = diff <= 0;
   if(pendente){
-    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}><Ico n="alerta"/> Teste pendente — concluir</div>;
+    return <div data-pendente="1" style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}><Ico n="alerta"/> Teste pendente — concluir</div>;
   }
   const dias = Math.floor(diff/86400000);
   const horas = Math.floor((diff%86400000)/3600000);
