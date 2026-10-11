@@ -63,3 +63,30 @@ test("12x36: o mapa novo aproveita as pessoas do mapa base; 4x2 não repete ning
   expect(n.postos.every((p) => !p.pessoaNome)).toBe(true);
   expect(n.preenchidoDe).toBeNull();
 });
+
+test("recepção duplicada entra na equipe dos DOIS líderes", () => {
+  const cs = [
+    { id: "l1", nome: "Líder 1", cargo: "VSPP Líder" }, { id: "l2", nome: "Líder 2", cargo: "VSPP Líder" },
+    { id: "r1", nome: "Rita R.", cargo: "Recepção", equipeLiderId: "l1", equipeLideresExtra: ["l2"] },
+  ];
+  const m = novoMapa({ projetoId: "P604", data: "2026-10-12", turno: "D" }); // segunda: recepção existe
+  expect(m.postos.map((p) => p.rotulo)).toContain("Recepção");
+  [cs[0], cs[1]].forEach((l) => {
+    const r = puxarEquipe({ postos: m.postos, lider: l, colabs: cs, pid: "P604", turno: "D" });
+    expect(r.postos.find((p) => p.rotulo === "Recepção").pessoaNome).toBe("Rita R.");
+  });
+});
+test("recepção 5x2: só segunda a sexta", () => {
+  expect(postosDoProjeto("P604", "D", "2026-10-12").map((p) => p.rotulo)).toContain("Recepção");
+  expect(postosDoProjeto("P604", "D", "2026-10-11").map((p) => p.rotulo)).not.toContain("Recepção"); // domingo
+  expect(postosDoProjeto("P605", "D", "2026-10-10").map((p) => p.rotulo)).not.toContain("Recepção"); // sábado
+});
+test("soVazios (rascunho reaberto): só preenche posto vazio e não repete quem já foi escolhido", () => {
+  const cs = [{ id: "l1", nome: "L", cargo: "VSPP Líder" }, { id: "c1", nome: "Cadu", cargo: "Vig CCO", equipeLiderId: "l1" }, { id: "d1", nome: "Davi", cargo: "CDA", equipeLiderId: "l1" }];
+  const m = novoMapa({ projetoId: "P601", data: "2026-10-12", turno: "D" });
+  const manual = m.postos.map((p) => (p.rotulo === "CCO" ? { ...p, pessoaId: "x9", pessoaNome: "Escolha manual" } : p));
+  const r = puxarEquipe({ postos: manual, lider: cs[0], colabs: cs, pid: "P601", turno: "D", soVazios: true });
+  const por = Object.fromEntries(r.postos.map((p) => [p.rotulo, p.pessoaNome]));
+  expect(por["CCO"]).toBe("Escolha manual");
+  expect(por["CDA"]).toBe("Davi");
+});

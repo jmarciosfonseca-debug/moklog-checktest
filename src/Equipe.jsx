@@ -44,6 +44,7 @@ import { UNIFORME_CATALOGO } from "./uniformeCatalogo";
 import { fvNoEscopo } from "./fvConfig";
 import {situacaoSolicitacao, podeEnviarAoGrupo, envioPendente, enviadoAposAprovacao} from "./equipeAprovacao";
 import { gravarComRecuperacao } from "./equipeConflito";
+import { pertenceA, lideresDe, semEquipeAlguma, alternarVinculo, removerVinculo, cargoCompartilhado } from "./equipe/vinculos";
 import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
@@ -1295,32 +1296,35 @@ export function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCa
 
 // ── Modal: encerrar afastamento informando a data real de retorno
 // ── Modal: montar a equipe de um líder (selecionar membros) ──────────────
-function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, onClose }){
+function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, onClose }){ // onToggle(liderId, membroId, {duplicar})
   const S = getStyles(dark);
   const ativos = colaboradores.filter(c=>(c.status||"ativo")==="ativo" && !ehLider(c, colaboradores));
   // Mostra membros do mesmo turno primeiro, mas permite qualquer um.
   const ordenados = [...ativos].sort((a,b)=>{
-    const am = a.equipeLiderId===lider.id ? 0 : 1;
-    const bm = b.equipeLiderId===lider.id ? 0 : 1;
+    const am = pertenceA(a,lider.id) ? 0 : 1;
+    const bm = pertenceA(b,lider.id) ? 0 : 1;
     if(am!==bm) return am-bm;
     return (a.nome||"").localeCompare(b.nome||"");
   });
-  const meus = ativos.filter(c=>c.equipeLiderId===lider.id).length;
+  const meus = ativos.filter(c=>pertenceA(c,lider.id)).length;
   const txt=dark?"#e8ecf5":"#0f172a", txt2=dark?"#94a3b8":"#64748b", card=dark?"#0b1220":"#fff";
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:card,borderRadius:14,padding:"18px 16px",width:"100%",maxWidth:440,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,maxHeight:"88vh",display:"flex",flexDirection:"column"}}>
         <div style={{fontSize:16,fontWeight:800,color:txt}}><Ico n="escudo"/> Equipe de {lider.nome}</div>
         <div style={{fontSize:11.5,color:txt2,marginBottom:12}}>{lider.cargo} · {lider.turno} · {meus} membro(s) vinculado(s)</div>
-        <div style={{fontSize:10.5,color:txt2,marginBottom:8}}>Toque para vincular/desvincular. Um membro em outra equipe será movido para esta.</div>
+        <div style={{fontSize:10.5,color:txt2,marginBottom:8}}>Toque para vincular/desvincular. Quem já está em outra equipe pode ser movido para esta ou duplicado (fica nas duas — ex.: recepção 5x2). A recepção já entra duplicada ao toque.</div>
         <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
           {ordenados.map(c=>{
-            const meu = c.equipeLiderId===lider.id;
-            const outra = c.equipeLiderId && c.equipeLiderId!==lider.id;
-            const nomeOutroLider = outra ? (colaboradores.find(x=>x.id===c.equipeLiderId)?.nome||"outro líder") : null;
+            const meu = pertenceA(c,lider.id);
+            const outrosIds = lideresDe(c).filter(id=>id!==lider.id);
+            const outra = !meu && outrosIds.length>0;
+            const nomesOutros = outrosIds.map(id=>colaboradores.find(x=>x.id===id)?.nome||"outro líder").join(", ");
+            const compart = cargoCompartilhado(c.cargo);
+            const clique = ()=> onToggle(lider.id, c.id, { duplicar: compart });
             return (
-              <div key={c.id} onClick={()=>onToggle(lider.id, c.id)}
-                style={{display:"flex",alignItems:"center",gap:9,padding:"8px 10px",borderRadius:9,cursor:"pointer",
+              <div key={c.id} onClick={outra && !compart ? undefined : clique}
+                style={{display:"flex",alignItems:"center",gap:9,padding:"8px 10px",borderRadius:9,cursor: outra && !compart ? "default" : "pointer",
                   background: meu ? "#0ea5e915" : "transparent",
                   border:`1px solid ${meu ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}`}}>
                 <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`2px solid ${meu?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`,background:meu?"#0ea5e9":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{meu?<><Ico n="check"/></>:""}</div>
@@ -1329,7 +1333,13 @@ function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, o
                   <div style={{fontSize:12.5,fontWeight:600,color:txt}}>{c.nome}</div>
                   <div style={{fontSize:10,color:txt2}}>{c.cargo} · {c.turno}</div>
                 </div>
-                {outra && <span style={{fontSize:9,color:"#f59e0b",fontWeight:700,flexShrink:0}}><Ico n="alerta"/> {nomeOutroLider}</span>}
+                {(outra||(meu&&outrosIds.length>0)) && <span style={{fontSize:9,color:"#f59e0b",fontWeight:700,flexShrink:0}}>{meu?"também em":"em"}: {nomesOutros}</span>}
+                {outra && !compart && (
+                  <span style={{display:"flex",gap:4,flexShrink:0}}>
+                    <button aria-label={`Mover ${c.nome} para esta equipe`} onClick={e=>{e.stopPropagation();onToggle(lider.id,c.id,{duplicar:false});}} style={{background:"transparent",border:"1px solid #f59e0b88",color:"#f59e0b",borderRadius:6,padding:"3px 7px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Mover</button>
+                    <button aria-label={`Duplicar ${c.nome} nesta equipe`} onClick={e=>{e.stopPropagation();onToggle(lider.id,c.id,{duplicar:true});}} style={{background:"transparent",border:"1px solid #0ea5e988",color:"#0ea5e9",borderRadius:6,padding:"3px 7px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Duplicar</button>
+                  </span>
+                )}
               </div>
             );
           })}
@@ -2344,20 +2354,16 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   };
 
   // ── Montagem de equipes: vincula/desvincula membros a um líder.
-  // Regra: um membro pertence a uma equipe só; ao ser puxado para uma,
-  // sai automaticamente da anterior (o equipeLiderId é sobrescrito).
-  const toggleMembroEquipe = async (liderId, membroId) => {
-    const novos = equipeData.colaboradores.map(c=>{
-      if(c.id!==membroId) return c;
-      const atual = c.equipeLiderId || null;
-      return { ...c, equipeLiderId: atual===liderId ? null : liderId };
-    });
+  // Regra: por padrão um membro pertence a uma equipe só (ao ser puxado para outra, é MOVIDO);
+  // "Duplicar" mantém nas duas (ex.: recepção 5x2 serve às equipes 12x36 de todos os líderes).
+  const toggleMembroEquipe = async (liderId, membroId, opcoes={}) => {
+    const novos = equipeData.colaboradores.map(c=> c.id!==membroId ? c : alternarVinculo(c, liderId, opcoes));
     await save({ ...equipeData, colaboradores:novos });
   };
-  // Desfaz uma equipe inteira (remove o vínculo de todos os membros do líder).
+  // Desfaz uma equipe inteira: remove só o vínculo com este líder (quem foi duplicado continua nas outras equipes).
   const desfazerEquipe = async (liderId) => {
-    if(!window.confirm("Desfazer esta equipe? Os membros ficarão sem equipe.")) return;
-    const novos = equipeData.colaboradores.map(c=> c.equipeLiderId===liderId ? {...c, equipeLiderId:null} : c);
+    if(!window.confirm("Desfazer esta equipe? Os membros ficarão sem esta equipe.")) return;
+    const novos = equipeData.colaboradores.map(c=> removerVinculo(c, liderId));
     await save({ ...equipeData, colaboradores:novos });
     setMontarLiderId(null);
   };
@@ -2981,7 +2987,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           {/* VISÃO POR EQUIPE MONTADA */}
           {!filtroRapido && visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (()=>{
             const lideres = ativos.filter(c=>ehLider(c, equipeData.colaboradores)).sort((a,b)=>(a.turno||"").localeCompare(b.turno||""));
-            const semEquipe = ativos.filter(c=>!ehLider(c, equipeData.colaboradores) && !c.equipeLiderId);
+            const semEquipe = ativos.filter(c=>!ehLider(c, equipeData.colaboradores) && semEquipeAlguma(c));
             const turnos = [...new Set(lideres.map(l=>l.turno))];
             return (
               <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -2992,7 +2998,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                     <div key={turno}>
                       <div style={{ fontSize:12, fontWeight:700, color:tc.badge, marginBottom:8, letterSpacing:.5, display:"flex", alignItems:"center", gap:8 }}><TurnoIcone turno={turno} tc={tc} size={26}/> {turno.toUpperCase()}</div>
                       {lideresTurno.map(lider=>{
-                        const membros = ativos.filter(c=>c.equipeLiderId===lider.id);
+                        const membros = ativos.filter(c=>pertenceA(c,lider.id));
                         return (
                           <div key={lider.id} style={{ border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, borderRadius:12, padding:10, marginBottom:10, background:dark?"#0a1120":"#fff" }}>
                             <div style={{ display:"flex", alignItems:"center", gap:9, padding:8, background:dark?"#0d1f2e":"#f0f9ff", borderRadius:8, border:"1px solid #0ea5e933" }}>

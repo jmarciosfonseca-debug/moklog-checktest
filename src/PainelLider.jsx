@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Ico, EmIco } from "./Icones";
+import { pertenceA, semEquipeAlguma } from "./equipe/vinculos";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -112,9 +113,9 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
   const lideres = cols.filter(c => /l[íi]der/i.test(String(c.cargo||"")));
   const equipesMontadas = lideres.map(l => ({
     lider: l.nome || "Líder",
-    membros: cols.filter(c => c.equipeLiderId === l.id).length,
+    membros: cols.filter(c => pertenceA(c, l.id)).length,
   })).filter(e => e.membros>0);
-  const semEquipe = cols.filter(c => !c.equipeLiderId && !/l[íi]der/i.test(String(c.cargo||""))).length;
+  const semEquipe = cols.filter(c => semEquipeAlguma(c) && !/l[íi]der/i.test(String(c.cargo||""))).length;
 
   // Card 2 — Férias e Cobertura (cruzando colabId → nome/cargo/turno)
   const ferias = Array.isArray(equipe?.ferias) ? equipe.ferias : [];

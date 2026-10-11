@@ -63,7 +63,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         if (m.status !== "enviado" && projetoPuxaEquipe(pid)) {
           const lp = (m.postos || []).find((p) => p.lider && p.pessoaId);
           const lc = lp && cs.find((c) => c.id === lp.pessoaId);
-          if (lc) { const r = puxarEquipe({ postos: m.postos, lider: lc, colabs: cs, pid, turno }); m = { ...m, postos: r.postos }; aviso = r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${lc.nome} puxada da montagem em Equipes. Ajuste só o que mudou.`; }
+          if (lc) { const r = puxarEquipe({ postos: m.postos, lider: lc, colabs: cs, pid, turno, soVazios: !!existente }); m = { ...m, postos: r.postos }; aviso = r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${lc.nome} puxada da montagem em Equipes. Ajuste só o que mudou.`; }
         }
         setAvisoEquipe(aviso);
         setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid, turno));
@@ -100,6 +100,21 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
       return alterar((m) => ({ ...m, postos: r.postos }));
     }
     setPosto(id, { pessoaId: c ? c.id : "", pessoaNome: c ? c.nome : "", detalhe: {} });
+  };
+
+  // O líder montou (ou ajustou) a equipe em Equipe com o mapa aberto: relê o cadastro e puxa de novo, sem tirar quem ele já escolheu.
+  const puxarDeNovo = async () => {
+    const lp = mapa.postos.find((p) => p.lider && p.pessoaId);
+    if (!lp) return setAvisoEquipe("Escolha primeiro o líder para puxar a equipe dele.");
+    try {
+      const cs = await io.loadColaboradores(pid, data);
+      const lc = cs.find((c) => c.id === lp.pessoaId);
+      setColabs(cs);
+      if (!lc) return;
+      const r = puxarEquipe({ postos: mapa.postos, lider: lc, colabs: cs, pid, turno, soVazios: true });
+      setAvisoEquipe(r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: monte lá e toque em Puxar de novo.` : `Equipe de ${lc.nome} atualizada da montagem em Equipes (${r.puxados} ${r.puxados === 1 ? "posto" : "postos"} preenchidos).`);
+      if (r.puxados) alterar((m) => ({ ...m, postos: r.postos }));
+    } catch (e) { setAvisoEquipe("Não consegui reler a Equipe agora. Tente de novo."); }
   };
 
   const concluir = async () => {
@@ -181,8 +196,11 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           <div style={S.card}>
             <div style={S.h}>Equipe do turno</div>
             {!projetoPuxaEquipe(pid) && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Projeto 4x2/5x2: a equipe muda a cada plantão e não é puxada sozinha. Escolha quem está em cada posto.</div>}
-            {projetoPuxaEquipe(pid) && avisoEquipe && <div role="status" style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>{avisoEquipe}</div>}
-            {projetoPuxaEquipe(pid) && !avisoEquipe && mapa.preenchidoDe && mapa.status !== "enviado" && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Pré-preenchido com o mapa de {mapa.preenchidoDe.data ? dataBR(mapa.preenchidoDe.data) : "dias atrás"} ({mapa.preenchidoDe.turno === "N" ? "noturno" : "diurno"}), mesma turma. Confira.</div>}
+            {projetoPuxaEquipe(pid) && mapa.status !== "enviado" && (() => {
+              const preench = mapa.preenchidoDe ? `Pré-preenchido com o mapa de ${mapa.preenchidoDe.data ? dataBR(mapa.preenchidoDe.data) : "dias atrás"} (${mapa.preenchidoDe.turno === "N" ? "noturno" : "diurno"}), mesma turma. Confira.` : "";
+              const texto = avisoEquipe || preench;
+              return (texto || mapa.postos.some((p) => p.lider && p.pessoaId)) ? <div role="status" style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>{texto} <button onClick={puxarDeNovo} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Puxar de novo</button></div> : null;
+            })()}
             {repetidas.length > 0 && <div role="alert" style={{ fontSize: 12, color: "#f59e0b", marginBottom: 8 }}>Atenção: {repetidas.map((r) => `${r.pessoa} em ${r.postos.join(" e ")}`).join("; ")}</div>}
             {mapa.postos.map((p) => (
               <div key={p.id} style={{ borderTop: `1px solid ${cor.line}`, padding: "10px 0" }}>
