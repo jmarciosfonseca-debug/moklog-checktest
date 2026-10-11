@@ -1,4 +1,5 @@
 import { Ico } from "./Icones";
+import IconeEquip from "./IconeEquip";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { useState, useEffect, useRef } from "react";
@@ -182,7 +183,7 @@ function ItemCard({ item, icon, title, children, onRemove, adminAuth, dark, prob
   return (
     <div style={{ background:dark?"#060c18":"#ffffff", border:`2px solid ${hasProblema?(STATUS_CONFIG[item.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`, borderRadius:10, overflow:"hidden", marginBottom:6 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", cursor:"pointer" }} onClick={()=>setOpen(!open)}>
-        <span style={{ fontSize:22, flexShrink:0 }}>{icon}</span>
+        <span style={{ flexShrink:0, display:"flex" }}><IconeEquip icon={icon} size={38}/></span>
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ fontSize:15, fontWeight:700, ...S.txt }}>{title}</div>
           <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap", alignItems:"center" }}>
@@ -496,7 +497,7 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, admin
     <div style={{background:dark?"#060c18":"#fff",border:`1px solid ${problemCount>0?"#ef444455":dark?"#0f172a":"#e2e8f0"}`,borderRadius:14,overflow:"hidden"}}>
       {/* Cabeçalho da seção — toque abre/fecha em cascata */}
       <div onClick={()=>setAberto(a=>!a)} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 14px",cursor:"pointer",userSelect:"none"}}>
-        <span style={{fontSize:22}}>{icon}</span>
+        <span style={{display:"flex"}}><IconeEquip icon={icon} size={38}/></span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:15,fontWeight:800,...S.txt}}>{titulo}</div>
           <div style={{fontSize:12,marginTop:2,color:problemCount>0?"#ef4444":items.length?"#22c55e":(dark?"#64748b":"#94a3b8"),fontWeight:problemCount>0?700:600,animation:problemCount>0?"mkBadgePulse 1.8s ease-in-out infinite":"none"}}>
@@ -636,7 +637,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
     <div style={{display:"flex",flexDirection:"column",gap:8}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:18}}>🏍️</span>
+          <IconeEquip icon="🏍️" size={34}/>
           <span style={{fontSize:13,fontWeight:700,...S.txt}}>Motocicleta</span>
           {hasProblema && <DiasAberto dataProblem={form.dataProblem}/>}
         </div>
