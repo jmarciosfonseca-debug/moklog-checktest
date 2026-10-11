@@ -1,4 +1,5 @@
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
+import { getDocsSeguro } from "./lerServidor";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -150,7 +151,7 @@ class ErrorBoundary extends React.Component {
 }
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -308,7 +309,7 @@ async function saveToFirebase(projectId, history) {
   return result;
 }
 async function loadAllFromFirebase() {
-  try { const snap=await getDocs(collection(db,"projects")); const data={}; snap.forEach(d=>{data[d.id]=d.data();}); return data; }
+  try { const snap=await getDocsSeguro(collection(db,"projects")); const data={}; snap.forEach(d=>{data[d.id]=d.data();}); return data; }
   catch(e){ return {}; }
 }
 async function deleteReportFromFirebase(projectId, newHistory) {
@@ -1749,7 +1750,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   const lerAmbulancias = async (pid) => { try {
                     const sn = await getDoc(doc(db, "ambulancias", pid)); const mapa = new Map();
                     for(const r of (sn.exists() ? (sn.data().registros||[]) : [])) mapa.set(r.id, r);
-                    try { const sub = await getDocs(collection(db, "ambulancias", pid, "registros")); sub.docs.forEach(d=>mapa.set(d.id, {...d.data(), id:d.id})); } catch(e){}
+                    try { const sub = await getDocsSeguro(collection(db, "ambulancias", pid, "registros")); sub.docs.forEach(d=>mapa.set(d.id, {...d.data(), id:d.id})); } catch(e){}
                     return [...mapa.values()];
                   } catch(e){ return null; } };
                   const extras = {};

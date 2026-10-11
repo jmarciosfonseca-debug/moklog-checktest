@@ -1,9 +1,10 @@
 import { Ico } from "./Icones";
+import { getDocsSeguro } from "./lerServidor";
 import { iconeTema } from "./temaClaro";
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
 import { useState, useEffect, useContext, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, where } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocFromServer, collection, query, where } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
 // Firebase Storage removido - usando compressão local
 
@@ -2035,7 +2036,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     const anosCarregar = [...new Set([anoAtual, anoFiltro])];
     setCestaPorAno({});
     Promise.all(Object.keys(CAMPANHAS).flatMap(tipo => anosCarregar.map(a=>
-      getDocs(query(collection(db,"equipes",project.id,CAMPANHAS[tipo].colecao), where("ano","==",a)))
+      getDocsSeguro(query(collection(db,"equipes",project.id,CAMPANHAS[tipo].colecao), where("ano","==",a)))
         .then(qs=>{ const m={}; qs.forEach(d=>{ const v=d.data(); if(v && v.colabId) m[v.colabId]=v; }); return [chaveCampanha(tipo,a),m]; })
         .catch(e=>{ console.warn("Campanha: falha na leitura", e); return [chaveCampanha(tipo,a),null]; })
     ))).then(res=>{

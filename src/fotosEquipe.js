@@ -10,8 +10,9 @@
 //   Trocar a foto = criar uma foto nova e mudar fotoRef pela gravação normal da Equipe (que tem revisão e devolve 409 em
 //   conflito). Foto legada (campo foto no documento) continua aparecendo até ser migrada. NADA é removido nem reduzido.
 // ─────────────────────────────────────────────────────────────
+import { getDocsSeguro } from "./lerServidor";
 import { createContext, useEffect, useState, useCallback } from "react";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection } from "firebase/firestore";
 import { authFetchEquipe, isDemo } from "./session";
 
 export const FOTO_SUBCOLECAO = "fotos";
@@ -40,7 +41,7 @@ export function fotosPendentes(lista, mapa) {
   return (lista || []).some(c => c.temFoto !== false && c.fotoRef && !fotoDe(c, mapa));
 }
 export async function carregarFotos(db, pid) {
-  const snap = await getDocs(collection(db, "equipes", pid, FOTO_SUBCOLECAO));
+  const snap = await getDocsSeguro(collection(db, "equipes", pid, FOTO_SUBCOLECAO));
   const mapa = {};
   snap.forEach(d => { const v = d.data(); if (v && ehFoto(v.data)) mapa[d.id] = v.data; });
   return mapa;

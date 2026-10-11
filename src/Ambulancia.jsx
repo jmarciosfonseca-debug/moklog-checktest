@@ -2,7 +2,7 @@ import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, getDocs, getDocFromServer, getDocsFromServer } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
 import { gerarPdfAmbulancia } from "./ambulanciaPdf";
 import { montarConsolidadoAmbulancia } from "./relatorios/ambulanciaRelatorio";
@@ -109,6 +109,8 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   const [relFim, setRelFim] = useState(() => new Date().toLocaleDateString("sv-SE"));
   const [relInterno, setRelInterno] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [fonte, setFonte] = useState("servidor"); // servidor | aparelho | erro
+  const [recarga, setRecarga] = useState(0);
   const [saving, setSaving] = useState(false);
   const [screen, setScreen] = useState("list"); // list | form
   const [form, setForm] = useState(blankReg());
@@ -119,19 +121,30 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   useEffect(()=>{
     let vivo = true;
     (async ()=>{
-      try{
-        // Formato ANTIGO: documento único com array registros[]
+      setLoading(true);
+      // 1) SERVIDOR primeiro (3 tentativas) — nunca confiar em cache vazio do aparelho.
+      // 2) Sem servidor: usa o aparelho, mas AVISA (fonte="aparelho"); sem nada: erro explícito.
+      const lerTudo = async (doServidor) => {
         let antigos = [];
-        const snap = await getDoc(doc(db, COL, project.id));
+        const snap = await (doServidor ? getDocFromServer : getDoc)(doc(db, COL, project.id));
         if(snap.exists()) antigos = (snap.data().registros || []).map(r => ({ ...r, _novo:false }));
-
-        // Formato NOVO: um documento por registro na subcoleção registros/
         let novos = [];
         try{
-          const subSnap = await getDocs(collection(db, COL, project.id, "registros"));
+          const subSnap = await (doServidor ? getDocsFromServer : getDocs)(collection(db, COL, project.id, "registros"));
           novos = subSnap.docs.map(d => ({ ...d.data(), id: d.id, _novo:true }));
-        }catch(e){ /* subcoleção pode não existir ainda */ }
-
+        }catch(e){ if(doServidor) throw e; }
+        return { antigos, novos };
+      };
+      let res = null, origem = "servidor";
+      const comLimite = (p, ms) => Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error("tempo esgotado")), ms))]);
+      for(let i=0;i<2 && !res;i++){
+        try{ res = await comLimite(lerTudo(true), 8000); }catch(e){ console.warn("load ambulancia (servidor) tentativa "+(i+1), e); }
+      }
+      if(!res){
+        try{ res = await comLimite(lerTudo(false), 5000); origem = "aparelho"; }catch(e){ console.warn("load ambulancia (aparelho):", e); }
+      }
+      if(res){
+        const { antigos, novos } = res;
         // Junta os dois, remove duplicados por id (novo tem prioridade) e ordena
         const mapa = new Map();
         for(const r of antigos) mapa.set(r.id, r);
@@ -141,8 +154,8 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           const kb = (a.data||"") + (a.criadoEm||"");
           return ka.localeCompare(kb);
         });
-        if(vivo) setRegistros(lista);
-      }catch(e){ console.warn("load ambulancia:", e); }
+        if(vivo){ setRegistros(lista); setFonte(origem); }
+      } else if(vivo){ setFonte("erro"); }
       // puxa lista de inquilinos cadastrados para o dropdown
       try{
         const snapInq = await getDoc(doc(db, COL_INQ, project.id));
@@ -155,7 +168,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
       if(vivo) setLoading(false);
     })();
     return ()=>{ vivo=false; };
-  },[project.id]);
+  },[project.id, recarga]);
 
   // Grava UM registro no seu próprio documento (subcoleção registros/).
   // Assim cada ocorrência tem seu próprio limite de 1MB — nunca estoura por
@@ -520,9 +533,17 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           </div>
         )}
 
+        {fonte!=="servidor" && (
+          <div style={{ margin:"0 0 12px", padding:"12px 14px", borderRadius:12, border:"1px solid #f59e0b88", background:"#f59e0b18", color:dark?"#fcd34d":"#92400e", fontSize:13, lineHeight:1.4 }}>
+            <strong>{fonte==="erro" ? "Não foi possível carregar o histórico." : "Sem conexão com o servidor."}</strong>{" "}
+            {fonte==="erro" ? "Seus registros NÃO foram apagados — a tela só não conseguiu buscá-los." : "Mostrando o que está salvo neste aparelho — pode estar incompleto."}
+            <div><button onClick={()=>setRecarga(n=>n+1)} style={{ marginTop:8, padding:"8px 14px", borderRadius:8, border:"1px solid #f59e0b", background:"transparent", color:"inherit", fontWeight:800, cursor:"pointer" }}>Tentar novamente</button></div>
+          </div>
+        )}
+
         {/* Lista */}
         {registros.length === 0 ? (
-          <div style={{ padding:"30px 16px", textAlign:"center", ...S.txt2, border:`1px dashed ${dark?"#1e293b":"#e2e8f0"}`, borderRadius:12 }}>
+          fonte!=="servidor" ? null : <div style={{ padding:"30px 16px", textAlign:"center", ...S.txt2, border:`1px dashed ${dark?"#1e293b":"#e2e8f0"}`, borderRadius:12 }}>
             Nenhum registro ainda. Toque em <strong>Novo Registro</strong> para começar.
           </div>
         ) : (
