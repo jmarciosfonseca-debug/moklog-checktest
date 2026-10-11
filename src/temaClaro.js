@@ -66,5 +66,5 @@ export function aplicarTema(tema) {
   if (tema === "lua") { if (el) el.remove(); return; }
   if (!el) { el = document.createElement("style"); el.id = ID; document.head.appendChild(el); }
   const tints = MAPA.map(([rgb, nova]) => `[style*="background: ${rgb}"]{background:${nova} !important}`).join("\n");
-  el.textContent = ["body{color:#1e293b}", tints, LEGIBILIDADE, tema === "sol" ? SOL : ""].join("\n");
+  el.textContent = ["body{color:#1e293b}", "svg.mk-ico{filter:none !important}", tints, LEGIBILIDADE, tema === "sol" ? SOL : ""].join("\n");
 }

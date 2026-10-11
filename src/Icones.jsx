@@ -88,7 +88,7 @@ export function Ico({ n, size = "1.1em", style, title }) {
   }
   const d = T[n];
   if (!d) return null;
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : "true"} role={title ? "img" : undefined} style={base}>{title ? <title>{title}</title> : null}{d}</svg>;
+  return <svg className="mk-ico" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden={title ? undefined : "true"} role={title ? "img" : undefined} style={base}>{title ? <title>{title}</title> : null}{d}</svg>;
 }
 
 export const NOMES_ICONES = Object.freeze([...Object.keys(T), ...Object.keys(PONTOS)]);
