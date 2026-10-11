@@ -41,3 +41,14 @@ test("o clique alterna a lista", async () => {
   await act(async () => host.querySelector('[role="button"]').click());
   expect(onToggle).toHaveBeenCalledTimes(1);
 });
+
+test("em implantação: sem contador, sem brilho e sem lista, mesmo com mapas pendentes", async () => {
+  await mostrar({ resumo: resumoDoPainel({ agora, mapas: [] }), emImplantacao: true, aberto: true });
+  expect(host.textContent).toContain("Em implantação");
+  expect(host.textContent).not.toMatch(/\d+ de 12/);
+  expect(host.textContent).not.toContain("Pendente");
+  expect(card().style.animation).toBe("none");
+});
+test("o interruptor padrão está desligado até existir o envio do mapa", () => {
+  expect(require("./ativo").MAPA_DIARIO_ATIVO).toBe(false);
+});
