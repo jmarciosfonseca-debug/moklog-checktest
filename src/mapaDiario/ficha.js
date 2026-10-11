@@ -26,6 +26,13 @@ export function lancamentosDoMapa(mapa) {
     const item = { id: idDe(mapa.id, p.pessoaId, tipo), colabId: p.pessoaId, tipo, data: mapa.data, detalhe, origem: "mapa", mapaId: mapa.id };
     if (tipo === "Falta") Object.assign(item, { diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) });
     if (!out.some((x) => x.id === item.id)) out.push(item);
+    // FT: quem faltou (escolhido do cadastro) recebe a falta na própria ficha, coberta por esta FT.
+    const d = p.detalhe || {};
+    if (tipo === "FT" && d.quemFaltouId && d.quemFaltouId !== p.pessoaId) {
+      const nomeFt = (p.pessoaNome || "").trim();
+      const falta = { id: idDe(mapa.id, d.quemFaltouId, "Falta"), colabId: d.quemFaltouId, tipo: "Falta", data: mapa.data, detalhe: `Falta no posto ${p.rotulo}${nomeFt ? ` (coberta por FT de ${nomeFt})` : ""} — ${origem}`, origem: "mapa", mapaId: mapa.id, diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) };
+      if (!out.some((x) => x.id === falta.id)) out.push(falta);
+    }
   });
   return out;
 }

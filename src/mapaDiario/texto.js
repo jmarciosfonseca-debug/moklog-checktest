@@ -22,7 +22,7 @@ function linhaPosto(p) {
     case "vago": return `${base}— sem ninguém no posto`;
     case "falta": return `${base}${nome} — FALTA`;
     case "atraso": return `${base}${nome} — atraso${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
-    case "ft": return `${base}${nome} — FT (folga trabalhada)`;
+    case "ft": return `${base}${nome} — FT (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : ""}`;
     case "cobertura": return `${base}${nome}${d.base ? " (Base)" : ""} — cobertura de ${d.deQuem}`;
     case "troca": return `${base}${nome} — troca de plantão, no lugar de ${d.noLugarDe}`;
     default: return `${base}${nome}`;

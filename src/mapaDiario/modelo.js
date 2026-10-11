@@ -144,6 +144,10 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
       if (!d.deQuem) erros.push(`${nome}: cobertura de quem?`);
       if (d.base && !p.pessoaNome) erros.push(`${nome}: digite o nome de quem da Base está cobrindo`);
     }
+    if (p.situacao === "ft") {
+      if (!d.quemFaltouId && !d.semFalta) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
+      if (d.quemFaltouId && d.quemFaltouId === p.pessoaId) erros.push(`${nome}: quem faltou não pode ser a própria pessoa da FT`);
+    }
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
   });
   const mat = mapa.material || materialNovo();

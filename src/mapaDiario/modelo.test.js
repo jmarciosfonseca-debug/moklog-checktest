@@ -56,7 +56,7 @@ test("exceções exigem o detalhe mínimo", () => {
   expect(validarParaConcluir(com(2, "troca", {})).join()).toMatch(/no lugar de quem/);
   expect(validarParaConcluir(com(2, "troca", { noLugarDe: "Beto" }))).toEqual([]);
   expect(validarParaConcluir(com(0, "falta", {}))).toEqual([]);
-  expect(validarParaConcluir(com(0, "ft", {}))).toEqual([]);
+  expect(validarParaConcluir(com(0, "ft", { quemFaltouId: "z", quemFaltou: "Z" }))).toEqual([]);
 });
 test("quilometragem: rodado = atual − anterior; negativo bloqueia", () => {
   expect(kmRodado({ kmAnterior: 1200, kmAtual: 1262 })).toBe(62);
@@ -251,4 +251,18 @@ describe("resumo que fala de exceção sem posto marcado", () => {
     const comFt = { ...base, resumo: "Rosemeire de extra", postos: base.postos.map((p, i) => (i === 0 ? { ...p, situacao: "ft" } : p)) };
     expect(avisoResumoSemExcecao(comFt)).toBe("");
   });
+});
+
+test("FT exige 'quem faltou' (ou 'ninguém faltou') e não aceita a própria pessoa", () => {
+  const base = preencher(mapa(), ["A", "B", "C"]);
+  const com = (detalhe) => ({ ...base, postos: base.postos.map((p, i) => (i === 1 ? { ...p, pessoaId: "x", situacao: "ft", detalhe } : p)) });
+  expect(validarParaConcluir(com({})).join("|")).toMatch(/FT cobrindo falta de quem/);
+  expect(validarParaConcluir(com({ quemFaltouId: "y", quemFaltou: "Y" }))).toEqual([]);
+  expect(validarParaConcluir(com({ semFalta: true }))).toEqual([]);
+  expect(validarParaConcluir(com({ quemFaltouId: "x" })).join("|")).toMatch(/própria pessoa/);
+});
+test("WhatsApp: a FT diz de quem foi a falta coberta", () => {
+  const m = mapa();
+  const t = montarTextoWhatsApp({ ...m, postos: m.postos.map((p, i) => (i === 0 ? { ...p, pessoaNome: "Rosemeire", situacao: "ft", detalhe: { quemFaltou: "Elaine", quemFaltouId: "e" } } : p)) });
+  expect(t).toContain("Rosemeire — FT (folga trabalhada), cobrindo a falta de Elaine");
 });

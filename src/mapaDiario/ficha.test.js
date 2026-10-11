@@ -54,3 +54,24 @@ test("resumo para o líder", () => {
   expect(resumoLancamento({ removidos: 0 }, m)).toBe("Ficha atualizada: 1 falta, 2 atrasos.");
   expect(resumoLancamento({ removidos: 0 }, mapa([posto("Líder", "a", "presente")]))).toBe("Nenhum lançamento para a ficha neste mapa.");
 });
+
+test("FT com 'quem faltou': a FT vai para quem cobriu e a falta para a ficha de quem faltou", () => {
+  const m = mapa([posto("CCO", "b", "ft", { quemFaltouId: "a", quemFaltou: "Ana" })]);
+  const l = lancamentosDoMapa(m);
+  expect(l.map((x) => [x.colabId, x.tipo])).toEqual([["b", "FT"], ["a", "Falta"]]);
+  expect(l[1]).toMatchObject({ id: "mapa:P601_2026-10-11_D:a:Falta", diasFalta: 1, origem: "mapa" });
+  expect(l[1].detalhe).toContain("coberta por FT de b");
+  const r = aplicarNaFicha(doc(), m);
+  expect(r.after.colaboradores[0].historico[0].tipo).toBe("Falta");
+  expect(r.after.colaboradores[1].historico[0].tipo).toBe("FT");
+  // concluir de novo não duplica; corrigir (trocar quem faltou) tira a falta antiga e lança a nova
+  const r2 = aplicarNaFicha(r.after, m);
+  expect(r2.mudou).toBe(false);
+  const r3 = aplicarNaFicha(r.after, mapa([posto("CCO", "b", "ft", { quemFaltouId: "c", quemFaltou: "Caio" })]));
+  expect(r3.after.colaboradores[0].historico.some((h) => h.tipo === "Falta")).toBe(false);
+  expect(r3.after.colaboradores[2].historico.some((h) => h.tipo === "Falta")).toBe(true);
+});
+test("FT sem 'quem faltou' ou 'ninguém faltou' só lança a FT; a própria pessoa não vira falta", () => {
+  expect(lancamentosDoMapa(mapa([posto("CCO", "b", "ft", { semFalta: true })])).map((x) => x.tipo)).toEqual(["FT"]);
+  expect(lancamentosDoMapa(mapa([posto("CCO", "b", "ft", { quemFaltouId: "b" })])).map((x) => x.tipo)).toEqual(["FT"]);
+});

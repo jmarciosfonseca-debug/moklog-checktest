@@ -240,6 +240,22 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     </label>
                   </div>
                 )}
+                {p.situacao === "ft" && (
+                  <div>
+                    <div style={S.lab}>Quem faltou?</div>
+                    <select aria-label="Quem faltou (FT)" value={p.detalhe?.semFalta ? "__ninguem" : p.detalhe?.quemFaltouId || ""} onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "__ninguem") return setDetalhe(p.id, { semFalta: true, quemFaltouId: "", quemFaltou: "" });
+                      const c = colabs.find((x) => x.id === v);
+                      setDetalhe(p.id, { semFalta: false, quemFaltouId: c ? c.id : "", quemFaltou: c ? c.nome : "" });
+                    }} style={S.in}>
+                      <option value="">Escolher quem faltou…</option>
+                      {colabs.filter((c) => c.id !== p.pessoaId).map((c) => <option key={c.id} value={c.id}>{nomeCurto(c)}</option>)}
+                      <option value="__ninguem">Ninguém faltou (reforço / vaga)</option>
+                    </select>
+                    {p.detalhe?.quemFaltouId && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>A falta vai para a ficha de {p.detalhe.quemFaltou} e a FT para a ficha de {p.pessoaNome || "quem está no posto"}.</div>}
+                  </div>
+                )}
                 {p.situacao === "troca" && (
                   <div>
                     <div style={S.lab}>No lugar de quem?</div>

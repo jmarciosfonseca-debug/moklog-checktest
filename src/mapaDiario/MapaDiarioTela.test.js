@@ -249,3 +249,20 @@ test("resumo cita extra sem exceção marcada: avisa uma vez e só envia no segu
   expect(io.saveMapa).toHaveBeenCalledTimes(1);
   expect(q('pre[aria-label="Texto do mapa"]')).not.toBeNull();
 });
+
+test("FT pergunta 'Quem faltou?', exige a escolha e manda a falta para a ficha de quem faltou", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
+  await abrirExc("P1 · Vigilante CCO");
+  await clicar(botao("FT"));
+  expect(host.textContent).toContain("Quem faltou?");
+  const sel = q('select[aria-label="Quem faltou (FT)"]');
+  expect([...sel.options].some((o) => o.value === "b")).toBe(false); // a própria pessoa da FT não aparece
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain("FT cobrindo falta de quem?");
+  await digitar(sel, "d");
+  await clicar(botao("Concluir mapa"));
+  const t = q('pre[aria-label="Texto do mapa"]').textContent;
+  expect(t).toContain("Marta A. — FT (folga trabalhada), cobrindo a falta de Joao V.");
+  const enviado = io.lancarNaFicha.mock.calls[0][0].postos[1];
+  expect(enviado).toMatchObject({ situacao: "ft", detalhe: { quemFaltouId: "d", quemFaltou: "Joao V." } });
+});
