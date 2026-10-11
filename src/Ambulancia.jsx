@@ -2,7 +2,7 @@ import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, getDocs, getDocFromServer, getDocsFromServer } from "firebase/firestore";
+import { getFirestore, terminate, clearIndexedDbPersistence, doc, getDoc, collection, getDocs, getDocFromServer, getDocsFromServer } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
 import { gerarPdfAmbulancia } from "./ambulanciaPdf";
 import { montarConsolidadoAmbulancia } from "./relatorios/ambulanciaRelatorio";
@@ -169,6 +169,14 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
     })();
     return ()=>{ vivo=false; };
   },[project.id, recarga]);
+
+  // Limpa só o cache local do aparelho (os registros ficam no servidor) e recarrega.
+  const reparar = async () => {
+    if(!window.confirm("Reparar a conexão deste aparelho?\n\nIsso limpa apenas a cópia local. Seus registros continuam salvos no servidor. Se houver algo salvo só neste aparelho e ainda não enviado, será perdido.")) return;
+    try{ await terminate(db); await clearIndexedDbPersistence(db); }catch(e){ console.warn("reparar cache:", e); }
+    try{ const ks = await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }catch(e){}
+    window.location.reload();
+  };
 
   // Grava UM registro no seu próprio documento (subcoleção registros/).
   // Assim cada ocorrência tem seu próprio limite de 1MB — nunca estoura por
@@ -537,7 +545,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           <div style={{ margin:"0 0 12px", padding:"12px 14px", borderRadius:12, border:"1px solid #f59e0b88", background:"#f59e0b18", color:dark?"#fcd34d":"#92400e", fontSize:13, lineHeight:1.4 }}>
             <strong>{fonte==="erro" ? "Não foi possível carregar o histórico." : "Sem conexão com o servidor."}</strong>{" "}
             {fonte==="erro" ? "Seus registros NÃO foram apagados — a tela só não conseguiu buscá-los." : "Mostrando o que está salvo neste aparelho — pode estar incompleto."}
-            <div><button onClick={()=>setRecarga(n=>n+1)} style={{ marginTop:8, padding:"8px 14px", borderRadius:8, border:"1px solid #f59e0b", background:"transparent", color:"inherit", fontWeight:800, cursor:"pointer" }}>Tentar novamente</button></div>
+            <div>{fonte==="erro" && <button onClick={reparar} style={{ marginTop:8, marginRight:8, padding:"8px 14px", borderRadius:8, border:"1px solid #f59e0b", background:"#f59e0b", color:"#1a1000", fontWeight:800, cursor:"pointer" }}>Reparar conexão</button>}<button onClick={()=>setRecarga(n=>n+1)} style={{ marginTop:8, padding:"8px 14px", borderRadius:8, border:"1px solid #f59e0b", background:"transparent", color:"inherit", fontWeight:800, cursor:"pointer" }}>Tentar novamente</button></div>
           </div>
         )}
 

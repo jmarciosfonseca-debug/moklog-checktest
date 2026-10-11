@@ -17,7 +17,8 @@ const firebaseConfig = {
 
 try {
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  // experimentalAutoDetectLongPolling: em redes/aparelhos onde o canal em tempo real é bloqueado, cai sozinho para long-polling.
+  initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true });
 } catch (e) {
   try { console.warn("[offline] cache persistente indisponível:", e && e.message); } catch {}
 }
