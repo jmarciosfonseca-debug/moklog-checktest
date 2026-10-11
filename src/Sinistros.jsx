@@ -27,6 +27,7 @@
 //     estilo do modulador de equipe já existente (consolidarRiscoGeral).
 // ─────────────────────────────────────────────────────────────
 
+import { Ico } from "./Icones";
 import React, { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -195,7 +196,7 @@ export default function Sinistros({ pid, projectName, onBack }) {
   return (
     <div style={S.wrap}>
       {onBack && <button style={S.back} onClick={onBack}>← Voltar</button>}
-      <div style={S.h}>🛡️ Histórico de Sinistros</div>
+      <div style={S.h}><Ico n="escudo"/> Histórico de Sinistros</div>
       <div style={S.sub}>{pid}{projectName ? " — " + projectName : ""} · painel gerencial</div>
 
       <div style={S.card}>
@@ -236,7 +237,7 @@ export default function Sinistros({ pid, projectName, onBack }) {
           {saving ? "Salvando…" : "Salvar"}
         </button>
       )}
-      {saved && <div style={S.ok}>✓ Sinistro registrado</div>}
+      {saved && <div style={S.ok}><Ico n="check"/> Sinistro registrado</div>}
     </div>
   );
 }

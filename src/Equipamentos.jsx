@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { useState, useEffect, useRef } from "react";
@@ -150,7 +151,7 @@ function StatusSelector({ value, onChange, tipos, dark }) {
       </div>
       {showJust && (
         <div style={{ background:dark?"#1a0202":"#fff5f5", border:"1px solid #ef444433", borderRadius:8, padding:"10px 12px", marginTop:8 }}>
-          <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginBottom:8 }}>⚠️ Justificativa obrigatória</div>
+          <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginBottom:8 }}><Ico n="alerta"/> Justificativa obrigatória</div>
           <div style={{ marginBottom:8 }}>
             <label style={S.lbl}>Data da ocorrência</label>
             <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
@@ -163,7 +164,7 @@ function StatusSelector({ value, onChange, tipos, dark }) {
             <button onClick={()=>setShowJust(false)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
             <button onClick={()=>confirmJust(value?.status)}
               style={{...S.btn,flex:1,fontSize:12,background:"linear-gradient(135deg,#ef4444,#dc2626)"}}>
-              ✓ Confirmar e Enviar WhatsApp
+              <Ico n="check"/> Confirmar e Enviar WhatsApp
             </button>
           </div>
         </div>
@@ -196,14 +197,14 @@ function ItemCard({ item, icon, title, children, onRemove, adminAuth, dark, prob
           <div style={{ paddingTop:10 }}>{children}</div>
           {hasProblema && item.justificativa && (
             <div style={{ background:dark?"#1a0202":"#fff5f5", border:"1px solid #ef444433", borderRadius:8, padding:"8px 12px", marginTop:8 }}>
-              <div style={{ fontSize:10, color:"#ef4444", fontWeight:700, marginBottom:3 }}>⚠️ {fmtDate(item.dataProblem)}</div>
+              <div style={{ fontSize:10, color:"#ef4444", fontWeight:700, marginBottom:3 }}><Ico n="alerta"/> {fmtDate(item.dataProblem)}</div>
               <div style={{ fontSize:11, ...S.txt }}>{item.justificativa}</div>
             </div>
           )}
           {adminAuth && onRemove && (
             <button onClick={()=>{ if(window.confirm("Excluir este item?")) onRemove(); }}
               style={{ ...S.btnSm, color:"#ef4444", border:"1px solid #ef444433", fontSize:10, marginTop:8 }}>
-              🗑 Excluir Item
+              <Ico n="lixeira"/> Excluir Item
             </button>
           )}
         </div>
@@ -348,13 +349,13 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
-        <div style={{fontSize:32, marginBottom:8}}>🛡️</div>
+        <div style={{fontSize:32, marginBottom:8}}><Ico n="escudo"/></div>
         <div style={{fontSize:16, fontWeight:800, ...S.txt, marginBottom:4}}>Equipamentos</div>
         <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex", flexDirection:"column", gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}>👷 Acesso Líder</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}><Ico n="capacete"/> Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec, fontSize:13, marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -460,7 +461,7 @@ export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial })
       <div style={{display:"flex",gap:8,marginTop:4}}>
         <button onClick={onCancel} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
         <button onClick={()=>{ if(!f.identificacao.trim()){ alert("Informe a identificação"); return; } const qtd=Number(f.qtd??1); if(!Number.isSafeInteger(qtd)||qtd<(tipo==="municao"?0:1)||qtd>100000){alert("Quantidade inválida");return;} onSave({...f,qtd}); }}
-          style={{...S.btn,flex:1,fontSize:13}}>{initial?"Salvar alterações":"✓ Adicionar"}</button>
+          style={{...S.btn,flex:1,fontSize:13}}>{initial?"Salvar alterações":<><Ico n="check"/>{" Adicionar"}</>}</button>
       </div>
     </div>
   );
@@ -526,11 +527,11 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, admin
             {!["municao","radiosHT"].includes(tipo)&&<span style={{fontSize:11,...S.txt2}}>Qtd: {item.qtd??1}</span>}
             {/* Campos específicos somente leitura */}
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {item.modelo && <span style={{fontSize:10,...S.txt2}}>📱 {item.modelo}</span>}
-              {item.marca  && <span style={{fontSize:10,...S.txt2}}>🏷 {item.marca}</span>}
+              {item.modelo && <span style={{fontSize:10,...S.txt2}}><Ico n="celular"/> {item.modelo}</span>}
+              {item.marca  && <span style={{fontSize:10,...S.txt2}}><Ico n="etiqueta"/> {item.marca}</span>}
               {item.calibre && <span style={{fontSize:10,...S.txt2}}>🔫 {item.calibre}</span>}
               {item.nSerie && <span style={{fontSize:10,...S.txt2}}>🔢 {item.nSerie}</span>}
-              {item.validade && <span style={{fontSize:10,color:new Date(item.validade)<new Date()?"#ef4444":"#22c55e"}}>📅 Val: {fmtDate(item.validade)}</span>}
+              {item.validade && <span style={{fontSize:10,color:new Date(item.validade)<new Date()?"#ef4444":"#22c55e"}}><Ico n="calendario"/> Val: {fmtDate(item.validade)}</span>}
               {item.qtd!==undefined && tipo==="municao" && <span style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>{item.qtd} unidades</span>}
               {item.qtd!==undefined && tipo==="radiosHT" && <span style={{fontSize:10,...S.txt2}}>Qtd: {item.qtd}</span>}
             </div>
@@ -599,7 +600,7 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, admin
             {item.status && item.status!=="ok" && (
               <button onClick={()=>updateItem(item.id,{status:"ok",justificativa:"",dataProblem:""})}
                 style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"6px 14px"}}>
-                ✓ Marcar como Resolvido
+                <Ico n="check"/> Marcar como Resolvido
               </button>
             )}
           </div>
@@ -639,7 +640,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
           <span style={{fontSize:13,fontWeight:700,...S.txt}}>Motocicleta</span>
           {hasProblema && <DiasAberto dataProblem={form.dataProblem}/>}
         </div>
-        {liderAuth && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}>✏️ Editar</button>}
+        {liderAuth && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}><Ico n="editar"/> Editar</button>}
       </div>
 
       <div style={{...S.card,border:`2px solid ${hasProblema?(STATUS_CONFIG[form.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`}}>
@@ -655,13 +656,13 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
             <div><label style={S.lbl}>Próxima Revisão (Data)</label><input type="date" value={form.proximaRevisao||""} onChange={e=>setForm(f=>({...f,proximaRevisao:e.target.value}))} style={S.inp}/></div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditing(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-              <button onClick={()=>save(form)} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+              <button onClick={()=>save(form)} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Salvar</button>
             </div>
           </div>
         ) : (
           <>
             {!form.placa ? (
-              <div style={{textAlign:"center",padding:"10px 0",fontSize:12,...S.txt2}}>Motocicleta não cadastrada{liderAuth?" — toque em ✏️ Editar":""}</div>
+              <div style={{textAlign:"center",padding:"10px 0",fontSize:12,...S.txt2}}>Motocicleta não cadastrada{liderAuth?<>{" — toque em "}<Ico n="editar"/>{" Editar"}</>:""}</div>
             ) : (
               <>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
@@ -678,7 +679,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                 </div>
                 {form.km && form.kmManutencao && Number(form.km) >= Number(form.kmManutencao) && (
                   <div style={{background:"#1a0202",border:"1px solid #ef444433",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-                    <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 KM de manutenção atingido!</div>
+                    <div style={{fontSize:11,color:"#ef4444",fontWeight:700}}><Ico n="pontoVermelho"/> KM de manutenção atingido!</div>
                     <div style={{fontSize:10,color:"#94a3b8"}}>KM atual ({form.km}) ≥ KM manutenção ({form.kmManutencao})</div>
                   </div>
                 )}
@@ -699,7 +700,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
 
                 {hasProblema && form.justificativa && (
                   <div style={{background:dark?"#1a0202":"#fff5f5",border:"1px solid #ef444433",borderRadius:8,padding:"8px 12px",marginTop:8}}>
-                    <div style={{fontSize:10,color:"#ef4444",fontWeight:700,marginBottom:3}}>⚠️ {fmtDate(form.dataProblem)}</div>
+                    <div style={{fontSize:10,color:"#ef4444",fontWeight:700,marginBottom:3}}><Ico n="alerta"/> {fmtDate(form.dataProblem)}</div>
                     <div style={{fontSize:11,...S.txt}}>{form.justificativa}</div>
                   </div>
                 )}
@@ -707,14 +708,14 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                 {liderAuth && hasProblema && (
                   <button onClick={()=>{ const u={...form,status:"ok",justificativa:"",dataProblem:""}; setForm(u); onUpdate(u); }}
                     style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e44",fontSize:10,padding:"6px 14px",marginTop:8}}>
-                    ✓ Marcar como Resolvido
+                    <Ico n="check"/> Marcar como Resolvido
                   </button>
                 )}
 
                 {/* Histórico manutenção */}
                 <div style={{marginTop:12,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,paddingTop:10}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <div style={{fontSize:11,fontWeight:700,...S.txt}}>🔧 Histórico Manutenção ({(form.historico||[]).length})</div>
+                    <div style={{fontSize:11,fontWeight:700,...S.txt}}><Ico n="ferramenta"/> Histórico Manutenção ({(form.historico||[]).length})</div>
                     <button onClick={()=>setShowHist(!showHist)} style={{...S.btnSm,fontSize:10,color:"#f59e0b",border:"1px solid #f59e0b44"}}>+ Registrar</button>
                   </div>
                   {showHist && (
@@ -726,7 +727,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                       <div style={{marginBottom:8}}><label style={S.lbl}>Descrição</label><textarea value={novaManut.desc} onChange={e=>setNovaManut(m=>({...m,desc:e.target.value}))} placeholder="O que foi feito..." style={{...S.inp,height:50,resize:"vertical",fontSize:12}}/></div>
                       <div style={{display:"flex",gap:8}}>
                         <button onClick={()=>setShowHist(false)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
-                        <button onClick={addManut} style={{...S.btn,flex:1,fontSize:12}}>✓ Adicionar</button>
+                        <button onClick={addManut} style={{...S.btn,flex:1,fontSize:12}}><Ico n="check"/> Adicionar</button>
                       </div>
                     </div>
                   )}
@@ -771,12 +772,12 @@ export function ContadorEquipamentos({ projectId }){
   const limite = chkAlvoTimestamp(alvo);
   const diff = limite - agora;
   if(diff <= 0){
-    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}>⚠️ Checagem pendente — concluir</div>;
+    return <div data-pendente="1" style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}><Ico n="alerta"/> Checagem pendente — concluir</div>;
   }
   const dias = Math.floor(diff/86400000);
   const horas = Math.floor((diff%86400000)/3600000);
   const minutos = Math.floor((diff%3600000)/60000);
-  return <div style={{fontSize:10,color:"#f43f5e",marginTop:3,fontWeight:700}}>⏳ {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)}</div>;
+  return <div style={{fontSize:10,color:"#f43f5e",marginTop:3,fontWeight:700}}><Ico n="ampulheta"/> {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)}</div>;
 }
 
 // Modal de conclusão da checagem semanal de equipamentos.
@@ -794,7 +795,7 @@ function ModalChecagem({ dark, resumo, onConfirm, onCancel }){
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}}>
       <div style={{background:cardBg,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:420,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
-        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>✓ Concluir checagem semanal</div>
+        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}><Ico n="check"/> Concluir checagem semanal</div>
         <div style={{fontSize:12,color:txt2,marginBottom:14}}>Confirme a verificação dos equipamentos. Situação atual: <strong style={{color:txt}}>{resumo.inop} inop/crítico · {resumo.parcial} parcial · {resumo.total} itens</strong>.</div>
 
         <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Algum item foi corrigido/substituído nesta semana?</div>
@@ -881,7 +882,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🛡️</div><div style={{fontSize:13,...S.txt2}}>Carregando equipamentos...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}><Ico n="escudo"/></div><div style={{fontSize:13,...S.txt2}}>Carregando equipamentos...</div></div>
     </div>
   );
 
@@ -904,7 +905,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🛡️ Equipamentos</div>
+              <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="escudo"/> Equipamentos</div>
               <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
             </div>
             {saving && <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700}}>⟳</div>}
@@ -931,15 +932,15 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
           {/* Badge acesso */}
           {adminAuth ? (
             <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{fontSize:12,color:"#22c55e",fontWeight:700}}>🔓 Gerencial — pode editar e resolver</div>
+              <div style={{fontSize:12,color:"#22c55e",fontWeight:700}}><Ico n="cadeadoAberto"/> Gerencial — pode editar e resolver</div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>gerarPDFEquipamentos(project,data)} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}>📄 PDF</button>
+                <button onClick={()=>gerarPDFEquipamentos(project,data)} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}><Ico n="arquivo"/> PDF</button>
                 <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm,color:"#64748b",fontSize:10}}>Sair</button>
               </div>
             </div>
           ) : (
             <div style={{background:"#001a2e",border:"1px solid #0ea5e933",borderRadius:10,padding:"8px 14px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{fontSize:12,color:"#0ea5e9",fontWeight:700}}>👷 Líder — pode cadastrar e atualizar status</div>
+              <div style={{fontSize:12,color:"#0ea5e9",fontWeight:700}}><Ico n="capacete"/> Líder — pode cadastrar e atualizar status</div>
               <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm,color:"#64748b",fontSize:10}}>Sair</button>
             </div>
           )}
@@ -960,11 +961,11 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
               <div style={{background:bg,border:`1px solid ${cor}44`,borderRadius:12,padding:"12px 14px"}}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
                   <div style={{flex:1,minWidth:180}}>
-                    <div style={{fontSize:13,fontWeight:800,color:cor}}>🗓️ Checagem semanal de equipamentos</div>
+                    <div style={{fontSize:13,fontWeight:800,color:cor}}><Ico n="calendario"/> Checagem semanal de equipamentos</div>
                     {pendente ? (
-                      <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginTop:3}}>⚠️ Pendente — verifique os itens e conclua a checagem.</div>
+                      <div style={{fontSize:11,color:"#f87171",fontWeight:700,marginTop:3}}><Ico n="alerta"/> Pendente — verifique os itens e conclua a checagem.</div>
                     ) : (
-                      <div style={{fontSize:11,...S.txt2,fontWeight:600,marginTop:3}}>⏳ {dias}d {horas}h {minutos}min · próximo domingo {fmtDate(alvo)} · 23:59</div>
+                      <div style={{fontSize:11,...S.txt2,fontWeight:600,marginTop:3}}><Ico n="ampulheta"/> {dias}d {horas}h {minutos}min · próximo domingo {fmtDate(alvo)} · 23:59</div>
                     )}
                     {chk?.ultimaChecagem && (
                       <div style={{fontSize:10,...S.txt2,marginTop:3}}>
@@ -975,7 +976,7 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
                   </div>
                   <button onClick={()=>setShowChecagem(true)}
                     style={{background:pendente?"linear-gradient(135deg,#dc2626,#991b1b)":"linear-gradient(135deg,#16a34a,#15803d)",border:"none",color:"#fff",borderRadius:8,padding:"9px 16px",fontSize:12,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>
-                    ✓ Concluir checagem
+                    <Ico n="check"/> Concluir checagem
                   </button>
                 </div>
               </div>

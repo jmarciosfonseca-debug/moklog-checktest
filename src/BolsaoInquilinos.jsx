@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -162,8 +163,8 @@ function PinGate({ project, onSuccess, onBack, dark }){
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn,fontSize:13}}>👷 Acesso Líder</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn,fontSize:13}}><Ico n="capacete"/> Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec,fontSize:13,marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -305,14 +306,14 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
             <div key={it.id} style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{fontSize:12,fontWeight:800,...S.txt}}>Veículo {i+1}</div>
-                {itens.length>1 && <button onClick={()=>delItem(it.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>}
+                {itens.length>1 && <button onClick={()=>delItem(it.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433"}}><Ico n="lixeira"/></button>}
               </div>
               <label style={S.lbl}>Placa</label>
               <input value={it.placa} onChange={e=>setItemCampo(it.id,"placa",e.target.value)} placeholder="ABC1D23"
                 style={{...S.inp,textTransform:"uppercase",letterSpacing:2,fontWeight:800,marginBottom:8}}/>
               {conhecida && (
                 <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,marginBottom:8}}>
-                  🔁 Já conhecida — pernoitando há {conhecida.diasConsecutivos} dia{conhecida.diasConsecutivos===1?"":"s"} <StatusBadge status={statusFromDias(conhecida.diasConsecutivos)}/>
+                  <Ico n="atualizar"/> Já conhecida — pernoitando há {conhecida.diasConsecutivos} dia{conhecida.diasConsecutivos===1?"":"s"} <StatusBadge status={statusFromDias(conhecida.diasConsecutivos)}/>
                 </div>
               )}
               <label style={S.lbl}>Inquilino</label>
@@ -320,7 +321,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
             </div>
           );
         })}
-        <button onClick={addItem} style={{...S.btnSec,fontSize:13}}>➕ Adicionar outro inquilino/placa</button>
+        <button onClick={addItem} style={{...S.btnSec,fontSize:13}}><Ico n="mais"/> Adicionar outro inquilino/placa</button>
 
         <div style={S.card}>
           <label style={S.lbl}>Fotos do local (opcional, até 3)</label>
@@ -334,11 +335,11 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
             {fotos.length<3 && (
               <>
                 <label style={{...S.btnSec,padding:"10px 13px",fontSize:12,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6,width:"auto"}}>
-                  📷 Câmera
+                  <Ico n="camera"/> Câmera
                   <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/>
                 </label>
                 <label style={{...S.btnSec,padding:"10px 13px",fontSize:12,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:6,width:"auto"}}>
-                  🖼️ Galeria
+                  <Ico n="imagem"/> Galeria
                   <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/>
                 </label>
               </>
@@ -348,7 +349,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
 
         {erro && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{erro}</div>}
         <button onClick={()=>setScreen("list")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-        <button onClick={registrar} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"✓ Registrar Checagem"}</button>
+        <button onClick={registrar} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":<><Ico n="check"/>{" Registrar Checagem"}</>}</button>
       </div>
     </div></div>
   );
@@ -360,7 +361,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
       <div style={{padding:"0 16px",display:"flex",flexDirection:"column",gap:10}}>
         <button onClick={abrirForm} style={S.btn}>▶ Nova Checagem de Ronda</button>
         {data.checagens.length>0 && (
-          <button onClick={baixarPdf} disabled={gerandoPdf} style={{...S.btnSec,fontSize:13,color:"#7c3aed",borderColor:"#7c3aed44"}}>{gerandoPdf?"Gerando…":"📄 Gerar PDF"}</button>
+          <button onClick={baixarPdf} disabled={gerandoPdf} style={{...S.btnSec,fontSize:13,color:"#7c3aed",borderColor:"#7c3aed44"}}>{gerandoPdf?"Gerando…":<><Ico n="arquivo"/>{" Gerar PDF"}</>}</button>
         )}
 
         {listaPlacas.length>0 && <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,marginTop:4}}>No bolsão ({listaPlacas.length})</div>}

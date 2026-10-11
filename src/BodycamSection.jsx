@@ -11,6 +11,7 @@
 //   O porteiro deve justificar por fora (não há reabertura pelo app).
 // • Horário é sempre capturado na hora do toque — nunca digitado à mão.
 // ─────────────────────────────────────────────────────────────
+import { Ico } from "./Icones";
 import { useState, useEffect } from "react";
 import { avisarFalhaServidor } from "./avisoSalvar";
 
@@ -278,7 +279,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   if(showForm) return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <div style={S.card}>
-        <div style={{fontSize:14,fontWeight:800,...S.txt,marginBottom:4}}>{editandoId?"✏️ Editando registro":"🎬 Descarregamento de Bodycam"}</div>
+        <div style={{fontSize:14,fontWeight:800,...S.txt,marginBottom:4}}>{editandoId?<><Ico n="editar"/>{" Editando registro"}</>:<><Ico n="video"/>{" Descarregamento de Bodycam"}</>}</div>
         {editandoId ? (
           <div style={{fontSize:11,...S.txt2}}>Corrigindo o registro de <b>{fmtDataBR(registros.find(r=>r.id===editandoId)?.dia)}</b> — data e horário originais são mantidos.</div>
         ) : (
@@ -286,7 +287,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
         )}
         {!editandoId && atrasado && (
           <div style={{marginTop:8,background:"#1a1000",border:"1px solid #f59e0b55",borderRadius:8,padding:"8px 12px"}}>
-            <div style={{fontSize:12,color:"#f59e0b",fontWeight:800}}>⚠️ Descarregado pós 00:00 — em atraso</div>
+            <div style={{fontSize:12,color:"#f59e0b",fontWeight:800}}><Ico n="alerta"/> Descarregado pós 00:00 — em atraso</div>
           </div>
         )}
       </div>
@@ -295,19 +296,19 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
         <input value={porteiro} onChange={e=>{setPorteiro(e.target.value);setErro(null);}} placeholder="Nome completo" style={S.inp}/>
       </div>
       <div style={S.card}>
-        <div style={{fontSize:12,fontWeight:800,...S.txt,marginBottom:8}}>🎥 Câmera do Líder <span style={{fontWeight:600,...S.txt2}}>(cobre as 24h — os dois turnos)</span></div>
-        <label style={S.lbl}>☀️ Líder Diurno</label>
+        <div style={{fontSize:12,fontWeight:800,...S.txt,marginBottom:8}}><Ico n="video"/> Câmera do Líder <span style={{fontWeight:600,...S.txt2}}>(cobre as 24h — os dois turnos)</span></div>
+        <label style={S.lbl}><Ico n="sol"/> Líder Diurno</label>
         <input value={liderDiurno} onChange={e=>{setLiderDiurno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
-        <label style={S.lbl}>🌙 Líder Noturno</label>
+        <label style={S.lbl}><Ico n="lua"/> Líder Noturno</label>
         <input value={liderNoturno} onChange={e=>{setLiderNoturno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
         <label style={S.lbl}>Quantidade de vídeos (24h)</label>
         <input value={qtdLider} inputMode="numeric" onChange={e=>{setQtdLider(e.target.value.replace(/[^0-9]/g,""));setErro(null);}} placeholder="Ex: 21" style={S.inp}/>
       </div>
       <div style={S.card}>
-        <div style={{fontSize:12,fontWeight:800,...S.txt,marginBottom:8}}>🎥 Câmera do Tático / Ronda <span style={{fontWeight:600,...S.txt2}}>(cobre as 24h — os dois turnos)</span></div>
-        <label style={S.lbl}>☀️ Vigilante Ronda Diurno</label>
+        <div style={{fontSize:12,fontWeight:800,...S.txt,marginBottom:8}}><Ico n="video"/> Câmera do Tático / Ronda <span style={{fontWeight:600,...S.txt2}}>(cobre as 24h — os dois turnos)</span></div>
+        <label style={S.lbl}><Ico n="sol"/> Vigilante Ronda Diurno</label>
         <input value={tacticoDiurno} onChange={e=>{setTacticoDiurno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
-        <label style={S.lbl}>🌙 Vigilante Ronda Noturno</label>
+        <label style={S.lbl}><Ico n="lua"/> Vigilante Ronda Noturno</label>
         <input value={tacticoNoturno} onChange={e=>{setTacticoNoturno(e.target.value);setErro(null);}} placeholder="Nome completo" style={{...S.inp,marginBottom:10}}/>
         <label style={S.lbl}>Quantidade de vídeos (24h)</label>
         <input value={qtdTatico} inputMode="numeric" onChange={e=>{setQtdTatico(e.target.value.replace(/[^0-9]/g,""));setErro(null);}} placeholder="Ex: 8" style={S.inp}/>
@@ -318,11 +319,11 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
           <button onClick={()=>setStatus("ok")} style={{flex:1,padding:"11px",borderRadius:8,fontWeight:800,fontSize:13,cursor:"pointer",
             border:`1px solid ${status==="ok"?"#22c55e":(dark?"#0f172a":"#e2e8f0")}`,
             background:status==="ok"?"#22c55e22":(dark?"#020510":"#fff"),
-            color:status==="ok"?"#22c55e":(dark?"#64748b":"#94a3b8")}}>✅ OK</button>
+            color:status==="ok"?"#22c55e":(dark?"#64748b":"#94a3b8")}}><Ico n="checkCirculo"/> OK</button>
           <button onClick={()=>setStatus("falha")} style={{flex:1,padding:"11px",borderRadius:8,fontWeight:800,fontSize:13,cursor:"pointer",
             border:`1px solid ${status==="falha"?"#ef4444":(dark?"#0f172a":"#e2e8f0")}`,
             background:status==="falha"?"#ef444422":(dark?"#020510":"#fff"),
-            color:status==="falha"?"#ef4444":(dark?"#64748b":"#94a3b8")}}>⚠️ Falha</button>
+            color:status==="falha"?"#ef4444":(dark?"#64748b":"#94a3b8")}}><Ico n="alerta"/> Falha</button>
         </div>
         {status==="falha" && (
           <textarea value={obsFalha} onChange={e=>{setObsFalha(e.target.value);setErro(null);}} rows={2} placeholder="Descreva a falha apresentada..."
@@ -339,11 +340,11 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
         ) : (
           <div style={{display:"flex",gap:8}}>
             <label style={{...S.btnSec,flex:1,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              📷 Câmera
+              <Ico n="camera"/> Câmera
               <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/>
             </label>
             <label style={{...S.btnSec,flex:1,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-              🖼️ Galeria
+              <Ico n="imagem"/> Galeria
               <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/>
             </label>
           </div>
@@ -352,7 +353,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
       {erro && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{erro}</div>}
       <div style={{display:"flex",gap:8}}>
         <button onClick={()=>{setEditandoId(null);setShowForm(false);}} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-        <button onClick={registrar} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Salvando…":(editandoId?"💾 Salvar Edição":"✓ Registrar")}</button>
+        <button onClick={registrar} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Salvando…":(editandoId?<><Ico n="disquete"/>{" Salvar Edição"}</>:<><Ico n="check"/>{" Registrar"}</>)}</button>
       </div>
     </div>
   );
@@ -361,14 +362,14 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
   return (
     <div style={{display:"flex",flexDirection:"column",gap:10}}>
       <div style={{...S.card,border:`1px solid ${jaRegistrado?(jaRegistrado.tipo==="falta"?"#ef444455":"#22c55e33"):"#f59e0b55"}`}}>
-        <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:6}}>🎬 Descarregamento de hoje</div>
+        <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:6}}><Ico n="video"/> Descarregamento de hoje</div>
         {jaRegistrado ? (
           jaRegistrado.tipo==="falta" ? (
-            <div style={{fontSize:13,color:"#ef4444",fontWeight:800}}>🔴 FALTA — {fmtDataBR(jaRegistrado.dia)} não foi descarregado</div>
+            <div style={{fontSize:13,color:"#ef4444",fontWeight:800}}><Ico n="pontoVermelho"/> FALTA — {fmtDataBR(jaRegistrado.dia)} não foi descarregado</div>
           ) : (
             <div>
               <div style={{fontSize:13,color:jaRegistrado.status==="falha"?"#f59e0b":"#22c55e",fontWeight:800}}>
-                {jaRegistrado.status==="falha"?"⚠️ Registrado com falha":"✅ Descarregado"} · {fmtDataBR(jaRegistrado.dia)} às {jaRegistrado.horario}
+                {jaRegistrado.status==="falha"?<><Ico n="alerta"/>{" Registrado com falha"}</>:<><Ico n="checkCirculo"/>{" Descarregado"}</>} · {fmtDataBR(jaRegistrado.dia)} às {jaRegistrado.horario}
               </div>
               {jaRegistrado.atrasado && <div style={{fontSize:11,color:"#f59e0b",marginTop:2,fontWeight:700}}>Pós 00:00 (em atraso)</div>}
             </div>
@@ -383,7 +384,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
       )}
       {adminAuth && registros.length>0 && (
         <button onClick={baixarPdf} disabled={gerandoPdf} style={{...S.btnSec,fontSize:13,color:"#7c3aed",borderColor:"#7c3aed44"}}>
-          {gerandoPdf?"Gerando…":"📄 Gerar PDF (gerencial)"}
+          {gerandoPdf?"Gerando…":<><Ico n="arquivo"/>{" Gerar PDF (gerencial)"}</>}
         </button>
       )}
 
@@ -393,7 +394,7 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
           {r.tipo==="falta" ? (
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{fontSize:12,fontWeight:700,...S.txt}}>{fmtDataBR(r.dia)}</div>
-              <span style={{fontSize:10,fontWeight:800,color:"#ef4444",background:"#1a0202",border:"1px solid #ef444433",padding:"3px 9px",borderRadius:6}}>🔴 FALTA</span>
+              <span style={{fontSize:10,fontWeight:800,color:"#ef4444",background:"#1a0202",border:"1px solid #ef444433",padding:"3px 9px",borderRadius:6}}><Ico n="pontoVermelho"/> FALTA</span>
             </div>
           ) : (
             <>
@@ -405,11 +406,11 @@ export default function BodycamSection({ project, dark, S, adminAuth, db, doc, s
                 </div>
               </div>
               <div style={{fontSize:11,...S.txt2,marginTop:4}}>Porteiro: {r.porteiro}</div>
-              <div style={{fontSize:11,...S.txt2}}>🎥 Líder: ☀️ {r.liderDiurno||"—"} · 🌙 {r.liderNoturno||"—"} ({r.qtdVideosLider} vídeos)</div>
-              <div style={{fontSize:11,...S.txt2}}>🎥 Ronda: ☀️ {r.tacticoDiurno||"—"} · 🌙 {r.tacticoNoturno||"—"} ({r.qtdVideosTatico} vídeos)</div>
+              <div style={{fontSize:11,...S.txt2}}><Ico n="video"/> Líder: <Ico n="sol"/> {r.liderDiurno||"—"} · <Ico n="lua"/> {r.liderNoturno||"—"} ({r.qtdVideosLider} vídeos)</div>
+              <div style={{fontSize:11,...S.txt2}}><Ico n="video"/> Ronda: <Ico n="sol"/> {r.tacticoDiurno||"—"} · <Ico n="lua"/> {r.tacticoNoturno||"—"} ({r.qtdVideosTatico} vídeos)</div>
               {r.obsFalha && <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>{r.obsFalha}</div>}
               {r.foto && <img src={r.foto} alt="Foto" style={{width:80,height:80,objectFit:"cover",borderRadius:8,marginTop:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}/>}
-              {adminAuth && <button onClick={()=>abrirEdicao(r)} style={{...S.btnSm,marginTop:8,color:"#f59e0b",borderColor:"#f59e0b44"}}>✏️ Editar</button>}
+              {adminAuth && <button onClick={()=>abrirEdicao(r)} style={{...S.btnSm,marginTop:8,color:"#f59e0b",borderColor:"#f59e0b44"}}><Ico n="editar"/> Editar</button>}
             </>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect } from "react";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -218,7 +219,7 @@ function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:"#f59e0b" }}>🚛 Registro — P260A</div>
+              <div style={{ fontSize:15, fontWeight:800, color:"#f59e0b" }}><Ico n="caminhao"/> Registro — P260A</div>
               <div style={{ fontSize:11, color:"#475569" }}>{fmtDate(r.data)}</div>
             </div>
             {noPatioAgora && (
@@ -230,7 +231,7 @@ function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:10 }}>
           {/* Dados da carga */}
           <div style={S.card}>
-            <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>📦 Dados da Carga</div>
+            <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}><Ico n="pacote"/> Dados da Carga</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
               {[
                 ["Data",          fmtDate(r.data)],
@@ -248,7 +249,7 @@ function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
 
           {/* Horários */}
           <div style={S.card}>
-            <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>⏱️ Horários</div>
+            <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}><Ico n="cronometro"/> Horários</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
               {[
                 ["Estacionou (Ext.)", r.estacionou||"--"],
@@ -264,7 +265,7 @@ function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
             </div>
             {dur && (
               <div style={{ marginTop:12, background:"#001a2e", border:"1px solid #0ea5e922", borderRadius:8, padding:"10px 14px", textAlign:"center" }}>
-                <span style={{ fontSize:15, color:"#0ea5e9", fontWeight:800 }}>⏳ Tempo no pátio: {dur}</span>
+                <span style={{ fontSize:15, color:"#0ea5e9", fontWeight:800 }}><Ico n="ampulheta"/> Tempo no pátio: {dur}</span>
               </div>
             )}
           </div>
@@ -272,14 +273,14 @@ function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
           {/* Ações */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
             <button onClick={()=>gerarPDFRegistro(r,"P260A")}
-              style={{ ...S.btnPurple, fontSize:13 }}>📄 PDF</button>
+              style={{ ...S.btnPurple, fontSize:13 }}><Ico n="arquivo"/> PDF</button>
             <button onClick={()=>enviarWhatsApp(r,"P260A")}
-              style={{ ...S.btn, fontSize:13 }}>💬 WhatsApp</button>
+              style={{ ...S.btn, fontSize:13 }}><Ico n="mensagem"/> WhatsApp</button>
           </div>
 
           <button onClick={()=>{ if(window.confirm("Excluir este registro?")) onExcluir(r.id); }}
             style={{ ...S.btnSec, color:"#ef4444", borderColor:"#ef444433", fontSize:13 }}>
-            🗑 Excluir Registro
+            <Ico n="lixeira"/> Excluir Registro
           </button>
         </div>
       </div>
@@ -367,7 +368,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:30,marginBottom:10}}>🚛</div>
+        <div style={{fontSize:30,marginBottom:10}}><Ico n="caminhao"/></div>
         <div style={{fontSize:13,color:"#64748b"}}>Carregando registros...</div>
       </div>
     </div>
@@ -388,7 +389,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={S.backBtn}>← Menu Jatinox</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:dark?"#f1f5f9":"#0f172a" }}>🚛 Acesso — P260A</div>
+              <div style={{ fontSize:15, fontWeight:800, color:dark?"#f1f5f9":"#0f172a" }}><Ico n="caminhao"/> Acesso — P260A</div>
               <div style={{ fontSize:11, color:"#475569" }}>Controle de Transportadoras</div>
             </div>
             <button onClick={toggleDark} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:dark?"#94a3b8":"#475569"}}>{iconeTema()}</button>
@@ -408,12 +409,12 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
           </div>
 
           <button onClick={()=>{ setForm(emptyForm()); setScreen("form"); }} style={S.btn}>
-            🚛 Novo Registro de Acesso
+            <Ico n="caminhao"/> Novo Registro de Acesso
           </button>
 
           <button onClick={()=>{ setSelIds([]); setScreen("list"); }}
             style={{ ...S.btnSec, color:"#0ea5e9", borderColor:"#0ea5e922", fontSize:13 }}>
-            📋 Ver Registros ({registros.length})
+            <Ico n="prancheta"/> Ver Registros ({registros.length})
           </button>
         </div>
       </div>
@@ -428,7 +429,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={()=>setScreen("menu")} style={S.backBtn}>← Voltar</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:"#f59e0b" }}>🚛 Novo Registro</div>
+              <div style={{ fontSize:15, fontWeight:800, color:"#f59e0b" }}><Ico n="caminhao"/> Novo Registro</div>
               <div style={{ fontSize:11, color:"#475569" }}>Controle de Fluxo — P260A</div>
             </div>
           </div>
@@ -436,7 +437,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
 
         <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
           <div style={S.card}>
-            <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>📦 Dados da Carga</div>
+            <div style={{ fontSize:11, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}><Ico n="pacote"/> Dados da Carga</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
               <div>
                 <label style={S.lbl}>Data</label>
@@ -458,7 +459,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
           </div>
 
           <div style={S.card}>
-            <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}>⏱️ Horários</div>
+            <div style={{ fontSize:11, color:"#0ea5e9", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginBottom:12 }}><Ico n="cronometro"/> Horários</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
               {[
                 ["Estacionou (Ext.)","estacionou"],
@@ -470,7 +471,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
                   <label style={S.lbl}>{label}</label>
                   <div style={{ display:"flex", gap:5 }}>
                     <input type="time" value={form[key]} onChange={e=>setF(key,e.target.value)} style={{ ...S.inp, flex:1 }}/>
-                    <button onClick={()=>setF(key,nowTime())} style={{ ...S.btnSm, padding:"8px 10px", fontSize:14, flexShrink:0 }}>⏱</button>
+                    <button onClick={()=>setF(key,nowTime())} style={{ ...S.btnSm, padding:"8px 10px", fontSize:14, flexShrink:0 }}><Ico n="cronometro"/></button>
                   </div>
                 </div>
               ))}
@@ -478,14 +479,14 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
             {form.entradaPatio && form.saidaPatio && (
               <div style={{ marginTop:10, background:"#001a2e", border:"1px solid #0ea5e922", borderRadius:8, padding:"8px 12px" }}>
                 <span style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}>
-                  ⏳ Duração: {calcDuracao(form.entradaPatio, form.saidaPatio)||"--"}
+                  <Ico n="ampulheta"/> Duração: {calcDuracao(form.entradaPatio, form.saidaPatio)||"--"}
                 </span>
               </div>
             )}
           </div>
 
           <button onClick={transmitir} disabled={saving} style={{ ...S.btn, opacity:saving?0.7:1 }}>
-            {saving?"⟳ Transmitindo...":"💾 Salvar e Enviar WhatsApp"}
+            {saving?"⟳ Transmitindo...":<><Ico n="disquete"/>{" Salvar e Enviar WhatsApp"}</>}
           </button>
           <div style={{ fontSize:10, color:"#334155", textAlign:"center" }}>
             Salva o registro e abre WhatsApp com o resumo
@@ -508,7 +509,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <button onClick={()=>{ setSelIds([]); setScreen("menu"); }} style={S.backBtn}>← Voltar</button>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:15, fontWeight:800, color:"#f1f5f9" }}>📋 Registros — P260A</div>
+                <div style={{ fontSize:15, fontWeight:800, color:"#f1f5f9" }}><Ico n="prancheta"/> Registros — P260A</div>
                 <div style={{ fontSize:11, color:"#475569" }}>
                   {registros.length} registro(s) {selIds.length>0?`· ${selIds.length} selecionado(s)`:""}
                 </div>
@@ -523,18 +524,18 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 <button onClick={todosSel?limparSel:selecionarTodos}
                   style={{ ...S.btnSm, padding:"8px 14px", fontSize:12, color:"#0ea5e9", border:"1px solid #0ea5e944", flex:1 }}>
-                  {todosSel?"✓ Desmarcar todos":"☐ Selecionar todos"}
+                  {todosSel?<><Ico n="check"/>{" Desmarcar todos"}</>:<><Ico n="quadrado"/>{" Selecionar todos"}</>}
                 </button>
                 <button onClick={gerarConsolidado}
                   style={{ ...S.btnPurple, flex:2, fontSize:13, padding:"9px 14px" }}>
-                  📊 {selIds.length>0?`PDF Consolidado (${selIds.length})`:"PDF Consolidado Geral"}
+                  <Ico n="grafico"/> {selIds.length>0?`PDF Consolidado (${selIds.length})`:"PDF Consolidado Geral"}
                 </button>
               </div>
             )}
 
             {registros.length===0 && (
               <div style={{ textAlign:"center", padding:"40px 0", color:"#334155" }}>
-                <div style={{ fontSize:32, marginBottom:10 }}>📭</div>
+                <div style={{ fontSize:32, marginBottom:10 }}><Ico n="pasta"/></div>
                 <div style={{ fontSize:13 }}>Nenhum registro ainda</div>
               </div>
             )}
@@ -581,7 +582,7 @@ function RegistroCard({ r, selIds, toggleSel, onVer, dark }) {
       <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
         {/* Checkbox */}
         <div onClick={()=>toggleSel(r.id)} style={{ width:22, height:22, borderRadius:6, border:`2px solid ${isSelected?"#7c3aed":"#1e293b"}`, background:isSelected?"#7c3aed22":"transparent", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", marginTop:2, cursor:"pointer" }}>
-          {isSelected && <span style={{ fontSize:12, color:"#a78bfa" }}>✓</span>}
+          {isSelected && <span style={{ fontSize:12, color:"#a78bfa" }}><Ico n="check"/></span>}
         </div>
 
         {/* Info */}
@@ -591,19 +592,19 @@ function RegistroCard({ r, selIds, toggleSel, onVer, dark }) {
             {r.placa && <span style={{ fontSize:11, color:"#0ea5e9", background:"#001a2e", padding:"2px 8px", borderRadius:5, fontWeight:700 }}>{r.placa}</span>}
             {noPatioAgora && <span style={{ fontSize:9, color:"#f59e0b", background:"#1a1000", padding:"2px 6px", borderRadius:4, fontWeight:700 }}>NO PÁTIO</span>}
           </div>
-          {r.motorista && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}>👤 {r.motorista}</div>}
+          {r.motorista && <div style={{ fontSize:11, color:"#64748b", marginBottom:4 }}><Ico n="usuario"/> {r.motorista}</div>}
           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-            <span style={{ fontSize:10, color:"#475569" }}>📅 {fmtDate(r.data)}</span>
+            <span style={{ fontSize:10, color:"#475569" }}><Ico n="calendario"/> {fmtDate(r.data)}</span>
             {r.entradaPatio && <span style={{ fontSize:10, color:"#22c55e" }}>↓ {r.entradaPatio}</span>}
             {r.saidaPatio   && <span style={{ fontSize:10, color:"#ef4444" }}>↑ {r.saidaPatio}</span>}
-            {dur && <span style={{ fontSize:10, color:"#0ea5e9", fontWeight:700 }}>⏱ {dur}</span>}
+            {dur && <span style={{ fontSize:10, color:"#0ea5e9", fontWeight:700 }}><Ico n="cronometro"/> {dur}</span>}
           </div>
         </div>
 
         {/* Botão VER */}
         <button onClick={onVer}
           style={{ background:"#0f172a", border:"1px solid #1e293b", color:"#94a3b8", borderRadius:7, padding:"6px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 }}>
-          👁 Ver
+          <Ico n="olho"/> Ver
         </button>
       </div>
     </div>

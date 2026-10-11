@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ════════════════════════════════════════════════════════════════════════
@@ -256,7 +257,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}>🚨 KeyAccess Falha</div>
+              <div style={{fontSize:16,fontWeight:800,color:"#ef4444"}}><Ico n="sirene"/> KeyAccess Falha</div>
               <div style={{fontSize:11,...S.txt2}}>Escolha o projeto</div>
             </div>
             <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
@@ -278,7 +279,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                 boxShadow:falhaRecente?"0 0 14px #ef444455":"none",
                 animation:falhaRecente?"kaGlow 1.6s ease-in-out infinite":"none"}}>
               <div style={{display:"flex",alignItems:"center",gap:12,width:"100%"}}>
-                <div style={{width:40,height:40,borderRadius:10,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}>🚨</div>
+                <div style={{width:40,height:40,borderRadius:10,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18}}><Ico n="sirene"/></div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:14,fontWeight:800,...S.txt}}>{p.id}</div>
                   <div style={{fontSize:11,...S.txt2}}>{p.name}</div>
@@ -304,7 +305,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                       transition:"width .5s ease"}}/>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-                    <span style={{fontSize:8,...S.txt2,fontWeight:700}}>{dias>=META?"META ATINGIDA \u2705":`META ${META}D`}</span>
+                    <span style={{fontSize:8,...S.txt2,fontWeight:700}}>{dias>=META?<>{"META ATINGIDA "}<Ico n="checkCirculo"/></>:`META ${META}D`}</span>
                     <span style={{fontSize:8,fontWeight:800,color:cor}}>{Math.round(pct)}%</span>
                   </div>
                 </div>
@@ -312,7 +313,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
             </button>
             );
           })}
-          <button onClick={()=>setScreen(hasGerencial()?"relatorios":"relatorios_pin")} style={{...S.btnSec,marginTop:10,color:"#a855f7",borderColor:"#a855f733"}}>📊 Relatórios Gerenciais</button>
+          <button onClick={()=>setScreen(hasGerencial()?"relatorios":"relatorios_pin")} style={{...S.btnSec,marginTop:10,color:"#a855f7",borderColor:"#a855f733"}}><Ico n="grafico"/> Relatórios Gerenciais</button>
         </div>
       </div>
     </div>
@@ -320,7 +321,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🚨</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}><Ico n="sirene"/></div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
     </div>
   );
 
@@ -335,7 +336,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <button onClick={()=>{setScreen("projetos");setProject(null);}} style={S.backBtn} aria-label="Voltar">← Voltar</button>
               <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#ef4444"}}>🚨 {project.id}</div>
+                <div style={{fontSize:15,fontWeight:800,color:"#ef4444"}}><Ico n="sirene"/> {project.id}</div>
                 <div style={{fontSize:11,...S.txt2}}>{project.name}</div>
               </div>
             </div>
@@ -374,7 +375,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                       </div>
                       {tipos.includes("outro")&&r.tipoCustom&&<div style={{fontSize:12,...S.txt,marginBottom:3}}>{r.tipoCustom}</div>}
                       <div style={{fontSize:11,...S.txt2}}>
-                        📅 {fmtDate(r.data)} · ⏱ {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · 👤 {r.registradoPor?.nome||"—"}
+                        <Ico n="calendario"/> {fmtDate(r.data)} · <Ico n="cronometro"/> {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · <Ico n="usuario"/> {r.registradoPor?.nome||"—"}
                       </div>
                       {r.obs&&<div style={{fontSize:11,...S.txt2,marginTop:3,fontStyle:"italic"}}>{r.obs}</div>}
                     </div>
@@ -459,7 +460,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onVoltar} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,color:"#ef4444"}}>🚨 Registrar Falha</div>
+              <div style={{fontSize:15,fontWeight:800,color:"#ef4444"}}><Ico n="sirene"/> Registrar Falha</div>
               <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
             </div>
           </div>
@@ -483,7 +484,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
                 return (
                   <button key={t.key} onClick={()=>setTipos(prev=> prev.includes(t.key) ? prev.filter(x=>x!==t.key) : [...prev,t.key])}
                     style={{textAlign:"left",background:sel?t.cor+"22":dark?"#020510":"#fff",border:`2px solid ${sel?t.cor:dark?"#1e293b":"#e2e8f0"}`,borderRadius:9,padding:"11px 14px",cursor:"pointer",fontSize:14,fontWeight:sel?700:500,color:sel?t.cor:dark?"#e2e8f0":"#334155",display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{width:18,height:18,borderRadius:5,border:`2px solid ${sel?t.cor:dark?"#475569":"#cbd5e1"}`,background:sel?t.cor:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}>{sel?"✓":""}</span>
+                    <span style={{width:18,height:18,borderRadius:5,border:`2px solid ${sel?t.cor:dark?"#475569":"#cbd5e1"}`,background:sel?t.cor:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#fff"}}>{sel?<><Ico n="check"/></>:""}</span>
                     {t.label}
                   </button>
                 );
@@ -511,10 +512,10 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
           </div>
           {duracao && (
             <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"7px 11px"}}>
-              ⏱ Tempo fora do ar: {duracao}
+              <Ico n="cronometro"/> Tempo fora do ar: {duracao}
             </div>
           )}
-          <div style={{fontSize:11,...S.txt2}}>💡 Os horários vêm preenchidos com o atual, mas podem ser ajustados pra registrar uma falha retroativa (ex: ocorreu de manhã, só deu pra lançar à tarde).</div>
+          <div style={{fontSize:11,...S.txt2}}><Ico n="lampada"/> Os horários vêm preenchidos com o atual, mas podem ser ajustados pra registrar uma falha retroativa (ex: ocorreu de manhã, só deu pra lançar à tarde).</div>
 
           <div>
             <label style={S.lbl}>Impacto Operacional (pode marcar mais de um)</label>
@@ -524,7 +525,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
                 return (
                   <button key={k} onClick={()=>setImpactos(prev=> prev.includes(k) ? prev.filter(x=>x!==k) : [...prev,k])}
                     style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#0ea5e9":dark?"#1e293b":"#e2e8f0"}`,background:sel?"#0ea5e922":dark?"#020510":"#fff",color:sel?"#0ea5e9":dark?"#94a3b8":"#64748b"}}>
-                    {sel?"✓ ":""}{lb}
+                    {sel?<><Ico n="check"/>{" "}</>:""}{lb}
                   </button>
                 );
               })}
@@ -551,7 +552,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
           </div>
 
           <button onClick={salvar} disabled={!podeSalvar||saving} style={{...S.btn,opacity:(!podeSalvar||saving)?0.5:1,cursor:(!podeSalvar||saving)?"not-allowed":"pointer"}}>
-            {saving?"⟳ Salvando...":"✓ Registrar Falha"}
+            {saving?"⟳ Salvando...":<><Ico n="check"/>{" Registrar Falha"}</>}
           </button>
         </div>
       </div>
@@ -567,7 +568,7 @@ function RelatoriosPinGate({ dark, S, onBack, onSuccess }){
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>📊</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="grafico"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Relatórios Gerenciais</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>PIN gerencial</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pin}
@@ -625,7 +626,7 @@ function RelatoriosKA({ dark, S, onBack }){
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,color:"#ef4444"}}>📊 Relatórios KeyAccess</div>
+              <div style={{fontSize:15,fontWeight:800,color:"#ef4444"}}><Ico n="grafico"/> Relatórios KeyAccess</div>
               <div style={{fontSize:11,...S.txt2}}>Falhas registradas em campo</div>
             </div>
           </div>
@@ -671,12 +672,12 @@ function RelatoriosKA({ dark, S, onBack }){
           </div>
 
           <button onClick={gerar} disabled={carregando} style={{...S.btnGreen,opacity:carregando?0.6:1}}>
-            {carregando?"⟳ Gerando...":"📊 Gerar Relatório"}
+            {carregando?"⟳ Gerando...":<><Ico n="grafico"/>{" Gerar Relatório"}</>}
           </button>
 
           {gerado && (
             <button onClick={async ()=>{ await gerarPDFRelatorioKA({modo,projsSel,dadosPorProjeto,dataIni,dataFim,impactoFiltro}); }}
-              style={{...S.btnSec,color:"#a855f7",borderColor:"#a855f733"}}>📄 Exportar PDF</button>
+              style={{...S.btnSec,color:"#a855f7",borderColor:"#a855f733"}}><Ico n="arquivo"/> Exportar PDF</button>
           )}
 
           {gerado && (
@@ -708,7 +709,7 @@ function RelatoriosKA({ dark, S, onBack }){
                       return (
                         <div key={r.id} style={{borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,padding:"8px 0"}}>
                           {r.diasDesdeAnterior!==null&&(
-                            <div style={{fontSize:10,color:"#22c55e",fontWeight:700,marginBottom:4}}>✅ {r.diasDesdeAnterior} dia(s) sem falha antes deste registro</div>
+                            <div style={{fontSize:10,color:"#22c55e",fontWeight:700,marginBottom:4}}><Ico n="checkCirculo"/> {r.diasDesdeAnterior} dia(s) sem falha antes deste registro</div>
                           )}
                           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:3}}>
                             {tiposR.map(tk=>{
@@ -721,7 +722,7 @@ function RelatoriosKA({ dark, S, onBack }){
                           </div>
                           {tiposR.includes("outro")&&r.tipoCustom&&<div style={{fontSize:11,...S.txt}}>{r.tipoCustom}</div>}
                           <div style={{fontSize:10,...S.txt2}}>
-                            📅 {fmtDate(r.data)} · ⏱ {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · 👤 {r.registradoPor?.nome||"—"}
+                            <Ico n="calendario"/> {fmtDate(r.data)} · <Ico n="cronometro"/> {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · <Ico n="usuario"/> {r.registradoPor?.nome||"—"}
                           </div>
                           {getResponsavelTexto(r)&&<div style={{fontSize:10,color:"#a855f7",fontWeight:700,marginTop:2}}>{getResponsavelTexto(r)}</div>}
                           {r.obs&&<div style={{fontSize:10,...S.txt2,fontStyle:"italic",marginTop:2}}>{r.obs}</div>}

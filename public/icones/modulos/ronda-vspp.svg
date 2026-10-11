@@ -1,0 +1,181 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Filtros de relevo 3D, feixe de luz e profundidade -->
+    <filter id="vspp2-shadow-suv" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-8" dy="16" stdDeviation="15" flood-color="#021A0F" flood-opacity="0.88"/>
+    </filter>
+
+    <filter id="vspp2-headlight-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+
+    <filter id="vspp2-light-source" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#A7F3D0" flood-opacity="0.95"/>
+    </filter>
+
+    <!-- Base de vidro fosco escuro com matiz verde-esmeralda -->
+    <linearGradient id="vspp2-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#071F14" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#04170E" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#010A05" stop-opacity="0.97"/>
+    </linearGradient>
+
+    <!-- Brilho volumétrico interno da placa -->
+    <radialGradient id="vspp2-glass-glow" cx="25%" cy="20%" r="75%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#047857" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Rim light chanfrado da borda externa -->
+    <linearGradient id="vspp2-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#D1FAE5" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#10B981" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#047857" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#064E3B" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Reflexo especular superior do vidro -->
+    <linearGradient id="vspp2-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="35%" stop-color="#6EE7B7" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Gradientes da Carroceria do SUV Tático -->
+    <linearGradient id="vspp2-suv-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="30%" stop-color="#059669"/>
+      <stop offset="70%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#064E3B"/>
+    </linearGradient>
+
+    <linearGradient id="vspp2-suv-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#ECFDF5" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#6EE7B7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#047857" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Vidros Blindados / Parabrisa -->
+    <linearGradient id="vspp2-glass-windshield" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="50%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <!-- Feixe de Luz Angular do Farol -->
+    <linearGradient id="vspp2-beam-grad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ECFDF5" stop-opacity="0.65"/>
+      <stop offset="35%" stop-color="#A7F3D0" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Barra de Giroflex -->
+    <linearGradient id="vspp2-lightbar-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="50%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+
+    <!-- Máscara estrita para confinar 100% de luz dentro da placa -->
+    <clipPath id="vspp2-plaque-clip">
+      <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/>
+    </clipPath>
+  </defs>
+
+  <!-- GRUPO PRINCIPAL CONFINADO NA PLACA -->
+  <g clip-path="url(#vspp2-plaque-clip)">
+    <!-- Fundo de vidro fosco escuro -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#vspp2-glass-base)"/>
+
+    <!-- Brilho volumétrico interno -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#vspp2-glass-glow)"/>
+
+    <!-- Reflexo especular diagonal superior -->
+    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#vspp2-specular-top)"/>
+
+    <!-- SÍMBOLO RELEVO 3D: SUV / VIATURA TÁTICA CENTRALIZADA (LARGURA ~715px) -->
+    <g id="vspp2-symbol-group">
+      <!-- 1. FEIXE DE LUZ DO FAROL DIANTEIRO DIREITO -->
+      <polygon points="760,545 890,470 910,615 760,595" 
+               fill="url(#vspp2-beam-grad)" filter="url(#vspp2-headlight-glow)"/>
+      <polygon points="620,560 830,590 810,695 620,625" 
+               fill="url(#vspp2-beam-grad)" filter="url(#vspp2-headlight-glow)"/>
+
+      <!-- 2. CARROCERIA ROBUSTA DO SUV (BLOCO ALTO E RETILÍNEO) -->
+      <g filter="url(#vspp2-shadow-suv)">
+        <!-- Barra de Giroflex Tática no Teto -->
+        <g transform="translate(0 78)">
+        <rect x="365" y="278" width="170" height="26" rx="10" ry="10" 
+              fill="url(#vspp2-lightbar-grad)" stroke="#FFFFFF" stroke-width="4"/>
+        <rect x="425" y="283" width="50" height="16" rx="6" ry="6" fill="#FFFFFF"/>
+
+        </g>
+
+        <!-- Casulo / Estrutura Principal da Picape-SUV -->
+        <path d="M 175,615 
+                 L 225,415 
+                 C 230,395 245,380 265,380 
+                 L 570,380 
+                 C 595,380 618,395 632,416 
+                 L 700,505 
+                 L 790,535 
+                 C 812,543 825,562 825,585 
+                 L 825,665 
+                 C 825,685 810,700 790,700 
+                 L 760,700 
+                 C 755,630 695,585 630,585 
+                 C 565,585 505,630 500,700 
+                 L 350,700 
+                 C 345,630 285,585 220,585 
+                 C 195,585 178,595 168,610 
+                 Z" 
+              fill="url(#vspp2-suv-grad)" stroke="url(#vspp2-suv-rim)" stroke-width="9" stroke-linejoin="round"/>
+
+        <!-- Chanfro Superior do Capô e Teto Reto de SUV -->
+        <path d="M 270,398 L 565,398 C 580,398 595,408 605,422 L 675,510 L 250,510 Z" 
+              fill="none" stroke="#FFFFFF" stroke-width="4" opacity="0.32"/>
+
+        <!-- Janelas Blindadas Anguladas -->
+        <!-- Janela Lateral Traseira -->
+        <path d="M 255,498 L 295,415 L 415,415 L 415,498 Z" 
+              fill="url(#vspp2-glass-windshield)" stroke="#94A3B8" stroke-width="5"/>
+        <!-- Janela Lateral Central -->
+        <path d="M 430,498 L 430,415 L 515,415 L 515,498 Z" 
+              fill="url(#vspp2-glass-windshield)" stroke="#94A3B8" stroke-width="5"/>
+        <!-- Parabrisa Dianteiro Imponente -->
+        <path d="M 530,498 L 530,415 L 585,415 L 670,498 Z" 
+              fill="url(#vspp2-glass-windshield)" stroke="#94A3B8" stroke-width="5"/>
+
+        <!-- Grade Frontal e Para-choque Tático Reforçado (Bullbar) -->
+        <rect x="755" y="595" width="70" height="75" rx="8" ry="8" 
+              fill="#1E293B" stroke="#94A3B8" stroke-width="5"/>
+        <line x1="765" y1="620" x2="815" y2="620" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+        <line x1="765" y1="645" x2="815" y2="645" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+
+        <!-- Caixas de Roda Robustas e Rodas All-Terrain -->
+        <!-- Roda Traseira -->
+        <circle cx="220" cy="700" r="62" fill="#09131C" stroke="#94A3B8" stroke-width="7"/>
+        <circle cx="220" cy="700" r="32" fill="#334155" stroke="#10B981" stroke-width="5"/>
+        <!-- Roda Dianteira -->
+        <circle cx="630" cy="700" r="62" fill="#09131C" stroke="#94A3B8" stroke-width="7"/>
+        <circle cx="630" cy="700" r="32" fill="#334155" stroke="#10B981" stroke-width="5"/>
+      </g>
+
+      <!-- 3. BLOCO ÓPTICO DIANTEIRO (FAROL EM ALTA POTÊNCIA) -->
+      <g filter="url(#vspp2-light-source)">
+        <polygon points="735,535 795,550 790,590 725,575" 
+                 fill="#FFFFFF" stroke="#A7F3D0" stroke-width="4"/>
+        <ellipse cx="760" cy="565" rx="18" ry="12" fill="#FFFFFF"/>
+      </g>
+    </g>
+
+    <!-- Friso de luz interno no bisel superior -->
+    <rect x="55.2" y="55.2" width="913.6" height="913.6" rx="198.75" ry="198.75" 
+          fill="none" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.25"/>
+  </g>
+
+  <!-- BORDA DE LUZ EXTERNA (RIM LIGHT DA PLACA) - ZERO VAZAMENTO -->
+  <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75" 
+        fill="none" stroke="url(#vspp2-rim-border)" stroke-width="7"/>
+</svg>

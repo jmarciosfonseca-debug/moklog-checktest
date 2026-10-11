@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -442,7 +443,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
               {fotos.map((src,i)=>(
                 <div key={i} style={{ position:"relative", borderRadius:10, overflow:"hidden", border:`1px solid ${dark?"#1e293b":"#e2e8f0"}` }}>
                   <img src={src} alt={`Foto ${i+1}`} style={{ width:"100%", height:120, objectFit:"cover", display:"block" }}/>
-                  <button onClick={()=>removerFoto(i)} style={{ position:"absolute", top:6, right:6, background:"rgba(239,68,68,.92)", color:"#fff", border:"none", borderRadius:6, width:26, height:26, fontSize:14, cursor:"pointer", fontWeight:800 }}>✕</button>
+                  <button onClick={()=>removerFoto(i)} style={{ position:"absolute", top:6, right:6, background:"rgba(239,68,68,.92)", color:"#fff", border:"none", borderRadius:6, width:26, height:26, fontSize:14, cursor:"pointer", fontWeight:800 }}><Ico n="x"/></button>
                 </div>
               ))}
             </div>
@@ -452,10 +453,10 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
                 <input ref={cameraRef} type="file" accept="image/*" capture="environment" multiple onChange={e=>{ addFotos(e.target.files); e.target.value=""; }} style={{ display:"none" }}/>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                   <button onClick={()=>fileRef.current && fileRef.current.click()} style={{ ...S.btnSec, width:"100%" }}>
-                    🖼️ Galeria
+                    <Ico n="imagem"/> Galeria
                   </button>
                   <button onClick={()=>cameraRef.current && cameraRef.current.click()} style={{ ...S.btnSec, width:"100%" }}>
-                    📷 Câmera
+                    <Ico n="camera"/> Câmera
                   </button>
                 </div>
               </>
@@ -470,12 +471,12 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           {/* Ações */}
           {!editandoId && (
             <button onClick={salvarRascunho} style={{ ...S.btnSec, width:"100%", marginTop:6, marginBottom:0 }}>
-              📝 Salvar rascunho (continuar depois)
+              <Ico n="notas"/> Salvar rascunho (continuar depois)
             </button>
           )}
           <div style={{ display:"flex", gap:10, marginTop:6 }}>
             <button onClick={()=>{ setScreen("list"); setForm(blankReg()); setEditandoId(null); }} style={{ ...S.btnSec, flex:1 }}>Cancelar</button>
-            <button onClick={salvar} disabled={saving} style={{ ...S.btnPrimary, flex:2, opacity:saving?.6:1 }}>{saving ? "Salvando…" : (editandoId ? "✓ Salvar alterações" : "✓ Salvar registro")}</button>
+            <button onClick={salvar} disabled={saving} style={{ ...S.btnPrimary, flex:2, opacity:saving?.6:1 }}>{saving ? "Salvando…" : (editandoId ? <><Ico n="check"/>{" Salvar alterações"}</> : <><Ico n="check"/>{" Salvar registro"}</>)}</button>
           </div>
         </div>
       </div></div>
@@ -512,9 +513,9 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
             </label>
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={()=>{ const { html } = montarConsolidadoAmbulancia(project, registros, { inicio:relIni, fim:relFim, interno:relInterno, inquilinosLista }); baixarHtml(html, `ambulancia_consolidado_${project.id}_${relIni}_a_${relFim}${relInterno?"_interno":""}.html`); }}
-                style={{ ...S.btnPrimary, flex:1, fontSize:13 }}>📊 Consolidado</button>
+                style={{ ...S.btnPrimary, flex:1, fontSize:13 }}><Ico n="grafico"/> Consolidado</button>
               <button onClick={()=>{ const { html } = montarConsolidadoAmbulancia(project, registros, { inicio:relIni, fim:relFim, interno:relInterno, inquilinosLista, comAnexo:true }); baixarHtml(html, `ambulancia_todos_${project.id}_${relIni}_a_${relFim}${relInterno?"_interno":""}.html`); }}
-                style={{ ...S.btnPrimary, flex:1, fontSize:13 }}>📥 Baixar todos</button>
+                style={{ ...S.btnPrimary, flex:1, fontSize:13 }}><Ico n="download"/> Baixar todos</button>
             </div>
           </div>
         )}
@@ -531,7 +532,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
               <div key={reg.id} style={{ ...S.card, borderLeft:`4px solid ${cor}` }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10 }}>
                   <div style={{ minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:800, ...S.txt }}>🚑 {reg.inquilino || "—"}</div>
+                    <div style={{ fontSize:15, fontWeight:800, ...S.txt }}><Ico n="cruz"/> {reg.inquilino || "—"}</div>
                     <div style={{ fontSize:12, ...S.txt2, marginTop:3 }}>
                       {fmtData(reg.data)}{reg.turno?` · ${reg.turno}`:""}{reg.horaEntrada?` · ${reg.horaEntrada}`:""}{reg.horaSaida?`→${reg.horaSaida}`:""}
                     </div>
@@ -540,16 +541,16 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
                       {reg.gravidade ? ` · ` : ""}
                       {reg.gravidade && <span style={{ color:cor, fontWeight:800 }}>{reg.gravidade}</span>}
                     </div>
-                    {reg.paciente && reg.paciente.trim() && <div style={{ fontSize:12, ...S.txt2, marginTop:2 }}>🧍 {reg.paciente}</div>}
-                    {(reg.fotos?.length>0) && <div style={{ fontSize:11, ...S.txt2, marginTop:3 }}>📷 {reg.fotos.length} foto(s)</div>}
+                    {reg.paciente && reg.paciente.trim() && <div style={{ fontSize:12, ...S.txt2, marginTop:2 }}><Ico n="pessoa"/> {reg.paciente}</div>}
+                    {(reg.fotos?.length>0) && <div style={{ fontSize:11, ...S.txt2, marginTop:3 }}><Ico n="camera"/> {reg.fotos.length} foto(s)</div>}
                   </div>
                   <span style={{ fontSize:9, fontWeight:800, color:"#fff", background:cor, borderRadius:5, padding:"3px 8px", whiteSpace:"nowrap" }}>{reg.gravidade || "—"}</span>
                 </div>
 
                 <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-                  <button onClick={()=>gerarPDF(reg)} style={{ ...S.btnSm, color:"#B21E27", borderColor:"#B21E2766" }}>📄 Gerar PDF</button>
-                  <button onClick={()=>abrirEdicao(reg)} style={{ ...S.btnSm, color:dark?"#cbd5e1":"#475569", borderColor:dark?"#334155":"#cbd5e1" }}>✏️ Editar</button>
-                  {adminAuth && <button onClick={()=>excluir(reg)} style={{ ...S.btnSm, color:"#ef4444", borderColor:"#ef444455" }}>🗑 Excluir</button>}
+                  <button onClick={()=>gerarPDF(reg)} style={{ ...S.btnSm, color:"#B21E27", borderColor:"#B21E2766" }}><Ico n="arquivo"/> Gerar PDF</button>
+                  <button onClick={()=>abrirEdicao(reg)} style={{ ...S.btnSm, color:dark?"#cbd5e1":"#475569", borderColor:dark?"#334155":"#cbd5e1" }}><Ico n="editar"/> Editar</button>
+                  {adminAuth && <button onClick={()=>excluir(reg)} style={{ ...S.btnSm, color:"#ef4444", borderColor:"#ef444455" }}><Ico n="lixeira"/> Excluir</button>}
                 </div>
               </div>
             );
@@ -566,7 +567,7 @@ function Header({ S, onBack, onToggleTheme, project, dark, titulo }){
     <div style={{ padding:"14px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10 }}>
       <button onClick={onBack} style={S.btnVoltar}>← Voltar</button>
       <div style={{ textAlign:"center", flex:1, minWidth:0 }}>
-        <div style={{ fontSize:15, fontWeight:800, ...S.txt }}>🚑 {titulo || "Acesso de Ambulância"}</div>
+        <div style={{ fontSize:15, fontWeight:800, ...S.txt }}><Ico n="cruz"/> {titulo || "Acesso de Ambulância"}</div>
         <div style={{ fontSize:11, ...S.txt2 }}>{project.id} · {project.name}</div>
       </div>
       <button onClick={onToggleTheme} style={S.btnVoltar}>{iconeTema()}</button>

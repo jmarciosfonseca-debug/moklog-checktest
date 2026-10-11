@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import {useRef,useState} from 'react';
 import {situacaoSolicitacao,enviadoAposAprovacao} from './equipeAprovacao';
 import {mensagemSolicitacoes,ASSINATURA_APROVADOR} from './equipeSolicitacoes';
@@ -44,7 +45,7 @@ export function FolhaWhats({solicitacoes,projectNome,colab,onRegistrar,onFechar,
     <div style={{background:dark?'#0b1220':'#fff',color:dark?'#e8ecf5':'#0f172a',borderRadius:14,padding:20,maxWidth:440,width:'100%'}}>
       <h3>Solicitação aprovada</h3><p>{solicitacoes.length} item(ns) aprovado(s), pronto(s) para enviar ao grupo.</p>
       <p>A mensagem segue assinada: Aprovado pelo {ASSINATURA_APROVADOR}. O app registra o toque no botão, não a entrega da mensagem. Escolha o grupo ou contato no WhatsApp.</p>
-      {feito?<div><p role="status">Toque registrado.</p><a href={url} target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a></div>:<button disabled={busy||!!erro} onClick={enviar} style={{width:'100%',padding:15,background:'#25d366',border:0,borderRadius:9,fontWeight:800,fontSize:16}}>📲 Enviar no WhatsApp</button>}
+      {feito?<div><p role="status">Toque registrado.</p><a href={url} target="_blank" rel="noopener noreferrer">Abrir WhatsApp</a></div>:<button disabled={busy||!!erro} onClick={enviar} style={{width:'100%',padding:15,background:'#25d366',border:0,borderRadius:9,fontWeight:800,fontSize:16}}><Ico n="celular"/> Enviar no WhatsApp</button>}
       {erro&&<div role="alert"><p>{erro}</p><button disabled={busy} onClick={registrar}>Tentar registrar de novo</button></div>}
       <button disabled={busy} onClick={onFechar} style={{marginTop:14,padding:10}}>{feito?'Concluir':'Enviar depois'}</button>
     </div>

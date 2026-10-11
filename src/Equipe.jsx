@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
 import { useState, useEffect, useContext, useRef } from "react";
@@ -96,7 +97,7 @@ function coberturaAtiva(colab){
   return hoje>=ini && hoje<=fim;
 }
 const HIST_COLORS = {
-  "Atraso": { bg: '#451a03', color: '#f59e0b', icon: '⏱' },
+  "Atraso": { bg: '#451a03', color: '#f59e0b', icon: <><Ico n="cronometro"/></> },
   "Falta":             { color:"#ef4444", bg:"#1a0202", badge:"#fee2e2" },
   "FT":                { color:"#f59e0b", bg:"#1a1000", badge:"#fef3c7" },
   "Medida Disciplinar":{ color:"#a855f7", bg:"#120a2e", badge:"#f3e8ff" },
@@ -106,10 +107,10 @@ const HIST_COLORS = {
 const ESCALAS = ["12x36","4x2","5x2","6x1"];
 
 const TURNO_CONFIG = {
-  "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
-  "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
-  "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:"☀️🌙" },
-  "Ferista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:"🔄" },
+  "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:<><Ico n="sol"/></> },
+  "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:<><Ico n="lua"/></> },
+  "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:<><Ico n="sol"/><Ico n="lua"/></> },
+  "Ferista":   { bg:"#0a1a2e", border:"#0ea5e933", badge:"#0ea5e9", icon:<><Ico n="atualizar"/></> },
 };
 
 function todayStr() { return new Date().toLocaleDateString("sv-SE"); }
@@ -238,7 +239,7 @@ function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
   if(!canEdit) return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
-        <div style={{fontSize:32, marginBottom:8}}>🔒</div>
+        <div style={{fontSize:32, marginBottom:8}}><Ico n="cadeado"/></div>
         <div style={{fontSize:14, fontWeight:700, ...S.txt, marginBottom:8}}>Edição não permitida</div>
         <div style={{fontSize:12, ...S.txt2, marginBottom:16}}>Este registro já foi editado. Apenas o gerencial pode editar novamente.</div>
         <button onClick={onCancel} style={{...S.btnSec, fontSize:13}}>← Voltar</button>
@@ -253,7 +254,7 @@ function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
           <div style={{display:"flex", alignItems:"center", gap:10}}>
             <button onClick={onCancel} style={S.backBtn}>← Cancelar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:14, fontWeight:800, ...S.txtPrimary}}>✏️ Editar Registro</div>
+              <div style={{fontSize:14, fontWeight:800, ...S.txtPrimary}}><Ico n="editar"/> Editar Registro</div>
               <div style={{fontSize:11, ...S.txtSecondary}}>
                 {item.tipo}
                 {isLider && <span style={{color:"#f59e0b"}}> · Edição única</span>}
@@ -295,12 +296,12 @@ function EditHistScreen({ item, isLider, onSave, onCancel, dark }) {
           </div>
           {isLider && (
             <div style={{background:"#1a1000", border:"1px solid #f59e0b33", borderRadius:8, padding:"8px 12px"}}>
-              <div style={{fontSize:11, color:"#f59e0b"}}>⚠️ Após salvar, este registro não poderá ser editado novamente pelo líder.</div>
+              <div style={{fontSize:11, color:"#f59e0b"}}><Ico n="alerta"/> Após salvar, este registro não poderá ser editado novamente pelo líder.</div>
             </div>
           )}
           <button onClick={()=>onSave({data, detalhe, label})}
             style={{...S.btn, background:`linear-gradient(135deg,${hc.color},${hc.color}cc)`}}>
-            ✓ Salvar Edição
+            <Ico n="check"/> Salvar Edição
           </button>
         </div>
       </div>
@@ -334,7 +335,7 @@ function Header({ title, sub, onBack, saving, dark, onToggleTheme }) {
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
         <button onClick={onBack} style={S.backBtn}>← Início</button>
         <div style={{ flex:1 }}>
-          <div style={{ fontSize:15, fontWeight:800, ...S.txtPrimary }}>👥 {title}</div>
+          <div style={{ fontSize:15, fontWeight:800, ...S.txtPrimary }}><Ico n="usuarios"/> {title}</div>
           <div style={{ fontSize:11, ...S.txtSecondary }}>{sub}</div>
         </div>
         {saving && <div style={{ fontSize:10, color:"#0ea5e9", fontWeight:700 }}>⟳</div>}
@@ -354,7 +355,7 @@ function Avatar({ colab, size=52, border="#1e293b" }) {
     <div style={{ width:size, height:size, borderRadius:size/4, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background:"#0f172a", display:"flex", alignItems:"center", justifyContent:"center" }}>
       {src
         ? <img src={src} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
-        : <span style={{ fontSize:size*0.45 }}>👤</span>
+        : <span style={{ fontSize:size*0.45 }}><Ico n="usuario"/></span>
       }
     </div>
   );
@@ -418,12 +419,12 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
   return (
     <div style={S.card}>
       <div onClick={()=>setAberto(a=>!a)} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer" }}>
-        <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>📦 Uniforme e Material Tático
+        <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}><Ico n="pacote"/> Uniforme e Material Tático
           {pendentes.length>0 && <span style={{ fontSize:10, color:"#f59e0b", marginLeft:8, fontWeight:700 }}>{pendentes.length} pendente(s)</span>}
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:8 }}>
           {pendentes.length>0 && <button onClick={(e)=>{ e.stopPropagation(); gerarPDFSolicitacoesColaborador({id:projectId}, colab); }}
-            style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:7, padding:"5px 10px", fontSize:10.5, fontWeight:700, cursor:"pointer" }}>📄 PDF</button>}
+            style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:7, padding:"5px 10px", fontSize:10.5, fontWeight:700, cursor:"pointer" }}><Ico n="arquivo"/> PDF</button>}
           <span style={{ color:"#64748b", fontSize:14 }}>{aberto?"▾":"›"}</span>
         </div>
       </div>
@@ -431,19 +432,19 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
       {aberto && (
         <div style={{ marginTop:12 }}>
           {canApprove&&onTodas&&<BotaoAprovarTodas alvos={alvosAguardando([colab],ano)} onTodas={onTodas} rotulo="Aprovar todas as pendentes deste colaborador"/>}
-          {canManage&&pendentes.filter(envioPendente).length>1&&<button onClick={()=>setWhatsFolha(pendentes.filter(envioPendente))} style={{marginBottom:8,width:"100%",padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>📲 Enviar aprovadas no WhatsApp ({pendentes.filter(envioPendente).length})</button>}
+          {canManage&&pendentes.filter(envioPendente).length>1&&<button onClick={()=>setWhatsFolha(pendentes.filter(envioPendente))} style={{marginBottom:8,width:"100%",padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}><Ico n="celular"/> Enviar aprovadas no WhatsApp ({pendentes.filter(envioPendente).length})</button>}
           {/* Solicitações pendentes com SLA */}
           {pendentes.map(s=>{
             const dias = uniformeDiasAberto(s.solicitadoEm);
             const alerta = dias>=UNIFORME_SLA_ALERTA;
             return (
               <div key={s.id} style={{ background:alerta?"#1a0202":(dark?"#1a1000":"#fffbeb"), border:`1px solid ${alerta?"#ef444455":"#f59e0b44"}`, borderRadius:10, padding:"10px 12px", marginBottom:8 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?"🔴":"⏳"} {s.item}{s.tamanho?` · ${s.tamanho}`:""} · Qtd: {s.qtd??s.quantidade??1} — pendente</div>
+                <div style={{ fontSize:12, fontWeight:700, color:alerta?"#ef4444":"#f59e0b" }}>{alerta?<><Ico n="pontoVermelho"/></>:<><Ico n="ampulheta"/></>} {s.item}{s.tamanho?` · ${s.tamanho}`:""} · Qtd: {s.qtd??s.quantidade??1} — pendente</div>
                 <div style={{ fontSize:10.5, color:txt2, marginTop:2 }}>Aberta há {dias} dia(s){s.motivo?` · ${s.motivo}`:""}{alerta?" · SLA excedido (5 dias)":""}</div>
                 <SeloWhats solic={s}/>
-                {canManage&&podeEnviarAoGrupo(s)&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{enviadoAposAprovacao(s)?"Reenviar no WhatsApp":"📲 Enviar no WhatsApp"}</button>}
+                {canManage&&podeEnviarAoGrupo(s)&&<button onClick={()=>setWhatsFolha([s])} style={{marginTop:8,padding:10,background:"#25d366",border:0,borderRadius:7,fontWeight:700}}>{enviadoAposAprovacao(s)?"Reenviar no WhatsApp":<><Ico n="celular"/>{" Enviar no WhatsApp"}</>}</button>}
                 <AprovacaoInline solic={s} canApprove={canApprove} onAprovar={(dec,opts)=>onAprovar && onAprovar([{ colabId:colab.id, solicId:s.id }], dec,opts)} dark={dark}/>
-                {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}>✓ Confirmar recebimento (zera SLA)</button>}
+                {canManage && <button onClick={()=>onConfirmar(colab.id, s.id)} style={{ marginTop:8, width:"100%", background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px", fontSize:12, fontWeight:700, cursor:"pointer" }}><Ico n="check"/> Confirmar recebimento (zera SLA)</button>}
               </div>
             );
           })}
@@ -460,7 +461,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
                     return (
                       <div key={it.nome} style={cardStyle(r.usa)}>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                          <div onClick={()=>setRascunho(p=>({...p,[it.nome]:{...r,usa:!r.usa}}))} style={{ width:22, height:22, borderRadius:6, flexShrink:0, cursor:"pointer", border:`2px solid ${r.usa?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:r.usa?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:900 }}>{r.usa?"✓":""}</div>
+                          <div onClick={()=>setRascunho(p=>({...p,[it.nome]:{...r,usa:!r.usa}}))} style={{ width:22, height:22, borderRadius:6, flexShrink:0, cursor:"pointer", border:`2px solid ${r.usa?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:r.usa?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:900 }}>{r.usa?<><Ico n="check"/></>:""}</div>
                           <div style={{ flex:1, fontSize:12.5, fontWeight:600, color:r.usa?txt:txt2 }}>{it.nome}</div>
                           {r.usa && it.pedeTamanho && (
                             <input value={r.tamanho} onChange={e=>setRascunho(p=>({...p,[it.nome]:{...r,tamanho:e.target.value}}))} placeholder="tam/nº"
@@ -474,21 +475,21 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
               ))}
               <div style={{ display:"flex", gap:8 }}>
                 <button onClick={()=>setModoMontar(false)} style={{ flex:1, background:"transparent", border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, color:txt2, borderRadius:9, padding:"11px", fontSize:13, fontWeight:700, cursor:"pointer" }}>Cancelar</button>
-                <button onClick={concluirMontagem} style={{ flex:2, background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:9, padding:"11px", fontSize:13, fontWeight:800, cursor:"pointer" }}>✓ Concluir lista de material</button>
+                <button onClick={concluirMontagem} style={{ flex:2, background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:9, padding:"11px", fontSize:13, fontWeight:800, cursor:"pointer" }}><Ico n="check"/> Concluir lista de material</button>
               </div>
             </div>
           ) : !unf.listaMontada ? (
             /* Estado inicial: lista ainda não montada */
             <div style={{ textAlign:"center", padding:"14px 10px", border:`1px dashed ${dark?"#232b4a":"#cbd5e1"}`, borderRadius:10 }}>
               <div style={{ fontSize:12.5, color:txt2, marginBottom:10 }}>Nenhuma lista de material montada ainda.</div>
-              {canManage && <button onClick={iniciarMontagem} style={{ background:"#0ea5e9", border:"none", color:"#fff", borderRadius:9, padding:"10px 18px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>➕ Montar lista de material</button>}
+              {canManage && <button onClick={iniciarMontagem} style={{ background:"#0ea5e9", border:"none", color:"#fff", borderRadius:9, padding:"10px 18px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}><Ico n="mais"/> Montar lista de material</button>}
             </div>
           ) : (
             /* FASE 2 — lista montada: só os itens que ele usa */
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <div style={{ fontSize:11.5, color:txt2 }}>{itensUsados.length} item(ns) neste colaborador</div>
-                {canManage && <button onClick={iniciarMontagem} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 11px" }}>✏️ Editar lista</button>}
+                {canManage && <button onClick={iniciarMontagem} style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 11px" }}><Ico n="editar"/> Editar lista</button>}
               </div>
 
               {itensUsados.length===0 ? (
@@ -509,7 +510,7 @@ export function UniformeModulo({ colab, projectNome, projectId, canManage, canAp
                             <div key={it.nome} style={cardStyle(sel)}>
                               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                                 {canManage && (
-                                  <div onClick={()=>toggleSelMulti(it.nome)} style={{ width:22, height:22, borderRadius:6, flexShrink:0, cursor:"pointer", border:`2px solid ${sel?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:sel?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:900 }}>{sel?"✓":""}</div>
+                                  <div onClick={()=>toggleSelMulti(it.nome)} style={{ width:22, height:22, borderRadius:6, flexShrink:0, cursor:"pointer", border:`2px solid ${sel?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:sel?"#0ea5e9":"transparent", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:12, fontWeight:900 }}>{sel?<><Ico n="check"/></>:""}</div>
                                 )}
                                 <div style={{ flex:1, minWidth:0 }}>
                                   <div style={{ fontSize:12.5, fontWeight:600, color:txt }}>{it.nome}{d.tamanho?<span style={{color:txt2,fontWeight:400}}> · {d.tamanho}</span>:""}{d.marca?<span style={{color:txt2,fontWeight:400}}> · {d.marca}</span>:""}</div>
@@ -661,7 +662,7 @@ function FVCard({ fv, projectLabel, contadores, ano, onSalvar, dark }){
           <div style={{ fontSize:10.5, color:txt2 }}>{fv?.atualizadoEm ? `Atualizado em ${new Date(fv.atualizadoEm).toLocaleDateString("pt-BR")}` : "Sem valor registrado"}</div>
         </div>
         {!edit && <button onClick={()=>{ setValorTxt(fv && typeof fv.valor==="number" ? String(fv.valor).replace(".",",") : ""); setEdit(true); }}
-          style={{ ...S.btnSm, fontSize:11, color:"#f59e0b", border:"1px solid #f59e0b55", padding:"6px 12px" }}>✏️ Editar</button>}
+          style={{ ...S.btnSm, fontSize:11, color:"#f59e0b", border:"1px solid #f59e0b55", padding:"6px 12px" }}><Ico n="editar"/> Editar</button>}
       </div>
       {edit && (
         <div style={{ marginTop:10 }}>
@@ -709,7 +710,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
       <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <button onClick={onBack} style={{ ...S.btnSm, padding:"7px 12px" }}>← Voltar</button>
-          <div style={{ fontSize:14, fontWeight:800, color:txt }}>✅ Aprovação de solicitações</div>
+          <div style={{ fontSize:14, fontWeight:800, color:txt }}><Ico n="checkCirculo"/> Aprovação de solicitações</div>
         </div>
         {fvControle}
         {aba==="aguardando"&&<BotaoAprovarTodas alvos={alvosAguardando(colaboradores,ano)} onTodas={onTodas}/>}
@@ -728,7 +729,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
         </div>
         <div style={{ ...S.card, padding:"10px 12px" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, flexWrap:"wrap" }}>
-            <button onClick={()=>setSel(todosSel?[]:elegiveis.map(i=>i.key))} style={{ ...S.btnSm, fontSize:10.5 }}>{todosSel?"☑ Desmarcar todas":`☐ Selecionar todas (${elegiveis.length})`}</button>
+            <button onClick={()=>setSel(todosSel?[]:elegiveis.map(i=>i.key))} style={{ ...S.btnSm, fontSize:10.5 }}>{todosSel?<><Ico n="quadradoCheck"/>{" Desmarcar todas"}</>:`☐ Selecionar todas (${elegiveis.length})`}</button>
             <span style={{ fontSize:11, color:txt2 }}>{sel.length} selecionada(s)</span>
           </div>
           <div style={{ display:"flex", gap:6, marginTop:8 }}>
@@ -745,7 +746,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
           return (
             <div key={key} onClick={()=>{if(situacaoSolicitacao(s)!=="legado")toggle(key);}} style={{ ...S.card, padding:"10px 12px", cursor:"pointer", border:`1px solid ${on?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}` }}>
               <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <div style={{ width:20, height:20, borderRadius:5, flexShrink:0, border:`2px solid ${on?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:on?"#0ea5e9":"transparent", color:"#fff", fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{on?"✓":""}</div>
+                <div style={{ width:20, height:20, borderRadius:5, flexShrink:0, border:`2px solid ${on?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`, background:on?"#0ea5e9":"transparent", color:"#fff", fontSize:11, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{on?<><Ico n="check"/></>:""}</div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:12.5, fontWeight:700, color:txt }}>{c.nome}</div>
                   <div style={{ fontSize:11, color:txt2 }}>{s.item}{s.tamanho?` · ${s.tamanho}`:""} · Qtd: {s.qtd??s.quantidade??1} · {s.status==="entregue"?"entregue":"pendente"} · {s.solicitadoEm?new Date(s.solicitadoEm).toLocaleDateString("pt-BR"):"—"}</div>
@@ -756,7 +757,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
             </div>
           );
         })}
-        <button onClick={onPDF} style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 PDF das aprovadas ({cont.aprovado}) — {ano}</button>
+        <button onClick={onPDF} style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}><Ico n="arquivo"/> PDF das aprovadas ({cont.aprovado}) — {ano}</button>
       </div>
       </div>
     </div>
@@ -824,7 +825,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             {(adminAuth||liderAuth) && (
               <button onClick={onEdit} style={{ ...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", marginLeft:"auto", padding:"6px 14px", fontSize:12 }}>
-                ✏️ Editar
+                <Ico n="editar"/> Editar
               </button>
             )}
           </div>
@@ -833,15 +834,15 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             <div style={{ flex:1 }}>
               <div style={{ fontSize:18, fontWeight:800, ...S.txtPrimary, lineHeight:1.2 }}>{colab.nome || "—"}</div>
               <div style={{ fontSize:12, color:"#94a3b8", marginTop:3 }}>{colab.cargo}</div>
-              {coberturaAtiva(colab) && <div style={{fontSize:10,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"2px 8px",borderRadius:6,display:"inline-block",marginTop:5}}>🔁 Cobrindo Líder até {fmtDate(colab.coberturaFim)}</div>}
-              {colab.telefone && <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}>📱 {colab.telefone}</div>}
+              {coberturaAtiva(colab) && <div style={{fontSize:10,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"2px 8px",borderRadius:6,display:"inline-block",marginTop:5}}><Ico n="atualizar"/> Cobrindo Líder até {fmtDate(colab.coberturaFim)}</div>}
+              {colab.telefone && <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}><Ico n="celular"/> {colab.telefone}</div>}
               <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:tc.badge, background:tc.bg, border:`1px solid ${tc.border}`, padding:"3px 9px", borderRadius:6 }}>
-                  {TURNO_CONFIG[colab.turno]?.icon || "⏰"} {colab.turno}
+                  {TURNO_CONFIG[colab.turno]?.icon || <><Ico n="relogio"/></>} {colab.turno}
                 </span>
                 {colab.escala && <span style={{ fontSize:10, fontWeight:700, color:"#0ea5e9", background:"#001a2e", border:"1px solid #0ea5e922", padding:"3px 9px", borderRadius:6 }}>{colab.escala}</span>}
                 <span style={{ fontSize:10, fontWeight:700, color:colab.status==="ativo"?"#22c55e":"#ef4444", background:colab.status==="ativo"?"#021a0d":"#1a0202", border:`1px solid ${colab.status==="ativo"?"#22c55e33":"#ef444433"}`, padding:"3px 9px", borderRadius:6 }}>
-                  {colab.status==="ativo"?"🟢 ATIVO":"🔴 DESLIGADO"}
+                  {colab.status==="ativo"?<><Ico n="pontoVerde"/>{" ATIVO"}</>:<><Ico n="pontoVermelho"/>{" DESLIGADO"}</>}
                 </span>
               </div>
               {maturidade && <div style={{ marginTop:6, fontSize:11, color:"#cbd5e1" }}><IndiceIndividual resultado={maturidade} /></div>}
@@ -883,7 +884,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           {/* Alerta: absenteísmo recorrente */}
           {absenteismoAlto && (
             <div style={{ background:"#1a0202", border:"1px solid #ef444455", borderRadius:10, padding:"9px 13px" }}>
-              <div style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}>⚠️ Absenteísmo recorrente</div>
+              <div style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}><Ico n="alerta"/> Absenteísmo recorrente</div>
               <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>{faltas30} faltas nos últimos 30 dias — atenção para padrão de ausência.</div>
             </div>
           )}
@@ -892,7 +893,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           {recicInfo && recicInfo.estado!=="ok" && (
             <div style={{ background:recicInfo.estado==="vencida"?"#1a0202":"#1a1000", border:`1px solid ${recicInfo.estado==="vencida"?"#ef444455":"#f59e0b55"}`, borderRadius:10, padding:"9px 13px" }}>
               <div style={{ fontSize:12, color:recicInfo.estado==="vencida"?"#ef4444":"#f59e0b", fontWeight:700 }}>
-                {recicInfo.estado==="vencida"?"🔴 Reciclagem vencida":"🟡 Reciclagem vencendo"}
+                {recicInfo.estado==="vencida"?<><Ico n="pontoVermelho"/>{" Reciclagem vencida"}</>:<><Ico n="pontoAmarelo"/>{" Reciclagem vencendo"}</>}
               </div>
               <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>
                 {recicInfo.estado==="vencida"
@@ -918,7 +919,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
                 <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:4}}>
                   <div style={{fontSize:11,color:"#94a3b8"}}>Afastamento marcado como aberto, mas sem registro correspondente.</div>
                   <button onClick={()=>onEncerrarAfast&&onEncerrarAfast(null)} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
-                    ✓ Encerrar
+                    <Ico n="check"/> Encerrar
                   </button>
                 </div>
               );
@@ -927,12 +928,12 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             return(
               <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:4}}>
                 <div>
-                  <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>🚨 Afastamento Indeterminado</div>
+                  <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}><Ico n="sirene"/> Afastamento Indeterminado</div>
                   <div style={{fontSize:11,color:"#94a3b8"}}>Desde {fmtDate(entry.data)} · {dias} dia(s) em aberto</div>
                 </div>
                 {adminAuth&&(
                   <button onClick={()=>onEncerrarAfast&&onEncerrarAfast(entry)} style={{background:"#22c55e22",border:"1px solid #22c55e44",color:"#22c55e",borderRadius:7,padding:"6px 12px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
-                    ✓ Encerrar
+                    <Ico n="check"/> Encerrar
                   </button>
                 )}
               </div>
@@ -999,22 +1000,22 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
                       {h.detalhe && <div style={{ fontSize:10, color:"#64748b" }}>{h.detalhe}</div>}
                       {h.editadoPor && (
                         <div style={{ fontSize:9, color:"#f59e0b", marginTop:2 }}>
-                          ✏️ Editado {h.editadoPor==="lider"?"pelo líder":"pelo gerencial"} · {fmtDate(h.editadoEm?.split("T")[0])}
+                          <Ico n="editar"/> Editado {h.editadoPor==="lider"?"pelo líder":"pelo gerencial"} · {fmtDate(h.editadoEm?.split("T")[0])}
                         </div>
                       )}
                     </div>
                     <div style={{ display:"flex", gap:4, flexShrink:0 }}>
                       {/* Líder: editar UMA vez se ainda não foi editado */}
                       {liderAuth && !adminAuth && !h.editadoPor && (
-                        <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
+                        <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}><Ico n="editar"/></button>
                       )}
                       {/* Gerencial: editar sempre */}
                       {adminAuth && (
-                        <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}>✏️</button>
+                        <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}><Ico n="editar"/></button>
                       )}
                       {/* Excluir: gerencial sempre; líder exceto Medida Disciplinar */}
                       {(adminAuth || (liderAuth && h.tipo!=="Medida Disciplinar")) && (
-                        <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}>✕</button>
+                        <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}><Ico n="x"/></button>
                       )}
                     </div>
                   </div>
@@ -1068,13 +1069,13 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
               <div style={{ width:82, height:82, borderRadius:14, overflow:"hidden", border:`2px dashed ${form.foto?"#0ea5e9":"#1e293b"}`, background:"#020510", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 {form.foto
                   ? <img src={form.foto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
-                  : <div style={{ textAlign:"center" }}><div style={{ fontSize:26 }}>📷</div><div style={{ fontSize:8, color:"#475569", marginTop:2 }}>FOTO</div></div>
+                  : <div style={{ textAlign:"center" }}><div style={{ fontSize:26 }}><Ico n="camera"/></div><div style={{ fontSize:8, color:"#475569", marginTop:2 }}>FOTO</div></div>
                 }
               </div>
               <input type="file" accept="image/*" style={{ position:"absolute", opacity:0, width:0, height:0 }} onChange={handleFoto}/>
             </label>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:form.foto?"#0ea5e9":"#64748b" }}>{form.foto?"✓ Foto adicionada":"Adicionar foto (opcional)"}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:form.foto?"#0ea5e9":"#64748b" }}>{form.foto?<><Ico n="check"/>{" Foto adicionada"}</>:"Adicionar foto (opcional)"}</div>
               <div style={{ fontSize:11, color:"#475569", marginTop:2 }}>Toque no avatar para escolher</div>
             </div>
           </div>
@@ -1101,7 +1102,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
           <div style={S.card}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:form.coberturaAtiva?10:0}}>
               <div>
-                <div style={{fontSize:13,fontWeight:800,...S.txtPrimary}}>🔁 Cobertura de Liderança</div>
+                <div style={{fontSize:13,fontWeight:800,...S.txtPrimary}}><Ico n="atualizar"/> Cobertura de Liderança</div>
                 <div style={{fontSize:10,...S.txtSecondary,marginTop:2}}>Assume a função de líder num período (ex: férias do titular), sem trocar o cargo cadastrado.</div>
               </div>
               <button onClick={()=>setF("coberturaAtiva",!form.coberturaAtiva)}
@@ -1170,12 +1171,12 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
 
           {form.foto&&form.foto.startsWith("data:")&&(
             <div style={{background:"#001a2e",border:"1px solid #0ea5e922",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:12}}>📷</span>
+              <span style={{fontSize:12}}><Ico n="camera"/></span>
               <span style={{fontSize:11,color:"#0ea5e9"}}>Foto selecionada — será enviada ao salvar</span>
             </div>
           )}
           <button onClick={onSave} disabled={saving} style={{ ...S.btn, opacity:saving?0.7:1 }}>
-            {saving?"⟳ Salvando...":"✓ Salvar Colaborador"}
+            {saving?"⟳ Salvando...":<><Ico n="check"/>{" Salvar Colaborador"}</>}
           </button>
           <div style={{fontSize:10,color:"#334155",textAlign:"center"}}>
             Foto opcional · Sem foto também é permitido
@@ -1226,7 +1227,7 @@ export function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCa
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:cardBg,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:430,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,maxHeight:"90vh",overflowY:"auto"}}>
-        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:2}}>🗓️ Checar minha equipe</div>
+        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:2}}><Ico n="calendario"/> Checar minha equipe</div>
         <div style={{fontSize:12,color:txt2,marginBottom:14}}>Cada líder confirma o status do seu plantão. {chkEqFeitos(feitos,num)}/{num} já feitos neste fim de semana.</div>
 
         <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Qual plantão você está checando?</div>
@@ -1237,7 +1238,7 @@ export function ChecagemEquipeModal({ project, equipeData, dark, onConfirm, onCa
             return (
               <button key={s.id} disabled={busy} onClick={()=>setSlotId(s.id)}
                 style={{flex:"1 1 45%",background:sel?"#0ea5e9":done?(dark?"#052e16":"#dcfce7"):"transparent",border:`1px solid ${sel?"#0ea5e9":done?"#22c55e55":(dark?"#1e293b":"#cbd5e1")}`,color:sel?"#fff":done?"#22c55e":txt2,borderRadius:8,padding:"9px",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                {done?"✓ ":""}{s.label}
+                {done?<><Ico n="check"/>{" "}</>:""}{s.label}
               </button>
             );
           })}
@@ -1298,7 +1299,7 @@ function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, o
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:card,borderRadius:14,padding:"18px 16px",width:"100%",maxWidth:440,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`,maxHeight:"88vh",display:"flex",flexDirection:"column"}}>
-        <div style={{fontSize:16,fontWeight:800,color:txt}}>🛡️ Equipe de {lider.nome}</div>
+        <div style={{fontSize:16,fontWeight:800,color:txt}}><Ico n="escudo"/> Equipe de {lider.nome}</div>
         <div style={{fontSize:11.5,color:txt2,marginBottom:12}}>{lider.cargo} · {lider.turno} · {meus} membro(s) vinculado(s)</div>
         <div style={{fontSize:10.5,color:txt2,marginBottom:8}}>Toque para vincular/desvincular. Um membro em outra equipe será movido para esta.</div>
         <div style={{flex:1,overflowY:"auto",display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
@@ -1311,13 +1312,13 @@ function MontarEquipeModal({ lider, colaboradores, dark, onToggle, onDesfazer, o
                 style={{display:"flex",alignItems:"center",gap:9,padding:"8px 10px",borderRadius:9,cursor:"pointer",
                   background: meu ? "#0ea5e915" : "transparent",
                   border:`1px solid ${meu ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}`}}>
-                <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`2px solid ${meu?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`,background:meu?"#0ea5e9":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{meu?"✓":""}</div>
+                <div style={{width:20,height:20,borderRadius:5,flexShrink:0,border:`2px solid ${meu?"#0ea5e9":(dark?"#3a4468":"#cbd5e1")}`,background:meu?"#0ea5e9":"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{meu?<><Ico n="check"/></>:""}</div>
                 <Avatar colab={c} size={30} border={dark?"#232b4a":"#e2e8f0"}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:12.5,fontWeight:600,color:txt}}>{c.nome}</div>
                   <div style={{fontSize:10,color:txt2}}>{c.cargo} · {c.turno}</div>
                 </div>
-                {outra && <span style={{fontSize:9,color:"#f59e0b",fontWeight:700,flexShrink:0}}>⚠️ {nomeOutroLider}</span>}
+                {outra && <span style={{fontSize:9,color:"#f59e0b",fontWeight:700,flexShrink:0}}><Ico n="alerta"/> {nomeOutroLider}</span>}
               </div>
             );
           })}
@@ -1346,7 +1347,7 @@ function EncerrarAfastModal({ colab, entry, dark, onConfirm, onCancel }) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:dark?"#0b1220":"#fff",borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:400,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
-        <div style={{fontSize:16,fontWeight:800,...S.txtPrimary,marginBottom:4}}>✓ Encerrar afastamento</div>
+        <div style={{fontSize:16,fontWeight:800,...S.txtPrimary,marginBottom:4}}><Ico n="check"/> Encerrar afastamento</div>
         <div style={{fontSize:12,...S.txtSecondary,marginBottom:14}}>
           {colab?.nome}{inicio?` · afastado desde ${fmtDate(inicio)}`:""}
         </div>
@@ -1447,7 +1448,7 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
                 )}
                 {histForm.subtipo==="Indeterminado" && (
                   <div style={{ background:"#1a0202", border:"1px solid #ef444433", borderRadius:8, padding:"8px 12px" }}>
-                    <div style={{ fontSize:11, color:"#ef4444" }}>⚠️ Afastamento indeterminado — ficará em aberto até encerramento</div>
+                    <div style={{ fontSize:11, color:"#ef4444" }}><Ico n="alerta"/> Afastamento indeterminado — ficará em aberto até encerramento</div>
                   </div>
                 )}
               </div>
@@ -1492,7 +1493,7 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
             )}
           </div>
           <button onClick={onSave} style={{ ...S.btn, background:`linear-gradient(135deg,${hc.color},${hc.color}cc)` }}>
-            ✓ Adicionar Registro
+            <Ico n="check"/> Adicionar Registro
           </button>
         </div>
       </div>
@@ -1511,13 +1512,13 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
   if(!open) return (
     <button onClick={()=>setOpen(true)}
       style={{ ...S.btnSec, color:"#ef4444", borderColor:"#ef444433", fontSize:13 }}>
-      🔴 Desligar Colaborador
+      <Ico n="pontoVermelho"/> Desligar Colaborador
     </button>
   );
 
   return (
     <div style={{ background:"#1a0202", border:"1px solid #ef444444", borderRadius:12, padding:"16px" }}>
-      <div style={{ fontSize:13, fontWeight:700, color:"#ef4444", marginBottom:12 }}>🔴 Desligar — {colab.nome}</div>
+      <div style={{ fontSize:13, fontWeight:700, color:"#ef4444", marginBottom:12 }}><Ico n="pontoVermelho"/> Desligar — {colab.nome}</div>
       <div style={{ marginBottom:10 }}>
         <div style={S.lbl}>Tipo de Desligamento</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
@@ -1543,7 +1544,7 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
           style={{ ...S.btnSec, flex:1, fontSize:13 }}>Cancelar</button>
         <button onClick={()=>{ onDesligar(colab, motivo, tipo, data); }}
           style={{ flex:1, background:"linear-gradient(135deg,#b91c1c,#991b1b)", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
-          ✓ Confirmar
+          <Ico n="check"/> Confirmar
         </button>
       </div>
     </div>
@@ -1705,10 +1706,10 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txtPrimary}}>🏖️ Projeção de Férias</div>
+              <div style={{fontSize:15,fontWeight:800,...S.txtPrimary}}><Ico n="guardachuva"/> Projeção de Férias</div>
               <div style={{fontSize:11,...S.txtSecondary}}>{project.id} · {lista.length} colaborador(es)</div>
             </div>
-            <button onClick={gerarPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}>📄 PDF</button>
+            <button onClick={gerarPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:10}}><Ico n="arquivo"/> PDF</button>
             <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:13,...S.txtSecondary}}>{iconeTema()}</button>
           </div>
         </div>
@@ -1725,7 +1726,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   {/* Foto */}
                   <div style={{width:44,height:44,borderRadius:10,overflow:"hidden",border:`2px solid ${tc.badge}44`,flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                    {fotoDe((colaboradores||[]).find(c=>c.id===item.colabId),mapaFotos)?<img src={fotoDe((colaboradores||[]).find(c=>c.id===item.colabId),mapaFotos)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20}}>👤</span>}
+                    {fotoDe((colaboradores||[]).find(c=>c.id===item.colabId),mapaFotos)?<img src={fotoDe((colaboradores||[]).find(c=>c.id===item.colabId),mapaFotos)} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span style={{fontSize:20}}><Ico n="usuario"/></span>}
                   </div>
                   {/* Info */}
                   <div style={{flex:1,minWidth:0}}>
@@ -1733,7 +1734,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                     <div style={{fontSize:11,...S.txtSecondary}}>{item.cargo}</div>
                     <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap",alignItems:"center"}}>
                       <span style={{fontSize:9,color:tc.badge,background:tc.bg,padding:"1px 6px",borderRadius:4,fontWeight:700}}>{tc.icon} {item.turno}</span>
-                      {pa && <span style={{fontSize:9,color:pa.completo?"#22c55e":"#f59e0b",fontWeight:700}}>{pa.completo?"✅ Aquisitivo OK":`⏳ ${pa.meses}m/12`}</span>}
+                      {pa && <span style={{fontSize:9,color:pa.completo?"#22c55e":"#f59e0b",fontWeight:700}}>{pa.completo?<><Ico n="checkCirculo"/>{" Aquisitivo OK"}</>:`⏳ ${pa.meses}m/12`}</span>}
                     </div>
                   </div>
                   {/* Reorder buttons — líder ou gerencial */}
@@ -1749,7 +1750,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                   {podeEditar && (
                     <button onClick={()=>setEditId(isEditing?null:item.colabId)}
                       style={{...S.btnSm,color:isEditing?"#ef4444":"#0ea5e9",border:`1px solid ${isEditing?"#ef444433":"#0ea5e944"}`,fontSize:10,flexShrink:0}}>
-                      {isEditing?"✕":"✏️"}
+                      {isEditing?<><Ico n="x"/></>:<><Ico n="editar"/></>}
                     </button>
                   )}
                 </div>
@@ -1769,12 +1770,12 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                         </div>
                         <div style={{gridColumn:"1/-1"}}>
                           <div style={{fontSize:9,...S.txtSecondary,fontWeight:700,textTransform:"uppercase",marginBottom:2}}>Cobertura</div>
-                          <div style={{fontSize:12,...S.txtPrimary}}>{item.cobertura||<span style={{color:dark?"#334155":"#94a3b8"}}>Não definida ⚠️</span>}</div>
+                          <div style={{fontSize:12,...S.txtPrimary}}>{item.cobertura||<span style={{color:dark?"#334155":"#94a3b8"}}>Não definida <Ico n="alerta"/></span>}</div>
                         </div>
                       </div>
                     ) : (
                       <div style={{fontSize:11,...S.txtSecondary}}>
-                        {podeEditar?"Toque em ✏️ para agendar férias":"Sem férias agendadas"}
+                        {podeEditar?<>{"Toque em "}<Ico n="editar"/>{" para agendar férias"}</>:"Sem férias agendadas"}
                       </div>
                     )}
                     {alerta && (
@@ -1820,7 +1821,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
                     <div style={{display:"flex",gap:8}}>
                       <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
                       <button onClick={salvar} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>
-                        {saving?"⟳ Salvando...":"✓ Salvar"}
+                        {saving?"⟳ Salvando...":<><Ico n="check"/>{" Salvar"}</>}
                       </button>
                     </div>
                   </div>
@@ -1832,7 +1833,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
           {podeEditar && (
             <button onClick={salvar} disabled={saving}
               style={{...S.btnGreen||S.btn, background:"linear-gradient(135deg,#16a34a,#15803d)", color:"#fff", border:"none", borderRadius:10, padding:"13px 16px", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8}}>
-              {saving?"⟳ Salvando ordem...":"💾 Salvar Ordem e Dados"}
+              {saving?"⟳ Salvando ordem...":<><Ico n="disquete"/>{" Salvar Ordem e Dados"}</>}
             </button>
           )}
         </div>
@@ -1853,7 +1854,7 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{ ...S.page, alignItems:"center", justifyContent:"center" }}>
       <div style={{ background: dark?"#060c18":"#ffffff", border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
-        <div style={{ fontSize:32, marginBottom:8 }}>👥</div>
+        <div style={{ fontSize:32, marginBottom:8 }}><Ico n="usuarios"/></div>
         <div style={{ fontSize:16, fontWeight:800, ...S.txtPrimary, marginBottom:4 }}>Equipe — {project.id}</div>
         <div style={{ fontSize:12, ...S.txtSecondary, marginBottom:20 }}>{project.name}</div>
 
@@ -1861,11 +1862,11 @@ function PinScreen({ project, onSuccess, onBack, dark }) {
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             <button onClick={()=>setMode("lider")}
               style={{ ...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13 }}>
-              👷 Acesso Líder
+              <Ico n="capacete"/> Acesso Líder
             </button>
             <button onClick={()=>setMode("admin")}
               style={{ ...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33" }}>
-              🔐 Acesso Gerencial
+              <Ico n="chave"/> Acesso Gerencial
             </button>
             <button onClick={onBack} style={{ ...S.btnSec, fontSize:13, marginTop:4 }}>← Voltar</button>
           </div>
@@ -1913,9 +1914,9 @@ export function ContadorEquipe({ projectId }){
   if(num===0) return null;
   const feitos=(chk && chk.alvo===alvo) ? chkEqFeitos(chk.checkins, num) : 0;
   if(feitos>=num){
-    return <div style={{fontSize:10,color:"#22c55e",marginTop:3,fontWeight:700}}>✓ Checagem da equipe concluída ({feitos}/{num})</div>;
+    return <div style={{fontSize:10,color:"#22c55e",marginTop:3,fontWeight:700}}><Ico n="check"/> Checagem da equipe concluída ({feitos}/{num})</div>;
   }
-  return <div style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}>🗓️ Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
+  return <div data-pendente="1" style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}><Ico n="calendario"/> Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
 }
 
 function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted, fotosApi }) {
@@ -2495,7 +2496,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:30,marginBottom:10}}>👥</div>
+        <div style={{fontSize:30,marginBottom:10}}><Ico n="usuarios"/></div>
         <div style={{fontSize:13,color:"#64748b"}}>Carregando equipe...</div>
       </div>
     </div>
@@ -2622,19 +2623,19 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           {adminAuth ? (
             <div style={{ background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"10px 14px" }}>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8, marginBottom: modoSel?8:0 }}>
-                <div style={{ fontSize:12, color:"#22c55e", fontWeight:700, whiteSpace:"nowrap" }}>🔓 Modo Gerencial Ativo</div>
+                <div style={{ fontSize:12, color:"#22c55e", fontWeight:700, whiteSpace:"nowrap" }}><Ico n="cadeadoAberto"/> Modo Gerencial Ativo</div>
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap", justifyContent:"flex-end" }}>
                   <button onClick={()=>{ setModoSel(!modoSel); setSelPDF([]); }}
                     style={{ ...S.btnSm, color: modoSel?"#f59e0b":"#22c55e", border:`1px solid ${modoSel?"#f59e0b44":"#22c55e44"}`, fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
-                    {modoSel?"✕ Cancelar":"📄 Exportar PDF"}
+                    {modoSel?<><Ico n="x"/>{" Cancelar"}</>:<><Ico n="arquivo"/>{" Exportar PDF"}</>}
                   </button>
                   <button onClick={()=>setScreen("ferias")}
                     style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
-                    🏖️ Férias
+                    <Ico n="guardachuva"/> Férias
                   </button>
                   <button onClick={()=>setScreen("aprovacoes")}
                     style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
-                    ✅ Aprovações
+                    <Ico n="checkCirculo"/> Aprovações
                   </button>
                   <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
                 </div>
@@ -2643,7 +2644,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                   <button onClick={()=>{ const ids=ativos.map(c=>c.id); setSelPDF(ids); }}
                     style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"4px 10px" }}>
-                    ☐ Todos ({ativos.length})
+                    <Ico n="quadrado"/> Todos ({ativos.length})
                   </button>
                   {getTurnos(project.id).map(t=>{
                     const cols=ativos.filter(c=>c.turno===t);
@@ -2683,7 +2684,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                       style={{ ...S.btnSm, fontSize:10, color: pdfComDesligados?"#fff":"#dc2626",
                         background: pdfComDesligados?"#dc2626":"transparent",
                         border:`1px solid ${pdfComDesligados?"#dc2626":"#dc262644"}`, padding:"4px 10px", fontWeight:700 }}>
-                      {pdfComDesligados?"☑":"☐"} Incluir desligados ({desligados.length})
+                      {pdfComDesligados?<><Ico n="quadradoCheck"/></>:<><Ico n="quadrado"/></>} Incluir desligados ({desligados.length})
                     </button>
                   )}
                 </div>
@@ -2691,11 +2692,11 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             </div>
           ) : liderAuth ? (
             <div style={{ background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}>👷 Acesso Líder — Pode adicionar registros</div>
+              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}><Ico n="capacete"/> Acesso Líder — Pode adicionar registros</div>
               <div style={{ display:"flex", gap:6 }}>
                 <button onClick={()=>setScreen("ferias")}
                   style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
-                  🏖️ Férias
+                  <Ico n="guardachuva"/> Férias
                 </button>
                 <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
               </div>
@@ -2716,9 +2717,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
               <div style={{ background:bg, border:`1px solid ${cor}44`, borderRadius:10, padding:"11px 14px" }}>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap" }}>
                   <div style={{ flex:1, minWidth:180 }}>
-                    <div style={{ fontSize:13, fontWeight:800, color:cor }}>🗓️ Checar a equipe — fim de semana</div>
+                    <div style={{ fontSize:13, fontWeight:800, color:cor }}><Ico n="calendario"/> Checar a equipe — fim de semana</div>
                     {completo ? (
-                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>✓ Concluída ({nFeitos}/{num}) · reabre no próximo sábado</div>
+                      <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}><Ico n="check"/> Concluída ({nFeitos}/{num}) · reabre no próximo sábado</div>
                     ) : (
                       <div style={{ fontSize:11, ...S.txtSecondary, marginTop:2 }}>{nFeitos}/{num} check-ins · fecha domingo 23:59</div>
                     )}
@@ -2731,7 +2732,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   {(!completo||adminAuth) && (
                     <button onClick={()=>setChecagemModal(true)}
                       style={{ background:"linear-gradient(135deg,#16a34a,#15803d)", border:"none", color:"#fff", borderRadius:8, padding:"9px 16px", fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>
-                      {completo?'Revisar checagem (gerencial)':'✓ Checar minha equipe'}
+                      {completo?'Revisar checagem (gerencial)':<><Ico n="check"/>{" Checar minha equipe"}</>}
                     </button>
                   )}
                 </div>
@@ -2773,7 +2774,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
               <div style={{ ...S.card, display:"flex", flexDirection:"column", gap:12 }}>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                   <div style={{ fontSize:13, fontWeight:800, color: dark?"#f8fafc":"#0f172a" }}>
-                    🛡️ Perfil de Segurança
+                    <Ico n="escudo"/> Perfil de Segurança
                   </div>
                   {!adminAuth && (
                     <span style={{ fontSize:9, color: dark?"#475569":"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:.5 }}>
@@ -2858,13 +2859,13 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 style={{ flex:1, padding:"9px", borderRadius:9, fontSize:12, fontWeight:700, cursor:"pointer",
                   background: !visaoEquipes ? "#0ea5e9" : "transparent", color: !visaoEquipes ? "#fff" : "#64748b",
                   border:`1px solid ${!visaoEquipes ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}` }}>
-                👥 Por turno
+                <Ico n="usuarios"/> Por turno
               </button>
               <button onClick={()=>setVisaoEquipes(true)}
                 style={{ flex:1, padding:"9px", borderRadius:9, fontSize:12, fontWeight:700, cursor:"pointer",
                   background: visaoEquipes ? "#0ea5e9" : "transparent", color: visaoEquipes ? "#fff" : "#64748b",
                   border:`1px solid ${visaoEquipes ? "#0ea5e9" : (dark?"#1e293b":"#e2e8f0")}` }}>
-                🛡️ Por equipe (plantões)
+                <Ico n="escudo"/> Por equipe (plantões)
               </button>
             </div>
           )}
@@ -2935,7 +2936,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 )}
                 {adminAuth && filtroRapido==="aprovado" && (
                   <button onClick={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
-                    style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 PDF Aprovados — {anoFiltro}</button>
+                    style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}><Ico n="arquivo"/> PDF Aprovados — {anoFiltro}</button>
                 )}
               </div>
             );
@@ -2967,7 +2968,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                               {liderAuth && (
                                 <button onClick={()=>setMontarLiderId(lider.id)}
                                   style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 10px" }}>
-                                  {membros.length?"✏️ Editar":"➕ Montar"}
+                                  {membros.length?<><Ico n="editar"/>{" Editar"}</>:<><Ico n="mais"/>{" Montar"}</>}
                                 </button>
                               )}
                             </div>
@@ -2993,7 +2994,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 })}
                 {semEquipe.length>0 && (
                   <div style={{ opacity:.75, fontSize:11, color:"#94a3b8", padding:10, border:`1px dashed ${dark?"#232b4a":"#cbd5e1"}`, borderRadius:8 }}>
-                    👥 Sem equipe ({semEquipe.length}): {semEquipe.map(c=>c.nome).join(", ")}
+                    <Ico n="usuarios"/> Sem equipe ({semEquipe.length}): {semEquipe.map(c=>c.nome).join(", ")}
                   </div>
                 )}
                 {lideres.length===0 && (
@@ -3046,18 +3047,18 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                           onClick={()=>{ if(modoSel){ setSelPDF(prev=>prev.includes(c.id)?prev.filter(id=>id!==c.id):[...prev,c.id]); } else { setSelColab(c);setScreen("view"); } }}>
                           {modoSel&&(
                             <div style={{ width:22,height:22,borderRadius:5,border:`2px solid ${selPDF.includes(c.id)?"#7c3aed":"#1e293b"}`,background:selPDF.includes(c.id)?"#7c3aed22":"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:"#a78bfa" }}>
-                              {selPDF.includes(c.id)&&"✓"}
+                              {selPDF.includes(c.id)&&<><Ico n="check"/></>}
                             </div>
                           )}
                           <Avatar colab={c} size={46} border={tc.badge+"44"}/>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
                             <div style={{ fontSize:11, ...S.txtSecondary, marginTop:1 }}>{c.cargo}</div>
-                            {coberturaAtiva(c) && <div style={{fontSize:9,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"1px 7px",borderRadius:5,display:"inline-block",marginTop:3}}>🔁 Cobrindo Líder até {fmtDate(c.coberturaFim)}</div>}
+                            {coberturaAtiva(c) && <div style={{fontSize:9,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"1px 7px",borderRadius:5,display:"inline-block",marginTop:3}}><Ico n="atualizar"/> Cobrindo Líder até {fmtDate(c.coberturaFim)}</div>}
                             <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
                               {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background:"#001a2e", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
-                              {c.telefone && <span style={{ fontSize:9, color:"#94a3b8", padding:"1px 5px" }}>📱 {c.telefone}</span>}
-                              {recPisca && <span style={{ fontSize:9, fontWeight:800, color:recEstado==="vencido"?"#ef4444":"#f59e0b", background:(recEstado==="vencido"?"#ef4444":"#f59e0b")+"22", padding:"1px 6px", borderRadius:4 }}>🔄 {reciclagemLabel(c.ultimaReciclagem)}</span>}
+                              {c.telefone && <span style={{ fontSize:9, color:"#94a3b8", padding:"1px 5px" }}><Ico n="celular"/> {c.telefone}</span>}
+                              {recPisca && <span style={{ fontSize:9, fontWeight:800, color:recEstado==="vencido"?"#ef4444":"#f59e0b", background:(recEstado==="vencido"?"#ef4444":"#f59e0b")+"22", padding:"1px 6px", borderRadius:4 }}><Ico n="atualizar"/> {reciclagemLabel(c.ultimaReciclagem)}</span>}
                             </div>
                           </div>
                           <div style={{ flexShrink:0, textAlign:"right" }}>
@@ -3098,7 +3099,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             <div style={S.card}>
               <button onClick={()=>setShowDesligados(!showDesligados)}
                 style={{ width:"100%", background:"transparent", border:"none", display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", padding:0 }}>
-                <span style={{ fontSize:12, fontWeight:700, color:"#ef4444" }}>🔴 Desligados ({desligados.length})</span>
+                <span style={{ fontSize:12, fontWeight:700, color:"#ef4444" }}><Ico n="pontoVermelho"/> Desligados ({desligados.length})</span>
                 <span style={{ color:"#334155", fontSize:12 }}>{showDesligados?"▲":"▼"}</span>
               </button>
               {showDesligados && (
@@ -3112,7 +3113,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                           <div style={{ fontSize:10, color:"#475569" }}>{c.cargo}</div>
                           <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap" }}>
                             {c.tipoDesligamento&&<span style={{ fontSize:9, color:"#ef4444", background:"#2a0202", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.tipoDesligamento}</span>}
-                            {c.desligadoEm&&<span style={{ fontSize:9, color:"#64748b" }}>📅 {fmtDate(c.desligadoEm)}</span>}
+                            {c.desligadoEm&&<span style={{ fontSize:9, color:"#64748b" }}><Ico n="calendario"/> {fmtDate(c.desligadoEm)}</span>}
                           </div>
                           {c.motivoDesligamento&&<div style={{ fontSize:10, color:"#64748b", marginTop:2, fontStyle:"italic" }}>{c.motivoDesligamento}</div>}
                         </div>
@@ -3129,7 +3130,7 @@ Esta ação não pode ser desfeita.`))
                                 excluirDesligado(c, idx);
                             }}
                               style={{ ...S.btnSm, color:"#ef4444", border:"1px solid #ef444433", fontSize:10, padding:"4px 10px" }}>
-                              🗑 Excluir
+                              <Ico n="lixeira"/> Excluir
                             </button>
                           </div>
                         )}
@@ -3143,7 +3144,7 @@ Esta ação não pode ser desfeita.`))
 
           {ativos.length === 0 && (
             <div style={{ textAlign:"center", padding:"40px 0" }}>
-              <div style={{ fontSize:40, marginBottom:10 }}>👥</div>
+              <div style={{ fontSize:40, marginBottom:10 }}><Ico n="usuarios"/></div>
               <div style={{ fontSize:14, ...S.txtPrimary, marginBottom:4 }}>Equipe vazia</div>
               <div style={{ fontSize:12, ...S.txtSecondary }}>
                 {liderAuth?"Toque em + Cadastrar Colaborador para começar":"Acesso necessário para cadastrar colaboradores"}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { paleta } from './MaturidadeResumo';
+import { primeiroRegistro, SUGESTOES_TREINAMENTO, treinamentosLancados } from './maturidade';
 
 export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) {
   const c = paleta(dark);
@@ -8,6 +9,8 @@ export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) 
   const botao = { padding: '9px 12px', margin: '6px 6px 0 0', background: c.sub, color: c.fg, border: `1px solid ${c.bd}`, borderRadius: 6, fontSize: 13, cursor: 'pointer' };
   const [desde, setDesde] = useState(equipe.historicoDesde || '');
   const [catalogo, setCatalogo] = useState(equipe.treinamentosEsperados || []);
+  const primeiro = primeiroRegistro(equipe);
+  const lancados = treinamentosLancados(equipe);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const mudar = (n, patch) => setCatalogo(lista => lista.map((t, i) => i === n ? { ...t, ...patch } : t));
@@ -19,10 +22,11 @@ export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) 
     catch (e) { setErro(e.message || 'Não foi possível salvar.'); }
     finally { setSalvando(false); }
   };
-  return <details style={{ border: `1px solid ${c.bd}`, borderRadius: 10, padding: 12, background: c.bg, color: c.fg }}><summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Configuração gerencial da maturidade</summary>
+  return <details id="cfg-maturidade" style={{ border: `1px solid ${c.bd}`, borderRadius: 10, padding: 12, background: c.bg, color: c.fg }}><summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>Configuração gerencial da maturidade</summary>
     <p style={mu}><b>Para que serve:</b> informa ao cálculo o que ele não consegue saber sozinho. Nada aqui altera fichas ou registros dos colaboradores; só muda como a maturidade é calculada.</p>
     <label style={{ display: 'block', fontSize: 13, marginTop: 8 }}>Histórico registrado desde
       <input type="date" value={desde} onChange={e => setDesde(e.target.value)} style={campo} /></label>
+    {primeiro && <button type="button" style={botao} onClick={() => setDesde(primeiro)}>Usar o 1º registro da equipe ({primeiro.split('-').reverse().join('/')})</button>}
     <p style={mu}>A data a partir da qual faltas, atrasos e folgas trabalhadas passaram a ser lançados no MokLog. Sem ao menos 90 dias de cobertura, esses eixos ficam "não aferidos" (em vez de parecerem 100%).</p>
     <h4 style={{ margin: '12px 0 4px', fontSize: 13 }}>Catálogo de treinamentos esperados</h4>
     <p style={mu}>Lista dos cursos que o posto exige. Com catálogo, o eixo "Obrigatórios" mede quantos o colaborador concluiu. Sem catálogo, aparece "Sem catálogo para aferir conclusão". Para lançar um treinamento a uma pessoa, use a ficha dela; aqui só se define o que é esperado. "Retirar do catálogo" remove apenas o item da lista, nenhum registro de colaborador é apagado.</p>
@@ -33,6 +37,9 @@ export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) 
       <button type="button" style={botao} onClick={() => setCatalogo(lista => lista.filter((_, i) => i !== n))}>Retirar do catálogo</button>
     </fieldset>)}
     <button type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, { nome: '', obrigatorio: true }])}>Adicionar ao catálogo</button>
+    {lancados.some(l => !catalogo.some(t => t.nome.trim().toLowerCase() === l.nome.toLowerCase())) && <button type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, ...lancados.filter(l => !lista.some(t => t.nome.trim().toLowerCase() === l.nome.toLowerCase())).map(l => ({ nome: l.nome, obrigatorio: true }))])}>Importar dos treinamentos já lançados nas fichas ({lancados.length})</button>}
+    <p style={mu}>Sugestões (edite e confirme antes de salvar):</p>
+    {SUGESTOES_TREINAMENTO.filter(s => !catalogo.some(t => t.nome === s.nome)).map(s => <button key={s.nome} type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, { ...s }])}>+ {s.nome}</button>)}
     <button type="button" style={{ ...botao, background: '#1d4ed8', color: '#fff', borderColor: '#1d4ed8' }} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar configuração'}</button>
     {erro && <p role="alert" style={{ color: '#ef4444', fontSize: 13 }}>{erro}</p>}
   </details>;

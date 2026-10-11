@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -222,16 +223,16 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
-        <div style={{fontSize:32, marginBottom:8}}>🏢</div>
+        <div style={{fontSize:32, marginBottom:8}}><Ico n="predio"/></div>
         <div style={{fontSize:16, fontWeight:800, ...S.txt, marginBottom:4}}>Informações do Projeto</div>
         <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex", flexDirection:"column", gap:8}}>
             <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#0369a1,#0c4a6e)", fontSize:13}}>
-              👷 Acesso Líder
+              <Ico n="capacete"/> Acesso Líder
             </button>
             <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}>
-              🔐 Acesso Gerencial
+              <Ico n="chave"/> Acesso Gerencial
             </button>
             <button onClick={onBack} style={{...S.btnSec, fontSize:13, marginTop:4}}>← Voltar</button>
           </div>
@@ -299,17 +300,17 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
   return (
     <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
       <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
-        <span style={{fontSize:24}}>🏢</span>
+        <span style={{fontSize:24}}><Ico n="predio"/></span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:16, fontWeight:800, color:"#0ea5e9"}}>Empresa de Segurança</div>
           <div style={{fontSize:13, marginTop:3, fontWeight:600, ...S.txt2}}>{form.nome||"Não cadastrada"}{visitasEfetivas.length?` · ${visitasEfetivas.length} visita(s)`:""}</div>
           {(()=>{const u=visitasEfetivas.length?visitasEfetivas[0]:null;const d=u?daysSince(u.data):null;
-            if(!u) return <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginTop:3}}>🔴 Nenhuma visita registrada</div>;
-            if(d>=VISITA_ALERTA_DIAS) return <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginTop:3}}>🔴 Visita em atraso — {d} dias</div>;
+            if(!u) return <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginTop:3}}><Ico n="pontoVermelho"/> Nenhuma visita registrada</div>;
+            if(d>=VISITA_ALERTA_DIAS) return <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginTop:3}}><Ico n="pontoVermelho"/> Visita em atraso — {d} dias</div>;
             return null;})()}
         </div>
         {adminAuth && aberto && !editing && (
-          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:12, padding:"7px 13px", flexShrink:0}}>✏️ Editar</button>
+          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:12, padding:"7px 13px", flexShrink:0}}><Ico n="editar"/> Editar</button>
         )}
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:15,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
@@ -326,7 +327,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
           ))}
           <div style={{display:"flex", gap:8}}>
             <button onClick={()=>setEditing(false)} style={{...S.btnSec, flex:1, fontSize:14}}>Cancelar</button>
-            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:14}}>✓ Salvar</button>
+            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:14}}><Ico n="check"/> Salvar</button>
           </div>
         </div>
       ) : (
@@ -344,8 +345,8 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
       <div style={{...S.card}}>
         {ccoMode && (
           <div style={{background:dark?"#001a2e":"#e0f2fe",border:"1px solid #0ea5e933",borderRadius:8,padding:"9px 13px",marginBottom:9}}>
-            <div style={{fontSize:12,color:dark?"#7dd3fc":"#0369a1",fontWeight:700}}>ℹ️ Visitas de supervisão agora ficam no CCO</div>
-            <div style={{fontSize:11,...S.txt2,marginTop:3}}>Registre em <strong>🚪 CCO → 👁️ Supervisão</strong> — o histórico aqui é atualizado automaticamente e a contagem de dias reinicia sozinha a cada nova visita.</div>
+            <div style={{fontSize:12,color:dark?"#7dd3fc":"#0369a1",fontWeight:700}}><Ico n="info"/> Visitas de supervisão agora ficam no CCO</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:3}}>Registre em <strong><Ico n="porta"/> CCO → <Ico n="olho"/> Supervisão</strong> — o histórico aqui é atualizado automaticamente e a contagem de dias reinicia sozinha a cada nova visita.</div>
           </div>
         )}
         {(()=>{
@@ -355,7 +356,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
           const semVisita = !ultima;
           if(atrasado || semVisita) return (
             <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:8,padding:"9px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:9}}>
-              <span style={{fontSize:18}}>🔴</span>
+              <span style={{fontSize:18}}><Ico n="pontoVermelho"/></span>
               <div>
                 <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>
                   {semVisita?"Nenhuma visita registrada":`Visita em atraso — ${dias} dias sem visita`}
@@ -366,7 +367,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
           );
           return (
             <div style={{background:"#021a0d",border:"1px solid #22c55e33",borderRadius:8,padding:"9px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:9}}>
-              <span style={{fontSize:18}}>✅</span>
+              <span style={{fontSize:18}}><Ico n="checkCirculo"/></span>
               <div>
                 <div style={{fontSize:12,color:"#22c55e",fontWeight:700}}>Última visita há {dias} dia(s)</div>
                 <div style={{fontSize:11,color:"#64748b"}}>Próxima em até {VISITA_ALERTA_DIAS-dias} dia(s)</div>
@@ -375,7 +376,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
           );
         })()}
         <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:11}}>
-          <div style={{fontSize:13, fontWeight:700, ...S.txt}}>📋 Histórico de Visitas <span style={{fontSize:12, ...S.txt2}}>({visitasEfetivas.length})</span></div>
+          <div style={{fontSize:13, fontWeight:700, ...S.txt}}><Ico n="prancheta"/> Histórico de Visitas <span style={{fontSize:12, ...S.txt2}}>({visitasEfetivas.length})</span></div>
           {!ccoMode && (
             <button onClick={()=>setShowAddVisita(!showAddVisita)}
               style={{...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:11, padding:"6px 11px"}}>+ Visita</button>
@@ -422,7 +423,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
             </div>
             <div style={{display:"flex", gap:8}}>
               <button onClick={()=>setShowAddVisita(false)} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-              <button onClick={addVisita} style={{...S.btn, flex:1, fontSize:13}}>✓ Adicionar</button>
+              <button onClick={addVisita} style={{...S.btn, flex:1, fontSize:13}}><Ico n="check"/> Adicionar</button>
             </div>
           </div>
         )}
@@ -436,16 +437,16 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
             <div key={v.id} style={{background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"11px 13px", border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:5}}>
                 <div style={{display:"flex", alignItems:"center", gap:9}}>
-                  <span style={{fontSize:12, color:"#0ea5e9", fontWeight:700}}>📅 {fmtDate(v.data)}</span>
+                  <span style={{fontSize:12, color:"#0ea5e9", fontWeight:700}}><Ico n="calendario"/> {fmtDate(v.data)}</span>
                   {v.turno && (
                     <span style={{fontSize:11, fontWeight:700, padding:"3px 9px", borderRadius:5,
                       background:v.turno==="Diurno"?"#f59e0b22":"#6366f122",
                       color:v.turno==="Diurno"?"#f59e0b":"#818cf8"}}>
-                      {v.turno==="Diurno"?"☀️":"🌙"} {v.turno}
+                      {v.turno==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>} {v.turno}
                     </span>
                   )}
                 </div>
-                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:15, cursor:"pointer"}}>✕</button>}
+                {adminAuth && !ccoMode && <button onClick={()=>removeVisita(v.id)} style={{background:"transparent", border:"none", color:"#ef444466", fontSize:15, cursor:"pointer"}}><Ico n="x"/></button>}
               </div>
               {v.supervisor && <div style={{fontSize:12,fontWeight:700,...S.txt,marginBottom:2}}>{v.supervisor}</div>}
               <div style={{fontSize:13, ...S.txt}}>{v.resumo}</div>
@@ -514,7 +515,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
   return (
     <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
       <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
-        <span style={{fontSize:22}}>🔧</span>
+        <span style={{fontSize:22}}><Ico n="ferramenta"/></span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:15, fontWeight:800, color:"#f59e0b"}}>Empresas de Manutenção</div>
           <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{empresas.length?`${empresas.length} cadastrada${empresas.length===1?"":"s"}`:"Nenhuma cadastrada"}</div>
@@ -526,8 +527,8 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
 
       {ccoMode && (
         <div style={{background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 12px"}}>
-          <div style={{fontSize:11,color:"#f59e0b",fontWeight:700}}>ℹ️ Registro de visitas fica no CCO</div>
-          <div style={{fontSize:10,...S.txt2,marginTop:2}}>Use <strong>🚪 CCO → 🛠️ Manutenção</strong> para lançar uma visita. Aqui você cadastra as empresas e vê o histórico de cada uma automaticamente, puxado do CCO pelo nome — sem duplicar registro.</div>
+          <div style={{fontSize:11,color:"#f59e0b",fontWeight:700}}><Ico n="info"/> Registro de visitas fica no CCO</div>
+          <div style={{fontSize:10,...S.txt2,marginTop:2}}>Use <strong><Ico n="porta"/> CCO → <Ico n="ferramenta"/> Manutenção</strong> para lançar uma visita. Aqui você cadastra as empresas e vê o histórico de cada uma automaticamente, puxado do CCO pelo nome — sem duplicar registro.</div>
         </div>
       )}
 
@@ -549,7 +550,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
             </div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-              <button onClick={gravarEdicao} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+              <button onClick={gravarEdicao} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Salvar</button>
             </div>
           </div>
         );
@@ -570,15 +571,15 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
               <div style={{marginTop:10,paddingTop:10,borderTop:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
                 {adminAuth && (
                   <div style={{display:"flex",gap:8,marginBottom:10}}>
-                    <button onClick={()=>abrirEdicao(emp)} style={{...S.btnSm,flex:1,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}>✏️ Editar</button>
+                    <button onClick={()=>abrirEdicao(emp)} style={{...S.btnSm,flex:1,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:11}}><Ico n="editar"/> Editar</button>
                     {delId!==emp.id
-                      ? <button onClick={()=>setDelId(emp.id)} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11}}>🗑</button>
+                      ? <button onClick={()=>setDelId(emp.id)} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11}}><Ico n="lixeira"/></button>
                       : <button onClick={()=>excluirEmpresa(emp.id)} style={{...S.btnSm,color:"#fff",background:"#dc2626",fontSize:11}}>Confirmar exclusão</button>}
                   </div>
                 )}
                 {!ccoMode && (
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <div style={{fontSize:11,fontWeight:700,...S.txt}}>📋 Histórico</div>
+                    <div style={{fontSize:11,fontWeight:700,...S.txt}}><Ico n="prancheta"/> Histórico</div>
                     <button onClick={()=>setShowAdd(showAdd===emp.id?null:emp.id)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}>+ Visita</button>
                   </div>
                 )}
@@ -592,7 +593,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
                     <textarea value={novaVisita.resumo} onChange={e=>setNovaVisita(v=>({...v,resumo:e.target.value}))} rows={2} style={{...S.inp,resize:"vertical",fontFamily:"inherit"}}/>
                     <div style={{display:"flex",gap:8,marginTop:8}}>
                       <button onClick={()=>setShowAdd(null)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
-                      <button onClick={()=>addVisita(emp.id)} style={{...S.btn,flex:1,fontSize:12}}>✓ Registrar</button>
+                      <button onClick={()=>addVisita(emp.id)} style={{...S.btn,flex:1,fontSize:12}}><Ico n="check"/> Registrar</button>
                     </div>
                   </div>
                 )}
@@ -627,11 +628,11 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
           </div>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-            <button onClick={gravarEdicao} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+            <button onClick={gravarEdicao} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Salvar</button>
           </div>
         </div>
       ) : adminAuth && (
-        <button onClick={()=>abrirEdicao(null)} style={S.addBtn}>➕ Nova Empresa</button>
+        <button onClick={()=>abrirEdicao(null)} style={S.addBtn}><Ico n="mais"/> Nova Empresa</button>
       )}
 
       </div>
@@ -654,13 +655,13 @@ function SecADM({ data, onSave, adminAuth, dark }) {
   return (
     <div style={{background:dark?"#060c18":"#fff",border:"1px solid "+(dark?"#0f172a":"#e2e8f0"),borderRadius:14,overflow:"hidden"}}>
       <div onClick={()=>setAberto(a=>!a)} style={{display:"flex", alignItems:"center", gap:10, padding:"14px", cursor:"pointer", userSelect:"none"}}>
-        <span style={{fontSize:22}}>👔</span>
+        <span style={{fontSize:22}}><Ico n="usuario"/></span>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:15, fontWeight:800, color:"#a855f7"}}>ADM</div>
           <div style={{fontSize:12, marginTop:2, ...S.txt2}}>{admPreenchidos?`${admPreenchidos} contato(s)`:"Nenhum contato"}</div>
         </div>
         {adminAuth && aberto && !editing && (
-          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:11, padding:"6px 12px", flexShrink:0}}>✏️ Editar</button>
+          <button onClick={(e)=>{e.stopPropagation();setEditing(true);}} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:11, padding:"6px 12px", flexShrink:0}}><Ico n="editar"/> Editar</button>
         )}
         <span style={{color:dark?"#475569":"#94a3b8",fontSize:14,flexShrink:0,transform:aberto?"rotate(90deg)":"none",transition:"transform .15s"}}>▸</span>
       </div>
@@ -683,7 +684,7 @@ function SecADM({ data, onSave, adminAuth, dark }) {
           ))}
           <div style={{display:"flex", gap:8}}>
             <button onClick={()=>setEditing(false)} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:13}}>✓ Salvar</button>
+            <button onClick={saveEdit} style={{...S.btn, flex:1, fontSize:13}}><Ico n="check"/> Salvar</button>
           </div>
         </div>
       ) : (
@@ -694,7 +695,7 @@ function SecADM({ data, onSave, adminAuth, dark }) {
             <div style={{display:"flex", flexDirection:"column", gap:8}}>
               {(data||[]).map((m,i)=> m.nome ? (
                 <div key={i} style={{display:"flex", alignItems:"center", gap:10, background:dark?"#020510":"#f8fafc", borderRadius:8, padding:"8px 12px"}}>
-                  <div style={{width:32, height:32, borderRadius:8, background:"#120a2e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0}}>👔</div>
+                  <div style={{width:32, height:32, borderRadius:8, background:"#120a2e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0}}><Ico n="usuario"/></div>
                   <div>
                     <div style={{fontSize:12, fontWeight:700, ...S.txt}}>{m.nome}</div>
                     <div style={{fontSize:10, ...S.txt2}}>{m.cargo||"—"}</div>
@@ -752,7 +753,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
   if(loading) return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{textAlign:"center"}}>
-        <div style={{fontSize:30, marginBottom:10}}>🏢</div>
+        <div style={{fontSize:30, marginBottom:10}}><Ico n="predio"/></div>
         <div style={{fontSize:13, ...S.txt2}}>Carregando informações...</div>
       </div>
     </div>
@@ -766,7 +767,7 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
           <div style={{display:"flex", alignItems:"center", gap:10}}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15, fontWeight:800, ...S.txt}}>🏢 Informações</div>
+              <div style={{fontSize:15, fontWeight:800, ...S.txt}}><Ico n="predio"/> Informações</div>
               <div style={{fontSize:11, ...S.txt2}}>{project.id} · {project.name}</div>
             </div>
             {saving && <div style={{fontSize:10, color:"#0ea5e9", fontWeight:700}}>⟳</div>}
@@ -778,15 +779,15 @@ export default function EmpresaInfo({ project, onBack, dark, onToggleTheme, shar
           {/* Badge acesso */}
           {adminAuth ? (
             <div style={{background:"#021a0d", border:"1px solid #22c55e33", borderRadius:10, padding:"8px 14px", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-              <div style={{fontSize:12, color:"#22c55e", fontWeight:700}}>🔓 Modo Gerencial — pode editar tudo</div>
+              <div style={{fontSize:12, color:"#22c55e", fontWeight:700}}><Ico n="cadeadoAberto"/> Modo Gerencial — pode editar tudo</div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={()=>gerarPDFEmpresa(project,info,dark)} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:10}}>📄 PDF</button>
+                <button onClick={()=>gerarPDFEmpresa(project,info,dark)} style={{...S.btnSm, color:"#a855f7", border:"1px solid #a855f744", fontSize:10}}><Ico n="arquivo"/> PDF</button>
                 <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
               </div>
             </div>
           ) : (
             <div style={{background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"8px 14px", display:"flex", alignItems:"center", justifyContent:"space-between"}}>
-              <div style={{fontSize:12, color:"#0ea5e9", fontWeight:700}}>👁 Somente leitura</div>
+              <div style={{fontSize:12, color:"#0ea5e9", fontWeight:700}}><Ico n="olho"/> Somente leitura</div>
               <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{...S.btnSm, color:"#64748b", fontSize:10}}>Sair</button>
             </div>
           )}

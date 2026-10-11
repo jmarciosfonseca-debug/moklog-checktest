@@ -27,6 +27,6 @@ test("lista da Equipe: migrada pela referência, legada do documento, marcada se
     expect(srcs).toContain(LEG);                  // ainda no documento principal (antes da migração)
     expect(srcs).not.toContain(REMOVIDA);         // R2/risco 3: temFoto:false nunca mostra foto, nem a legada
     expect(mockGetDocs.mock.calls.some(c=>c[0].p==="equipes/P601/fotos")).toBe(true);
-    expect(host.textContent).toContain("👤");     // quem não tem foto (ou ainda não carregou) mostra o ícone
+    expect(host.querySelector("svg")).not.toBeNull();     // quem não tem foto (ou ainda não carregou) mostra o ícone
   }finally{await act(async()=>root.unmount());host.remove();}
 });

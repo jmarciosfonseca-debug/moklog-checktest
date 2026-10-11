@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -182,7 +183,7 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
 
   if(loading) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🏢</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}><Ico n="predio"/></div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
     </div>
   );
 
@@ -197,11 +198,11 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:800,...S.txt}}>🏢 Inquilinos e Ocupação</div>
+            <div style={{fontSize:14,fontWeight:800,...S.txt}}><Ico n="predio"/> Inquilinos e Ocupação</div>
             <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
           </div>
           <button onClick={()=>gerarPDFInquilinos(project, unidades)}
-            style={{...S.btnSm,color:"#0ea5e9",borderColor:"#0ea5e944",fontWeight:700,padding:"7px 10px"}}>📄 PDF</button>
+            style={{...S.btnSm,color:"#0ea5e9",borderColor:"#0ea5e944",fontWeight:700,padding:"7px 10px"}}><Ico n="arquivo"/> PDF</button>
         </div>
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
@@ -268,9 +269,9 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
         <label style={S.lbl}>Operação</label>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setForm(f=>({...f,opera24h:true,horarioOperacao:""}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>🕐 24h</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}><Ico n="relogio"/> 24h</button>
           <button onClick={()=>setForm(f=>({...f,opera24h:false}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}>⏰ Horário definido</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}><Ico n="relogio"/> Horário definido</button>
         </div>
         {!form.opera24h&&<input value={form.horarioOperacao} onChange={e=>setForm(f=>({...f,horarioOperacao:e.target.value}))} placeholder="Ex: 06h às 22h, Seg a Sex" style={{...S.inp,marginTop:6}}/>}
       </div>
@@ -282,14 +283,14 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
         <label style={S.lbl}>Status</label>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setForm(f=>({...f,status:"ativo"}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>✅ Ativo</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}><Ico n="checkCirculo"/> Ativo</button>
           <button onClick={()=>setForm(f=>({...f,status:"vazio",inquilino:"",docas:"",opera24h:false,horarioOperacao:"",contato:""}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}>🔴 Vazio</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}><Ico n="pontoVermelho"/> Vazio</button>
         </div>
       </div>
       <div style={{display:"flex",gap:8}}>
         <button onClick={()=>{setShowAdd(false);setEditId(null);setForm({...blank});}} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-        <button onClick={addUnidade} style={{...S.btn,fontSize:13}}>✓ Adicionar</button>
+        <button onClick={addUnidade} style={{...S.btn,fontSize:13}}><Ico n="check"/> Adicionar</button>
       </div>
     </div>
             </div>
@@ -308,7 +309,7 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
                 {/* Header — clicável pra expandir */}
                 <div onClick={()=>setExpandedId(isExpanded?null:u.id)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",userSelect:"none"}}>
                   <div style={{width:40,height:40,borderRadius:10,background:u.status==="ativo"?(dark?"#021a0d":"#f0fdf4"):(dark?"#1a0202":"#fef2f2"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:20}}>{u.status==="ativo"?"🏢":"🔴"}</span>
+                    <span style={{fontSize:20}}>{u.status==="ativo"?<><Ico n="predio"/></>:<><Ico n="pontoVermelho"/></>}</span>
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:14,fontWeight:800,...S.txt}}>{u.tipo} {u.nome}</div>
@@ -328,13 +329,13 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
                     {u.contato&&<div style={{fontSize:13,...S.txt}}><span style={{...S.txt2,fontSize:11}}>Contato: </span>{u.contato}</div>}
                     {adminAuth&&(
                       <div style={{display:"flex",gap:8,marginTop:6}}>
-                        <button onClick={()=>startEdit(u)} style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 12px",fontSize:12,fontWeight:700}}>✏️ Editar</button>
-                        <button onClick={()=>removeUnidade(u.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444444",padding:"7px 12px",fontSize:12}}>🗑 Remover</button>
+                        <button onClick={()=>startEdit(u)} style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 12px",fontSize:12,fontWeight:700}}><Ico n="editar"/> Editar</button>
+                        <button onClick={()=>removeUnidade(u.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444444",padding:"7px 12px",fontSize:12}}><Ico n="lixeira"/> Remover</button>
                       </div>
                     )}
                     {!adminAuth&&(
                       <div style={{display:"flex",gap:8,marginTop:6}}>
-                        <button onClick={()=>startEdit(u)} style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 12px",fontSize:12,fontWeight:700}}>✏️ Editar</button>
+                        <button onClick={()=>startEdit(u)} style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 12px",fontSize:12,fontWeight:700}}><Ico n="editar"/> Editar</button>
                       </div>
                     )}
                   </div>
@@ -371,9 +372,9 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
         <label style={S.lbl}>Operação</label>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setForm(f=>({...f,opera24h:true,horarioOperacao:""}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>🕐 24h</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.opera24h?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}><Ico n="relogio"/> 24h</button>
           <button onClick={()=>setForm(f=>({...f,opera24h:false}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}>⏰ Horário definido</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(!form.opera24h?{background:"#f59e0b22",borderColor:"#f59e0b66",color:"#f59e0b"}:{})}}><Ico n="relogio"/> Horário definido</button>
         </div>
         {!form.opera24h&&<input value={form.horarioOperacao} onChange={e=>setForm(f=>({...f,horarioOperacao:e.target.value}))} placeholder="Ex: 06h às 22h, Seg a Sex" style={{...S.inp,marginTop:6}}/>}
       </div>
@@ -385,14 +386,14 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
         <label style={S.lbl}>Status</label>
         <div style={{display:"flex",gap:8}}>
           <button onClick={()=>setForm(f=>({...f,status:"ativo"}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}>✅ Ativo</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="ativo"?{background:"#22c55e22",borderColor:"#22c55e66",color:"#22c55e"}:{})}}><Ico n="checkCirculo"/> Ativo</button>
           <button onClick={()=>setForm(f=>({...f,status:"vazio",inquilino:"",docas:"",opera24h:false,horarioOperacao:"",contato:""}))}
-            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}>🔴 Vazio</button>
+            style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(form.status==="vazio"?{background:"#ef444422",borderColor:"#ef444466",color:"#ef4444"}:{})}}><Ico n="pontoVermelho"/> Vazio</button>
         </div>
       </div>
       <div style={{display:"flex",gap:8}}>
         <button onClick={()=>{setShowAdd(false);setEditId(null);setForm({...blank});}} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-        <button onClick={updateUnidade} style={{...S.btn,fontSize:13}}>✓ Salvar alterações</button>
+        <button onClick={updateUnidade} style={{...S.btn,fontSize:13}}><Ico n="check"/> Salvar alterações</button>
       </div>
     </div>
                   </div>

@@ -1,0 +1,141 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Filtros de relevo 3D e oclusão de ambiente -->
+    <filter id="cco-shadow-portal" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-8" dy="16" stdDeviation="14" flood-color="#021A0E" flood-opacity="0.85"/>
+    </filter>
+
+    <filter id="cco-shadow-door" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-10" dy="18" stdDeviation="15" flood-color="#010F08" flood-opacity="0.9"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#22C55E" flood-opacity="0.35"/>
+    </filter>
+
+    <filter id="cco-led-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#4ADE80" flood-opacity="0.9"/>
+    </filter>
+
+    <!-- Gradiente base da placa de vidro fosco escuro -->
+    <linearGradient id="cco-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F1F17" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#071A11" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#020D08" stop-opacity="0.97"/>
+    </linearGradient>
+
+    <!-- Brilho interno volumétrico verde da placa -->
+    <radialGradient id="cco-glass-glow" cx="25%" cy="20%" r="75%">
+      <stop offset="0%" stop-color="#22C55E" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#15803D" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Rim light chanfrado da borda externa -->
+    <linearGradient id="cco-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#DCFCE7" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#22C55E" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#15803D" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#052E16" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Reflexo especular superior do vidro -->
+    <linearGradient id="cco-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="35%" stop-color="#86EFAC" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Gradientes 3D - Portal / Batente Estrutural -->
+    <linearGradient id="cco-portal-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#166534"/>
+      <stop offset="45%" stop-color="#0F3822"/>
+      <stop offset="100%" stop-color="#051F12"/>
+    </linearGradient>
+
+    <linearGradient id="cco-portal-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#86EFAC" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#22C55E" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#052E16" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Gradientes 3D - Folha da Porta Maciça -->
+    <linearGradient id="cco-door-grad" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#4ADE80"/>
+      <stop offset="25%" stop-color="#22C55E"/>
+      <stop offset="70%" stop-color="#15803D"/>
+      <stop offset="100%" stop-color="#0B381E"/>
+    </linearGradient>
+
+    <linearGradient id="cco-door-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#F0FDF4" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#4ADE80" stop-opacity="0.85"/>
+      <stop offset="75%" stop-color="#22C55E" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#14532D" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Painel de Controle Biométrico / Console Lateral -->
+    <linearGradient id="cco-panel-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="50%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <!-- Máscara estrita para confinar 100% de luz dentro da placa de cantos arredondados -->
+    <clipPath id="cco-plaque-clip">
+      <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/>
+    </clipPath>
+  </defs>
+
+  <!-- GRUPO PRINCIPAL CONFINADO NA PLACA -->
+  <g clip-path="url(#cco-plaque-clip)">
+    <!-- Fundo de vidro fosco escuro -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#cco-glass-base)"/>
+
+    <!-- Brilho volumétrico interno verde -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#cco-glass-glow)"/>
+
+    <!-- Reflexo especular diagonal superior (luz do alto à esquerda) -->
+    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#cco-specular-top)"/>
+
+    <!-- SÍMBOLO RELEVO 3D: CCO - PORTA DE ACESSO COM PAINEL E INDICADOR LUMINOSO -->
+    <g id="cco-symbol-group">
+      <!-- 1. PORTAL ESTRUTURAL EXTERNO (PORTAL BLINDADO) -->
+      <g filter="url(#cco-shadow-portal)">
+        <path d="M 270 200 C 270 185, 282 172, 297 172 L 727 172 C 742 172, 754 185, 754 200 L 754 850 L 684 850 L 684 246 L 340 246 L 340 850 L 270 850 Z" 
+              fill="url(#cco-portal-grad)" stroke="url(#cco-portal-rim)" stroke-width="8" stroke-linejoin="round"/>
+      </g>
+
+      <!-- 2. FOLHA DA PORTA MACIÇA (VOLUME LISO, RELEVO 3D CENTRAL) -->
+      <g filter="url(#cco-shadow-door)">
+        <rect x="362" y="264" width="300" height="586" rx="22" ry="22" 
+              fill="url(#cco-door-grad)" stroke="url(#cco-door-rim)" stroke-width="9"/>
+        <!-- Reflexo suave de profundidade no topo da folha da porta -->
+        <rect x="376" y="278" width="272" height="42" rx="10" ry="10" 
+              fill="#FFFFFF" opacity="0.22"/>
+      </g>
+
+      <!-- 3. PAINEL DE CONTROLE / TERMINAL BIOMÉTRICO (DETALHE SECUNDÁRIO) -->
+      <rect x="580" y="525" width="48" height="88" rx="8" ry="8" 
+            fill="url(#cco-panel-grad)" stroke="#94A3B8" stroke-width="5" stroke-opacity="0.85"/>
+      <!-- Friso de leitura biométrica / cartão -->
+      <rect x="592" y="542" width="24" height="24" rx="4" ry="4" 
+            fill="#15803D" stroke="#4ADE80" stroke-width="2"/>
+      <line x1="592" y1="582" x2="616" y2="582" stroke="#94A3B8" stroke-width="3" stroke-linecap="round"/>
+      <line x1="592" y1="594" x2="616" y2="594" stroke="#94A3B8" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- 4. INDICADOR LUMINOSO SUPERIOR (LED DE ACESSO CCO) -->
+      <!-- Caixa base do indicador no topo do portal -->
+      <rect x="477" y="194" width="70" height="30" rx="8" ry="8" 
+            fill="#052E16" stroke="#15803D" stroke-width="4"/>
+      <!-- LED aceso com emissão intensa -->
+      <ellipse cx="512" cy="209" rx="20" ry="8" fill="#86EFAC" filter="url(#cco-led-glow)"/>
+      <ellipse cx="512" cy="209" rx="11" ry="4" fill="#FFFFFF"/>
+    </g>
+
+    <!-- Friso de luz interno no bisel superior -->
+    <rect x="55.2" y="55.2" width="913.6" height="913.6" rx="198.75" ry="198.75" 
+          fill="none" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.25"/>
+  </g>
+
+  <!-- BORDA DE LUZ EXTERNA (RIM LIGHT DA PLACA) - ZERO VAZAMENTO -->
+  <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75" 
+        fill="none" stroke="url(#cco-rim-border)" stroke-width="7"/>
+</svg>

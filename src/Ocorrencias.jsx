@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
@@ -405,13 +406,13 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{...S.page, alignItems:"center", justifyContent:"center"}}>
       <div style={{...S.card, maxWidth:320, width:"100%", margin:16, textAlign:"center"}}>
-        <div style={{fontSize:32, marginBottom:8}}>📋</div>
+        <div style={{fontSize:32, marginBottom:8}}><Ico n="prancheta"/></div>
         <div style={{fontSize:16, fontWeight:800, ...S.txt, marginBottom:4}}>Registro Situacional</div>
         <div style={{fontSize:12, ...S.txt2, marginBottom:20}}>{project?.id||""} · {project?.name||""}</div>
         {!mode ? (
           <div style={{display:"flex", flexDirection:"column", gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#b45309,#92400e)", fontSize:13}}>📋 Acesso Líder / Vigilante</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn, background:"linear-gradient(135deg,#b45309,#92400e)", fontSize:13}}><Ico n="prancheta"/> Acesso Líder / Vigilante</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec, fontSize:13, color:"#f59e0b", borderColor:"#f59e0b33"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec, fontSize:13, marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -735,7 +736,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, position:"sticky", top:0, zIndex:5}}>
       <button onClick={onBack} style={S.backBtn}>← Voltar</button>
       <div style={{textAlign:"center", flex:1}}>
-        <div style={{fontSize:14, fontWeight:800, ...S.txt}}>📋 Registro Situacional</div>
+        <div style={{fontSize:14, fontWeight:800, ...S.txt}}><Ico n="prancheta"/> Registro Situacional</div>
         <div style={{fontSize:11, ...S.txt2}}>{project?.id} · {project?.name}</div>
       </div>
       {onToggleTheme
@@ -830,19 +831,19 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           display:"flex", gap:8, flexWrap:"wrap"}}>
           <button onClick={salvar} disabled={saving}
             style={{...S.btn, flex:"2 1 150px", opacity:saving?.6:1}}>
-            {saving ? "Salvando..." : "✓ Concluir"}
+            {saving ? "Salvando..." : <><Ico n="check"/>{" Concluir"}</>}
           </button>
           <button onClick={salvarRascunho}
-            style={{...S.btnSec, flex:"1 1 120px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 {rascunhoSalvoEm ? `Salvo ${rascunhoSalvoEm}` : "Rascunho"}</button>
+            style={{...S.btnSec, flex:"1 1 120px", color:"#3b82f6", borderColor:"#3b82f644"}}><Ico n="disquete"/> {rascunhoSalvoEm ? `Salvo ${rascunhoSalvoEm}` : "Rascunho"}</button>
           <button onClick={excluirPreenchimento}
-            style={{...S.btnSec, flex:"1 1 100px", color:"#ef4444", borderColor:"#ef444433"}}>🗑 Excluir</button>
+            style={{...S.btnSec, flex:"1 1 100px", color:"#ef4444", borderColor:"#ef444433"}}><Ico n="lixeira"/> Excluir</button>
         </div>
       )}
       {/* Faixa: rascunho não finalizado */}
       {temRascunho && (
         <div style={{background:"#3b82f611", border:"1px solid #3b82f644", borderRadius:12,
           padding:"10px 12px", display:"flex", alignItems:"center", gap:10, flexWrap:"wrap"}}>
-          <span style={{fontSize:13, color:"#93c5fd", flex:1, minWidth:160}}>📄 Há um rascunho não finalizado neste dispositivo.</span>
+          <span style={{fontSize:13, color:"#93c5fd", flex:1, minWidth:160}}><Ico n="arquivo"/> Há um rascunho não finalizado neste dispositivo.</span>
           <button onClick={retomarRascunho} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>Retomar</button>
           <button onClick={descartarRascunho} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433"}}>Descartar</button>
         </div>
@@ -852,7 +853,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       {reincidencias.length>0 && !reincIgnorada && (
         <div style={{background:"#f59e0b14", border:"1.5px solid #f59e0b55", borderRadius:12, padding:"12px 14px"}}>
           <div style={{fontSize:14, fontWeight:800, color:"#f59e0b", marginBottom:6}}>
-            ⚠️ Possível reincidência — {reincidencias.length} RS anterior{reincidencias.length>1?"es":""} da mesma natureza
+            <Ico n="alerta"/> Possível reincidência — {reincidencias.length} RS anterior{reincidencias.length>1?"es":""} da mesma natureza
           </div>
           <div style={{fontSize:12, ...S.txt2, marginBottom:8}}>
             Registro(s) anterior(es) com mesmo nome, documento ou placa:
@@ -876,7 +877,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           <div style={{display:"flex", gap:8}}>
             <button onClick={anexarReincidencia}
               style={{...S.btn, flex:2, background:"linear-gradient(135deg,#b45309,#92400e)"}}>
-              🔗 Anexar como reincidência
+              <Ico n="elo"/> Anexar como reincidência
             </button>
             <button onClick={()=>setReincIgnorada(true)} style={{...S.btnSec, flex:1}}>Ignorar</button>
           </div>
@@ -888,7 +889,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         <div style={{background:"#dc262614", border:"1.5px solid #dc262655", borderRadius:12,
           padding:"10px 12px", display:"flex", alignItems:"center", gap:8}}>
           <span style={{fontSize:13, fontWeight:800, color:"#f87171", flex:1}}>
-            🔴 REINCIDENTE — vinculado a {(form.reincidenteDe||[]).length} RS anterior(es)
+            <Ico n="pontoVermelho"/> REINCIDENTE — vinculado a {(form.reincidenteDe||[]).length} RS anterior(es)
           </span>
           <button onClick={()=>setForm(f=>({...f, reincidente:false, reincidenteDe:[]}))}
             style={{...S.btnSm, color:"#94a3b8"}}>Desfazer</button>
@@ -921,7 +922,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           </select>
           {subSel?.ajuda && (
             <div style={{marginTop:8, fontSize:12, ...S.txt2, background:dark?"#020510":"#f8fafc",
-              borderRadius:8, padding:"8px 10px", lineHeight:1.5}}>💡 {subSel.ajuda}</div>
+              borderRadius:8, padding:"8px 10px", lineHeight:1.5}}><Ico n="lampada"/> {subSel.ajuda}</div>
           )}
         </div>
       )}
@@ -976,7 +977,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           <div style={S.card}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
               <label style={{...S.lbl, marginBottom:0}}>Envolvidos (opcional)</label>
-              <button onClick={addEnvolvido} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}>➕ Adicionar</button>
+              <button onClick={addEnvolvido} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}><Ico n="mais"/> Adicionar</button>
             </div>
             {(form.envolvidos||[]).map((ev,idx)=>(
               <div key={idx} style={{marginBottom:8, paddingBottom:8,
@@ -986,7 +987,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
                   <input placeholder="Nome" value={ev.nome}
                     onChange={e=>setEnvolvido(idx,"nome",e.target.value)} style={{...S.inp, flex:1}}/>
                   {form.envolvidos.length>1 && (
-                    <button onClick={()=>removeEnvolvido(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}>🗑</button>
+                    <button onClick={()=>removeEnvolvido(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}><Ico n="lixeira"/></button>
                   )}
                 </div>
                 <input placeholder="Documento (CPF/CNPJ)" value={ev.documento}
@@ -999,7 +1000,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             </div>
             {!adminAuth && ((form.envolvidos||[]).some(e=>e.documento)||form.telefoneEnvolvido) && (
               <div style={{marginTop:6, fontSize:11, color:"#f59e0b"}}>
-                🔒 Dado sensível: será mascarado na tela e no PDF (LGPD).
+                <Ico n="cadeado"/> Dado sensível: será mascarado na tela e no PDF (LGPD).
               </div>
             )}
           </div>
@@ -1015,7 +1016,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             </div>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
               <label style={{...S.lbl, marginBottom:0}}>Veículo(s)</label>
-              <button onClick={addVeiculo} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}>➕ Adicionar</button>
+              <button onClick={addVeiculo} style={{...S.btnSm, color:"#22c55e", borderColor:"#22c55e44"}}><Ico n="mais"/> Adicionar</button>
             </div>
             {(form.veiculos||[]).map((v,idx)=>(
               <div key={idx} style={{marginBottom:8}}>
@@ -1029,7 +1030,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
                     {TIPOS_VEICULO.map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                   {form.veiculos.length>1 && (
-                    <button onClick={()=>removeVeiculo(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}>🗑</button>
+                    <button onClick={()=>removeVeiculo(idx)} style={{...S.btnSm, color:"#ef4444", borderColor:"#ef444433", padding:"6px 9px"}}><Ico n="lixeira"/></button>
                   )}
                 </div>
                 {v.tipo==="Carreta" && (
@@ -1058,7 +1059,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
               onChange={e=>setF("detalhamento",e.target.value)}
               style={{...S.inp, resize:"vertical", fontFamily:"inherit"}}/>
             {subSel?.fotos && (
-              <div style={{marginTop:6, fontSize:11, ...S.txt2}}>📷 {subSel.fotos}</div>
+              <div style={{marginTop:6, fontSize:11, ...S.txt2}}><Ico n="camera"/> {subSel.fotos}</div>
             )}
           </div>
 
@@ -1096,18 +1097,18 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
             <label style={S.lbl}>Evidências</label>
             <div style={{display:"flex", gap:8, marginBottom:8}}>
               <label style={{...S.btnSm, flex:1, textAlign:"center", cursor:"pointer"}}>
-                📷 Foto local
+                <Ico n="camera"/> Foto local
                 <input type="file" accept="image/*" multiple style={{display:"none"}}
                   onChange={e=>{addFotos(e.target.files,"local"); e.target.value="";}}/>
               </label>
               <label style={{...S.btnSm, flex:1, textAlign:"center", cursor:"pointer"}}>
-                🎥 Print CFTV
+                <Ico n="video"/> Print CFTV
                 <input type="file" accept="image/*" multiple style={{display:"none"}}
                   onChange={e=>{addFotos(e.target.files,"cftv"); e.target.value="";}}/>
               </label>
             </div>
             <div style={{fontSize:10, color:"#f59e0b", marginBottom:8}}>
-              ⚠️ Não apague as mídias do dispositivo antes de confirmar o envio.
+              <Ico n="alerta"/> Não apague as mídias do dispositivo antes de confirmar o envio.
             </div>
             {form.fotos.length>0 && (
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8}}>
@@ -1150,10 +1151,10 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
 
           {/* Ações (rodapé) — espelham a barra sticky do topo */}
           <div style={{display:"flex", gap:8, marginBottom:20, flexWrap:"wrap"}}>
-            <button onClick={salvarRascunho} style={{...S.btnSec, flex:"1 1 130px", color:"#3b82f6", borderColor:"#3b82f644"}}>💾 Salvar rascunho</button>
+            <button onClick={salvarRascunho} style={{...S.btnSec, flex:"1 1 130px", color:"#3b82f6", borderColor:"#3b82f644"}}><Ico n="disquete"/> Salvar rascunho</button>
             <button onClick={salvar} disabled={saving}
               style={{...S.btn, flex:"2 1 180px", opacity:saving?.6:1}}>
-              {saving ? "Salvando..." : "✓ Concluir ocorrência"}
+              {saving ? "Salvando..." : <><Ico n="check"/>{" Concluir ocorrência"}</>}
             </button>
           </div>
         </>
@@ -1181,7 +1182,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         <div style={{flex:1}}/>
         {adminAuth && registrosFiltrados.length>0 && (
           <button onClick={()=>gerarPdfPacoteRS(project, registrosFiltrados, { titulo:`Histórico (${filtroStatus})` })}
-            style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF do pacote</button>
+            style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}><Ico n="arquivo"/> PDF do pacote</button>
         )}
       </div>
 
@@ -1235,25 +1236,25 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
                 <div style={{display:"flex", flexWrap:"wrap", gap:"4px 12px", marginTop:6, fontSize:12, ...S.txt2}}>
                   {evs.map((ev,i)=>(
                     <span key={i} style={{display:"inline-flex", gap:6}}>
-                      {ev.nome && <span>👤 {ev.nome}</span>}
-                      {ev.documento && <span>📄 {adminAuth ? ev.documento : mascararDoc(ev.documento)}</span>}
+                      {ev.nome && <span><Ico n="usuario"/> {ev.nome}</span>}
+                      {ev.documento && <span><Ico n="arquivo"/> {adminAuth ? ev.documento : mascararDoc(ev.documento)}</span>}
                     </span>
                   ))}
-                  {r.telefoneEnvolvido && <span>📞 {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</span>}
+                  {r.telefoneEnvolvido && <span><Ico n="telefone"/> {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</span>}
                 </div>
               );
             })()}
 
             <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
-              <button onClick={()=>abrirVisualizacao(r)} style={{...S.btnSm, color:"#8b5cf6", borderColor:"#8b5cf655", fontWeight:800}}>👁️ Ver</button>
-              <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
-              <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Enviar (Outlook)</button>
-              <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}>💬 WhatsApp</button>
+              <button onClick={()=>abrirVisualizacao(r)} style={{...S.btnSm, color:"#8b5cf6", borderColor:"#8b5cf655", fontWeight:800}}><Ico n="olho"/> Ver</button>
+              <button onClick={()=>abrirEdicaoTextos(r)} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}><Ico n="editar"/> Editar</button>
+              <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}><Ico n="upload"/> Enviar (Outlook)</button>
+              <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}><Ico n="mensagem"/> WhatsApp</button>
               {adminAuth && (
-                <button onClick={()=>{marcarVista(r);gerarPdfRS(project, r);}} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>
+                <button onClick={()=>{marcarVista(r);gerarPdfRS(project, r);}} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}><Ico n="arquivo"/> PDF</button>
               )}
               {st===RS_STATUS.PENDENTE
-                ? <button onClick={()=>mudarStatus(r.id, RS_STATUS.ARQUIVADO)} style={S.btnSm}>📥 Arquivar</button>
+                ? <button onClick={()=>mudarStatus(r.id, RS_STATUS.ARQUIVADO)} style={S.btnSm}><Ico n="download"/> Arquivar</button>
                 : <button onClick={()=>mudarStatus(r.id, RS_STATUS.PENDENTE)} style={S.btnSm}>↩️ Reabrir</button>}
             </div>
           </div>
@@ -1308,7 +1309,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
   const telaEditarTextos = (
     <div style={{padding:"4px 12px", display:"flex", flexDirection:"column", gap:12}}>
       <div style={{background:"#3b82f611", border:"1px solid #3b82f644", borderRadius:12, padding:"12px 14px"}}>
-        <div style={{fontSize:14, fontWeight:800, color:"#3b82f6"}}>✏️ Editar textos da RS</div>
+        <div style={{fontSize:14, fontWeight:800, color:"#3b82f6"}}><Ico n="editar"/> Editar textos da RS</div>
         <div style={{fontSize:12, ...S.txt2, marginTop:4}}>
           Apenas os textos abaixo podem ser corrigidos. Dados da ocorrência (natureza, envolvidos, placas, data) ficam preservados.
         </div>
@@ -1332,7 +1333,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
       <div style={{display:"flex", gap:8, marginBottom:20}}>
         <button onClick={cancelarEdicao} style={{...S.btnSec, flex:1}}>Cancelar</button>
         <button onClick={salvarEdicaoTextos} disabled={saving} style={{...S.btn, flex:2, opacity:saving?.6:1}}>
-          {saving ? "Salvando..." : "✓ Salvar correções"}
+          {saving ? "Salvando..." : <><Ico n="check"/>{" Salvar correções"}</>}
         </button>
       </div>
     </div>
@@ -1404,10 +1405,10 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
               {envs.map((ev,i)=>(
                 <div key={i} style={{fontSize:13.5, ...S.txt, marginBottom:4, display:"flex", gap:8, flexWrap:"wrap"}}>
                   <span style={{fontWeight:700}}>{i+1}º {ev.nome||"—"}</span>
-                  {ev.documento && <span style={{...S.txt2}}>📄 {adminAuth ? ev.documento : mascararDoc(ev.documento)}</span>}
+                  {ev.documento && <span style={{...S.txt2}}><Ico n="arquivo"/> {adminAuth ? ev.documento : mascararDoc(ev.documento)}</span>}
                 </div>
               ))}
-              {r.telefoneEnvolvido && <div style={{fontSize:13, ...S.txt2, marginTop:2}}>📞 {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</div>}
+              {r.telefoneEnvolvido && <div style={{fontSize:13, ...S.txt2, marginTop:2}}><Ico n="telefone"/> {adminAuth ? r.telefoneEnvolvido : mascararTel(r.telefoneEnvolvido)}</div>}
             </Bloco>
           )}
 
@@ -1450,10 +1451,10 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
         {/* Ações — mesma permissão do histórico (PDF só gerencial) */}
         <div style={{display:"flex", gap:6, flexWrap:"wrap", marginTop:8}}>
           <button onClick={fecharVisualizacao} style={{...S.btnSec, flex:"1 1 90px"}}>← Voltar</button>
-          <button onClick={()=>{ const rr=r; fecharVisualizacao(); abrirEdicaoTextos(rr); }} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}>✏️ Editar</button>
-          <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}>📤 Outlook</button>
-          <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}>💬 WhatsApp</button>
-          {adminAuth && <button onClick={()=>gerarPdfRS(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}>📄 PDF</button>}
+          <button onClick={()=>{ const rr=r; fecharVisualizacao(); abrirEdicaoTextos(rr); }} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f644"}}><Ico n="editar"/> Editar</button>
+          <button onClick={()=>enviarRSOutlook(project, r)} style={{...S.btnSm, color:"#0078d4", borderColor:"#0078d444"}}><Ico n="upload"/> Outlook</button>
+          <button onClick={()=>enviarRSWhatsapp(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a44"}}><Ico n="mensagem"/> WhatsApp</button>
+          {adminAuth && <button onClick={()=>gerarPdfRS(project, r)} style={{...S.btnSm, color:"#16a34a", borderColor:"#16a34a33"}}><Ico n="arquivo"/> PDF</button>}
         </div>
       </div>
     );

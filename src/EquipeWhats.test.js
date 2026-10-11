@@ -24,7 +24,7 @@ test('formulários individual e múltiplo enviam a quantidade escolhida',async()
  const solicitar=jest.fn(async(id,itens)=>Array.isArray(itens)?itens:[itens]);
  const colab={id:'c',nome:'Teste',uniforme:{listaMontada:true,itens:{'Camisa / Camisão':{usa:true,tamanho:'M'}},solicitacoes:[]}};
  await render(<UniformeModulo colab={colab} canManage onSolicitar={solicitar}/>);
- await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.startsWith('📦 Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
+ await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.includes('Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
  await click('Solicitar');
  const preencher=async(label,valor)=>act(async()=>{
   const input=host.querySelector(`[aria-label="${label}"]`);
@@ -91,7 +91,7 @@ test('múltiplo registra uma vez e AVISA que aguarda aprovação: nada de WhatsA
  const solicitar=jest.fn(async(id,lote)=>lote.map((i,n)=>({...s,...i,id:'id-'+n})));
  const colab={id:'c',nome:'Ana',uniforme:{listaMontada:true,itens,solicitacoes:[]}};
  await render(<UniformeModulo colab={colab} projectNome="P260A" canManage onSolicitar={solicitar}/>);
- await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.startsWith('📦 Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
+ await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.includes('Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
  await click('Uniforme completo');await click('Registrar 5 itens');
  expect(solicitar).toHaveBeenCalledTimes(1);expect(solicitar.mock.calls[0][1]).toHaveLength(5);
  expect(host.textContent).toContain('Aguardando aprovação do gerencial');expect(host.querySelector('[role="dialog"]')).toBeNull();
@@ -111,7 +111,7 @@ test('múltiplo registra uma vez e AVISA que aguarda aprovação: nada de WhatsA
 test('várias aprovadas pendentes de envio: um botão só envia todas numa mensagem assinada',async()=>{
  const colab={id:'c',nome:'Ana',uniforme:{listaMontada:true,itens:{},solicitacoes:[{...ap,id:'a1-111111',item:'Boné'},{...ap,id:'a2-222222',item:'Calça'},{...s,id:'a3-333333',item:'Galocha'}]}};
  await render(<UniformeModulo colab={colab} projectNome="P260A" canManage onRegistrarWhats={jest.fn()}/>);
- await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.startsWith('📦 Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
+ await act(async()=>[...host.querySelectorAll('div')].find(el=>el.textContent.includes('Uniforme e Material Tático')&&el.style.cursor==='pointer').click());
  expect(btn('Enviar aprovadas no WhatsApp (2)')).toBeDefined();                              // a aguardando fica de fora
  await click('Enviar aprovadas no WhatsApp (2)');
  expect(host.querySelector('[role="dialog"]')).not.toBeNull();expect(host.textContent).toContain('2 item(ns) aprovado(s)');

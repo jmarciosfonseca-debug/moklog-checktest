@@ -176,8 +176,10 @@ export function notaTreinamentos(resumo) {
 export function calcularMapaEquipe(equipe, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
+  // Faltas/FT são lançadas desde o início do app (confirmado pelo gerencial): sem data configurada, vale o 1º registro da equipe.
+  const desdeHistorico = equipe.historicoDesde || primeiroRegistro(equipe);
   const individuos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo').map(c => {
-    const rh = calcularRH(c, equipe.historicoDesde, hoje);
+    const rh = calcularRH(c, desdeHistorico, hoje);
     const reciclagem = calcularReciclagem(c, hoje);
     const resultado = agregarEixos({ assiduidade: rh.assiduidade, ft: rh.ft, treinamento: calcularTreinamento(c, equipe.treinamentosEsperados, hoje), reciclagem: reciclagem.valor, tempoCasa: calcularTempoCasa(c.dataContratacao, hoje) });
     const alertas = [...rh.alertas];
@@ -200,4 +202,45 @@ export function calcularMapaEquipe(equipe, hoje) {
   const treinamentos = resumirTreinamentos(individuos.map(i => i.colaborador), hoje);
   individuos.forEach(i => { i.treinamentosRegistrados = treinamentos.pessoas.find(p => p.id === i.colaborador.id); i.treinamentosFicha = classificarTreinamentos(i.colaborador, hoje); });
   return { hoje, individuos, eixos, treinamentos, ...estabilidade, ...agregarEquipe(individuos, estabilidade.estabilidade), top: ordenados.filter(i => i.indice >= corte), alertas: individuos.flatMap(i => i.alertas.map(texto => ({ colabId: i.colaborador.id, nome: i.colaborador.nome, texto }))) };
+}
+
+// Data do 1º lançamento de falta/FT/atraso na equipe (ativos e desligados) — ponto de partida SUGERIDO
+// para "Histórico registrado desde". É só sugestão: o gerencial confirma que tudo desde então foi lançado.
+export function primeiroRegistro(equipe) {
+  const todos = [...(equipe?.colaboradores || []), ...(equipe?.desligados || [])];
+  let menor = null;
+  for (const c of todos) for (const h of (Array.isArray(c.historico) ? c.historico : [])) {
+    if (!h || !['Falta', 'FT', 'Atraso'].includes(h.tipo)) continue;
+    const d = data(h.data);
+    if (d !== null && (menor === null || d < menor)) menor = d;
+  }
+  return menor === null ? null : new Date(menor).toISOString().slice(0, 10);
+}
+export function diasEntre(inicioISO, fimISO) {
+  const a = data(inicioISO), b = data(fimISO);
+  return a === null || b === null ? null : Math.floor((b - a) / DIA);
+}
+export const SUGESTOES_TREINAMENTO = Object.freeze([
+  { nome: 'Brigada de incêndio', obrigatorio: true, validadeMeses: 12 },
+  { nome: 'Tiro defensivo / armamento', obrigatorio: true, validadeMeses: 12 },
+  { nome: 'Primeiros socorros', obrigatorio: true, validadeMeses: 24 },
+]);
+
+// Treinamentos já lançados nas fichas (distintos, com contagem de pessoas) — base sugerida para o catálogo.
+export function treinamentosLancados(equipe) {
+  const mapa = new Map();
+  for (const c of equipe?.colaboradores || []) {
+    const vistos = new Set();
+    for (const h of (Array.isArray(c.historico) ? c.historico : [])) {
+      const nome = String(h?.detalhe || '').trim();
+      if (!h || h.tipo !== 'Treinamento' || !nome) continue;
+      const chave = normalizar(nome);
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      const atual = mapa.get(chave) || { nome, pessoas: 0 };
+      atual.pessoas++;
+      mapa.set(chave, atual);
+    }
+  }
+  return [...mapa.values()].sort((x, y) => y.pessoas - x.pessoas || x.nome.localeCompare(y.nome));
 }

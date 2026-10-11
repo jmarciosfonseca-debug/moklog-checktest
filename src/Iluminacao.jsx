@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -205,13 +206,13 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>💡</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="lampada"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Teste de Iluminação</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}>👷 Acesso Líder</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}><Ico n="capacete"/> Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec,fontSize:13,marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -381,7 +382,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px 10px"}}>
       <button onClick={()=>{ if(screen==="main") onBack(); else setScreen("main"); }} style={S.backBtn} aria-label="Voltar">←</button>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:15,fontWeight:800,...S.txt}}>💡 Teste de Iluminação</div>
+        <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="lampada"/> Teste de Iluminação</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
       </div>
       {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
@@ -398,7 +399,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
           <input value={cfgUrl} onChange={e=>setCfgUrl(e.target.value)} placeholder={`/mapas/${project.id}.jpg`} style={S.inp}/>
           <div style={{fontSize:10,...S.txt2,marginTop:6}}>Use a imagem com os quadrantes já desenhados — ela aparece como está para a equipe.</div>
         </div>
-        <button onClick={salvarConfig} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":"💾 Salvar"}</button>
+        <button onClick={salvarConfig} disabled={saving} style={{...S.btn,opacity:saving?.6:1}}>{saving?"Salvando…":<><Ico n="disquete"/>{" Salvar"}</>}</button>
         <button onClick={()=>setScreen("main")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
         <div style={{...S.card,border:"1px solid #ef444433",marginTop:6}}>
           <div style={{fontSize:11,fontWeight:800,color:"#ef4444",marginBottom:6}}>ZONA DE PERIGO</div>
@@ -429,7 +430,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
   // ── Editor inline de quadrante (novo ou existente)
   const Editor = (
     <div style={{...S.card,border:"1px solid #ca8a0455"}}>
-      <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:10}}>{editId==="novo"?"➕ Novo quadrante":"✏️ Editar quadrante"}</div>
+      <div style={{fontSize:13,fontWeight:800,...S.txt,marginBottom:10}}>{editId==="novo"?<><Ico n="mais"/>{" Novo quadrante"}</>:<><Ico n="editar"/>{" Editar quadrante"}</>}</div>
       <div style={{display:"flex",gap:8}}>
         <div style={{flex:1}}>
           <label style={S.lbl}>Quadrante</label>
@@ -455,7 +456,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
       {edErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginTop:8,textAlign:"center"}}>{edErr}</div>}
       <div style={{display:"flex",gap:8,marginTop:10}}>
         <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-        <button onClick={gravarEdicao} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Gravando…":"💾 Gravar"}</button>
+        <button onClick={gravarEdicao} disabled={saving} style={{...S.btn,flex:1,fontSize:13}}>{saving?"Gravando…":<><Ico n="disquete"/>{" Gravar"}</>}</button>
       </div>
     </div>
   );
@@ -482,11 +483,11 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
             <div style={{...S.card, border:`1px solid ${cor}44`, background:bg, display:"flex", flexDirection:"column", gap:8}}>
               <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
                 <div>
-                  <div style={{fontSize:12, fontWeight:800, ...S.txt}}>💡 Teste Quinzenal de Iluminação</div>
+                  <div style={{fontSize:12, fontWeight:800, ...S.txt}}><Ico n="lampada"/> Teste Quinzenal de Iluminação</div>
                   <div style={{fontSize:11, ...S.txt2, marginTop:2}}>Alvo: <strong>domingo, {tqFmtDate(alvo)} · 21h</strong></div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13, fontWeight:900, color:cor}}>{pendente ? "⚠️ Pendente" : `Faltam ${dias}d`}</div>
+                  <div style={{fontSize:13, fontWeight:900, color:cor}}>{pendente ? <><Ico n="alerta"/>{" Pendente"}</> : `Faltam ${dias}d`}</div>
                 </div>
               </div>
               {ultimo && (
@@ -504,14 +505,14 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
               {!tqAssinando ? (
                 <button onClick={()=>setTqAssinando(true)}
                   style={{...S.btnSm, color:cor, borderColor:`${cor}66`, fontWeight:700, padding:"9px 14px", fontSize:12}}>
-                  ✓ Concluir teste realizado
+                  <Ico n="check"/> Concluir teste realizado
                 </button>
               ) : (
                 <div style={{display:"flex", flexDirection:"column", gap:8}}>
                   <input value={tqAssinatura} onChange={e=>setTqAssinatura(e.target.value)} placeholder="Nome de quem assina..." style={S.inp}/>
                   <div style={{display:"flex", gap:8}}>
                     <button onClick={()=>{setTqAssinando(false); setTqAssinatura("");}} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-                    <button onClick={registrarTesteQuinzenal} disabled={saving} style={{...S.btn, flex:1, fontSize:13, opacity:saving?.6:1}}>{saving?"Salvando…":"✓ Assinar e concluir"}</button>
+                    <button onClick={registrarTesteQuinzenal} disabled={saving} style={{...S.btn, flex:1, fontSize:13, opacity:saving?.6:1}}>{saving?"Salvando…":<><Ico n="check"/>{" Assinar e concluir"}</>}</button>
                   </div>
                 </div>
               )}
@@ -551,8 +552,8 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
         )}
         {faltamDef.length>0 && (
           <div style={{...S.card,border:"1px solid #f59e0b55",background:dark?"#1a1000":"#fffbeb"}}>
-            <div style={{fontSize:12,fontWeight:800,color:"#f59e0b"}}>⚠️ Falta informar os deficientes</div>
-            <div style={{fontSize:11,...S.txt2,marginTop:2}}>Agora informe quantos pontos estão deficientes/apagados em: {faltamDef.map(q=>q.nome).join(", ")}. Toque em ✏️ Editar no quadrante.</div>
+            <div style={{fontSize:12,fontWeight:800,color:"#f59e0b"}}><Ico n="alerta"/> Falta informar os deficientes</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:2}}>Agora informe quantos pontos estão deficientes/apagados em: {faltamDef.map(q=>q.nome).join(", ")}. Toque em <Ico n="editar"/> Editar no quadrante.</div>
           </div>
         )}
 
@@ -585,8 +586,8 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
               </div>
               {c.def!=null && <div style={{marginTop:8}}><BarraPct pct={c.pct} dark={dark}/></div>}
               <div style={{display:"flex",gap:8,marginTop:10}}>
-                <button onClick={()=>abrirEdicao(q)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:12}}>✏️ Editar</button>
-                {adminAuth && delId!==q.id && <button onClick={()=>setDelId(q.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433",padding:"8px 12px",fontSize:12}}>🗑</button>}
+                <button onClick={()=>abrirEdicao(q)} style={{...S.btnSm,flex:1,padding:"8px",fontSize:12}}><Ico n="editar"/> Editar</button>
+                {adminAuth && delId!==q.id && <button onClick={()=>setDelId(q.id)} style={{...S.btnSm,color:"#ef4444",borderColor:"#ef444433",padding:"8px 12px",fontSize:12}}><Ico n="lixeira"/></button>}
               </div>
               {adminAuth && delId===q.id && (
                 <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
@@ -601,12 +602,12 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
 
         {/* Ações */}
         {editId==="novo" ? Editor : (
-          <button onClick={()=>abrirEdicao(null)} style={temQuadrantes?{...S.btnSec,fontSize:13}:S.btn}>➕ Adicionar quadrante</button>
+          <button onClick={()=>abrirEdicao(null)} style={temQuadrantes?{...S.btnSec,fontSize:13}:S.btn}><Ico n="mais"/> Adicionar quadrante</button>
         )}
         {adminAuth && temQuadrantes && g.total>0 && (
-          <button onClick={()=>gerarPdfIluminacao(project, data)} style={{...S.btn,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 Gerar PDF da Iluminação</button>
+          <button onClick={()=>gerarPdfIluminacao(project, data)} style={{...S.btn,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}><Ico n="arquivo"/> Gerar PDF da Iluminação</button>
         )}
-        {adminAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar Mapa</button>}
+        {adminAuth && <button onClick={abrirConfig} style={{...S.btnSec,fontSize:13}}><Ico n="engrenagem"/> Configurar Mapa</button>}
         {saving && <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>salvando…</div>}
       </div>
     </div></div>

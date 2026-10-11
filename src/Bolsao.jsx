@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { baixarBolsao } from "./relatorios/bolsaoRelatorio";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { checkPin } from "./session";
@@ -152,13 +153,13 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>🚧</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="obras"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Fiscalização de Bolsão</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}>👷 Acesso Líder</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}><Ico n="capacete"/> Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec,fontSize:13,marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -336,7 +337,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🚧</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}><Ico n="obras"/></div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
     </div>
   );
 
@@ -355,14 +356,14 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
             <button onClick={()=>setScreen("list")} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:800,...S.txt}}>📄 Gerar Relatório</div>
+              <div style={{fontSize:14,fontWeight:800,...S.txt}}><Ico n="arquivo"/> Gerar Relatório</div>
               <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
             </div>
           </div>
           <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
 
             <div style={S.card}>
-              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>🎯 Relatório de 1 Placa Específica</div>
+              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}><Ico n="alvo"/> Relatório de 1 Placa Específica</div>
               <div style={{fontSize:10,...S.txt2,marginBottom:8}}>Histórico completo só dela — ideal pra evidência pontual, fica bem mais curto.</div>
               <input value={buscaPlacaRelatorio} onChange={e=>setBuscaPlacaRelatorio(normalizaPlaca(e.target.value))} placeholder="Digite a placa..." autoCapitalize="characters" style={{...S.inp,fontWeight:800,letterSpacing:2,marginBottom:buscaResultados.length?8:0}}/>
               {buscaResultados.map(p=>(
@@ -374,23 +375,23 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
               ))}
             </div>
 
-            <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginTop:4}}>📊 Relatório por Período</div>
+            <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginTop:4}}><Ico n="grafico"/> Relatório por Período</div>
 
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setModoRelatorio("geral")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:12,fontWeight:700,...(modoRelatorio==="geral"?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}>📚 Geral (todas)</button>
-              <button onClick={()=>setModoRelatorio("alerta")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:12,fontWeight:700,...(modoRelatorio==="alerta"?{background:"#ef444422",borderColor:"#ef444466",color:"#f87171"}:{})}}>⚠️ Só Atenção/Crítico</button>
+              <button onClick={()=>setModoRelatorio("geral")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:12,fontWeight:700,...(modoRelatorio==="geral"?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}><Ico n="livro"/> Geral (todas)</button>
+              <button onClick={()=>setModoRelatorio("alerta")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:12,fontWeight:700,...(modoRelatorio==="alerta"?{background:"#ef444422",borderColor:"#ef444466",color:"#f87171"}:{})}}><Ico n="alerta"/> Só Atenção/Crítico</button>
             </div>
             <div style={{fontSize:10,...S.txt2,marginTop:-4}}>{modoRelatorio==="alerta"?"Relatório bem mais curto — ignora as placas Normais.":"Inclui todas as placas do período (pode ficar longo)."}</div>
 
-            <button onClick={()=>gerar({label:"Hoje (últimas 24h)", from:new Date(Date.now()-86400000), to:hojeFim(), turno:null})} style={{...S.btn,fontSize:14}}>🗓 Hoje (últimas 24h)</button>
+            <button onClick={()=>gerar({label:"Hoje (últimas 24h)", from:new Date(Date.now()-86400000), to:hojeFim(), turno:null})} style={{...S.btn,fontSize:14}}><Ico n="calendario"/> Hoje (últimas 24h)</button>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>gerar({label:"Turno Diurno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Diurno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>☀️ Turno Diurno</button>
-              <button onClick={()=>gerar({label:"Turno Noturno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Noturno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#6366f1",borderColor:"#6366f133"}}>🌙 Turno Noturno</button>
+              <button onClick={()=>gerar({label:"Turno Diurno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Diurno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}><Ico n="sol"/> Turno Diurno</button>
+              <button onClick={()=>gerar({label:"Turno Noturno (hoje)", from:hojeInicio(0), to:hojeFim(), turno:"Noturno"})} style={{...S.btnSec,flex:1,fontSize:13,color:"#6366f1",borderColor:"#6366f133"}}><Ico n="lua"/> Turno Noturno</button>
             </div>
-            <button onClick={()=>gerar({label:"Última semana (7 dias)", from:new Date(Date.now()-7*86400000), to:hojeFim(), turno:null})} style={{...S.btnSec,fontSize:14}}>📅 Última semana (7 dias)</button>
+            <button onClick={()=>gerar({label:"Última semana (7 dias)", from:new Date(Date.now()-7*86400000), to:hojeFim(), turno:null})} style={{...S.btnSec,fontSize:14}}><Ico n="calendario"/> Última semana (7 dias)</button>
 
             <div style={{...S.card,marginTop:6}}>
-              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>🗂 Período personalizado</div>
+              <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}><Ico n="pasta"/> Período personalizado</div>
               <div style={{display:"flex",gap:8,marginBottom:10}}>
                 <div style={{flex:1}}><label style={S.lbl}>De</label><input type="date" value={dataIni} max={dataFim} onChange={e=>setDataIni(e.target.value)} style={S.inp}/></div>
                 <div style={{flex:1}}><label style={S.lbl}>Até</label><input type="date" value={dataFim} min={dataIni} max={todayStrLocal()} onChange={e=>setDataFim(e.target.value)} style={S.inp}/></div>
@@ -400,7 +401,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
                 const to = new Date(dataFim+"T23:59:59");
                 const label = dataIni===dataFim ? `Dia ${fmtDate(dataIni)}` : `${fmtDate(dataIni)} a ${fmtDate(dataFim)}`;
                 gerar({label, from, to, turno:null});
-              }} style={{...S.btn,background:"linear-gradient(135deg,#92400e,#78350f)",fontSize:13}}>📄 Gerar Personalizado</button>
+              }} style={{...S.btn,background:"linear-gradient(135deg,#92400e,#78350f)",fontSize:13}}><Ico n="arquivo"/> Gerar Personalizado</button>
             </div>
           </div>
         </div>
@@ -422,9 +423,9 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:12}}>
           {feedback && (
             <div style={{...S.card,textAlign:"center",border:`2px solid ${STATUS_CFG[feedback.status].border}`,background:STATUS_CFG[feedback.status].bg}}>
-              <div style={{fontSize:11,...S.txt2,marginBottom:4}}>{feedback.novoDia?"✅ Registrado — novo dia computado":"✅ Registrado — dentro da janela de 12h (mesmo dia)"}</div>
+              <div style={{fontSize:11,...S.txt2,marginBottom:4}}>{feedback.novoDia?<><Ico n="checkCirculo"/>{" Registrado — novo dia computado"}</>:<><Ico n="checkCirculo"/>{" Registrado — dentro da janela de 12h (mesmo dia)"}</>}</div>
               <div style={{fontSize:20,fontWeight:900,letterSpacing:2,...S.txt}}>{feedback.placa}</div>
-              {feedback.aliasRedirect&&<div style={{fontSize:10,color:"#0ea5e9",marginTop:2}}>🔁 Digitado "{feedback.aliasRedirect}" — reconhecido como a mesma placa</div>}
+              {feedback.aliasRedirect&&<div style={{fontSize:10,color:"#0ea5e9",marginTop:2}}><Ico n="atualizar"/> Digitado "{feedback.aliasRedirect}" — reconhecido como a mesma placa</div>}
               <div style={{display:"flex",justifyContent:"center",gap:8,marginTop:6,alignItems:"center"}}>
                 <StatusBadge status={feedback.status}/>
                 <span style={{fontSize:12,fontWeight:700,color:STATUS_CFG[feedback.status].color}}>{feedback.dias}d consecutivo{feedback.dias!==1?"s":""}</span>
@@ -435,8 +436,8 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
           <div style={S.card}>
             <label style={S.lbl}>Tipo de Veículo</label>
             <div style={{display:"flex",gap:8,marginBottom:14}}>
-              <button onClick={()=>setTipoInput("caminhao")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(tipoInput==="caminhao"?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}>🚛 Caminhão</button>
-              <button onClick={()=>setTipoInput("carreta_desengatada")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(tipoInput==="carreta_desengatada"?{background:"#ef444422",borderColor:"#ef444466",color:"#f87171"}:{})}}>🔓 Carreta Desengatada</button>
+              <button onClick={()=>setTipoInput("caminhao")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(tipoInput==="caminhao"?{background:"#1d4ed822",borderColor:"#1d4ed866",color:"#60a5fa"}:{})}}><Ico n="caminhao"/> Caminhão</button>
+              <button onClick={()=>setTipoInput("carreta_desengatada")} style={{...S.btnSm,flex:1,padding:"10px",fontSize:13,fontWeight:700,...(tipoInput==="carreta_desengatada"?{background:"#ef444422",borderColor:"#ef444466",color:"#f87171"}:{})}}><Ico n="cadeadoAberto"/> Carreta Desengatada</button>
             </div>
 
             <label style={S.lbl}>Placa</label>
@@ -446,7 +447,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
             {matchAtual && matchAtual.status!=="normal" && (
               <div style={{marginTop:12,padding:"12px 14px",borderRadius:9,background:STATUS_CFG[matchAtual.status].bg,border:`2px solid ${STATUS_CFG[matchAtual.status].border}`}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-                  <span style={{fontSize:18}}>{matchAtual.status==="critico"?"🚨":"⚠️"}</span>
+                  <span style={{fontSize:18}}>{matchAtual.status==="critico"?<><Ico n="sirene"/></>:<><Ico n="alerta"/></>}</span>
                   <span style={{fontSize:13,fontWeight:800,color:STATUS_CFG[matchAtual.status].color}}>
                     Placa já reincidente — {matchAtual.diasConsecutivos} dia{matchAtual.diasConsecutivos!==1?"s":""} consecutivo{matchAtual.diasConsecutivos!==1?"s":""}
                   </span>
@@ -457,15 +458,15 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
                     : `Em observação — entra em Crítico a partir de ${DIAS_CRITICO} dias.`}
                 </div>
                 {matchAtual.status==="critico" && !matchAtual.bloqueado && (
-                  <button onClick={()=>toggleBloqueio(matchAtual.placa)} style={{...S.btnSm,width:"100%",background:"#ef444422",color:"#ef4444",borderColor:"#ef444466",fontWeight:800,padding:"9px"}}>🔒 Marcar Bloqueio Agora</button>
+                  <button onClick={()=>toggleBloqueio(matchAtual.placa)} style={{...S.btnSm,width:"100%",background:"#ef444422",color:"#ef4444",borderColor:"#ef444466",fontWeight:800,padding:"9px"}}><Ico n="cadeado"/> Marcar Bloqueio Agora</button>
                 )}
-                {matchAtual.bloqueado && <div style={{fontSize:11,color:"#ef4444",fontWeight:700,textAlign:"center"}}>🔒 Já está marcada como Bloqueada</div>}
+                {matchAtual.bloqueado && <div style={{fontSize:11,color:"#ef4444",fontWeight:700,textAlign:"center"}}><Ico n="cadeado"/> Já está marcada como Bloqueada</div>}
               </div>
             )}
 
             {sugestoes.length>0 && (
               <div style={{marginTop:12}}>
-                <div style={{fontSize:10,...S.txt2,fontWeight:700,marginBottom:6}}>🕘 Já registradas antes, começando assim:</div>
+                <div style={{fontSize:10,...S.txt2,fontWeight:700,marginBottom:6}}><Ico n="relogio"/> Já registradas antes, começando assim:</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                   {sugestoes.map(s=>(
                     <button key={s.placa} onClick={()=>setPlacaInput(s.placa)}
@@ -498,24 +499,24 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:800,...S.txt}}>🚧 Fiscalização de Bolsão</div>
+            <div style={{fontSize:14,fontWeight:800,...S.txt}}><Ico n="obras"/> Fiscalização de Bolsão</div>
             <div style={{fontSize:11,...S.txt2}}>{project.id} · {project.name}</div>
           </div>
         </div>
 
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
-          <button onClick={()=>{setScreen("registrar");setFeedback(null);}} style={{...S.btn,fontSize:15,padding:"15px"}}>📋 Registrar Placa</button>
-          <button onClick={()=>setScreen("relatorio")} style={{...S.btnSec,fontSize:13,color:"#92400e",borderColor:"#92400e44"}}>📄 Gerar Relatório</button>
+          <button onClick={()=>{setScreen("registrar");setFeedback(null);}} style={{...S.btn,fontSize:15,padding:"15px"}}><Ico n="prancheta"/> Registrar Placa</button>
+          <button onClick={()=>setScreen("relatorio")} style={{...S.btnSec,fontSize:13,color:"#92400e",borderColor:"#92400e44"}}><Ico n="arquivo"/> Gerar Relatório</button>
 
           {authLevel==="admin" && project.id==="P311B" && (
             <div style={{...S.card,border:"1px dashed #0ea5e944"}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#0ea5e9",marginBottom:6}}>📥 Importação de Histórico (Gerencial)</div>
+              <div style={{fontSize:11,fontWeight:700,color:"#0ea5e9",marginBottom:6}}><Ico n="download"/> Importação de Histórico (Gerencial)</div>
               <div style={{fontSize:10,...S.txt2,marginBottom:8,lineHeight:1.4}}>
                 Carrega o relatório de reincidências de Junho/2026 (177 placas) pra dar histórico ao módulo. Nunca sobrescreve placas já registradas no app.
               </div>
               {importStatus==="importando" && <div style={{fontSize:12,color:"#0ea5e9",textAlign:"center"}}>Importando...</div>}
               {importStatus && importStatus!=="importando" && (
-                <div style={{fontSize:11,color:"#22c55e",textAlign:"center",marginBottom:6}}>✅ {importStatus.added} importada(s){importStatus.skipped>0?`, ${importStatus.skipped} já existiam (preservadas)`:""}</div>
+                <div style={{fontSize:11,color:"#22c55e",textAlign:"center",marginBottom:6}}><Ico n="checkCirculo"/> {importStatus.added} importada(s){importStatus.skipped>0?`, ${importStatus.skipped} já existiam (preservadas)`:""}</div>
               )}
               {(!importStatus || importStatus==="importando") && (
                 <button onClick={importarHistorico} disabled={importStatus==="importando"} style={{...S.btnSm,width:"100%",color:"#0ea5e9",borderColor:"#0ea5e944",fontWeight:700,padding:"9px"}}>Importar Histórico Jun/2026</button>
@@ -534,7 +535,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
           {listaFiltrada.length===0 && (
             <div style={{textAlign:"center",padding:"30px 0"}}>
-              <div style={{fontSize:28,marginBottom:8}}>🚧</div>
+              <div style={{fontSize:28,marginBottom:8}}><Ico n="obras"/></div>
               <div style={{fontSize:12,...S.txt2}}>{aba==="todos"?"Nenhuma placa registrada ainda":"Nenhuma placa nessa categoria"}</div>
             </div>
           )}
@@ -544,9 +545,9 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
             return (
             <div key={p.placa} style={{...S.card,border:`1px solid ${p.bloqueado?"#ef444466":STATUS_CFG[p.status].border}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:17,fontWeight:900,letterSpacing:1.5,...S.txt}}>{ultimoTipo==="carreta_desengatada"?"🔓":"🚛"} {p.placa}</span>
+                <span style={{fontSize:17,fontWeight:900,letterSpacing:1.5,...S.txt}}>{ultimoTipo==="carreta_desengatada"?<><Ico n="cadeadoAberto"/></>:<><Ico n="caminhao"/></>} {p.placa}</span>
                 <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                  {p.bloqueado&&<span style={{fontSize:10,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:5}}>🔒 Bloqueado</span>}
+                  {p.bloqueado&&<span style={{fontSize:10,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:5}}><Ico n="cadeado"/> Bloqueado</span>}
                   <StatusBadge status={p.status}/>
                 </div>
               </div>
@@ -567,13 +568,13 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
               <div style={{display:"flex",gap:6,marginTop:9}}>
                 {!p.bloqueado && (p.status==="atencao"||p.status==="critico") &&
-                  <button onClick={()=>toggleBloqueio(p.placa)} style={{...S.btnSm,flex:1,color:"#ef4444",borderColor:"#ef444444",fontWeight:700}}>🔒 Marcar Bloqueio</button>}
+                  <button onClick={()=>toggleBloqueio(p.placa)} style={{...S.btnSm,flex:1,color:"#ef4444",borderColor:"#ef444444",fontWeight:700}}><Ico n="cadeado"/> Marcar Bloqueio</button>}
                 {p.bloqueado && !p.bloqueioDados &&
-                  <button onClick={()=>abrirFormMotorista(p.placa)} style={{...S.btnSm,flex:1,color:"#f59e0b",borderColor:"#f59e0b44",fontWeight:700}}>📝 Coletar Dados do Motorista</button>}
+                  <button onClick={()=>abrirFormMotorista(p.placa)} style={{...S.btnSm,flex:1,color:"#f59e0b",borderColor:"#f59e0b44",fontWeight:700}}><Ico n="notas"/> Coletar Dados do Motorista</button>}
                 {p.bloqueado && p.bloqueioDados &&
-                  <button onClick={()=>abrirFormMotorista(p.placa)} style={{...S.btnSm,flex:1,fontWeight:700}}>✏️ Editar Dados</button>}
+                  <button onClick={()=>abrirFormMotorista(p.placa)} style={{...S.btnSm,flex:1,fontWeight:700}}><Ico n="editar"/> Editar Dados</button>}
                 {p.bloqueado &&
-                  <button onClick={()=>{if(window.confirm("Desmarcar bloqueio desta placa?")) toggleBloqueio(p.placa);}} style={{...S.btnSm,color:"#64748b"}}>✕</button>}
+                  <button onClick={()=>{if(window.confirm("Desmarcar bloqueio desta placa?")) toggleBloqueio(p.placa);}} style={{...S.btnSm,color:"#64748b"}}><Ico n="x"/></button>}
               </div>
             </div>
           );})}
@@ -587,7 +588,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
       {placaBloqueioForm && (
         <div onClick={()=>setPlacaBloqueioForm(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
           <div onClick={e=>e.stopPropagation()} style={{...S.card,maxWidth:380,width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
-            <div style={{fontSize:15,fontWeight:800,...S.txt,marginBottom:2}}>📝 Dados do Motorista</div>
+            <div style={{fontSize:15,fontWeight:800,...S.txt,marginBottom:2}}><Ico n="notas"/> Dados do Motorista</div>
             <div style={{fontSize:18,fontWeight:900,letterSpacing:1.5,color:"#ef4444",marginBottom:14}}>{placaBloqueioForm}</div>
 
             <label style={S.lbl}>Nome do Motorista *</label>
@@ -604,7 +605,7 @@ export default function Bolsao({ project, onBack, dark, onToggleTheme, sharedAut
 
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setPlacaBloqueioForm(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-              <button onClick={salvarDadosMotorista} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#f59e0b,#d97706)"}}>✓ Salvar</button>
+              <button onClick={salvarDadosMotorista} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#f59e0b,#d97706)"}}><Ico n="check"/> Salvar</button>
             </div>
           </div>
         </div>

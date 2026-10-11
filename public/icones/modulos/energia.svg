@@ -1,0 +1,116 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Filtros de relevo 3D, emissão de energia e profundidade -->
+    <filter id="nrg-shadow-hex" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-8" dy="16" stdDeviation="16" flood-color="#1A0202" flood-opacity="0.9"/>
+    </filter>
+
+    <filter id="nrg-shadow-bolt" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-10" dy="18" stdDeviation="15" flood-color="#120000" flood-opacity="0.95"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#EF4444" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- Base de vidro fosco escuro com matiz vermelho -->
+    <linearGradient id="nrg-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1F0808" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#140404" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#0A0101" stop-opacity="0.97"/>
+    </linearGradient>
+
+    <!-- Brilho volumétrico interno vermelho da placa -->
+    <radialGradient id="nrg-glass-glow" cx="25%" cy="20%" r="75%">
+      <stop offset="0%" stop-color="#EF4444" stop-opacity="0.32"/>
+      <stop offset="45%" stop-color="#B91C1C" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#EF4444" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Rim light chanfrado da borda externa -->
+    <linearGradient id="nrg-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#FEE2E2" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#EF4444" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#B91C1C" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#450A0A" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Reflexo especular superior do vidro -->
+    <linearGradient id="nrg-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="35%" stop-color="#FCA5A5" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Gradientes 3D do Hexágono Estrutural -->
+    <linearGradient id="nrg-hex-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#DC2626"/>
+      <stop offset="45%" stop-color="#991B1B"/>
+      <stop offset="100%" stop-color="#450A0A"/>
+    </linearGradient>
+
+    <linearGradient id="nrg-hex-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#FEF2F2" stop-opacity="0.95"/>
+      <stop offset="35%" stop-color="#F87171" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#7F1D1D" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Gradientes 3D do Raio Sólido Central -->
+    <linearGradient id="nrg-bolt-grad" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#FEE2E2"/>
+      <stop offset="60%" stop-color="#F87171"/>
+      <stop offset="100%" stop-color="#DC2626"/>
+    </linearGradient>
+
+    <linearGradient id="nrg-bolt-rim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#FECACA" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#EF4444" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- Máscara estrita para confinar 100% de luz dentro da placa -->
+    <clipPath id="nrg-plaque-clip">
+      <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/>
+    </clipPath>
+  </defs>
+
+  <!-- GRUPO PRINCIPAL CONFINADO NA PLACA -->
+  <g clip-path="url(#nrg-plaque-clip)">
+    <!-- Fundo de vidro fosco escuro -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#nrg-glass-base)"/>
+
+    <!-- Brilho volumétrico interno vermelho -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#nrg-glass-glow)"/>
+
+    <!-- Reflexo especular diagonal superior -->
+    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#nrg-specular-top)"/>
+
+    <!-- SÍMBOLO RELEVO 3D: OCORRÊNCIAS DE ENERGIA -->
+    <g id="nrg-symbol-group">
+      <!-- 1. HEXÁGONO ESTRUTURAL MACIÇO (BASE 3D CHANFRADA) -->
+      <g filter="url(#nrg-shadow-hex)">
+        <polygon points="512,185 785,342 785,658 512,815 239,658 239,342" 
+                 fill="url(#nrg-hex-grad)" stroke="url(#nrg-hex-rim)" stroke-width="12" stroke-linejoin="round"/>
+        <!-- Friso de luz no chanfro superior do hexágono -->
+        <polygon points="512,210 760,352 760,648 512,790 264,648 264,352" 
+                 fill="#1E293B" stroke="#94A3B8" stroke-width="5" opacity="0.4" stroke-linejoin="round"/>
+      </g>
+
+      <!-- 2. RAIO ESTILIZADO EM ALTO RELEVO 3D (TOTALMENTE CONTIDO NO HEXÁGONO) -->
+      <g filter="url(#nrg-shadow-bolt)">
+        <!-- Corpo maciço e angulado do raio (geometria larga para 44 px) -->
+        <polygon points="545,245 355,505 485,505 425,755 675,475 535,475" 
+                 fill="url(#nrg-bolt-grad)" stroke="url(#nrg-bolt-rim)" stroke-width="8" stroke-linejoin="round"/>
+        <!-- Reflexo especular na quina superior do raio -->
+        <polygon points="545,245 420,415 485,415 460,505 515,365" 
+                 fill="#FFFFFF" opacity="0.45"/>
+      </g>
+    </g>
+
+    <!-- Friso de luz interno no bisel superior -->
+    <rect x="55.2" y="55.2" width="913.6" height="913.6" rx="198.75" ry="198.75" 
+          fill="none" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.25"/>
+  </g>
+
+  <!-- BORDA DE LUZ EXTERNA (RIM LIGHT DA PLACA) - ZERO VAZAMENTO -->
+  <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75" 
+        fill="none" stroke="url(#nrg-rim-border)" stroke-width="7"/>
+</svg>
