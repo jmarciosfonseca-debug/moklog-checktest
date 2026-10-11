@@ -50,6 +50,8 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
     exc.forEach((e) => L.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — ${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}: ${(e.obs || "").trim()}`));
     if ((mat.obs || "").trim()) L.push(`   ↳ ${mat.obs.trim()}`);
   }
+  const qs = Object.values(mat.quantidades || {}).filter((q) => q && String(q.qtd).trim());
+  if (qs.length) L.push(`   Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
   (mapa.veiculos || []).forEach((v) => {
     const r = kmRodado(v);
     const partes = [];

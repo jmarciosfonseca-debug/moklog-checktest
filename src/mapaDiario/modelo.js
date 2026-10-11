@@ -8,6 +8,7 @@
 //  - material/armamento/munição: uma linha "sem alteração" já marcada;
 //  - quilometragem rodada = odômetro atual − anterior.
 
+import { itensDaBase } from "./materialBase";
 import { chaveMapa } from "./regras";
 
 export const SITUACOES = [
@@ -57,7 +58,7 @@ export function novoMapa({ projetoId, data, turno, horario, base = null, agora =
     : [];
   return {
     id: chave, projetoId, data, turno, horario: horario || null, status: "rascunho",
-    postos, material: materialNovo(), veiculos,
+    postos, material: { ...materialNovo(), ...(base && base.material && base.material.quantidades ? { quantidades: base.material.quantidades } : {}) }, veiculos,
     supervisao: null, resumo: "", observacoes: "",
     criadoEm: agora.toISOString(), atualizadoEm: agora.toISOString(), enviadoEm: null, enviadoPor: "",
   };
@@ -80,20 +81,26 @@ const CATEGORIAS_MATERIAL = [
 // Lista conferível a partir do cadastro de Equipamentos do projeto (somente leitura).
 // Bodycam e ZTRAX só existem no P311A/P311B (mesma regra do módulo Equipamentos).
 const SO_NO_MEGA_CURITIBA_ITAJAI = { bodycam: ["P311A", "P311B"], ztrax: ["P311A", "P311B"] };
-export function itensDeEquipamento(data, projetoId = null) {
-  if (!data) return [];
-  const out = [];
-  CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
-    const restrito = SO_NO_MEGA_CURITIBA_ITAJAI[cat];
-    if (restrito && projetoId && !restrito.includes(projetoId)) return;
-    (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => {
-      if (!it || typeof it !== "object") return;
-      const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
-      const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
-      out.push({ id: `${cat}:${it.id || i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok" });
+export function itensDeEquipamento(data, projetoId = null, turno = null) {
+  const rotulos = Object.fromEntries(CATEGORIAS_MATERIAL);
+  const cad = [];
+  if (data) {
+    CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
+      const restrito = SO_NO_MEGA_CURITIBA_ITAJAI[cat];
+      if (restrito && projetoId && !restrito.includes(projetoId)) return;
+      (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => {
+        if (!it || typeof it !== "object") return;
+        const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
+        const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
+        cad.push({ id: `${cat}:${it.id || i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok" });
+      });
     });
-  });
-  return out;
+  }
+  // Base do Codex (o que o projeto declara nos mapas) + cadastro: o cadastro vence por categoria.
+  const comCadastro = new Set(cad.map((i) => i.categoria));
+  const base = itensDaBase(projetoId, turno, rotulos).filter((i) => !comCadastro.has(i.categoria));
+  const ordem = CATEGORIAS_MATERIAL.map(([c]) => c);
+  return [...cad, ...base].sort((a, b) => ordem.indexOf(a.categoria) - ordem.indexOf(b.categoria));
 }
 
 // "Armamento 2 · Munição 1 · Rádios HT 3": o que existe neste projeto para conferir.
@@ -101,6 +108,13 @@ export function resumoItens(itens) {
   const cont = new Map();
   (itens || []).forEach((i) => cont.set(i.rotuloCategoria, (cont.get(i.rotuloCategoria) || 0) + 1));
   return [...cont.entries()].map(([k, n]) => `${k} ${n}`).join(" · ");
+}
+
+// Itens que o líder precisa contar e informar (quantidade desconhecida na base).
+export const itensContaveis = (itens) => (itens || []).filter((i) => i.contar);
+export function definirQuantidade(material, item, qtd) {
+  const base = { ...materialNovo(), ...(material || {}) };
+  return { ...base, quantidades: { ...(base.quantidades || {}), [item.chaveQtd]: { nome: item.nome, qtd: String(qtd) } } };
 }
 
 // Atualiza a situação de um item (ok remove a exceção). Mantém `semAlteracao` coerente.
@@ -122,7 +136,7 @@ export function kmRodado(v) {
 }
 
 // Validação para concluir. Devolve lista de textos curtos; vazia = pode concluir.
-export function validarParaConcluir(mapa) {
+export function validarParaConcluir(mapa, itensContaveis = []) {
   const erros = [];
   (mapa.postos || []).forEach((p) => {
     const nome = p.rotulo || "Posto";
@@ -139,6 +153,10 @@ export function validarParaConcluir(mapa) {
   (mat.excecoes || []).forEach((e) => {
     if (!(e.nome || "").trim()) { erros.push("Material: informe qual item tem anomalia"); return; }
     if (!e.obs || e.obs.trim().length < 3) erros.push(`Material — ${e.nome}: descreva a ${e.situacao === "indisponivel" ? "indisponibilidade" : "anomalia"}`);
+  });
+  (itensContaveis || []).forEach((it) => {
+    const q = Number(String((mat.quantidades || {})[it.chaveQtd]?.qtd ?? "").replace(",", "."));
+    if (!(q > 0)) erros.push(`Material — informe a quantidade de ${it.nome}`);
   });
   if (!mat.semAlteracao && !(mat.excecoes || []).length && !(mat.obs || "").trim()) erros.push('Material: marque "Sem alteração" ou descreva o que mudou');
   (mapa.veiculos || []).forEach((v) => {

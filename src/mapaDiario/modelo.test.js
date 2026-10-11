@@ -167,13 +167,50 @@ describe("lista de material por projeto", () => {
     const p601 = itensDeEquipamento(eq, "P601").map((i) => i.nome);
     expect(p601).not.toContain("Bodycam 01");
     expect(p601).not.toContain("ZTRAX 1");
-    expect(p601).toEqual(["Arma 01", "Arma 02", "Munição"]);
+    expect(p601).toEqual(["Arma 01", "Arma 02", "Munição", "Par de placas balísticas"]);
   });
   test("resumo mostra o que existe no projeto; vai no texto do WhatsApp quando está tudo ok", () => {
-    expect(resumoItens(itensDeEquipamento(eq, "P601"))).toBe("Armamento 2 · Munição 1");
+    expect(resumoItens(itensDeEquipamento(eq, "P601"))).toBe("Armamento 2 · Munição 1 · Placas balísticas 1");
     expect(resumoItens([])).toBe("");
     const m = preencher(mapa(), ["A", "B", "C"]);
     const t = montarTextoWhatsApp({ ...m, material: { ...materialNovo(), conferidos: "Armamento 2 · Munição 1" } });
     expect(t).toContain("Sem alteração — conferido e disponível (Armamento 2 · Munição 1)");
+  });
+});
+
+describe("base do Codex por projeto", () => {
+  const nomes = (pid, turno, eq = null) => itensDeEquipamento(eq, pid, turno).map((i) => i.nome);
+  test("P311A: bodycam e rádios por turno (dia 4/5, noite 3/4); P311B sem bodycam", () => {
+    expect(nomes("P311A", "D").filter((n) => n.startsWith("Bodycam"))).toHaveLength(4);
+    expect(nomes("P311A", "N").filter((n) => n.startsWith("Bodycam"))).toHaveLength(3);
+    expect(nomes("P311A", "D").filter((n) => n.startsWith("Rádio HT"))).toHaveLength(5);
+    expect(nomes("P311A", "N").filter((n) => n.startsWith("Rádio HT"))).toHaveLength(4);
+    expect(nomes("P311B", "D").some((n) => /Bodycam/.test(n))).toBe(false);
+    expect(resumoItens(itensDeEquipamento(null, "P311B", "D"))).toBe("Armamento 2 · Munição 1 · Placas balísticas 4");
+  });
+  test("quantidades confirmadas pelo Marcio: P601/P602 2 rev. + 36 mun.; P505 3 rev. + 52 mun.; P260C 1 pistola + 1 revólver", () => {
+    ["P601", "P602"].forEach((pid) => { expect(nomes(pid, "D").filter((n) => n.startsWith("Revólver .38"))).toHaveLength(2); expect(itensDeEquipamento(null, pid, "D").find((i) => i.categoria === "municao").detalhe).toBe("36 munições"); });
+    expect(nomes("P505", "D").filter((n) => n.startsWith("Revólver .38"))).toHaveLength(3);
+    expect(itensDeEquipamento(null, "P505", "N").find((i) => i.categoria === "municao").detalhe).toBe("52 munições");
+    expect(nomes("P260C", "D").filter((n) => /^(Pistola|Revólver)/.test(n))).toEqual(["Pistola .380", "Revólver .38"]);
+  });
+  test("projetos sem bodycam; P505 só tem armamento revólver", () => {
+    ["P601", "P602", "P604", "P605", "P606", "P607", "P260A", "P260B", "P260C"].forEach((pid) => expect(nomes(pid, "D").some((n) => /Bodycam/.test(n))).toBe(false));
+        expect(nomes("P505", "D")).toEqual(expect.arrayContaining(["Lanterna", "Rádio HT", "Smartphone"]));
+  });
+  test("P260A pistolas .380 x3 e P260B x1; P604 diurno tem rádio/tablet, noturno não", () => {
+    expect(nomes("P260A", "D").filter((n) => n.startsWith("Pistola .380"))).toHaveLength(3);
+    expect(nomes("P260B", "D").filter((n) => n.startsWith("Pistola .380"))).toHaveLength(1);
+    expect(nomes("P604", "D")).toEqual(expect.arrayContaining(["Rádio", "Tablet"]));
+    expect(nomes("P604", "N")).not.toContain("Tablet");
+  });
+  test("cadastro de Equipamentos substitui a base só na categoria que ele cobre", () => {
+    const eq = { armamento: [{ id: "a1", identificacao: "Arma 01" }] };
+    const it = itensDeEquipamento(eq, "P605", "D");
+    expect(it.filter((i) => i.categoria === "armamento").map((i) => i.nome)).toEqual(["Arma 01"]);
+    expect(it.filter((i) => i.categoria === "placas")).toHaveLength(2);
+  });
+  test("projeto fora da base e sem cadastro continua vazio", () => {
+    expect(itensDeEquipamento(null, "P999", "D")).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
 
@@ -55,7 +55,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         }
         const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
         if (!vivo) return;
-        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid));
+        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid, turno));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -85,11 +85,12 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   };
 
   const concluir = async () => {
-    const erros = validarParaConcluir(mapa);
+    const contaveis = itensContaveis(itensMat);
+    const erros = validarParaConcluir(mapa, contaveis);
     setAvisos(erros);
     if (erros.length) return;
     const agora = agoraFn().toISOString();
-    const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
+    const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapa.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapa.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); }
     catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); }
   };
@@ -227,6 +228,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                 <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: cor.txt, marginTop: 10 }}>
                   <input type="checkbox" disabled={exc.length > 0} checked={!!mat.semAlteracao && exc.length === 0} onChange={(e) => setMat((m) => ({ ...m, semAlteracao: e.target.checked }))} /> Sem alteração: conferi e está tudo disponível
                 </label>
+                {itensContaveis(itensMat).length > 0 && (
+                  <div style={{ marginTop: 10, padding: "8px 10px", border: `1px dashed ${cor.line}`, borderRadius: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: cor.txt2, marginBottom: 6 }}>CONTE E INFORME A QUANTIDADE (fica salva para os próximos mapas)</div>
+                    {itensContaveis(itensMat).map((it) => {
+                      const q = (mat.quantidades || {})[it.chaveQtd]?.qtd ?? "";
+                      return (
+                        <label key={it.chaveQtd} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: cor.txt, marginBottom: 6 }}>
+                          <span style={{ flex: 1 }}>{it.nome} <span style={{ color: cor.txt2 }}>· {it.rotuloCategoria}</span></span>
+                          <input aria-label={`Quantidade: ${it.nome}`} type="number" inputMode="numeric" min="0" placeholder="Qtd" value={q} onChange={(e) => setMat((m) => definirQuantidade(m, it, e.target.value))} style={{ ...S.in, width: 70, textAlign: "center", borderColor: String(q).trim() ? undefined : "#f59e0b" }} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
                 {!mat.semAlteracao && exc.length === 0 && !matAberto && <textarea aria-label="O que mudou no material" rows={2} placeholder="O que mudou no material" value={mat.obs || ""} onChange={(e) => setMat((m) => ({ ...m, obs: e.target.value }))} style={{ ...S.in, marginTop: 8 }} />}
                 {matAberto && (
                   <div style={{ marginTop: 10 }}>
