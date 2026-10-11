@@ -107,7 +107,7 @@ function getStyles(dark) {
     lbl:     { display:"block", fontSize:10, color:dark?"#475569":"#64748b", fontWeight:700, marginBottom:4, textTransform:"uppercase", letterSpacing:.5 },
     hdrBg:   { background:dark?"#04080f":"#f8fafc", borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}` },
     txt:     { color:dark?"#f1f5f9":"#0f172a" },
-    txt2:    { color:dark?"#475569":"#64748b" },
+    txt2:    { color:dark?"#94a3b8":"#64748b" },
     addBtn:  { background:"transparent", border:`1px dashed ${dark?"#1e293b":"#cbd5e1"}`, color:dark?"#475569":"#64748b", borderRadius:8, padding:"8px 14px", fontSize:12, cursor:"pointer", width:"100%", marginTop:6 },
   };
 }
