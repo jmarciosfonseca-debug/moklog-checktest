@@ -203,3 +203,25 @@ test("P505 (4x2): não puxa nem repete ninguém e avisa o líder", async () => {
   expect(q('select[aria-label="Quem está no posto VSPP Líder"]').value).toBe("");
   expect(io.loadUltimoMapa).toHaveBeenCalledWith("P505", "D", "2026-10-11", { gapPar: false });
 });
+
+test("concluir: grava o mapa e só depois lança Falta/FT/Atraso na ficha, mostrando o resumo", async () => {
+  const ordem = [];
+  await montar({
+    saveMapa: jest.fn(async (m) => { ordem.push("mapa"); salvos.push(m); return { ...m, atualizadoEm: "x" }; }),
+    lancarNaFicha: jest.fn(async () => { ordem.push("ficha"); return { removidos: 0 }; }),
+  });
+  await abrirExc("L1 · Vigilante Líder");
+  await clicar(botao("Falta"));
+  await clicar(botao("Concluir mapa"));
+  expect(ordem).toEqual(["mapa", "ficha"]);
+  expect(io.lancarNaFicha.mock.calls[0][0].postos[0]).toMatchObject({ situacao: "falta" });
+  expect(host.textContent).toContain("Ficha atualizada: 1 falta.");
+});
+test("se a ficha falhar, o mapa e o WhatsApp continuam liberados e o líder é avisado", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => { throw new Error("Sessão expirada"); }) });
+  await abrirExc("L1 · Vigilante Líder");
+  await clicar(botao("Falta"));
+  await clicar(botao("Concluir mapa"));
+  expect(q('pre[aria-label="Texto do mapa"]')).not.toBeNull();
+  expect(host.textContent).toContain("Falta/FT/Atraso NÃO entraram na ficha (Sessão expirada)");
+});

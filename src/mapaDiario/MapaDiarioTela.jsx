@@ -6,6 +6,7 @@ import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
 import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
+import { resumoLancamento } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
 
@@ -32,6 +33,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [abertos, setAbertos] = useState({});
   const [itensMat, setItensMat] = useState([]);
   const [avisoEquipe, setAvisoEquipe] = useState("");
+  const [fichaMsg, setFichaMsg] = useState(null);
   const [matAberto, setMatAberto] = useState(false);
   const carregadoRef = useRef(false);
   const timer = useRef(null);
@@ -108,7 +110,13 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     const agora = agoraFn().toISOString();
     const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapa.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapa.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); }
-    catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); }
+    catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); return; }
+    // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
+    setFichaMsg(null);
+    if (io.lancarNaFicha) {
+      try { const r = await io.lancarNaFicha(final); setFichaMsg({ ok: true, texto: resumoLancamento(r, final) }); }
+      catch (e) { setFichaMsg({ ok: false, texto: `Mapa gravado, mas Falta/FT/Atraso NÃO entraram na ficha (${e.message || "erro"}). Toque em Concluir mapa de novo (correção) para tentar outra vez.` }); }
+    }
   };
 
   const texto = mapa ? montarTextoWhatsApp(mapa, { nomeProjeto: project?.name || "" }) : "";
@@ -338,6 +346,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           {enviado && (
             <div style={{ ...S.card, borderColor: "#16a34a" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", marginBottom: 8 }}>Mapa gravado. Agora envie no WhatsApp.</div>
+              {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}</div>}
               <pre aria-label="Texto do mapa" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, color: cor.txt, background: cor.input, border: `1px solid ${cor.line}`, borderRadius: 10, padding: 10, margin: "0 0 10px" }}>{texto}</pre>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <a href={linkWhatsApp(texto)} target="_blank" rel="noreferrer" style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Abrir WhatsApp</a>

@@ -5,6 +5,8 @@ import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { setDoc } from "../fireGuard";
 import { diasEntre } from "./regras";
+import { isDemo, authFetchEquipe } from "../session";
+import { aplicarNaFicha } from "./ficha";
 
 const db = () => {
   const app = getApps()[0];
@@ -80,4 +82,17 @@ export async function loadEnviosDoTurno(itens) {
     return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null };
   }));
   return res;
+}
+
+// Lança Falta/FT/Atraso do mapa na ficha (histórico do colaborador) pelo mesmo endpoint da tela de Equipe,
+// que faz a mescla segura (nada é sobrescrito). Sem exceções novas, não grava nada.
+export async function lancarNaFicha(mapa) {
+  const snap = await getDoc(doc(db(), "equipes", mapa.projetoId));
+  const before = snap.exists() ? snap.data() : { colaboradores: [], desligados: [] };
+  const r = aplicarNaFicha(before, mapa);
+  if (!r.mudou || isDemo()) return r;
+  const resp = await authFetchEquipe("/api/equipe-save", { method: "POST", body: JSON.stringify({ pid: mapa.projetoId, before, after: r.after }) });
+  const res = await resp.json().catch(() => ({}));
+  if (!resp.ok || !res.ok) throw new Error(res.erro || "Não foi possível salvar na ficha.");
+  return r;
 }
