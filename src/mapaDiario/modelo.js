@@ -10,6 +10,7 @@
 
 import { itensDaBase } from "./materialBase";
 import { chaveMapa } from "./regras";
+import { postosDoProjeto, defDoPosto, projetoPuxaEquipe } from "./postos";
 
 export const SITUACOES = [
   { id: "presente", rotulo: "Presente" },
@@ -22,43 +23,39 @@ export const SITUACOES = [
 ];
 export const ROTULO_SITUACAO = Object.fromEntries(SITUACOES.map((s) => [s.id, s.rotulo]));
 
-// Postos de partida por projeto/turno (o líder pode renomear, incluir e remover).
-// P311B: L1 = Vigilante Líder, P1 = Vig CCO, P2 = Vigilante Ronda.
-// P311A: Líder, Tático (Vig Ronda), Apoio, Portaria (Porteiro CCO).
-// P605: um posto único Líder/CCO.
-const BASE = {
-  P311A: { D: ["Líder", "Tático", "Apoio", "Portaria"], N: ["Líder", "Tático", "Portaria"] },
-  P311B: { D: ["L1", "P1", "P2"], N: ["L1", "P1", "P2"] },
-  P601: { D: ["Líder", "VSPP Apoio", "VSPP P1", "CCO", "CDA"], N: ["Líder", "CCO", "CDA"] },
-  P605: { D: ["Líder/CCO", "VSPP", "CDA"], N: ["Líder/CCO", "VSPP"] },
-};
-const GENERICO = ["Líder", "CCO", "Vigilante"];
-// Horário próprio de posto (ver horarios.js): só como dica de exibição.
-const HORARIO_POSTO = { P601: { "VSPP Apoio": { inicio: "08:00", fim: "20:00" } }, P505: { Ronda: { inicio: "08:00", fim: "20:00" } } };
+// Postos de partida por projeto/turno: ver postos.js (hierarquia definida pelo Marcio).
+export function postosPadrao(projetoId, turno, dataISO = null) {
+  return postosDoProjeto(projetoId, turno, dataISO).map((p) => ({ rotulo: p.rotulo, horario: p.horario || null, lider: !!p.lider, cargos: p.cargos }));
+}
 
 let _seq = 0;
 const novoId = () => `p${Date.now().toString(36)}${(_seq++).toString(36)}`;
 
-export function postosPadrao(projetoId, turno) {
-  const lista = (BASE[projetoId] && BASE[projetoId][turno]) || GENERICO;
-  return lista.map((rotulo) => ({ rotulo, horario: (HORARIO_POSTO[projetoId] || {})[rotulo] || null }));
-}
-
-export function postoVazio(rotulo = "", horario = null) {
-  return { id: novoId(), rotulo, horario, pessoaId: "", pessoaNome: "", situacao: "presente", detalhe: {}, obs: "" };
+export function postoVazio(rotulo = "", horario = null, extra = {}) {
+  return { id: novoId(), rotulo, horario, pessoaId: "", pessoaNome: "", situacao: "presente", detalhe: {}, obs: "", ...extra };
 }
 
 export function novoMapa({ projetoId, data, turno, horario, base = null, agora = new Date() }) {
   const chave = chaveMapa(projetoId, data, turno);
-  const postos = base && base.postos && base.postos.length
-    ? base.postos.map((p) => ({ ...postoVazio(p.rotulo, p.horario || null), pessoaId: p.pessoaId || "", pessoaNome: p.pessoaNome || "" }))
-    : postosPadrao(projetoId, turno).map((p) => postoVazio(p.rotulo, p.horario));
+  // Estrutura SEMPRE pela definição atual do projeto; as pessoas vêm do último mapa só nos projetos 12x36
+  // (nos 4x2 a equipe muda a cada plantão, então não se repete ninguém).
+  const usaBase = projetoPuxaEquipe(projetoId) && base && base.postos && base.postos.length;
+  const defs = postosPadrao(projetoId, turno, data);
+  const doBase = (p) => (usaBase ? base.postos.find((b) => b.rotulo === p.rotulo || (defDoPosto(projetoId, turno, b.rotulo) || {}).rotulo === p.rotulo) : null);
+  const postos = defs.map((p) => {
+    const b = doBase(p);
+    return postoVazio(p.rotulo, p.horario, { lider: p.lider, cargos: p.cargos, pessoaId: (b && b.pessoaId) || "", pessoaNome: (b && b.pessoaNome) || "" });
+  });
+  if (usaBase) base.postos.forEach((b) => { // postos extras que o líder tinha incluído
+    if (!defDoPosto(projetoId, turno, b.rotulo) && !postos.some((p) => p.rotulo === b.rotulo)) postos.push(postoVazio(b.rotulo, b.horario || null, { pessoaId: b.pessoaId || "", pessoaNome: b.pessoaNome || "" }));
+  });
   const veiculos = base && base.veiculos && base.veiculos.length
     ? base.veiculos.map((v) => ({ id: v.id, rotulo: v.rotulo, kmAnterior: v.kmAtual ?? v.kmAnterior ?? null, kmAtual: null }))
     : [];
   return {
     id: chave, projetoId, data, turno, horario: horario || null, status: "rascunho",
     postos, material: { ...materialNovo(), ...(base && base.material && base.material.quantidades ? { quantidades: base.material.quantidades } : {}) }, veiculos,
+    preenchidoDe: usaBase ? { data: base.data || null, turno: base.turno || turno } : null,
     supervisao: null, resumo: "", observacoes: "",
     criadoEm: agora.toISOString(), atualizadoEm: agora.toISOString(), enviadoEm: null, enviadoPor: "",
   };
