@@ -29,42 +29,49 @@ function linhaPosto(p) {
   }
 }
 
+// Cada assunto é um bloco; os blocos saem separados por uma linha em branco (no WhatsApp ficava tudo junto).
 export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
-  const L = [];
-  L.push("*MAPA DE EQUIPE*");
-  L.push(`*Projeto:* ${cabecalhoProjeto(mapa.projetoId)}${nomeProjeto ? ` — ${nomeProjeto}` : ""}`);
-  L.push(`*Turno:* ${rotuloTurno(mapa.turno, mapa.horario)}`);
-  L.push(`*Data:* ${rotuloDia(mapa.data)}, ${dataBR(mapa.data)}`);
-  L.push("");
-  L.push("*Equipe:*");
-  (mapa.postos || []).forEach((p) => { L.push(linhaPosto(p)); if (p.obs && p.obs.trim()) L.push(`   ↳ ${p.obs.trim()}`); });
+  const blocos = [];
+  blocos.push([
+    "*MAPA DE EQUIPE*",
+    `*Projeto:* ${cabecalhoProjeto(mapa.projetoId)}${nomeProjeto ? ` — ${nomeProjeto}` : ""}`,
+    `*Turno:* ${rotuloTurno(mapa.turno, mapa.horario)}`,
+    `*Data:* ${rotuloDia(mapa.data)}, ${dataBR(mapa.data)}`,
+  ]);
+  const eq = ["*Equipe:*"];
+  (mapa.postos || []).forEach((p) => { eq.push(linhaPosto(p)); if (p.obs && p.obs.trim()) eq.push(`   ↳ ${p.obs.trim()}`); });
+  blocos.push(eq);
   const excPostos = (mapa.postos || []).filter((p) => p.situacao !== "presente" && ROTULO_SITUACAO[p.situacao]);
-  L.push("");
-  L.push(`*Faltas/atrasos/FT/trocas:* ${excPostos.length ? excPostos.map((p) => `${p.rotulo} — ${ROTULO_SITUACAO[p.situacao]}`).join("; ") : "Sem ocorrências"}`);
+  blocos.push([`*Faltas/atrasos/FT/trocas:* ${excPostos.length ? excPostos.map((p) => `${p.rotulo} — ${ROTULO_SITUACAO[p.situacao]}`).join("; ") : "Sem ocorrências"}`]);
   const mat = mapa.material || { semAlteracao: true };
   const exc = (mat.excecoes || []);
+  const m = [];
   if (mat.semAlteracao && !exc.length) {
-    L.push(`*Material (armamento, munição, rádios):* Sem alteração — conferido e disponível${mat.conferidos ? ` (${mat.conferidos})` : ""}`);
+    m.push(`*Material (armamento, munição, rádios):* Sem alteração — conferido e disponível${mat.conferidos ? ` (${mat.conferidos})` : ""}`);
   } else {
-    L.push("*Material (armamento, munição, rádios):* COM ALTERAÇÃO");
-    exc.forEach((e) => L.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — ${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}: ${(e.obs || "").trim()}`));
-    if ((mat.obs || "").trim()) L.push(`   ↳ ${mat.obs.trim()}`);
+    m.push("*Material (armamento, munição, rádios):* COM ALTERAÇÃO");
+    exc.forEach((e) => m.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — ${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}: ${(e.obs || "").trim()}`));
+    if ((mat.obs || "").trim()) m.push(`   ↳ ${mat.obs.trim()}`);
   }
   const qs = Object.values(mat.quantidades || {}).filter((q) => q && String(q.qtd).trim());
-  if (qs.length) L.push(`   Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
+  if (qs.length) m.push(`   Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
+  blocos.push(m);
+  // Veículo sem nenhuma leitura não vira linha (antes saía "Veículo 2: —").
+  const veic = [];
   (mapa.veiculos || []).forEach((v) => {
     const r = kmRodado(v);
     const partes = [];
     if (v.kmAnterior != null && v.kmAnterior !== "") partes.push(`anterior ${v.kmAnterior}`);
     if (v.kmAtual != null && v.kmAtual !== "") partes.push(`atual ${v.kmAtual}`);
     if (r != null) partes.push(`rodado ${r} km`);
-    L.push(`*${v.rotulo || "Veículo"}:* ${partes.length ? partes.join(" · ") : "—"}`);
+    if (partes.length) veic.push(`*${v.rotulo || "Veículo"}:* ${partes.join(" · ")}`);
   });
+  if (veic.length) blocos.push(veic);
   const s = mapa.supervisao;
-  L.push(`*Última visita da supervisão:* ${s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—"}`);
-  if (mapa.resumo && mapa.resumo.trim()) { L.push(""); L.push(`*Resumo da passagem:* ${mapa.resumo.trim()}`); }
-  if (mapa.observacoes && mapa.observacoes.trim()) L.push(`*Observações:* ${mapa.observacoes.trim()}`);
-  return L.join("\n");
+  blocos.push([`*Última visita da supervisão:* ${s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—"}`]);
+  if (mapa.resumo && mapa.resumo.trim()) blocos.push([`*Resumo da passagem:* ${mapa.resumo.trim()}`]);
+  if (mapa.observacoes && mapa.observacoes.trim()) blocos.push([`*Observações:* ${mapa.observacoes.trim()}`]);
+  return blocos.map((b) => b.join("\n")).join("\n\n");
 }
 
 export const linkWhatsApp = (texto) => `https://wa.me/?text=${encodeURIComponent(texto)}`;

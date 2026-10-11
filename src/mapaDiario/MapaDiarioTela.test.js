@@ -238,3 +238,14 @@ test("rascunho reaberto: não troca o que o líder já escolheu; 'Puxar de novo'
   expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("d"); // continua o manual
   expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c"); // preencheu o vazio
 });
+
+test("resumo cita extra sem exceção marcada: avisa uma vez e só envia no segundo toque", async () => {
+  await montar();
+  await digitar(q('textarea[aria-label="Resumo da passagem"]'), "A vigilante Rosemeire está de extra.");
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain('O resumo fala de "extra"');
+  expect(io.saveMapa).not.toHaveBeenCalled();
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(1);
+  expect(q('pre[aria-label="Texto do mapa"]')).not.toBeNull();
+});
