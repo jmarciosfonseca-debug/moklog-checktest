@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { paleta } from './MaturidadeResumo';
-import { primeiroRegistro, SUGESTOES_TREINAMENTO } from './maturidade';
+import { primeiroRegistro, SUGESTOES_TREINAMENTO, treinamentosLancados } from './maturidade';
 
 export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) {
   const c = paleta(dark);
@@ -10,6 +10,7 @@ export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) 
   const [desde, setDesde] = useState(equipe.historicoDesde || '');
   const [catalogo, setCatalogo] = useState(equipe.treinamentosEsperados || []);
   const primeiro = primeiroRegistro(equipe);
+  const lancados = treinamentosLancados(equipe);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const mudar = (n, patch) => setCatalogo(lista => lista.map((t, i) => i === n ? { ...t, ...patch } : t));
@@ -36,6 +37,7 @@ export default function ConfiguracaoMaturidade({ equipe, onSave, dark = true }) 
       <button type="button" style={botao} onClick={() => setCatalogo(lista => lista.filter((_, i) => i !== n))}>Retirar do catálogo</button>
     </fieldset>)}
     <button type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, { nome: '', obrigatorio: true }])}>Adicionar ao catálogo</button>
+    {lancados.some(l => !catalogo.some(t => t.nome.trim().toLowerCase() === l.nome.toLowerCase())) && <button type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, ...lancados.filter(l => !lista.some(t => t.nome.trim().toLowerCase() === l.nome.toLowerCase())).map(l => ({ nome: l.nome, obrigatorio: true }))])}>Importar dos treinamentos já lançados nas fichas ({lancados.length})</button>}
     <p style={mu}>Sugestões (edite e confirme antes de salvar):</p>
     {SUGESTOES_TREINAMENTO.filter(s => !catalogo.some(t => t.nome === s.nome)).map(s => <button key={s.nome} type="button" style={botao} onClick={() => setCatalogo(lista => [...lista, { ...s }])}>+ {s.nome}</button>)}
     <button type="button" style={{ ...botao, background: '#1d4ed8', color: '#fff', borderColor: '#1d4ed8' }} disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar configuração'}</button>

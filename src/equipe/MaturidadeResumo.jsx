@@ -56,13 +56,12 @@ export function ComoCompletar({ equipe, modelo, hoje, dark = true }) {
     const prim = primeiroRegistro(equipe), dias = prim ? diasEntre(prim, hoje) : null;
     let dica;
     if (!equipe.historicoDesde) dica = prim
-      ? (dias >= 90 ? `Sugestão: usar ${brData(prim)} (1º registro da equipe, ${dias} dias). Confirme que todas as faltas e folgas desde então foram lançadas.`
-        : `O 1º registro é de ${brData(prim)} (${dias} dias): faltam ${90 - dias} dias para o mínimo de 90. Até lá, "não aferido" é o correto.`)
-      : 'Ainda não há faltas, atrasos ou folgas lançados na equipe: lance-os nas fichas e defina a data de início.';
+      ? `O cálculo já usa automaticamente o 1º registro da equipe (${brData(prim)}, ${dias} dias de histórico). Faltam ${Math.max(0, 90 - dias)} dias para o mínimo de 90 — até lá, "não aferido" é o correto, não uma falha.`
+      : 'Ainda não há faltas, atrasos ou folgas lançados na equipe: lance-os nas fichas.';
     else dica = `Início definido em ${brData(equipe.historicoDesde)}, mas a cobertura ainda não chega a 90 dias (ou a data é inválida/futura).`;
-    faltando.push({ eixo: 'Assiduidade e Folga trabalhada', passo: 'Em "Configuração gerencial da maturidade", preencha "Histórico registrado desde" (mínimo de 90 dias de cobertura) e salve.', dica });
+    faltando.push({ eixo: 'Assiduidade e Folga trabalhada', passo: 'Lance faltas, atrasos e folgas trabalhadas nas fichas. O eixo é aferido sozinho quando o histórico completar 90 dias (ou fixe outra data em "Configuração gerencial").', dica });
   }
-  if (modelo.eixos.treinamento === null) faltando.push({ eixo: 'Conclusão dos obrigatórios', passo: 'Em "Configuração gerencial da maturidade", cadastre o catálogo de treinamentos exigidos (marque "Obrigatório", validade opcional) e salve. Depois lance cada treinamento na ficha, com o mesmo nome do catálogo.', dica: 'Há sugestões prontas na própria configuração (Brigada de incêndio, Tiro defensivo, Primeiros socorros) — edite conforme o posto.' });
+  if (modelo.eixos.treinamento === null) faltando.push({ eixo: 'Conclusão dos obrigatórios', passo: 'Em "Configuração gerencial da maturidade", cadastre o catálogo de treinamentos exigidos (marque "Obrigatório", validade opcional) e salve. Depois lance cada treinamento na ficha, com o mesmo nome do catálogo.', dica: 'Na configuração, o botão "Importar dos treinamentos já lançados nas fichas" monta o catálogo com o que a equipe já tem registrado; há também sugestões prontas — edite conforme o posto.' });
   if (!faltando.length) return null;
   const abrir = () => { const el = document.getElementById('cfg-maturidade'); if (el) { el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } };
   const t = dark ? { fg: '#fecaca', bg: '#1a0202', bd: '#ef4444' } : { fg: '#991b1b', bg: '#fef2f2', bd: '#dc2626' };
