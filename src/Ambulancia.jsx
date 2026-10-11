@@ -514,7 +514,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
 
         {/* KPIs */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
-          <Kpi S={S} valor={totalGeral} label="TOTAL" cor="#0ea5e9"/>
+          <Kpi S={S} valor={totalGeral} label="TOTAL HISTÓRICO" cor="#0ea5e9"/>
           <Kpi S={S} valor={totalDiurno} label="DIURNO" cor="#f59e0b"/>
           <Kpi S={S} valor={totalNoturno} label="NOTURNO" cor="#6366f1"/>
         </div>
