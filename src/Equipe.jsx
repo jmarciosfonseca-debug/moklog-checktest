@@ -2902,7 +2902,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
           {/* Aprovações liberadas ao LÍDER (aviso pulsando, lote, PDF) */}
           {liderAuth && !adminAuth && (
-            <PainelAprovacoesLider project={project} projectNome={projectNome} colaboradores={equipeData.colaboradores} onRegistrar={registrarWhats} dark={dark}/>
+            <PainelAprovacoesLider project={project} projectNome={`${project.id} · ${project.name||""}`} colaboradores={equipeData.colaboradores} onRegistrar={registrarWhats} dark={dark}/>
           )}
           {/* Consultor: PDFs consolidados (aprovados e histórico completo) */}
           {adminAuth && (
