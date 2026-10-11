@@ -71,7 +71,7 @@ const CARGOS_PROJETO = {
   P505:  ["VSPP Líder","VSPP Apoio","Vig CCO","CDA","Recepção"],
   P260A: ["VSPP Líder","VSPP Apoio","Vig CCO"],
   P260B: ["VSPP Líder","VSPP Apoio","Vig CCO"],
-  P260C: ["VSPP Líder","VSPP Apoio","Vig CCO","Cão de Guarda"],
+  P260C: ["VSPP Líder","VSPP Apoio","Vigilante","Vig CCO","Cão de Guarda"],
   P311A: ["Vigilante Líder","Vigilante Apoio","Vigilante Ronda","Porteiro CCO"],
   P311B: ["Vigilante Líder","Vigilante Apoio","Vigilante Ronda","Vig CCO"],
   P606:  ["Vigilante Líder","Vigilante Apoio","Vig CCO"],
