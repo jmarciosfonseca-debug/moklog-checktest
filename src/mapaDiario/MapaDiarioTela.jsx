@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, validarParaConcluir, pessoasRepetidas, kmRodado } from "./modelo";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
 
@@ -29,6 +29,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [avisos, setAvisos] = useState([]);
   const [copiado, setCopiado] = useState(false);
   const [abertos, setAbertos] = useState({});
+  const [itensMat, setItensMat] = useState([]);
+  const [matAberto, setMatAberto] = useState(false);
   const carregadoRef = useRef(false);
   const timer = useRef(null);
 
@@ -51,8 +53,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           const vis = await io.loadUltimaVisita(pid).catch(() => null);
           m = { ...m, supervisao: vis };
         }
+        const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
         if (!vivo) return;
-        setColabs(cs); setMapa(m);
+        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -86,7 +89,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     setAvisos(erros);
     if (erros.length) return;
     const agora = agoraFn().toISOString();
-    const final = { ...mapa, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
+    const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); }
     catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); }
   };
@@ -202,11 +205,71 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           </div>
 
           <div style={S.card}>
-            <div style={S.h}>Material, armamento e munição</div>
-            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: cor.txt }}>
-              <input type="checkbox" checked={!!mapa.material?.semAlteracao} onChange={(e) => alterar((m) => ({ ...m, material: { ...m.material, semAlteracao: e.target.checked } }))} /> Sem alteração
-            </label>
-            {!mapa.material?.semAlteracao && <textarea aria-label="O que mudou no material" rows={2} placeholder="O que mudou" value={mapa.material?.obs || ""} onChange={(e) => alterar((m) => ({ ...m, material: { ...m.material, obs: e.target.value } }))} style={{ ...S.in, marginTop: 8 }} />}
+            {(() => {
+              const mat = { ...materialNovo(), ...(mapa.material || {}) };
+              const exc = mat.excecoes || [];
+              const situacaoDe = (id) => (exc.find((e) => e.id === id) || {}).situacao || "ok";
+              const obsDe = (id) => (exc.find((e) => e.id === id) || {}).obs || "";
+              const setMat = (fn) => alterar((m) => ({ ...m, material: fn({ ...materialNovo(), ...(m.material || {}) }) }));
+              const grupos = itensMat.reduce((g, it) => { (g[it.rotuloCategoria] = g[it.rotuloCategoria] || []).push(it); return g; }, {});
+              const livres = exc.filter((e) => String(e.id).startsWith("livre:"));
+              const resumo = exc.length ? `${exc.length} com alteração` : mat.semAlteracao ? "Sem alteração · tudo disponível" : "Alterado";
+              const corRes = exc.length || !mat.semAlteracao ? "#f59e0b" : "#16a34a";
+              return (<>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ ...S.h, marginBottom: 2 }}>Material, armamento e munição</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: corRes }}>{resumo}</div>
+                    <div style={{ fontSize: 11, color: cor.txt2, marginTop: 2 }}>{itensMat.length ? `Lista do projeto: ${resumoItens(itensMat)}` : "Nenhum equipamento cadastrado neste projeto: complete em Equipamentos"}</div>
+                  </div>
+                  <button aria-expanded={matAberto} aria-label="Conferir material" onClick={() => setMatAberto((v) => !v)} style={S.btn}>{matAberto ? "Recolher ▴" : "Conferir ▾"}</button>
+                </div>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: cor.txt, marginTop: 10 }}>
+                  <input type="checkbox" disabled={exc.length > 0} checked={!!mat.semAlteracao && exc.length === 0} onChange={(e) => setMat((m) => ({ ...m, semAlteracao: e.target.checked }))} /> Sem alteração: conferi e está tudo disponível
+                </label>
+                {!mat.semAlteracao && exc.length === 0 && !matAberto && <textarea aria-label="O que mudou no material" rows={2} placeholder="O que mudou no material" value={mat.obs || ""} onChange={(e) => setMat((m) => ({ ...m, obs: e.target.value }))} style={{ ...S.in, marginTop: 8 }} />}
+                {matAberto && (
+                  <div style={{ marginTop: 10 }}>
+                    {itensMat.length === 0 && <div style={{ fontSize: 12, color: cor.txt2 }}>Sem equipamentos cadastrados neste projeto. Use "+ Outro item" para registrar uma anomalia.</div>}
+                    {Object.entries(grupos).map(([nomeGrupo, itens]) => (
+                      <div key={nomeGrupo} style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: cor.txt2, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>{nomeGrupo}</div>
+                        {itens.map((it) => {
+                          const sit = situacaoDe(it.id);
+                          return (
+                            <div key={it.id} style={{ borderTop: `1px solid ${cor.line}`, padding: "8px 0" }}>
+                              <div style={{ fontSize: 13, color: cor.txt, fontWeight: 700 }}>{it.nome}{it.detalhe ? <span style={{ color: cor.txt2, fontWeight: 500 }}> · {it.detalhe}</span> : null}</div>
+                              {it.cadastro && it.cadastro !== "ok" && <div style={{ fontSize: 11, color: "#f59e0b" }}>No cadastro de Equipamentos: {it.cadastro}</div>}
+                              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                                {SITUACOES_MATERIAL.map((o) => (
+                                  <button key={o.id} aria-pressed={sit === o.id} aria-label={`${it.nome}: ${o.rotulo}`} onClick={() => setMat((m) => definirSituacaoMaterial(m, it, o.id))} style={S.chip(sit === o.id, o.id === "ok" ? "#16a34a" : o.id === "anomalia" ? "#f59e0b" : "#dc2626")}>{o.rotulo}</button>
+                                ))}
+                              </div>
+                              {sit !== "ok" && <input aria-label={`Observação: ${it.nome}`} placeholder="Descreva o que houve (obrigatório)" value={obsDe(it.id)} onChange={(e) => setMat((m) => definirSituacaoMaterial(m, it, sit, e.target.value))} style={{ ...S.in, marginTop: 8 }} />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                    {livres.map((e) => (
+                      <div key={e.id} style={{ borderTop: `1px solid ${cor.line}`, padding: "8px 0" }}>
+                        <input aria-label="Nome do item" placeholder="Qual item?" value={e.nome} onChange={(ev) => setMat((m) => ({ ...m, excecoes: m.excecoes.map((x) => (x.id === e.id ? { ...x, nome: ev.target.value } : x)) }))} style={S.in} />
+                        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                          {SITUACOES_MATERIAL.filter((o) => o.id !== "ok").map((o) => (
+                            <button key={o.id} aria-pressed={e.situacao === o.id} onClick={() => setMat((m) => ({ ...m, excecoes: m.excecoes.map((x) => (x.id === e.id ? { ...x, situacao: o.id } : x)) }))} style={S.chip(e.situacao === o.id, o.id === "anomalia" ? "#f59e0b" : "#dc2626")}>{o.rotulo}</button>
+                          ))}
+                          <button aria-label="Remover item" onClick={() => setMat((m) => { const ex = m.excecoes.filter((x) => x.id !== e.id); return { ...m, excecoes: ex, semAlteracao: ex.length ? false : !(m.obs || "").trim() }; })} style={{ ...S.btn, padding: "6px 9px" }}>×</button>
+                        </div>
+                        <input aria-label={`Observação: ${e.nome || "item"}`} placeholder="Descreva o que houve (obrigatório)" value={e.obs || ""} onChange={(ev) => setMat((m) => ({ ...m, excecoes: m.excecoes.map((x) => (x.id === e.id ? { ...x, obs: ev.target.value } : x)) }))} style={{ ...S.in, marginTop: 8 }} />
+                      </div>
+                    ))}
+                    <button onClick={() => setMat((m) => ({ ...m, semAlteracao: false, excecoes: [...m.excecoes, { id: `livre:${Date.now().toString(36)}`, categoria: "outros", nome: "", detalhe: "", situacao: "anomalia", obs: "" }] }))} style={S.btn}>+ Outro item</button>
+                    <div style={S.lab}>Observação do material (opcional)</div>
+                    <textarea aria-label="Observação do material" rows={2} placeholder="Qualquer informação sobre armamento, munição ou rádios" value={mat.obs || ""} onChange={(e) => setMat((m) => ({ ...m, obs: e.target.value }))} style={S.in} />
+                  </div>
+                )}
+              </>);
+            })()}
           </div>
 
           <div style={S.card}>

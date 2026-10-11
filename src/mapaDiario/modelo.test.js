@@ -1,4 +1,4 @@
-import { novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas } from "./modelo";
+import { novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 const H = { inicio: "06:00", fim: "18:00" };
@@ -107,5 +107,73 @@ describe("texto do WhatsApp", () => {
   });
   test("link do WhatsApp codifica o texto", () => {
     expect(linkWhatsApp("a b\n*c*")).toBe("https://wa.me/?text=a%20b%0A*c*");
+  });
+});
+
+describe("material, armamento e munição", () => {
+  const eq = { armamento: [{ id: "a1", identificacao: "Arma 01", calibre: ".38", nSerie: "123", status: "ok" }], municao: [{ id: "m1", identificacao: "Munição .38", qtd: 24, status: "ok" }], radiosHT: [{ id: "r1", identificacao: "Rádio 01", status: "inop" }], placas: [] };
+  test("lista conferível vem do cadastro de Equipamentos, com detalhe e status do cadastro", () => {
+    const it = itensDeEquipamento(eq);
+    expect(it.map((i) => i.nome)).toEqual(["Arma 01", "Munição .38", "Rádio 01"]);
+    expect(it[0]).toMatchObject({ categoria: "armamento", detalhe: ".38 · nº 123", cadastro: "ok" });
+    expect(it[1].detalhe).toBe("24 un.");
+    expect(it[2].cadastro).toBe("inop");
+    expect(itensDeEquipamento(null)).toEqual([]);
+  });
+  test("anomalia tira o 'sem alteração'; voltar para disponível remove a exceção", () => {
+    const [arma] = itensDeEquipamento(eq);
+    let m = definirSituacaoMaterial(materialNovo(), arma, "anomalia", "Coronha trincada");
+    expect(m.semAlteracao).toBe(false);
+    expect(m.excecoes).toEqual([expect.objectContaining({ nome: "Arma 01", situacao: "anomalia", obs: "Coronha trincada" })]);
+    m = definirSituacaoMaterial(m, arma, "indisponivel");
+    expect(m.excecoes[0]).toMatchObject({ situacao: "indisponivel", obs: "Coronha trincada" });
+    m = definirSituacaoMaterial(m, arma, "ok");
+    expect(m.excecoes).toEqual([]);
+  });
+  test("conclusão exige observação em cada anomalia e nome no item livre", () => {
+    const base = preencher(mapa(), ["A", "B", "C"]);
+    const [arma] = itensDeEquipamento(eq);
+    const comAnom = { ...base, material: definirSituacaoMaterial(materialNovo(), arma, "anomalia", "") };
+    expect(validarParaConcluir(comAnom).join()).toMatch(/Material — Arma 01: descreva a anomalia/);
+    const ok = { ...base, material: definirSituacaoMaterial(materialNovo(), arma, "anomalia", "Coronha trincada") };
+    expect(validarParaConcluir(ok)).toEqual([]);
+    const indisp = { ...base, material: definirSituacaoMaterial(materialNovo(), arma, "indisponivel", "") };
+    expect(validarParaConcluir(indisp).join()).toMatch(/descreva a indisponibilidade/);
+    const livre = { ...base, material: { ...materialNovo(), semAlteracao: false, excecoes: [{ id: "livre:x", nome: "", situacao: "anomalia", obs: "x y z" }] } };
+    expect(validarParaConcluir(livre).join()).toMatch(/informe qual item/);
+    const semMarca = { ...base, material: { ...materialNovo(), semAlteracao: false } };
+    expect(validarParaConcluir(semMarca).join()).toMatch(/marque "Sem alteração" ou descreva/);
+  });
+  test("no WhatsApp: sem alteração = conferido; com exceção lista item, situação e observação", () => {
+    const base = preencher(mapa(), ["A", "B", "C"]);
+    expect(montarTextoWhatsApp(base)).toContain("Sem alteração — conferido e disponível");
+    const [arma, mun] = itensDeEquipamento(eq);
+    let m = definirSituacaoMaterial(materialNovo(), arma, "anomalia", "Coronha trincada");
+    m = definirSituacaoMaterial(m, mun, "indisponivel", "Faltam 6 munições");
+    const t = montarTextoWhatsApp({ ...base, material: { ...m, obs: "Acionado o armeiro" } });
+    expect(t).toContain("COM ALTERAÇÃO");
+    expect(t).toContain("• Arma 01 (.38 · nº 123) — ANOMALIA: Coronha trincada");
+    expect(t).toContain("• Munição .38 (24 un.) — INDISPONÍVEL: Faltam 6 munições");
+    expect(t).toContain("↳ Acionado o armeiro");
+    expect(t).not.toContain("Sem alteração — conferido");
+  });
+});
+
+describe("lista de material por projeto", () => {
+  const eq = { armamento: [{ id: "a1", identificacao: "Arma 01" }, { id: "a2", identificacao: "Arma 02" }], municao: [{ id: "m1", identificacao: "Munição" }], bodycam: [{ id: "b1", identificacao: "Bodycam 01" }], ztrax: [{ id: "z1", identificacao: "ZTRAX 1" }] };
+  test("bodycam e ZTRAX só aparecem no P311A/P311B", () => {
+    expect(itensDeEquipamento(eq, "P311A").map((i) => i.nome)).toContain("Bodycam 01");
+    expect(itensDeEquipamento(eq, "P311B").map((i) => i.nome)).toContain("ZTRAX 1");
+    const p601 = itensDeEquipamento(eq, "P601").map((i) => i.nome);
+    expect(p601).not.toContain("Bodycam 01");
+    expect(p601).not.toContain("ZTRAX 1");
+    expect(p601).toEqual(["Arma 01", "Arma 02", "Munição"]);
+  });
+  test("resumo mostra o que existe no projeto; vai no texto do WhatsApp quando está tudo ok", () => {
+    expect(resumoItens(itensDeEquipamento(eq, "P601"))).toBe("Armamento 2 · Munição 1");
+    expect(resumoItens([])).toBe("");
+    const m = preencher(mapa(), ["A", "B", "C"]);
+    const t = montarTextoWhatsApp({ ...m, material: { ...materialNovo(), conferidos: "Armamento 2 · Munição 1" } });
+    expect(t).toContain("Sem alteração — conferido e disponível (Armamento 2 · Munição 1)");
   });
 });

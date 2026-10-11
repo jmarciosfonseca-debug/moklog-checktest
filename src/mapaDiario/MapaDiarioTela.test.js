@@ -21,6 +21,7 @@ const montar = async (extra = {}) => {
     loadColaboradores: jest.fn(async () => colabs),
     loadMapa: jest.fn(async () => null),
     loadUltimoMapa: jest.fn(async () => ({ postos: [{ rotulo: "L1", pessoaId: "a", pessoaNome: "Luiz D." }, { rotulo: "P1", pessoaId: "b", pessoaNome: "Marta A." }, { rotulo: "P2", pessoaId: "c", pessoaNome: "Ari A." }], veiculos: [{ id: "m", rotulo: "Moto", kmAtual: 1200 }] })),
+    loadEquipamentos: jest.fn(async () => ({ armamento: [{ id: "a1", identificacao: "Arma 01", calibre: ".38", nSerie: "123", status: "ok" }], municao: [{ id: "m1", identificacao: "Munição .38", qtd: 24, status: "ok" }] })),
     loadUltimaVisita: jest.fn(async () => ({ ultimaData: "2026-10-09", supervisor: "Marcio", turno: "Diurno" })),
     saveMapa: jest.fn(async (m) => { salvos.push(m); return { ...m, atualizadoEm: "x" }; }),
     ...extra,
@@ -103,4 +104,54 @@ test("erro ao abrir não destrói nada e avisa", async () => {
   await montar({ loadColaboradores: jest.fn(async () => { throw new Error("x"); }) });
   expect(q('[role="alert"]').textContent).toContain("Não consegui abrir o mapa agora");
   expect(io.saveMapa).not.toHaveBeenCalled();
+});
+
+test("material: botão Conferir expande a lista do cadastro e anomalia exige observação", async () => {
+  await montar();
+  expect(host.textContent).toContain("Sem alteração · tudo disponível");
+  expect(host.textContent).not.toContain("Arma 01");
+  expect(host.textContent).toContain("Lista do projeto: Armamento 1 · Munição 1");
+  await clicar(q('button[aria-label="Conferir material"]'));
+  expect(host.textContent).toContain("Arma 01");
+  expect(host.textContent).toContain(".38 · nº 123");
+  await clicar(q('button[aria-label="Arma 01: Anomalia"]'));
+  expect(host.textContent).toContain("1 com alteração");
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain("Material — Arma 01: descreva a anomalia");
+  expect(io.saveMapa).not.toHaveBeenCalled();
+  await digitar(q('input[aria-label="Observação: Arma 01"]'), "Coronha trincada");
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(1);
+  const t = q('pre[aria-label="Texto do mapa"]').textContent;
+  expect(t).toContain("• Arma 01 (.38 · nº 123) — ANOMALIA: Coronha trincada");
+  expect(salvos[0].material.excecoes[0]).toMatchObject({ situacao: "anomalia", obs: "Coronha trincada" });
+});
+test("material: item novo fora do cadastro e voltar para Disponível limpa a exceção", async () => {
+  await montar();
+  await clicar(q('button[aria-label="Conferir material"]'));
+  await clicar(botao("+ Outro item"));
+  expect(q('input[aria-label="Nome do item"]')).not.toBeNull();
+  await clicar(q('button[aria-label="Remover item"]'));
+  expect(host.textContent).toContain("Sem alteração · tudo disponível");
+  await clicar(q('button[aria-label="Munição .38: Indisponível"]'));
+  expect(host.textContent).toContain("1 com alteração");
+  await clicar(q('button[aria-label="Munição .38: Disponível"]'));
+  expect(host.textContent).toContain("Sem alteração · tudo disponível");
+});
+test("sem cadastro de equipamentos a tela avisa e ainda deixa registrar anomalia", async () => {
+  await montar({ loadEquipamentos: jest.fn(async () => null) });
+  await clicar(q('button[aria-label="Conferir material"]'));
+  expect(host.textContent).toContain("Sem equipamentos cadastrados neste projeto");
+  expect(botao("+ Outro item")).toBeDefined();
+});
+
+test("tudo ok: conclui sem observação e o texto diz o que foi conferido; sem cadastro avisa", async () => {
+  await montar();
+  await clicar(botao("Concluir mapa"));
+  expect(q('pre[aria-label="Texto do mapa"]').textContent).toContain("Sem alteração — conferido e disponível (Armamento 1 · Munição 1)");
+  expect(salvos[0].material.conferidos).toBe("Armamento 1 · Munição 1");
+});
+test("projeto sem equipamentos cadastrados mostra aviso no cabeçalho do material", async () => {
+  await montar({ loadEquipamentos: jest.fn(async () => null) });
+  expect(host.textContent).toContain("Nenhum equipamento cadastrado neste projeto: complete em Equipamentos");
 });

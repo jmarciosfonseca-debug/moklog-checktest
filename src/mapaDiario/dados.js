@@ -23,6 +23,12 @@ export async function loadColaboradores(pid, hojeISO) {
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
 
+// Cadastro de Equipamentos do projeto (somente leitura) para conferir o material no mapa.
+export async function loadEquipamentos(pid) {
+  const snap = await getDoc(doc(db(), "equipamentos", pid));
+  return snap.exists() ? snap.data() : null;
+}
+
 export async function loadMapa(pid, chave) {
   const snap = await getDoc(doc(db(), "equipes", pid, "mapas", chave));
   return snap.exists() ? snap.data() : null;
