@@ -1,0 +1,42 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<filter id="diag-glow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#38BDF8" flood-opacity="0.95"/></filter>
+<filter id="diag-shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="-8" dy="16" stdDeviation="13" flood-color="#010B1A" flood-opacity="0.9"/></filter>
+<linearGradient id="diag-base" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#0F2A4D"/><stop offset="45%" stop-color="#0B1F3A"/><stop offset="100%" stop-color="#040D1C"/></linearGradient>
+<radialGradient id="diag-bg-glow" cx="30%" cy="22%" r="80%"><stop offset="0%" stop-color="#0EA5E9" stop-opacity="0.34"/><stop offset="55%" stop-color="#0369A1" stop-opacity="0.12"/><stop offset="100%" stop-color="#0EA5E9" stop-opacity="0"/></radialGradient>
+<linearGradient id="diag-rim" x1="15%" y1="10%" x2="85%" y2="90%"><stop offset="0%" stop-color="#E0F2FE" stop-opacity="0.95"/><stop offset="28%" stop-color="#38BDF8" stop-opacity="0.85"/><stop offset="62%" stop-color="#0369A1" stop-opacity="0.4"/><stop offset="100%" stop-color="#082F49" stop-opacity="0.15"/></linearGradient>
+<linearGradient id="diag-spec" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.26"/><stop offset="35%" stop-color="#7DD3FC" stop-opacity="0.06"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+<linearGradient id="diag-ring" x1="10%" y1="0%" x2="90%" y2="100%"><stop offset="0%" stop-color="#E0F2FE"/><stop offset="35%" stop-color="#38BDF8"/><stop offset="100%" stop-color="#0369A1"/></linearGradient>
+<linearGradient id="diag-steel" x1="10%" y1="0%" x2="90%" y2="100%"><stop offset="0%" stop-color="#7C93B3"/><stop offset="45%" stop-color="#2B4770"/><stop offset="100%" stop-color="#0D1F3C"/></linearGradient>
+<radialGradient id="diag-lens" cx="42%" cy="38%" r="70%"><stop offset="0%" stop-color="#0E4B7C" stop-opacity="0.95"/><stop offset="65%" stop-color="#072A4B" stop-opacity="0.95"/><stop offset="100%" stop-color="#030F22"/></radialGradient>
+<linearGradient id="diag-sweep" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#38BDF8" stop-opacity="0.6"/><stop offset="100%" stop-color="#38BDF8" stop-opacity="0"/></linearGradient>
+<radialGradient id="diag-dot" cx="38%" cy="34%" r="70%"><stop offset="0%" stop-color="#fff"/><stop offset="55%" stop-color="#BAE6FD"/><stop offset="100%" stop-color="#0EA5E9"/></radialGradient>
+<clipPath id="diag-clip"><rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/></clipPath>
+<clipPath id="diag-lens-clip"><circle cx="512" cy="512" r="168"/></clipPath>
+</defs>
+<g clip-path="url(#diag-clip)">
+<rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#diag-base)"/>
+<rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#diag-bg-glow)"/>
+<rect x="51.2" y="51.2" width="921.6" height="460" fill="url(#diag-spec)"/>
+</g>
+<rect x="55" y="55" width="914" height="914" rx="199" ry="199" fill="none" stroke="url(#diag-rim)" stroke-width="7"/>
+<g filter="url(#diag-shadow)">
+<g fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g stroke="url(#diag-steel)" stroke-width="46"><path d="M345 392 H268 C198 392 156 444 156 512 C156 580 198 632 268 632 H345"/><g transform="translate(1024 0) scale(-1 1)"><path d="M345 392 H268 C198 392 156 444 156 512 C156 580 198 632 268 632 H345"/></g></g>
+<g stroke="#BAE6FD" stroke-opacity="0.55" stroke-width="4" transform="translate(0 -17)"><path d="M345 392 H268 C198 392 156 444 156 512 C156 580 198 632 268 632 H345"/></g>
+<g stroke="#BAE6FD" stroke-opacity="0.55" stroke-width="4" transform="translate(1024 -17) scale(-1 1)"><path d="M345 392 H268 C198 392 156 444 156 512 C156 580 198 632 268 632 H345"/></g>
+</g>
+<circle cx="512" cy="512" r="168" fill="url(#diag-lens)"/>
+</g>
+<g clip-path="url(#diag-lens-clip)">
+<path d="M512 512 L400 318 A224 224 0 0 1 700 392 Z" fill="url(#diag-sweep)"/>
+<circle cx="512" cy="512" r="112" fill="none" stroke="#38BDF8" stroke-opacity="0.5" stroke-width="3" stroke-dasharray="4 10"/>
+<path d="M344 512 H430 L452 462 L486 560 L512 512 H680" fill="none" stroke="#7DD3FC" stroke-opacity="0.8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="450" cy="400" rx="100" ry="44" fill="#fff" opacity="0.09" transform="rotate(-25 450 400)"/>
+</g>
+<g fill="none" stroke="url(#diag-ring)" stroke-width="44" filter="url(#diag-glow)"><path d="M705.6 542.7 A196 196 0 0 1 542.7 705.6"/><path d="M481.3 705.6 A196 196 0 0 1 318.4 542.7"/><path d="M318.4 481.3 A196 196 0 0 1 481.3 318.4"/><path d="M542.7 318.4 A196 196 0 0 1 705.6 481.3"/></g>
+<g stroke="#F0F9FF" stroke-opacity="0.45" stroke-width="3" fill="none"><circle cx="512" cy="512" r="174" /></g>
+<g fill="#7DD3FC" filter="url(#diag-glow)"><rect x="498" y="168" width="28" height="104" rx="10"/><rect x="498" y="752" width="28" height="104" rx="10"/></g>
+<g filter="url(#diag-glow)"><circle cx="512" cy="512" r="46" fill="none" stroke="#7DD3FC" stroke-opacity="0.8" stroke-width="4"/><circle cx="512" cy="512" r="30" fill="url(#diag-dot)"/></g>
+<circle cx="640" cy="404" r="8" fill="#F0F9FF" filter="url(#diag-glow)"/>
+</svg>
