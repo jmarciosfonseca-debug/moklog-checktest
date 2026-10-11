@@ -111,6 +111,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
   const [loading, setLoading] = useState(true);
   const [fonte, setFonte] = useState("servidor"); // servidor | aparelho | erro
   const [recarga, setRecarga] = useState(0);
+  const [erroCod, setErroCod] = useState("");
   const [saving, setSaving] = useState(false);
   const [screen, setScreen] = useState("list"); // list | form
   const [form, setForm] = useState(blankReg());
@@ -138,7 +139,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
       let res = null, origem = "servidor";
       const comLimite = (p, ms) => Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error("tempo esgotado")), ms))]);
       for(let i=0;i<2 && !res;i++){
-        try{ res = await comLimite(lerTudo(true), 8000); }catch(e){ console.warn("load ambulancia (servidor) tentativa "+(i+1), e); }
+        try{ res = await comLimite(lerTudo(true), 8000); }catch(e){ console.warn("load ambulancia (servidor) tentativa "+(i+1), e); setErroCod((e&&(e.code||e.message))||"erro"); }
       }
       if(!res){
         try{ res = await comLimite(lerTudo(false), 5000); origem = "aparelho"; }catch(e){ console.warn("load ambulancia (aparelho):", e); }
@@ -545,6 +546,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           <div style={{ margin:"0 0 12px", padding:"12px 14px", borderRadius:12, border:"1px solid #f59e0b88", background:"#f59e0b18", color:dark?"#fcd34d":"#92400e", fontSize:13, lineHeight:1.4 }}>
             <strong>{fonte==="erro" ? "Não foi possível carregar o histórico." : "Sem conexão com o servidor."}</strong>{" "}
             {fonte==="erro" ? "Seus registros NÃO foram apagados — a tela só não conseguiu buscá-los." : "Mostrando o que está salvo neste aparelho — pode estar incompleto."}
+            {erroCod && <div style={{ fontSize:11, opacity:.75, marginTop:4 }}>Detalhe técnico: {String(erroCod).slice(0,120)}</div>}
             <div>{fonte==="erro" && <button onClick={reparar} style={{ marginTop:8, marginRight:8, padding:"8px 14px", borderRadius:8, border:"1px solid #f59e0b", background:"#f59e0b", color:"#1a1000", fontWeight:800, cursor:"pointer" }}>Reparar conexão</button>}<button onClick={()=>setRecarga(n=>n+1)} style={{ marginTop:8, padding:"8px 14px", borderRadius:8, border:"1px solid #f59e0b", background:"transparent", color:"inherit", fontWeight:800, cursor:"pointer" }}>Tentar novamente</button></div>
           </div>
         )}
