@@ -1,4 +1,4 @@
-import { Ico } from "./Icones";
+import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
@@ -758,7 +758,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           <button key={t.k} onClick={()=>setScreen(t.k)}
             style={{...S.btnSm, flex:1, padding:"9px 6px", fontSize:12,
               ...(screen===t.k ? { background:"linear-gradient(135deg,#b45309,#92400e)", color:"#fff", border:"none" } : {})}}>
-            {t.label}
+            <IcoTxt>{t.label}</IcoTxt>
           </button>
         ))}
       </div>
@@ -1053,7 +1053,7 @@ export default function Ocorrencias({ project, onBack, dark, onToggleTheme, shar
           <div style={S.card}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4}}>
               <label style={{...S.lbl, marginBottom:0}}>Detalhamento</label>
-              <button onClick={gerarRascunho} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f633"}}>✨ Gerar rascunho</button>
+              <button onClick={gerarRascunho} style={{...S.btnSm, color:"#3b82f6", borderColor:"#3b82f633"}}><Ico n="estrela"/> Gerar rascunho</button>
             </div>
             <textarea rows={6} value={form.detalhamento}
               onChange={e=>setF("detalhamento",e.target.value)}

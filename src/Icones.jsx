@@ -114,3 +114,23 @@ export const EMOJI_PARA_ICONE = Object.freeze({
   "🔴": "pontoVermelho", "🟢": "pontoVerde", "🟡": "pontoAmarelo", "🟠": "pontoLaranja",
   "🔵": "pontoAzul", "🟣": "pontoRoxo", "⚫": "pontoPreto",
 });
+
+// Converte emoji inicial de um texto/rótulo em ícone de linha (quando mapeado).
+// Ex.: <IcoTxt>{"☀️ Diurno"}</IcoTxt> → [sol] Diurno. Sem mapa, mantém o texto.
+const _EMOJI_INI = /^(\p{Extended_Pictographic}|[✓✗✔✖])️?\s*/u;
+export function icoDe(emoji) {
+  const k = String(emoji || "").replace(/️/g, "");
+  return EMOJI_PARA_ICONE[k] || null;
+}
+export function IcoTxt({ children }) {
+  const s = typeof children === "string" ? children : null;
+  if (s === null) return children;
+  const m = s.match(_EMOJI_INI);
+  const n = m && icoDe(m[1]);
+  if (!n) return s;
+  return <><Ico n={n} />{" "}{s.slice(m[0].length)}</>;
+}
+export function EmIco({ e }) {
+  const n = icoDe(e);
+  return n ? <Ico n={n} /> : <>{e}</>;
+}

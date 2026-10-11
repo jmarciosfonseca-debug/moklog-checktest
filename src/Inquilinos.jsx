@@ -1,4 +1,4 @@
-import { Ico } from "./Icones";
+import { Ico, IcoTxt } from "./Icones";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -232,7 +232,7 @@ export default function Inquilinos({ project, onBack, dark, sharedAuth, onAuthGr
                     background:filtro===k?"#1d4ed822":"transparent",
                     color:filtro===k?"#60a5fa":(dark?"#94a3b8":"#64748b"),
                     borderColor:filtro===k?"#1d4ed866":(dark?"#0f172a":"#e2e8f0")
-                  }}>{l}</button>
+                  }}><IcoTxt>{l}</IcoTxt></button>
               ))}
             </div>
           </div>

@@ -403,7 +403,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
         <button onClick={()=>setScreen("main")} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
         <div style={{...S.card,border:"1px solid #ef444433",marginTop:6}}>
           <div style={{fontSize:11,fontWeight:800,color:"#ef4444",marginBottom:6}}>ZONA DE PERIGO</div>
-          {confirmLimpar===0 && <button onClick={()=>setConfirmLimpar(1)} style={{...S.btnSec,fontSize:13,color:"#ef4444",borderColor:"#ef444433"}}>🧹 Limpar tudo deste projeto</button>}
+          {confirmLimpar===0 && <button onClick={()=>setConfirmLimpar(1)} style={{...S.btnSec,fontSize:13,color:"#ef4444",borderColor:"#ef444433"}}><Ico n="lixeira"/> Limpar tudo deste projeto</button>}
           {confirmLimpar===1 && (
             <>
               <div style={{fontSize:12,...S.txt,marginBottom:8}}>Apagar TODOS os quadrantes e pontos de iluminação do {project.id}? O mapa configurado é mantido.</div>
@@ -418,7 +418,7 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
               <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginBottom:8}}>Última confirmação — essa ação não pode ser desfeita.</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>setConfirmLimpar(0)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-                <button onClick={limparTudo} disabled={saving} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>{saving?"Limpando…":"🧹 Apagar tudo"}</button>
+                <button onClick={limparTudo} disabled={saving} style={{...S.btn,flex:1,fontSize:13,background:"linear-gradient(135deg,#dc2626,#991b1b)"}}>{saving?"Limpando…":"Apagar tudo"}</button>
               </div>
             </>
           )}

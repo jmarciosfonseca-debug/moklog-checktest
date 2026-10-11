@@ -1,4 +1,4 @@
-import { Ico } from "./Icones";
+import { Ico, EmIco, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -390,7 +390,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
                 border:`1px solid ${filtroTurno===key?"#0ea5e9":(dark?"#0f172a":"#e2e8f0")}`,
                 background:filtroTurno===key?"#0ea5e922":(dark?"#020510":"#fff"),
                 color:filtroTurno===key?"#0ea5e9":(dark?"#64748b":"#94a3b8")}}>
-              {label}
+              <IcoTxt>{label}</IcoTxt>
             </button>
           ))}
         </div>
@@ -412,7 +412,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
                       border:`1px solid ${novaVisita.turno===t?(t==="Diurno"?"#f59e0b":"#6366f1"):(dark?"#0f172a":"#e2e8f0")}`,
                       background:novaVisita.turno===t?(t==="Diurno"?"#f59e0b22":"#6366f122"):(dark?"#020510":"#fff"),
                       color:novaVisita.turno===t?(t==="Diurno"?"#f59e0b":"#818cf8"):(dark?"#64748b":"#94a3b8")}}>
-                    {icon} {t}
+                    <EmIco e={icon}/> {t}
                   </button>
                 ))}
               </div>

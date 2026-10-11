@@ -1,4 +1,4 @@
-import { Ico } from "./Icones";
+import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ════════════════════════════════════════════════════════════════════════
@@ -370,7 +370,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                           return <span key={tk} style={{fontSize:10,fontWeight:700,color:tag.cor,background:tag.cor+"22",padding:"2px 8px",borderRadius:6}}>{tk==="outro"?"Outro":tag.label}</span>;
                         })}
                         {getImpactos(r).map(imp=>(
-                          <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 8px",borderRadius:6}}>{labelImpacto(imp)}</span>
+                          <span key={imp} style={{fontSize:10,fontWeight:700,color:"#0ea5e9",background:"#0ea5e922",padding:"2px 8px",borderRadius:6}}><IcoTxt>{labelImpacto(imp)}</IcoTxt></span>
                         ))}
                       </div>
                       {tipos.includes("outro")&&r.tipoCustom&&<div style={{fontSize:12,...S.txt,marginBottom:3}}>{r.tipoCustom}</div>}
@@ -525,7 +525,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
                 return (
                   <button key={k} onClick={()=>setImpactos(prev=> prev.includes(k) ? prev.filter(x=>x!==k) : [...prev,k])}
                     style={{flex:1,padding:"10px",borderRadius:8,fontSize:13,fontWeight:700,cursor:"pointer",border:`2px solid ${sel?"#0ea5e9":dark?"#1e293b":"#e2e8f0"}`,background:sel?"#0ea5e922":dark?"#020510":"#fff",color:sel?"#0ea5e9":dark?"#94a3b8":"#64748b"}}>
-                    {sel?<><Ico n="check"/>{" "}</>:""}{lb}
+                    {sel?<><Ico n="check"/>{" "}</>:""}<IcoTxt>{lb}</IcoTxt>
                   </button>
                 );
               })}

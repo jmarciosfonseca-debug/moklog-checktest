@@ -14,7 +14,7 @@
 // gerencial. Este painel apenas consolida e detalha.
 // ─────────────────────────────────────────────────────────────
 
-import { Ico } from "./Icones";
+import { Ico, EmIco } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -204,7 +204,7 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
   );
   const CardTitle = ({ icon, children, onOpen, openLabel }) => (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-      <div style={{ fontSize:14, fontWeight:800, color:txt }}>{icon} {children}</div>
+      <div style={{ fontSize:14, fontWeight:800, color:txt, display:"flex", alignItems:"center", gap:6 }}><EmIco e={icon}/> {children}</div>
       {onOpen && <button onClick={onOpen} style={{ background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"5px 10px", fontSize:11, cursor:"pointer", fontWeight:600 }}>{openLabel}</button>}
     </div>
   );
