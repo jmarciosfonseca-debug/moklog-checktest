@@ -15,7 +15,8 @@ const colabs = [
   { id: "d", nome: "Joao V.", cargo: "Vigilante Ronda", turno: "Folguista", emFerias: false },
 ];
 let host, root, io, salvos;
-const montar = async (extra = {}) => {
+const montar = async (extraTodo = {}) => {
+  const { __pid, ...extra } = extraTodo;
   salvos = [];
   io = {
     loadColaboradores: jest.fn(async () => colabs),
@@ -26,7 +27,7 @@ const montar = async (extra = {}) => {
     saveMapa: jest.fn(async (m) => { salvos.push(m); return { ...m, atualizadoEm: "x" }; }),
     ...extra,
   };
-  await act(async () => root.render(<MapaDiarioTela project={{ id: "P311B", name: "Mega Itajaí B" }} dark onBack={() => {}} io={io} agoraFn={() => AGORA} />));
+  await act(async () => root.render(<MapaDiarioTela project={{ id: __pid || "P311B", name: "Mega Itajaí B" }} dark onBack={() => {}} io={io} agoraFn={() => AGORA} />));
   await act(async () => { await Promise.resolve(); });
 };
 beforeEach(() => { jest.useFakeTimers("modern"); jest.setSystemTime(AGORA); host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host); });
@@ -155,4 +156,24 @@ test("tudo ok: conclui sem observação e o texto diz o que foi conferido; sem c
 test("sem cadastro, a lista de referência do projeto (base do Codex) aparece no cabeçalho do material", async () => {
   await montar({ loadEquipamentos: jest.fn(async () => null) });
   expect(host.textContent).toContain("Lista do projeto: Armamento 2 · Munição 1 · Placas balísticas 4");
+});
+
+test("P601: placas sem quantidade na base — líder informa, não conclui sem, e vai no WhatsApp", async () => {
+  await montar({ __pid: "P601", loadEquipamentos: jest.fn(async () => null) });
+  expect(q('input[aria-label="Quantidade: Par de placas balísticas"]')).not.toBeNull();
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain("Material — informe a quantidade de Par de placas balísticas");
+  expect(io.saveMapa).not.toHaveBeenCalled();
+  await digitar(q('input[aria-label="Quantidade: Par de placas balísticas"]'), "3");
+  await clicar(botao("Concluir mapa"));
+  expect(q('pre[aria-label="Texto do mapa"]').textContent).toContain("Quantidades conferidas: Par de placas balísticas 3");
+  expect(salvos[0].material.quantidades["placas:Par de placas balísticas"]).toEqual({ nome: "Par de placas balísticas", qtd: "3" });
+});
+test("P601: a quantidade informada abre preenchida no próximo mapa", async () => {
+  await montar({ __pid: "P601", loadEquipamentos: jest.fn(async () => null), loadUltimoMapa: jest.fn(async () => ({ postos: [], veiculos: [], material: { quantidades: { "placas:Par de placas balísticas": { nome: "Par de placas balísticas", qtd: "3" } } } })) });
+  expect(q('input[aria-label="Quantidade: Par de placas balísticas"]').value).toBe("3");
+});
+test("P311B: sem item de quantidade desconhecida não aparece o bloco de contagem", async () => {
+  await montar();
+  expect(host.textContent).not.toContain("CONTE E INFORME A QUANTIDADE");
 });

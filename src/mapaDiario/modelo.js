@@ -58,7 +58,7 @@ export function novoMapa({ projetoId, data, turno, horario, base = null, agora =
     : [];
   return {
     id: chave, projetoId, data, turno, horario: horario || null, status: "rascunho",
-    postos, material: materialNovo(), veiculos,
+    postos, material: { ...materialNovo(), ...(base && base.material && base.material.quantidades ? { quantidades: base.material.quantidades } : {}) }, veiculos,
     supervisao: null, resumo: "", observacoes: "",
     criadoEm: agora.toISOString(), atualizadoEm: agora.toISOString(), enviadoEm: null, enviadoPor: "",
   };
@@ -110,6 +110,13 @@ export function resumoItens(itens) {
   return [...cont.entries()].map(([k, n]) => `${k} ${n}`).join(" · ");
 }
 
+// Itens que o líder precisa contar e informar (quantidade desconhecida na base).
+export const itensContaveis = (itens) => (itens || []).filter((i) => i.contar);
+export function definirQuantidade(material, item, qtd) {
+  const base = { ...materialNovo(), ...(material || {}) };
+  return { ...base, quantidades: { ...(base.quantidades || {}), [item.chaveQtd]: { nome: item.nome, qtd: String(qtd) } } };
+}
+
 // Atualiza a situação de um item (ok remove a exceção). Mantém `semAlteracao` coerente.
 export function definirSituacaoMaterial(material, item, situacao, obs) {
   const base = { ...materialNovo(), ...(material || {}) };
@@ -129,7 +136,7 @@ export function kmRodado(v) {
 }
 
 // Validação para concluir. Devolve lista de textos curtos; vazia = pode concluir.
-export function validarParaConcluir(mapa) {
+export function validarParaConcluir(mapa, itensContaveis = []) {
   const erros = [];
   (mapa.postos || []).forEach((p) => {
     const nome = p.rotulo || "Posto";
@@ -146,6 +153,10 @@ export function validarParaConcluir(mapa) {
   (mat.excecoes || []).forEach((e) => {
     if (!(e.nome || "").trim()) { erros.push("Material: informe qual item tem anomalia"); return; }
     if (!e.obs || e.obs.trim().length < 3) erros.push(`Material — ${e.nome}: descreva a ${e.situacao === "indisponivel" ? "indisponibilidade" : "anomalia"}`);
+  });
+  (itensContaveis || []).forEach((it) => {
+    const q = Number(String((mat.quantidades || {})[it.chaveQtd]?.qtd ?? "").replace(",", "."));
+    if (!(q > 0)) erros.push(`Material — informe a quantidade de ${it.nome}`);
   });
   if (!mat.semAlteracao && !(mat.excecoes || []).length && !(mat.obs || "").trim()) erros.push('Material: marque "Sem alteração" ou descreva o que mudou');
   (mapa.veiculos || []).forEach((v) => {

@@ -4,6 +4,8 @@
 // (ex.: bodycam só no P311A). Quantidade null = o mapa não informou o número.
 // Quando o cadastro de Equipamentos do projeto tem itens de uma categoria, o cadastro (com
 // identificação/nº de série) substitui a linha genérica desta base naquela categoria.
+// Itens sem quantidade conhecida (null) e contáveis são marcados no mapa para o líder informar e salvar
+// (fica gravada no mapa e abre preenchida nos próximos). Documentação e carga não são contáveis.
 // Item: [categoria, nome, quantidade|null, detalhe]. Turno: base.D / base.N ou base.todos.
 const REV38 = ["armamento", "Revólver .38"];
 const PLACAS = ["placas", "Par de placas balísticas"];
@@ -29,6 +31,8 @@ export const MATERIAL_BASE = {
   P260C: { todos: [["outros", "Algemas", null], ["armamento", "Pistola .380", 1], ["armamento", "Revólver .38", 1], ["armamento", "Carregador", null], ["municao", "Munição", null], ["outros", "Jet loader", null], [...PLACAS, null]] },
 };
 
+const NAO_CONTAVEL = new Set(["Documentação", "Carga dos equipamentos"]);
+
 // Itens da base para o projeto/turno, já expandidos (uma linha por unidade quando a quantidade é conhecida).
 export function itensDaBase(projetoId, turno, rotulos) {
   const b = MATERIAL_BASE[projetoId];
@@ -42,6 +46,7 @@ export function itensDaBase(projetoId, turno, rotulos) {
         id: `base:${cat}:${idx}:${u}`, categoria: cat, rotuloCategoria: rotulos[cat] || "Outros",
         nome: unidades > 1 ? `${nome} ${u} de ${unidades}` : nome,
         detalhe: det || (unidades === 1 && qtd > 1 ? `${qtd} un.` : ""), cadastro: "ok", origem: "base",
+        ...(qtd == null && !NAO_CONTAVEL.has(nome) ? { contar: true, chaveQtd: `${cat}:${nome}` } : {}),
       });
     }
   });
