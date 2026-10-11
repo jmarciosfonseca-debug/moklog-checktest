@@ -169,6 +169,14 @@ button:has([data-pendente]) .module-icon-container{animation:mk-neon-pulse 3s in
 @media (prefers-reduced-motion:reduce){button:has([data-pendente]) .module-icon-container{animation:none}.module-icon-container{transition:none}}`;
   document.head.appendChild(st);
 }
+// Arte 3D do cliente (public/icones/clientes/<chave>.svg); se não carregar, usa o ícone de linha informado
+function IconeCliente({ arq, cor, fallback }) {
+  const [falhou, setFalhou] = useState(false);
+  if (falhou) return fallback;
+  return <img src={`/icones/clientes/${arq}.svg`} alt="" width={92} height={92} draggable={false} onError={()=>setFalhou(true)}
+    style={{ display:"block", margin:"-4px 0 -2px", filter:`drop-shadow(0 6px 14px ${cor}55)` }}/>;
+}
+
 function IconeModulo({ n, cor, arq, bg, txt }) {
   const [ext, setExt] = useState(()=>!arq || _semArte.has(arq) ? null : "svg");
   const falhou = ext === null;
@@ -4569,10 +4577,10 @@ export default function App(){
           </button>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
-              {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#1d4ed8", ids:["P601","P602","P604","P605","P606","P607"]},
-              {key:"mega",    label:"Projetos Mega",  sub:"P311A, P311B",   color:"#0ea5e9", ids:["P311A","P311B"]},
-              {key:"klog",    label:"Projetos Klog",  sub:"P505",           color:"#16a34a", ids:["P505"]},
-              {key:"jatinox", label:"Jatinox",        sub:"P260A · B · C",  color:"#7c3aed", ids:["P260A"]},
+              {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#559ba4", ids:["P601","P602","P604","P605","P606","P607"]},
+              {key:"mega",    label:"Projetos Mega",  sub:"P311A, P311B",   color:"#f97316", ids:["P311A","P311B"]},
+              {key:"klog",    label:"Projetos Klog",  sub:"P505",           color:"#3b82f6", ids:["P505"]},
+              {key:"jatinox", label:"Jatinox",        sub:"P260A · B · C",  color:"#dc2626", ids:["P260A"]},
             ].map(grp=>{
               const grpProjects = grp.ids.map(id=>PROJECTS[id]).filter(Boolean);
               const healths = grpProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.slice(-1)[0];return last?computeHealth(p,last.state):null;}).filter(Boolean);
@@ -4583,23 +4591,23 @@ export default function App(){
                 <button key={grp.key} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
                   style={{background:T.card,border:`1.5px solid ${hasProblems?grp.color+"99":grp.color+"44"}`,borderRadius:20,padding:"20px 14px 18px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",boxShadow:T.cardShadow(grp.color)}}>
                   {hasProblems&&<div style={{position:"absolute",top:10,right:10,width:8,height:8,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444aa",animation:"mkGlow 1.6s infinite"}}/>}
-                  <svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <IconeCliente arq={grp.key} cor={grp.color} fallback={<svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 18L26 4L48 18V42H4V18Z" stroke={grp.color} strokeWidth="2.5" strokeLinejoin="round" fill={grp.color+"11"}/>
                     <rect x="18" y="26" width="16" height="16" rx="1" stroke={grp.color} strokeWidth="2" fill={grp.color+"22"}/>
                     <rect x="10" y="20" width="8" height="8" rx="1" stroke={grp.color} strokeWidth="1.5" fill="none"/>
                     <rect x="34" y="20" width="8" height="8" rx="1" stroke={grp.color} strokeWidth="1.5" fill="none"/>
                     <line x1="26" y1="26" x2="26" y2="42" stroke={grp.color} strokeWidth="1.5"/>
-                  </svg>
+                  </svg>}/>
                   <div style={{fontSize:13,fontWeight:800,color:T.cardTxt,lineHeight:1.2}}>{grp.label}</div>
                   <div style={{fontSize:11,color:T.cardSub}}>{grp.sub}</div>
                   {avgPct!==null?(
                     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-                      <StatusRing pct={avgPct} size={64} color={avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}/>
+                      <StatusRing pct={avgPct} size={46} color={avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}/>
                       {totalInop>0&&<span style={{fontSize:12,color:"#ef4444",fontWeight:700}}>{totalInop} inop</span>}
                     </div>
                   ):(
                     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-                      <StatusRing empty size={64} color="#7c3aed"/>
+                      <StatusRing empty size={46} color="#7c3aed"/>
                       <span style={{fontSize:12,color:"#a78bfa"}}>Sem dados</span>
                     </div>
                   )}
