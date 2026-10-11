@@ -17,8 +17,7 @@ const firebaseConfig = {
 
 try {
   const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-  // experimentalAutoDetectLongPolling: em redes/aparelhos onde o canal em tempo real é bloqueado, cai sozinho para long-polling.
-  initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true });
+  initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
 } catch (e) {
   try { console.warn("[offline] cache persistente indisponível:", e && e.message); } catch {}
 }
