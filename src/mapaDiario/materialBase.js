@@ -1,6 +1,7 @@
-// Base de material por projeto, levantada pelo Codex nos mapas do WhatsApp (09–11/10/2026).
+// Base de material por projeto, levantada pelo Codex nos mapas do WhatsApp (09–11/10/2026)
+// e ajustada pelo Marcio (P601/P602: 2 rev. + 36 mun.; P505: 3 rev. + 52 mun.; P260C: 1 pistola + 1 revólver).
 // É a LISTA DE REFERÊNCIA para o líder conferir no mapa: o que cada projeto declara de fato
-// (ex.: bodycam só no P311A; P505 sem armamento). Quantidade null = o mapa não informou o número.
+// (ex.: bodycam só no P311A). Quantidade null = o mapa não informou o número.
 // Quando o cadastro de Equipamentos do projeto tem itens de uma categoria, o cadastro (com
 // identificação/nº de série) substitui a linha genérica desta base naquela categoria.
 // Item: [categoria, nome, quantidade|null, detalhe]. Turno: base.D / base.N ou base.todos.
@@ -8,8 +9,8 @@ const REV38 = ["armamento", "Revólver .38"];
 const PLACAS = ["placas", "Par de placas balísticas"];
 
 export const MATERIAL_BASE = {
-  P601: { todos: [[...REV38, null], [...PLACAS, null]] },
-  P602: { todos: [[...REV38, null], [...PLACAS, null]] },
+  P601: { todos: [[...REV38, 2], ["municao", "Munição .38", 36, "36 munições"], [...PLACAS, null]] },
+  P602: { todos: [[...REV38, 2], ["municao", "Munição .38", 36, "36 munições"], [...PLACAS, null]] },
   P604: {
     D: [[...REV38, 3], [...PLACAS, null], ["municao", "Munição", null], ["radiosHT", "Rádio", null], ["smartphones", "Smartphone", null], ["outros", "Tablet", null], ["outros", "Documentação", null]],
     N: [[...REV38, 3], [...PLACAS, null]],
@@ -22,10 +23,10 @@ export const MATERIAL_BASE = {
     N: [[...REV38, 3], [...PLACAS, 3], ["bodycam", "Bodycam", 3], ["radiosHT", "Rádio HT", 4], ["municao", "Munição .38", 72, "72 munições"]],
   },
   P311B: { todos: [[...REV38, 2], [...PLACAS, 4], ["municao", "Munição .38", 36, "36 munições"]] },
-  P505: { todos: [["outros", "Carga dos equipamentos", null], ["lanternas", "Lanterna", null], ["outros", "Documentação", null], ["radiosHT", "Rádio HT", null], ["smartphones", "Smartphone", null]] },
+  P505: { todos: [[...REV38, 3], ["municao", "Munição .38", 52, "52 munições"], ["outros", "Carga dos equipamentos", null], ["lanternas", "Lanterna", null], ["outros", "Documentação", null], ["radiosHT", "Rádio HT", null], ["smartphones", "Smartphone", null]] },
   P260A: { todos: [["armamento", "Pistola .380", 3], ["municao", "Munição .380", 90, "90 munições"], [...PLACAS, 4]] },
   P260B: { todos: [["armamento", "Pistola .380", 1], ["armamento", "Carregador", 2], ["municao", "Munição .380", 30, "30 munições"], [...PLACAS, 2]] },
-  P260C: { todos: [["outros", "Algemas", null], ["armamento", "Pistola .380", null], ["armamento", "Revólver .38", null], ["armamento", "Carregador", null], ["municao", "Munição", null], ["outros", "Jet loader", null], [...PLACAS, null]] },
+  P260C: { todos: [["outros", "Algemas", null], ["armamento", "Pistola .380", 1], ["armamento", "Revólver .38", 1], ["armamento", "Carregador", null], ["municao", "Munição", null], ["outros", "Jet loader", null], [...PLACAS, null]] },
 };
 
 // Itens da base para o projeto/turno, já expandidos (uma linha por unidade quando a quantidade é conhecida).

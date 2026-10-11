@@ -188,10 +188,15 @@ describe("base do Codex por projeto", () => {
     expect(nomes("P311B", "D").some((n) => /Bodycam/.test(n))).toBe(false);
     expect(resumoItens(itensDeEquipamento(null, "P311B", "D"))).toBe("Armamento 2 · Munição 1 · Placas balísticas 4");
   });
-  test("projetos sem bodycam e sem armamento: P505 não tem inventário balístico", () => {
+  test("quantidades confirmadas pelo Marcio: P601/P602 2 rev. + 36 mun.; P505 3 rev. + 52 mun.; P260C 1 pistola + 1 revólver", () => {
+    ["P601", "P602"].forEach((pid) => { expect(nomes(pid, "D").filter((n) => n.startsWith("Revólver .38"))).toHaveLength(2); expect(itensDeEquipamento(null, pid, "D").find((i) => i.categoria === "municao").detalhe).toBe("36 munições"); });
+    expect(nomes("P505", "D").filter((n) => n.startsWith("Revólver .38"))).toHaveLength(3);
+    expect(itensDeEquipamento(null, "P505", "N").find((i) => i.categoria === "municao").detalhe).toBe("52 munições");
+    expect(nomes("P260C", "D").filter((n) => /^(Pistola|Revólver)/.test(n))).toEqual(["Pistola .380", "Revólver .38"]);
+  });
+  test("projetos sem bodycam; P505 só tem armamento revólver", () => {
     ["P601", "P602", "P604", "P605", "P606", "P607", "P260A", "P260B", "P260C"].forEach((pid) => expect(nomes(pid, "D").some((n) => /Bodycam/.test(n))).toBe(false));
-    expect(itensDeEquipamento(null, "P505", "D").some((i) => i.categoria === "armamento")).toBe(false);
-    expect(nomes("P505", "D")).toEqual(expect.arrayContaining(["Lanterna", "Rádio HT", "Smartphone"]));
+        expect(nomes("P505", "D")).toEqual(expect.arrayContaining(["Lanterna", "Rádio HT", "Smartphone"]));
   });
   test("P260A pistolas .380 x3 e P260B x1; P604 diurno tem rádio/tablet, noturno não", () => {
     expect(nomes("P260A", "D").filter((n) => n.startsWith("Pistola .380"))).toHaveLength(3);
