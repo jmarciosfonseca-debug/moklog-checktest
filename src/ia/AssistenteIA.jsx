@@ -14,6 +14,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { abrirSessao, perguntar, hasValidToken } from "./iaClient";
+import IconeIA from "./IconeIA";
 
 const RED = "#cc2222";
 const BG = "#060c18";
@@ -40,14 +41,13 @@ export function BotaoIA({ onClick }) {
       aria-label="Abrir Assistente IA MokLog"
       style={{
         position: "fixed", right: 16, bottom: "calc(84px + env(safe-area-inset-bottom, 0px))",
-        zIndex: 9998, width: 56, height: 56, borderRadius: "50%",
-        background: `linear-gradient(135deg, ${RED}, #7a1414)`,
-        border: "1px solid rgba(255,255,255,.12)", color: "#fff",
-        fontSize: 22, cursor: "pointer", boxShadow: "0 6px 20px rgba(0,0,0,.5)",
+        zIndex: 9998, width: 60, height: 60, padding: 0, borderRadius: 16,
+        background: "none", border: "none", cursor: "pointer",
+        boxShadow: "0 6px 20px rgba(0,0,0,.55)",
         display: "flex", alignItems: "center", justifyContent: "center",
       }}
     >
-      ✨
+      <IconeIA size={60} />
     </button>
   );
 }
@@ -160,7 +160,7 @@ export default function AssistenteIA({ open, onClose }) {
       >
         {/* Cabeçalho */}
         <div style={{ padding: "16px 16px 12px", borderBottom: `1px solid ${BORDER}`, background: BG2, display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${RED}, #7a1414)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>✨</div>
+          <IconeIA size={36} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 900, color: TXT }}>Assistente IA <span style={{ color: RED }}>MokLog</span></div>
             <div style={{ fontSize: 11, color: MUTED }}>Consulta dados operacionais atuais · somente leitura</div>

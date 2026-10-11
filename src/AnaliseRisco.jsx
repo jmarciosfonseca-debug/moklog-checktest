@@ -7,9 +7,9 @@
 //   2. CTMK                         → ctmk/{pid} (status/offlineSince) — painel
 //   3. Iluminação                   → iluminacao/{pid} (quadrantes[])
 //   4. Perimetral (ROTEADA):
-//        Golgi P601/602/604-607     → rondas_plantoes (plantao.perimetral.zonas)
-//        Klog P505                  → perimetral/{pid} (testes[].zonas)
-//        Mega P311A/B               → sem perimetral
+//        QUALQUER projeto: rondas_plantoes (plantao.perimetral.zonas)
+//        e/ou perimetral/{pid} (testes[].zonas) — usa a origem com histórico
+//        (Golgi, P311A, P311B, P505…). Sem histórico → fonte desconsiderada.
 //   5. Ronda Virtual                → cco_ronda/{pid} (registros[] arquivados; rondas{off})
 //   6. Energia                      → energia_ocorrencias/{pid} (eventos[])
 //   7. Equipe                       → equipes/{pid} (colaboradores[])
@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Ico } from "./Icones";
+import { normalizarZona, resumirColecaoPerimetral, escolherFontePerimetral } from "./perimetralFontes";
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -93,20 +94,13 @@ export const PACOTES = {
   mega:  { label: "Mega",  ids: ["P311A","P311B"] },
   klog:  { label: "Klog",  ids: ["P505"] },
 };
-// Perimetral por rondas_plantoes (Caminho B) — todos os Golgi.
-const PERIMETRAL_RONDAS = ["P601","P602","P604","P605","P606","P607"];
-// Perimetral por coleção perimetral/{pid} — P505.
-const PERIMETRAL_COLECAO = ["P505"];
+// Perimetral: SEM lista fixa de projetos. Lê as duas origens possíveis
+// (rondas_plantoes via rondas/{pid} e perimetral/{pid}) e usa a que tiver histórico.
 
 const statusPerimetralPeso = (status) => ({ inoperante: 3, parcial: 2, ok: 1 }[String(status || "ok").toLowerCase()] || 2);
 const temHoraConfiavel = (valor) => /T\d{2}:\d{2}|\d{2}:\d{2}:\d{2}/.test(String(valor || ""));
 const diaDaRonda = (valor) => String(valor || "").slice(0, 10);
 const textoZonaSemNome = (n) => `Ponto físico nº ${n} da ronda perimetral, sem identificação nominal`;
-const normalizarZona = (valor) => {
-  const texto = String(valor || "").trim();
-  const m = texto.match(/(?:zona\s*|z\s*-?\s*)0*(\d{1,3})\b/i);
-  return m ? `Z-${String(m[1]).padStart(2, "0")}` : texto.toUpperCase();
-};
 
 function gravidadeBrecha({ totalZonas = 1, zonaIndex = 1, coberturaAlternativa = "não informada", estadoTotal = false }) {
   if (estadoTotal) return "total";
@@ -286,9 +280,8 @@ async function coletarKeyAccessInfo(pid) {
 
 // ── FONTE 4: Perimetral (roteada por projeto) ────────────────
 async function coletarPerimetral(pid) {
-  if (PERIMETRAL_RONDAS.includes(pid)) return coletarPerimetralRondas(pid);
-  if (PERIMETRAL_COLECAO.includes(pid)) return coletarPerimetralColecao(pid);
-  return { ok: false, temDado: false, motivo: "este projeto não possui teste perimetral" };
+  const [rondas, colecao] = await Promise.all([coletarPerimetralRondas(pid), coletarPerimetralColecao(pid)]);
+  return escolherFontePerimetral(rondas, colecao);
 }
 // Golgi: rondas_plantoes via índice rondas/{pid}
 async function coletarPerimetralRondas(pid) {
@@ -418,26 +411,15 @@ async function coletarPerimetralRondas(pid) {
     const dataUltimaRonda = ordenadosPorData.length ? String(dataDe(ordenadosPorData[ordenadosPorData.length - 1])) : null;
 
     return { ok: true, temDado: true, fonte: "rondas", plantoes: comPeri.length, totalPlantoes: plantoes.length, totalRondas, pctOk, zonas, piorZona, estadoRecenteZonas, dataUltimaRonda };
-  } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler ronda perimetral" }; }
+  } catch (e) { return { ok: false, temDado: false, erro: true, motivo: "erro ao ler ronda perimetral" }; }
 }
 // P505: coleção perimetral/{pid}
 async function coletarPerimetralColecao(pid) {
   try {
     const snap = await getDoc(doc(db, "perimetral", pid));
     if (!snap.exists()) return { ok: false, temDado: false, motivo: "sem dados perimetrais" };
-    const testes = snap.data().testes || [];
-    if (!testes.length) return { ok: false, temDado: false, motivo: "sem testes perimetrais" };
-    const ult = [...testes].sort((a, b) => (b.data || "").localeCompare(a.data || ""))[0];
-    const zonasObj = ult.zonas || {};
-    const zonas = Object.entries(zonasObj).map(([nome, zv]) => {
-      const st = (zv?.status || "ok").toLowerCase();
-      return { nome, total: 1, ruins: st === "ok" ? 0 : 1, pctFalha: st === "ok" ? 0 : 100, status: st };
-    });
-    const ruins = zonas.filter((z) => z.ruins > 0);
-    const pctOk = zonas.length ? Math.round(((zonas.length - ruins.length) / zonas.length) * 100) : null;
-    const piorZona = ruins[0] || null;
-    return { ok: true, temDado: true, fonte: "colecao", dataUlt: fmtDate(ult.data), pctOk, zonas, piorZona };
-  } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler perimetral" }; }
+    return resumirColecaoPerimetral(snap.data().testes || [], fmtDate);
+  } catch (e) { return { ok: false, temDado: false, erro: true, motivo: "erro ao ler perimetral" }; }
 }
 
 // ── FONTE 5: Ronda Virtual (cco_ronda) ───────────────────────
@@ -864,6 +846,8 @@ function vetoresPerimetrais(peri) {
     };
   });
 }
+
+export const vetoresPerimetraisParaTeste = (peri) => vetoresPerimetrais(peri);
 
 // Ronda virtual é tática: execução ruim reduz a capacidade de detecção, mas
 // não compra redução de risco quando uma barreira física já caiu.
