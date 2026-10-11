@@ -26,6 +26,7 @@
 // Aditivo: NÃO grava nada no Firestore — só lê. Backward-compatible.
 // ─────────────────────────────────────────────────────────────
 
+import { Ico } from "./Icones";
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -2167,7 +2168,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
       <div style={S.top}>
         <button style={S.back} onClick={onBack}>← Voltar</button>
         <div>
-          <div style={S.h}>📋 Análise de Risco — {pacoteInfo.label}</div>
+          <div style={S.h}><Ico n="prancheta"/> Análise de Risco — {pacoteInfo.label}</div>
           <div style={S.sub}>Selecione o projeto e as fontes; o PDF consolidado é gerado a partir da sua seleção.</div>
         </div>
       </div>
@@ -2190,7 +2191,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
             return (
               <div key={f.key}>
                 <div style={stFonteRow(on)} onClick={() => toggleFonte(f.key)}>
-                  <div style={stCheck(on)}>{on ? "✓" : ""}</div>
+                  <div style={stCheck(on)}>{on ? <><Ico n="check"/></> : ""}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>{f.label}</div>
                     <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 1 }}>{f.desc}</div>
@@ -2210,7 +2211,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
 
           {estado === "aviso" && (
             <div style={S.aviso}>
-              <div style={S.avisoT}>⚠️ Fontes marcadas sem dado neste projeto</div>
+              <div style={S.avisoT}><Ico n="alerta"/> Fontes marcadas sem dado neste projeto</div>
               {faltantes.map((f) => (
                 <div key={f.key} style={S.avisoItem}>• <b>{f.label}</b> — {f.motivo}</div>
               ))}
@@ -2227,7 +2228,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
             disabled={!algumaMarcada || estado === "coletando"}
             onClick={() => gerar(false)}
           >
-            {estado === "coletando" ? "Consolidando…" : "📄 Gerar Análise de Risco (PDF)"}
+            {estado === "coletando" ? "Consolidando…" : <><Ico n="arquivo"/>{" Gerar Análise de Risco (PDF)"}</>}
           </button>
           {estado === "pronto" && (
             <button style={{ ...S.smallBtn, marginTop: 8, width: "100%" }} onClick={() => {

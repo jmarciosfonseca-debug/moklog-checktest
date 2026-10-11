@@ -4,6 +4,7 @@
 // Acesso: PIN gerencial (validado pelo App via validarPin).
 // "Atualizar agora": POST /api/fv-sync (PIN validado no servidor).
 // ─────────────────────────────────────────────────────────────
+import { Ico } from "./Icones";
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { FV_PROJETOS, FV_NOMES, FV_TIPOS, FV_TIPO_ROTULO, FV_DESATUALIZADO_H } from "./fvConfig";
@@ -101,7 +102,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
     <Page bg={c.bg}>
       <button onClick={onBack} style={{ ...btn, alignSelf:"flex-start" }}>← Voltar</button>
       <div style={{ ...card, textAlign:"center" }}>
-        <div style={{ fontSize:16, fontWeight:800, color:c.txt }}>💰 Gestão FV</div>
+        <div style={{ fontSize:16, fontWeight:800, color:c.txt }}><Ico n="moeda"/> Gestão FV</div>
         <div style={{ fontSize:12, color:c.txt2, margin:"4px 0 12px" }}>Acesso restrito · PIN gerencial</div>
         <input type="password" inputMode="numeric" value={pin} onChange={e => { setPin(e.target.value); setPinErro(""); }}
           onKeyDown={e => { if (e.key === "Enter") document.getElementById("fvPinOk")?.click(); }}
@@ -122,10 +123,10 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
           <div style={{ fontSize:11, color:c.txt2 }}>Última sincronização com sucesso</div>
           <div style={{ fontSize:14, fontWeight:800, color:c.txt }}>{dth(status?.ultimaOk)}</div>
         </div>
-        <button disabled={sincronizando} onClick={atualizarAgora} style={{ ...btn, color:"#0ea5e9", borderColor:"#0ea5e955", opacity:sincronizando ? .6 : 1 }}>{sincronizando ? "Sincronizando..." : "🔄 Atualizar agora"}</button>
+        <button disabled={sincronizando} onClick={atualizarAgora} style={{ ...btn, color:"#0ea5e9", borderColor:"#0ea5e955", opacity:sincronizando ? .6 : 1 }}>{sincronizando ? "Sincronizando..." : <><Ico n="atualizar"/>{" Atualizar agora"}</>}</button>
       </div>
-      {status?.status === "erro" && <div style={{ fontSize:11, color:"#f59e0b", marginTop:6 }}>⚠️ Última tentativa ({dth(status.ultimaExecucao)}) falhou: {status.erro}. Exibindo o último dado válido.</div>}
-      {status?.status !== "erro" && desatualizado && <div style={{ fontSize:11, color:"#f59e0b", marginTop:6 }}>⚠️ Dados desatualizados{horasSync !== null ? ` (há ${Math.floor(horasSync)} h)` : ""}.</div>}
+      {status?.status === "erro" && <div style={{ fontSize:11, color:"#f59e0b", marginTop:6 }}><Ico n="alerta"/> Última tentativa ({dth(status.ultimaExecucao)}) falhou: {status.erro}. Exibindo o último dado válido.</div>}
+      {status?.status !== "erro" && desatualizado && <div style={{ fontSize:11, color:"#f59e0b", marginTop:6 }}><Ico n="alerta"/> Dados desatualizados{horasSync !== null ? ` (há ${Math.floor(horasSync)} h)` : ""}.</div>}
       <div style={{ fontSize:10.5, color:c.txt2, marginTop:6 }}>Atualização manual por Excel · aplicada somente ao clicar · não consulta o portal em tempo real.</div>
       {status?.dataExportacao && <div style={{ fontSize:10.5, color:c.txt2, marginTop:4 }}>Dados exportados em {dt(status.dataExportacao)}. Projeções são estimativas internas.</div>}
       {msgSync && <div style={{ fontSize:11, color:"#0ea5e9", marginTop:6 }}>{msgSync}</div>}
@@ -181,7 +182,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
   return (
     <Page bg={c.bg}>
       <button onClick={onBack} style={{ ...btn, alignSelf:"flex-start" }}>← Voltar</button>
-      <div style={{ fontSize:16, fontWeight:800, color:c.txt }}>💰 Gestão FV</div>
+      <div style={{ fontSize:16, fontWeight:800, color:c.txt }}><Ico n="moeda"/> Gestão FV</div>
       {statusBox}
       {carregando && <div style={{ fontSize:12, color:c.txt2 }}>Carregando...</div>}
       {!carregando && (!leituraErro || Object.keys(resumos).length > 0) && FV_PROJETOS.map(pid => {
@@ -193,7 +194,7 @@ export default function GestaoFV({ dark = true, onBack, validarPin }) {
               <div style={{ minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:c.txt }}>{pid} · {FV_NOMES[pid]}</div>
                 <div style={{ fontSize:11, color:c.txt2 }}>{r ? (r.ultimoCredito ? `Último crédito ${dt(r.ultimoCredito.data)} · ${brl(r.ultimoCredito.valor)}` : "Sem créditos registrados") : "Aguardando primeira sincronização"}</div>
-                {r?.statusSincronizacao === "erro" && <div style={{ fontSize:10.5, color:"#f59e0b" }}>⚠️ Última tentativa falhou · dado de {dth(r.sincronizadoEm)}</div>}
+                {r?.statusSincronizacao === "erro" && <div style={{ fontSize:10.5, color:"#f59e0b" }}><Ico n="alerta"/> Última tentativa falhou · dado de {dth(r.sincronizadoEm)}</div>}
               </div>
               <span style={{ fontSize:15, fontWeight:800, color:cor, whiteSpace:"nowrap" }}>{r ? brl(r.saldoAtual) : "—"}</span>
             </div>

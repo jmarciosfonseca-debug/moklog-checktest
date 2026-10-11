@@ -14,6 +14,7 @@
 // gerencial. Este painel apenas consolida e detalha.
 // ─────────────────────────────────────────────────────────────
 
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -226,7 +227,7 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={{ background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", fontWeight:600 }}>← Início</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Painel do Líder</div>
+              <div style={{ fontSize:15, fontWeight:800, color:txt }}><Ico n="prancheta"/> Painel do Líder</div>
               <div style={{ fontSize:11, color:txt2 }}>{projectId} — {nomeProjeto} · Sessão de líder ativa</div>
             </div>
             {onToggleTheme && <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }}>{iconeTema()}</button>}
@@ -242,7 +243,7 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
             <Card>
               <CardTitle icon="🔔">Próximos Passos</CardTitle>
               {alertas.length === 0 ? (
-                <div style={{ fontSize:12, color:"#22c55e", fontWeight:600 }}>✓ Tudo em dia. Nenhum alerta no momento.</div>
+                <div style={{ fontSize:12, color:"#22c55e", fontWeight:600 }}><Ico n="check"/> Tudo em dia. Nenhum alerta no momento.</div>
               ) : (
                 <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
                   {alertas.map((a,i)=>(
@@ -316,7 +317,7 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
               {materialPendente.length>0 && (
                 <button onClick={()=>gerarPDFSolicitacoesLote({id:projectId}, equipe?.colaboradores||[])}
                   style={{ marginTop:10, width:"100%", background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:8, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                  📄 Baixar PDF das pendências (lote)
+                  <Ico n="arquivo"/> Baixar PDF das pendências (lote)
                 </button>
               )}
             </Card>
@@ -361,12 +362,12 @@ export default function PainelLider({ projectId, dark, onBack, onToggleTheme, on
           <div style={{ background:cardBg, borderTop:`1px solid ${border}`, borderRadius:"16px 16px 0 0", width:"100%", maxWidth:480, maxHeight:"80vh", overflowY:"auto", padding:"16px" }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
               <div style={{ fontSize:14, fontWeight:800, color:txt }}>{drill.titulo}</div>
-              <button onClick={()=>setDrill(null)} style={{ background:"transparent", border:"none", color:txt2, fontSize:20, cursor:"pointer" }}>✕</button>
+              <button onClick={()=>setDrill(null)} style={{ background:"transparent", border:"none", color:txt2, fontSize:20, cursor:"pointer" }}><Ico n="x"/></button>
             </div>
             {drill.tipo==="material" && drill.itens.length>0 && (
               <button onClick={()=>gerarPDFSolicitacoesLote({id:projectId}, equipe?.colaboradores||[])}
                 style={{ width:"100%", marginBottom:12, background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:8, padding:"10px", fontSize:12, fontWeight:700, cursor:"pointer" }}>
-                📄 Baixar PDF de todas as pendências (lote)
+                <Ico n="arquivo"/> Baixar PDF de todas as pendências (lote)
               </button>
             )}
             {drill.itens.length===0 && <div style={{ color:txt2, fontSize:13 }}>Nenhum item.</div>}

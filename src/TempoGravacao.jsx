@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { useState, useEffect } from "react";
 import { montarRelatorioGravacao } from "./relatorios/gravacaoRelatorio";
 import { baixarHtml } from "./relatorios/padraoMoked";
@@ -144,7 +145,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
 
   if(loading) return(
     <div style={{textAlign:"center",padding:"40px 0"}}>
-      <div style={{fontSize:28,marginBottom:8}}>📹</div>
+      <div style={{fontSize:28,marginBottom:8}}><Ico n="video"/></div>
       <div style={{fontSize:13,...S.txt2}}>Carregando câmeras...</div>
     </div>
   );
@@ -186,7 +187,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
           <div style={{...S.card, border:`1px solid ${cor}44`, background:bg, display:"flex", flexDirection:"column", gap:8}}>
             <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
               <div>
-                <div style={{fontSize:12, fontWeight:800, color:dark?"#f8fafc":"#0f172a"}}>📹 Teste Quinzenal de Gravação</div>
+                <div style={{fontSize:12, fontWeight:800, color:dark?"#f8fafc":"#0f172a"}}><Ico n="video"/> Teste Quinzenal de Gravação</div>
                 <div style={{fontSize:11, ...S.txt2, marginTop:2}}>Próximo: <strong>domingo, {fmtDate(alvo)}</strong></div>
               </div>
               <div style={{textAlign:"right"}}>
@@ -201,7 +202,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
             {!tqAssinando ? (
               <button onClick={()=>setTqAssinando(true)}
                 style={{...S.btnSm, color:cor, borderColor:`${cor}66`, fontWeight:700, padding:"9px 14px", fontSize:12}}>
-                ✓ Registrar teste realizado
+                <Ico n="check"/> Registrar teste realizado
               </button>
             ) : (
               <div style={{display:"flex", flexDirection:"column", gap:8}}>
@@ -215,7 +216,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
                 )}
                 <div style={{display:"flex", gap:8}}>
                   <button onClick={()=>{setTqAssinando(false); setTqAssinatura("");}} style={{...S.btnSec, flex:1, fontSize:13}}>Cancelar</button>
-                  <button onClick={registrarTesteQuinzenal} style={{...S.btn, flex:1, fontSize:13}}>✓ Assinar e zerar</button>
+                  <button onClick={registrarTesteQuinzenal} style={{...S.btn, flex:1, fontSize:13}}><Ico n="check"/> Assinar e zerar</button>
                 </div>
               </div>
             )}
@@ -226,7 +227,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
       {/* Ações */}
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
         <button onClick={()=>setShowAdd(true)} style={{...S.btnSm,color:"#22c55e",borderColor:"#22c55e44",fontWeight:700,padding:"8px 14px",fontSize:12}}>+ Adicionar Câmera</button>
-        <button onClick={()=>gerarPDFGravacao(project, cameras)} style={{...S.btnSm,color:"#0ea5e9",borderColor:"#0ea5e944",fontWeight:700,padding:"8px 14px",fontSize:12}}>📄 PDF</button>
+        <button onClick={()=>gerarPDFGravacao(project, cameras)} style={{...S.btnSm,color:"#0ea5e9",borderColor:"#0ea5e944",fontWeight:700,padding:"8px 14px",fontSize:12}}><Ico n="arquivo"/> PDF</button>
         <div style={{marginLeft:"auto",display:"flex",gap:4}}>
           {[["todos","Todos"],["alerta","⚠ <30d"],["ok","✅ OK"]].map(([k,l])=>(
             <button key={k} onClick={()=>setFiltro(k)}
@@ -247,7 +248,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
           <input value={addEspec} onChange={e=>setAddEspec(e.target.value)} placeholder="Especificação (ex: Hikvision DS-2CD2T47, 4MP)" style={{...S.inp,fontSize:12}}/>
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>{setShowAdd(false);setAddNome("");setAddEspec("");}} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-            <button onClick={addCamera} style={{...S.btn,flex:1,fontSize:13}}>✓ Adicionar</button>
+            <button onClick={addCamera} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Adicionar</button>
           </div>
         </div>
       )}
@@ -269,7 +270,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
           <div key={cam.id} style={{...S.card,border:`1px solid ${temDias&&dias<30?cor+"44":(dark?"#0f172a":"#e2e8f0")}`}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{width:42,height:42,borderRadius:10,background:dark?"#0a0f1e":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <span style={{fontSize:20}}>📹</span>
+                <span style={{fontSize:20}}><Ico n="video"/></span>
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:14,fontWeight:800,...S.txt}}>{cam.nome}</div>
@@ -284,17 +285,17 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
               </div>
               <button onClick={()=>{setEditCamId(null);setEditingId(isEditing?null:cam.id);setEditDias(temDias?String(dias):"");setEditPor("");}}
                 style={{...S.btnSm,color:"#0ea5e9",borderColor:"#0ea5e944",padding:"7px 10px",fontSize:11,fontWeight:700,flexShrink:0}}>
-                {isEditing?"✕":"📝 Check"}
+                {isEditing?<><Ico n="x"/></>:<><Ico n="notas"/>{" Check"}</>}
               </button>
               <button onClick={()=>{isEditingCam?setEditCamId(null):abrirEdicaoCamera(cam);}}
                 style={{...S.btnSm,color:"#f59e0b",borderColor:"#f59e0b44",padding:"7px 10px",fontSize:11,fontWeight:700,flexShrink:0}}>
-                {isEditingCam?"✕":"✏️"}
+                {isEditingCam?<><Ico n="x"/></>:<><Ico n="editar"/></>}
               </button>
             </div>
 
             {isEditingCam&&(
               <div style={{marginTop:10,padding:"10px 12px",background:dark?"#020510":"#f8fafc",borderRadius:8,display:"flex",flexDirection:"column",gap:8,border:"1px solid #f59e0b33"}}>
-                <div style={{fontSize:11,fontWeight:800,color:"#f59e0b",textTransform:"uppercase",letterSpacing:".5px"}}>✏️ Editar Câmera</div>
+                <div style={{fontSize:11,fontWeight:800,color:"#f59e0b",textTransform:"uppercase",letterSpacing:".5px"}}><Ico n="editar"/> Editar Câmera</div>
                 <div>
                   <label style={S.lbl}>Nome da câmera</label>
                   <input value={editCamNome} onChange={e=>setEditCamNome(e.target.value)} placeholder="Ex: CAM-01 Doca Norte" style={{...S.inp,fontSize:13,fontWeight:700}}/>
@@ -305,7 +306,7 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>{setEditCamId(null);setEditCamNome("");setEditCamEspec("");}} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-                  <button onClick={()=>salvarEdicaoCamera(cam.id)} style={{...S.btn,flex:1,fontSize:13}}>✓ Salvar</button>
+                  <button onClick={()=>salvarEdicaoCamera(cam.id)} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Salvar</button>
                 </div>
               </div>
             )}
@@ -330,14 +331,14 @@ export default function TempoGravacao({ project, dark, S, adminAuth, db, doc, se
                 </div>
                 <div style={{display:"flex",gap:8}}>
                   <button onClick={()=>setEditingId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
-                  <button onClick={()=>registrarChecagem(cam.id)} style={{...S.btn,flex:1,fontSize:13}}>✓ Registrar</button>
+                  <button onClick={()=>registrarChecagem(cam.id)} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Registrar</button>
                 </div>
               </div>
             )}
 
             {!isEditing&&!isEditingCam&&(
               <div style={{marginTop:6,display:"flex",justifyContent:"flex-end"}}>
-                <button onClick={()=>removeCamera(cam.id)} style={{background:"transparent",border:"none",color:"#ef444466",fontSize:11,cursor:"pointer",padding:"4px 8px"}}>🗑 Remover</button>
+                <button onClick={()=>removeCamera(cam.id)} style={{background:"transparent",border:"none",color:"#ef444466",fontSize:11,cursor:"pointer",padding:"4px 8px"}}><Ico n="lixeira"/> Remover</button>
               </div>
             )}
           </div>

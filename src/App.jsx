@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -104,14 +105,14 @@ class ErrorBoundary extends React.Component {
         return (
           <div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",margin:"4px 0"}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:18}}>⚠️</span>
+              <span style={{fontSize:18}}><Ico n="alerta"/></span>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,color:"#ef4444",fontWeight:700}}>Erro em: {moduleName}</div>
                 <div style={{fontSize:11,color:"#94a3b8"}}>{friendlyMsg}</div>
               </div>
               <button onClick={()=>this.setState({hasError:false,error:null,errorInfo:null})}
                 style={{background:"#1d4ed8",color:"#fff",border:"none",borderRadius:6,padding:"5px 10px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>
-                🔄 Tentar
+                <Ico n="atualizar"/> Tentar
               </button>
             </div>
           </div>
@@ -121,7 +122,7 @@ class ErrorBoundary extends React.Component {
       return (
         <div style={{minHeight:"100vh",background:"#04080f",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif",padding:24}}>
           <div style={{background:"#1a0202",border:"2px solid #ef4444",borderRadius:16,padding:"28px 24px",maxWidth:360,width:"100%",textAlign:"center"}}>
-            <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+            <div style={{fontSize:40,marginBottom:12}}><Ico n="alerta"/></div>
             <div style={{fontSize:16,fontWeight:800,color:"#f1f5f9",marginBottom:8}}>Algo deu errado</div>
             <div style={{fontSize:12,color:"#94a3b8",marginBottom:6}}>
               Módulo: <strong style={{color:"#f59e0b"}}>{moduleName}</strong>
@@ -131,7 +132,7 @@ class ErrorBoundary extends React.Component {
             </div>
             <button onClick={()=>this.setState({hasError:false,error:null,errorInfo:null})}
               style={{background:"linear-gradient(135deg,#1d4ed8,#1e40af)",color:"#fff",border:"none",borderRadius:10,padding:"12px 24px",fontSize:14,fontWeight:700,cursor:"pointer",width:"100%",marginBottom:8}}>
-              🔄 Tentar novamente
+              <Ico n="atualizar"/> Tentar novamente
             </button>
             <button onClick={()=>window.location.reload()}
               style={{background:"transparent",color:"#94a3b8",border:"1px solid #1e293b",borderRadius:10,padding:"10px 24px",fontSize:13,fontWeight:600,cursor:"pointer",width:"100%"}}>
@@ -652,7 +653,7 @@ function ContagemProximoDomingo({ light }){
   return (
     <>
       <div style={{fontSize:12,color:cor,marginTop:2,fontWeight:600}}>Próximo relatório: domingo, {dataFmt}</div>
-      <div style={{fontSize:11,color:cor,marginTop:1,fontWeight:700}}>⏳ {dias}d {horas}h {minutos}min</div>
+      <div style={{fontSize:11,color:cor,marginTop:1,fontWeight:700}}><Ico n="ampulheta"/> {dias}d {horas}h {minutos}min</div>
     </>
   );
 }
@@ -680,12 +681,12 @@ function ContadorIluminacao({ projectId }){
   const diff = limite - agora;
   const pendente = diff <= 0;
   if(pendente){
-    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}>⚠️ Teste pendente — concluir</div>;
+    return <div style={{fontSize:10,color:"#f87171",marginTop:3,fontWeight:700}}><Ico n="alerta"/> Teste pendente — concluir</div>;
   }
   const dias = Math.floor(diff/86400000);
   const horas = Math.floor((diff%86400000)/3600000);
   const minutos = Math.floor((diff%3600000)/60000);
-  return <div style={{fontSize:10,color:"#eab308",marginTop:3,fontWeight:700}}>⏳ {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)} 21h</div>;
+  return <div style={{fontSize:10,color:"#eab308",marginTop:3,fontWeight:700}}><Ico n="ampulheta"/> {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)} 21h</div>;
 }
 const calcPct = (ok,total) => total===0?100:Math.round((ok/total)*100);
 
@@ -1054,7 +1055,7 @@ function CtmkConfirmModal({ confirm, project, onCancel, onConfirm }) {
 
         <div style={{background:goingOffline?"#1a020233":"#021a0d33",border:`1px solid ${goingOffline?"#ef444433":"#22c55e33"}`,borderRadius:8,padding:"10px 12px",marginBottom:14,textAlign:"center"}}>
           <div style={{fontSize:13,fontWeight:800,color:goingOffline?"#ef4444":"#22c55e",marginBottom:4}}>
-            {goingOffline ? "⚠ Você certificou que a central está sem imagem?" : "⚠ Você certificou que a central voltou a operar?"}
+            {goingOffline ? <><Ico n="alerta"/>{" Você certificou que a central está sem imagem?"}</> : <><Ico n="alerta"/>{" Você certificou que a central voltou a operar?"}</>}
           </div>
           <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.4}}>
             {goingOffline
@@ -1153,12 +1154,12 @@ function SmartPhotoUpload({catId, catLabel, itemLabel, photos, setPhotos}) {
     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6,padding:"6px 8px",background:"#020510",borderRadius:6,border:"1px solid #0f172a"}}>
       <img src={existing[0].url} alt="" style={{width:52,height:40,objectFit:"cover",borderRadius:4,border:"1px solid #1e293b"}}/>
       <div style={{flex:1,fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{itemLabel||catLabel}</div>
-      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}} aria-label="Remover">✕</button>
+      <button onClick={removePhoto} style={{...S.iconBtn,color:"#ef4444",flexShrink:0}} aria-label="Remover"><Ico n="x"/></button>
     </div>
   );
   return (
     <label style={{display:"flex",alignItems:"center",gap:6,marginTop:6,cursor:"pointer",color:"#94a3b8",fontSize:11,padding:"4px 0"}}>
-      <span style={{fontSize:14}}>📷</span>
+      <span style={{fontSize:14}}><Ico n="camera"/></span>
       <span>Foto: {itemLabel||catLabel} (câmera ou galeria)</span>
       <input type="file" accept="image/*" style={{position:"absolute",opacity:0,width:0,height:0}} onChange={handlePhoto}/>
     </label>
@@ -1276,7 +1277,7 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
               </div>
               <input placeholder="Problema..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
               <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover">✕</button>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover"><Ico n="x"/></button>
             </div>
             {setPhotos&&<SmartPhotoUpload catId={cat.id} catLabel={cat.label} itemLabel={it.id||`Item ${i+1}`} photos={photos} setPhotos={setPhotos}/>}
           </div>
@@ -1305,7 +1306,7 @@ function NotesCat({cat,value,onChange}){
             <input placeholder="Item..." value={it.label} onChange={e=>upd(i,{label:e.target.value})} style={{...S.inp,width:140,fontSize:12}}/>
             <input placeholder="Observacao..." value={it.note} onChange={e=>upd(i,{note:e.target.value})} style={{...S.inp,flex:1,minWidth:100,fontSize:12}}/>
             <input type="date" value={it.since} onChange={e=>upd(i,{since:e.target.value})} style={{...S.inp,maxWidth:145,fontSize:12}}/>
-            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover">✕</button>
+            <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover"><Ico n="x"/></button>
           </div>
         ))}
         <button onClick={add} style={S.addBtn}>+ Adicionar item</button>
@@ -1330,7 +1331,7 @@ function MaintenanceCat({cat,value,onChange}){
           <div key={i} style={{background:"#020510",borderRadius:8,padding:"10px 12px",border:"1px solid #1e293b"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Visita {i+1}</span>
-              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover">✕</button>
+              <button onClick={()=>rem(i)} style={{...S.iconBtn,color:"#ef4444"}} aria-label="Remover"><Ico n="x"/></button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:7}}>
               <div><label style={S.lbl}>Data</label><input type="date" value={v.date} onChange={e=>upd(i,{date:e.target.value})} style={S.inp}/></div>
@@ -1654,11 +1655,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:8}}>
             <button onClick={()=>setV360(null)} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>🎯 Visão 360 — {tituloGrupo}</div>
+              <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}><Ico n="alvo"/> Visão 360 — {tituloGrupo}</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>Saúde operacional consolidada — todos os módulos</div>
             </div>
             {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, mediaGrupo, grupoSel?grupoSel.label:null)}
-              style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}>📄 PDF Executivo</button>}
+              style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}><Ico n="arquivo"/> PDF Executivo</button>}
             {!loadingV&&rows.length>0&&grupoSel&&<button disabled={gerandoExec} onClick={async()=>{
                 // HTML Executivo: mesmas linhas da Visão 360 + resumos de cada relatório, lidos SÓ NO CLIQUE (somente leitura).
                 // Fonte que falhar = null ("não aferido" no arquivo); documento inexistente = [] (sem registros).
@@ -1711,11 +1712,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             ))}
           </div>}
           {!loadingV&&v360Grupo==="todos"&&<div style={{fontSize:11,color:"#f59e0b",background:"#1a1000",border:"1px solid #f59e0b33",borderRadius:8,padding:"8px 12px",marginBottom:8}}>
-            ⚠ Visão "Todos" é de uso interno Moked. Para enviar a um cliente, selecione o grupo dele — o PDF nunca mistura clientes.
+            <Ico n="alerta"/> Visão "Todos" é de uso interno Moked. Para enviar a um cliente, selecione o grupo dele — o PDF nunca mistura clientes.
           </div>}
 
           {loadingV&&<div style={{textAlign:"center",padding:"50px 0"}}>
-            <div style={{fontSize:28,marginBottom:10}}>🎯</div>
+            <div style={{fontSize:28,marginBottom:10}}><Ico n="alvo"/></div>
             <div style={{fontSize:13,color:"#94a3b8"}}>Cruzando dados de todos os módulos...</div>
           </div>}
 
@@ -1736,7 +1737,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   <span style={{fontSize:16,minWidth:32,textAlign:"center"}}>{medal(i)}</span>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{r.id} <span style={{fontWeight:400,color:"#94a3b8",fontSize:11}}>· {r.name}</span></div>
-                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}{r.ilumTotal>0&&<span style={{color:r.ilumDeficientes>0?"#ef4444":"#22c55e",fontWeight:700}}> · 💡 {r.ilumDeficientes} deficiente{r.ilumDeficientes===1?"":"s"}</span>}{(r.energiaAberta||r.energiaQuedas7d>0)&&<span style={{color:r.energiaAberta?"#ef4444":"#f59e0b",fontWeight:700}}> · ⚡ {r.energiaAberta?"em aberto":`${r.energiaQuedas7d} queda${r.energiaQuedas7d===1?"":"s"} (7d)`}</span>}</div>
+                    <div style={{fontSize:11,color:"#94a3b8"}}>Checklist base: {r.semChecklist?"sem relatório":r.base+"%"}{r.ilumTotal>0&&<span style={{color:r.ilumDeficientes>0?"#ef4444":"#22c55e",fontWeight:700}}> · <Ico n="lampada"/> {r.ilumDeficientes} deficiente{r.ilumDeficientes===1?"":"s"}</span>}{(r.energiaAberta||r.energiaQuedas7d>0)&&<span style={{color:r.energiaAberta?"#ef4444":"#f59e0b",fontWeight:700}}> · <Ico n="raio"/> {r.energiaAberta?"em aberto":`${r.energiaQuedas7d} queda${r.energiaQuedas7d===1?"":"s"} (7d)`}</span>}</div>
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{fontSize:22,fontWeight:900,color:scoreColor(r.score)}}>{r.score}</div>
@@ -1746,11 +1747,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                 {r.penalidades.length>0&&<div style={{borderTop:"1px solid #0a0f1e",paddingTop:8,display:"flex",flexDirection:"column",gap:3}}>
                   {r.penalidades.map((p,j)=>(
                     <div key={j} style={{fontSize:11,color:"#f59e0b",display:"flex",justifyContent:"space-between"}}>
-                      <span>⚠ {p.label}</span><span style={{fontWeight:800,color:"#ef4444"}}>−{p.val}</span>
+                      <span><Ico n="alerta"/> {p.label}</span><span style={{fontWeight:800,color:"#ef4444"}}>−{p.val}</span>
                     </div>
                   ))}
                 </div>}
-                {r.penalidades.length===0&&!r.semChecklist&&<div style={{fontSize:11,color:"#22c55e",marginTop:2}}>✓ Sem pendências ativas em nenhum módulo</div>}
+                {r.penalidades.length===0&&!r.semChecklist&&<div style={{fontSize:11,color:"#22c55e",marginTop:2}}><Ico n="check"/> Sem pendências ativas em nenhum módulo</div>}
               </div>
             ))}
 
@@ -1786,12 +1787,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         <div style={S.formWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a",marginBottom:12}}>
             <button onClick={()=>setGroupCompScreen(null)} style={S.backBtn} aria-label="Voltar">← Painel</button>
-            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>📊 Comparativo {label}</div><div style={{fontSize:11,color:"#94a3b8"}}>Escolha o período a comparar</div></div>
+            <div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}><Ico n="grafico"/> Comparativo {label}</div><div style={{fontSize:11,color:"#94a3b8"}}>Escolha o período a comparar</div></div>
           </div>
           <div style={{display:"flex",gap:8,marginBottom:14}}>
-            <button onClick={()=>applyPreset("hoje")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>🗓 Última semana</button>
-            <button onClick={()=>applyPreset("mes")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>📅 Último mês</button>
-            <button onClick={()=>applyPreset("tudo")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}>🗂 Tudo</button>
+            <button onClick={()=>applyPreset("hoje")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}><Ico n="calendario"/> Última semana</button>
+            <button onClick={()=>applyPreset("mes")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}><Ico n="calendario"/> Último mês</button>
+            <button onClick={()=>applyPreset("tudo")} style={{...S.secBtn,flex:1,fontSize:12,padding:"10px 6px"}}><Ico n="pasta"/> Tudo</button>
           </div>
           <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>Ou selecione manualmente ({selWeeks.size} selecionada{selWeeks.size===1?"":"s"})</div>
           <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:90}}>
@@ -1800,7 +1801,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
               const sel=selWeeks.has(d); const cnt=countForDate(d);
               return(
                 <div key={d} onClick={()=>toggleWeek(d)} style={{display:"flex",alignItems:"center",gap:10,background:sel?"#0c1f3d":"#060c18",border:`1.5px solid ${sel?"#3b82f6":"#0f172a"}`,borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
-                  <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${sel?"#3b82f6":"#64748b"}`,background:sel?"#3b82f6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{sel?"✓":""}</div>
+                  <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${sel?"#3b82f6":"#64748b"}`,background:sel?"#3b82f6":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",flexShrink:0}}>{sel?<><Ico n="check"/></>:""}</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,fontWeight:700,color:"#f1f5f9"}}>{getWeekLabel(d)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(d)}</span></div>
                   </div>
@@ -1812,7 +1813,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         </div>
         <div style={{position:"fixed",bottom:0,left:0,right:0,background:"#020510",borderTop:"1px solid #0f172a",padding:14}}>
           <button onClick={gerar} disabled={selWeeks.size===0} style={{...S.primaryBtn,width:"100%",background:selWeeks.size===0?"#1e293b":"linear-gradient(135deg,#1d4ed8,#1e3a8a)",fontSize:14,opacity:selWeeks.size===0?0.6:1,maxWidth:480,margin:"0 auto",display:"block"}}>
-            📊 Gerar Comparativo ({selWeeks.size} semana{selWeeks.size===1?"":"s"})
+            <Ico n="grafico"/> Gerar Comparativo ({selWeeks.size} semana{selWeeks.size===1?"":"s"})
           </button>
         </div>
       </div>
@@ -1873,11 +1874,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                 followupsInfo
               );
             }}
-            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 PDF</button>
+            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}><Ico n="arquivo"/> PDF</button>
           {onEditReport&&<button onClick={()=>onEditReport(viewReport.project,viewReport.report,viewReport.idx)}
-            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}>✏️ Editar</button>}
+            style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#0369a1,#0c4a6e)",fontSize:13}}><Ico n="editar"/> Editar</button>}
           <button onClick={()=>{setConfirmDel({projectId:viewReport.project.id,idx:viewReport.idx,date:viewReport.report.meta?.date});setViewReport(null);}}
-            style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}} aria-label="Excluir relatório">🗑 Excluir</button>
+            style={{...S.secBtn,flex:1,color:"#ef4444",borderColor:"#ef444433",fontSize:13}} aria-label="Excluir relatório"><Ico n="lixeira"/> Excluir</button>
         </div>
       </div>
     </div>
@@ -1901,7 +1902,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"10px 14px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
               <div>
-                <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}>🔗 Link Manutencao</div>
+                <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}><Ico n="elo"/> Link Manutencao</div>
                 <div style={{fontSize:11,color:"#94a3b8"}}>{viewToken?"Ativo":"Inativo"}</div>
               </div>
               <button onClick={()=>toggleViewLink(p.id)} style={{...S.sm,...(viewToken?S.smBad:S.smOk),fontSize:11,padding:"5px 10px"}}>
@@ -1910,17 +1911,17 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             </div>
             {viewToken&&<div style={{marginTop:8}}>
               <div style={{fontSize:11,color:"#94a3b8",wordBreak:"break-all",background:"#020510",padding:"5px 8px",borderRadius:5,marginBottom:5}}>{viewUrl}</div>
-              <button onClick={()=>navigator.clipboard.writeText(viewUrl)} style={{...S.sm,fontSize:11,width:"100%"}}>📋 Copiar Link</button>
+              <button onClick={()=>navigator.clipboard.writeText(viewUrl)} style={{...S.sm,fontSize:11,width:"100%"}}><Ico n="prancheta"/> Copiar Link</button>
             </div>}
           </div>
           {sel.length>=2&&<>
             <button onClick={async()=>{const fu=await loadFollowups(db,p.id).catch(()=>({}));generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")),{followups:fu});}}
             style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:6,fontSize:14}}>
-            📊 Gerar Consolidado ({sel.length} semanas)</button>
+            <Ico n="grafico"/> Gerar Consolidado ({sel.length} semanas)</button>
             <button onClick={async()=>{const fu=await loadFollowups(db,p.id).catch(()=>({}));generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")),{followups:fu,interno:true});}}
             style={{...S.sm,width:"100%",marginBottom:8,fontSize:12}}>
-            🔎 Versão interna (com conferência de divergências)</button></>}
-          {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#94a3b8",marginBottom:8}}>☑ Selecione 2 a 6 relatorios para consolidado</div>}
+            <Ico n="busca"/> Versão interna (com conferência de divergências)</button></>}
+          {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#94a3b8",marginBottom:8}}><Ico n="quadradoCheck"/> Selecione 2 a 6 relatorios para consolidado</div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {hist.slice().reverse().map((r,revIdx)=>{
               const realIdx=hist.length-1-revIdx;
@@ -1932,23 +1933,23 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                   <div style={{display:"flex",alignItems:"center",gap:10}}>
                     <button onClick={()=>toggleSel(realIdx)}
                       style={{width:30,height:30,borderRadius:6,border:`2px solid ${isSelected?color:"#94a3b8"}`,background:isSelected?color+"22":"transparent",flexShrink:0,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:isSelected?color:"#94a3b8"}}>
-                      {isSelected?"✓":""}
+                      {isSelected?<><Ico n="check"/></>:""}
                     </button>
                     <HealthRing pct={h.pct} size={44}/>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
                       <div style={{fontSize:11,color:"#64748b"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}{r.meta?.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(r.meta.tempoPreenchimentoSeg/60)}min`:""}</div>
-                      {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}>✍ {r.meta.signature}</div>}
-                      <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inop`:"✔ OK"}</div>
+                      {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}><Ico n="editar"/> {r.meta.signature}</div>}
+                      <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inop`:<><Ico n="check"/>{" OK"}</>}</div>
                     </div>
                   </div>
                   <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
                     <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
                   </div>
                   <div style={{display:"flex",gap:6,marginTop:10}}>
-                    <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}>👁 Ver</button>
-                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id), loadFollowups(db,p.id).catch(()=>({}))]); await generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>📄 PDF</button>
-                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório">🗑</button>
+                    <button onClick={()=>setViewReport({project:p,report:r,idx:realIdx})} style={{...S.secBtn,flex:1,padding:"9px",fontSize:12}}><Ico n="olho"/> Ver</button>
+                    <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(p.id), loadEnergiaResumoParaPDF(p.id), loadFollowups(db,p.id).catch(()=>({}))]); await generatePDF(p,r.state,r.meta,[],ctmkInfoFor(p.id),inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,padding:"9px",fontSize:12,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}><Ico n="arquivo"/> PDF</button>
+                    <button onClick={()=>setConfirmDel({projectId:p.id,idx:realIdx,date:r.meta?.date})} style={{...S.secBtn,padding:"9px 12px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}} aria-label="Excluir relatório"><Ico n="lixeira"/></button>
                   </div>
                 </div>
               );
@@ -1996,11 +1997,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         </div>}
 
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
-          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>📋 Análise de Risco por Grupo</div>
-          <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Golgi</button>
-          <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Mega</button>
-          <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}>📋 Análise de Risco Klog</button>
-          <button onClick={onGestaoFV} style={{...S.primaryBtn,width:"100%",marginTop:8}}>💰 Gestão FV</button>
+          <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="prancheta"/> Análise de Risco por Grupo</div>
+          <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}><Ico n="prancheta"/> Análise de Risco Golgi</button>
+          <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}><Ico n="prancheta"/> Análise de Risco Mega</button>
+          <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}><Ico n="prancheta"/> Análise de Risco Klog</button>
+          <button onClick={onGestaoFV} style={{...S.primaryBtn,width:"100%",marginTop:8}}><Ico n="moeda"/> Gestão FV</button>
         </div>}
         {/* Recursos gerenciais renderizados a partir do registro único
             (gerenciaisConfig.js). Evita que um recurso — como a Visão 360 —
@@ -2017,7 +2018,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             );
           })}
         </div>
-        {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>🔴 {allPend.filter(p=>p.status==="inop").length} Inop · ⚠️ {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
+        {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}><Ico n="pontoVermelho"/> {allPend.filter(p=>p.status==="inop").length} Inop · <Ico n="alerta"/> {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
         </div>
@@ -2107,7 +2108,7 @@ function PendenciesScreen({stored, onBack}) {
             <button key={key} onClick={()=>setFilter(key)} style={{...S.sm,flex:1,padding:"7px",fontSize:11,...(filter===key?{background:"#1d4ed8",border:"1px solid #1d4ed8",color:"white"}:{})}}>{label} ({count})</button>
           ))}
         </div>
-        {filtered.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:"#22c55e",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>✅</div>Nenhuma pendência encontrada!</div>}
+        {filtered.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:"#22c55e",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}><Ico n="checkCirculo"/></div>Nenhuma pendência encontrada!</div>}
         {(()=>{
           // Agrupa por projeto preservando a ordem (mais antiga primeiro, pois filtered já vem ordenado por dias desc)
           const grupos=[]; const gIdx={};
@@ -2179,7 +2180,7 @@ function PendenciesScreen({stored, onBack}) {
                               </div>
                             </div>
                             <button type="button" onClick={()=>abrirFollowup(p)} style={{...S.sm,width:"100%",marginTop:8,padding:"7px 9px",fontSize:11,textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                              <span>📋 {fu?"Atualizar / ver tratativas":"Registrar follow-up"}</span>
+                              <span><Ico n="prancheta"/> {fu?"Atualizar / ver tratativas":"Registrar follow-up"}</span>
                               {fuInfo&&<span style={{color:fuInfo.color,fontWeight:800}}>{fuInfo.label}</span>}
                             </button>
                             {painelAberto&&<div style={{marginTop:8,padding:"10px",border:"1px solid #1e293b",borderRadius:8,background:"#060c18"}}>
@@ -2190,9 +2191,9 @@ function PendenciesScreen({stored, onBack}) {
                                 </select>
                                 <textarea value={fuForm.texto} onChange={e=>setFuForm(f=>({...f,texto:e.target.value}))} placeholder="Descreva a tratativa, responsável e próximo passo..." rows={3} style={{...S.inp,width:"100%",resize:"vertical",marginBottom:7}}/>
                                 <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link de evidência, chamado ou orçamento (opcional)" style={{...S.inp,width:"100%",marginBottom:7}}/>
-                                <button type="button" disabled={fuSaving} onClick={()=>salvarFollowup(p)} style={{...S.primaryBtn,width:"100%",fontSize:11,opacity:fuSaving?.65:1}}>{fuSaving?"Salvando...":"💾 Salvar follow-up"}</button>
+                                <button type="button" disabled={fuSaving} onClick={()=>salvarFollowup(p)} style={{...S.primaryBtn,width:"100%",fontSize:11,opacity:fuSaving?.65:1}}>{fuSaving?"Salvando...":<><Ico n="disquete"/>{" Salvar follow-up"}</>}</button>
                               </>:<div style={{fontSize:11,color:"#94a3b8"}}>Somente o perfil gerencial pode registrar tratativas.</div>}
-                              <div style={{fontSize:10,color:"#94a3b8",fontWeight:800,marginTop:10,marginBottom:5}}>📋 Tratativas registradas ({fu?.entries?.length||0})</div>
+                              <div style={{fontSize:10,color:"#94a3b8",fontWeight:800,marginTop:10,marginBottom:5}}><Ico n="prancheta"/> Tratativas registradas ({fu?.entries?.length||0})</div>
                               {(fu?.entries||[]).length===0?<div style={{fontSize:11,color:"#64748b"}}>Nenhuma tratativa registrada.</div>:(fu.entries||[]).map((entry,idx)=>{
                                 const info=statusInfo(entry.status);
                                 return <div key={entry.id||idx} style={{borderTop:"1px solid #0f172a",padding:"7px 0"}}>
@@ -2242,12 +2243,12 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
         </div>
         {canManage&&(
           <div style={{display:"flex",gap:8,marginBottom:8}}>
-            <button onClick={()=>onEdit&&onEdit(project,rep,viewReport.idx)} style={{...S.secBtn,flex:1,fontSize:13,color:"#f59e0b",border:"1px solid #f59e0b44"}}>✏️ Editar este relatório</button>
-            <button onClick={()=>{if(window.confirm("Excluir definitivamente o relatório de "+fmtDate(repMeta.date)+"? Essa ação não pode ser desfeita.")){onDelete&&onDelete(project.id,viewReport.idx);setViewReport(null);}}} style={{...S.secBtn,flex:1,fontSize:13,color:"#ef4444",border:"1px solid #ef444444"}}>🗑 Excluir</button>
+            <button onClick={()=>onEdit&&onEdit(project,rep,viewReport.idx)} style={{...S.secBtn,flex:1,fontSize:13,color:"#f59e0b",border:"1px solid #f59e0b44"}}><Ico n="editar"/> Editar este relatório</button>
+            <button onClick={()=>{if(window.confirm("Excluir definitivamente o relatório de "+fmtDate(repMeta.date)+"? Essa ação não pode ser desfeita.")){onDelete&&onDelete(project.id,viewReport.idx);setViewReport(null);}}} style={{...S.secBtn,flex:1,fontSize:13,color:"#ef4444",border:"1px solid #ef444444"}}><Ico n="lixeira"/> Excluir</button>
           </div>
         )}
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-          <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📂 Últimos testes</div>
+          <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}><Ico n="pasta"/> Últimos testes</div>
           {ultimos.map((u,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:i<ultimos.length-1?"1px solid #0a0f1e":"none"}}>
               <span style={{fontSize:11,fontWeight:800,color:"#cbd5e1",minWidth:54}}>{u.wk}</span>
@@ -2257,7 +2258,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
           ))}
         </div>
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:10,padding:"12px 14px",marginBottom:8}}>
-          <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>📋 Cabeçalho</div>
+          <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}><Ico n="prancheta"/> Cabeçalho</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             {[
               ["Data",        fmtDate(repMeta.date)],
@@ -2303,7 +2304,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
                 <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:3}}>▸ {it?.label}{it?.note?` — ${it.note}`:""}</div>
               ))}
               {cat.type==="maintenance"&&Array.isArray(sv.visits)&&sv.visits.map((v,i)=>(
-                <div key={i} style={{fontSize:11,color:"#94a3b8",marginLeft:16,marginTop:3}}>🔧 {fmtDate(v?.date)} · {v?.empresa||"—"} · {v?.tec1||"—"}</div>
+                <div key={i} style={{fontSize:11,color:"#94a3b8",marginLeft:16,marginTop:3}}><Ico n="ferramenta"/> {fmtDate(v?.date)} · {v?.empresa||"—"} · {v?.tec1||"—"}</div>
               ))}
             </div>
           );
@@ -2314,7 +2315,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
             <div style={{fontSize:12,color:"#94a3b8"}}>{repMeta.obs}</div>
           </div>
         )}
-        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:8}}>👁 Somente leitura — sem PDF neste acesso</div>
+        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:8}}><Ico n="olho"/> Somente leitura — sem PDF neste acesso</div>
       </div>
     </div>
     );
@@ -2327,7 +2328,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
           <button onClick={onBack} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#94a3b8"}}>{project.name} · {hist.length} relatório(s)</div></div>
         </div>
-        {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#94a3b8",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}>📭</div>Nenhum relatorio salvo ainda.</div>}
+        {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#94a3b8",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}><Ico n="pasta"/></div>Nenhum relatorio salvo ainda.</div>}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {hist.map((r,i)=>{
             const h=computeHealth(project,r.state);
@@ -2339,8 +2340,8 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
                     <div style={{fontSize:11,color:"#64748b"}}>Lider: {r.meta?.leader||"—"} · CCO: {r.meta?.cco||"—"}</div>
-                    {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}>✍ {r.meta.signature}</div>}
-                    <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inoperante(s)`:"✔ Tudo OK"}</div>
+                    {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}><Ico n="editar"/> {r.meta.signature}</div>}
+                    <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inoperante(s)`:<><Ico n="check"/>{" Tudo OK"}</>}</div>
                   </div>
                 </div>
                 <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
@@ -2349,7 +2350,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
                 <div style={{marginTop:10}}>
                   <button onClick={()=>setViewReport({project,report:r,idx:hist.length-1-i})}
                     style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px"}}>
-                    👁 Ver Relatório Completo
+                    <Ico n="olho"/> Ver Relatório Completo
                   </button>
                 </div>
               </div>
@@ -2401,18 +2402,18 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
           <HealthRing pct={computeHealth(project,state).pct} size={44}/>
         </div>
         <div style={{background:"#021a0d",border:"1px solid #22c55e",borderRadius:10,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:18}}>✅</span>
+          <span style={{fontSize:18}}><Ico n="checkCirculo"/></span>
           <div><div style={{fontSize:13,fontWeight:700,color:"#22c55e"}}>Relatorio finalizado!</div><div style={{fontSize:11,color:"#64748b"}}>Salvo · {fmtDate(meta.date)} · Assinado por {meta.signature||"—"}{meta.tempoPreenchimentoSeg?` · ⏱️ ${Math.floor(meta.tempoPreenchimentoSeg/60)}min${meta.tempoPreenchimentoSeg%60>0?String(meta.tempoPreenchimentoSeg%60).padStart(2,"0")+"s":""}`:""}</div></div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id), loadFollowups(db,project.id).catch(()=>({}))]); await generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}>📄 Exportar PDF</button>
-          <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?"✓ Copiado!":"📋 Copiar Texto"}</button>
+          <button onClick={async ()=>{ const [inquilinosInfo, energiaInfo, followupsInfo] = await Promise.all([loadInquilinosParaPDF(project.id), loadEnergiaResumoParaPDF(project.id), loadFollowups(db,project.id).catch(()=>({}))]); await generatePDF(project,state,meta,photos,ctmkInfo,inquilinosInfo,energiaInfo,followupsInfo); }} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:13}}><Ico n="arquivo"/> Exportar PDF</button>
+          <button onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{...S.primaryBtn,flex:1,fontSize:13}}>{copied?<><Ico n="check"/>{" Copiado!"}</>:<><Ico n="prancheta"/>{" Copiar Texto"}</>}</button>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <button onClick={handleEmail} disabled={sending||emailSent} style={{...S.primaryBtn,flex:1,background:emailSent?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#059669,#047857)",fontSize:13,opacity:sending?0.7:1}}>{sending?"⟳ Enviando...":emailSent?"✓ Email Enviado!":"✉ Enviar Email"}</button>
-          <button onClick={handleWhatsApp} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#16a34a,#15803d)",fontSize:13}}>💬 WhatsApp</button>
+          <button onClick={handleEmail} disabled={sending||emailSent} style={{...S.primaryBtn,flex:1,background:emailSent?"linear-gradient(135deg,#16a34a,#15803d)":"linear-gradient(135deg,#059669,#047857)",fontSize:13,opacity:sending?0.7:1}}>{sending?"⟳ Enviando...":emailSent?<><Ico n="check"/>{" Email Enviado!"}</>:"✉ Enviar Email"}</button>
+          <button onClick={handleWhatsApp} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#16a34a,#15803d)",fontSize:13}}><Ico n="mensagem"/> WhatsApp</button>
         </div>
-        <button onClick={onHome} style={{...S.secBtn,width:"100%",fontSize:13}}>🏠 Inicio</button>
+        <button onClick={onHome} style={{...S.secBtn,width:"100%",fontSize:13}}><Ico n="casa"/> Inicio</button>
         <div style={{background:"#f8fafc",borderRadius:10,padding:"14px 16px",border:"1px solid #e2e8f0",maxHeight:"45vh",overflowY:"auto",marginTop:12}}>
           <pre style={{margin:0,fontFamily:"'Courier New',monospace",fontSize:11,whiteSpace:"pre-wrap",color:"#1e293b",lineHeight:1.7}}>{text}</pre>
         </div>
@@ -2451,11 +2452,11 @@ function ViewScreen({projectId, token, stored}) {
     </div>
   );
   if(!project || !validToken || (token !== validToken && token !== (projectId+"_"+validToken) && token !== validToken.split("_").pop())) {
-    return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>🔒</div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#94a3b8"}}>Solicite um novo link ao gestor.</div></div></div>);
+    return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}><Ico n="cadeado"/></div><div style={{fontSize:16,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Link invalido ou expirado</div><div style={{fontSize:13,color:"#94a3b8"}}>Solicite um novo link ao gestor.</div></div></div>);
   }
   const hist = stored[projectId]?.history??[];
   const last = hist.slice(-1)[0];
-  if(!last) return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}>📭</div><div style={{fontSize:16,color:"#f1f5f9"}}>Sem relatorios disponíveis ainda.</div></div></div>);
+  if(!last) return(<div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{textAlign:"center",padding:32,color:"#94a3b8"}}><div style={{fontSize:40,marginBottom:12}}><Ico n="pasta"/></div><div style={{fontSize:16,color:"#f1f5f9"}}>Sem relatorios disponíveis ainda.</div></div></div>);
   const h = computeHealth(project, last.state);
   const issues = [];
   for(const cat of project.categories){const s=last.state[cat.id];if(!s)continue;if(cat.type==="single"){const st=resolveStatus(s);if(st!=="ok")issues.push({cat:cat.label,item:"—",status:st,since:s.since,note:s.note});}else if(cat.type==="items"){s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok")issues.push({cat:cat.label,item:cat.itemLabels[i],status:st,since:v.since,note:v.note});});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push({cat:cat.label,item:it.id||"?",status:"inop",since:it.since,note:it.note}));}}
@@ -2470,7 +2471,7 @@ function ViewScreen({projectId, token, stored}) {
           </div>
         </div>
         <div style={{fontSize:12,fontWeight:700,color:"#f1f5f9",marginBottom:8}}>Itens com Pendencia ({issues.length})</div>
-        {issues.length===0&&<div style={{textAlign:"center",padding:"20px",color:"#22c55e",fontSize:13}}>✔ Nenhuma pendencia ativa</div>}
+        {issues.length===0&&<div style={{textAlign:"center",padding:"20px",color:"#22c55e",fontSize:13}}><Ico n="check"/> Nenhuma pendencia ativa</div>}
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
           {issues.map((iss,i)=>(
             <div key={i} style={{background:"#060c18",border:`1px solid ${iss.status==="partial"?"#f59e0b33":"#ef444433"}`,borderRadius:8,padding:"10px 12px"}}>
@@ -2534,7 +2535,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onBack} style={backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,color:txt}}>🛡️ Equipamentos</div>
+              <div style={{fontSize:15,fontWeight:800,color:txt}}><Ico n="escudo"/> Equipamentos</div>
               <div style={{fontSize:11,color:txt2}}>Todos os projetos</div>
             </div>
             <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${border}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,color:txt2}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
@@ -2553,7 +2554,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
                 <button key={p.id} onClick={()=>onOpenEquip(p)}
                   style={{background:cardBg,border:`2px solid ${hasProb?inop>0?"#ef444444":"#f59e0b44":border}`,borderRadius:12,padding:"14px 16px",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:12}}>
                   <div style={{width:44,height:44,borderRadius:10,background:hasProb?inop>0?"#1a0202":"#1a1000":"#021a0d",border:`1px solid ${hasProb?inop>0?"#ef444433":"#f59e0b33":"#22c55e33"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:20}}>
-                    🛡️
+                    <Ico n="escudo"/>
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,fontWeight:800,color:txt}}>{p.id}</div>
@@ -2561,9 +2562,9 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
                     {total>0?(
                       <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
                         <span style={{fontSize:11,fontWeight:700,color:"#0ea5e9",background:"#001a2e",padding:"1px 6px",borderRadius:4}}>{total} itens</span>
-                        {inop>0&&<span style={{fontSize:11,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"1px 6px",borderRadius:4}}>🔴 {inop} inop</span>}
-                        {parcial>0&&<span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#1a1000",padding:"1px 6px",borderRadius:4}}>⚠️ {parcial} parcial</span>}
-                        {!hasProb&&<span style={{fontSize:11,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}>✅ OK</span>}
+                        {inop>0&&<span style={{fontSize:11,fontWeight:700,color:"#ef4444",background:"#1a0202",padding:"1px 6px",borderRadius:4}}><Ico n="pontoVermelho"/> {inop} inop</span>}
+                        {parcial>0&&<span style={{fontSize:11,fontWeight:700,color:"#f59e0b",background:"#1a1000",padding:"1px 6px",borderRadius:4}}><Ico n="alerta"/> {parcial} parcial</span>}
+                        {!hasProb&&<span style={{fontSize:11,fontWeight:700,color:"#22c55e",background:"#021a0d",padding:"1px 6px",borderRadius:4}}><Ico n="checkCirculo"/> OK</span>}
                       </div>
                     ):(
                       <div style={{fontSize:11,color:txt2,marginTop:3}}>Inventário de equipamentos não preenchido</div>
@@ -2745,7 +2746,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     return (
       <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
-          <div style={{fontSize:32,marginBottom:8}}>🔐</div>
+          <div style={{fontSize:32,marginBottom:8}}><Ico n="chave"/></div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Registros</div>
           <div style={{fontSize:12,color:txt2,marginBottom:20}}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={entradaPin}
@@ -2789,7 +2790,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     return (
       <div style={{minHeight:"100vh",background:bg,display:"flex",justifyContent:"center",alignItems:"center",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif"}}>
         <div style={{background:cardBg,border:`1px solid ${border}`,borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
-          <div style={{fontSize:32,marginBottom:8}}>🛡️</div>
+          <div style={{fontSize:32,marginBottom:8}}><Ico n="escudo"/></div>
           <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>Equipamentos</div>
           <div style={{fontSize:12,color:txt2,marginBottom:20}}>PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={equipPinInput}
@@ -2822,7 +2823,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
     return (
       <div style={{ minHeight:"100vh", background:bg, display:"flex", justifyContent:"center", alignItems:"center", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif" }}>
         <div style={{ background:cardBg, border:`1px solid ${border}`, borderRadius:16, padding:"28px 24px", maxWidth:320, width:"100%", textAlign:"center", margin:16 }}>
-          <div style={{ fontSize:32, marginBottom:8 }}>🔐</div>
+          <div style={{ fontSize:32, marginBottom:8 }}><Ico n="chave"/></div>
           <div style={{ fontSize:16, fontWeight:800, color:txt, marginBottom:4 }}>Área Restrita</div>
           <div style={{ fontSize:12, color:txt2, marginBottom:20 }}>Insira o PIN gerencial ou o PIN do seu projeto</div>
           <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8} value={pinInput}
@@ -2853,7 +2854,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <button onClick={()=>setSubScreen(null)} style={backBtn} aria-label="Voltar">← Voltar</button>
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 Colaboradores</div>
+                <div style={{ fontSize:15, fontWeight:800, color:txt }}><Ico n="usuarios"/> Colaboradores</div>
                 <div style={{ fontSize:11, color:txt2 }}>Selecione o projeto</div>
               </div>
               <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
@@ -2867,7 +2868,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 <button key={p.id} onClick={()=>{ setSelProject(p); }}
                   style={{ background:cardBg, border:`1px solid ${colabCount>0?"#0ea5e944":border}`, borderRadius:12, padding:"14px 16px", cursor:"pointer", textAlign:"left", display:"flex", alignItems:"center", gap:12 }}>
                   <div style={{ width:42, height:42, borderRadius:10, background: dark?"#0f172a":"#f1f5f9", border:`1px solid ${border}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <span style={{ fontSize:18 }}>👥</span>
+                    <span style={{ fontSize:18 }}><Ico n="usuarios"/></span>
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:800, color:txt }}>{p.id}</div>
@@ -2893,7 +2894,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={backBtn} aria-label="Voltar ao início">← Início</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:txt }}>📋 Registros</div>
+              <div style={{ fontSize:15, fontWeight:800, color:txt }}><Ico n="prancheta"/> Registros</div>
               <div style={{ fontSize:11, color:txt2 }}>Colaboradores e Acessos</div>
             </div>
             <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
@@ -2927,7 +2928,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               return (
                 <div style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#334155":"#e2e8f0"}`, borderRadius:16, padding:"14px 18px", animation:"mkFadeIn .35s ease both" }}>
                   <div onClick={()=>toggleRh("projetos")} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer" }}>
-                    <div style={{ fontSize:22 }}>🗂️</div>
+                    <div style={{ fontSize:22 }}><Ico n="pasta"/></div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:15, fontWeight:800, color:txt }}>Projetos</div>
                       <div style={{ fontSize:11, color:txt2, marginTop:1 }}>Abrir o painel de um projeto (visão do líder)</div>
@@ -2960,7 +2961,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
               <div style={{display:"flex",alignItems:"center",gap:14}}>
                 <div style={{ width:54, height:54, borderRadius:14, background: dark?"#001a2e":"#e0f2fe", border:`1px solid ${dark?"#0ea5e955":"#7dd3fc"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #0ea5e922":"none" }}>
-                  <span style={{ fontSize:25 }}>👥</span>
+                  <span style={{ fontSize:25 }}><Ico n="usuarios"/></span>
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
@@ -2971,8 +2972,8 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               {st&&(
                 <>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:11}}>
-                    <Badge cor="#22c55e">🟢 {st.ativos} ativo(s)</Badge>
-                    <Badge cor="#0ea5e9">🏖️ {st.feriasHoje} em férias</Badge>
+                    <Badge cor="#22c55e"><Ico n="pontoVerde"/> {st.ativos} ativo(s)</Badge>
+                    <Badge cor="#0ea5e9"><Ico n="guardachuva"/> {st.feriasHoje} em férias</Badge>
                   </div>
                   {disp!==null&&(
                     <>
@@ -2997,7 +2998,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               </div>);
               return (
               <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
-                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⚡ Requer atenção</div>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}><Ico n="raio"/> Requer atenção</div>
 
                 {st.voltamFerias>0&&<div style={{borderBottom:rowBorder}}>
                   <div onClick={()=>toggleRh("volta")} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",cursor:"pointer"}}>
@@ -3041,7 +3042,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               const lista = rhExpand.vetAll ? st.veteranos : st.veteranos.slice(0,8);
               return (
               <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
-                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>⭐ Veteranos — tempo de casa</div>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}><Ico n="estrela"/> Veteranos — tempo de casa</div>
                 {lista.map((v,i)=>{
                   const anos=Math.floor(v.meses/12), resto=v.meses%12;
                   const tempo=anos>0?`${anos}a ${resto}m`:`${resto}m`;
@@ -3054,7 +3055,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                   </div>);
                 })}
                 {st.veteranos.length>8&&<div onClick={()=>toggleRh("vetAll")} style={{textAlign:"center",fontSize:11,color:"#38bdf8",fontWeight:700,cursor:"pointer",padding:"7px 0 2px"}}>{rhExpand.vetAll?"▲ ver menos":`▼ ver todos (${st.veteranos.length})`}</div>}
-                <div style={{fontSize:9,color:txt2,marginTop:8,fontStyle:"italic"}}>⭐ 1 ano+ · ⭐⭐ 3 anos+ · ⭐⭐⭐ 5 anos+ · toque num nome para abrir o arquivo pessoal</div>
+                <div style={{fontSize:9,color:txt2,marginTop:8,fontStyle:"italic"}}><Ico n="estrela"/> 1 ano+ · <Ico n="estrela"/><Ico n="estrela"/> 3 anos+ · <Ico n="estrela"/><Ico n="estrela"/><Ico n="estrela"/> 5 anos+ · toque num nome para abrir o arquivo pessoal</div>
               </div>);
             })()}
 
@@ -3064,7 +3065,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               const lista = rhExpand.movPior ? piorPrimeiro : comDados.slice(0,8);
               return (
               <div style={{background:dark?"#070d18":cardBg,border:`1px solid ${dark?"#0ea5e922":"#bae6fd"}`,borderRadius:14,padding:"14px 16px"}}>
-                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>🛡️ Movimentação de equipe (90d) — {rhExpand.movPior?"maior no topo":"menor no topo"}</div>
+                <div style={{fontSize:9,color:txt2,fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}><Ico n="escudo"/> Movimentação de equipe (90d) — {rhExpand.movPior?"maior no topo":"menor no topo"}</div>
                 {lista.map((e,i)=>{
                   const cor=e.desligados90d===0?"#22c55e":e.taxa<=0.1?"#84cc16":e.taxa<=0.25?"#f59e0b":"#ef4444";
                   const pctBar=100-Math.min(80,Math.round(e.taxa*160));
@@ -3085,7 +3086,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none"), animation:"mkFadeIn .35s ease both", animationDelay:"60ms" }}>
               <div style={{display:"flex",alignItems:"center",gap:14}}>
                 <div style={{ width:54, height:54, borderRadius:14, background: dark?"#1a1000":"#fffbeb", border:`1px solid ${dark?"#f59e0b55":"#fcd34d"}`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:dark?"0 0 10px #f59e0b22":"none", position:"relative" }}>
-                  <span style={{ fontSize:25 }}>🛡️</span>
+                  <span style={{ fontSize:25 }}><Ico n="escudo"/></span>
                   {st&&st.inop>0&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444",animation:"regPulse 1.4s ease-in-out infinite"}}/>}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
@@ -3098,10 +3099,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                 <>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:11}}>
                     {st.inop===0&&st.parcial===0
-                      ? <Badge cor="#22c55e">✅ Tudo operacional</Badge>
+                      ? <Badge cor="#22c55e"><Ico n="checkCirculo"/> Tudo operacional</Badge>
                       : (<>
-                          {st.inop>0&&<Badge cor="#ef4444" pulse>🔴 {st.inop} inop</Badge>}
-                          {st.parcial>0&&<Badge cor="#f59e0b">⚠️ {st.parcial} parcial</Badge>}
+                          {st.inop>0&&<Badge cor="#ef4444" pulse><Ico n="pontoVermelho"/> {st.inop} inop</Badge>}
+                          {st.parcial>0&&<Badge cor="#f59e0b"><Ico n="alerta"/> {st.parcial} parcial</Badge>}
                         </>)
                     }
                   </div>
@@ -3140,11 +3141,11 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
   const backBtn = { background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", flexShrink:0, fontWeight:600 };
 
   const TURNO_CONFIG = {
-    "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
-    "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
-    "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:"☀️🌙" },
-    "Diurno A":  { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:"☀️" },
-    "Noturno A": { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:"🌙" },
+    "Diurno":    { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:<><Ico n="sol"/></> },
+    "Noturno":   { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:<><Ico n="lua"/></> },
+    "Folguista": { bg:"#1a1a10", border:"#f59e0b33", badge:"#f59e0b", icon:<><Ico n="sol"/><Ico n="lua"/></> },
+    "Diurno A":  { bg:"#1a2e1a", border:"#22c55e33", badge:"#22c55e", icon:<><Ico n="sol"/></> },
+    "Noturno A": { bg:"#0a0a2e", border:"#6366f133", badge:"#818cf8", icon:<><Ico n="lua"/></> },
     "Diurno B":  { bg:"#1a2a10", border:"#84cc1633", badge:"#a3e635", icon:"🌤️" },
     "Noturno B": { bg:"#0f0a2a", border:"#a855f733", badge:"#c084fc", icon:"🌃" },
   };
@@ -3181,7 +3182,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
   if(loading) return (
     <div style={{ minHeight:"100vh", background:bg, display:"flex", alignItems:"center", justifyContent:"center" }}>
       <div style={{ textAlign:"center" }}>
-        <div style={{ fontSize:28, marginBottom:8 }}>👥</div>
+        <div style={{ fontSize:28, marginBottom:8 }}><Ico n="usuarios"/></div>
         <div style={{ fontSize:13, color:txt2 }}>Carregando equipe...</div>
       </div>
     </div>
@@ -3199,7 +3200,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <button onClick={onBack} style={backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:txt }}>👥 {project.id}</div>
+              <div style={{ fontSize:15, fontWeight:800, color:txt }}><Ico n="usuarios"/> {project.id}</div>
               <div style={{ fontSize:11, color:txt2 }}>{project.name} · {ativos.length} ativo(s)</div>
             </div>
             <button onClick={onToggleTheme} style={{ background:"transparent", border:`1px solid ${border}`, borderRadius:8, padding:"5px 10px", cursor:"pointer", fontSize:14, color:txt2 }} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
@@ -3226,7 +3227,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
 
           {ativos.length === 0 ? (
             <div style={{ textAlign:"center", padding:"40px 0" }}>
-              <div style={{ fontSize:36, marginBottom:10 }}>👥</div>
+              <div style={{ fontSize:36, marginBottom:10 }}><Ico n="usuarios"/></div>
               <div style={{ fontSize:14, color:txt }}>Equipe vazia</div>
               <div style={{ fontSize:12, color:txt2, marginTop:4 }}>Nenhum colaborador cadastrado</div>
             </div>
@@ -3251,15 +3252,15 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
                         return (
                           <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", marginBottom:6, border:`1px solid ${tc.border}` }}>
                             <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${tc.badge}44`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                              {fotoDe(c, fotosEq.mapa) ? <img src={fotoDe(c, fotosEq.mapa)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
+                              {fotoDe(c, fotosEq.mapa) ? <img src={fotoDe(c, fotosEq.mapa)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}><Ico n="usuario"/></span>}
                             </div>
                             <div style={{ flex:1, minWidth:0 }}>
                               <div style={{ fontSize:13, fontWeight:700, color:txt, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
                               <div style={{ fontSize:11, color:txt2 }}>{c.cargo}</div>
                               <div style={{ display:"flex", gap:5, marginTop:3, flexWrap:"wrap" }}>
                                 {c.escala && <span style={{ fontSize:11, color:"#0ea5e9", background: dark?"#001a2e":"#e0f2fe", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}
-                                {c.telefone && <span style={{ fontSize:11, color:txt2 }}>📱 {c.telefone}</span>}
-                                {c.dataContratacao && <span style={{ fontSize:11, color:txt2 }}>📅 {fmtDate(c.dataContratacao)}</span>}
+                                {c.telefone && <span style={{ fontSize:11, color:txt2 }}><Ico n="celular"/> {c.telefone}</span>}
+                                {c.dataContratacao && <span style={{ fontSize:11, color:txt2 }}><Ico n="calendario"/> {fmtDate(c.dataContratacao)}</span>}
                               </div>
                             </div>
                             <div style={{ flexShrink:0, textAlign:"right" }}>
@@ -3277,7 +3278,7 @@ function EquipeReadOnly({ project, dark, stored, onBack, onToggleTheme, onOpenFu
               {ativos.filter(c=>!TURNOS.includes(c.turno)).map(c=>(
                 <div key={c.id} style={{ display:"flex", alignItems:"center", gap:10, background:cardBg, borderRadius:10, padding:"10px 12px", border:`1px solid ${border}` }}>
                   <div style={{ width:44, height:44, borderRadius:10, overflow:"hidden", border:`2px solid ${border}`, flexShrink:0, background: dark?"#0f172a":"#f1f5f9", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    {fotoDe(c, fotosEq.mapa) ? <img src={fotoDe(c, fotosEq.mapa)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}>👤</span>}
+                    {fotoDe(c, fotosEq.mapa) ? <img src={fotoDe(c, fotosEq.mapa)} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : <span style={{ fontSize:20 }}><Ico n="usuario"/></span>}
                   </div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:txt }}>{c.nome}</div>
@@ -3907,11 +3908,11 @@ export default function App(){
         <div style={{position:"fixed",bottom:16,right:16,background:"#1d4ed8",color:"#fff",borderRadius:20,padding:"7px 14px",fontSize:12,fontWeight:700,zIndex:999}}>⟳ Sincronizando...</div>
       )}
       {syncStatus==="saved" && (
-        <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:isSunday()?"9px 18px":"7px 14px",fontSize:isSunday()?13:12,fontWeight:800,zIndex:999,boxShadow:isSunday()?"0 4px 18px rgba(21,128,61,.5)":"none"}}>{isSunday()?"✅ Teste Semanal Finalizado!":"✓ Salvo"}</div>
+        <div style={{position:"fixed",bottom:16,right:16,background:"#15803d",color:"#fff",borderRadius:20,padding:isSunday()?"9px 18px":"7px 14px",fontSize:isSunday()?13:12,fontWeight:800,zIndex:999,boxShadow:isSunday()?"0 4px 18px rgba(21,128,61,.5)":"none"}}>{isSunday()?<><Ico n="checkCirculo"/>{" Teste Semanal Finalizado!"}</>:<><Ico n="check"/>{" Salvo"}</>}</div>
       )}
       {pendingSync && (
         <div style={{position:"fixed",bottom:16,left:16,right:16,maxWidth:420,margin:"0 auto",background:"#7c2d12",color:"#fff",borderRadius:12,padding:"12px 14px",zIndex:1000,display:"flex",alignItems:"center",gap:10,boxShadow:"0 6px 24px rgba(0,0,0,.45)"}}>
-          <span style={{fontSize:20,flexShrink:0}}>⚠️</span>
+          <span style={{fontSize:20,flexShrink:0}}><Ico n="alerta"/></span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:12,fontWeight:700}}>Relatório não sincronizado — {pendingSync.projectId}</div>
             <div style={{fontSize:11,opacity:.85}}>Salvo só neste aparelho. Toque em "Tentar" para enviar ao servidor.</div>
@@ -3945,12 +3946,12 @@ export default function App(){
   if(showMonthlyPrompt) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #7c3aed",borderRadius:16,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",margin:16}}>
-        <div style={{fontSize:28,marginBottom:10}}>📊</div>
+        <div style={{fontSize:28,marginBottom:10}}><Ico n="grafico"/></div>
         <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Último teste do mês!</div>
         <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>Este é o último domingo do mês.<br/>Deseja gerar o consolidado mensal após finalizar?</div>
         <div style={{display:"flex",gap:8,flexDirection:"column"}}>
           <button onClick={()=>{setShowMonthlyPrompt(false);if(!meta.signature||meta.signature.trim()===""){setSigError(true);return;}saveReport(state,meta);setScreen("report");setTimeout(()=>{const hist=stored[project.id]?.history??[];const now=new Date();const monthReports=hist.map((r,i)=>({r,i})).filter(({r})=>{if(!r.meta?.date)return false;const d=new Date(r.meta.date+"T12:00:00");return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});if(monthReports.length>=2){generateConsolidatedPDF(project,monthReports.map(({r})=>r));}},1500);}} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",fontSize:14}}>
-            ✓ Finalizar + Gerar Consolidado
+            <Ico n="check"/> Finalizar + Gerar Consolidado
           </button>
           <button onClick={()=>{setShowMonthlyPrompt(false);if(!meta.signature||meta.signature.trim()===""){setSigError(true);return;}saveReport(state,meta);setScreen("report");}} style={{...S.secBtn,width:"100%",fontSize:14}}>Só finalizar</button>
           <button onClick={()=>setShowMonthlyPrompt(false)} style={{...S.secBtn,width:"100%",fontSize:13,color:"#94a3b8"}}>Cancelar</button>
@@ -3962,13 +3963,13 @@ export default function App(){
   if(showDraftPrompt) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{background:"#060c18",border:"1px solid #f59e0b",borderRadius:16,padding:"28px 24px",maxWidth:320,width:"100%",textAlign:"center",margin:16}}>
-        <div style={{fontSize:28,marginBottom:10}}>📝</div>
+        <div style={{fontSize:28,marginBottom:10}}><Ico n="notas"/></div>
         <div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Rascunho encontrado</div>
         <div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>Relatorio em andamento de {project.id}. Continuar?</div>
         <div style={{display:"flex",gap:8,flexDirection:"column"}}>
           <button onClick={continueDraft} style={{...S.primaryBtn,width:"100%",fontSize:14}}>↩ Continuar rascunho</button>
-          <button onClick={discardDraft} style={{...S.secBtn,width:"100%",fontSize:14}}>📝 Descartar e comecar novo</button>
-          <button onClick={deleteDraftOnly} style={{...S.secBtn,width:"100%",fontSize:14,color:"#ef4444",borderColor:"#ef444444"}}>🗑 Excluir rascunho</button>
+          <button onClick={discardDraft} style={{...S.secBtn,width:"100%",fontSize:14}}><Ico n="notas"/> Descartar e comecar novo</button>
+          <button onClick={deleteDraftOnly} style={{...S.secBtn,width:"100%",fontSize:14,color:"#ef4444",borderColor:"#ef444444"}}><Ico n="lixeira"/> Excluir rascunho</button>
         </div>
       </div>
     </div>
@@ -4009,7 +4010,7 @@ export default function App(){
             )}
             {!h&&(
               <div style={{background:"#060c18",border:"1px solid #7c3aed33",borderRadius:12,padding:"20px",textAlign:"center"}}>
-                <div style={{fontSize:28,marginBottom:6}}>📋</div>
+                <div style={{fontSize:28,marginBottom:6}}><Ico n="prancheta"/></div>
                 <div style={{fontSize:13,color:"#a78bfa",fontWeight:700}}>Nenhum teste realizado ainda</div>
                 <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>Toque em "Novo Relatório" pra começar</div>
               </div>
@@ -4018,7 +4019,7 @@ export default function App(){
             <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
               style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
                 animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
-              <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}>📋</span></div>
+              <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}><Ico n="prancheta"/></span></div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
                 <div style={{fontSize:11,color:"#bfdbfe",fontWeight:700}}>P260A</div>
@@ -4026,11 +4027,11 @@ export default function App(){
               </div>
             </button>
             <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
-            <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}>📅 Histórico de Relatórios Semanais</button>
+            <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}><Ico n="calendario"/> Histórico de Relatórios Semanais</button>
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <button onClick={()=>{setEquipeProject({id:"P260A",name:"Jatinox Unidade A"});setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0ea5e9"),border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
-              <button onClick={()=>{setAcessoCCOProject({id:"P260A",name:"Jatinox Unidade A"});setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS({id:"P260A",name:"Jatinox Unidade A"});}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",gridColumn:"1/-1",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts["P260A"]&&rsCounts["P260A"].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts["P260A"].total} RS</span>{rsCounts["P260A"].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts["P260A"].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
+              <button onClick={()=>{setEquipeProject({id:"P260A",name:"Jatinox Unidade A"});setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0ea5e9"),border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="usuarios"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
+              <button onClick={()=>{setAcessoCCOProject({id:"P260A",name:"Jatinox Unidade A"});setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="porta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS({id:"P260A",name:"Jatinox Unidade A"});}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",gridColumn:"1/-1",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="prancheta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts["P260A"]&&rsCounts["P260A"].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts["P260A"].total} RS</span>{rsCounts["P260A"].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts["P260A"].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
             </div>
 
             <CtmkBadge info={ctmkData["P260A"]} onToggle={()=>requestCtmkToggle("P260A",hasGerencial())} size="large"/>
@@ -4059,7 +4060,7 @@ export default function App(){
       {showConfirmModal && (
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.75)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:dark?"#060c18":"#fff",border:"2px solid #f59e0b66",borderRadius:16,padding:"26px 22px",maxWidth:360,width:"100%"}}>
-            <div style={{fontSize:28,textAlign:"center",marginBottom:10}}>⚠️</div>
+            <div style={{fontSize:28,textAlign:"center",marginBottom:10}}><Ico n="alerta"/></div>
             <div style={{fontSize:15,fontWeight:800,color:dark?"#f1f5f9":"#1e293b",textAlign:"center",marginBottom:10}}>Atenção Líder!</div>
             <div style={{fontSize:13,color:dark?"#94a3b8":"#64748b",lineHeight:1.65,marginBottom:20,textAlign:"center"}}>
               Por favor, revise todo o relatório antes de enviar. Verifique se os textos explicativos estão corretos e se você inseriu a <strong style={{color:dark?"#f1f5f9":"#1e293b"}}>data inicial de todas as ocorrências</strong> e dispositivos inoperantes/parciais.
@@ -4071,7 +4072,7 @@ export default function App(){
               </button>
               <button onClick={confirmAndSend}
                 style={{flex:1,background:"linear-gradient(135deg,#16a34a,#15803d)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                ✓ Confirmar e Enviar
+                <Ico n="check"/> Confirmar e Enviar
               </button>
             </div>
           </div>
@@ -4080,7 +4081,7 @@ export default function App(){
       <SyncBadge/><DemoBanner/>
       {firestoreDown && (
         <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:18}}>🚫</span>
+          <span style={{fontSize:18}}><Ico n="xCirculo"/></span>
           <div style={{flex:1}}>
             <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Servidor não está respondendo</div>
             <div style={{fontSize:11,color:"#fed7aa"}}>O que você salvar agora pode ficar só neste aparelho até a conexão voltar. Avise o suporte se isso persistir.</div>
@@ -4090,7 +4091,7 @@ export default function App(){
       <div style={S.formWrap}>
         {editingIdx!==null&&(
           <div style={{background:"#001a2e",border:"1px solid #0ea5e966",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
-            <span style={{fontSize:16}}>✏️</span>
+            <span style={{fontSize:16}}><Ico n="editar"/></span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:700,color:"#0ea5e9"}}>Modo edição gerencial</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>Você está editando um relatório já salvo. Ao confirmar, ele será sobrescrito (sem duplicar).</div>
@@ -4110,20 +4111,20 @@ export default function App(){
           <div style={{height:"100%",width:`${health.pct}%`,background:health.pct>=90?"#22c55e":health.pct>=70?"#f59e0b":"#ef4444",borderRadius:2,transition:"width .4s"}}/>
         </div>}
         {health&&<div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:11,color:"#22c55e",background:"#021a0d",padding:"2px 8px",borderRadius:4,fontWeight:700}}>✅ {health.ok} OK</span>
-          {health.partial>0&&<span style={{fontSize:11,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}>⚠️ {health.partial} Parcial</span>}
-          {health.inop>0&&<span style={{fontSize:11,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}>🔴 {health.inop} Inop</span>}
+          <span style={{fontSize:11,color:"#22c55e",background:"#021a0d",padding:"2px 8px",borderRadius:4,fontWeight:700}}><Ico n="checkCirculo"/> {health.ok} OK</span>
+          {health.partial>0&&<span style={{fontSize:11,color:"#d97706",background:"#1a1000",padding:"2px 8px",borderRadius:4,fontWeight:700}}><Ico n="alerta"/> {health.partial} Parcial</span>}
+          {health.inop>0&&<span style={{fontSize:11,color:"#ef4444",background:"#1a0202",padding:"2px 8px",borderRadius:4,fontWeight:700}}><Ico n="pontoVermelho"/> {health.inop} Inop</span>}
         </div>}
         {avisoFotosRascunho>0&&(
           <div role="alert" style={{fontSize:12,fontWeight:700,color:"#f59e0b",background:"#f59e0b18",border:"1px solid #f59e0b55",borderRadius:10,padding:"9px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontSize:15}}>⚠️</span>
+            <span style={{fontSize:15}}><Ico n="alerta"/></span>
             <span style={{flex:1}}>Este rascunho tinha {avisoFotosRascunho} foto{avisoFotosRascunho===1?"":"s"}. As fotos não ficam salvas no rascunho — <b>reanexe antes de enviar</b>.</span>
             <button onClick={()=>setAvisoFotosRascunho(0)} style={{background:"none",border:"none",color:"#f59e0b",fontSize:16,fontWeight:900,cursor:"pointer",padding:"0 4px"}}>×</button>
           </div>
         )}
         {editingIdx===null&&formTimerRef.current&&(
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"8px 12px",background:"linear-gradient(165deg,#0f172a,#060c18)",border:"1px solid #1d4ed844",borderRadius:10,marginBottom:8}}>
-            <span style={{fontSize:14}}>⏱️</span>
+            <span style={{fontSize:14}}><Ico n="cronometro"/></span>
             <span style={{fontSize:13,fontWeight:800,color:"#60a5fa",fontVariantNumeric:"tabular-nums",letterSpacing:1}}>
               {String(Math.floor(formElapsed/3600)).padStart(2,"0")}:{String(Math.floor((formElapsed%3600)/60)).padStart(2,"0")}:{String(formElapsed%60).padStart(2,"0")}
             </span>
@@ -4131,9 +4132,9 @@ export default function App(){
           </div>
         )}
         <div style={S.metaCard}>
-          <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>📋 Cabecalho do Relatorio</div>
+          <div style={{fontSize:11,color:"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}><Ico n="prancheta"/> Cabecalho do Relatorio</div>
           {editingIdx!==null&&<div style={{background:"#1a1000",border:"1px solid #f59e0b44",borderRadius:8,padding:"8px 10px",marginBottom:10,fontSize:11,color:"#fbbf24"}}>
-            ✏️ Editando relatório existente — a data abaixo já é a data original deste teste ({fmtDate(meta.date)}). Só altere se for uma <strong>correção retroativa</strong> (ex: data errada no cadastro).
+            <Ico n="editar"/> Editando relatório existente — a data abaixo já é a data original deste teste ({fmtDate(meta.date)}). Só altere se for uma <strong>correção retroativa</strong> (ex: data errada no cadastro).
           </div>}
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:8}}>
             {[["Data","date","date"],["Inicio","start","time"],["Termino","end","time"],["Lider VSPP","leader","text"],["CCO","cco","text"],["Operador Moked 24h","moked","text"],["Horario Contato Moked","mokedTime","time"]].map(([label,key,type])=>(
@@ -4145,8 +4146,8 @@ export default function App(){
             <div style={{display:"flex",flexDirection:"column",justifyContent:"flex-end"}}>
               <label style={S.lbl}>Contato Moked?</label>
               <div style={{display:"flex",gap:6,marginTop:3}}>
-                <button onClick={()=>setMeta(m=>({...m,mokedContact:true}))} style={{...S.sm,...(meta.mokedContact?S.smOk:{}),flex:1}}>✓ Sim</button>
-                <button onClick={()=>setMeta(m=>({...m,mokedContact:false}))} style={{...S.sm,...(!meta.mokedContact?S.smBad:{}),flex:1}}>✗ Nao</button>
+                <button onClick={()=>setMeta(m=>({...m,mokedContact:true}))} style={{...S.sm,...(meta.mokedContact?S.smOk:{}),flex:1}}><Ico n="check"/> Sim</button>
+                <button onClick={()=>setMeta(m=>({...m,mokedContact:false}))} style={{...S.sm,...(!meta.mokedContact?S.smBad:{}),flex:1}}><Ico n="x"/> Nao</button>
               </div>
             </div>
           </div>
@@ -4205,7 +4206,7 @@ export default function App(){
         {state&&(
           <div style={{...S.metaCard,marginTop:8,border:sigError?"1px solid #ef4444":"1px solid #0f172a"}}>
             <div style={{fontSize:11,color:sigError?"#ef4444":"#f59e0b",fontWeight:800,textTransform:"uppercase",letterSpacing:.8,marginBottom:8}}>
-              ✍️ Assinatura {sigError&&"— obrigatoria para finalizar"}
+              <Ico n="editar"/> Assinatura {sigError&&"— obrigatoria para finalizar"}
             </div>
             <label htmlFor="campo-assinatura" style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>Assinatura do líder</label>
             <input id="campo-assinatura" placeholder="Digite seu nome completo para assinar..." value={meta.signature||""}
@@ -4218,7 +4219,7 @@ export default function App(){
           <div style={{marginTop:14,display:"flex",gap:8,flexWrap:"wrap"}}>
             {!canFinalize && (
               <div role="alert" style={{width:"100%",background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",marginBottom:4}}>
-                <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginBottom:4}}>⚠️ Campos obrigatórios não preenchidos:</div>
+                <div style={{fontSize:12,color:"#ef4444",fontWeight:700,marginBottom:4}}><Ico n="alerta"/> Campos obrigatórios não preenchidos:</div>
                 {missingFields().map(f=>(
                   <div key={f} style={{fontSize:11,color:"#fca5a5"}}>• {f}</div>
                 ))}
@@ -4226,12 +4227,12 @@ export default function App(){
             )}
             <button onClick={finalize} disabled={!canFinalize}
               style={{...S.primaryBtn,flex:2,fontSize:14,opacity:canFinalize?1:0.45,cursor:canFinalize?"pointer":"not-allowed"}}>
-              {editingIdx!==null?"✓ Salvar Alterações":"✓ Finalizar e Gerar Relatório"}
+              {editingIdx!==null?<><Ico n="check"/>{" Salvar Alterações"}</>:<><Ico n="check"/>{" Finalizar e Gerar Relatório"}</>}
             </button>
             <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen(project?.id==="P260A"?"p260a_home":"home");}}} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button>
           </div>
         )}
-        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:4}}>{editingIdx!==null?"✏️ Editando relatório existente":"💾 Rascunho salvo automaticamente"}</div>
+        <div style={{fontSize:11,color:"#94a3b8",textAlign:"center",marginTop:4}}>{editingIdx!==null?<><Ico n="editar"/>{" Editando relatório existente"}</>:<><Ico n="disquete"/>{" Rascunho salvo automaticamente"}</>}</div>
       </div>
     </div>
   );
@@ -4244,7 +4245,7 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
           <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>🏭 Jatinox</div>
+            <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}><Ico n="predio"/> Jatinox</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>P260A · P260B · P260C</div>
           </div>
         </div>
@@ -4255,14 +4256,14 @@ export default function App(){
               <div key={jp.id} style={{background:"#060c18",border:`2px solid ${isSel?"#7c3aed66":"#0f172a"}`,borderRadius:14,overflow:"hidden"}}>
                 <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px",cursor:"pointer"}} onClick={()=>setJatinoxSel(isSel?null:jp.id)}>
                   <div style={{width:48,height:48,borderRadius:12,background:"linear-gradient(135deg,#1e1040,#0f0820)",border:"1px solid #3b1d8a",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    <span style={{fontSize:22}}>🏭</span>
+                    <span style={{fontSize:22}}><Ico n="predio"/></span>
                   </div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{jp.id}</div>
                     <div style={{fontSize:12,color:"#94a3b8"}}>{jp.name}</div>
                     <div style={{display:"flex",gap:5,marginTop:5,flexWrap:"wrap"}}>
-                      {jp.hasAcesso&&<span style={{fontSize:11,color:"#f59e0b",background:"#1a1000",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #f59e0b22"}}>🚛 ACESSO</span>}
-                      {jp.hasEquipe&&<span style={{fontSize:11,color:"#0ea5e9",background:"#001a2e",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #0ea5e922"}}>👥 EQUIPE</span>}
+                      {jp.hasAcesso&&<span style={{fontSize:11,color:"#f59e0b",background:"#1a1000",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #f59e0b22"}}><Ico n="caminhao"/> ACESSO</span>}
+                      {jp.hasEquipe&&<span style={{fontSize:11,color:"#0ea5e9",background:"#001a2e",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #0ea5e922"}}><Ico n="usuarios"/> EQUIPE</span>}
                       {jp.hasCaoGuarda&&<span style={{fontSize:11,color:"#22c55e",background:"#021a0d",padding:"2px 7px",borderRadius:5,fontWeight:700,border:"1px solid #22c55e22"}}>🐕 CÃO GUARDA</span>}
                     </div>
                   </div>
@@ -4274,42 +4275,42 @@ export default function App(){
                     {jp.hasAcesso&&(
                       <button onClick={()=>comPin(jp.id,()=>setShowAcesso(true))}
                         style={{...S.primaryBtn,fontSize:13,background:"linear-gradient(135deg,#92400e,#78350f)"}}>
-                        🚛 Acesso Transportadoras
+                        <Ico n="caminhao"/> Acesso Transportadoras
                       </button>
                     )}
                     {jp.hasEquipe&&(
                       <button onClick={()=>{setEquipeProject({id:jp.id,name:jp.name,hasCaoGuarda:jp.hasCaoGuarda});setShowEquipe(true);}}
                         style={{...S.primaryBtn,fontSize:13,background:"linear-gradient(135deg,#0369a1,#0c4a6e)"}}>
-                        👥 Equipe — {jp.id}
+                        <Ico n="usuarios"/> Equipe — {jp.id}
                       </button>
                     )}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                       {jp.id==="P260A"&&(
                         <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setShowAcessoCCO(true);}}
-                          style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button>
+                          style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="porta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button>
                       )}
                       {(jp.id==="P260A"||jp.id==="P260C")&&(
-                        <button onClick={()=>{abrirRS({id:jp.id,name:jp.name});}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts[jp.id]&&rsCounts[jp.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[jp.id].total} RS</span>{rsCounts[jp.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[jp.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
+                        <button onClick={()=>{abrirRS({id:jp.id,name:jp.name});}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="prancheta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts[jp.id]&&rsCounts[jp.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[jp.id].total} RS</span>{rsCounts[jp.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[jp.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
                       )}
                       <button onClick={()=>{setEquipamentosProject({id:jp.id,name:jp.name});setShowEquipamentos(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:jp.id==="P260A"?"auto":"1/-1"}}>🛡️ Equipamentos</button>
+                        style={{...S.secBtn,fontSize:12,color:"#f59e0b",borderColor:"#f59e0b22",gridColumn:jp.id==="P260A"?"auto":"1/-1"}}><Ico n="escudo"/> Equipamentos</button>
                       <button onClick={()=>{setEmpresaInfoProject({id:jp.id,name:jp.name});setShowEmpresaInfo(true);}}
-                        style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}>🏢 Empresas</button>
+                        style={{...S.secBtn,fontSize:12,color:"#a855f7",borderColor:"#a855f722",gridColumn:"1/-1"}}><Ico n="predio"/> Empresas</button>
                       {(jp.id==="P260B"||jp.id==="P260C")&&(
                         <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setAcessoCCOAbas(["supervisao","manutencao"]);setShowAcessoCCO(true);}}
                           style={{gridColumn:"1/-1",background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)"}}>
-                          <div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#a855f7"),border:"1px solid #a855f733",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👁️</span></div>
+                          <div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#a855f7"),border:"1px solid #a855f733",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="olho"/></span></div>
                           <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#a855f7")}}>Supervisão / Manutenção</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro de visitas técnicas</div></div>
                           <span style={{color:T.modChev("#a855f7"),fontSize:18}}>›</span>
                         </button>
                       )}
-                      <button onClick={()=>{setIluminacaoProject({id:jp.id,name:jp.name});setShowIluminacao(true);}} style={{gridColumn:"1/-1",background:T.mod("#eab308"),border:"1.5px solid #eab30844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#facc15"),border:"1px solid #facc1533",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>💡</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#facc15")}}>Teste de Iluminação</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Contagem por Quadrante</div><ContadorIluminacao projectId={jp.id}/></div><span style={{color:T.modChev("#facc15"),fontSize:18}}>›</span></button>
-                      <button onClick={()=>{setRondaProject({id:jp.id,name:jp.name});setShowRonda(true);}} style={{gridColumn:"1/-1",background:T.mod("#0d9488"),border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#2dd4bf"),border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚶</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#2dd4bf")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:T.modChev("#2dd4bf"),fontSize:18}}>›</span></button>
-                      <button onClick={()=>{setEnergiaProject({id:jp.id,name:jp.name});setShowEnergia(true);}} style={{gridColumn:"1/-1",background:T.mod("#ef4444"),border:"1.5px solid #ef444444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#ef4444"),border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>⚡</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#ef4444")}}>Ocorrências de Energia</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle e Estabilidade</div></div><span style={{color:T.modChev("#ef4444"),fontSize:18}}>›</span></button>
+                      <button onClick={()=>{setIluminacaoProject({id:jp.id,name:jp.name});setShowIluminacao(true);}} style={{gridColumn:"1/-1",background:T.mod("#eab308"),border:"1.5px solid #eab30844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#facc15"),border:"1px solid #facc1533",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="lampada"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#facc15")}}>Teste de Iluminação</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Contagem por Quadrante</div><ContadorIluminacao projectId={jp.id}/></div><span style={{color:T.modChev("#facc15"),fontSize:18}}>›</span></button>
+                      <button onClick={()=>{setRondaProject({id:jp.id,name:jp.name});setShowRonda(true);}} style={{gridColumn:"1/-1",background:T.mod("#0d9488"),border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#2dd4bf"),border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="pessoa"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#2dd4bf")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:T.modChev("#2dd4bf"),fontSize:18}}>›</span></button>
+                      <button onClick={()=>{setEnergiaProject({id:jp.id,name:jp.name});setShowEnergia(true);}} style={{gridColumn:"1/-1",background:T.mod("#ef4444"),border:"1.5px solid #ef444444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#ef4444"),border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="raio"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#ef4444")}}>Ocorrências de Energia</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle e Estabilidade</div></div><span style={{color:T.modChev("#ef4444"),fontSize:18}}>›</span></button>
 
                       {jp.id==="P260A"&&(
                         <button onClick={()=>{setHomeGroup(null);setProject(PROJECTS["P260A"]);setScreen(checkAuth("P260A")?"p260a_home":"pin_gate");}}
-                          style={{...S.secBtn,fontSize:12,color:"#7c3aed",borderColor:"#7c3aed22",gridColumn:"1/-1"}}>📋 Checklist Semanal</button>
+                          style={{...S.secBtn,fontSize:12,color:"#7c3aed",borderColor:"#7c3aed22",gridColumn:"1/-1"}}><Ico n="prancheta"/> Checklist Semanal</button>
                       )}
                     </div>
                   </div>
@@ -4345,14 +4346,14 @@ export default function App(){
             </div>
             {(()=>{if(RS_TRANCADO&&!hasGerencial())return null;const tp=groupProjects.reduce((a,pid)=>a+((rsCounts[pid]&&rsCounts[pid].naoVistas)||0),0);return tp>0?(
               <div title="RS pendentes de visualização no grupo" style={{display:"flex",alignItems:"center",gap:6,background:"#B21E27",color:"#fff",borderRadius:8,padding:"5px 10px",fontWeight:800,fontSize:12,boxShadow:"0 2px 8px rgba(178,30,39,.4)"}}>
-                <span style={{fontSize:14}}>🛡️</span>Total RS Pendentes: {tp}
+                <span style={{fontSize:14}}><Ico n="escudo"/></span>Total RS Pendentes: {tp}
               </div>
             ):null;})()}
           </div>
 
           {draft&&groupProjects.includes(draft.projectId)&&(
             <div style={{background:dark?"#0f172a":"#fef3c7",border:"1px solid #f59e0b55",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-              <span style={{fontSize:16}}>📝</span>
+              <span style={{fontSize:16}}><Ico n="notas"/></span>
               <div style={{flex:1}}>
                 <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
                 <div style={{fontSize:11,color:"#94a3b8"}}>{draft.projectId} — salvo automaticamente</div>
@@ -4392,7 +4393,7 @@ export default function App(){
                       <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,hasGerencial())}/>
                       {rsCounts[p.id]&&rsCounts[p.id].naoVistas>0&&(
                         <div title="RS pendentes de visualização" style={{display:"flex",alignItems:"center",gap:5,background:"#B21E27",color:"#fff",borderRadius:6,padding:"2px 8px",fontWeight:800,fontSize:12,boxShadow:"0 2px 6px rgba(178,30,39,.4)"}}>
-                          <span style={{fontSize:13}}>🛡️</span>{rsCounts[p.id].naoVistas} RS
+                          <span style={{fontSize:13}}><Ico n="escudo"/></span>{rsCounts[p.id].naoVistas} RS
                         </div>
                       )}
                       {isActive&&<span style={{fontSize:11,color:color,fontWeight:700,background:color+"22",padding:"2px 6px",borderRadius:5}}>SELECIONADO</span>}
@@ -4413,7 +4414,7 @@ export default function App(){
                   <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
                     style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
                       animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
-                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}>📋</span></div>
+                    <div style={{width:48,height:48,borderRadius:14,background:"rgba(255,255,255,.16)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:24}}><Ico n="prancheta"/></span></div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:16,fontWeight:900,color:"#fff",letterSpacing:.2}}>Novo Relatório Semanal</div>
                       <div style={{fontSize:11,color:"#bfdbfe",fontWeight:700}}>{project.id}</div>
@@ -4421,17 +4422,17 @@ export default function App(){
                     </div>
                   </button>
                   <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
-                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}>📅 Histórico de Relatórios Semanais</button>
+                  <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}><Ico n="calendario"/> Histórico de Relatórios Semanais</button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0ea5e9"),border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
-                    <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
-                    <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🛡️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
-                    <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#a855f7"),border:"1px solid #a855f733",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🏢</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#a855f7")}}>Empresas</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Parcerias & Vínculos</div></div><span style={{color:T.modChev("#a855f7"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0ea5e9"),border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="usuarios"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="porta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="prancheta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="escudo"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#a855f7"),border:"1px solid #a855f733",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="predio"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#a855f7")}}>Empresas</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Parcerias & Vínculos</div></div><span style={{color:T.modChev("#a855f7"),fontSize:18}}>›</span></button>
 
-                    {(project.id==="P505"||project.id==="P311A")&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#e879f9"),border:"1px solid #e879f933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🔒</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#e879f9")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Zonas Perimetrais</div></div><span style={{color:T.modChev("#e879f9"),fontSize:18}}>›</span></button>}{<button onClick={()=>{setIluminacaoProject(project);setShowIluminacao(true);}} style={{background:T.mod("#eab308"),border:"1.5px solid #eab30844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#facc15"),border:"1px solid #facc1533",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>💡</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#facc15")}}>Teste de Iluminação</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Contagem por Quadrante</div><ContadorIluminacao projectId={project.id}/></div><span style={{color:T.modChev("#facc15"),fontSize:18}}>›</span></button>}{project.id!=="P505"&&project.id!=="P311A"&&<button onClick={()=>{setRondaProject(project);setShowRonda(true);}} style={{background:T.mod("#0d9488"),border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#2dd4bf"),border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚶</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#2dd4bf")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:T.modChev("#2dd4bf"),fontSize:18}}>›</span></button>}<button onClick={()=>{setEnergiaProject(project);setShowEnergia(true);}} style={{background:T.mod("#ef4444"),border:"1.5px solid #ef444444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#ef4444"),border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>⚡</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#ef4444")}}>Ocorrências de Energia</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle e Estabilidade</div></div><span style={{color:T.modChev("#ef4444"),fontSize:18}}>›</span></button>{(project.id==="P311A"||project.id==="P311B")&&<button onClick={()=>{comPin(project.id,()=>{setAmbulanciaProject(project);setShowAmbulancia(true);});}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#0ea5e915,#0ea5e908)",border:"1.5px solid #38bdf8",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 6px 22px rgba(14,165,233,.35), 0 0 0 0 rgba(56,189,248,.6)",animation:"mkPulse 2.4s ease-in-out infinite"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e91f",border:"1px solid #38bdf855",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚑</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#38bdf8")}}>Acesso de Ambulância</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro e Monitoramento</div></div><span style={{color:"#38bdf866",fontSize:18}}>›</span></button>}{project.id==="P505"&&<button onClick={()=>{setBolsaoInqProject(project);setShowBolsaoInq(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🅿️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Checagem de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Veículos de Inquilinos</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
-                    {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚧</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Fiscalização de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle de Pátio</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
-                    {project.id==="P601"&&<button onClick={()=>comPin(project.id,()=>setShowRondaVSPP(true))} style={{background:T.mod("#0f6e56"),border:"1.5px solid #0f6e5644",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0f6e56"),border:"1px solid #0f6e5633",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚗</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0f6e56")}}>Ronda VSPP</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Patrulhamento Veicular</div></div><span style={{color:T.modChev("#0f6e56"),fontSize:18}}>›</span></button>}
-                    <button onClick={()=>comPin(project.id,()=>{setInquilinosProject(project);setShowInquilinos(true);})} style={{background:T.mod("#06b6d4"),border:"1.5px solid #06b6d444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#06b6d4"),border:"1px solid #06b6d433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🏗️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#06b6d4")}}>Inquilinos / Galpões</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocupação & Locatários</div></div><span style={{color:T.modChev("#06b6d4"),fontSize:18}}>›</span></button>
+                    {(project.id==="P505"||project.id==="P311A")&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#e879f9"),border:"1px solid #e879f933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="cadeado"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#e879f9")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Zonas Perimetrais</div></div><span style={{color:T.modChev("#e879f9"),fontSize:18}}>›</span></button>}{<button onClick={()=>{setIluminacaoProject(project);setShowIluminacao(true);}} style={{background:T.mod("#eab308"),border:"1.5px solid #eab30844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#facc15"),border:"1px solid #facc1533",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="lampada"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#facc15")}}>Teste de Iluminação</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Contagem por Quadrante</div><ContadorIluminacao projectId={project.id}/></div><span style={{color:T.modChev("#facc15"),fontSize:18}}>›</span></button>}{project.id!=="P505"&&project.id!=="P311A"&&<button onClick={()=>{setRondaProject(project);setShowRonda(true);}} style={{background:T.mod("#0d9488"),border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#2dd4bf"),border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="pessoa"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#2dd4bf")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:T.modChev("#2dd4bf"),fontSize:18}}>›</span></button>}<button onClick={()=>{setEnergiaProject(project);setShowEnergia(true);}} style={{background:T.mod("#ef4444"),border:"1.5px solid #ef444444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#ef4444"),border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="raio"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#ef4444")}}>Ocorrências de Energia</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle e Estabilidade</div></div><span style={{color:T.modChev("#ef4444"),fontSize:18}}>›</span></button>{(project.id==="P311A"||project.id==="P311B")&&<button onClick={()=>{comPin(project.id,()=>{setAmbulanciaProject(project);setShowAmbulancia(true);});}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#0ea5e915,#0ea5e908)",border:"1.5px solid #38bdf8",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 6px 22px rgba(14,165,233,.35), 0 0 0 0 rgba(56,189,248,.6)",animation:"mkPulse 2.4s ease-in-out infinite"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e91f",border:"1px solid #38bdf855",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="cruz"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#38bdf8")}}>Acesso de Ambulância</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro e Monitoramento</div></div><span style={{color:"#38bdf866",fontSize:18}}>›</span></button>}{project.id==="P505"&&<button onClick={()=>{setBolsaoInqProject(project);setShowBolsaoInq(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🅿️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Checagem de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Veículos de Inquilinos</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
+                    {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="obras"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Fiscalização de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle de Pátio</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
+                    {project.id==="P601"&&<button onClick={()=>comPin(project.id,()=>setShowRondaVSPP(true))} style={{background:T.mod("#0f6e56"),border:"1.5px solid #0f6e5644",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0f6e56"),border:"1px solid #0f6e5633",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="carro"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0f6e56")}}>Ronda VSPP</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Patrulhamento Veicular</div></div><span style={{color:T.modChev("#0f6e56"),fontSize:18}}>›</span></button>}
+                    <button onClick={()=>comPin(project.id,()=>{setInquilinosProject(project);setShowInquilinos(true);})} style={{background:T.mod("#06b6d4"),border:"1.5px solid #06b6d444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#06b6d4"),border:"1px solid #06b6d433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="obras"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#06b6d4")}}>Inquilinos / Galpões</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocupação & Locatários</div></div><span style={{color:T.modChev("#06b6d4"),fontSize:18}}>›</span></button>
                   </div>
                 </>
               ):(
@@ -4450,15 +4451,15 @@ export default function App(){
                     </div>
                   </button>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0ea5e9"),border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>👥</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
-                    <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚪</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>📋</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?" 🔒":""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
-                    <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🛡️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
-                    <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#a855f7"),border:"1px solid #a855f733",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🏢</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#a855f7")}}>Empresas</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Parcerias & Vínculos</div></div><span style={{color:T.modChev("#a855f7"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0ea5e9"),border:"1px solid #0ea5e933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="usuarios"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#22c55e"),border:"1px solid #22c55e33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="porta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="prancheta"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="escudo"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
+                    <button onClick={()=>{setEmpresaInfoProject(project);setShowEmpresaInfo(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#a855f7"),border:"1px solid #a855f733",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="predio"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#a855f7")}}>Empresas</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Parcerias & Vínculos</div></div><span style={{color:T.modChev("#a855f7"),fontSize:18}}>›</span></button>
 
-                    {(project.id==="P505"||project.id==="P311A")&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#e879f9"),border:"1px solid #e879f933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🔒</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#e879f9")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Zonas Perimetrais</div></div><span style={{color:T.modChev("#e879f9"),fontSize:18}}>›</span></button>}{<button onClick={()=>{setIluminacaoProject(project);setShowIluminacao(true);}} style={{background:T.mod("#eab308"),border:"1.5px solid #eab30844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#facc15"),border:"1px solid #facc1533",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>💡</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#facc15")}}>Teste de Iluminação</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Contagem por Quadrante</div><ContadorIluminacao projectId={project.id}/></div><span style={{color:T.modChev("#facc15"),fontSize:18}}>›</span></button>}{project.id!=="P505"&&project.id!=="P311A"&&<button onClick={()=>{setRondaProject(project);setShowRonda(true);}} style={{background:T.mod("#0d9488"),border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#2dd4bf"),border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚶</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#2dd4bf")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:T.modChev("#2dd4bf"),fontSize:18}}>›</span></button>}<button onClick={()=>{setEnergiaProject(project);setShowEnergia(true);}} style={{background:T.mod("#ef4444"),border:"1.5px solid #ef444444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#ef4444"),border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>⚡</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#ef4444")}}>Ocorrências de Energia</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle e Estabilidade</div></div><span style={{color:T.modChev("#ef4444"),fontSize:18}}>›</span></button>{(project.id==="P311A"||project.id==="P311B")&&<button onClick={()=>{comPin(project.id,()=>{setAmbulanciaProject(project);setShowAmbulancia(true);});}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#0ea5e915,#0ea5e908)",border:"1.5px solid #38bdf8",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 6px 22px rgba(14,165,233,.35), 0 0 0 0 rgba(56,189,248,.6)",animation:"mkPulse 2.4s ease-in-out infinite"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e91f",border:"1px solid #38bdf855",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚑</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#38bdf8")}}>Acesso de Ambulância</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro e Monitoramento</div></div><span style={{color:"#38bdf866",fontSize:18}}>›</span></button>}{project.id==="P505"&&<button onClick={()=>{setBolsaoInqProject(project);setShowBolsaoInq(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🅿️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Checagem de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Veículos de Inquilinos</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
-                    {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚧</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Fiscalização de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle de Pátio</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
-                    {project.id==="P601"&&<button onClick={()=>comPin(project.id,()=>setShowRondaVSPP(true))} style={{background:T.mod("#0f6e56"),border:"1.5px solid #0f6e5644",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0f6e56"),border:"1px solid #0f6e5633",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🚗</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0f6e56")}}>Ronda VSPP</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Patrulhamento Veicular</div></div><span style={{color:T.modChev("#0f6e56"),fontSize:18}}>›</span></button>}
-                    <button onClick={()=>comPin(project.id,()=>{setInquilinosProject(project);setShowInquilinos(true);})} style={{background:T.mod("#06b6d4"),border:"1.5px solid #06b6d444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#06b6d4"),border:"1px solid #06b6d433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🏗️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#06b6d4")}}>Inquilinos / Galpões</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocupação & Locatários</div></div><span style={{color:T.modChev("#06b6d4"),fontSize:18}}>›</span></button>
+                    {(project.id==="P505"||project.id==="P311A")&&<button onClick={()=>{setPerimetralProject(project);setShowPerimetral(true);}} style={{background:T.mod("#a855f7"),border:"1.5px solid #a855f744",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#e879f9"),border:"1px solid #e879f933",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="cadeado"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#e879f9")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Zonas Perimetrais</div></div><span style={{color:T.modChev("#e879f9"),fontSize:18}}>›</span></button>}{<button onClick={()=>{setIluminacaoProject(project);setShowIluminacao(true);}} style={{background:T.mod("#eab308"),border:"1.5px solid #eab30844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#facc15"),border:"1px solid #facc1533",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="lampada"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#facc15")}}>Teste de Iluminação</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Contagem por Quadrante</div><ContadorIluminacao projectId={project.id}/></div><span style={{color:T.modChev("#facc15"),fontSize:18}}>›</span></button>}{project.id!=="P505"&&project.id!=="P311A"&&<button onClick={()=>{setRondaProject(project);setShowRonda(true);}} style={{background:T.mod("#0d9488"),border:"1.5px solid #0d948844",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#2dd4bf"),border:"1px solid #2dd4bf33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="pessoa"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#2dd4bf")}}>Ronda Perimetral Diária</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro por Turno</div></div><span style={{color:T.modChev("#2dd4bf"),fontSize:18}}>›</span></button>}<button onClick={()=>{setEnergiaProject(project);setShowEnergia(true);}} style={{background:T.mod("#ef4444"),border:"1.5px solid #ef444444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#ef4444"),border:"1px solid #ef444433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="raio"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#ef4444")}}>Ocorrências de Energia</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle e Estabilidade</div></div><span style={{color:T.modChev("#ef4444"),fontSize:18}}>›</span></button>{(project.id==="P311A"||project.id==="P311B")&&<button onClick={()=>{comPin(project.id,()=>{setAmbulanciaProject(project);setShowAmbulancia(true);});}} style={{gridColumn:"1/-1",background:"linear-gradient(165deg,#0ea5e915,#0ea5e908)",border:"1.5px solid #38bdf8",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:"0 6px 22px rgba(14,165,233,.35), 0 0 0 0 rgba(56,189,248,.6)",animation:"mkPulse 2.4s ease-in-out infinite"}}><div style={{width:44,height:44,borderRadius:12,background:"#0ea5e91f",border:"1px solid #38bdf855",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="cruz"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#38bdf8")}}>Acesso de Ambulância</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Registro e Monitoramento</div></div><span style={{color:"#38bdf866",fontSize:18}}>›</span></button>}{project.id==="P505"&&<button onClick={()=>{setBolsaoInqProject(project);setShowBolsaoInq(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}>🅿️</span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Checagem de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Veículos de Inquilinos</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
+                    {BOLSAO_ELIGIBLE.includes(project.id)&&<button onClick={()=>{setBolsaoProject(project);setShowBolsao(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#f59e0b"),border:"1px solid #f59e0b33",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="obras"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Fiscalização de Bolsão</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Controle de Pátio</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>}
+                    {project.id==="P601"&&<button onClick={()=>comPin(project.id,()=>setShowRondaVSPP(true))} style={{background:T.mod("#0f6e56"),border:"1.5px solid #0f6e5644",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#0f6e56"),border:"1px solid #0f6e5633",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="carro"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0f6e56")}}>Ronda VSPP</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Patrulhamento Veicular</div></div><span style={{color:T.modChev("#0f6e56"),fontSize:18}}>›</span></button>}
+                    <button onClick={()=>comPin(project.id,()=>{setInquilinosProject(project);setShowInquilinos(true);})} style={{background:T.mod("#06b6d4"),border:"1.5px solid #06b6d444",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><div style={{width:44,height:44,borderRadius:12,background:T.modIconBg("#06b6d4"),border:"1px solid #06b6d433",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:22}}><Ico n="obras"/></span></div><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#06b6d4")}}>Inquilinos / Galpões</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocupação & Locatários</div></div><span style={{color:T.modChev("#06b6d4"),fontSize:18}}>›</span></button>
                   </div>
                 </>
               )}
@@ -4482,13 +4483,13 @@ export default function App(){
       `}</style>
       {!isOnline && (
         <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#92400e",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-          <span style={{fontSize:14}}>📡</span>
+          <span style={{fontSize:14}}><Ico n="antena"/></span>
           <span style={{fontSize:12,color:"#fef3c7",fontWeight:700}}>Sem conexão — dados salvos localmente, aguardando reconexão...</span>
         </div>
       )}
       {isOnline && firestoreDown && (
         <div role="alert" style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#7c2d12",padding:"8px 16px",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-          <span style={{fontSize:14}}>🚫</span>
+          <span style={{fontSize:14}}><Ico n="xCirculo"/></span>
           <span style={{fontSize:12,color:"#fff",fontWeight:700}}>Servidor não está respondendo — o que for salvo agora pode ficar só neste aparelho. Avise o suporte técnico.</span>
         </div>
       )}
@@ -4503,18 +4504,18 @@ export default function App(){
             <div style={{fontSize:11,color:T.sub,marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
           <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:totalInopHome>0?"mkPulse 2.2s infinite":"none"}} aria-label="Ver pendências">🔴 Inop</button>
-            <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700,position:"relative"}} aria-label="Ver registros">📋 Registros
+            <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:totalInopHome>0?"mkPulse 2.2s infinite":"none"}} aria-label="Ver pendências"><Ico n="pontoVermelho"/> Inop</button>
+            <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700,position:"relative"}} aria-label="Ver registros"><Ico n="prancheta"/> Registros
               {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
             </button>
-            <button onClick={()=>setScreen("dashboard")} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:T.hdrTxt,fontWeight:600}} aria-label="Abrir painel gerencial">📊 Painel</button>
+            <button onClick={()=>setScreen("dashboard")} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:T.hdrTxt,fontWeight:600}} aria-label="Abrir painel gerencial"><Ico n="grafico"/> Painel</button>
             <button onClick={()=>setDark(!dark)} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:T.hdrTxt}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
           </div>
         </div>
 
         {draft&&draft.projectId===project.id&&(
           <div style={{background:T.draftBg,border:"1px solid #f59e0b55",borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:T.draftShadow}}>
-            <span style={{fontSize:16}}>📝</span>
+            <span style={{fontSize:16}}><Ico n="notas"/></span>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>Rascunho em andamento</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>{project.id} — salvo automaticamente</div>
@@ -4532,7 +4533,7 @@ export default function App(){
           </div>
           <button onClick={()=>setShowDiagnostico(true)}
             style={{marginBottom:10,width:"100%",background:T.diagBg,border:`1.5px solid ${T.diagBorder}`,borderRadius:18,padding:"16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:T.diagShadow}}>
-            <div style={{width:48,height:48,borderRadius:14,background:"#38bdf814",border:"1px solid #38bdf844",display:"flex",alignItems:"center",justifyContent:"center",fontSize:25,flexShrink:0}}>🧭</div>
+            <div style={{width:48,height:48,borderRadius:14,background:"#38bdf814",border:"1px solid #38bdf844",display:"flex",alignItems:"center",justifyContent:"center",fontSize:25,flexShrink:0}}><Ico n="bussola"/></div>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:T.diagTxt}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:T.diagSub,marginTop:3}}>Catálogo publicado · rascunho local</div></div>
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
@@ -4605,7 +4606,7 @@ export default function App(){
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                   <div style={{fontSize:11,color:T.saudeLabel,fontWeight:700}}>Saúde Geral da Operação</div>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}>🔴 {totalInop} inop</span>}
+                    {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}><Ico n="pontoVermelho"/> {totalInop} inop</span>}
                     <span style={{fontSize:17,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444",textShadow:`0 0 12px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}55`}}>{avg}%</span>
                   </div>
                 </div>

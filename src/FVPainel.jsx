@@ -4,6 +4,7 @@
 // Plano: fv_plano/{pid} → creditoMensal, vtMensal, amMensal, recorrentes[], lancamentos[].
 // Catálogo de preços: fv_plano/_catalogo → itens[{id,nome,valor}] (compartilhado).
 // ─────────────────────────────────────────────────────────────
+import { Ico } from "./Icones";
 import { useState, useEffect } from "react";
 import { authFetch } from './session';
 import { getTheme } from "./generatePDF";
@@ -193,10 +194,10 @@ function LinhaParam({ c, rot, sub, valor, manual, onSalvar, podeEditar }) {
         <div style={{ display:"flex", gap:4, alignItems:"center" }}>
           <Campo c={c} autoFocus inputMode="decimal" value={txt} onChange={e => setTxt(e.target.value)} style={{ width:110 }}/>
           <Botao c={c} disabled={busy} onClick={async () => { setBusy(true); const n = txt.trim() === "" ? null : parseBR(txt); if (txt.trim() !== "" && n === null) { setBusy(false); return; } if (await onSalvar(n)) setEdit(false); setBusy(false); }}>OK</Botao>
-          <Botao c={c} onClick={() => setEdit(false)}>✕</Botao>
+          <Botao c={c} onClick={() => setEdit(false)}><Ico n="x"/></Botao>
         </div>
       ) : (
-        <Botao c={c} disabled={!podeEditar} onClick={() => { setTxt(manual ? txtBR(valor) : ""); setEdit(true); }} style={{ color:c.txt, fontSize:13 }}>{brl(valor)} ✏️</Botao>
+        <Botao c={c} disabled={!podeEditar} onClick={() => { setTxt(manual ? txtBR(valor) : ""); setEdit(true); }} style={{ color:c.txt, fontSize:13 }}>{brl(valor)} <Ico n="editar"/></Botao>
       )}
     </div>
   );
@@ -212,7 +213,7 @@ function FormRecorrente({ c, inicial, onSalvar, onCancelar, onExcluir }) {
       <Campo c={c} inputMode="decimal" placeholder="Valor/mês" value={v} onChange={e => setV(e.target.value)} style={{ flex:1, minWidth:90 }}/>
       <Botao c={c} solid cor="#16a34a" disabled={busy} onClick={async () => { const n = parseBR(v); if (!d.trim() || n === null) return; setBusy(true); await onSalvar({ id, descricao:d.trim(), valor:n }); setBusy(false); }}>Salvar</Botao>
       {onExcluir && <Botao c={c} cor="#ef4444" disabled={busy} onClick={onExcluir}>Excluir</Botao>}
-      <Botao c={c} onClick={onCancelar}>✕</Botao>
+      <Botao c={c} onClick={onCancelar}><Ico n="x"/></Botao>
     </div>
   );
 }
@@ -229,7 +230,7 @@ function FormItem({ c, inicial, onSalvar, onCancelar, onExcluir }) {
       <select aria-label="Item da Equipe" value={equipeItem} onChange={e=>setEquipeItem(e.target.value)} style={{maxWidth:"100%",padding:8,background:c.in,color:c.txt}}><option value="">Sem vínculo com a Equipe</option>{UNIFORME_NOMES.map(nome=><option key={nome}>{nome}</option>)}</select>
       <Botao c={c} solid cor="#16a34a" disabled={busy} onClick={async () => { const n = parseBR(v); if (!d.trim() || n === null) return; setBusy(true); await onSalvar({ id, nome:d.trim(), valor:n, equipeItem:equipeItem||null }); setBusy(false); }}>Salvar</Botao>
       {onExcluir && <Botao c={c} cor="#ef4444" disabled={busy} onClick={onExcluir}>Excluir</Botao>}
-      <Botao c={c} onClick={onCancelar}>✕</Botao>
+      <Botao c={c} onClick={onCancelar}><Ico n="x"/></Botao>
     </div>
   );
 }
@@ -394,7 +395,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, dark = true, 
         {kpi(`Projetado ${rotuloMes(proj.serie[11].mes)}`, brl(proj.saldoFinal), corV(proj.saldoFinal), `${proj.saldoFinal - (saldo || 0) >= 0 ? "+" : ""}${brl(proj.saldoFinal - (saldo || 0))} em 12 meses`)}
         {kpi("Gastos previstos 12m", brl(T.gastos), "#ef4444", `fixos ${brl(T.gastosFixos)} · planejados ${brl(T.previstosSaida)}`)}
       </div>
-      {proj.primeiroNegativo && <div style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}>⚠️ Pela projeção, o FV fica negativo em {rotuloMes(proj.primeiroNegativo)}.</div>}
+      {proj.primeiroNegativo && <div style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}><Ico n="alerta"/> Pela projeção, o FV fica negativo em {rotuloMes(proj.primeiroNegativo)}.</div>}
 
       {/* 2. Base mensal */}
       <div style={card}>
@@ -411,7 +412,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, dark = true, 
             ? <FormRecorrente key={r.id} c={c} inicial={r} onCancelar={() => setFormRec(null)} onSalvar={async d => { if (await gravarPlano(b => ({ ...b, recorrentes:b.recorrentes.map(x => x.id === r.id ? { ...x, ...d } : x) }))) setFormRec(null); }} onExcluir={async () => { if (await gravarPlano(b => ({ ...b, recorrentes:b.recorrentes.filter(x => x.id !== r.id) }))) setFormRec(null); }}/>
             : <div key={r.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0", opacity:r.ativo === false ? .5 : 1 }}>
                 <span style={{ fontSize:12, color:c.txt2 }}>{r.descricao}</span>
-                <span style={{ display:"flex", gap:6, alignItems:"center" }}><span style={{ fontSize:12, color:c.txt }}>{brl(r.valor)}/mês</span>{podeEditar && <Botao c={c} onClick={() => setFormRec(r)} style={{ padding:"3px 7px" }}>✏️</Botao>}</span>
+                <span style={{ display:"flex", gap:6, alignItems:"center" }}><span style={{ fontSize:12, color:c.txt }}>{brl(r.valor)}/mês</span>{podeEditar && <Botao c={c} onClick={() => setFormRec(r)} style={{ padding:"3px 7px" }}><Ico n="editar"/></Botao>}</span>
               </div>)}
           {formRec && !formRec.id && <FormRecorrente c={c} onCancelar={() => setFormRec(null)} onSalvar={async d => { if (await gravarPlano(b => ({ ...b, recorrentes:[...b.recorrentes, { id:novoIdPlano("rc"), ativo:true, ...d }] }))) setFormRec(null); }}/>}
         </div>
@@ -432,7 +433,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, dark = true, 
               ? <FormItem key={it.id} c={c} inicial={it} onCancelar={() => setFormItem(null)} onSalvar={async d => { if (await gravarCatalogo(l => l.map(x => x.id === it.id ? { ...x, ...d } : x))) setFormItem(null); }} onExcluir={async () => { if (window.confirm("Excluir item do catálogo?") && await gravarCatalogo(l => l.filter(x => x.id !== it.id))) setFormItem(null); }}/>
               : <div key={it.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0", borderTop:`1px solid ${c.bd}` }}>
                   <span style={{ fontSize:12, color:c.txt }}>{it.nome}{it.equipeItem&&<small> · Equipe: {it.equipeItem}</small>}</span>
-                  <span style={{ display:"flex", gap:6, alignItems:"center" }}><span style={{ fontSize:12, color:c.txt2 }}>{brl(it.valor)}</span>{podeEditar && <Botao c={c} onClick={() => setFormItem(it)} style={{ padding:"3px 7px" }}>✏️</Botao>}</span>
+                  <span style={{ display:"flex", gap:6, alignItems:"center" }}><span style={{ fontSize:12, color:c.txt2 }}>{brl(it.valor)}</span>{podeEditar && <Botao c={c} onClick={() => setFormItem(it)} style={{ padding:"3px 7px" }}><Ico n="editar"/></Botao>}</span>
                 </div>)}
             {formItem && !formItem.id && <FormItem c={c} onCancelar={() => setFormItem(null)} onSalvar={async d => { if (await gravarCatalogo(l => [...l, { id:novoIdPlano("it"), ...d }])) setFormItem(null); }}/>}
             {podeEditar && !formItem && <Botao c={c} cor="#0ea5e9" onClick={() => setFormItem({})} style={{ marginTop:6 }}>+ Item (camisa, calça, sapato, kit…)</Botao>}
@@ -458,7 +459,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, dark = true, 
               </div>
               <div style={{ display:"flex", alignItems:"center", gap:4 }}>
                 <span style={{ fontSize:12.5, fontWeight:800, color:ef < 0 ? "#ef4444" : "#22c55e", whiteSpace:"nowrap" }}>{brl(ef)}</span>
-                {podeEditar && (l.vinculo==="aprovacao"?<Botao c={c} disabled={gravandoOrigem||l.origemCancelada} onClick={()=>marcarAprovacao(l)}>{l.realizado?"Voltar a previsto":"Realizado"}</Botao>:<Botao c={c} onClick={() => setFormLanc(l)} style={{ padding:"4px 7px" }}>✏️</Botao>)}
+                {podeEditar && (l.vinculo==="aprovacao"?<Botao c={c} disabled={gravandoOrigem||l.origemCancelada} onClick={()=>marcarAprovacao(l)}>{l.realizado?"Voltar a previsto":"Realizado"}</Botao>:<Botao c={c} onClick={() => setFormLanc(l)} style={{ padding:"4px 7px" }}><Ico n="editar"/></Botao>)}
               </div>
             </div>
           );
@@ -486,7 +487,7 @@ export default function FVPainel({ pid, nome, resumo, lancamentos, dark = true, 
       </div>
 
       <button onClick={() => gerarPDFProjetoFV({ pid, nome, resumo, real, serie, proj, plano, ctx, reservas, periodo })}
-        style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}>📄 Relatório · Imprimir / Salvar PDF · {pid}</button>
+        style={{ background:"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor:"pointer" }}><Ico n="arquivo"/> Relatório · Imprimir / Salvar PDF · {pid}</button>
     </div>
   );
 }

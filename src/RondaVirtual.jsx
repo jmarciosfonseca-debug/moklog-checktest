@@ -17,6 +17,7 @@
 //               justificativa:"", obs:"" } }
 //   }
 // ════════════════════════════════════════════════════════════════════════
+import { Ico } from "./Icones";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { setDoc as fgSetDoc } from "./fireGuard";
@@ -29,8 +30,8 @@ import { baixarHtml } from "./relatorios/padraoMoked";
 // Noturno (DIÁRIO): 18:00→22:00 a cada 1h, 23:00→05:30(+1) a cada 30min
 // Diurno (FIM DE SEMANA / FERIADO): 06:00→17:00 a cada 1h, janela final 17:30
 export const RONDA_TURNOS = {
-  noturno: { key:"noturno", label:"Noturno", icon:"🌙", color:"#818cf8", bg:"#0a0a2e", obs:"Preenchimento diário" },
-  diurno:  { key:"diurno",  label:"Diurno",  icon:"☀️", color:"#f59e0b", bg:"#1a1000", obs:"Apenas finais de semana e feriados" },
+  noturno: { key:"noturno", label:"Noturno", icon:<><Ico n="lua"/></>, color:"#818cf8", bg:"#0a0a2e", obs:"Preenchimento diário" },
+  diurno:  { key:"diurno",  label:"Diurno",  icon:<><Ico n="sol"/></>, color:"#f59e0b", bg:"#1a1000", obs:"Apenas finais de semana e feriados" },
 };
 
 
@@ -115,14 +116,14 @@ function rondaTemConteudo(r) {
 
 
 const STATUS_META = {
-  feita:          { label:"No horário",     color:"#22c55e", bg:"#021a0d", icon:"✅" },
-  feita_atrasada: { label:"Feita c/ atraso",color:"#f59e0b", bg:"#1a1000", icon:"⏱️" },
-  em_andamento:   { label:"Em andamento",   color:"#38bdf8", bg:"#04141f", icon:"⏳" },
-  naoexec:        { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:"❌" },
+  feita:          { label:"No horário",     color:"#22c55e", bg:"#021a0d", icon:<><Ico n="checkCirculo"/></> },
+  feita_atrasada: { label:"Feita c/ atraso",color:"#f59e0b", bg:"#1a1000", icon:<><Ico n="cronometro"/></> },
+  em_andamento:   { label:"Em andamento",   color:"#38bdf8", bg:"#04141f", icon:<><Ico n="ampulheta"/></> },
+  naoexec:        { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:<><Ico n="xCirculo"/></> },
   aguardando:     { label:"Aguardando",     color:"#64748b", bg:"transparent", icon:"🕓" },
   aberto:         { label:"Iniciar agora",  color:"#22c55e", bg:"#021a0d", icon:"▶" },
-  atraso_aberto:  { label:"Atrasada",       color:"#f59e0b", bg:"#1a1000", icon:"⚠️" },
-  bloqueado:      { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:"🔒" },
+  atraso_aberto:  { label:"Atrasada",       color:"#f59e0b", bg:"#1a1000", icon:<><Ico n="alerta"/></> },
+  bloqueado:      { label:"Não executada",  color:"#ef4444", bg:"#1a0202", icon:<><Ico n="cadeado"/></> },
 };
 
 function hojeISO(){ return new Date().toLocaleDateString("sv-SE"); }
@@ -462,7 +463,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
 
   if(loading) return (
     <div style={{textAlign:"center",padding:"40px 0"}}>
-      <div style={{fontSize:28,marginBottom:8}}>🎥</div>
+      <div style={{fontSize:28,marginBottom:8}}><Ico n="video"/></div>
       <div style={{fontSize:13,...S.txt2}}>Carregando rondas virtuais...</div>
     </div>
   );
@@ -473,7 +474,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           de "app não responde" quando, na verdade, é a rede/Firebase que falhou. */}
       {erroSalvar && (
         <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:18}}>🚫</span>
+          <span style={{fontSize:18}}><Ico n="xCirculo"/></span>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Falha ao salvar a ronda</div>
             <div style={{fontSize:11,color:"#fed7aa"}}>O servidor não respondeu. Esta ação ainda não foi salva — toque em "Tentar" antes de continuar.</div>
@@ -495,14 +496,14 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       {!showArquivados && (
         jaTemAberto ? (
           <div style={{...S.card,border:"1px solid #f59e0b44",background:dark?"#1a1000":"#fffbeb"}}>
-            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>⚠ Já existe um turno em aberto</div>
+            <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}><Ico n="alerta"/> Já existe um turno em aberto</div>
             <div style={{fontSize:12,...S.txt}}>
               Conclua e arquive o turno de <strong>{ativos[0]?.plantonista?.nome||"—"}</strong> ({RONDA_TURNOS[ativos[0]?.tipo]?.label}) antes de abrir um novo turno de ronda.
             </div>
           </div>
         ) : (
         <div style={S.card}>
-          <div style={{fontSize:11,color:"#818cf8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}>🎥 Abrir turno de ronda</div>
+          <div style={{fontSize:11,color:"#818cf8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}><Ico n="video"/> Abrir turno de ronda</div>
           <label style={S.lbl}>Turno</label>
           <div style={{display:"flex",gap:6,marginBottom:10}}>
             {Object.values(RONDA_TURNOS).map(t=>{
@@ -533,7 +534,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           {equipe.length===0 && <div style={{fontSize:11,color:"#ef4444",marginBottom:8}}>Nenhum colaborador em equipes/{"{projeto}"}. Cadastre a equipe primeiro.</div>}
           {novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id, selEhFolguista) && (
             <div style={{fontSize:11,color:"#f59e0b",marginBottom:8,background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:7,padding:"7px 9px"}}>
-              📅 Turno diurno indisponível hoje. {temGradeEspecial(project.id)?"Só abre no domingo ou em feriado.":"Só abre em sábados, domingos e feriados."} O turno noturno está disponível todos os dias.
+              <Ico n="calendario"/> Turno diurno indisponível hoje. {temGradeEspecial(project.id)?"Só abre no domingo ou em feriado.":"Só abre em sábados, domingos e feriados."} O turno noturno está disponível todos os dias.
             </div>
           )}
           {(()=>{ const bloqueado = novoTipo==="diurno" && !podeAbrirDiurno(hojeISO(), project.id, selEhFolguista);
@@ -551,7 +552,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       {/* Toggle ativos / arquivados */}
       <div style={{display:"flex",gap:6}}>
         <button onClick={()=>setShowArquivados(false)} style={{...S.btnSm,flex:1,padding:"7px",...(!showArquivados?{background:"#818cf822",border:"1px solid #818cf866",color:"#818cf8"}:{})}}>Ativos ({ativos.length})</button>
-        <button onClick={()=>setShowArquivados(true)} style={{...S.btnSm,flex:1,padding:"7px",...(showArquivados?{background:"#64748b22",border:"1px solid #64748b66",color:"#94a3b8"}:{})}}>📦 Arquivados ({arquivados.length})</button>
+        <button onClick={()=>setShowArquivados(true)} style={{...S.btnSm,flex:1,padding:"7px",...(showArquivados?{background:"#64748b22",border:"1px solid #64748b66",color:"#94a3b8"}:{})}}><Ico n="pacote"/> Arquivados ({arquivados.length})</button>
       </div>
 
       {showArquivados && arquivados.length>0 && (
@@ -592,7 +593,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
                   {rotulosColaboradoras(pessoas).map(p=>{ const on=relColabs.has(p.k); return (
                     <button key={p.k} onClick={()=>setRelColabs(prev=>{const n=new Set(prev); n.has(p.k)?n.delete(p.k):n.add(p.k); return n;})}
                       style={{...chip,background:on?"#a855f733":"transparent",border:`1px solid ${on?"#a855f7":(dark?"#334155":"#cbd5e1")}`,color:on?"#a855f7":"#94a3b8"}}>
-                      {on?"✓ ":""}{p.rotulo}
+                      {on?<><Ico n="check"/>{" "}</>:""}{p.rotulo}
                     </button>); })}
                   {relColabs.size>0 && <button onClick={()=>setRelColabs(new Set())} style={{...chip,background:"transparent",border:"none",color:"#94a3b8"}}>todas</button>}
                 </div>
@@ -602,7 +603,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
                   </label>
                   <button disabled={!noFiltro.length} onClick={()=>gerarPDFConsolidadoRonda(project, arquivados, { interno: relInterno, de: relDe, ate: relAte, tipo: relTipo || null, colaboradores: relColabs.size ? [...relColabs] : null })}
                     style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap",opacity:noFiltro.length?1:0.5}}>
-                    📊 Consolidado do filtro ({noFiltro.length} turno{noFiltro.length===1?"":"s"})
+                    <Ico n="grafico"/> Consolidado do filtro ({noFiltro.length} turno{noFiltro.length===1?"":"s"})
                   </button>
                 </div>
               </div>
@@ -610,11 +611,11 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           })()}
           {/* Contador + gerar */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-            <span style={{fontSize:11,color:"#a855f7",fontWeight:700}}>☑ {selTurnos.size} turno{selTurnos.size===1?"":"s"} selecionado{selTurnos.size===1?"":"s"} p/ consolidado</span>
+            <span style={{fontSize:11,color:"#a855f7",fontWeight:700}}><Ico n="quadradoCheck"/> {selTurnos.size} turno{selTurnos.size===1?"":"s"} selecionado{selTurnos.size===1?"":"s"} p/ consolidado</span>
             {selTurnos.size>=2 && (
               <button onClick={()=>gerarPDFConsolidadoRonda(project, arquivados.filter(t=>selTurnos.has(t.id)), { interno: relInterno })}
                 style={{...S.btnSm,background:"#a855f722",border:"1px solid #a855f766",color:"#a855f7",fontWeight:700,whiteSpace:"nowrap"}}>
-                📊 Gerar Consolidado
+                <Ico n="grafico"/> Gerar Consolidado
               </button>
             )}
           </div>
@@ -623,7 +624,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
 
       {visiveis.length===0 && (
         <div style={{textAlign:"center",padding:"36px 0"}}>
-          <div style={{fontSize:30,marginBottom:8}}>{showArquivados?"📦":"🎥"}</div>
+          <div style={{fontSize:30,marginBottom:8}}>{showArquivados?<><Ico n="pacote"/></>:<><Ico n="video"/></>}</div>
           <div style={{fontSize:13,...S.txt}}>{showArquivados?"Nenhum turno arquivado":"Nenhum turno de ronda aberto"}</div>
         </div>
       )}
@@ -633,7 +634,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
           {showArquivados && (
             <button onClick={()=>setSelTurnos(prev=>{const next=new Set(prev);next.has(t.id)?next.delete(t.id):next.add(t.id);return next;})}
               style={{marginTop:14,width:24,height:24,borderRadius:6,border:`2px solid ${selTurnos.has(t.id)?"#a855f7":"#475569"}`,background:selTurnos.has(t.id)?"#a855f733":"transparent",color:"#a855f7",fontSize:13,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"}}>
-              {selTurnos.has(t.id)?"✓":""}
+              {selTurnos.has(t.id)?<><Ico n="check"/></>:""}
             </button>
           )}
           <div style={{flex:1,minWidth:0}}>
@@ -734,14 +735,14 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:13,fontWeight:700,...S.txt}}>
             {turno.plantonista?.nome||"—"}
-            {turno.arquivado&&<span style={{fontSize:9,color:"#64748b",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}>📦 Arquivado</span>}
+            {turno.arquivado&&<span style={{fontSize:9,color:"#64748b",fontWeight:700,marginLeft:6,background:dark?"#0f172a":"#f1f5f9",padding:"1px 6px",borderRadius:6}}><Ico n="pacote"/> Arquivado</span>}
           </div>
           <div style={{display:"flex",gap:8,marginTop:3,flexWrap:"wrap"}}>
             <span style={{fontSize:10,color:tinfo.color,fontWeight:700}}>{tinfo.icon} {tinfo.label}</span>
-            <span style={{fontSize:10,...S.txt2}}>📅 {fmtDataBR(turno.dataInicio)}</span>
-            <span style={{fontSize:10,color:"#22c55e"}}>✅ {feitas}</span>
-            <span style={{fontSize:10,color:"#ef4444"}}>❌ {naoexec}</span>
-            {pendJust>0 && <span style={{fontSize:10,color:"#f59e0b",fontWeight:700}}>⚠ {pendJust} p/ justificar</span>}
+            <span style={{fontSize:10,...S.txt2}}><Ico n="calendario"/> {fmtDataBR(turno.dataInicio)}</span>
+            <span style={{fontSize:10,color:"#22c55e"}}><Ico n="checkCirculo"/> {feitas}</span>
+            <span style={{fontSize:10,color:"#ef4444"}}><Ico n="xCirculo"/> {naoexec}</span>
+            {pendJust>0 && <span style={{fontSize:10,color:"#f59e0b",fontWeight:700}}><Ico n="alerta"/> {pendJust} p/ justificar</span>}
           </div>
         </div>
         <span style={{...S.txt2,fontSize:12}}>{open?"▲":"▼"}</span>
@@ -749,7 +750,7 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
 
       {turno.tipo==="diurno" && !isFimDeSemana(turno.dataInicio) && (
         <div style={{fontSize:10,color:"#f59e0b",marginTop:8,background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:7,padding:"6px 9px"}}>
-          ⚠ Turno diurno é previsto apenas para finais de semana e feriados.
+          <Ico n="alerta"/> Turno diurno é previsto apenas para finais de semana e feriados.
         </div>
       )}
 
@@ -764,20 +765,20 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
 
           {!turno.arquivado && naoRealizadasSemJust>0 && (
             <div style={{fontSize:11,color:"#ef4444",marginTop:6,background:dark?"#1a0202":"#fef2f2",border:"1px solid #ef444444",borderRadius:7,padding:"7px 9px"}}>
-              ⚠ {naoRealizadasSemJust} ronda(s) não realizada(s) sem justificativa. Justifique todas para poder concluir e arquivar o turno.
+              <Ico n="alerta"/> {naoRealizadasSemJust} ronda(s) não realizada(s) sem justificativa. Justifique todas para poder concluir e arquivar o turno.
             </div>
           )}
 
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
-            <button onClick={onPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f733"}}>📄 PDF</button>
+            <button onClick={onPDF} style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f733"}}><Ico n="arquivo"/> PDF</button>
             {!turno.arquivado
-              ? <button onClick={tentarArquivar} style={{...S.btnSm,color:naoRealizadasSemJust>0?"#94a3b8":"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,opacity:naoRealizadasSemJust>0?0.6:1}}>📦 Concluir e arquivar</button>
+              ? <button onClick={tentarArquivar} style={{...S.btnSm,color:naoRealizadasSemJust>0?"#94a3b8":"#64748b",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,opacity:naoRealizadasSemJust>0?0.6:1}}><Ico n="pacote"/> Concluir e arquivar</button>
               : <button onClick={onDesarquivar} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>↩ Desarquivar</button>}
             {!turno.arquivado && turnoVazio && (
               <button onClick={()=>{ if(window.confirm(`Cancelar este turno?\n\n${turno.plantonista?.nome||"—"} · ${RONDA_TURNOS[turno.tipo]?.label||turno.tipo}\n\nNenhuma ronda foi registrada. O turno será removido e você poderá abrir outro.`)) onExcluir(true); }}
-                style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44"}}>✕ Cancelar turno</button>
+                style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44"}}><Ico n="x"/> Cancelar turno</button>
             )}
-            {adminAuth && <button onClick={onExcluir} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433"}}>🗑 Excluir</button>}
+            {adminAuth && <button onClick={onExcluir} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433"}}><Ico n="lixeira"/> Excluir</button>}
           </div>
         </div>
       )}
@@ -810,8 +811,8 @@ function SlotRow({ linha, dark, S, disabled, onIniciar, onFecharSem, onFecharCom
         )}
         {!disabled && iniciada && !fechada && (
           <div style={{display:"flex",gap:4}}>
-            <button onClick={onFecharSem} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e66",padding:"5px 8px"}}>✓ Sem anomalia</button>
-            <button onClick={onFecharCom} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444466",padding:"5px 8px"}}>⚠ Com anomalia</button>
+            <button onClick={onFecharSem} style={{...S.btnSm,color:"#22c55e",border:"1px solid #22c55e66",padding:"5px 8px"}}><Ico n="check"/> Sem anomalia</button>
+            <button onClick={onFecharCom} style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444466",padding:"5px 8px"}}><Ico n="alerta"/> Com anomalia</button>
           </div>
         )}
         {!disabled && st==="bloqueado" && !reg?.naoExec && (
@@ -851,7 +852,7 @@ function SlotRow({ linha, dark, S, disabled, onIniciar, onFecharSem, onFecharCom
       )}
 
       {disabled && reg?.justificativa && (
-        <div style={{fontSize:11,color:"#f59e0b",marginTop:5}}>⚠ {reg.justificativa}</div>
+        <div style={{fontSize:11,color:"#f59e0b",marginTop:5}}><Ico n="alerta"/> {reg.justificativa}</div>
       )}
       {disabled && reg?.obs && (
         <div style={{fontSize:11,...S.txt2,marginTop:4,lineHeight:1.4}}>{reg.obs}</div>

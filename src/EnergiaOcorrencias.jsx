@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -356,13 +357,13 @@ function PinGate({ project, onSuccess, onBack, dark }){
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>⚡</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="raio"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Ocorrências de Energia</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn,fontSize:13}}>👷 Acesso Líder</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:COR.amber,borderColor:"#f5b94255"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn,fontSize:13}}><Ico n="capacete"/> Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:COR.amber,borderColor:"#f5b94255"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec,fontSize:13,marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -434,7 +435,7 @@ function DieselAvulsoModal({ dark, onConfirm, onCancel }){
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
       <div style={{background:card,borderRadius:14,padding:"20px 18px",width:"100%",maxWidth:410,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>
-        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}>⛽ Solicitar diesel (sem queda)</div>
+        <div style={{fontSize:16,fontWeight:800,color:txt,marginBottom:4}}><Ico n="combustivel"/> Solicitar diesel (sem queda)</div>
         <div style={{fontSize:12,color:txt2,marginBottom:14}}>Informe quem está solicitando o abastecimento.</div>
         <div style={{fontSize:12,fontWeight:700,color:txt,marginBottom:6}}>Função</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
@@ -488,7 +489,7 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
 
   return (
     <div style={{marginTop:16,paddingTop:14,borderTop:`1px solid ${COR.redBorder}`}}>
-      <div style={{fontSize:11,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",color:COR.amber,marginBottom:4}}>⛽ Abastecimento de diesel</div>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:.6,textTransform:"uppercase",color:COR.amber,marginBottom:4}}><Ico n="combustivel"/> Abastecimento de diesel</div>
       <div style={{fontSize:10.5,padding:"7px 10px",borderRadius:8,marginBottom:12,fontWeight:600,
         background:janela.liberada?"rgba(63,191,127,.1)":"rgba(245,185,66,.1)",
         color:janela.liberada?COR.green:COR.amber,border:`1px solid ${janela.liberada?"#2a5c42":"#7a5c1a"}`}}>
@@ -500,7 +501,7 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
 
         {/* PASSO 1 — solicitar diesel */}
         <div style={stepStyle(!passo1Feito, passo1Feito)}>
-          <div style={dotStyle(!passo1Feito, passo1Feito)}>{passo1Feito?"✓":"1"}</div>
+          <div style={dotStyle(!passo1Feito, passo1Feito)}>{passo1Feito?<><Ico n="check"/></>:"1"}</div>
           <div style={{fontSize:13,fontWeight:700,color:dark?"#e8ecf5":"#0f172a"}}>Solicitar diesel ao fornecedor</div>
           {passo1Feito ? (
             <div style={{fontSize:11,color:"#94a3b8",marginTop:3}}>
@@ -509,19 +510,19 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
           ) : (janela.liberada || aberto.tipoRegistro==="diesel_avulso") ? (
             <>
               <button onClick={()=>setCascataAberta(v=>!v)} style={{width:"100%",marginTop:8,padding:"9px",borderRadius:8,border:`1px solid ${COR.purple}55`,background:"transparent",color:COR.purple,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
-                ⛽ Fornecedor de diesel ▾
+                <Ico n="combustivel"/> Fornecedor de diesel ▾
               </button>
               {cascataAberta && (
                 <div style={{marginTop:6}}>
                   {DIESEL_FORNECEDORES.map(f=>(
                     <div key={f.nome} onClick={()=>setFornSel(f)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:dark?"#0d1424":"#fff",border:`1px solid ${fornSel?.nome===f.nome?"#3fbf7f":(dark?"#1c2438":"#e2e8f0")}`,borderRadius:9,padding:"9px 12px",marginBottom:6,cursor:"pointer"}}>
-                      <span style={{fontSize:12.5,fontWeight:700,color:dark?"#e8ecf5":"#0f172a"}}>{fornSel?.nome===f.nome?"✓ ":""}{f.nome}</span>
-                      <a href={`tel:${f.telefone}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:COR.green,fontWeight:700,textDecoration:"none"}}>📞 {f.exibicao}</a>
+                      <span style={{fontSize:12.5,fontWeight:700,color:dark?"#e8ecf5":"#0f172a"}}>{fornSel?.nome===f.nome?<><Ico n="check"/>{" "}</>:""}{f.nome}</span>
+                      <a href={`tel:${f.telefone}`} onClick={e=>e.stopPropagation()} style={{fontSize:12,color:COR.green,fontWeight:700,textDecoration:"none"}}><Ico n="telefone"/> {f.exibicao}</a>
                     </div>
                   ))}
                   {fornSel && (
                     <button onClick={()=>onContato(aberto.id, fornSel)} style={{width:"100%",marginTop:4,padding:"10px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
-                      ✓ Contato efetuado → cravar horário e iniciar contagem
+                      <Ico n="check"/> Contato efetuado → cravar horário e iniciar contagem
                     </button>
                   )}
                 </div>
@@ -535,10 +536,10 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
         {/* PASSO 2 — aguardando entrega (cronômetro do diesel) */}
         {passo1Feito && (
           <div style={stepStyle(!passo2Feito, passo2Feito)}>
-            <div style={dotStyle(!passo2Feito, passo2Feito)}>{passo2Feito?"✓":"2"}</div>
+            <div style={dotStyle(!passo2Feito, passo2Feito)}>{passo2Feito?<><Ico n="check"/></>:"2"}</div>
             <div style={{fontSize:13,fontWeight:700,color:dark?"#e8ecf5":"#0f172a"}}>Aguardando entrega</div>
             <div style={{background:dark?"#1a1000":"#fffbeb",border:`1px solid ${dark?"#7a5c1a":"#fde68a"}`,borderRadius:10,padding:10,marginTop:8,textAlign:"center"}}>
-              <div style={{fontSize:9.5,color:COR.amber,textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}>⏱️ Tempo de resposta (contato → chegada)</div>
+              <div style={{fontSize:9.5,color:COR.amber,textTransform:"uppercase",letterSpacing:.5,fontWeight:700}}><Ico n="cronometro"/> Tempo de resposta (contato → chegada)</div>
               <div style={{fontSize:22,fontWeight:900,color:COR.amber,fontVariantNumeric:"tabular-nums"}}>
                 {dieselFmtDur(d.contatoEfetuadoEm, passo2Feito?new Date(d.entregaChegouEm).getTime():agora)}
               </div>
@@ -547,7 +548,7 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
               <div style={{fontSize:11,color:"#94a3b8",marginTop:6}}>Entrega chegou às {fmtHora(d.entregaChegouEm)}</div>
             ) : (
               <button onClick={()=>onEntrega(aberto.id)} style={{width:"100%",marginTop:8,padding:"10px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:700,cursor:"pointer"}}>
-                🚚 Entrega chegou → cravar horário
+                <Ico n="caminhao"/> Entrega chegou → cravar horário
               </button>
             )}
           </div>
@@ -556,7 +557,7 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
         {/* PASSO 3 — abastecimento */}
         {passo2Feito && (
           <div style={stepStyle(!passo3Feito, passo3Feito)}>
-            <div style={dotStyle(!passo3Feito, passo3Feito)}>{passo3Feito?"✓":"3"}</div>
+            <div style={dotStyle(!passo3Feito, passo3Feito)}>{passo3Feito?<><Ico n="check"/></>:"3"}</div>
             <div style={{fontSize:13,fontWeight:700,color:dark?"#e8ecf5":"#0f172a"}}>Abastecimento</div>
             {passo3Feito ? (
               <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>
@@ -575,12 +576,12 @@ function DieselFluxo({ evento, agora, dark, fornSel, setFornSel, onContato, onEn
                   </div>
                 ) : (
                   <label style={{display:"block",marginTop:8,padding:"12px",borderRadius:10,border:`1.5px dashed ${dark?"#2a3450":"#cbd5e1"}`,textAlign:"center",fontSize:12,color:"#64748b",cursor:"pointer"}}>
-                    📷 Foto da bomba do caminhão (1)
+                    <Ico n="camera"/> Foto da bomba do caminhão (1)
                     <input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{addFotoDiesel(e.target.files?.[0]);e.target.value="";}}/>
                   </label>
                 )}
                 <button onClick={()=>onFinalizar(aberto.id,litros,descricao,foto)} style={{width:"100%",marginTop:8,padding:"11px",borderRadius:8,border:"none",background:COR.green,color:"#fff",fontSize:12.5,fontWeight:800,cursor:"pointer"}}>
-                  ✓ Finalizar abastecimento → para cronômetro do diesel
+                  <Ico n="check"/> Finalizar abastecimento → para cronômetro do diesel
                 </button>
               </>
             )}
@@ -783,7 +784,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
     <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px 14px 14px"}}>
       <button onClick={()=>{ if(screen==="home") onBack(); else setScreen("home"); }} style={S.backBtn}>←</button>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:19,fontWeight:700,...S.txt}}>⚡ Ocorrências de Energia</div>
+        <div style={{fontSize:19,fontWeight:700,...S.txt}}><Ico n="raio"/> Ocorrências de Energia</div>
         <div style={{fontSize:12.5,...S.txt2,fontWeight:500}}>{project.id} · {project.name}</div>
       </div>
       {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
@@ -796,7 +797,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
       {Header}
       <div style={{padding:"0 14px",display:"flex",flexDirection:"column",gap:10}}>
         <div style={S.card}>
-          <div style={{fontSize:15,fontWeight:800,...S.txt}}>{editandoId?"✏️ Editando ocorrência":"✅ Voltou a energia"}</div>
+          <div style={{fontSize:15,fontWeight:800,...S.txt}}>{editandoId?<><Ico n="editar"/>{" Editando ocorrência"}</>:<><Ico n="checkCirculo"/>{" Voltou a energia"}</>}</div>
           {editandoId ? (
             <div style={{fontSize:12,...S.txt2,marginTop:2}}>{(()=>{const ev=eventos.find(e=>e.id===editandoId);return ev?`Queda de ${fmtDataHora(ev.inicioQueda)} até ${fmtDataHora(ev.fimQueda)}`:"";})()}</div>
           ) : (
@@ -828,12 +829,12 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
               style={{flex:1,padding:"12px",borderRadius:11,fontWeight:900,fontSize:14,cursor:"pointer",
                 border:`2px solid ${form.gerador==="sim"?COR.green:(dark?"#232b4a":"#e2e8f0")}`,
                 background:form.gerador==="sim"?COR.green:(dark?"#151c36":"#fff"),
-                color:form.gerador==="sim"?"#04140b":(dark?"#eef1fa":"#475569")}}>✅ Sim</button>
+                color:form.gerador==="sim"?"#04140b":(dark?"#eef1fa":"#475569")}}><Ico n="checkCirculo"/> Sim</button>
             <button onClick={()=>{setForm(f=>({...f,gerador:"nao"}));setErro(null);}}
               style={{flex:1,padding:"12px",borderRadius:11,fontWeight:900,fontSize:14,cursor:"pointer",
                 border:`2px solid ${form.gerador==="nao"?COR.red:(dark?"#232b4a":"#e2e8f0")}`,
                 background:form.gerador==="nao"?COR.red:(dark?"#151c36":"#fff"),
-                color:form.gerador==="nao"?"#2a0303":(dark?"#eef1fa":"#475569")}}>❌ Não</button>
+                color:form.gerador==="nao"?"#2a0303":(dark?"#eef1fa":"#475569")}}><Ico n="xCirculo"/> Não</button>
           </div>
           {form.gerador==="nao" && (
             <input value={form.obsGerador} onChange={e=>{setForm(f=>({...f,obsGerador:e.target.value}));setErro(null);}} placeholder="Por que não acionou? Qual o impacto?" style={{...S.inp,marginTop:10,fontSize:13}}/>
@@ -874,14 +875,14 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             </div>
           ) : (
             <div style={{display:"flex",gap:8,marginTop:4}}>
-              <label style={{...S.btnSec,fontSize:12,cursor:"pointer",width:"auto",padding:"9px 13px"}}>📷 Câmera<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/></label>
-              <label style={{...S.btnSec,fontSize:12,cursor:"pointer",width:"auto",padding:"9px 13px"}}>🖼️ Galeria<input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/></label>
+              <label style={{...S.btnSec,fontSize:12,cursor:"pointer",width:"auto",padding:"9px 13px"}}><Ico n="camera"/> Câmera<input type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/></label>
+              <label style={{...S.btnSec,fontSize:12,cursor:"pointer",width:"auto",padding:"9px 13px"}}><Ico n="imagem"/> Galeria<input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{addFoto(e.target.files?.[0]);e.target.value="";}}/></label>
             </div>
           )}
         </div>
         {erro && <div role="alert" style={{fontSize:12,color:COR.red,textAlign:"center"}}>{erro}</div>}
         <button onClick={()=>{setEditandoId(null);setScreen("home");}} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-        <button onClick={concluir} disabled={saving} style={S.btn}>{saving?"Salvando…":(editandoId?"💾 Salvar Edição":"✓ Concluir Ocorrência")}</button>
+        <button onClick={concluir} disabled={saving} style={S.btn}>{saving?"Salvando…":(editandoId?<><Ico n="disquete"/>{" Salvar Edição"}</>:<><Ico n="check"/>{" Concluir Ocorrência"}</>)}</button>
       </div>
     </div></div>
   );
@@ -901,7 +902,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             <>
               <div style={S.card}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{fontSize:15,fontWeight:800,...S.txt}}>⛽ Solicitação de diesel</div>
+                  <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="combustivel"/> Solicitação de diesel</div>
                   <span style={{fontSize:10.5,fontWeight:700,padding:"4px 9px",borderRadius:999,background:"rgba(194,65,12,.14)",color:"#f59e0b"}}>
                     {dz.abastecimentoCompletoEm?"Concluído":dz.entregaChegouEm?"Em abastecimento":dz.acionado?"Aguardando":"Aberto"}
                   </span>
@@ -938,20 +939,20 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Manutencista: <b style={S.txt}>{ev.manutencista?"Sim":"Não"}</b></div>
             <div style={{fontSize:12,...S.txt2,marginBottom:6}}>Impacto na operação: <b style={{color:ev.impactoOperacao?COR.red:S.txt.color}}>{ev.impactoOperacao?"Sim":"Não"}</b>{ev.obsImpacto?` — ${ev.obsImpacto}`:""}</div>
             <div style={{fontSize:12,...S.txt2}}>Inquilino impactado: <b style={S.txt}>{ev.inquilinoImpactado?(ev.inquilinosAfetados||"Sim"):"Não"}</b></div>
-            {ev.obs && <div style={{fontSize:12,...S.txt2,marginTop:6}}>📝 {ev.obs}</div>}
+            {ev.obs && <div style={{fontSize:12,...S.txt2,marginTop:6}}><Ico n="notas"/> {ev.obs}</div>}
           </div>
           {ev.foto && <div style={S.card}><img src={ev.foto} alt="" style={{width:"100%",borderRadius:10}}/></div>}
           </>
           )}
           <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>gerarPdfEvento(project,data.config,ev)} style={{...S.btnSec,flex:1,fontSize:12,color:COR.purple}}>📄 PDF</button>
-            <button onClick={()=>abrirWhatsApp(project,data.config,ev)} style={{...S.btnSec,flex:1,fontSize:12,color:COR.green}}>📲 WhatsApp</button>
+            <button onClick={()=>gerarPdfEvento(project,data.config,ev)} style={{...S.btnSec,flex:1,fontSize:12,color:COR.purple}}><Ico n="arquivo"/> PDF</button>
+            <button onClick={()=>abrirWhatsApp(project,data.config,ev)} style={{...S.btnSec,flex:1,fontSize:12,color:COR.green}}><Ico n="celular"/> WhatsApp</button>
           </div>
-          {liderAuth && !ev.arquivado && <button onClick={()=>abrirEdicao(ev)} style={{...S.btnSec,fontSize:13,color:COR.amber}}>✏️ Editar</button>}
-          {liderAuth && !ev.arquivado && <button onClick={()=>arquivar(ev.id)} style={{...S.btnSec,fontSize:13}}>📥 Arquivar</button>}
+          {liderAuth && !ev.arquivado && <button onClick={()=>abrirEdicao(ev)} style={{...S.btnSec,fontSize:13,color:COR.amber}}><Ico n="editar"/> Editar</button>}
+          {liderAuth && !ev.arquivado && <button onClick={()=>arquivar(ev.id)} style={{...S.btnSec,fontSize:13}}><Ico n="download"/> Arquivar</button>}
           {adminAuth && (confirmDelId===ev.id
             ? <button onClick={()=>excluirEvento(ev.id)} style={{...S.btn,background:"#dc2626"}}>Confirmar exclusão</button>
-            : <button onClick={()=>setConfirmDelId(ev.id)} style={{...S.btnSec,fontSize:13,color:COR.red}}>🗑 Excluir registro</button>)}
+            : <button onClick={()=>setConfirmDelId(ev.id)} style={{...S.btnSec,fontSize:13,color:COR.red}}><Ico n="lixeira"/> Excluir registro</button>)}
           <button onClick={()=>{setViewId(null);setConfirmDelId(null);setScreen("home");}} style={{...S.btnSec,fontSize:13}}>← Voltar</button>
         </div>
       </div></div>
@@ -970,10 +971,10 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
         {data.config?.concessionaria ? (
           <div style={{background:dark?"linear-gradient(160deg,#151c36,#10162b)":"#fff",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,borderRadius:16,overflow:"hidden"}}>
             <div onClick={()=>setCondAberto(o=>!o)} style={{padding:16,display:"flex",alignItems:"center",gap:12,cursor:"pointer"}}>
-              <div style={{width:44,height:44,borderRadius:12,background:"rgba(139,124,246,.14)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🏢</div>
+              <div style={{width:44,height:44,borderRadius:12,background:"rgba(139,124,246,.14)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}><Ico n="predio"/></div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:17,fontWeight:700,...S.txt}}>{data.config.concessionaria}</div>
-                <div style={{fontSize:15,color:COR.purple,fontWeight:600,marginTop:2}}>📞 {data.config.telefoneConcessionaria}</div>
+                <div style={{fontSize:15,color:COR.purple,fontWeight:600,marginTop:2}}><Ico n="telefone"/> {data.config.telefoneConcessionaria}</div>
               </div>
               <span style={{color:S.txt2.color,fontSize:14,transform:condAberto?"rotate(180deg)":"none",transition:"transform .25s",flexShrink:0}}>▼</span>
             </div>
@@ -986,15 +987,15 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                       : <span style={{fontSize:14,fontWeight:600,...S.txt,textAlign:"right"}}>{v}</span>}
                   </div>
                 ))}
-                {liderAuth && <button onClick={abrirSheet} style={{...S.btnSec,marginTop:8,fontSize:13}}>✏️ Editar dados</button>}
+                {liderAuth && <button onClick={abrirSheet} style={{...S.btnSec,marginTop:8,fontSize:13}}><Ico n="editar"/> Editar dados</button>}
               </div>
             )}
           </div>
         ) : liderAuth ? (
           <div style={{...S.card,border:"1px solid #f5b94255",background:dark?"#1a1000":"#fffbeb"}}>
-            <div style={{fontSize:13,fontWeight:800,color:COR.amber}}>⚠️ Cadastro pendente</div>
+            <div style={{fontSize:13,fontWeight:800,color:COR.amber}}><Ico n="alerta"/> Cadastro pendente</div>
             <div style={{fontSize:12,...S.txt2,marginTop:2,marginBottom:10}}>Configure a concessionária uma única vez. O registro de ocorrências continua liberado enquanto isso.</div>
-            <button onClick={abrirSheet} style={{...S.btnSec,fontSize:13}}>⚙️ Configurar agora</button>
+            <button onClick={abrirSheet} style={{...S.btnSec,fontSize:13}}><Ico n="engrenagem"/> Configurar agora</button>
           </div>
         ) : null}
 
@@ -1007,16 +1008,16 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
               Em aberto — aguardando retorno
             </div>
             <style>{`@keyframes mkEnergyPulse{0%{box-shadow:0 0 0 0 rgba(224,82,79,.5)}70%{box-shadow:0 0 0 7px rgba(224,82,79,0)}100%{box-shadow:0 0 0 0 rgba(224,82,79,0)}}`}</style>
-            <div style={{fontSize:17,fontWeight:700,color:"#fff",marginBottom:4}}>⚡ Queda de energia</div>
+            <div style={{fontSize:17,fontWeight:700,color:"#fff",marginBottom:4}}><Ico n="raio"/> Queda de energia</div>
             <div style={{fontSize:13.5,color:"#d8a5a5",marginBottom:4}}>Início: {fmtDataHora(aberto.inicioQueda)}</div>
             {/* Turno de início x turno atual (cobre ocorrência intermediária) */}
             <div style={{display:"flex",gap:6,margin:"6px 0"}}>
               <span style={{fontSize:10,fontWeight:700,padding:"4px 9px",borderRadius:7,background:(aberto.turnoInicio||aberto.turno)==="Diurno"?"rgba(245,185,66,.14)":"rgba(139,124,246,.16)",color:(aberto.turnoInicio||aberto.turno)==="Diurno"?COR.amber:COR.purple}}>
-                {(aberto.turnoInicio||aberto.turno)==="Diurno"?"☀️":"🌙"} Início: {aberto.turnoInicio||aberto.turno}
+                {(aberto.turnoInicio||aberto.turno)==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>} Início: {aberto.turnoInicio||aberto.turno}
               </span>
               {turnoAgora()!==(aberto.turnoInicio||aberto.turno) && (
                 <span style={{fontSize:10,fontWeight:700,padding:"4px 9px",borderRadius:7,background:turnoAgora()==="Diurno"?"rgba(245,185,66,.14)":"rgba(139,124,246,.16)",color:turnoAgora()==="Diurno"?COR.amber:COR.purple}}>
-                  {turnoAgora()==="Diurno"?"☀️":"🌙"} Agora: {turnoAgora()}
+                  {turnoAgora()==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>} Agora: {turnoAgora()}
                 </span>
               )}
             </div>
@@ -1025,7 +1026,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
             </div>
             <button onClick={abrirConcluir} style={{width:"100%",padding:15,borderRadius:13,border:"none",
               background:`linear-gradient(135deg,${COR.green},#2e9c66)`,color:"#06130c",fontSize:15.5,fontWeight:800,cursor:"pointer"}}>
-              ⚡ Energia restabelecida? — cravar horário
+              <Ico n="raio"/> Energia restabelecida? — cravar horário
             </button>
 
             {/* Fluxo de diesel (só projetos elegíveis) */}
@@ -1055,16 +1056,16 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                 <div style={{fontSize:11.5,...S.txt2,marginTop:6}}>Já vem preenchido com o horário atual. Ajuste se a queda foi antes.</div>
                 <div style={{display:"flex",gap:8,marginTop:12}}>
                   <button onClick={()=>setModoRegistro(false)} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
-                  <button onClick={registrarQueda} disabled={saving} style={S.btn}>{saving?"Salvando…":"✓ Confirmar queda"}</button>
+                  <button onClick={registrarQueda} disabled={saving} style={S.btn}>{saving?"Salvando…":<><Ico n="check"/>{" Confirmar queda"}</>}</button>
                 </div>
               </div>
             ) : (
-              <button onClick={abrirRegistro} disabled={saving} style={S.btn}>➕ Registrar falta de energia</button>
+              <button onClick={abrirRegistro} disabled={saving} style={S.btn}><Ico n="mais"/> Registrar falta de energia</button>
             )}
             {/* Solicitação avulsa de diesel (sem queda) — só projetos elegíveis */}
             {dieselOn && !modoRegistro && (
               <button onClick={registrarDieselAvulso} disabled={saving} style={{...S.btnSec,fontSize:13,marginTop:8,borderColor:COR.amber,color:COR.amber}}>
-                ⛽ Solicitar diesel (sem queda de energia)
+                <Ico n="combustivel"/> Solicitar diesel (sem queda de energia)
               </button>
             )}
           </>
@@ -1075,7 +1076,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
           <div key={ev.id} style={{background:dark?"#1a1000":"#fffbeb",border:`2px solid ${COR.amber}`,borderRadius:16,padding:16}}>
             <div style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11.5,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",
               color:COR.amber,background:"rgba(245,185,66,.12)",padding:"5px 10px",borderRadius:999,marginBottom:10}}>
-              ⛽ Abastecimento em andamento
+              <Ico n="combustivel"/> Abastecimento em andamento
             </div>
             <div style={{fontSize:15,fontWeight:700,color:dark?"#fff":"#0f172a"}}>
               {ev.tipoRegistro==="diesel_avulso" ? "Solicitação de diesel (sem queda)" : "Diesel pendente — energia já restabelecida"}
@@ -1117,7 +1118,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                     background: modoSel&&sel ? (dark?"#1a1533":"#f5f3ff") : "transparent",
                     borderBottom:i<historicoVisivel.length-1?`1px solid ${dark?"#232b4a88":"#f1f5f9"}`:"none"}}>
                   {modoSel && (
-                    <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:`2px solid ${sel?COR.purple:(dark?"#3a4468":"#cbd5e1")}`,background:sel?COR.purple:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:900}}>{sel?"✓":""}</div>
+                    <div style={{flexShrink:0,width:20,height:20,borderRadius:5,border:`2px solid ${sel?COR.purple:(dark?"#3a4468":"#cbd5e1")}`,background:sel?COR.purple:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:12,fontWeight:900}}>{sel?<><Ico n="check"/></>:""}</div>
                   )}
                   <div style={{textAlign:"center",flexShrink:0,width:44}}>
                     <div style={{fontSize:16,fontWeight:800,...S.txt}}>{dm.d}</div>
@@ -1126,14 +1127,14 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                   <div style={{flex:1,minWidth:0}}>
                     {ev.tipoRegistro==="diesel_avulso" ? (
                       <>
-                        <div style={{fontSize:14,fontWeight:600,...S.txt}}>⛽ Abastecimento avulso{ev.diesel?.fornecedor?.nome?` · ${ev.diesel.fornecedor.nome}`:""}</div>
+                        <div style={{fontSize:14,fontWeight:600,...S.txt}}><Ico n="combustivel"/> Abastecimento avulso{ev.diesel?.fornecedor?.nome?` · ${ev.diesel.fornecedor.nome}`:""}</div>
                         <div style={{fontSize:12.5,color:S.txt2.color,marginTop:2}}>
                           {ev.diesel?.litros?`${ev.diesel.litros}`:"—"}{ev.diesel?.solicitante?` · ${ev.diesel.solicitante}`:""}
                         </div>
                       </>
                     ) : (
                       <>
-                        <div style={{fontSize:14,fontWeight:600,...S.txt}}>{fmtHora(ev.inicioQueda)} → {fmtHora(ev.fimQueda)}{ev.arquivado?" 📥":""}{ev.diesel?.acionado?" ⛽":""}</div>
+                        <div style={{fontSize:14,fontWeight:600,...S.txt}}>{fmtHora(ev.inicioQueda)} → {fmtHora(ev.fimQueda)}{ev.arquivado?<>{" "}<Ico n="download"/></>:""}{ev.diesel?.acionado?<>{" "}<Ico n="combustivel"/></>:""}</div>
                         <div style={{fontSize:12.5,color:S.txt2.color,marginTop:2}}>Duração: {duracaoFmt(new Date(ev.inicioQueda),new Date(ev.fimQueda))}</div>
                       </>
                     )}
@@ -1143,7 +1144,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                     color:ev.turno==="Diurno"?COR.amber:COR.purple}}>{ev.turno}</span>
                   {!modoSel && (
                     <button title="Baixar relatório" onClick={(e)=>{e.stopPropagation();gerarPdfEvento(project,data.config,ev);}}
-                      style={{flexShrink:0,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,borderRadius:9,padding:"6px 9px",fontSize:14,cursor:"pointer",color:COR.purple}}>📄</button>
+                      style={{flexShrink:0,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,borderRadius:9,padding:"6px 9px",fontSize:14,cursor:"pointer",color:COR.purple}}><Ico n="arquivo"/></button>
                   )}
                 </div>
               );
@@ -1154,18 +1155,18 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
         {/* Relatório (gerencial) */}
         {adminAuth && eventos.length>0 && (
           <div style={{...S.card,marginTop:6}}>
-            <div style={{fontSize:12,color:S.txt2.color,textTransform:"uppercase",letterSpacing:.8,marginBottom:10,fontWeight:700}}>📄 Relatório de ocorrências (gerencial)</div>
+            <div style={{fontSize:12,color:S.txt2.color,textTransform:"uppercase",letterSpacing:.8,marginBottom:10,fontWeight:700}}><Ico n="arquivo"/> Relatório de ocorrências (gerencial)</div>
 
             {/* Modo seleção manual */}
             {modoSel ? (
               <div style={{marginBottom:10}}>
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <button onClick={()=>setSelPDF(historicoVisivel.map(e=>e.id))} style={{flex:1,padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${COR.purple}44`,color:COR.purple,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>✓ Selecionar todos ({historicoVisivel.length})</button>
-                  <button onClick={()=>setSelPDF([])} style={{flex:1,padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:S.txt2.color,fontSize:12.5,fontWeight:700,cursor:"pointer"}}>✕ Limpar</button>
+                  <button onClick={()=>setSelPDF(historicoVisivel.map(e=>e.id))} style={{flex:1,padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${COR.purple}44`,color:COR.purple,fontSize:12.5,fontWeight:700,cursor:"pointer"}}><Ico n="check"/> Selecionar todos ({historicoVisivel.length})</button>
+                  <button onClick={()=>setSelPDF([])} style={{flex:1,padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:S.txt2.color,fontSize:12.5,fontWeight:700,cursor:"pointer"}}><Ico n="x"/> Limpar</button>
                 </div>
                 <button disabled={selPDF.length===0} onClick={()=>{gerarPdfSelecao(project,eventos,selPDF,relInterno);}}
                   style={{width:"100%",padding:"12px 4px",borderRadius:11,background:selPDF.length?`linear-gradient(135deg,${COR.purple},#6d28d9)`:(dark?"#151c36":"#e2e8f0"),border:"none",color:selPDF.length?"#fff":"#94a3b8",fontSize:13.5,fontWeight:800,cursor:selPDF.length?"pointer":"not-allowed",marginBottom:8}}>
-                  📄 Gerar PDF da seleção ({selPDF.length})
+                  <Ico n="arquivo"/> Gerar PDF da seleção ({selPDF.length})
                 </button>
                 <button onClick={()=>{setModoSel(false);setSelPDF([]);}} style={{width:"100%",padding:"9px 4px",borderRadius:10,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:S.txt2.color,fontSize:12.5,fontWeight:600,cursor:"pointer"}}>Cancelar seleção</button>
               </div>
@@ -1173,7 +1174,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
               <>
                 <button onClick={()=>{setModoSel(true);setSelPDF([]);setVerTodos(true);}}
                   style={{width:"100%",padding:"11px 4px",borderRadius:11,background:"transparent",border:`1.5px dashed ${COR.purple}66`,color:COR.purple,fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:10}}>
-                  ☑️ Selecionar ocorrências para PDF
+                  <Ico n="quadradoCheck"/> Selecionar ocorrências para PDF
                 </button>
                 <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:S.txt2.color,margin:"2px 0 10px",cursor:"pointer"}}>
                   <input type="checkbox" checked={relInterno} onChange={ev=>setRelInterno(ev.target.checked)}/> Versão interna (com conferência do registro)
@@ -1184,7 +1185,7 @@ export default function EnergiaOcorrencias({ project, onBack, dark, onToggleThem
                   <button onClick={()=>gerarPdfPeriodo(project,eventos,15,"Quinzenal",relInterno)} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Quinzenal</button>
                   <button onClick={()=>gerarPdfPeriodo(project,eventos,30,"Mensal",relInterno)} style={{flex:1,padding:"11px 4px",borderRadius:11,background:"transparent",border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`,color:COR.purple,fontSize:13.5,fontWeight:600,cursor:"pointer"}}>Mensal</button>
                 </div>
-                <button onClick={()=>gerarPdfPeriodo(project,eventos,null,"Histórico Completo",relInterno)} style={{width:"100%",padding:"12px 4px",borderRadius:11,background:`linear-gradient(135deg,${COR.purple},#6d28d9)`,border:"none",color:"#fff",fontSize:13.5,fontWeight:800,cursor:"pointer"}}>📚 Histórico Completo ({eventos.length})</button>
+                <button onClick={()=>gerarPdfPeriodo(project,eventos,null,"Histórico Completo",relInterno)} style={{width:"100%",padding:"12px 4px",borderRadius:11,background:`linear-gradient(135deg,${COR.purple},#6d28d9)`,border:"none",color:"#fff",fontSize:13.5,fontWeight:800,cursor:"pointer"}}><Ico n="livro"/> Histórico Completo ({eventos.length})</button>
               </>
             )}
           </div>

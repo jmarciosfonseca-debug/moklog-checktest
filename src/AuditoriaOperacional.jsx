@@ -8,6 +8,7 @@
 // PDF verdadeiro + Storage é a Fase 1B, após validar infra).
 // ─────────────────────────────────────────────────────────────
 
+import { Ico } from "./Icones";
 import { useState, useEffect, useCallback } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -123,7 +124,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
           <button onClick={onBack} style={{ background:"transparent", border:`1px solid ${border}`, color:txt2, borderRadius:7, padding:"7px 12px", fontSize:12, cursor:"pointer", fontWeight:600 }}>← Painel</button>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:16, fontWeight:800, color:txt }}>📋 Auditoria Operacional</div>
+            <div style={{ fontSize:16, fontWeight:800, color:txt }}><Ico n="prancheta"/> Auditoria Operacional</div>
             <div style={{ fontSize:11, color:txt2 }}>{projectId} — Mega CL Curitiba · piloto</div>
           </div>
         </div>
@@ -221,7 +222,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
             {erroPdf && <div role="alert" style={{ fontSize:11, color:"#ef4444", marginBottom:8 }}>{erroPdf}</div>}
             <button onClick={baixarPDF} disabled={gerando || !matriz}
               style={{ width:"100%", background: gerando?"#334155":"linear-gradient(135deg,#B21E27,#121212)", color:"#fff", border:"none", borderRadius:9, padding:"11px", fontSize:12.5, fontWeight:700, cursor: gerando?"wait":"pointer" }}>
-              {gerando ? "Gerando PDF…" : "📄 Gerar PDF verdadeiro"}
+              {gerando ? "Gerando PDF…" : <><Ico n="arquivo"/>{" Gerar PDF verdadeiro"}</>}
             </button>
           </Card>
 

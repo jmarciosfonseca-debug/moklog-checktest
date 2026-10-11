@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -438,7 +439,7 @@ function PinGate({ onSuccess, onBack, dark, project, pcfg }) {
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>🔒</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="cadeado"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Teste Perimetral</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {pcfg.clienteNome||project.name}</div>
         <input type="password" inputMode="numeric" placeholder="PIN" maxLength={8}
@@ -576,7 +577,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
   if(pcfg.zonas.length===0) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:340,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>🚧</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="obras"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:6}}>Teste Perimetral</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:16}}>{project.id} · {project.name}</div>
         <div style={{fontSize:13,...S.txt2,lineHeight:1.5,marginBottom:18}}>
@@ -590,7 +591,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
   if(loading) return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🔒</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}><Ico n="cadeado"/></div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
     </div>
   );
 
@@ -607,7 +608,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
       <div onClick={e=>e.stopPropagation()}
         style={{...S.card,width:"100%",maxWidth:380,padding:18,display:"flex",flexDirection:"column",gap:12}}>
         <div>
-          <div style={{fontSize:15,fontWeight:800,...S.txt}}>📄 Conteúdo do relatório</div>
+          <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="arquivo"/> Conteúdo do relatório</div>
           <div style={{fontSize:11,...S.txt2,marginTop:3}}>
             {pdfSel.modo==="teste"
               ? `${pdfSel.teste.turno} · ${fmtDate(pdfSel.teste.data)}`
@@ -626,7 +627,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               background:pdfSel[o.k]?"#a855f715":(dark?"#0b1220":"#f8fafc"),
               border:`1px solid ${pdfSel[o.k]?"#a855f7":(dark?"#1e293b":"#e2e8f0")}`}}>
             <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:14}}>{pdfSel[o.k]?"\u2611":"\u2610"}</span>
+              <span style={{fontSize:14}}>{pdfSel[o.k]?<><Ico n="quadradoCheck"/></>:<><Ico n="quadrado"/></>}</span>
               <span style={{fontSize:13,fontWeight:700,...S.txt}}>{o.ic} {o.t}</span>
               {o.n!==null && <span style={{marginLeft:"auto",fontSize:10,...S.txt2}}>{o.n} registro(s)</span>}
             </div>
@@ -647,7 +648,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             style={{...S.btnSm,flex:1,fontSize:13,padding:"11px 0",justifyContent:"center",
               opacity:podeGerar?1:0.4,cursor:podeGerar?"pointer":"not-allowed",
               color:"#a855f7",border:"1px solid #a855f744",background:"#a855f712"}}>
-            📄 Gerar PDF
+            <Ico n="arquivo"/> Gerar PDF
           </button>
         </div>
         {!podeGerar && <div style={{fontSize:10,color:"#f59e0b",textAlign:"center"}}>Marque ao menos uma seção.</div>}
@@ -666,12 +667,12 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <button onClick={()=>{setViewTeste(null);setScreen("list");}} style={S.backBtn}>← Voltar</button>
               <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:800,...S.txt}}>{viewTeste.turno==="Diurno"?"☀️":"🌙"} {viewTeste.turno} · {fmtDate(viewTeste.data)}</div>
+                <div style={{fontSize:15,fontWeight:800,...S.txt}}>{viewTeste.turno==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>} {viewTeste.turno} · {fmtDate(viewTeste.data)}</div>
                 <div style={{fontSize:11,...S.txt2}}>{viewTeste.quemFez||"—"} · {viewTeste.hora}</div>
               </div>
               {adminAuth && (
                 <button onClick={()=>setPdfSel({modo:"teste",teste:viewTeste,perim:true,rondas:(viewTeste.rondas||[]).length>0})}
-                  style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:11}}>📄 PDF</button>
+                  style={{...S.btnSm,color:"#a855f7",border:"1px solid #a855f744",fontSize:11}}><Ico n="arquivo"/> PDF</button>
               )}
             </div>
           </div>
@@ -687,12 +688,12 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             </div>
             {/* Mini mapa */}
             <div style={S.card}>
-              <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}>🗺️ Mapa</div>
+              <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:8}}><Ico n="mapa"/> Mapa</div>
               <MapaPerimetral zonas={viewTeste.zonas} size="normal" pcfg={pcfg}/>
             </div>
             {/* Zonas */}
             <div style={S.card}>
-              <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:10}}>🔒 Status das Zonas</div>
+              <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase",marginBottom:10}}><Ico n="cadeado"/> Status das Zonas</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                 {pcfg.zonas.map(zona=>{
                   const zd = viewTeste.zonas[zona]||{status:"ok",obs:""};
@@ -716,7 +717,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             {/* Continuidade da Ronda — registros livres ao longo do plantão */}
             <div style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:(viewTeste.rondas||[]).length>0?10:0}}>
-                <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase"}}>🚶 Continuidade da Ronda ({(viewTeste.rondas||[]).length})</div>
+                <div style={{fontSize:10,...S.txt2,fontWeight:700,textTransform:"uppercase"}}><Ico n="pessoa"/> Continuidade da Ronda ({(viewTeste.rondas||[]).length})</div>
                 {saving && <span style={{fontSize:9,...S.txt2}}>salvando…</span>}
               </div>
               {(viewTeste.rondas||[]).map((r,i)=>(
@@ -726,10 +727,10 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                     <div style={{fontSize:12,fontWeight:800,...S.txt,minWidth:62}}>Ronda {i+1}</div>
                     <input type="time" value={r.hora||""} onChange={e=>editRondaCont(r.id,"hora",e.target.value)}
                       style={{...S.inp,flex:1,fontSize:14,padding:"9px 10px"}}/>
-                    {adminAuth && <button onClick={()=>delRondaCont(r.id)} style={{...S.btnSm,padding:"7px 9px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>}
+                    {adminAuth && <button onClick={()=>delRondaCont(r.id)} style={{...S.btnSm,padding:"7px 9px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}><Ico n="lixeira"/></button>}
                   </div>
                   <div style={{marginTop:8}}>
-                    <label style={{...S.lbl,fontSize:9}}>👤 Executante</label>
+                    <label style={{...S.lbl,fontSize:9}}><Ico n="usuario"/> Executante</label>
                     <select value={r.executante||""} onChange={e=>editRondaCont(r.id,"executante",e.target.value)}
                       style={{...S.inp,fontSize:13,padding:"9px 10px"}}>
                       <option value="">— selecionar —</option>
@@ -741,9 +742,9 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                     placeholder="Observação (opcional)..." style={{...S.inp,fontSize:13,marginTop:8}}/>
                 </div>
               ))}
-              <button onClick={addRondaCont} style={{...S.btnGreen,fontSize:13,marginTop:(viewTeste.rondas||[]).length>0?2:10}}>➕ Registrar ronda (agora)</button>
+              <button onClick={addRondaCont} style={{...S.btnGreen,fontSize:13,marginTop:(viewTeste.rondas||[]).length>0?2:10}}><Ico n="mais"/> Registrar ronda (agora)</button>
             </div>
-            {adminAuth&&<button onClick={()=>excluir(viewTeste.id)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir</button>}
+            {adminAuth&&<button onClick={()=>excluir(viewTeste.id)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}><Ico n="lixeira"/> Excluir</button>}
           </div>
         </div>
       </div>
@@ -764,7 +765,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <button onClick={()=>{setScreen("list");setForm(null);}} style={S.backBtn}>← Cancelar</button>
               <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:800,...S.txt}}>🔒 Novo Teste Perimetral</div>
+                <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="cadeado"/> Novo Teste Perimetral</div>
                 <div style={{fontSize:11,...S.txt2}}>P505 · Klog Guarulhos</div>
               </div>
               <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{iconeTema()}</button>
@@ -783,7 +784,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                   <label style={S.lbl}>Hora</label>
                   <div style={{display:"flex",gap:5}}>
                     <input type="time" value={form.hora} onChange={e=>setForm(f=>({...f,hora:e.target.value}))} style={{...S.inp,flex:1}}/>
-                    <button onClick={()=>setForm(f=>({...f,hora:nowTime()}))} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}>⏱</button>
+                    <button onClick={()=>setForm(f=>({...f,hora:nowTime()}))} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}><Ico n="cronometro"/></button>
                   </div>
                 </div>
               </div>
@@ -794,7 +795,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                   {["Diurno","Noturno"].map(t=>(
                     <button key={t} onClick={()=>setForm(f=>({...f,turno:t,quemFez:"",quemFezId:""}))}
                       style={{flex:1,background:form.turno===t?t==="Diurno"?"#1a2e1a":"#0a0a2e":"transparent",border:`2px solid ${form.turno===t?t==="Diurno"?"#22c55e":"#818cf8":"#0f172a"}`,color:form.turno===t?t==="Diurno"?"#22c55e":"#818cf8":dark?"#475569":"#94a3b8",borderRadius:8,padding:"10px",fontSize:13,cursor:"pointer",fontWeight:form.turno===t?700:400}}>
-                      {t==="Diurno"?"☀️ Diurno":"🌙 Noturno"}
+                      {t==="Diurno"?<><Ico n="sol"/>{" Diurno"}</>:<><Ico n="lua"/>{" Noturno"}</>}
                     </button>
                   ))}
                 </div>
@@ -803,7 +804,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
             {/* Equipe — seleção automática */}
             <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>👤 Equipe</div>
+              <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="usuario"/> Equipe</div>
               {/* Quem fez o teste */}
               <div>
                 <label style={S.lbl}>Realizou o Teste *</label>
@@ -813,13 +814,13 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                       <button key={c.id} onClick={()=>setForm(f=>({...f,quemFez:c.nome,quemFezId:c.id}))}
                         style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,background:form.quemFezId===c.id?dark?"#001a2e":"#e0f2fe":"transparent",border:`1px solid ${form.quemFezId===c.id?"#0ea5e944":dark?"#0f172a":"#e2e8f0"}`,cursor:"pointer",textAlign:"left"}}>
                         <div style={{width:30,height:30,borderRadius:8,overflow:"hidden",flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
-                          {c.foto?<img src={c.foto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:"👤"}
+                          {c.foto?<img src={c.foto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:<><Ico n="usuario"/></>}
                         </div>
                         <div style={{flex:1}}>
                           <div style={{fontSize:12,fontWeight:700,...S.txt}}>{c.nome}</div>
                           <div style={{fontSize:10,...S.txt2}}>{c.cargo} · {c.turno}</div>
                         </div>
-                        {form.quemFezId===c.id&&<span style={{color:"#0ea5e9",fontSize:14}}>✓</span>}
+                        {form.quemFezId===c.id&&<span style={{color:"#0ea5e9",fontSize:14}}><Ico n="check"/></span>}
                       </button>
                     ))}
                     {/* Manual fallback */}
@@ -840,13 +841,13 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                       <button key={c.id} onClick={()=>setForm(f=>({...f,centralAcompanhou:c.nome,centralId:c.id}))}
                         style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",borderRadius:8,background:form.centralId===c.id?dark?"#021a0d":"#dcfce7":"transparent",border:`1px solid ${form.centralId===c.id?"#22c55e44":dark?"#0f172a":"#e2e8f0"}`,cursor:"pointer",textAlign:"left"}}>
                         <div style={{width:28,height:28,borderRadius:7,overflow:"hidden",flexShrink:0,background:dark?"#0f172a":"#f1f5f9",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
-                          {c.foto?<img src={c.foto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:"👤"}
+                          {c.foto?<img src={c.foto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:<><Ico n="usuario"/></>}
                         </div>
                         <div style={{flex:1}}>
                           <div style={{fontSize:12,fontWeight:700,...S.txt}}>{c.nome}</div>
                           <div style={{fontSize:10,...S.txt2}}>{c.cargo}</div>
                         </div>
-                        {form.centralId===c.id&&<span style={{color:"#22c55e",fontSize:14}}>✓</span>}
+                        {form.centralId===c.id&&<span style={{color:"#22c55e",fontSize:14}}><Ico n="check"/></span>}
                       </button>
                     ))}
                     <input value={form.centralId?"":form.centralAcompanhou} onChange={e=>setForm(f=>({...f,centralAcompanhou:e.target.value,centralId:""}))}
@@ -861,7 +862,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
             {/* Zonas */}
             <div style={S.card}>
-              <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}>🔒 Status das {pcfg.zonas.length} Zonas</div>
+              <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}><Ico n="cadeado"/> Status das {pcfg.zonas.length} Zonas</div>
               {pcfg.zonas.map(zona=>{
                 const zd = form.zonas[zona]||{status:"ok",obs:""};
                 const temProb = zd.status!=="ok";
@@ -892,7 +893,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             </div>
 
             <button onClick={salvar} disabled={saving} style={{...S.btnGreen,opacity:saving?0.7:1}}>
-              {saving?"⟳ Salvando...":"✓ Finalizar Teste"}
+              {saving?"⟳ Salvando...":<><Ico n="check"/>{" Finalizar Teste"}</>}
             </button>
           </div>
         </div>
@@ -911,7 +912,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txt}}>🔒 Teste Perimetral</div>
+              <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="cadeado"/> Teste Perimetral</div>
               <div style={{fontSize:11,...S.txt2}}>{project?.id || "—"} · {testes.length} teste(s) no total</div>
             </div>
             <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{iconeTema()}</button>
@@ -924,11 +925,11 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
           {ultimoTeste&&(
             <div style={{background:dark?"#001a2e":"#e0f2fe",border:"1px solid #0ea5e933",borderRadius:10,padding:"10px 14px",cursor:"pointer"}}
               onClick={()=>{setViewTeste(ultimoTeste);setScreen("view");}}>
-              <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",marginBottom:4}}>📋 Último Teste</div>
+              <div style={{fontSize:10,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",marginBottom:4}}><Ico n="prancheta"/> Último Teste</div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div>
                   <div style={{fontSize:13,fontWeight:700,...S.txt}}>
-                    {ultimoTeste.turno==="Diurno"?"☀️":"🌙"} {ultimoTeste.turno} · {fmtDate(ultimoTeste.data)}
+                    {ultimoTeste.turno==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>} {ultimoTeste.turno} · {fmtDate(ultimoTeste.data)}
                   </div>
                   <div style={{fontSize:11,...S.txt2}}>{ultimoTeste.quemFez||"—"} · {ultimoTeste.hora}</div>
                 </div>
@@ -948,7 +949,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 {["Todos","Diurno","Noturno"].map(f=>(
                   <button key={f} onClick={()=>setFiltroTurno(f)}
                     style={{...S.btnSm,color:filtroTurno===f?"#0ea5e9":dark?"#475569":"#94a3b8",border:`1px solid ${filtroTurno===f?"#0ea5e944":dark?"#0f172a":"#e2e8f0"}`,background:filtroTurno===f?dark?"#001a2e":"#e0f2fe":"transparent",fontSize:11}}>
-                    {f==="Todos"?"Todos":f==="Diurno"?"☀️ Diurno":"🌙 Noturno"}
+                    {f==="Todos"?"Todos":f==="Diurno"?<><Ico n="sol"/>{" Diurno"}</>:<><Ico n="lua"/>{" Noturno"}</>}
                   </button>
                 ))}
                 <div style={{flex:1}}/>
@@ -983,7 +984,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                   {modoSelecao
                     ? selecionados.length>0
                       ? `📄 Gerar PDF (${selecionados.length} selecionado${selecionados.length!==1?"s":""})`
-                      : "📄 Selecione ao menos 1"
+                      : <><Ico n="arquivo"/>{" Selecione ao menos 1"}</>
                     : `☐ Selecionar para PDF Consolidado`}
                 </button>
                 {!modoSelecao && testesFiltrados.length>0 && (
@@ -996,16 +997,16 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 )}
                 {modoSelecao && (
                   <button onClick={()=>{setModoSelecao(false);setSelecionados([]);}}
-                    style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11,padding:"8px 10px"}}>✕</button>
+                    style={{...S.btnSm,color:"#ef4444",border:"1px solid #ef444433",fontSize:11,padding:"8px 10px"}}><Ico n="x"/></button>
                 )}
               </div>
               )}
               {modoSelecao && (
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   <button onClick={()=>setSelecionados(testesFiltrados.map(t=>t.id))}
-                    style={{...S.btnSm,fontSize:10,color:"#0ea5e9",border:"1px solid #0ea5e944"}}>✓ Selecionar todos</button>
+                    style={{...S.btnSm,fontSize:10,color:"#0ea5e9",border:"1px solid #0ea5e944"}}><Ico n="check"/> Selecionar todos</button>
                   <button onClick={()=>setSelecionados([])}
-                    style={{...S.btnSm,fontSize:10,color:"#64748b",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}>✕ Limpar</button>
+                    style={{...S.btnSm,fontSize:10,color:"#64748b",border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}><Ico n="x"/> Limpar</button>
                 </div>
               )}
 
@@ -1033,12 +1034,12 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                               <button onClick={()=>setSelecionados(prev=>
                                 prev.includes(t.id)?prev.filter(x=>x!==t.id):[...prev,t.id]
                               )} style={{width:26,height:26,borderRadius:6,border:`2px solid ${selecionados.includes(t.id)?"#a855f7":dark?"#334155":"#cbd5e1"}`,background:selecionados.includes(t.id)?"#a855f7":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:14,color:"#fff"}}>
-                                {selecionados.includes(t.id)?"✓":""}
+                                {selecionados.includes(t.id)?<><Ico n="check"/></>:""}
                               </button>
                             )}
                             <div style={{width:36,height:36,borderRadius:9,background:t.turno==="Diurno"?dark?"#1a2e1a":"#dcfce7":dark?"#0a0a2e":"#e0e7ff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18,cursor:"pointer"}}
                               onClick={()=>{if(!modoSelecao){setViewTeste(t);setScreen("view");}}}>
-                              {t.turno==="Diurno"?"☀️":"🌙"}
+                              {t.turno==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>}
                             </div>
                             <div style={{flex:1,cursor:"pointer"}} onClick={()=>{
                               if(modoSelecao){
@@ -1052,7 +1053,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                             </div>
                             {probs>0
                               ?<span style={{fontSize:10,color:"#ef4444",fontWeight:700,background:"#1a0202",padding:"2px 8px",borderRadius:5}}>{probs} prob.</span>
-                              :<span style={{fontSize:10,color:"#22c55e",fontWeight:700,background:"#021a0d",padding:"2px 8px",borderRadius:5}}>✅ OK</span>
+                              :<span style={{fontSize:10,color:"#22c55e",fontWeight:700,background:"#021a0d",padding:"2px 8px",borderRadius:5}}><Ico n="checkCirculo"/> OK</span>
                             }
                             {!modoSelecao&&<span style={{...S.txt2,fontSize:14}}>›</span>}
                           </div>
@@ -1067,7 +1068,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
 
           {testes.length===0&&(
             <div style={{textAlign:"center",padding:"40px 0"}}>
-              <div style={{fontSize:32,marginBottom:10}}>🔒</div>
+              <div style={{fontSize:32,marginBottom:10}}><Ico n="cadeado"/></div>
               <div style={{fontSize:13,...S.txt}}>Nenhum teste registrado ainda</div>
             </div>
           )}

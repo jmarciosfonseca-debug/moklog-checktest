@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { useState, useEffect } from "react";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { initializeApp, getApps } from "firebase/app";
@@ -241,7 +242,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
 
   if(loading) return(
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}>🚗</div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
+      <div style={{textAlign:"center"}}><div style={{fontSize:30,marginBottom:10}}><Ico n="carro"/></div><div style={{fontSize:13,...S.txt2}}>Carregando...</div></div>
     </div>
   );
 
@@ -259,11 +260,11 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
           <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
             <button onClick={()=>setScreen("list")} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:800,...S.txt}}>🚗 Ronda VSPP — {fmtDate(diaAtual.data)}</div>
+              <div style={{fontSize:14,fontWeight:800,...S.txt}}><Ico n="carro"/> Ronda VSPP — {fmtDate(diaAtual.data)}</div>
               <div style={{fontSize:11,...S.txt2}}>P601 · Diurno · <span style={{color:pctColor,fontWeight:700}}>{pct}% executado</span></div>
             </div>
             <button onClick={()=>gerarPDFRondaVSPP(project,diaAtual,data.registros||[])}
-              style={{...S.btnSm,color:"#0f6e56",borderColor:"#0f6e5644",fontWeight:700,padding:"7px 10px"}}>📄 PDF</button>
+              style={{...S.btnSm,color:"#0f6e56",borderColor:"#0f6e5644",fontWeight:700,padding:"7px 10px"}}><Ico n="arquivo"/> PDF</button>
           </div>
 
           <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
@@ -288,7 +289,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
 
             {/* KM */}
             <div style={S.card}>
-              <label style={{...S.lbl,marginBottom:10}}>🚗 KM do Turno</label>
+              <label style={{...S.lbl,marginBottom:10}}><Ico n="carro"/> KM do Turno</label>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <div>
                   <label style={S.lbl}>KM Início (1ª ronda)</label>
@@ -305,14 +306,14 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
               </div>
               {diaAtual.kmInicial&&diaAtual.kmFinal&&(
                 <div style={{marginTop:8,padding:"6px 10px",background:dark?"#021a0d":"#f0fdf4",borderRadius:6,fontSize:12,color:"#0f6e56",fontWeight:700}}>
-                  🚗 KM percorrido no turno: {Math.abs(parseFloat(diaAtual.kmFinal)-parseFloat(diaAtual.kmInicial)).toFixed(1)} km
+                  <Ico n="carro"/> KM percorrido no turno: {Math.abs(parseFloat(diaAtual.kmFinal)-parseFloat(diaAtual.kmInicial)).toFixed(1)} km
                 </div>
               )}
             </div>
 
             {/* Mapa */}
             <div style={S.card}>
-              <label style={{...S.lbl,marginBottom:8}}>🗺️ Rota de Ronda VSPP</label>
+              <label style={{...S.lbl,marginBottom:8}}><Ico n="mapa"/> Rota de Ronda VSPP</label>
               <img src={`data:image/jpeg;base64,${MAPA_B64}`} alt="Rota de Ronda VSPP"
                 style={{width:"100%",borderRadius:8,border:`1px solid ${dark?"#1e293b":"#e2e8f0"}`}}/>
             </div>
@@ -330,15 +331,15 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
                     <div style={{display:"flex",gap:6,flex:1,flexWrap:"wrap"}}>
                       <button onClick={()=>marcarSlot(h,"feito")}
                         style={{...S.btnSm,flex:1,background:st==="feito"?"#021a0d":"transparent",borderColor:st==="feito"?"#22c55e66":dark?"#0f172a":"#e2e8f0",color:st==="feito"?"#22c55e":dark?"#94a3b8":"#64748b",fontWeight:st==="feito"?700:600,padding:"9px"}}>
-                        ✓ Feito{m?.hora?` (${m.hora})`:""}
+                        <Ico n="check"/> Feito{m?.hora?` (${m.hora})`:""}
                       </button>
                       <button onClick={()=>marcarSlot(h,"nao_feito")}
                         style={{...S.btnSm,flex:1,background:st==="nao_feito"?"#1a0202":"transparent",borderColor:st==="nao_feito"?"#ef444466":dark?"#0f172a":"#e2e8f0",color:st==="nao_feito"?"#ef4444":dark?"#94a3b8":"#64748b",fontWeight:st==="nao_feito"?700:600,padding:"9px"}}>
-                        ✗ Não feito
+                        <Ico n="x"/> Não feito
                       </button>
                     </div>
                     {adminAuth&&<button onClick={()=>setConfirmDelSlot({hora:h,tipo:"dia"})}
-                      style={{...S.btnSm,color:"#94a3b8",padding:"6px 8px",flexShrink:0}}>🗑</button>}
+                      style={{...S.btnSm,color:"#94a3b8",padding:"6px 8px",flexShrink:0}}><Ico n="lixeira"/></button>}
                   </div>
                   <input value={m?.obs||""} onChange={e=>{
                     const mNew={...diaAtual.marcacoes,[h]:{...(diaAtual.marcacoes?.[h]||{}),obs:e.target.value}};
@@ -388,22 +389,22 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"14px 16px",borderBottom:`1px solid ${dark?"#0a0f1e":"#e2e8f0"}`}}>
           <button onClick={onBack} style={S.backBtn}>← Voltar</button>
           <div style={{flex:1}}>
-            <div style={{fontSize:14,fontWeight:800,...S.txt}}>🚗 Ronda VSPP</div>
+            <div style={{fontSize:14,fontWeight:800,...S.txt}}><Ico n="carro"/> Ronda VSPP</div>
             <div style={{fontSize:11,...S.txt2}}>P601 · Golgi Cajamar · Turno Diurno · {data.slots?.length||15} horários</div>
           </div>
         </div>
         <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>
           <div style={S.card}>
-            <label style={{...S.lbl,marginBottom:8}}>🗺️ Rota de Ronda</label>
+            <label style={{...S.lbl,marginBottom:8}}><Ico n="mapa"/> Rota de Ronda</label>
             <img src={`data:image/jpeg;base64,${MAPA_B64}`} alt="Rota de Ronda VSPP" style={{width:"100%",borderRadius:8}}/>
           </div>
 
-          {!temHoje&&<button onClick={()=>abrirDia(hoje)} style={{...S.btn,fontSize:15,padding:"15px"}}>🚗 Iniciar Ronda de Hoje</button>}
+          {!temHoje&&<button onClick={()=>abrirDia(hoje)} style={{...S.btn,fontSize:15,padding:"15px"}}><Ico n="carro"/> Iniciar Ronda de Hoje</button>}
           {temHoje&&<button onClick={()=>abrirDia(hoje)} style={{...S.btn,fontSize:14}}>▶ Continuar Ronda de Hoje</button>}
 
           {adminAuth&&(
             <div style={{...S.card,border:`1px dashed ${dark?"#1e293b":"#e2e8f0"}`}}>
-              <div style={{fontSize:11,...S.txt2,fontWeight:700,marginBottom:8}}>⚙️ Gerenciar Horários (Gerencial)</div>
+              <div style={{fontSize:11,...S.txt2,fontWeight:700,marginBottom:8}}><Ico n="engrenagem"/> Gerenciar Horários (Gerencial)</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
                 {(data.slots||SLOTS_DEFAULT).map(h=>(
                   <div key={h} style={{display:"flex",alignItems:"center",gap:4,background:dark?"#0a0f1e":"#f1f5f9",borderRadius:6,padding:"4px 8px"}}>
@@ -434,9 +435,9 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
                   <span style={{fontSize:13,fontWeight:800,...S.txt}}>{fmtDate(r.data)}</span>
                   <span style={{fontSize:14,fontWeight:900,color:c}}>{p}%</span>
                 </div>
-                <div style={{fontSize:11,...S.txt2}}>{r.executor||"Executor não informado"} · ✓ {f} · ✗ {nf}</div>
+                <div style={{fontSize:11,...S.txt2}}>{r.executor||"Executor não informado"} · <Ico n="check"/> {f} · <Ico n="x"/> {nf}</div>
                 {(r.kmInicial||r.kmFinal)&&<div style={{fontSize:11,...S.txt2,marginTop:2}}>
-                  🚗 {r.kmInicial?`Ini: ${r.kmInicial} km`:""}{r.kmInicial&&r.kmFinal?" · ":""}{r.kmFinal?`Fim: ${r.kmFinal} km`:""}
+                  <Ico n="carro"/> {r.kmInicial?`Ini: ${r.kmInicial} km`:""}{r.kmInicial&&r.kmFinal?" · ":""}{r.kmFinal?`Fim: ${r.kmFinal} km`:""}
                 </div>}
                 <div style={{marginTop:6,height:3,background:dark?"#0f172a":"#e2e8f0",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${p}%`,background:c,borderRadius:2}}/>
@@ -447,7 +448,7 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
           {registros.length>1&&<button onClick={()=>setVerTodas(v=>!v)} style={{...S.btnSec,fontSize:13}}>{verTodas?"Mostrar só a última ronda":`Ver todas as rondas (${registros.length})`}</button>}
           {registros.length>0&&(
             <div style={S.card}>
-              <button onClick={()=>setConsolOpen(v=>!v)} style={{...S.btn,fontSize:13}}>📑 Consolidado geral (PDF)</button>
+              <button onClick={()=>setConsolOpen(v=>!v)} style={{...S.btn,fontSize:13}}><Ico n="arquivo"/> Consolidado geral (PDF)</button>
               {consolOpen&&(
                 <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:8}}>
                   <div style={{fontSize:11,...S.txt2}}>Deixe as datas em branco para incluir todas as rondas.</div>

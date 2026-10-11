@@ -1,3 +1,5 @@
+import { createElement } from "react";
+import { Ico } from "./Icones";
 // temaClaro.js — ajuste do MODO CLARO para blocos com fundo escuro fixo.
 // Várias telas (Equipe, Equipamentos, CCO etc.) pintam avisos/etiquetas com
 // fundos escuros "chapados" (vermelho, verde, âmbar...) que só fazem sentido
@@ -35,7 +37,7 @@ export function temaSalvo() {
 export function proximoTema(t) { return TEMAS[(TEMAS.indexOf(t) + 1) % TEMAS.length]; }
 // chamado no corpo do App: mantém o ícone dos botões sincronizado já no mesmo render
 export function definirTema(t) { _atual = t; }
-export function iconeTema() { return ICONES[_atual] || "🌙"; }
+export function iconeTema() { return createElement(Ico, { n: _atual === "sol" || _atual === "nuvem" ? _atual : "lua" }); }
 export function tituloTema() { return `Tema ${NOMES[_atual]} — toque para trocar (Lua · Nuvem · Sol)`; }
 
 // Legibilidade no celular (só nos temas claros): letras minúsculas maiores e

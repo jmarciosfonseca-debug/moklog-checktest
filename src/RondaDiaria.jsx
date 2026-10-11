@@ -1,3 +1,4 @@
+import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { gerarConsolidadoPlantoesHTML } from "./relatorios/perimetralPlantao";
@@ -80,8 +81,8 @@ function fmtData(d){ try { return new Date(d+"T12:00:00").toLocaleDateString("pt
 function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 
 const TURNO_UI = {
-  diurno:  { label:"Diurno",  icon:"☀️", cor:"#f59e0b", limite:"18:00" },
-  noturno: { label:"Noturno", icon:"🌙", cor:"#818cf8", limite:"06:00" },
+  diurno:  { label:"Diurno",  icon:<><Ico n="sol"/></>, cor:"#f59e0b", limite:"18:00" },
+  noturno: { label:"Noturno", icon:<><Ico n="lua"/></>, cor:"#818cf8", limite:"06:00" },
 };
 const VESTIARIO_ELIGIBLE = ["P601","P602","P604","P605","P606"]; // ronda de vestiário — só Golgi (exceto P607)
 const PERIMETRAL_ELIGIBLE = ["P601","P602","P604","P605","P606","P607"]; // teste perimetral dentro do plantão — todos os Golgi
@@ -303,13 +304,13 @@ function PinGate({ project, onSuccess, onBack, dark }) {
   return (
     <div style={{...S.page,alignItems:"center",justifyContent:"center"}}>
       <div style={{...S.card,maxWidth:320,width:"100%",margin:16,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:8}}>🚶</div>
+        <div style={{fontSize:32,marginBottom:8}}><Ico n="pessoa"/></div>
         <div style={{fontSize:16,fontWeight:800,...S.txt,marginBottom:4}}>Ronda Perimetral Diária</div>
         <div style={{fontSize:12,...S.txt2,marginBottom:20}}>{project.id} · {project.name}</div>
         {!mode ? (
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <button onClick={()=>setMode("lider")} style={{...S.btn,fontSize:13}}>👷 Acesso Líder</button>
-            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}>🔐 Acesso Gerencial</button>
+            <button onClick={()=>setMode("lider")} style={{...S.btn,fontSize:13}}><Ico n="capacete"/> Acesso Líder</button>
+            <button onClick={()=>setMode("admin")} style={{...S.btnSec,fontSize:13,color:"#f59e0b",borderColor:"#f59e0b33"}}><Ico n="chave"/> Acesso Gerencial</button>
             <button onClick={onBack} style={{...S.btnSec,fontSize:13,marginTop:4}}>← Voltar</button>
           </div>
         ) : (
@@ -390,7 +391,7 @@ function montarSecaoPerimetral(project, plantoes){
       const st=z?(STMARK[z.status]||STMARK.ok):null;
       return `<td style="text-align:center;color:${st?st.c:"#cbd5e1"}">${st?st.m:"–"}</td>`;
     }).join("");
-    return `<tr><td>${fmtData(p.dataPlantao)}</td><td>${t.icon} ${t.label}</td><td>${(p.lider||"—").replace(/</g,"&lt;")}</td>${cels}</tr>`;
+    return `<tr><td>${fmtData(p.dataPlantao)}</td><td>${t.label}</td><td>${(p.lider||"—").replace(/</g,"&lt;")}</td>${cels}</tr>`;
   }).join("");
   const thZonas=Array.from({length:nZonas}).map((_,zi)=>`<th style="text-align:center">Z${String(zi+1).padStart(2,"0")}</th>`).join("");
   const mapaImg = MAPA_PDF[project.id] ? `<div style="text-align:center"><div style="position:relative;display:inline-block;max-width:100%;border-radius:8px;overflow:hidden"><img src="${MAPA_PDF[project.id]}" style="max-height:290px;max-width:100%;width:auto;height:auto;display:block"/>${markers}</div></div>` : "";
@@ -752,7 +753,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
       <style>{`@keyframes mkPulseDot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(34,197,94,.6);}50%{opacity:.7;box-shadow:0 0 0 5px rgba(34,197,94,0);}}`}</style>
       <button onClick={()=>{ if(screen==="home") onBack(); else { setViewFull(null); setConfirmDel(false); setScreen("home"); } }} style={S.backBtn} aria-label="Voltar">←</button>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{fontSize:15,fontWeight:800,...S.txt}}>🚶 Ronda Perimetral Diária</div>
+        <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="pessoa"/> Ronda Perimetral Diária</div>
         <div style={{fontSize:10,...S.txt2}}>{project.id} · {project.name}</div>
       </div>
       {onToggleTheme && <button onClick={onToggleTheme} style={S.btnSm}>{iconeTema()}</button>}
@@ -779,7 +780,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             {!aberta && <div style={{fontSize:13,fontWeight:600,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"}{r.executante?` · ${String(r.executante).split(" ")[0]}`:""}</div>}
           </div>
           <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            {!aberta && (r.fotos||[]).length>0 && <span style={{fontSize:12,...S.txt2}}>📷{(r.fotos||[]).length}</span>}
+            {!aberta && (r.fotos||[]).length>0 && <span style={{fontSize:12,...S.txt2}}><Ico n="camera"/>{(r.fotos||[]).length}</span>}
             <span style={{...S.txt2,fontSize:14,transform:aberta?"rotate(180deg)":"none",transition:"transform .2s"}}>▾</span>
           </div>
         </div>
@@ -788,12 +789,12 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
               <button disabled={travado} onClick={()=>!travado&&editRonda(r.id,"externa",!r.externa,true)}
                 style={{...S.btnSm, fontSize:13, padding:"7px 12px", color:r.externa?"#22c55e":(dark?"#64748b":"#475569"), borderColor:r.externa?"#22c55e44":undefined, opacity:travado?.6:1}}>
-                {r.externa?"✓ Externa":"Externa?"}
+                {r.externa?<><Ico n="check"/>{" Externa"}</>:"Externa?"}
               </button>
-              {!travado && <button onClick={()=>delRonda(r.id)} style={{...S.btnSm,fontSize:13,padding:"7px 12px",color:"#ef4444",borderColor:"#ef444433",marginLeft:6}}>🗑</button>}
+              {!travado && <button onClick={()=>delRonda(r.id)} style={{...S.btnSm,fontSize:13,padding:"7px 12px",color:"#ef4444",borderColor:"#ef444433",marginLeft:6}}><Ico n="lixeira"/></button>}
             </div>
             <div style={{marginBottom:10}}>
-              <label style={{...S.lbl,fontSize:11}}>👤 Executante da ronda</label>
+              <label style={{...S.lbl,fontSize:11}}><Ico n="usuario"/> Executante da ronda</label>
               <select value={r.executante||""} disabled={travado}
                 onChange={e=>editRonda(r.id,"executante",e.target.value,true)}
                 style={{...S.inp,fontSize:14,padding:"11px 12px",opacity:travado?.7:1}}>
@@ -827,12 +828,12 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               {!travado && (r.fotos||[]).length<MAX_FOTOS_RONDA && (
                 <>
                   <label style={{...S.btnSm,padding:"10px 13px",fontSize:13,display:"inline-flex",alignItems:"center",gap:6}}>
-                    📷 Câmera
+                    <Ico n="camera"/> Câmera
                     <input type="file" accept="image/*" capture="environment" style={{display:"none"}}
                       onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
                   </label>
                   <label style={{...S.btnSm,padding:"10px 13px",fontSize:13,display:"inline-flex",alignItems:"center",gap:6}}>
-                    🖼️ Galeria
+                    <Ico n="imagem"/> Galeria
                     <input type="file" accept="image/*" style={{display:"none"}}
                       onChange={e=>{ addFoto(r.id, e.target.files?.[0]); e.target.value=""; }}/>
                   </label>
@@ -865,12 +866,12 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                   </div>
                   <span style={{fontSize:10,fontWeight:800,padding:"3px 9px",borderRadius:6,
                     color:p.enviado?"#22c55e":"#f59e0b", background:p.enviado?"#021a0d":"#1a1000",
-                    border:`1px solid ${p.enviado?"#22c55e33":"#f59e0b33"}`}}>{p.enviado?"✅ Enviado":"⏳ Pendente"}</span>
+                    border:`1px solid ${p.enviado?"#22c55e33":"#f59e0b33"}`}}>{p.enviado?<><Ico n="checkCirculo"/>{" Enviado"}</>:<><Ico n="ampulheta"/>{" Pendente"}</>}</span>
                 </div>
               </div>
               {p.perimetral?.feito && (
                 <div style={S.card}>
-                  <div style={{fontSize:11,fontWeight:800,...S.txt,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>🔒 Teste Perimetral — realizado</div>
+                  <div style={{fontSize:11,fontWeight:800,...S.txt,textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}><Ico n="cadeado"/> Teste Perimetral — realizado</div>
                   {(p.perimetral.zonas||[]).length>0 ? (
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
                       {(p.perimetral.zonas||[]).map((z,zi)=>{
@@ -897,7 +898,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                     <div style={{fontSize:12,fontWeight:800,...S.txt}}>Ronda {i+1}</div>
                     <div style={{fontSize:12,...S.txt2}}>{r.inicio||"—"} – {r.fim||"—"} {r.externa?"· Externa (sim)":""}</div>
                   </div>
-                  {r.executante && <div style={{fontSize:11,...S.txt2,marginTop:2}}>👤 Executou: {r.executante}</div>}
+                  {r.executante && <div style={{fontSize:11,...S.txt2,marginTop:2}}><Ico n="usuario"/> Executou: {r.executante}</div>}
                   {r.obs && <div style={{fontSize:11,...S.txt2,marginTop:4}}>{r.obs}</div>}
                   {(r.fotos||[]).length>0 && (
                     <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
@@ -906,8 +907,8 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                   )}
                 </div>
               ))}
-              {adminAuth && p.enviado && <button onClick={reabrirView} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
-              {adminAuth && !confirmDel && <button onClick={()=>setConfirmDel(true)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}>🗑 Excluir plantão</button>}
+              {adminAuth && p.enviado && <button onClick={reabrirView} style={{...S.btnSec,fontSize:13}}><Ico n="cadeadoAberto"/> Reabrir plantão (gerencial)</button>}
+              {adminAuth && !confirmDel && <button onClick={()=>setConfirmDel(true)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}><Ico n="lixeira"/> Excluir plantão</button>}
               {adminAuth && confirmDel && (
                 <div style={{...S.card,border:"1px solid #ef444455"}}>
                   <div style={{fontSize:12,...S.txt,marginBottom:10}}>Excluir definitivamente o plantão {t.label.toLowerCase()} de {fmtData(p.dataPlantao)}?</div>
@@ -970,7 +971,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         {pendenciaAnt && (
           <div style={{...S.card,border:"1px solid #ef444455",background:dark?"#1a0202":"#fef2f2"}}>
-            <div style={{fontSize:12,fontWeight:800,color:"#ef4444"}}>⚠️ Plantão anterior sem envio</div>
+            <div style={{fontSize:12,fontWeight:800,color:"#ef4444"}}><Ico n="alerta"/> Plantão anterior sem envio</div>
             <div style={{fontSize:11,...S.txt2,marginTop:2,marginBottom:10}}>{TURNO_UI[ant.turno].icon} {TURNO_UI[ant.turno].label} de {fmtData(ant.dataPlantao)} {plantaoAnt?"não foi enviado.":"não foi registrado."}</div>
             <button
               disabled={concluindoAnt}
@@ -982,7 +983,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               style={{...S.btnSec, width:"100%", fontSize:13, fontWeight:800,
                 color:"#22c55e", borderColor:"#22c55e55",
                 opacity:concluindoAnt?0.6:1, cursor:concluindoAnt?"default":"pointer"}}>
-              {concluindoAnt ? "Concluindo..." : "✅ Concluir plantão anterior"}
+              {concluindoAnt ? "Concluindo..." : <><Ico n="checkCirculo"/>{" Concluir plantão anterior"}</>}
             </button>
           </div>
         )}
@@ -991,7 +992,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div style={{fontSize:17,fontWeight:900,color:tui.cor}}>{tui.icon} {tui.label} · {fmtData(dataP)}</div>
             {travado
-              ? <span style={{fontSize:10,fontWeight:800,color:"#22c55e",background:"#021a0d",border:"1px solid #22c55e33",padding:"3px 9px",borderRadius:6}}>✅ Enviado</span>
+              ? <span style={{fontSize:10,fontWeight:800,color:"#22c55e",background:"#021a0d",border:"1px solid #22c55e33",padding:"3px 9px",borderRadius:6}}><Ico n="checkCirculo"/> Enviado</span>
               : <span style={{fontSize:10,fontWeight:700,...S.txt2}}>envio até {tui.limite}</span>}
           </div>
           <div style={{marginTop:10}}>
@@ -1035,7 +1036,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                 <label style={S.lbl}>🚿 Ronda Vestiário</label>
                 <button disabled={travado} onClick={()=>!travado&&setVestiario("feito",!marcado)}
                   style={{...S.btnSm,fontSize:12,padding:"7px 14px",color:marcado?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:marcado?"#22c55e44":undefined,opacity:travado?.6:1}}>
-                  {marcado?"✓ Feita":"Marcar como feita"}
+                  {marcado?<><Ico n="check"/>{" Feita"}</>:"Marcar como feita"}
                 </button>
               </div>
               {marcado && (
@@ -1044,11 +1045,11 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                     <button disabled={travado} onClick={()=>!travado&&setVestiario("status","ok")}
                       style={{flex:1,padding:"10px",borderRadius:8,fontWeight:800,fontSize:13,cursor:travado?"default":"pointer",
                         border:`1px solid ${v.status==="ok"||!v.status?"#22c55e":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="ok"||!v.status?"#22c55e22":(dark?"#020510":"#fff"),
-                        color:v.status==="ok"||!v.status?"#22c55e":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>✅ OK</button>
+                        color:v.status==="ok"||!v.status?"#22c55e":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}><Ico n="checkCirculo"/> OK</button>
                     <button disabled={travado} onClick={()=>!travado&&setVestiario("status","anomalia")}
                       style={{flex:1,padding:"10px",borderRadius:8,fontWeight:800,fontSize:13,cursor:travado?"default":"pointer",
                         border:`1px solid ${v.status==="anomalia"?"#ef4444":(dark?"#0f172a":"#e2e8f0")}`,background:v.status==="anomalia"?"#ef444422":(dark?"#020510":"#fff"),
-                        color:v.status==="anomalia"?"#ef4444":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}>⚠️ Anomalia</button>
+                        color:v.status==="anomalia"?"#ef4444":(dark?"#cbd5e1":"#94a3b8"),opacity:travado?.6:1}}><Ico n="alerta"/> Anomalia</button>
                   </div>
                   {v.status==="anomalia" && (
                     <input value={v.obs||""} disabled={travado} onChange={e=>setVestiario("obs",e.target.value)}
@@ -1067,10 +1068,10 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           return (
             <div style={S.card}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <label style={S.lbl}>🔒 Teste Perimetral</label>
+                <label style={S.lbl}><Ico n="cadeado"/> Teste Perimetral</label>
                 <button disabled={travado} onClick={()=>!travado&&marcarPerimetralFeito(!marcado)}
                   style={{...S.btnSm,fontSize:12,padding:"7px 14px",color:marcado?"#22c55e":(dark?"#cbd5e1":"#475569"),borderColor:marcado?"#22c55e44":undefined,opacity:travado?.6:1}}>
-                  {marcado?"✓ Feito":"Marcar como feito"}
+                  {marcado?<><Ico n="check"/>{" Feito"}</>:"Marcar como feito"}
                 </button>
               </div>
               {marcado && NUM_ZONAS_FIXAS>0 && (
@@ -1129,7 +1130,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                               </button>
                             ))}
                           </div>
-                          {!travado && <button onClick={()=>delZonaPer(z.id)} style={{...S.btnSm,padding:"6px 9px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}>🗑</button>}
+                          {!travado && <button onClick={()=>delZonaPer(z.id)} style={{...S.btnSm,padding:"6px 9px",fontSize:12,color:"#ef4444",borderColor:"#ef444433"}}><Ico n="lixeira"/></button>}
                         </div>
                         {(z.status==="parcial"||z.status==="inoperante") && (
                           <input value={z.obs||""} disabled={travado} onChange={e=>editZonaPer(z.id,"obs",e.target.value,false)}
@@ -1139,7 +1140,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                     );
                   })}
                   {!travado && (
-                    <button onClick={addZonaPer} style={{...S.btnSec,fontSize:13,padding:"11px 14px"}}>➕ Adicionar zona ({zonas.length===0?"Z-01":nomeZona(zonas.length)})</button>
+                    <button onClick={addZonaPer} style={{...S.btnSec,fontSize:13,padding:"11px 14px"}}><Ico n="mais"/> Adicionar zona ({zonas.length===0?"Z-01":nomeZona(zonas.length)})</button>
                   )}
                   <input value={per.obs||""} disabled={travado} onChange={e=>setPerimetral("obs",e.target.value,false)}
                     placeholder="Observação geral do teste (opcional)..." style={{...S.inp,fontSize:13}}/>
@@ -1153,12 +1154,12 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         {!travado && (atualFull?.lider
           ? <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>
-          : <div style={{...S.card,textAlign:"center",fontSize:12,...S.txt2,border:"1px solid #f59e0b44"}}>⚠️ Selecione o responsável acima antes de registrar a primeira ronda.</div>
+          : <div style={{...S.card,textAlign:"center",fontSize:12,...S.txt2,border:"1px solid #f59e0b44"}}><Ico n="alerta"/> Selecione o responsável acima antes de registrar a primeira ronda.</div>
         )}
 
         {envioErr && <div role="alert" style={{fontSize:12,color:"#ef4444",textAlign:"center"}}>{envioErr}</div>}
         {!travado && nRondas>0 && !confirmEnvio && (
-          <button onClick={()=>setConfirmEnvio(true)} style={{...S.btn,background:"linear-gradient(135deg,#2563eb,#1d4ed8)"}}>📤 Enviar rondas do turno ({nRondas})</button>
+          <button onClick={()=>setConfirmEnvio(true)} style={{...S.btn,background:"linear-gradient(135deg,#2563eb,#1d4ed8)"}}><Ico n="upload"/> Enviar rondas do turno ({nRondas})</button>
         )}
         {!travado && confirmEnvio && (
           <div style={{...S.card,border:"1px solid #2563eb55"}}>
@@ -1169,25 +1170,25 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
             </div>
           </div>
         )}
-        {travado && adminAuth && <button onClick={reabrirAtual} style={{...S.btnSec,fontSize:13}}>🔓 Reabrir plantão (gerencial)</button>}
+        {travado && adminAuth && <button onClick={reabrirAtual} style={{...S.btnSec,fontSize:13}}><Ico n="cadeadoAberto"/> Reabrir plantão (gerencial)</button>}
         {saving && <div style={{fontSize:10,...S.txt2,textAlign:"center"}}>salvando…</div>}
         {!saving && pendenteSync && (
           <div role="alert" style={{fontSize:11,fontWeight:800,color:"#f59e0b",textAlign:"center",background:"#f59e0b18",border:"1px solid #f59e0b55",borderRadius:8,padding:"7px 10px",margin:"4px 0"}}>
-            ⚠️ Salvo apenas neste aparelho — sem conexão com o servidor. Verifique a internet; será reenviado ao salvar novamente com sinal.
+            <Ico n="alerta"/> Salvo apenas neste aparelho — sem conexão com o servidor. Verifique a internet; será reenviado ao salvar novamente com sinal.
           </div>
         )}
 
         {adminAuth && (
           <>
           <button onClick={()=>temMapa?setShowPdfMenu(true):baixarPdfConsolidado("ambos")} disabled={gerandoPdf} style={{...S.btn,background:"linear-gradient(135deg,#7c3aed,#6d28d9)",opacity:gerandoPdf?.7:1}}>
-            {gerandoPdf?"Gerando…":"📄 PDF Consolidado (gerencial)"}
+            {gerandoPdf?"Gerando…":<><Ico n="arquivo"/>{" PDF Consolidado (gerencial)"}</>}
           </button>
           {showPdfMenu && (
             <div onClick={()=>setShowPdfMenu(false)} style={{position:"fixed",inset:0,background:"#000000cc",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
               <div onClick={e=>e.stopPropagation()} style={{...S.card,width:"100%",maxWidth:360,padding:18,display:"flex",flexDirection:"column",gap:10}}>
-                <div style={{fontSize:15,fontWeight:800,...S.txt}}>📄 O que incluir no relatório?</div>
-                <button onClick={()=>baixarPdfConsolidado("perim")} style={{...S.btn,fontSize:13,background:"linear-gradient(135deg,#0d9488,#0f766e)"}}>🔒 Só Teste Perimetral<br/><span style={{fontSize:10,opacity:.8}}>Mapa, zonas e taxa de falha</span></button>
-                <button onClick={()=>baixarPdfConsolidado("ambos")} style={{...S.btn,fontSize:13,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}>🔒+🚶 Perimetral + Rondas<br/><span style={{fontSize:10,opacity:.8}}>Tudo: perimetral e lista de rondas</span></button>
+                <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="arquivo"/> O que incluir no relatório?</div>
+                <button onClick={()=>baixarPdfConsolidado("perim")} style={{...S.btn,fontSize:13,background:"linear-gradient(135deg,#0d9488,#0f766e)"}}><Ico n="cadeado"/> Só Teste Perimetral<br/><span style={{fontSize:10,opacity:.8}}>Mapa, zonas e taxa de falha</span></button>
+                <button onClick={()=>baixarPdfConsolidado("ambos")} style={{...S.btn,fontSize:13,background:"linear-gradient(135deg,#7c3aed,#6d28d9)"}}><Ico n="cadeado"/>+<Ico n="pessoa"/> Perimetral + Rondas<br/><span style={{fontSize:10,opacity:.8}}>Tudo: perimetral e lista de rondas</span></button>
                 <button onClick={()=>setShowPdfMenu(false)} style={{...S.btnSec,fontSize:13}}>Cancelar</button>
               </div>
             </div>
@@ -1209,7 +1210,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               </div>
               <span style={{fontSize:10,fontWeight:800,padding:"3px 9px",borderRadius:6,
                 color:p.enviado?"#22c55e":"#ef4444", background:p.enviado?"#021a0d":"#1a0202",
-                border:`1px solid ${p.enviado?"#22c55e33":"#ef444433"}`}}>{p.enviado?"✅":"⏳ pendente"}</span>
+                border:`1px solid ${p.enviado?"#22c55e33":"#ef444433"}`}}>{p.enviado?<><Ico n="checkCirculo"/></>:<><Ico n="ampulheta"/>{" pendente"}</>}</span>
               <span style={{...S.txt2,fontSize:16}}>›</span>
             </button>
           );
