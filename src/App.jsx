@@ -153,6 +153,7 @@ class ErrorBoundary extends React.Component {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import PainelMapasEquipe from "./mapaDiario/PainelMapasEquipe";
+import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
@@ -3409,6 +3410,7 @@ export default function App(){
   applyTheme(dark);
   useEffect(()=>{ aplicarTema(tema); },[tema]);
   const T=themeTokens(dark);
+  const botaoMapaDiario=(proj)=>(<button onClick={()=>setMapaDiarioProject({id:proj.id,name:proj.name})} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"14px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="mapa-equipe" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Mapa de Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Mapa diário do turno</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>);
   const [showRegistros,setShowRegistros]=useState(false);
   const [showDiagnostico,setShowDiagnostico]=useState(false);
   const [showAcessoCCO,setShowAcessoCCO]=useState(false);
@@ -3478,6 +3480,7 @@ export default function App(){
   const [showKeyAccess,setShowKeyAccess]=useState(false); // 🚨 KeyAccess Falha (em construção)
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
+  const [mapaDiarioProject,setMapaDiarioProject]=useState(null);
   const [homeGroup,setHomeGroup]=useState(null);
   const [showIA,setShowIA]=useState(false); // drawer do Assistente IA Gerencial
   const [jatinoxSel,setJatinoxSel]=useState(null);
@@ -4002,6 +4005,7 @@ export default function App(){
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
   if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} projects={PROJECTS} projectGroups={{golgi:["P601","P602","P604","P605","P606","P607"],mega:["P311A","P311B"],klog:["P505"]}} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
+  if(mapaDiarioProject) return <ErrorBoundary moduleName="Mapa de Equipe diário"><MapaDiarioTela project={mapaDiarioProject} dark={dark} onBack={()=>setMapaDiarioProject(null)}/></ErrorBoundary>;
   if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)}/></ErrorBoundary>;
   if(showRegistros) return <ErrorBoundary moduleName="Registros"><RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/></ErrorBoundary>;
   if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);setAcessoCCOAbas(null);}} sharedAuth={getProjectAuthMode(acessoCCOProject.id)} onAuthGranted={(mode)=>grantAuth(acessoCCOProject.id,mode)} abasPermitidas={acessoCCOAbas}/></ErrorBoundary>;
@@ -4105,6 +4109,7 @@ export default function App(){
             </button>
             <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
             <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:14,width:"100%"}}><Ico n="calendario"/> Histórico de Relatórios Semanais</button>
+            {botaoMapaDiario({id:"P260A",name:"Jatinox Unidade A"})}
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               <button onClick={()=>{setEquipeProject({id:"P260A",name:"Jatinox Unidade A"});setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={T.modIconBg("#0ea5e9")} txt={T.ttl("#0ea5e9")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
@@ -4361,6 +4366,7 @@ export default function App(){
                         <Ico n="usuarios"/> Equipe — {jp.id}
                       </button>
                     )}
+                    {jp.hasEquipe&&botaoMapaDiario({id:jp.id,name:jp.name})}
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                       {jp.id==="P260A"&&(
                         <button onClick={()=>{setAcessoCCOProject({id:jp.id,name:jp.name});setShowAcessoCCO(true);}}
@@ -4500,6 +4506,7 @@ export default function App(){
                   </button>
                   <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
                   <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}><Ico n="calendario"/> Histórico de Relatórios Semanais</button>
+                  {botaoMapaDiario(project)}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={T.modIconBg("#0ea5e9")} txt={T.ttl("#0ea5e9")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
                     <button onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="porta" cor="#22c55e" arq="cco" bg={T.modIconBg("#22c55e")} txt={T.ttl("#22c55e")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="registro" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
