@@ -178,6 +178,39 @@ function IconeCliente({ arq, cor, fallback }) {
 }
 
 // Ícone 3D pequeno para botões cheios (Painel Gerencial); cai no ícone de linha se a arte não carregar
+// Botão "vidro" do Painel Gerencial: ícone 3D grande, título + legenda, brilho
+// sutil na cor do recurso (substitui as barras sólidas).
+// Botão do topo da home: ícone 3D + rótulo, em "vidro" (substitui os botões chapados).
+function TopoBtn({arq,fb,label,onClick,cor,aria,children,anim}){
+  const [r,g,b]=cor||[148,163,184];
+  const [ok,setOk]=useState(true);
+  return (
+    <button onClick={onClick} aria-label={aria||label} style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 4px 6px",borderRadius:14,cursor:"pointer",color:"#e2e8f0",fontSize:11,fontWeight:700,
+      background:`radial-gradient(120% 130% at 50% 0%, rgba(${r},${g},${b},.22), rgba(${r},${g},${b},.04) 70%), #0a1322`,border:`1px solid rgba(${r},${g},${b},.4)`,
+      boxShadow:"0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)",animation:anim||"none"}}>
+      {ok?<img src={`/icones/modulos/${arq}.svg`} alt="" width={34} height={34} draggable={false} onError={()=>setOk(false)} style={{display:"block"}}/>:<span style={{fontSize:20,display:"flex"}}><Ico n={fb}/></span>}
+      <span>{label}</span>
+      {children}
+    </button>
+  );
+}
+
+function BtnVidro({cor,arq,fb,label,sub,onClick,style}){
+  const [r,g,b]=cor;
+  return (
+    <button onClick={onClick} style={{width:"100%",display:"flex",alignItems:"center",gap:14,padding:"12px 14px",borderRadius:16,cursor:"pointer",textAlign:"left",color:"#f1f5f9",
+      background:`radial-gradient(120% 140% at 0% 0%, rgba(${r},${g},${b},.22), rgba(${r},${g},${b},.04) 55%), #0a1322`,
+      border:`1px solid rgba(${r},${g},${b},.38)`,boxShadow:`0 6px 22px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(${r},${g},${b},.05)`,...style}}>
+      <span style={{flexShrink:0,display:"flex"}}><IconeModulo n={fb} arq={arq} cor={`rgb(${r},${g},${b})`} bg={`rgba(${r},${g},${b},.15)`} txt={`rgb(${r},${g},${b})`}/></span>
+      <span style={{flex:1,minWidth:0}}>
+        <span style={{display:"block",fontSize:14,fontWeight:800,letterSpacing:.2}}>{label}</span>
+        {sub&&<span style={{display:"block",fontSize:11,color:"#94a3b8",marginTop:2}}>{sub}</span>}
+      </span>
+      <span style={{color:`rgb(${r},${g},${b})`,fontSize:18,fontWeight:700,flexShrink:0}}>›</span>
+    </button>
+  );
+}
+
 function IconeBotao({ arq, fb, size=30 }) {
   const [falhou, setFalhou] = useState(false);
   if (falhou) return <Ico n={fb}/>;
@@ -2044,10 +2077,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
 
         {(getAvailableDates(GOLGI_IDS).length>0||getAvailableDates(MEGA_IDS).length>0)&&<div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           <div style={{fontSize:11,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="prancheta"/> Análise de Risco por Grupo</div>
-          <button onClick={()=>setAnaliseRiscoPacote("golgi")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}><IconeBotao arq="analise-risco" fb="prancheta"/> Análise de Risco Golgi</button>
-          <button onClick={()=>setAnaliseRiscoPacote("mega")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}><IconeBotao arq="analise-risco" fb="prancheta"/> Análise de Risco Mega</button>
-          <button onClick={()=>setAnaliseRiscoPacote("klog")} style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#14795A,#1D9E75)",fontSize:13,border:"1px solid #1D9E7566"}}><IconeBotao arq="analise-risco" fb="prancheta"/> Análise de Risco Klog</button>
-          <button onClick={onGestaoFV} style={{...S.primaryBtn,width:"100%",marginTop:8}}><IconeBotao arq="gestao-fv" fb="moeda"/> Gestão FV</button>
+          <BtnVidro cor={[16,185,129]} arq="analise-risco" fb="prancheta" label="Análise de Risco Golgi" sub="Pacote do grupo" onClick={()=>setAnaliseRiscoPacote("golgi")}/>
+          <BtnVidro cor={[16,185,129]} arq="analise-risco" fb="prancheta" label="Análise de Risco Mega" sub="Pacote do grupo" onClick={()=>setAnaliseRiscoPacote("mega")}/>
+          <BtnVidro cor={[16,185,129]} arq="analise-risco" fb="prancheta" label="Análise de Risco Klog" sub="Pacote do grupo" onClick={()=>setAnaliseRiscoPacote("klog")}/>
+          <BtnVidro cor={[56,189,248]} arq="gestao-fv" fb="moeda" label="Gestão FV" sub="Financeiro e faturamento" onClick={onGestaoFV} style={{marginTop:8}}/>
         </div>}
         {/* Recursos gerenciais renderizados a partir do registro único
             (gerenciaisConfig.js). Evita que um recurso — como a Visão 360 —
@@ -2057,14 +2090,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             const acao = r.id==="visao-360" ? carregarVisao360 : r.id==="auditoria-operacional" ? (()=>setShowAuditoria(true)) : null;
             if(!acao) return null; // sem ação → não renderiza (o teste acusa órfão)
             return (
-              <button key={r.id} onClick={acao}
-                style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#1d4ed8,#1e40af)",fontSize:13,border:"1px solid #1d4ed866"}}>
-                <IconeBotao arq={r.id==="visao-360"?"visao-360":"auditoria"} fb={EMOJI_PARA_ICONE[String(r.icone).replace(/\uFE0F/g,"")]||"prancheta"}/> {r.label}
-              </button>
+              <BtnVidro key={r.id} cor={r.id==="visao-360"?[56,189,248]:[139,92,246]} arq={r.id==="visao-360"?"visao-360":"auditoria"} fb={EMOJI_PARA_ICONE[String(r.icone).replace(/\uFE0F/g,"")]||"prancheta"} label={r.label} sub={r.id==="visao-360"?"Panorama de todos os projetos":"Auditoria operacional"} onClick={acao}/>
             );
           })}
         </div>
-        {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"#1a0202",border:"1px solid #ef444444",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}><Ico n="pontoVermelho"/> {allPend.filter(p=>p.status==="inop").length} Inop · <Ico n="alerta"/> {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
+        {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"radial-gradient(120% 160% at 0% 0%, rgba(239,68,68,.2), rgba(239,68,68,.03) 60%), #0a1322",border:"1px solid rgba(239,68,68,.4)",boxShadow:"inset 0 1px 0 rgba(255,255,255,.06)",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}><Ico n="pontoVermelho"/> {allPend.filter(p=>p.status==="inop").length} Inop · <Ico n="alerta"/> {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
         </div>
@@ -4547,14 +4577,14 @@ export default function App(){
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
             <div style={{fontSize:11,color:T.sub,marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
-          <div style={{marginLeft:"auto",display:"flex",gap:6}}>
-            <button onClick={()=>setScreen("pendencies")} style={{background:"rgba(239,68,68,.08)",border:"1px solid #ef444455",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#ef4444",fontWeight:700,animation:totalInopHome>0?"mkPulse 2.2s infinite":"none"}} aria-label="Ver pendências"><Ico n="pontoVermelho"/> Inop</button>
-            <button onClick={()=>setShowRegistros(true)} style={{background:"rgba(204,34,34,.07)",border:"1px solid #cc222240",borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:11,color:"#e05555",fontWeight:700,position:"relative"}} aria-label="Ver registros"><Ico n="prancheta"/> Registros
-              {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
-            </button>
-            <button onClick={()=>setScreen("dashboard")} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 13px",cursor:"pointer",fontSize:12,color:T.hdrTxt,fontWeight:600}} aria-label="Abrir painel gerencial"><Ico n="grafico"/> Painel</button>
-            <button onClick={()=>setDark(!dark)} style={{background:T.hdrBg,border:`1px solid ${T.hdrBorder}`,borderRadius:11,padding:"8px 11px",cursor:"pointer",fontSize:14,color:T.hdrTxt}} aria-label="Alternar tema claro/escuro">{iconeTema()}</button>
-          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
+          <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[239,68,68]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
+          <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[204,34,34]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
+            {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
+          </TopoBtn>
+          <TopoBtn arq="painel" fb="grafico" label="Painel" cor={[56,189,248]} aria="Abrir painel gerencial" onClick={()=>setScreen("dashboard")}/>
+          <button onClick={()=>setDark(!dark)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 4px 6px",borderRadius:14,cursor:"pointer",color:"#e2e8f0",fontSize:11,fontWeight:700,background:"radial-gradient(120% 130% at 50% 0%, rgba(165,180,252,.2), rgba(165,180,252,.03) 70%), #0a1322",border:"1px solid rgba(165,180,252,.38)",boxShadow:"0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)"}} aria-label="Alternar tema claro/escuro"><span style={{display:"flex",width:34,height:34,alignItems:"center",justifyContent:"center"}}>{React.cloneElement(iconeTema(),{width:34,height:34})}</span><span>Tema</span></button>
         </div>
 
         {draft&&draft.projectId===project.id&&(
