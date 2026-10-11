@@ -4563,7 +4563,7 @@ export default function App(){
           </div>
           <button onClick={()=>setShowDiagnostico(true)}
             style={{marginBottom:10,width:"100%",background:T.diagBg,border:`1.5px solid ${T.diagBorder}`,borderRadius:18,padding:"16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:T.diagShadow}}>
-            <div style={{width:48,height:48,borderRadius:14,background:"#38bdf814",border:"1px solid #38bdf844",display:"flex",alignItems:"center",justifyContent:"center",fontSize:25,flexShrink:0}}><Ico n="bussola"/></div>
+            <IconeModulo n="bussola" cor="#0ea5e9" arq="diagnostico" bg="#38bdf814" txt="#38bdf8"/>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:T.diagTxt}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:T.diagSub,marginTop:3}}>Catálogo publicado · rascunho local</div></div>
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
