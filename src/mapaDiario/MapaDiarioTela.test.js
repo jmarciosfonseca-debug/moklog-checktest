@@ -250,19 +250,26 @@ test("resumo cita extra sem exceção marcada: avisa uma vez e só envia no segu
   expect(q('pre[aria-label="Texto do mapa"]')).not.toBeNull();
 });
 
-test("FT pergunta 'Quem faltou?', exige a escolha e manda a falta para a ficha de quem faltou", async () => {
+test("FT só no posto extra: pergunta 'Quem faltou?', o posto dele vira Falta e a falta vai para a ficha dele", async () => {
   await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
   await abrirExc("P1 · Vigilante CCO");
+  expect(botao("FT")).toBeUndefined(); // o efetivo já vem marcado: FT não é opção no posto do escopo
+  await clicar(botao("+ Posto extra"));
+  await digitar(q('select[aria-label="Quem está no posto Posto extra"]'), "d");
   await clicar(botao("FT"));
   expect(host.textContent).toContain("Quem faltou?");
   const sel = q('select[aria-label="Quem faltou (FT)"]');
-  expect([...sel.options].some((o) => o.value === "b")).toBe(false); // a própria pessoa da FT não aparece
   await clicar(botao("Concluir mapa"));
   expect(q('[role="alert"]').textContent).toContain("FT cobrindo falta de quem?");
-  await digitar(sel, "d");
+  const optB = [...sel.options].find((o) => o.value.startsWith("p:") && o.textContent.includes("Marta A."));
+  expect(optB).toBeTruthy();
+  await digitar(sel, optB.value);
+  expect(q('button[aria-label="Exceção do posto P1 · Vigilante CCO"]').textContent).toContain("Falta");
   await clicar(botao("Concluir mapa"));
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("Marta A. — FT (folga trabalhada), cobrindo a falta de Joao V.");
-  const enviado = io.lancarNaFicha.mock.calls[0][0].postos[1];
-  expect(enviado).toMatchObject({ situacao: "ft", detalhe: { quemFaltouId: "d", quemFaltou: "Joao V." } });
+  expect(t).toContain("P1 · Vigilante CCO: Marta A. — FALTA");
+  expect(t).toContain("Joao V. — FT (folga trabalhada), cobrindo a falta de Marta A.");
+  const postos = io.lancarNaFicha.mock.calls[0][0].postos;
+  expect(postos.find((p) => p.rotulo === "P1 · Vigilante CCO")).toMatchObject({ situacao: "falta" });
+  expect(postos.find((p) => p.rotulo === "Posto extra")).toMatchObject({ situacao: "ft", detalhe: { quemFaltouId: "b" } });
 });

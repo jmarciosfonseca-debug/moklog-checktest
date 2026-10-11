@@ -1,6 +1,7 @@
-import { avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
+import { ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
+import { postoVazio as postoVazioT } from "./modelo";
 const H = { inicio: "06:00", fim: "18:00" };
 const mapa = (extra = {}) => ({ ...novoMapa({ projetoId: "P311B", data: "2026-10-11", turno: "D", horario: H }), ...extra });
 const preencher = (m, nomes) => ({ ...m, postos: m.postos.map((p, i) => ({ ...p, pessoaId: `c${i}`, pessoaNome: nomes[i] })) });
@@ -265,4 +266,30 @@ test("WhatsApp: a FT diz de quem foi a falta coberta", () => {
   const m = mapa();
   const t = montarTextoWhatsApp({ ...m, postos: m.postos.map((p, i) => (i === 0 ? { ...p, pessoaNome: "Rosemeire", situacao: "ft", detalhe: { quemFaltou: "Elaine", quemFaltouId: "e" } } : p)) });
   expect(t).toContain("Rosemeire — FT (folga trabalhada), cobrindo a falta de Elaine");
+});
+
+test("FT no posto extra: vincula a falta ao efetivo e desfaz ao sair de FT, remover o extra ou limpar a falta", () => {
+  const base = preencher(mapa(), ["A", "B", "C"]);
+  const extra = { ...postoVazioT(), id: "x1", rotulo: "Posto extra", pessoaId: "z", pessoaNome: "Zé", situacao: "ft" };
+  const m0 = { ...base, postos: [...base.postos, extra] };
+  expect(ehPostoExtra(m0, extra)).toBe(true);
+  expect(ehPostoExtra(m0, base.postos[0])).toBe(false);
+  expect(candidatosAFalta(m0, "x1").map((p) => p.pessoaNome)).toEqual(["A", "B", "C"]);
+  const alvo = base.postos[1];
+  const m1 = vincularFalta(m0, "x1", `p:${alvo.id}`);
+  expect(m1.postos[1]).toMatchObject({ situacao: "falta", detalhe: { porFtDe: "x1" } });
+  expect(m1.postos[3].detalhe).toMatchObject({ quemFaltouId: "c1", quemFaltou: "B", faltaPostoId: alvo.id });
+  expect(validarParaConcluir(m1)).toEqual([]);
+  // trocar quem faltou desfaz o anterior
+  const m2 = vincularFalta(m1, "x1", `p:${base.postos[2].id}`);
+  expect(m2.postos[1].situacao).toBe("presente");
+  expect(m2.postos[2].situacao).toBe("falta");
+  // sair de FT desfaz; remover o extra desfaz; limpar a falta no posto limpa o vínculo no FT
+  expect(mudarSituacao(m1, "x1", "presente").postos[1].situacao).toBe("presente");
+  expect(removerPosto(m1, "x1").postos).toHaveLength(3);
+  expect(removerPosto(m1, "x1").postos[1].situacao).toBe("presente");
+  const m3 = mudarSituacao(m1, alvo.id, "presente");
+  expect(m3.postos[3].detalhe.quemFaltouId).toBeUndefined();
+  expect(validarParaConcluir(m3).join("|")).toMatch(/FT cobrindo falta de quem/);
+  expect(desfazerVinculoFalta(m0, "x1")).toEqual(m0);
 });

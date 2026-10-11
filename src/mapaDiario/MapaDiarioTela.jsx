@@ -5,7 +5,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto } from "./modelo";
 import { resumoLancamento } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
@@ -218,11 +218,11 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     )}
                   </div>
                   <button aria-label={`Exceção do posto ${p.rotulo}`} aria-expanded={p.situacao !== "presente" || !!abertos[p.id]} onClick={() => setAbertos((a) => ({ ...a, [p.id]: !a[p.id] }))} style={{ ...S.btn, padding: "6px 9px", color: p.situacao === "presente" ? cor.txt2 : cor.ac, borderColor: p.situacao === "presente" ? cor.line : cor.ac }}>{p.situacao === "presente" ? "Exceção" : ROTULO_SITUACAO[p.situacao]}</button>
-                  <button aria-label={`Remover posto ${p.rotulo}`} onClick={() => alterar((m) => ({ ...m, postos: m.postos.filter((x) => x.id !== p.id) }))} style={{ ...S.btn, padding: "6px 9px" }}>×</button>
+                  <button aria-label={`Remover posto ${p.rotulo}`} onClick={() => alterar((m) => removerPosto(m, p.id))} style={{ ...S.btn, padding: "6px 9px" }}>×</button>
                 </div>
                 {(p.situacao !== "presente" || abertos[p.id]) && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                  {SITUACOES.map((s) => (
-                    <button key={s.id} aria-pressed={p.situacao === s.id} onClick={() => setPosto(p.id, { situacao: s.id, detalhe: { livre: p.detalhe?.livre } })} style={S.chip(p.situacao === s.id, s.id === "presente" ? "#16a34a" : s.id === "falta" ? "#dc2626" : cor.ac)}>{s.rotulo}</button>
+                  {SITUACOES.filter((s) => s.id !== "ft" || ehPostoExtra(mapa, p) || p.situacao === "ft").map((s) => (
+                    <button key={s.id} aria-pressed={p.situacao === s.id} onClick={() => alterar((m) => mudarSituacao(m, p.id, s.id))} style={S.chip(p.situacao === s.id, s.id === "presente" ? "#16a34a" : s.id === "falta" ? "#dc2626" : cor.ac)}>{s.rotulo}</button>
                   ))}
                 </div>}
                 {p.situacao === "atraso" && (
@@ -240,22 +240,26 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     </label>
                   </div>
                 )}
-                {p.situacao === "ft" && (
-                  <div>
-                    <div style={S.lab}>Quem faltou?</div>
-                    <select aria-label="Quem faltou (FT)" value={p.detalhe?.semFalta ? "__ninguem" : p.detalhe?.quemFaltouId || ""} onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === "__ninguem") return setDetalhe(p.id, { semFalta: true, quemFaltouId: "", quemFaltou: "" });
-                      const c = colabs.find((x) => x.id === v);
-                      setDetalhe(p.id, { semFalta: false, quemFaltouId: c ? c.id : "", quemFaltou: c ? c.nome : "" });
-                    }} style={S.in}>
-                      <option value="">Escolher quem faltou…</option>
-                      {colabs.filter((c) => c.id !== p.pessoaId).map((c) => <option key={c.id} value={c.id}>{nomeCurto(c)}</option>)}
-                      <option value="__ninguem">Ninguém faltou (reforço / vaga)</option>
-                    </select>
-                    {p.detalhe?.quemFaltouId && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>A falta vai para a ficha de {p.detalhe.quemFaltou} e a FT para a ficha de {p.pessoaNome || "quem está no posto"}.</div>}
-                  </div>
-                )}
+                {p.situacao === "ft" && (() => {
+                  const cand = candidatosAFalta(mapa, p.id);
+                  const idsNoMapa = new Set(cand.map((x) => x.pessoaId).filter(Boolean));
+                  const outros = colabs.filter((c) => c.id !== p.pessoaId && !(mapa.postos || []).some((x) => x.pessoaId === c.id) && !idsNoMapa.has(c.id));
+                  const valor = p.detalhe?.semFalta ? "__ninguem" : p.detalhe?.faltaPostoId ? `p:${p.detalhe.faltaPostoId}` : p.detalhe?.quemFaltouId ? `c:${p.detalhe.quemFaltouId}` : "";
+                  return (
+                    <div>
+                      <div style={S.lab}>Quem faltou?</div>
+                      <select aria-label="Quem faltou (FT)" value={valor} onChange={(e) => alterar((m) => vincularFalta(m, p.id, e.target.value, colabs))} style={S.in}>
+                        <option value="">Escolher quem faltou…</option>
+                        <optgroup label="Efetivo do mapa">
+                          {cand.map((x) => <option key={x.id} value={`p:${x.id}`}>{x.pessoaNome || "Sem nome"} — {x.rotulo}</option>)}
+                        </optgroup>
+                        {outros.length > 0 && <optgroup label="Outros do projeto">{outros.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
+                        <option value="__ninguem">Ninguém faltou (reforço / vaga)</option>
+                      </select>
+                      {p.detalhe?.quemFaltou && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>{p.detalhe.faltaPostoId ? "O posto dele passa a Falta. " : ""}A falta vai para a ficha de {p.detalhe.quemFaltou} e a FT para a ficha de {p.pessoaNome || "quem está no posto extra"}.</div>}
+                    </div>
+                  );
+                })()}
                 {p.situacao === "troca" && (
                   <div>
                     <div style={S.lab}>No lugar de quem?</div>
@@ -267,7 +271,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                 )}
               </div>
             ))}
-            <button onClick={() => alterar((m) => ({ ...m, postos: [...m.postos, postoVazio("Posto extra")] }))} style={{ ...S.btn, marginTop: 6 }}>+ Posto</button>
+            <button onClick={() => { const novo = postoVazio("Posto extra"); setAbertos((a) => ({ ...a, [novo.id]: true })); alterar((m) => ({ ...m, postos: [...m.postos, novo] })); }} style={{ ...S.btn, marginTop: 6 }}>+ Posto extra</button>
           </div>
 
           <div style={S.card}>

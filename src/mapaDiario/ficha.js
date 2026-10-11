@@ -22,7 +22,10 @@ export function lancamentosDoMapa(mapa) {
       const d = p.detalhe || {};
       detalhe = `Atraso ${d.minutos ? `de ${d.minutos} min` : d.hora ? `(chegou às ${d.hora})` : ""} no posto ${p.rotulo} — ${origem}`.replace(/\s+/g, " ");
     } else if (tipo === "FT") detalhe = `FT no posto ${p.rotulo} — ${origem}`;
-    else detalhe = `Falta no posto ${p.rotulo} — ${origem}`;
+    else {
+      const ft = (mapa.postos || []).find((x) => x.id === (p.detalhe || {}).porFtDe);
+      detalhe = `Falta no posto ${p.rotulo}${ft && ft.pessoaNome ? ` (coberta por FT de ${ft.pessoaNome})` : ""} — ${origem}`;
+    }
     const item = { id: idDe(mapa.id, p.pessoaId, tipo), colabId: p.pessoaId, tipo, data: mapa.data, detalhe, origem: "mapa", mapaId: mapa.id };
     if (tipo === "Falta") Object.assign(item, { diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) });
     if (!out.some((x) => x.id === item.id)) out.push(item);

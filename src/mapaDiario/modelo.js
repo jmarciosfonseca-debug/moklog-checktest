@@ -145,7 +145,7 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
       if (d.base && !p.pessoaNome) erros.push(`${nome}: digite o nome de quem da Base está cobrindo`);
     }
     if (p.situacao === "ft") {
-      if (!d.quemFaltouId && !d.semFalta) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
+      if (!d.quemFaltouId && !d.quemFaltou && !d.semFalta) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
       if (d.quemFaltouId && d.quemFaltouId === p.pessoaId) erros.push(`${nome}: quem faltou não pode ser a própria pessoa da FT`);
     }
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
@@ -176,6 +176,64 @@ export function avisoResumoSemExcecao(mapa) {
   if (!m) return "";
   if ((mapa.postos || []).some((p) => p.situacao && p.situacao !== "presente")) return "";
   return `O resumo fala de "${m[2]}", mas nenhum posto está marcado como Falta, FT, Atraso, Cobertura ou Troca. Marque no posto (botão Exceção): é isso que vai para "Faltas/atrasos/FT/trocas" e para a ficha.`;
+}
+
+// ── FT: sempre no posto extra (o efetivo já vem marcado pelo escopo do projeto) ───────────────────────
+// "Quem faltou?" escolhe alguém do efetivo do mapa: o posto dele passa a FALTA (porFtDe) e a falta vai para a ficha dele.
+export const ehPostoExtra = (mapa, p) => !!p && !defDoPosto(mapa.projetoId, mapa.turno, p.rotulo);
+
+// Quem pode ser apontado como "quem faltou": o efetivo do mapa (posto com pessoa, presente ou já em falta).
+export const candidatosAFalta = (mapa, ftId) =>
+  (mapa.postos || []).filter((x) => x.id !== ftId && (x.pessoaId || (x.pessoaNome || "").trim()) && ["presente", "falta"].includes(x.situacao) && !(x.situacao === "falta" && x.detalhe && x.detalhe.porFtDe && x.detalhe.porFtDe !== ftId));
+
+const semVinculo = (d = {}) => { const { quemFaltouId, quemFaltou, faltaPostoId, semFalta, ...resto } = d; return resto; };
+
+export function desfazerVinculoFalta(mapa, ftId) {
+  const ft = (mapa.postos || []).find((x) => x.id === ftId);
+  if (!ft) return mapa;
+  const alvo = ft.detalhe && ft.detalhe.faltaPostoId;
+  return { ...mapa, postos: mapa.postos.map((x) => {
+    if (x.id === ftId) return { ...x, detalhe: semVinculo(x.detalhe) };
+    if (x.id === alvo && x.situacao === "falta" && x.detalhe && x.detalhe.porFtDe === ftId) { const { porFtDe, ...d } = x.detalhe; return { ...x, situacao: "presente", detalhe: d }; }
+    return x;
+  }) };
+}
+
+// valor: "" | "__ninguem" | "p:<postoId>" (efetivo do mapa) | "c:<colabId>" (outro colaborador do projeto)
+export function vincularFalta(mapa, ftId, valor, colabs = []) {
+  let m = desfazerVinculoFalta(mapa, ftId);
+  if (valor === "__ninguem") return { ...m, postos: m.postos.map((x) => (x.id === ftId ? { ...x, detalhe: { ...x.detalhe, semFalta: true } } : x)) };
+  if (valor && valor.startsWith("p:")) {
+    const q = m.postos.find((x) => x.id === valor.slice(2));
+    if (!q) return m;
+    return { ...m, postos: m.postos.map((x) => {
+      if (x.id === q.id) return { ...x, situacao: "falta", detalhe: { ...x.detalhe, porFtDe: ftId } };
+      if (x.id === ftId) return { ...x, detalhe: { ...x.detalhe, quemFaltouId: q.pessoaId || "", quemFaltou: q.pessoaNome || "", faltaPostoId: q.id } };
+      return x;
+    }) };
+  }
+  if (valor && valor.startsWith("c:")) {
+    const c = colabs.find((x) => x.id === valor.slice(2));
+    if (!c) return m;
+    return { ...m, postos: m.postos.map((x) => (x.id === ftId ? { ...x, detalhe: { ...x.detalhe, quemFaltouId: c.id, quemFaltou: c.nome } } : x)) };
+  }
+  return m;
+}
+
+// Troca a situação de um posto mantendo o vínculo FT ⇄ falta coerente.
+export function mudarSituacao(mapa, id, nova) {
+  const p = (mapa.postos || []).find((x) => x.id === id);
+  if (!p || p.situacao === nova) return mapa;
+  let m = mapa;
+  if (p.situacao === "ft") m = desfazerVinculoFalta(m, id);
+  const porFt = p.situacao === "falta" && p.detalhe && p.detalhe.porFtDe;
+  if (porFt) m = { ...m, postos: m.postos.map((x) => (x.id === porFt ? { ...x, detalhe: semVinculo(x.detalhe) } : x)) };
+  return { ...m, postos: m.postos.map((x) => (x.id === id ? { ...x, situacao: nova, detalhe: { livre: x.detalhe && x.detalhe.livre } } : x)) };
+}
+
+export function removerPosto(mapa, id) {
+  const m = desfazerVinculoFalta(mapa, id);
+  return { ...m, postos: m.postos.filter((x) => x.id !== id) };
 }
 
 // Exceções do turno (o que o gerencial e o líder precisam enxergar rápido).
