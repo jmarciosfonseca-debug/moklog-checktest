@@ -146,7 +146,7 @@ function getStyles(dark){
     backBtn:{minHeight:44, minWidth:44, background:"transparent",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,color:dark?"#94a3b8":"#64748b",borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600},
     inp:{width:"100%",background:dark?"#020510":"#fff",border:`1px solid ${dark?"#0f172a":"#cbd5e1"}`,borderRadius:7,color:dark?"#e2e8f0":"#1e293b",padding:"10px 12px",fontSize:13,boxSizing:"border-box",outline:"none"},
     lbl:{display:"block",fontSize:10,color:dark?"#475569":"#64748b",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:.5},
-    txt:{color:dark?"#f1f5f9":"#0f172a"}, txt2:{color:dark?"#475569":"#64748b"},
+    txt:{color:dark?"#f1f5f9":"#0f172a"}, txt2:{color:dark?"#94a3b8":"#64748b"},
   };
 }
 function StatusBadge({status}){ const c=STATUS_CFG[status]||STATUS_CFG.normal; return <span style={{fontSize:10,fontWeight:700,color:c.color,background:c.bg,border:`1px solid ${c.border}`,padding:"2px 8px",borderRadius:5}}>{c.label}</span>; }
