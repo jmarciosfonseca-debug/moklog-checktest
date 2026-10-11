@@ -3,6 +3,8 @@ import { calcularMapaEquipe, rotuloTreinamentos, notaTreinamentos, TITULO_TREINA
 import { radarEquipe } from '../relatorios/mapaEquipeRelatorio';
 
 export const ROTULOS_EIXOS = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Treinamento', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
+// 'aaaa-mm-dd' → 'dd/mm/aaaa' (padrão BR). Valor fora do formato é devolvido como veio.
+export const dataBR = d => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d ?? ''); };
 const nota = n => n === null ? 'Não aferido' : `${Math.round(n)}/100`;
 
 export function IndiceIndividual({ resultado }) {
@@ -30,7 +32,7 @@ export default function MaturidadeResumo({ equipe, hoje, dark = true }) {
   return <details style={{ border: `1px solid ${c.bd}`, borderRadius: 10, padding: 12, background: c.bg, color: c.fg }}>
     <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>Maturidade da equipe: {nota(modelo.indice)} · {modelo.classe}</summary>
     <p style={mu}><b>Para que serve:</b> resume, em um número de 0 a 100, o que está registrado na equipe (faltas, folgas trabalhadas, treinamentos, reciclagem e tempo de casa). É o mesmo cálculo do PDF "Mapa de Equipe". Eixo sem registro aparece como "não aferido" e fica fora da conta. Não avalia competência de ninguém.</p>
-    <p style={mu}>Referência {hoje} · {modelo.individuos.length} ativos · {modelo.quantidadeAferida} aferidos · Turnover 12 meses: {modelo.turnover === null ? 'Não aferido' : `${Math.round(modelo.turnover)}%`} · Estabilidade: {nota(modelo.estabilidade)}</p>
+    <p style={mu}>Referência {dataBR(hoje)} · {modelo.individuos.length} ativos · {modelo.quantidadeAferida} aferidos · Turnover 12 meses: {modelo.turnover === null ? 'Não aferido' : `${Math.round(modelo.turnover)}%`} · Estabilidade: {nota(modelo.estabilidade)}</p>
     <p style={{ ...mu, color: c.fg }}><strong>{TITULO_TREINAMENTOS}:</strong> {rotuloTreinamentos(modelo.treinamentos)}<br /><span style={mu}>{notaTreinamentos(modelo.treinamentos)}</span></p>
     <ComoCompletar equipe={equipe} modelo={modelo} hoje={hoje} dark={dark} />
     <div style={{ maxWidth: 300, width: '100%', margin: '8px auto', background: '#fff', color: '#111827', borderRadius: 8, padding: 4 }} dangerouslySetInnerHTML={{ __html: radarEquipe(modelo.eixos) }} />
