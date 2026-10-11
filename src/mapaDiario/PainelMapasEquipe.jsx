@@ -1,0 +1,87 @@
+// Barra "Mapa de Equipe diário" em Registros (só gerencial).
+// Mostra "n de N" do turno em vigor e faz brilhar quem ainda não enviou.
+// Somente leitura: não grava nada. Se a leitura falhar, diz que não leu — nunca mostra "0 de 12" no escuro.
+import { useEffect, useState } from "react";
+import { getApps } from "firebase/app";
+import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
+import { Ico } from "../Icones";
+import { resumoDoPainel, dataBrasilia } from "./painel";
+import { somarDias } from "./regras";
+
+const COR = { enviado: "#16a34a", aguardando: "#64748b", cobranca: "#f59e0b", pendente: "#dc2626", "sem-horario": "#64748b" };
+const ROTULO = { enviado: "Enviado", aguardando: "Aguardando", cobranca: "Enviar agora", pendente: "Pendente", "sem-horario": "Sem horário" };
+const hhmm = (d) => d ? new Date(d.getTime() - 3 * 3600000).toISOString().slice(11, 16) : "";
+
+export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p) => p, aberto, onToggle }) {
+  const txt = dark ? "#f1f5f9" : "#0f172a";
+  const txt2 = dark ? "#64748b" : "#94a3b8";
+  const brilha = !!resumo?.brilha && !erro;
+  const cor = erro ? "#64748b" : brilha ? (resumo.pendentes.length ? "#dc2626" : "#f59e0b") : "#16a34a";
+  return (
+    <div style={{ background: dark ? "linear-gradient(135deg,#07101f,#060c18)" : "#ffffff", border: `2px solid ${brilha ? cor : dark ? "#334155" : "#e2e8f0"}`, borderRadius: 16, padding: "12px 16px",
+      animation: brilha ? "mkMapaBrilho 1.4s ease-in-out infinite" : "none" }} data-testid="painel-mapas">
+      <style>{`@keyframes mkMapaBrilho{0%,100%{box-shadow:0 0 0 0 ${cor}00}50%{box-shadow:0 0 14px 2px ${cor}88}}`}</style>
+      <div onClick={onToggle} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} role="button" aria-expanded={!!aberto}>
+        <div style={{ fontSize: 20, color: txt2, display: "flex" }}><Ico n="prancheta" /></div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: txt }}>Mapa de Equipe diário</div>
+          <div style={{ fontSize: 11, color: txt2 }}>{erro ? "Não consegui ler os mapas agora" : carregando ? "Lendo…" : brilha ? "Há projeto sem mapa enviado" : "Turno em vigor"}</div>
+        </div>
+        {!carregando && !erro && resumo && (
+          <span style={{ fontSize: 15, fontWeight: 900, color: cor, background: cor + "1c", border: `1px solid ${cor}55`, borderRadius: 8, padding: "3px 10px" }}>
+            {resumo.enviados} de {resumo.total}
+          </span>
+        )}
+        <span style={{ color: txt2, fontSize: 18 }}>{aberto ? "⌄" : "›"}</span>
+      </div>
+      {aberto && resumo && !erro && (
+        <div style={{ marginTop: 10 }}>
+          {resumo.itens.map((i) => (
+            <div key={i.projetoId} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", borderTop: `1px solid ${dark ? "#0f172a" : "#eef2f7"}` }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: COR[i.estado], flexShrink: 0, animation: i.brilha ? "mkMapaBrilho 1.4s ease-in-out infinite" : "none" }} />
+              <div style={{ flex: 1, fontSize: 12.5, color: txt, fontWeight: 700 }}>{nomeProj(i.projetoId)}</div>
+              <span style={{ fontSize: 11, color: txt2 }}>{i.turno === "N" ? "Noturno" : i.turno === "D" ? "Diurno" : ""}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: COR[i.estado] }}>{ROTULO[i.estado]}{i.enviadoEm ? ` ${hhmm(i.enviadoEm)}` : ""}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function PainelMapasEquipe({ dark, nomeProj }) {
+  const [agora, setAgora] = useState(() => new Date());
+  const [mapas, setMapas] = useState([]);
+  const [erro, setErro] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [aberto, setAberto] = useState(false);
+
+  useEffect(() => { const t = setInterval(() => setAgora(new Date()), 30000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    let vivo = true;
+    const ler = async () => {
+      try {
+        const app = getApps()[0];
+        if (!app) throw new Error("sem app");
+        const db = getFirestore(app);
+        const hoje = dataBrasilia(new Date());
+        const snap = await getDocs(query(collection(db, "mapasEquipe"), where("data", "in", [somarDias(hoje, -1), hoje])));
+        if (!vivo) return;
+        setMapas(snap.docs.map((d) => {
+          const x = d.data();
+          const env = x.enviadoEm && x.enviadoEm.toDate ? x.enviadoEm.toDate() : x.enviadoEm || null;
+          return { projetoId: x.projetoId, data: x.data, turno: x.turno, enviadoEm: env };
+        }));
+        setErro(false);
+      } catch (e) { if (vivo) setErro(true); }
+      finally { if (vivo) setCarregando(false); }
+    };
+    ler();
+    const t = setInterval(ler, 60000);
+    return () => { vivo = false; clearInterval(t); };
+  }, []);
+
+  const resumo = resumoDoPainel({ agora, mapas });
+  return <PainelMapasView resumo={resumo} erro={erro} carregando={carregando} dark={dark} nomeProj={nomeProj} aberto={aberto} onToggle={() => setAberto((a) => !a)} />;
+}
