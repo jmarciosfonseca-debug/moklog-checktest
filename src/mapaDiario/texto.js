@@ -38,11 +38,18 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
   L.push("");
   L.push("*Equipe:*");
   (mapa.postos || []).forEach((p) => { L.push(linhaPosto(p)); if (p.obs && p.obs.trim()) L.push(`   ↳ ${p.obs.trim()}`); });
-  const exc = (mapa.postos || []).filter((p) => p.situacao !== "presente" && ROTULO_SITUACAO[p.situacao]);
+  const excPostos = (mapa.postos || []).filter((p) => p.situacao !== "presente" && ROTULO_SITUACAO[p.situacao]);
   L.push("");
-  L.push(`*Faltas/atrasos/FT/trocas:* ${exc.length ? exc.map((p) => `${p.rotulo} — ${ROTULO_SITUACAO[p.situacao]}`).join("; ") : "Sem ocorrências"}`);
+  L.push(`*Faltas/atrasos/FT/trocas:* ${excPostos.length ? excPostos.map((p) => `${p.rotulo} — ${ROTULO_SITUACAO[p.situacao]}`).join("; ") : "Sem ocorrências"}`);
   const mat = mapa.material || { semAlteracao: true };
-  L.push(`*Material (armamento, munição, rádios):* ${mat.semAlteracao ? "Sem alteração" : (mat.obs || "").trim() || "Alterado (sem detalhe)"}`);
+  const exc = (mat.excecoes || []);
+  if (mat.semAlteracao && !exc.length) {
+    L.push("*Material (armamento, munição, rádios):* Sem alteração — conferido e disponível");
+  } else {
+    L.push("*Material (armamento, munição, rádios):* COM ALTERAÇÃO");
+    exc.forEach((e) => L.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — ${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}: ${(e.obs || "").trim()}`));
+    if ((mat.obs || "").trim()) L.push(`   ↳ ${mat.obs.trim()}`);
+  }
   (mapa.veiculos || []).forEach((v) => {
     const r = kmRodado(v);
     const partes = [];

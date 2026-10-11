@@ -57,10 +57,49 @@ export function novoMapa({ projetoId, data, turno, horario, base = null, agora =
     : [];
   return {
     id: chave, projetoId, data, turno, horario: horario || null, status: "rascunho",
-    postos, material: { semAlteracao: true, obs: "" }, veiculos,
+    postos, material: materialNovo(), veiculos,
     supervisao: null, resumo: "", observacoes: "",
     criadoEm: agora.toISOString(), atualizadoEm: agora.toISOString(), enviadoEm: null, enviadoPor: "",
   };
+}
+
+// ── Material / armamento / munição ────────────────────────────────────────────
+// semAlteracao: o líder conferiu tudo visualmente e está disponível. Qualquer exceção (anomalia ou
+// item indisponível) tira o "sem alteração" e exige observação do que houve.
+export const SITUACOES_MATERIAL = [
+  { id: "ok", rotulo: "Disponível" },
+  { id: "anomalia", rotulo: "Anomalia" },
+  { id: "indisponivel", rotulo: "Indisponível" },
+];
+export const materialNovo = () => ({ semAlteracao: true, obs: "", excecoes: [] });
+
+const CATEGORIAS_MATERIAL = [
+  ["armamento", "Armamento"], ["municao", "Munição"], ["placas", "Placas balísticas"], ["radiosHT", "Rádios HT"],
+  ["smartphones", "Smartphones"], ["lanternas", "Lanternas"], ["bodycam", "Bodycam"], ["ztrax", "ZTRAX"], ["outros", "Outros"],
+];
+// Lista conferível a partir do cadastro de Equipamentos do projeto (somente leitura).
+export function itensDeEquipamento(data) {
+  if (!data) return [];
+  const out = [];
+  CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
+    (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => {
+      if (!it || typeof it !== "object") return;
+      const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
+      const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
+      out.push({ id: `${cat}:${it.id || i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok" });
+    });
+  });
+  return out;
+}
+
+// Atualiza a situação de um item (ok remove a exceção). Mantém `semAlteracao` coerente.
+export function definirSituacaoMaterial(material, item, situacao, obs) {
+  const base = { ...materialNovo(), ...(material || {}) };
+  const outras = (base.excecoes || []).filter((e) => e.id !== item.id);
+  const atual = (base.excecoes || []).find((e) => e.id === item.id);
+  const excecoes = situacao === "ok" ? outras : [...outras, { id: item.id, categoria: item.categoria || "outros", nome: item.nome, detalhe: item.detalhe || "", situacao, obs: obs != null ? obs : (atual ? atual.obs : "") }];
+  // Sem exceções e sem observação solta: volta a "sem alteração" (o líder desfez a anomalia).
+  return { ...base, excecoes, semAlteracao: excecoes.length ? false : !(base.obs || "").trim() };
 }
 
 const num = (v) => (v === "" || v == null ? null : Number(String(v).replace(",", ".")));
@@ -85,6 +124,12 @@ export function validarParaConcluir(mapa) {
     }
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
   });
+  const mat = mapa.material || materialNovo();
+  (mat.excecoes || []).forEach((e) => {
+    if (!(e.nome || "").trim()) { erros.push("Material: informe qual item tem anomalia"); return; }
+    if (!e.obs || e.obs.trim().length < 3) erros.push(`Material — ${e.nome}: descreva a ${e.situacao === "indisponivel" ? "indisponibilidade" : "anomalia"}`);
+  });
+  if (!mat.semAlteracao && !(mat.excecoes || []).length && !(mat.obs || "").trim()) erros.push('Material: marque "Sem alteração" ou descreva o que mudou');
   (mapa.veiculos || []).forEach((v) => {
     const r = kmRodado(v);
     if (num(v.kmAtual) != null && num(v.kmAnterior) != null && r != null && r < 0) erros.push(`${v.rotulo || "Veículo"}: km atual menor que o anterior`);
