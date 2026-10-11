@@ -1,0 +1,236 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Filtros de profundidade, relevo 3D e néon tático -->
+    <filter id="mapa-shadow-deep" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-8" dy="16" stdDeviation="15" flood-color="#0F0500" flood-opacity="0.92"/>
+    </filter>
+
+    <filter id="mapa-shadow-team" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="-6" dy="12" stdDeviation="10" flood-color="#0F0300" flood-opacity="0.95"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#F59E0B" flood-opacity="0.55"/>
+    </filter>
+
+    <filter id="mapa-glow-gold" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#FBBF24" flood-opacity="0.9"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="20" flood-color="#F59E0B" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- Base de vidro fosco escuro com matiz âmbar/grafite -->
+    <linearGradient id="mapa-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1F1306" stop-opacity="0.96"/>
+      <stop offset="45%" stop-color="#140B03" stop-opacity="0.94"/>
+      <stop offset="100%" stop-color="#080401" stop-opacity="0.98"/>
+    </linearGradient>
+
+    <!-- Brilho volumétrico interno âmbar/ouro -->
+    <radialGradient id="mapa-glass-glow" cx="22%" cy="18%" r="75%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.30"/>
+      <stop offset="45%" stop-color="#D97706" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#1F1306" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Rim light chanfrado da borda externa -->
+    <linearGradient id="mapa-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#FEF3C7" stop-opacity="0.95"/>
+      <stop offset="25%" stop-color="#F59E0B" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#B45309" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#451A03" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Reflexo especular diagonal superior do vidro -->
+    <linearGradient id="mapa-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
+      <stop offset="35%" stop-color="#FDE047" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Gradientes da Prancheta (Chassi de Titânio/Carbono) -->
+    <linearGradient id="mapa-board-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#2D1C0C"/>
+      <stop offset="45%" stop-color="#1C1006"/>
+      <stop offset="100%" stop-color="#0D0602"/>
+    </linearGradient>
+
+    <linearGradient id="mapa-board-rim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" stop-opacity="0.85"/>
+      <stop offset="40%" stop-color="#B45309" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#451A03" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Gradiente dos Avatares da Equipe (Ouro / Âmbar 3D) -->
+    <linearGradient id="mapa-team-gold" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="20%" stop-color="#FEF08A"/>
+      <stop offset="55%" stop-color="#F59E0B"/>
+      <stop offset="85%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#9A3412"/>
+    </linearGradient>
+
+    <linearGradient id="mapa-team-rim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="30%" stop-color="#FEF3C7" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#B45309" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- Gradiente da Presilha Metálica Superior (Aço Escovado) -->
+    <linearGradient id="mapa-clip-steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E2E8F0"/>
+      <stop offset="35%" stop-color="#94A3B8"/>
+      <stop offset="70%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+
+    <!-- Máscara estrita para confinar 100% de luz dentro da placa -->
+    <clipPath id="mapa-plaque-clip">
+      <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75"/>
+    </clipPath>
+  </defs>
+
+  <!-- GRUPO PRINCIPAL CONFINADO NA PLACA -->
+  <g clip-path="url(#mapa-plaque-clip)">
+    <!-- Fundo de vidro fosco escuro -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#mapa-glass-base)"/>
+
+    <!-- Brilho volumétrico interno -->
+    <rect x="51.2" y="51.2" width="921.6" height="921.6" fill="url(#mapa-glass-glow)"/>
+
+    <!-- Reflexo especular diagonal superior -->
+    <path d="M 51.2 51.2 L 972.8 51.2 L 972.8 380 L 51.2 580 Z" fill="url(#mapa-specular-top)"/>
+
+    <!-- RETÍCULA TÁTICA DE PRECISÃO AO FUNDO -->
+    <g opacity="0.25">
+      <line x1="512" y1="140" x2="512" y2="884" stroke="#D97706" stroke-width="1.5" stroke-opacity="0.4"/>
+      <line x1="140" y1="512" x2="884" y2="512" stroke="#D97706" stroke-width="1.5" stroke-opacity="0.4"/>
+      <circle cx="512" cy="512" r="260" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="10 8"/>
+    </g>
+
+    <!-- SÍMBOLO RELEVO 3D: MAPA DIÁRIO DE EQUIPE -->
+    <g id="mapa-symbol-group">
+
+      <!-- 1. PRANCHETA TÁTICA DO DIÁRIO (CHASSI BASE) -->
+      <g filter="url(#mapa-shadow-deep)">
+        <!-- Prancha Principal com cantos biselados -->
+        <rect x="330" y="240" width="364" height="550" rx="28" ry="28" 
+              fill="url(#mapa-board-grad)" stroke="url(#mapa-board-rim)" stroke-width="6"/>
+
+        <!-- Friso Interno da Moldura da Prancheta -->
+        <rect x="346" y="256" width="332" height="518" rx="20" ry="20" 
+              fill="none" stroke="#F59E0B" stroke-width="2" stroke-opacity="0.4"/>
+
+        <!-- Topo da Pauta / Header do Diário -->
+        <rect x="360" y="272" width="304" height="36" rx="8" ry="8" 
+              fill="#0A0401" opacity="0.75"/>
+
+        <!-- Linhas de Pauta do Diário (Escala/Turno) -->
+        <line x1="375" y1="360" x2="540" y2="360" stroke="#78350F" stroke-width="3" opacity="0.4"/>
+        <line x1="375" y1="410" x2="520" y2="410" stroke="#78350F" stroke-width="3" opacity="0.4"/>
+        <line x1="375" y1="460" x2="520" y2="460" stroke="#78350F" stroke-width="3" opacity="0.4"/>
+      </g>
+
+      <!-- 2. MAPA DE DISPERSÃO / REDE TÁTICA DA EQUIPE (MAPPING NODES) -->
+      <g stroke="#F59E0B" stroke-width="2" opacity="0.65">
+        <line x1="410" y1="395" x2="495" y2="370"/>
+        <line x1="495" y1="370" x2="565" y2="425"/>
+        <circle cx="410" cy="395" r="4.5" fill="#FFFFFF"/>
+        <circle cx="495" cy="370" r="5.5" fill="#FDE047" filter="url(#mapa-glow-gold)"/>
+        <circle cx="565" cy="425" r="4.5" fill="#FFFFFF"/>
+      </g>
+
+      <!-- 3. CHECKLIST DO PLANTÃO DIÁRIO COM STATUS LUMINOSOS (CHECKMARKS) -->
+      <g filter="url(#mapa-shadow-team)">
+        <!-- Linha 1 -->
+        <circle cx="590" cy="460" r="6.5" fill="#F59E0B" filter="url(#mapa-glow-gold)"/>
+        <path d="M 612 456 L 617 461 L 626 452" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Linha 2 -->
+        <circle cx="590" cy="505" r="6.5" fill="#F59E0B" filter="url(#mapa-glow-gold)"/>
+        <path d="M 612 501 L 617 506 L 626 497" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Linha 3 -->
+        <circle cx="590" cy="550" r="6.5" fill="#F59E0B" filter="url(#mapa-glow-gold)"/>
+        <path d="M 612 546 L 617 551 L 626 542" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Linha 4 -->
+        <circle cx="590" cy="595" r="6.5" fill="#D97706"/>
+        <path d="M 612 591 L 617 596 L 626 587" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Linha 5 -->
+        <circle cx="590" cy="640" r="6.5" fill="#D97706"/>
+        <path d="M 612 636 L 617 641 L 626 632" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Linha 6 -->
+        <circle cx="590" cy="685" r="6.5" fill="#B45309"/>
+        <path d="M 612 681 L 617 686 L 626 677" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Linha 7 -->
+        <circle cx="590" cy="730" r="6.5" fill="#B45309"/>
+        <path d="M 612 726 L 617 731 L 626 722" fill="none" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+      </g>
+
+      <!-- 4. RELÓGIO DE ESCALAS/PLANTÃO 24H (DIAL SUPERIOR DIREITO) -->
+      <g filter="url(#mapa-shadow-team)">
+        <circle cx="610" cy="355" r="38" fill="#1C0A02" stroke="#9A3412" stroke-width="3"/>
+        <circle cx="610" cy="355" r="28" fill="none" stroke="#F59E0B" stroke-width="1.5" stroke-dasharray="4 2"/>
+        <!-- Ponteiros (Shift / Hora Ativa) -->
+        <line x1="610" y1="355" x2="610" y2="340" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="610" y1="355" x2="626" y2="355" stroke="#FDE047" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="610" cy="355" r="4.5" fill="#FFFFFF"/>
+        <!-- Marcador 24H -->
+        <text x="610" y="331" font-family="system-ui, sans-serif" font-size="9" font-weight="900" fill="#F59E0B" text-anchor="middle">24</text>
+        <text x="610" y="388" font-family="system-ui, sans-serif" font-size="9" font-weight="900" fill="#9A3412" text-anchor="middle">12</text>
+        <text x="643" y="358" font-family="system-ui, sans-serif" font-size="9" font-weight="900" fill="#9A3412" text-anchor="middle">6</text>
+        <text x="579" y="358" font-family="system-ui, sans-serif" font-size="9" font-weight="900" fill="#9A3412" text-anchor="middle">18</text>
+      </g>
+
+      <!-- 5. EQUIPE EM RELEVO OURO 3D (AVANTE NA PRANCHETA) -->
+      <g filter="url(#mapa-shadow-team)">
+        <!-- Operador Esquerdo -->
+        <path d="M 334,640 
+                 C 334,585, 342,568, 360,560 
+                 C 382,550, 412,580, 412,610 
+                 C 412,630, 412,652, 412,668 
+                 L 334,668 Z" 
+              fill="url(#mapa-team-gold)" stroke="url(#mapa-team-rim)" stroke-width="4.5" stroke-linejoin="round"/>
+        <circle cx="373" cy="505" r="30" fill="url(#mapa-team-gold)" stroke="url(#mapa-team-rim)" stroke-width="4.5"/>
+
+        <!-- Operador Direito -->
+        <path d="M 482,646 
+                 C 482,585, 492,570, 510,560 
+                 C 530,548, 560,580, 560,612 
+                 C 560,632, 560,642, 560,658 
+                 L 482,658 Z" 
+              fill="url(#mapa-team-gold)" stroke="url(#mapa-team-rim)" stroke-width="4.5" stroke-linejoin="round"/>
+        <circle cx="521" cy="510" r="30" fill="url(#mapa-team-gold)" stroke="url(#mapa-team-rim)" stroke-width="4.5"/>
+
+        <!-- LÍDER DE EQUIPE NO CENTRO (EM DESTAQUE 3D MACIÇO) -->
+        <path d="M 376,680 
+                 C 376,605, 396,585, 414,570 
+                 C 440,550, 470,550, 496,570 
+                 C 514,585, 534,605, 534,680 
+                 Z" 
+              fill="url(#mapa-team-gold)" stroke="url(#mapa-team-rim)" stroke-width="6" stroke-linejoin="round"/>
+        <circle cx="455" cy="495" r="42" fill="url(#mapa-team-gold)" stroke="url(#mapa-team-rim)" stroke-width="6"/>
+        
+        <!-- Detalhe do Uniforme/Gravata do Líder -->
+        <polygon points="440,595 470,595 455,650" fill="#78350F" opacity="0.8" stroke="url(#mapa-team-rim)" stroke-width="2"/>
+        <circle cx="455" cy="600" r="5" fill="#FFFFFF"/>
+      </g>
+
+      <!-- 6. PRESILHA METÁLICA TÁTICA (BINDER CLIP EM AÇO) -->
+      <g filter="url(#mapa-shadow-deep)">
+        <!-- Bloco de fixação da presilha -->
+        <polygon points="448,225 576,225 576,260 448,260" 
+                 fill="url(#mapa-clip-steel)" stroke="#94A3B8" stroke-width="4" stroke-linejoin="round"/>
+        
+        <!-- Alça de Pressão da Presilha (Arame de aço cromado) -->
+        <path d="M 474,244 L 474,185 C 474,155, 492,142, 512,142 C 532,142, 550,155, 550,185 L 550,244" 
+              fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+        <path d="M 474,244 L 474,185 C 474,155, 492,142, 512,142 C 532,142, 550,155, 550,185 L 550,244" 
+              fill="none" stroke="url(#mapa-clip-steel)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="500" y="234" width="24" height="12" rx="4" ry="4" fill="#64748B" stroke="#0F172A" stroke-width="2"/>
+      </g>
+    </g>
+
+    <!-- Friso de luz interno no bisel superior da placa -->
+    <rect x="55.2" y="55.2" width="913.6" height="913.6" rx="198.75" ry="198.75" 
+          fill="none" stroke="#FFFFFF" stroke-width="2" stroke-opacity="0.25"/>
+  </g>
+
+  <!-- BORDA DE LUZ EXTERNA (RIM LIGHT DA PLACA) - ZERO VAZAMENTO -->
+  <rect x="51.2" y="51.2" width="921.6" height="921.6" rx="202.75" ry="202.75" 
+        fill="none" stroke="url(#mapa-rim-border)" stroke-width="7"/>
+</svg>
