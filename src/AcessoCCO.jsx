@@ -316,9 +316,58 @@ function PillGroup({ options, value, onChange, dark }) {
   );
 }
 
+// ─── Cenário "Centro de Comando" (só visual; tema escuro) ───────────────────────
+const CCO_CSS = `
+.cco-room{position:relative;isolation:isolate}
+.cco-room::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(34,197,94,.17),transparent 70%),
+  linear-gradient(rgba(34,197,94,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(34,197,94,.045) 1px,transparent 1px);
+  background-size:auto,34px 34px,34px 34px}
+.cco-room::after{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.016) 0 1px,transparent 1px 3px)}
+.cco-room>*{position:relative;z-index:1}
+.cco-status{position:relative;overflow:hidden;display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:7px 12px;border-radius:10px;
+  background:linear-gradient(90deg,rgba(34,197,94,.15),rgba(14,165,233,.07));border:1px solid rgba(34,197,94,.38);
+  box-shadow:0 0 16px rgba(34,197,94,.14),inset 0 1px 0 rgba(255,255,255,.05);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;letter-spacing:1.2px;color:#86efac}
+.cco-status::after{content:"";position:absolute;top:0;bottom:0;width:40%;left:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(134,239,172,.16),transparent);animation:ccoScan 4.5s linear infinite}
+@keyframes ccoScan{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+.cco-led{width:9px;height:9px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e;animation:ccoDot 1.6s ease-in-out infinite;flex-shrink:0}
+.cco-room .cco-kpi{position:relative;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.04),rgba(2,8,16,.9))!important;
+  border:1px solid color-mix(in srgb,var(--k) 38%,transparent)!important;box-shadow:0 0 16px color-mix(in srgb,var(--k) 16%,transparent),inset 0 1px 0 rgba(255,255,255,.05)}
+.cco-room .cco-kpi::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--k),transparent);box-shadow:0 0 10px var(--k)}
+.cco-room .cco-kpi>div:first-child{font-size:28px!important;line-height:1.1;text-shadow:0 0 16px var(--k);font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.cco-room .cco-kpi>div:last-child{font-size:10px!important;letter-spacing:1.6px}
+.cco-room .cco-tab:hover{filter:brightness(1.18)}
+.cco-room .cco-tab[data-sel="1"]::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:2px;border-radius:2px;background:currentColor;box-shadow:0 0 8px currentColor}
+@media (prefers-reduced-motion:reduce){.cco-status::after,.cco-led{animation:none}}
+`;
+function CcoLogo({ size=30 }) {
+  const [falhou, setFalhou] = useState(false);
+  if (falhou) return <Ico n="porta"/>;
+  return <img src="/icones/modulos/cco.svg" alt="" width={size} height={size} draggable={false} onError={()=>setFalhou(true)}
+    style={{ display:"inline-block", verticalAlign:"middle", filter:"drop-shadow(0 0 8px rgba(34,197,94,.55))" }}/>;
+}
+function CcoStatus({ project, hoje }) {
+  const [agora, setAgora] = useState(()=>new Date());
+  useEffect(()=>{ const t=setInterval(()=>setAgora(new Date()),1000); return ()=>clearInterval(t); },[]);
+  const hh = agora.toLocaleTimeString("pt-BR",{hour12:false});
+  return (
+    <div className="cco-status">
+      <span className="cco-led"/>
+      <span style={{fontWeight:800}}>CCO ONLINE</span>
+      <span style={{opacity:.65}}>{project?.id||""}</span>
+      <span style={{flex:1}}/>
+      <span style={{opacity:.8}}>HOJE {String(hoje).padStart(2,"0")}</span>
+      <span style={{fontWeight:800,color:"#bbf7d0"}}>{hh}</span>
+    </div>
+  );
+}
+
 function KPI({ S, val, label, color }) {
   return (
-    <div style={{...S.card,textAlign:"center",padding:"10px 8px"}}>
+    <div className="cco-kpi" style={{...S.card,textAlign:"center",padding:"10px 8px","--k":color}}>
       <div style={{fontSize:22,fontWeight:900,color}}>{val}</div>
       <div style={{fontSize:11,...S.txt2,fontWeight:700}}>{label}</div>
     </div>
@@ -801,7 +850,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
         const sel = tema===t.key;
         const dot = dots[t.key];
         return (
-          <button key={t.key} onClick={()=>{setTema(t.key);setScreen("list");}}
+          <button key={t.key} className="cco-tab" data-sel={sel?"1":"0"} onClick={()=>{setTema(t.key);setScreen("list");}}
             style={{flex:"1 1 30%",minWidth:104,position:"relative",display:"flex",alignItems:"center",gap:7,
               background:sel
                 ? `linear-gradient(135deg, ${t.color}30, ${t.color}12)`
@@ -862,18 +911,21 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
   const hoje = visiveis.filter(r=>r.data===todayStr());
   const anteriores = visiveis.filter(r=>r.data!==todayStr());
 
+  const sala = dark!==false;
   return (
-    <div style={S.page}>
+    <div style={S.page} className={sala?"cco-room":undefined}>
+      {sala && <style>{CCO_CSS}</style>}
       <div style={S.wrap}>
         <div style={{position:"sticky",top:0,zIndex:10,...S.hdrBg,padding:"14px 16px 0"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="porta"/> CCO / Vig CCO</div>
+              <div style={{fontSize:15,fontWeight:800,display:"flex",alignItems:"center",gap:8,...S.txt}}>{sala?<CcoLogo size={30}/>:<Ico n="porta"/>} CCO / Vig CCO</div>
               <div style={{fontSize:11,...S.txt2}}>{project?.id||""} · {project?.name||""}</div>
             </div>
             <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{iconeTema()}</button>
           </div>
+          {sala && <CcoStatus project={project} hoje={hoje.length}/>}
           <TabBar/>
         </div>
 
