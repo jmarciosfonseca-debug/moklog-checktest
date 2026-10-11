@@ -1,6 +1,6 @@
 // Mapa de Equipe diário — horários dos turnos por projeto (e por posto, quando diferem).
 // Só dados e funções puras: sem tela, sem gravação.
-// `confirmado:false` = horário ainda a confirmar com o Marcio; a tela deve sinalizar.
+// `confirmado:false` = horário a confirmar com o Marcio; a tela deve sinalizar (hoje todos confirmados).
 
 const PADRAO = { D: { inicio: "06:00", fim: "18:00" }, N: { inicio: "18:00", fim: "06:00" } };
 
@@ -15,8 +15,8 @@ export const HORARIOS_PROJETO = {
   P602: { turnos: PADRAO, confirmado: true },
   P604: { turnos: PADRAO, confirmado: true },
   P605: { turnos: PADRAO, confirmado: true },
-  P606: { turnos: PADRAO, confirmado: false },
-  P607: { turnos: { D: { inicio: "07:00", fim: "19:00" }, N: { inicio: "19:00", fim: "07:00" } }, confirmado: true },
+  P606: { turnos: { D: { inicio: "07:00", fim: "19:00" }, N: { inicio: "19:00", fim: "07:00" } }, confirmado: true },
+  P607: { turnos: PADRAO, confirmado: true },
 };
 
 // Horário do turno do projeto; se o posto tiver horário próprio, ele prevalece.
