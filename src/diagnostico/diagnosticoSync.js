@@ -49,3 +49,23 @@ export function friendlyPersistError(error) {
   if(code.includes("resource-exhausted"))return "O diagnóstico excedeu o limite aceito pelo Firestore.";
   return "Não foi possível salvar o diagnóstico no Firestore. O rascunho local continua protegido.";
 }
+
+// Numeração de revisões do projeto: ordem de criação (1 = primeira). Arquivados contam, para o número não mudar.
+export function numerosRevisao(diagnosticos=[]) {
+  const ordenados=[...diagnosticos].sort((a,b)=>String(a?.criadoEm||a?.atualizadoEm||"").localeCompare(String(b?.criadoEm||b?.atualizadoEm||"")));
+  return ordenados.reduce((mapa,d,i)=>{if(d?.id)mapa[d.id]=i+1;return mapa;},{});
+}
+
+// Revisão contra a qual o relatório compara: a de origem (baseId) se houver; senão a salva imediatamente antes.
+export function escolherAnterior(diagnosticos=[],atualId=null,baseId=null) {
+  const outros=diagnosticos.filter(d=>d?.id&&d.id!==atualId&&d.respostas&&Object.keys(d.respostas).length);
+  if(baseId){const base=outros.find(d=>d.id===baseId);if(base)return base;}
+  const atual=diagnosticos.find(d=>d?.id===atualId);
+  const marco=String(atual?.criadoEm||"");
+  const candidatos=marco?outros.filter(d=>String(d.criadoEm||"")<marco):outros;
+  return [...candidatos].sort((a,b)=>String(b.criadoEm||b.atualizadoEm||"").localeCompare(String(a.criadoEm||a.atualizadoEm||"")))[0]||null;
+}
+
+export function rotuloRevisaoDe(numero) {
+  return numero?`Revisão ${numero}`:"";
+}

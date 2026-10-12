@@ -39,3 +39,23 @@ test("mensagens de erro de gravação dizem a causa e que o rascunho está prote
   expect(friendlyPersistError({ code: "unavailable" })).toMatch(/rascunho local continua protegido/);
   expect(friendlyPersistError({})).toMatch(/rascunho local continua protegido/);
 });
+
+import { numerosRevisao, escolherAnterior, rotuloRevisaoDe } from "./diagnosticoSync";
+const revs = [
+  { id: "c", criadoEm: "2026-10-12T10:00:00Z", respostas: { x: { status: "conforme" } } },
+  { id: "a", criadoEm: "2026-10-01T10:00:00Z", respostas: { x: { status: "nao_conforme" } } },
+  { id: "b", criadoEm: "2026-10-05T10:00:00Z", respostas: { x: { status: "parcial" } } },
+  { id: "v", criadoEm: "2026-10-13T10:00:00Z", respostas: {} },
+];
+test("revisões numeradas pela ordem de criação", () => {
+  expect(numerosRevisao(revs)).toEqual({ a: 1, b: 2, c: 3, v: 4 });
+  expect(rotuloRevisaoDe(2)).toBe("Revisão 2");
+  expect(rotuloRevisaoDe(undefined)).toBe("");
+});
+test("anterior: a de origem; senão a salva imediatamente antes; nunca a própria nem uma vazia", () => {
+  expect(escolherAnterior(revs, "c", "a").id).toBe("a");
+  expect(escolherAnterior(revs, "c", null).id).toBe("b");
+  expect(escolherAnterior(revs, "a", null)).toBeNull();
+  expect(escolherAnterior(revs, null, null).id).toBe("c"); // rascunho ainda não salvo compara com a mais recente com respostas
+  expect(escolherAnterior([], "x", null)).toBeNull();
+});
