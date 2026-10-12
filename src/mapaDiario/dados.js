@@ -7,6 +7,7 @@ import { setDoc } from "../fireGuard";
 import { diasEntre } from "./regras";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
+import { semUndefined } from "./modelo";
 
 const db = () => {
   const app = getApps()[0];
@@ -49,7 +50,7 @@ export async function loadUltimoMapa(pid, turno, antesDe, { gapPar = false } = {
 
 export async function saveMapa(mapa) {
   const agora = new Date().toISOString();
-  const doc_ = { ...mapa, atualizadoEm: agora };
+  const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
   await setDoc(doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id), doc_);
   return doc_;
 }

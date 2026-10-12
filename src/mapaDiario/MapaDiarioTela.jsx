@@ -141,7 +141,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     const agora = agoraFn().toISOString();
     const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapa.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapa.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); setEditando(false); }
-    catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); return; }
+    catch (e) { setAvisos([`NÃO GRAVOU o mapa (${(e && e.message) || "erro"}). Confira a conexão e toque em Concluir mapa de novo. O WhatsApp só libera depois de gravar.`]); return; }
     // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
     setFichaMsg(null);
     await lancarFicha(final);
@@ -454,16 +454,18 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
             <div style={{ ...S.card, borderColor: "#16a34a" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : "Mapa gravado. Agora envie no WhatsApp."}</div>
               {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}{(fichaMsg.linhas || []).map((l, i) => <div key={i} style={{ marginTop: 3 }}>{l}</div>)}{fichaMsg.erro && <div style={{ marginTop: 6 }}><button disabled={fichaBusy} onClick={() => lancarFicha(fichaMsg.alvo)} style={S.btn}>{fichaBusy ? "Lançando…" : "Lançar na ficha de novo"}</button></div>}</div>}
+              {!editando && <>
               <pre aria-label="Texto do mapa" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, color: cor.txt, background: cor.input, border: `1px solid ${cor.line}`, borderRadius: 10, padding: 10, margin: "0 0 10px" }}>{texto}</pre>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <a href={linkWhatsApp(texto)} target="_blank" rel="noreferrer" style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Abrir WhatsApp</a>
                 <button onClick={copiar} style={S.btn}>{copiado ? "Copiado" : "Copiar texto"}</button>
               </div>
+              </>}
               {!editando && <>
                 <div style={{ fontSize: 11, color: cor.txt2, marginTop: 8 }}>Mapa arquivado neste dia. Se algo mudou (alguém saiu, outra pessoa entrou), toque em Editar mapa, corrija e conclua de novo; a correção fica registrada.</div>
                 <button onClick={editarMapa} style={{ ...S.btn, marginTop: 8 }}>Editar mapa</button>
               </>}
-              {editando && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>Editando o mapa enviado. Corrija os campos e toque em Concluir mapa.</div>}
+              {editando && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>Editando o mapa enviado. O WhatsApp só volta depois que você tocar em Concluir mapa e o app confirmar que gravou.</div>}
             </div>
           )}
         </>)}

@@ -294,7 +294,7 @@ export function mudarSituacao(mapa, id, nova) {
   if (p.situacao === "ft") m = desfazerVinculoFalta(m, id);
   const porFt = p.situacao === "falta" && p.detalhe && p.detalhe.porFtDe;
   if (porFt) m = { ...m, postos: m.postos.map((x) => (x.id === porFt ? { ...x, detalhe: semVinculo(x.detalhe) } : x)) };
-  return { ...m, postos: m.postos.map((x) => (x.id === id ? { ...x, situacao: nova, detalhe: { livre: x.detalhe && x.detalhe.livre } } : x)) };
+  return { ...m, postos: m.postos.map((x) => (x.id === id ? { ...x, situacao: nova, detalhe: x.detalhe && x.detalhe.livre ? { livre: true } : {} } : x)) }; // nunca undefined: o Firestore recusa o mapa inteiro
 }
 
 export function removerPosto(mapa, id) {
@@ -318,4 +318,11 @@ export function pessoasRepetidas(mapa) {
     else vistos.set(k, p.rotulo);
   });
   return rep;
+}
+
+// O Firestore recusa documento com valor `undefined` (a gravação inteira falha). Tira de qualquer profundidade antes de gravar.
+export function semUndefined(v) {
+  if (Array.isArray(v)) return v.map(semUndefined);
+  if (v && typeof v === "object") return Object.keys(v).reduce((o, k) => { if (v[k] !== undefined) o[k] = semUndefined(v[k]); return o; }, {});
+  return v;
 }

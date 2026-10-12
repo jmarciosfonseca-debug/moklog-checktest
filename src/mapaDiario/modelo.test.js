@@ -1,4 +1,4 @@
-import { ehMoto, garantirMoto, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
+import { ehMoto, garantirMoto, semUndefined, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 import { postoVazio as postoVazioT } from "./modelo";
@@ -374,4 +374,22 @@ test("completarPostosFixos (P607): três 'Posto extra' voltam para Honda, AGP CC
   const extra = (id, nome) => ({ ...postoVazioT("Posto extra"), pessoaId: id, pessoaNome: nome });
   const ok = completarPostosFixos({ ...m, postos: [extra("m", "Marco"), extra("c", "Cremildo"), extra("r", "Maria")] }, cs);
   expect(ok.postos.map((p) => `${p.rotulo}:${p.pessoaNome}`)).toEqual(["Vigilante Honda:Maria", "AGP CCO:Marco", "Vigilante Pista:Cremildo"]);
+});
+const achaUndef = (o, p = "") => (o === undefined ? [p] : o && typeof o === "object" ? Object.keys(o).flatMap((k) => achaUndef(o[k], `${p}/${k}`)) : []);
+test("nenhuma troca de situação deixa valor undefined no mapa (o Firestore recusa o documento inteiro)", () => {
+  const colabs = [{ id: "L", nome: "Luiz", equipeLiderId: null }, { id: "e", nome: "Elaine", equipeLiderId: "L" }];
+  let m = mapa();
+  m = { ...m, postos: m.postos.map((p, i) => ({ ...p, pessoaId: `c${i}`, pessoaNome: `N${i}` })) };
+  for (const sit of ["falta", "atraso", "cobertura", "troca", "vago", "ft", "presente"]) {
+    const x = mudarSituacao(m, m.postos[1].id, sit);
+    expect(achaUndef(x)).toEqual([]);
+  }
+  const ft = vincularFalta(mudarSituacao(m, m.postos[1].id, "ft"), m.postos[1].id, "c:e", colabs);
+  expect(achaUndef(ft)).toEqual([]);
+  expect(achaUndef(vincularFalta(mudarSituacao(m, m.postos[1].id, "ft"), m.postos[1].id, "__ninguem", colabs))).toEqual([]);
+});
+test("semUndefined: tira undefined em qualquer profundidade, sem mexer no resto", () => {
+  const sujo = { a: 1, b: undefined, c: { d: undefined, e: [1, { f: undefined, g: 2 }] }, h: null, i: "" };
+  expect(semUndefined(sujo)).toEqual({ a: 1, c: { e: [1, { g: 2 }] }, h: null, i: "" });
+  expect(Object.keys(semUndefined(sujo))).not.toContain("b");
 });
