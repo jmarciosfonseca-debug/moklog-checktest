@@ -7,12 +7,13 @@ import { resumoDoPainel, turnoVigente, PROJETOS_DO_MAPA } from "./painel";
 import { chaveMapa } from "./regras";
 import { loadEnviosDoTurno } from "./dados";
 import { MAPA_DIARIO_ATIVO } from "./ativo";
+import ConsolidadoMapas from "./ConsolidadoMapas";
 
 const COR = { enviado: "#16a34a", aguardando: "#64748b", cobranca: "#f59e0b", pendente: "#dc2626", "sem-horario": "#64748b" };
 const ROTULO = { enviado: "Enviado", aguardando: "Aguardando", cobranca: "Enviar agora", pendente: "Pendente", "sem-horario": "Sem horário" };
 const hhmm = (d) => d ? new Date(d.getTime() - 3 * 3600000).toISOString().slice(11, 16) : "";
 
-export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p) => p, aberto, onToggle, emImplantacao = false }) {
+export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p) => p, aberto, onToggle, emImplantacao = false, extra = null }) {
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#64748b" : "#94a3b8";
   const brilha = !emImplantacao && !!resumo?.brilha && !erro;
@@ -46,6 +47,7 @@ export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p)
           ))}
         </div>
       )}
+      {aberto && !emImplantacao && extra}
     </div>
   );
 }
@@ -81,5 +83,5 @@ export default function PainelMapasEquipe({ dark, nomeProj, ativo = MAPA_DIARIO_
   }, [ativo]);
 
   const resumo = resumoDoPainel({ agora, mapas });
-  return <PainelMapasView emImplantacao={!ativo} resumo={resumo} erro={erro} carregando={carregando && ativo} dark={dark} nomeProj={nomeProj} aberto={aberto} onToggle={() => setAberto((a) => !a)} />;
+  return <PainelMapasView emImplantacao={!ativo} resumo={resumo} erro={erro} carregando={carregando && ativo} dark={dark} nomeProj={nomeProj} aberto={aberto} onToggle={() => setAberto((a) => !a)} extra={<ConsolidadoMapas dark={dark} nomeProj={nomeProj} />} />;
 }
