@@ -1,8 +1,8 @@
-// Dimensionamento operacional por projeto (documento do Marcio, 11/10/2026) — fonte de conferência dos postos.
+// Dimensionamento operacional por projeto (documento do Marcio, 11/10/2026; P260A corrigido por ele: VSPP 1 e VSPP 2 são dois postos 5x2) — fonte de conferência dos postos.
 // Cada posto: [nome, horas, escala, diurnos, noturnos, folguistas]. "Foguista" no documento = folguista (4x2).
 // O mapa (postos.js) é testado contra esta tabela: nº de postos por projeto, postos 24h que existem de dia e de noite.
 export const ESCOPO = {
-  P260A: [["VSPP Líder", 24, "4x2", 1, 1, 1], ["VSPP Apoio", 12, "5x2", 2, 0, 0], ["Vig. Monitoramento CCO", 24, "4x2", 1, 1, 1]],
+  P260A: [["VSPP Líder", 24, "4x2", 1, 1, 1], ["VSPP 1", 12, "5x2", 1, 0, 0], ["VSPP 2", 12, "5x2", 1, 0, 0], ["Vig. Monitoramento CCO", 24, "4x2", 1, 1, 1]],
   P260B: [["VSPP", 24, "4x2", 1, 1, 1]],
   P260C: [["VSPP Líder", 24, "4x2", 1, 1, 1], ["Vigilante Patrimonial", 24, "12x36", 2, 2, 0]],
   P311A: [["Líder", 24, "12x36", 2, 2, 0], ["Vigilante Ronda Tático", 24, "12x36", 2, 2, 0], ["Vigilante Apoio", 12, "12x36", 2, 0, 0], ["Porteiro CCO", 24, "12x36", 2, 2, 0]],

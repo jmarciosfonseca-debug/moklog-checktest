@@ -20,8 +20,8 @@ test("postos de partida seguem o mapeamento confirmado", () => {
   expect(postosPadrao("P260C", "N").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante Patrimonial"]);
   expect(postosPadrao("P604", "D").map((p) => p.rotulo)).toContain("Recepção");
   expect(postosPadrao("P605", "D").map((p) => p.rotulo)).toContain("Recepção");
-  expect(postosPadrao("P260A", "D", "2026-10-12").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO"]);
-  expect(postosPadrao("P260A", "D", "2026-10-11").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO"]); // apoio todos os dias (2 pessoas se revezam);
+  expect(postosPadrao("P260A", "D", "2026-10-12").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP 1", "VSPP 2", "Vigilante CCO"]);
+  expect(postosPadrao("P260A", "D", "2026-10-11").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante CCO"]); // VSPP 1 e 2 só de segunda a sexta;
 });
 test("mapa novo: rascunho, material sem alteração já marcado, todos presentes", () => {
   const m = mapa();

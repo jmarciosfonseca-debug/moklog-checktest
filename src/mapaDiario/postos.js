@@ -54,9 +54,9 @@ export const POSTOS = {
     D: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("VSPP Ronda", APOIO, { horario: h0820 }), P("CDA", ["CDA"])],
     N: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("CDA", ["CDA"])],
   },
-  // P260A: um posto de apoio (12h, 5x2, duas pessoas se revezam), só de dia.
+  // P260A: VSPP Líder e Vigilante CCO (24h, 4x2) + dois postos VSPP 1 e 2 (12h, 5x2, segunda a sexta), só de dia.
   P260A: {
-    D: [lider("VSPP Líder"), P("VSPP Apoio", APOIO, { legado: ["VSPP Apoio 1", "VSPP Apoio 2"] }), P("Vigilante CCO", CCO)],
+    D: [lider("VSPP Líder"), P("VSPP 1", APOIO, { dias: [1, 2, 3, 4, 5], legado: ["VSPP Apoio 1"] }), P("VSPP 2", APOIO, { dias: [1, 2, 3, 4, 5], legado: ["VSPP Apoio 2"] }), P("Vigilante CCO", CCO)],
     N: [lider("VSPP Líder"), P("Vigilante CCO", CCO)],
   },
   // P260B: um posto só por turno.

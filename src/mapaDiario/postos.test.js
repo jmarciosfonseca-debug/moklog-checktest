@@ -101,10 +101,10 @@ describe("postos × dimensionamento", () => {
     expect(dia.length).toBe(ESCOPO[pid].length);
     expect(noite.length).toBe(ESCOPO[pid].filter(([, horas]) => horas === 24).length);
   });
-  test("totais do documento: 44 postos; 79 diurnos, 61 noturnos, 7 folguistas (147)", () => {
+  test("totais do documento (com P260A corrigido: 45 postos); 79 diurnos, 61 noturnos, 7 folguistas (147)", () => {
     const t = Object.keys(ESCOPO).reduce((a, pid) => { const x = totaisDoProjeto(pid); return { postos: a.postos + x.postos, diurnos: a.diurnos + x.diurnos, noturnos: a.noturnos + x.noturnos, folguistas: a.folguistas + x.folguistas }; }, { postos: 0, diurnos: 0, noturnos: 0, folguistas: 0 });
-    expect(t).toEqual({ postos: 44, diurnos: 79, noturnos: 61, folguistas: 7 });
+    expect(t).toEqual({ postos: 45, diurnos: 79, noturnos: 61, folguistas: 7 });
     expect(totaisDoProjeto("P601")).toEqual({ postos: 5, diurnos: 10, noturnos: 6, folguistas: 0 });
-    expect(totaisDoProjeto("P260A")).toEqual({ postos: 3, diurnos: 4, noturnos: 2, folguistas: 2 });
+    expect(totaisDoProjeto("P260A")).toEqual({ postos: 4, diurnos: 4, noturnos: 2, folguistas: 2 });
   });
 });
