@@ -1,4 +1,5 @@
 import { calcularAvisos, idadeTexto, plantoesDoAviso } from "./regras";
+import { AVISOS_CFG } from "./config";
 
 const agora = new Date("2026-10-12T10:00:00-03:00"); // P606: diurno desde 07:00; noturno anterior de 11/10
 const ATUAL = "P606_2026-10-12_D", ANT = "P606_2026-10-11_N";
@@ -6,10 +7,12 @@ const posto = (id, rotulo, pessoaNome, situacao = "presente", detalhe = {}, extr
 const enviado = (postos, extra = {}) => ({ status: "enviado", enviadoEm: "2026-10-11T22:10:00.000Z", postos, ...extra });
 const ids = (r) => r.avisos.map((a) => a.id);
 const calc = (fontes, gerencial = true) => calcularAvisos({ agora, fontes, gerencial });
+const calcK = (fontes) => calcularAvisos({ agora, fontes, gerencial: true, cfg: { ...AVISOS_CFG, keyAccess: { ...AVISOS_CFG.keyAccess, ativo: true } } });
 
 test("plantões: atual e anterior do projeto; sem horário = nada", () => {
   const p = plantoesDoAviso("P606", agora);
-  expect(p.map((x) => x.chave)).toEqual([ATUAL, ANT]);
+  expect(p.map((x) => x.chave)).toEqual([ATUAL, ANT, "P606_2026-10-11_D"]);
+  expect(plantoesDoAviso("P606", agora, 2)).toHaveLength(2);
   expect(plantoesDoAviso("XXX", agora)).toEqual([]);
 });
 
@@ -46,6 +49,8 @@ test("falta coberta por FT, falta só na FT, posto vago, atraso e material", () 
     posto("v", "Ronda", "", "vago"),
     posto("a", "Apoio", "Zé", "atraso", { minutos: 20 }),
     posto("h", "Hum", "Ana", "ft", { semFalta: true }),
+    posto("t", "Portaria", "Lia", "troca", { noLugarDe: "Rui" }),
+    posto("k", "Ronda 2", "Teo", "cobertura", { deQuem: "Gil", base: true }),
   ], { material: { excecoes: [{ nome: "Moto", situacao: "indisponivel", obs: "pneu" }, { nome: "Rádio HT", situacao: "anomalia" }] } });
   const r = calc({ mapas: { P606: { [ATUAL]: mapa, [ANT]: enviado([]) } } });
   const por = (t) => r.avisos.filter((a) => a.tipo === t);
@@ -56,7 +61,11 @@ test("falta coberta por FT, falta só na FT, posto vago, atraso e material", () 
   expect(por("atraso")[0]).toMatchObject({ sev: "info" });
   expect(por("atraso")[0].detalhe).toContain("20 min");
   expect(por("material").map((a) => [a.titulo, a.sev])).toEqual([["Moto: indisponível", "atencao"], ["Rádio HT: com anomalia", "info"]]);
-  expect(r.avisos.some((a) => a.titulo.includes("Ana"))).toBe(false); // FT sem falta não é aviso
+  expect(por("ft").map((a) => a.titulo)).toEqual(["FT: Ana"]); // FT sem falta: só informativo (a FT que cobre falta já está na falta)
+  expect(por("troca")[0]).toMatchObject({ sev: "info", titulo: "Troca: Lia" });
+  expect(por("troca")[0].detalhe).toContain("no lugar de Rui");
+  expect(por("cobertura")[0].titulo).toBe("Cobertura (Base): Teo");
+  expect(por("cobertura")[0].detalhe).toContain("cobrindo Gil");
   expect(r.contagem.critico).toBe(3);
 });
 
@@ -73,8 +82,9 @@ test("perfil não gerencial não vê aviso de pessoa/supervisão/mapa", () => {
   expect(calc(fontes, false).avisos.map((a) => a.tipo)).toEqual(["ctmk"]);
 });
 
-test("KeyAccess: aberta sem horaFim; ≥ 48 h = crítico; fechada não avisa", () => {
-  const r = calc({ keyaccess: { P605: [
+test("KeyAccess vem DESLIGADO por padrão (o botão da Home já mostra); ligado: aberta sem horaFim, ≥ 48 h = crítico, fechada não avisa", () => {
+  expect(calc({ keyaccess: { P605: [{ id: "a", data: "2026-10-01", horaInicio: "08:00" }] } }).avisos).toEqual([]);
+  const r = calcK({ keyaccess: { P605: [
     { id: "a", data: "2026-10-12", horaInicio: "08:00", tipos: ["catraca"] },
     { id: "b", data: "2026-10-09", hora: "09:00" },
     { id: "c", data: "2026-10-12", horaInicio: "08:00", horaFim: "09:00" },
@@ -127,13 +137,48 @@ test("relatório semanal atrasado, supervisão, iluminação e bolsão", () => {
 });
 
 test("problema resolvido some no recálculo; ordem: crítico, atenção, info; mais antigo primeiro", () => {
-  const f1 = { ctmk: { P601: { status: "offline", offlineSince: "2026-10-12T05:00:00-03:00" } }, keyaccess: { P605: [{ id: "a", data: "2026-10-09", horaInicio: "08:00" }] }, mapas: { P606: { [ATUAL]: enviado([posto("a", "Apoio", "Zé", "atraso")]), [ANT]: enviado([]) } } };
+  const man = (status) => ({ id: "m", data: "2026-10-01", status, empresa: "Acme", sistema: "CFTV", servico: "x" });
+  const f1 = { ctmk: { P601: { status: "offline", offlineSince: "2026-10-12T05:00:00-03:00" } }, manutencao: { P605: [man("pendente")] }, mapas: { P606: { [ATUAL]: enviado([posto("a", "Apoio", "Zé", "atraso")]), [ANT]: enviado([]) } } };
   expect(calc(f1).avisos.map((a) => a.sev)).toEqual(["critico", "atencao", "info"]);
-  const f2 = { ...f1, keyaccess: { P605: [{ id: "a", data: "2026-10-09", horaInicio: "08:00", horaFim: "10:00" }] } };
-  expect(ids(calc(f2))).not.toContain("keyaccess:P605:a");
+  const f2 = { ...f1, manutencao: { P605: [man("concluida")] } };
+  expect(ids(calc(f2))).not.toContain("manutencao:P605:m");
 });
 
 test("dentro da mesma severidade, o que acontece agora (falta) vem antes do crônico (equipamento inoperante há 41 dias)", () => {
   const r = calc({ pendencias: [{ projetoId: "P604", cat: "Câmeras", item: "—", status: "inop", days: 41 }], mapas: { P606: { [ATUAL]: enviado([]), [ANT]: enviado([posto("c", "CCO", "Elaine", "falta")]) } } });
   expect(r.avisos.map((a) => a.tipo)).toEqual(["falta", "inop"]);
+});
+
+test("cobre o dia: plantão diurno de ontem sem envio também vira aviso crítico", () => {
+  const r = calc({ mapas: { P606: { [ATUAL]: enviado([]), [ANT]: enviado([]), "P606_2026-10-11_D": null } } });
+  expect(r.avisos.map((a) => [a.tipo, a.sev, a.id])).toEqual([["mapa", "critico", "mapa:P606:2026-10-11:D"]]);
+});
+
+test("teste quinzenal de iluminação: pendente (atenção; ≥ 7 dias crítico), hoje às 21h (info), em dia não avisa", () => {
+  const q = [{ nome: "A", total: 10, deficientes: 0 }];
+  const r = calc({ iluminacao: {
+    P601: { quadrantes: q, testeQuinzenal: { alvo: "2026-10-11" } },
+    P602: { quadrantes: q, testeQuinzenal: { alvo: "2026-10-04" } },
+    P604: { quadrantes: q, testeQuinzenal: { alvo: "2026-10-12" } },
+    P605: { quadrantes: q, testeQuinzenal: { alvo: "2026-10-25" } },
+    P606: { quadrantes: [], testeQuinzenal: { alvo: "2026-10-04" } },
+  } });
+  expect(r.avisos.map((a) => [a.projetoId, a.sev, a.titulo])).toEqual([
+    ["P602", "critico", "Teste quinzenal de iluminação pendente"],
+    ["P601", "atencao", "Teste quinzenal de iluminação pendente"],
+    ["P604", "info", "Teste de iluminação hoje às 21h"],
+  ]);
+  expect(r.avisos[1].detalhe).toBe("Previsto para domingo 11/10/2026 às 21h");
+});
+
+test("férias: saída nos próximos 7 dias (hoje/amanhã = atenção), retorno nos próximos 3; só ativos", () => {
+  const f = (colabId, dataInicio, dataRetorno, extra = {}) => ({ colabId, dataInicio, dataRetorno, ...extra });
+  const nomes = { c1: "Ana", c2: "Bia", c3: "Caio", c4: "Davi", c6: "Eva", c7: "Gil" };
+  const r = calc({ equipes: { P601: { nomes, ferias: [
+    f("c1", "2026-10-13", "2026-11-12", { cobertura: "Zé" }), f("c2", "2026-10-18", "2026-11-17"), f("c3", "2026-10-25", "2026-11-24"),
+    f("c4", "2026-09-13", "2026-10-13"), f("c5", "2026-10-13", "2026-11-12"), f("c6", "2026-09-20", "2026-10-20"), f("c7", "2026-08-01", "2026-08-31"),
+  ] } } });
+  expect(r.avisos.map((a) => [a.titulo, a.sev])).toEqual([["Ana sai de férias amanhã", "atencao"], ["Davi volta de férias amanhã", "info"], ["Bia sai de férias em 6 dias", "info"]]);
+  expect(r.avisos[0].detalhe).toBe("Retorno previsto 12/11/2026 · cobertura: Zé");
+  expect(calc({ equipes: { P601: { nomes, ferias: [f("c1", "2026-10-13", "2026-11-12")] } } }, false).avisos).toEqual([]); // só gerencial
 });
