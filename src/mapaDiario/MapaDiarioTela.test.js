@@ -14,7 +14,7 @@ const colabs = [
   { id: "c", nome: "Ari A.", cargo: "Vigilante Ronda", turno: "Diurno", emFerias: false },
   { id: "d", nome: "Joao V.", cargo: "Vigilante Ronda", turno: "Folguista", emFerias: false },
 ];
-const BASE601 = { postos: [["Líder", "a"], ["VSPP Apoio", "b"], ["VSPP P1", "c"], ["CCO", "d"], ["CDA", "a2"]].map(([rotulo, id]) => ({ rotulo, pessoaId: id, pessoaNome: id })), veiculos: [] };
+const BASE601 = { postos: [["Líder", "a"], ["VSPP Apoio", "b"], ["VSPP Ronda", "c"], ["CCO", "d"], ["CDA", "a2"]].map(([rotulo, id]) => ({ rotulo, pessoaId: id, pessoaNome: id })), veiculos: [] };
 let host, root, io, salvos;
 const montar = async (extraTodo = {}) => {
   const { __pid, ...extra } = extraTodo;

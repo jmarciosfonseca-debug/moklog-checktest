@@ -23,20 +23,20 @@ test("escolher o líder puxa quem ele montou, por cargo, sem repetir e sem quem 
   const por = Object.fromEntries(r.postos.map((p) => [p.rotulo, p.pessoaNome]));
   expect(por["CCO"]).toBe("Monica C.");
   expect(por["CDA"]).toBe("Davi D.");
-  expect(por["VSPP Apoio/Ronda"]).toBe("Ana A.");
-  expect(por["VSPP P1"]).toBe(""); // Aline está de férias: não entra
+  expect(por["VSPP Apoio"]).toBe("Ana A.");
+  expect(por["VSPP Ronda"]).toBe(""); // Aline está de férias: não entra
   expect(r.puxados).toBe(3);
   expect(r.semEquipe).toBe(false);
 });
 test("trocar de líder troca a equipe; exceção e nome digitado não são mexidos", () => {
   const m = mapa601();
   const com = puxarEquipe({ postos: m.postos, lider: colabs[0], colabs, pid: "P601", turno: "D" }).postos;
-  const edit = com.map((p) => (p.rotulo === "CDA" ? { ...p, situacao: "falta" } : p.rotulo === "VSPP Apoio/Ronda" ? { ...p, pessoaNome: "Fulano da Base", detalhe: { livre: true } } : p));
+  const edit = com.map((p) => (p.rotulo === "CDA" ? { ...p, situacao: "falta" } : p.rotulo === "VSPP Apoio" ? { ...p, pessoaNome: "Fulano da Base", detalhe: { livre: true } } : p));
   const r = puxarEquipe({ postos: edit, lider: colabs[5], colabs, pid: "P601", turno: "D" });
   const por = Object.fromEntries(r.postos.map((p) => [p.rotulo, p]));
   expect(por["CCO"].pessoaNome).toBe("Carla C.");
   expect(por["CDA"].pessoaNome).toBe("Davi D."); // em falta: preservado
-  expect(por["VSPP Apoio/Ronda"].pessoaNome).toBe("Fulano da Base");
+  expect(por["VSPP Apoio"].pessoaNome).toBe("Fulano da Base");
 });
 test("líder sem equipe montada: não mexe ao abrir; ao trocar manualmente limpa a equipe do líder anterior", () => {
   const m = mapa601();
@@ -89,4 +89,22 @@ test("soVazios (rascunho reaberto): só preenche posto vazio e não repete quem 
   const por = Object.fromEntries(r.postos.map((p) => [p.rotulo, p.pessoaNome]));
   expect(por["CCO"]).toBe("Escolha manual");
   expect(por["CDA"]).toBe("Davi");
+});
+
+// ── o mapa tem que bater com o dimensionamento do Marcio (escopo.js) ─────────────────────────────
+import { ESCOPO, totaisDoProjeto } from "./escopo";
+import { postosDoProjeto as postosDe } from "./postos";
+describe("postos × dimensionamento", () => {
+  test.each(Object.keys(ESCOPO))("%s: nº de postos de dia = postos do escopo; de noite = postos 24h", (pid) => {
+    const dia = postosDe(pid, "D", "2026-10-07"); // quarta: inclui os postos só de dias úteis
+    const noite = postosDe(pid, "N", "2026-10-07");
+    expect(dia.length).toBe(ESCOPO[pid].length);
+    expect(noite.length).toBe(ESCOPO[pid].filter(([, horas]) => horas === 24).length);
+  });
+  test("totais do documento (com P260A corrigido: 45 postos); 79 diurnos, 61 noturnos, 7 folguistas (147)", () => {
+    const t = Object.keys(ESCOPO).reduce((a, pid) => { const x = totaisDoProjeto(pid); return { postos: a.postos + x.postos, diurnos: a.diurnos + x.diurnos, noturnos: a.noturnos + x.noturnos, folguistas: a.folguistas + x.folguistas }; }, { postos: 0, diurnos: 0, noturnos: 0, folguistas: 0 });
+    expect(t).toEqual({ postos: 45, diurnos: 79, noturnos: 61, folguistas: 7 });
+    expect(totaisDoProjeto("P601")).toEqual({ postos: 5, diurnos: 10, noturnos: 6, folguistas: 0 });
+    expect(totaisDoProjeto("P260A")).toEqual({ postos: 4, diurnos: 4, noturnos: 2, folguistas: 2 });
+  });
 });
