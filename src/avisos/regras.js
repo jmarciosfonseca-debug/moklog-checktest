@@ -1,9 +1,10 @@
 // Painel de Avisos — motor puro. Cada aviso é CALCULADO do estado atual das fontes: se o problema deixa de existir,
 // o aviso some sozinho (nada é gravado, nada fica "esquecido"). Fonte não lida (undefined) não gera aviso nem "tudo certo".
 import { AVISOS_CFG, CATEGORIAS, SEVERIDADES } from "./config";
-import { turnoVigente } from "../mapaDiario/painel";
+import { turnoVigente, dataBrasilia } from "../mapaDiario/painel";
+import { tqAlvoVigente, tqAlvoTimestamp } from "../iluminacaoTeste";
 import { horarioDoTurno } from "../mapaDiario/horarios";
-import { chaveMapa, inicioDoTurno, somarDias, estadoDoMapa } from "../mapaDiario/regras";
+import { chaveMapa, inicioDoTurno, somarDias, estadoDoMapa, diasEntre } from "../mapaDiario/regras";
 
 const MIN = 60000, HORA = 3600000, DIA = 86400000;
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -28,15 +29,18 @@ const instante = (dataISO, hhmm = "12:00") => {
 };
 const iso = (v) => { if (!v) return null; const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; };
 
-// Plantão em vigor e o anterior (12 h antes) de um projeto. Sem horário cadastrado = [].
-export function plantoesDoAviso(projetoId, agora) {
+// Plantão em vigor e os anteriores (de 12 em 12 h, até `n`). Sem horário cadastrado = [].
+export function plantoesDoAviso(projetoId, agora, n = AVISOS_CFG.plantoes) {
   const v = turnoVigente(projetoId, agora);
   if (!v) return [];
   const lista = [{ slot: "atual", data: v.data, turno: v.turno, inicio: v.inicio, chave: chaveMapa(projetoId, v.data, v.turno) }];
-  const tAnt = v.turno === "D" ? "N" : "D";
-  const dAnt = v.turno === "D" ? somarDias(v.data, -1) : v.data;
-  const h = horarioDoTurno(projetoId, tAnt);
-  if (h) lista.push({ slot: "anterior", data: dAnt, turno: tAnt, inicio: inicioDoTurno(dAnt, h.inicio), chave: chaveMapa(projetoId, dAnt, tAnt) });
+  let { data, turno } = v;
+  while (lista.length < n) {
+    if (turno === "D") { turno = "N"; data = somarDias(data, -1); } else turno = "D";
+    const h = horarioDoTurno(projetoId, turno);
+    if (!h) break;
+    lista.push({ slot: "anterior", data, turno, inicio: inicioDoTurno(data, h.inicio), chave: chaveMapa(projetoId, data, turno) });
+  }
   return lista;
 }
 
@@ -68,6 +72,14 @@ function avisosDoMapa(pid, p, mapa) {
   }
   for (const x of postos) {
     if (x.situacao === "vago") out.push(A({ id: `vago:${base}:${norm(x.rotulo)}`, tipo: "vago", sev: "critico", projetoId: pid, titulo: `Posto sem ninguém: ${x.rotulo || "posto"}`, detalhe: quando, desde: p.inicio }));
+    else if (x.situacao === "troca" || x.situacao === "cobertura") {
+      const d = x.detalhe || {};
+      const quem = x.situacao === "troca" ? d.noLugarDe : d.deQuem;
+      out.push(A({ id: `${x.situacao}:${base}:${norm(nome(x) || x.rotulo)}`, tipo: x.situacao, sev: "info", projetoId: pid, titulo: `${x.situacao === "troca" ? "Troca" : d.base ? "Cobertura (Base)" : "Cobertura"}: ${nome(x) || "colaborador"}`, detalhe: [quem ? (x.situacao === "troca" ? `no lugar de ${quem}` : `cobrindo ${quem}`) : "", x.rotulo, quando].filter(Boolean).join(" · "), desde: p.inicio }));
+    } else if (x.situacao === "ft") {
+      const d = x.detalhe || {};
+      if (!String(d.quemFaltou || "").trim() || d.semFalta) out.push(A({ id: `ft:${base}:${norm(nome(x) || x.rotulo)}`, tipo: "ft", sev: "info", projetoId: pid, titulo: `FT: ${nome(x) || "colaborador"}`, detalhe: ["folga trabalhada", x.rotulo, quando].filter(Boolean).join(" · "), desde: p.inicio }));
+    }
     else if (x.situacao === "atraso") {
       const d = x.detalhe || {};
       out.push(A({ id: `atraso:${base}:${norm(nome(x) || x.rotulo)}`, tipo: "atraso", sev: "info", projetoId: pid, titulo: `Atraso de ${nome(x) || "colaborador"}`, detalhe: [x.rotulo, quando, d.minutos ? `${d.minutos} min` : ""].filter(Boolean).join(" · "), desde: p.inicio }));
@@ -100,7 +112,7 @@ function avisosMapas({ agora, mapas, cfg }) {
 }
 
 // ── Fontes de campo ──
-const avisosKeyAccess = ({ agora, keyaccess, cfg }) => Object.entries(keyaccess || {}).flatMap(([pid, regs]) => (regs || []).filter((r) => r && !r.horaFim).map((r) => {
+const avisosKeyAccess = ({ agora, keyaccess, cfg }) => !cfg.keyAccess.ativo ? [] : Object.entries(keyaccess || {}).flatMap(([pid, regs]) => (regs || []).filter((r) => r && !r.horaFim).map((r) => {
   const desde = instante(r.data, r.horaInicio || r.hora);
   const horas = desde ? (agora - desde) / HORA : 0;
   const tipos = Array.isArray(r.tipos) && r.tipos.length ? r.tipos.join(", ") : "";
@@ -156,10 +168,47 @@ const avisosSupervisao = ({ agora, supervisao, cfg }) => Object.entries(supervis
   return A({ id: `supervisao:${pid}`, tipo: "supervisao", sev: dias >= cfg.supervisao.criticoDias ? "critico" : "atencao", projetoId: pid, titulo: `Sem visita da supervisão há ${dias} dias`, detalhe: `Última visita em ${dataBR(ult)}`, desde });
 }).filter(Boolean);
 
-const avisosIluminacao = ({ iluminacao }) => Object.entries(iluminacao || {}).map(([pid, quads]) => {
-  const def = (quads || []).reduce((a, q) => a + (Number(q && q.deficientes) || 0), 0);
-  return def > 0 ? A({ id: `iluminacao:${pid}`, tipo: "iluminacao", sev: "atencao", projetoId: pid, titulo: `${def} ${def === 1 ? "ponto de iluminação deficiente" : "pontos de iluminação deficientes"}` }) : null;
-}).filter(Boolean);
+// iluminacao[pid]: { quadrantes, testeQuinzenal } (ou só a lista de quadrantes). Deficientes + teste quinzenal (domingos 21h, regra em iluminacaoTeste.js).
+const avisosIluminacao = ({ agora, iluminacao, cfg }) => Object.entries(iluminacao || {}).flatMap(([pid, v]) => {
+  const completo = v && !Array.isArray(v);
+  const quads = (Array.isArray(v) ? v : completo ? v.quadrantes : []) || [];
+  const out = [];
+  const def = quads.reduce((a, q) => a + (Number(q && q.deficientes) || 0), 0);
+  if (def > 0) out.push(A({ id: `iluminacao:${pid}`, tipo: "iluminacao", sev: "atencao", projetoId: pid, titulo: `${def} ${def === 1 ? "ponto de iluminação deficiente" : "pontos de iluminação deficientes"}` }));
+  if (completo && quads.length) {
+    const alvo = tqAlvoVigente(v.testeQuinzenal, agora);
+    const limite = new Date(tqAlvoTimestamp(alvo));
+    if (agora >= limite) {
+      const dias = Math.floor((agora - limite) / DIA);
+      out.push(A({ id: `iluminacao-teste:${pid}:${alvo}`, tipo: "iluminacao", sev: dias >= cfg.iluminacaoTeste.criticoDias ? "critico" : "atencao", projetoId: pid, titulo: "Teste quinzenal de iluminação pendente", detalhe: `Previsto para domingo ${dataBR(alvo)} às 21h`, desde: limite }));
+    } else if (alvo === dataBrasilia(agora)) {
+      out.push(A({ id: `iluminacao-teste:${pid}:${alvo}`, tipo: "iluminacao", sev: "info", projetoId: pid, titulo: "Teste de iluminação hoje às 21h", detalhe: "Teste quinzenal (domingo)", desde: null }));
+    }
+  }
+  return out;
+});
+
+// equipes[pid]: { ferias:[{colabId,dataInicio,dataRetorno,cobertura}], nomes:{colabId: nome} } — só colaboradores ativos têm nome.
+const quando = (d) => (d === 0 ? "hoje" : d === 1 ? "amanhã" : `em ${d} dias`);
+const avisosFerias = ({ agora, equipes, cfg }) => {
+  const hoje = dataBrasilia(agora);
+  const out = [];
+  for (const [pid, e] of Object.entries(equipes || {})) {
+    const nomes = (e && e.nomes) || {};
+    for (const f of (e && e.ferias) || []) {
+      if (!f || !f.colabId || !nomes[f.colabId]) continue;
+      const nome = nomes[f.colabId];
+      const ini = f.dataInicio ? diasEntre(hoje, f.dataInicio) : null;
+      const ret = f.dataRetorno ? diasEntre(hoje, f.dataRetorno) : null;
+      if (ini !== null && ini >= 0 && ini <= cfg.ferias.saidaDias) {
+        out.push(A({ id: `ferias-saida:${pid}:${f.colabId}:${f.dataInicio}`, tipo: "ferias", sev: ini <= 1 ? "atencao" : "info", projetoId: pid, titulo: `${nome} sai de férias ${quando(ini)}`, detalhe: [f.dataRetorno ? `Retorno previsto ${dataBR(f.dataRetorno)}` : "", f.cobertura ? `cobertura: ${f.cobertura}` : ""].filter(Boolean).join(" · "), desde: null }));
+      } else if (ret !== null && ret >= 0 && ret <= cfg.ferias.retornoDias && (ini === null || ini <= 0)) {
+        out.push(A({ id: `ferias-retorno:${pid}:${f.colabId}:${f.dataRetorno}`, tipo: "ferias", sev: "info", projetoId: pid, titulo: `${nome} volta de férias ${quando(ret)}`, detalhe: f.dataInicio ? `Férias desde ${dataBR(f.dataInicio)}` : "", desde: null }));
+      }
+    }
+  }
+  return out;
+};
 
 const avisosBolsao = ({ bolsao }) => Object.entries(bolsao || {}).map(([pid, placas]) => {
   const n = Object.values(placas || {}).filter((x) => x && x.status === "critico").length;
@@ -172,7 +221,7 @@ export function calcularAvisos({ agora = new Date(), fontes = {}, gerencial = fa
   const todos = [
     ...avisosMapas({ agora, cfg, mapas: fontes.mapas }),
     ...avisosKeyAccess(ctx), ...avisosCtmk(ctx), ...avisosEnergia(ctx), ...avisosManutencao(ctx), ...avisosInop(ctx),
-    ...avisosRelatorio(ctx), ...avisosSupervisao(ctx), ...avisosIluminacao(ctx), ...avisosBolsao(ctx),
+    ...avisosRelatorio(ctx), ...avisosSupervisao(ctx), ...avisosIluminacao(ctx), ...avisosBolsao(ctx), ...avisosFerias(ctx),
   ].filter((a) => gerencial || !a.gerencial);
   const ordem = (a) => (CATEGORIAS[a.tipo] || {}).ordem ?? 9;
   todos.sort((a, b) => SEVERIDADES[a.sev] - SEVERIDADES[b.sev] || ordem(a) - ordem(b) || ((a.desde ? a.desde.getTime() : Infinity) - (b.desde ? b.desde.getTime() : Infinity)) || a.projetoId.localeCompare(b.projetoId) || a.id.localeCompare(b.id));

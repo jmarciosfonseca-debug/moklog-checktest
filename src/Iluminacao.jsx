@@ -26,6 +26,7 @@ import { setDoc } from "./fireGuard";
 import { montarRelatorioIluminacao, carregarMapa } from "./relatorios/iluminacaoRelatorio";
 import { abrirParaImpressao } from "./relatorios/padraoMoked";
 import { getAccess, grantSession } from "./session";
+import { TQ_ANCORA, TQ_HORA, tqParseISO, tqISO, tqAjustaDomingo, tqProximoAPartirDe, tqAlvoVigente, tqAlvoTimestamp } from "./iluminacaoTeste";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -64,37 +65,10 @@ function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.
 // vigente (fica "pendente") até a equipe concluir o teste. Só então crava +14d.
 // Trava de domingo: se a data calculada não cair no domingo, ajusta para o
 // domingo à frente. Hora do teste: 21h (turno noturno).
-export const TQ_ANCORA = "2026-08-09";
-export const TQ_HORA = 21;
+export { TQ_ANCORA, TQ_HORA, tqProximoAPartirDe, tqAlvoVigente, tqAlvoTimestamp };
 function tqFmtDate(d){ if(!d) return "—"; try{ return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); }catch{ return d; } }
 function tqTodayStr(){ return new Date().toLocaleDateString("sv-SE"); }
-function tqParseISO(iso){ return new Date(iso+"T12:00:00"); }
-function tqISO(d){ return d.toLocaleDateString("sv-SE"); }
-function tqAjustaDomingo(d){ const diff=(7-d.getDay())%7; if(diff!==0){ const nd=new Date(d); nd.setDate(nd.getDate()+diff); return nd; } return d; }
-export function tqProximoAPartirDe(baseISO){ const b=tqParseISO(baseISO); b.setDate(b.getDate()+14); return tqISO(tqAjustaDomingo(b)); }
-// Alvo vigente quando ainda não há registro: o primeiro domingo do ciclo (âncora
-// ou seguinte) que ainda não passou do horário de teste. NÃO pula ciclos sozinho.
-export function tqAlvoVigente(tq){
-  if(tq && tq.alvo) return tq.alvo;
-  // sem registro: parte da âncora e avança de 14 em 14 só até alcançar "hoje",
-  // mas para no primeiro alvo cujo horário-limite (21h) ainda não passou.
-  let alvo = tqParseISO(TQ_ANCORA);
-  const agora = new Date();
-  while(true){
-    const limite = new Date(alvo); limite.setHours(TQ_HORA,0,0,0);
-    if(agora < limite) break;                 // ainda não chegou no teste deste ciclo
-    const prox = new Date(alvo); prox.setDate(prox.getDate()+14);
-    // se o próximo ciclo ainda é futuro mas este já passou, este vira "pendente":
-    const proxLimite = new Date(prox); proxLimite.setHours(TQ_HORA,0,0,0);
-    if(agora < proxLimite){ /* mantém alvo atual como pendente */ break; }
-    alvo = prox;
-  }
-  return tqISO(tqAjustaDomingo(alvo));
-}
-// Alvo como timestamp no horário do teste (21h de domingo).
-export function tqAlvoTimestamp(alvoISO){ const d=tqParseISO(alvoISO); d.setHours(TQ_HORA,0,0,0); return d.getTime(); }
 function tqDiasRestantes(alvoISO){ const alvo=tqParseISO(alvoISO); alvo.setHours(TQ_HORA,0,0,0); const agora=Date.now(); return Math.max(0, Math.round((alvo.getTime()-agora)/86400000)); }
-
 // ── Números de um quadrante (deficientes null = ainda não informado)
 export function calcQuad(q){
   const total = Number(q?.total)||0;
