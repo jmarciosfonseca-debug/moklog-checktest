@@ -17,16 +17,43 @@ const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 const nomeDe = (p) => String(p?.pessoaNome || "").trim();
 const hh = (h) => (h ? String(h).replace(":", "h") : "");
 
+// Líder do mapa: o posto marcado como líder; mapas antigos sem a marca caem no primeiro posto com "Líder" no nome.
 export const liderDoMapa = (mapa) => {
   const ps = mapa.postos || [];
-  const p = ps.find((x) => x.lider && nomeDe(x)) || null;
+  const p = ps.find((x) => x.lider && nomeDe(x)) || ps.find((x) => /l[ií]der/i.test(x.rotulo || "") && nomeDe(x)) || null;
   return p ? nomeDe(p) : "";
 };
 
 const ordemTurno = (t) => (t === "D" ? 0 : 1);
 const porData = (a, b) => String(a.data).localeCompare(String(b.data)) || String(a.projetoId).localeCompare(String(b.projetoId)) || ordemTurno(a.turno) - ordemTurno(b.turno);
 
+// Texto de detalhe (e pessoas envolvidas) de um posto que saiu do normal.
+export function detalheDoPosto(p, postos = []) {
+  const d = p.detalhe || {};
+  let detalhe = "";
+  const envolvidos = [nomeDe(p)];
+  if (p.situacao === "falta") {
+    const ft = postos.find((x) => x.id && x.id === d.porFtDe);
+    if (ft && nomeDe(ft)) { detalhe = `coberta por FT de ${nomeDe(ft)}`; envolvidos.push(nomeDe(ft)); }
+  } else if (p.situacao === "ft") {
+    if (d.quemFaltou) { detalhe = `cobrindo a falta de ${d.quemFaltou}`; envolvidos.push(d.quemFaltou); }
+    else if (d.semFalta) detalhe = "sem falta (folga trabalhada)";
+  } else if (p.situacao === "cobertura") {
+    detalhe = `${d.base ? "Base, " : ""}cobrindo ${d.deQuem || "—"}`; envolvidos.push(d.deQuem);
+  } else if (p.situacao === "troca") {
+    detalhe = `no lugar de ${d.noLugarDe || "—"}`; envolvidos.push(d.noLugarDe);
+  } else if (p.situacao === "atraso") {
+    detalhe = [d.hora ? `chegou às ${hh(d.hora)}` : "", d.minutos ? `${d.minutos} min` : ""].filter(Boolean).join(" · ");
+  } else if (p.situacao === "vago") {
+    detalhe = "posto sem ninguém";
+  }
+  if ((p.obs || "").trim()) detalhe = detalhe ? `${detalhe} — ${p.obs.trim()}` : p.obs.trim();
+  return { detalhe, envolvidos: envolvidos.filter(Boolean) };
+}
+
 // Uma linha por posto que saiu do normal, já com o texto do detalhe.
+// FT que cobre uma falta sempre mostra a falta: se o mapa não tem o posto da pessoa que faltou marcado como falta
+// (mapa antigo, ou a FT entrou direto no posto), a falta sai derivada da própria FT (mesma regra que lança na ficha).
 export function ocorrenciasDoMapa(mapa) {
   const postos = mapa.postos || [];
   const lider = liderDoMapa(mapa);
@@ -34,28 +61,24 @@ export function ocorrenciasDoMapa(mapa) {
   const linhas = [];
   for (const p of postos) {
     if (!p.situacao || p.situacao === "presente" || !TIPOS_LINHA.includes(p.situacao)) continue;
-    const d = p.detalhe || {};
-    let detalhe = "";
-    const envolvidos = [nomeDe(p)];
-    if (p.situacao === "falta") {
-      const ft = postos.find((x) => x.id && x.id === d.porFtDe);
-      if (ft && nomeDe(ft)) { detalhe = `coberta por FT de ${nomeDe(ft)}`; envolvidos.push(nomeDe(ft)); }
-    } else if (p.situacao === "ft") {
-      if (d.quemFaltou) { detalhe = `cobrindo a falta de ${d.quemFaltou}`; envolvidos.push(d.quemFaltou); }
-      else if (d.semFalta) detalhe = "sem falta (folga trabalhada)";
-    } else if (p.situacao === "cobertura") {
-      detalhe = `${d.base ? "Base, " : ""}cobrindo ${d.deQuem || "—"}`; envolvidos.push(d.deQuem);
-    } else if (p.situacao === "troca") {
-      detalhe = `no lugar de ${d.noLugarDe || "—"}`; envolvidos.push(d.noLugarDe);
-    } else if (p.situacao === "atraso") {
-      detalhe = [d.hora ? `chegou às ${hh(d.hora)}` : "", d.minutos ? `${d.minutos} min` : ""].filter(Boolean).join(" · ");
-    } else if (p.situacao === "vago") {
-      detalhe = "posto sem ninguém";
-    }
-    if ((p.obs || "").trim()) detalhe = detalhe ? `${detalhe} — ${p.obs.trim()}` : p.obs.trim();
-    linhas.push({ ...ctx, tipo: p.situacao, posto: p.rotulo || "", pessoa: nomeDe(p), detalhe, envolvidos: envolvidos.filter(Boolean) });
+    const { detalhe, envolvidos } = detalheDoPosto(p, postos);
+    linhas.push({ ...ctx, tipo: p.situacao, posto: p.rotulo || "", pessoa: nomeDe(p), pessoaId: p.pessoaId || "", detalhe, envolvidos });
   }
-  return linhas;
+  for (const p of postos) {
+    if (p.situacao !== "ft") continue;
+    const d = p.detalhe || {};
+    const quem = String(d.quemFaltou || "").trim();
+    if (d.semFalta || !quem) continue;
+    const jaTem = postos.some((x) => x.situacao === "falta" && (
+      (d.faltaPostoId && x.id === d.faltaPostoId) || (x.detalhe && x.detalhe.porFtDe === p.id)
+      || (d.quemFaltouId && x.pessoaId === d.quemFaltouId) || norm(nomeDe(x)) === norm(quem)));
+    if (jaTem) continue;
+    const obs = (p.obs || "").trim();
+    const base = `coberta por FT de ${nomeDe(p)}`;
+    linhas.push({ ...ctx, tipo: "falta", posto: /^posto extra$/i.test((p.rotulo || "").trim()) ? "—" : (p.rotulo || "—"), pessoa: quem, pessoaId: d.quemFaltouId || "", detalhe: obs ? `${base} — ${obs}` : base, envolvidos: [quem, nomeDe(p)].filter(Boolean), derivada: true });
+  }
+  const rank = { falta: 0, ft: 1 }; // falta antes da FT que a cobre; o resto mantém a ordem dos postos
+  return linhas.map((l, i) => ({ l, i })).sort((a, b) => (rank[a.l.tipo] ?? 2) - (rank[b.l.tipo] ?? 2) || a.i - b.i).map((x) => x.l);
 }
 
 export function descreverFiltros(f = {}, nomeProj = (p) => p) {

@@ -36,7 +36,7 @@ test("validarPeriodo", () => {
 test("fluxo: busca o período, filtra por falta/FT e baixa o PDF com o filtro aplicado", async () => {
   const ler = jest.fn(async () => MAPAS);
   const abrir = jest.fn(() => "aba");
-  await montar({ ler, abrir });
+  await montar({ ler, abrir, lerFotos: jest.fn(async () => ({ porId: {}, porNome: {} })) });
   expect(host.textContent).not.toContain("Buscar mapas do período"); // fechado
   await clicarTexto("Consolidado em PDF");
   await clicarTexto("Buscar mapas do período");
@@ -91,4 +91,32 @@ test("popup bloqueado: avisa que baixou o HTML", async () => {
   await clicarTexto("Buscar mapas do período");
   await clicarTexto("Baixar consolidado");
   expect(host.querySelector('[role="status"]').textContent).toContain("baixado como HTML");
+});
+
+const FOTO = "data:image/jpeg;base64,AAAA";
+test("fotos: busca a foto de cada projeto do consolidado, usa uma vez no PDF e avisa se alguma falhar", async () => {
+  const lerFotos = jest.fn(async (pid) => { if (pid === "P601") throw new Error("sem acesso"); return { porId: {}, porNome: { "elaine": FOTO, "rosemeire": FOTO } }; });
+  const abrir = jest.fn(() => "aba");
+  const MAPAS2 = [{ ...MAPAS[0], postos: [posto("l", "Líder", "Marcos", "presente", {}, { lider: true }), posto("c", "CCO", "Elaine", "falta", { porFtDe: "f" }), posto("f", "Posto extra", "Rosemeire", "ft", { quemFaltou: "Elaine" })] }, MAPAS[1]];
+  await montar({ ler: jest.fn(async () => MAPAS2), abrir, lerFotos });
+  await clicarTexto("Consolidado em PDF");
+  await clicarTexto("Buscar mapas do período");
+  await clicarTexto("Baixar consolidado");
+  expect(lerFotos.mock.calls.map((c) => c[0]).sort()).toEqual(["P601", "P606"]);
+  const html = abrir.mock.calls[0][0];
+  expect(html.split(FOTO).length - 1).toBe(1); // a mesma foto não se repete
+  expect(html).toContain("mk-f0");
+  expect(host.querySelector('[role="status"]').textContent).toContain("Algumas fotos não carregaram");
+});
+test("sem a opção de fotos, não lê foto nenhuma e o PDF sai sem avatares", async () => {
+  const lerFotos = jest.fn(async () => ({ porId: {}, porNome: {} }));
+  const abrir = jest.fn(() => "aba");
+  await montar({ ler: jest.fn(async () => MAPAS), abrir, lerFotos });
+  await clicarTexto("Consolidado em PDF");
+  await clicarTexto("Buscar mapas do período");
+  const cb = [...host.querySelectorAll('input[type="checkbox"]')].find((c) => c.parentElement.textContent.includes("fotos dos colaboradores"));
+  await act(async () => cb.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await clicarTexto("Baixar consolidado");
+  expect(lerFotos).not.toHaveBeenCalled();
+  expect(abrir.mock.calls[0][0]).not.toContain("mk-av");
 });

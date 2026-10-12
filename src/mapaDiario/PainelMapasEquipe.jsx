@@ -8,6 +8,7 @@ import { chaveMapa } from "./regras";
 import { loadEnviosDoTurno } from "./dados";
 import { MAPA_DIARIO_ATIVO } from "./ativo";
 import ConsolidadoMapas from "./ConsolidadoMapas";
+import VerMapasProjeto from "./VerMapasProjeto";
 
 const COR = { enviado: "#16a34a", aguardando: "#64748b", cobranca: "#f59e0b", pendente: "#dc2626", "sem-horario": "#64748b" };
 const ROTULO = { enviado: "Enviado", aguardando: "Aguardando", cobranca: "Enviar agora", pendente: "Pendente", "sem-horario": "Sem horário" };
@@ -16,6 +17,7 @@ const hhmm = (d) => d ? new Date(d.getTime() - 3 * 3600000).toISOString().slice(
 export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p) => p, aberto, onToggle, emImplantacao = false, extra = null }) {
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#64748b" : "#94a3b8";
+  const [ver, setVer] = useState(null); // projeto aberto na cascata do "Ver"
   const brilha = !emImplantacao && !!resumo?.brilha && !erro;
   const cor = erro || emImplantacao ? "#64748b" : brilha ? (resumo.pendentes.length ? "#dc2626" : "#f59e0b") : "#16a34a";
   return (
@@ -37,14 +39,23 @@ export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p)
       </div>
       {aberto && resumo && !erro && !emImplantacao && (
         <div style={{ marginTop: 10 }}>
-          {resumo.itens.map((i) => (
-            <div key={i.projetoId} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", borderTop: `1px solid ${dark ? "#0f172a" : "#eef2f7"}` }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: COR[i.estado], flexShrink: 0, animation: i.brilha ? "mkMapaBrilho 1.4s ease-in-out infinite" : "none" }} />
-              <div style={{ flex: 1, fontSize: 12.5, color: txt, fontWeight: 700 }}>{nomeProj(i.projetoId)}</div>
-              <span style={{ fontSize: 11, color: txt2 }}>{i.turno === "N" ? "Noturno" : i.turno === "D" ? "Diurno" : ""}</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: COR[i.estado] }}>{ROTULO[i.estado]}{i.enviadoEm ? ` ${hhmm(i.enviadoEm)}` : ""}</span>
-            </div>
-          ))}
+          {resumo.itens.map((i) => {
+            const podeVer = !!i.data && (i.turno === "D" || i.turno === "N");
+            const aberta = ver === i.projetoId;
+            return (
+              <div key={i.projetoId} style={{ borderTop: `1px solid ${dark ? "#0f172a" : "#eef2f7"}` }}>
+                <div onClick={podeVer ? () => setVer(aberta ? null : i.projetoId) : undefined} role={podeVer ? "button" : undefined} aria-expanded={podeVer ? aberta : undefined}
+                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", cursor: podeVer ? "pointer" : "default" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: COR[i.estado], flexShrink: 0, animation: i.brilha ? "mkMapaBrilho 1.4s ease-in-out infinite" : "none" }} />
+                  <div style={{ flex: 1, fontSize: 12.5, color: txt, fontWeight: 700 }}>{nomeProj(i.projetoId)}</div>
+                  <span style={{ fontSize: 11, color: txt2 }}>{i.turno === "N" ? "Noturno" : i.turno === "D" ? "Diurno" : ""}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: COR[i.estado] }}>{ROTULO[i.estado]}{i.enviadoEm ? ` ${hhmm(i.enviadoEm)}` : ""}</span>
+                  {podeVer && <span style={{ fontSize: 11, fontWeight: 800, color: "#a78bfa", border: "1px solid #7c3aed66", borderRadius: 6, padding: "1px 7px" }}>Ver {aberta ? "⌄" : "›"}</span>}
+                </div>
+                {aberta && podeVer && <VerMapasProjeto projetoId={i.projetoId} data={i.data} turno={i.turno} dark={dark} />}
+              </div>
+            );
+          })}
         </div>
       )}
       {aberto && !emImplantacao && extra}
