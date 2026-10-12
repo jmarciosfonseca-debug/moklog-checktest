@@ -343,3 +343,11 @@ test("12x36: 'É da equipe' dispensa o aviso", async () => {
   await clicar(botao("É da equipe"));
   expect(host.textContent).not.toContain("não é da equipe de Luiz D.");
 });
+test("mapa enviado que perdeu um posto fixo: 'Editar mapa' devolve o posto vazio", async () => {
+  const gravado = { id: "P311B_2026-10-11_D", projetoId: "P311B", data: "2026-10-11", turno: "D", status: "enviado", enviadoEm: AGORA.toISOString(), veiculos: [{ id: "moto", rotulo: "Moto", kmAnterior: 1, kmAtual: 5 }], material: { semAlteracao: true, obs: "", excecoes: [] }, resumo: "ok", visita: { houve: false },
+    postos: [{ id: "x1", rotulo: "P1 · Vigilante CCO", pessoaId: "b", pessoaNome: "Marta A.", situacao: "presente", detalhe: {}, obs: "" }, { id: "x2", rotulo: "P2 · Vigilante Honda", pessoaId: "c", pessoaNome: "Ari A.", situacao: "presente", detalhe: {}, obs: "" }] }; // sem o líder
+  await montar({ loadMapa: jest.fn(async () => gravado), __semObrig: true });
+  expect(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]')).toBeNull();
+  await clicar(botao("Editar mapa"));
+  expect(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]')).toBeTruthy();
+});

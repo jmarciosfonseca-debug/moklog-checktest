@@ -1,4 +1,4 @@
-import { ehMoto, garantirMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
+import { ehMoto, garantirMoto, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 import { postoVazio as postoVazioT } from "./modelo";
@@ -348,4 +348,13 @@ test("WhatsApp traz 'Neste turno' com a visita informada", () => {
   const m = completo(preencher(mapa(), ["A", "B", "C"]));
   expect(montarTextoWhatsApp({ ...m, visita: { houve: true, supervisor: "Marcio" } })).toContain("Neste turno: visita de Marcio");
   expect(montarTextoWhatsApp({ ...m, visita: { houve: false, supervisor: "" } })).toContain("Neste turno: sem visita");
+});
+test("completarPostosFixos: devolve o posto fixo que foi tirado, na ordem, e mantém os extras", () => {
+  const m = novoMapa({ projetoId: "P601", data: "2026-10-11", turno: "N", horario: { inicio: "18:00", fim: "06:00" } });
+  expect(m.postos.map((p) => p.rotulo)).toEqual(["Líder", "CCO", "CDA"]);
+  const sem = { ...m, postos: [{ ...m.postos[1], pessoaNome: "Sueli" }, m.postos[2], postoVazioT("Posto extra")] }; // Líder removido
+  const ok = completarPostosFixos(sem);
+  expect(ok.postos.map((p) => p.rotulo)).toEqual(["Líder", "CCO", "CDA", "Posto extra"]);
+  expect(ok.postos[1].pessoaNome).toBe("Sueli");
+  expect(completarPostosFixos(m)).toBe(m); // nada a devolver: mesmo objeto
 });

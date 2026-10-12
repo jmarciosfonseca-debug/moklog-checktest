@@ -68,6 +68,24 @@ export function novoMapa({ projetoId, data, turno, horario, base = null, agora =
   });
 }
 
+// Mapa já gravado (ou enviado) que perdeu um posto fixo — ex.: tirado com o antigo "×": devolve o posto vazio, na ordem do escopo.
+// Os postos extras continuam como estão, depois dos fixos.
+export function completarPostosFixos(mapa) {
+  const pid = mapa.projetoId, turno = mapa.turno;
+  const defs = postosPadrao(pid, turno, mapa.data);
+  const postos = mapa.postos || [];
+  const usados = new Set();
+  const fixos = defs.map((d) => {
+    const ex = postos.find((p) => !usados.has(p.id) && (defDoPosto(pid, turno, p.rotulo) || {}).rotulo === d.rotulo);
+    if (ex) { usados.add(ex.id); return ex; }
+    return postoVazio(d.rotulo, d.horario, { lider: d.lider, cargos: d.cargos });
+  });
+  const extras = postos.filter((p) => !usados.has(p.id));
+  const novos = [...fixos, ...extras];
+  const igual = novos.length === postos.length && novos.every((p, i) => p === postos[i]);
+  return igual ? mapa : { ...mapa, postos: novos };
+}
+
 // ── Material / armamento / munição ────────────────────────────────────────────
 // semAlteracao: o líder conferiu tudo visualmente e está disponível. Qualquer exceção (anomalia ou
 // item indisponível) tira o "sem alteração" e exige observação do que houve.
