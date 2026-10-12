@@ -1,6 +1,6 @@
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
 import { getDocsSeguro } from "./lerServidor";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
@@ -154,6 +154,7 @@ class ErrorBoundary extends React.Component {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import PainelMapasEquipe from "./mapaDiario/PainelMapasEquipe";
+import PainelAvisos from "./avisos/PainelAvisos";
 import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
@@ -3585,6 +3586,13 @@ export default function App(){
 
   // ── Monitor de falhas KeyAccess ainda abertas (sem horaFim) — alimenta o banner da Home
   const [keyAccessOpenCount, setKeyAccessOpenCount] = useState(0);
+  // ── Painel de Avisos: insumos do checklist (equipamento inoperante, relatório semanal atrasado) calculados do `stored` em tempo real
+  const avisosPendencias = useMemo(()=>getAllPendencies(stored).map(p=>({projetoId:p.project.id,cat:p.cat,item:p.item,status:p.status,days:p.days})),[stored]);
+  const avisosUltimoRelatorio = useMemo(()=>{
+    const o={};
+    Object.keys(PROJECTS).forEach(pid=>{ const datas=(stored[pid]?.history??[]).map(r=>r?.meta?.date).filter(Boolean).sort(); o[pid]=datas.length?datas[datas.length-1]:null; });
+    return o;
+  },[stored]);
   useEffect(()=>{
     if(!loaded) return;
     const ids=Object.keys(PROJECTS);
@@ -4622,27 +4630,10 @@ export default function App(){
             <span style={{color:keyAccessOpenCount>0?"#ef4444":"#94a3b8",fontSize:18,flexShrink:0}}>›</span>
           </button>
 
-          {(()=>{
-            const allP=Object.values(PROJECTS);
-            const valid=allP.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.slice(-1)[0];return last?computeHealth(p,last.state):null;}).filter(Boolean);
-            if(!valid.length) return null;
-            const avg=Math.round(valid.reduce((a,h)=>a+h.pct,0)/valid.length);
-            const totalInop=valid.reduce((a,h)=>a+h.inop,0);
-            return(
-              <div style={{marginTop:10,background:T.saudeBg,border:"1px solid #22c55e2e",borderRadius:14,padding:"12px 14px",boxShadow:T.saudeShadow}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{fontSize:11,color:T.saudeLabel,fontWeight:700}}>Saúde Geral da Operação</div>
-                  <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}><Ico n="pontoVermelho"/> {totalInop} inop</span>}
-                    <span style={{fontSize:17,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444",textShadow:`0 0 12px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}55`}}>{avg}%</span>
-                  </div>
-                </div>
-                <div style={{height:6,background:T.track,borderRadius:4,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${avg}%`,background:`linear-gradient(90deg,${avg>=90?"#16a34a,#22c55e":avg>=70?"#d97706,#f59e0b":"#dc2626,#ef4444"})`,borderRadius:4,boxShadow:`0 0 12px ${avg>=90?"#22c55e":"#f59e0b"}66`}}/>
-                </div>
-              </div>
-            );
-          })()}
+          <PainelAvisos dark={dark} gerencial={hasGerencial()} projetos={Object.keys(PROJECTS)} ctmkData={ctmkData}
+            pendencias={avisosPendencias} ultimoRelatorio={avisosUltimoRelatorio}
+            nomeProj={(pid)=>PROJECTS[pid]?.name?`${pid} · ${PROJECTS[pid].name}`:pid}
+            onAbrir={(a)=>{ const pid=a.projetoId||""; setJatinoxSel(null); setHomeGroup(pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>
         </div>
 
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
