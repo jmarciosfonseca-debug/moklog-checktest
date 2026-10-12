@@ -115,3 +115,29 @@ test("cópia de segurança e PDF existem na tela", async () => {
   expect(botao("Baixar TXT")).toBeTruthy();
   expect(botao("Cópia de segurança")).toBeTruthy();
 });
+
+test("nova revisão a partir de um diagnóstico salvo: copia as respostas, guarda baseId e o original fica intacto; PDF direto da lista", async () => {
+  const antigo = { tipo: "existente", projetoRef: "P607", estado: "rascunho", criadoEm: "2026-10-01T10:00:00.000Z", atualizadoEm: "2026-10-01T10:00:00.000Z", respostas: { "D01.01.01": { status: "nao_conforme", situacao: "Trecho caído", updatedAt: 1 } } };
+  mockGetDocs.mockImplementation(async (q) => {
+    const col = (q._q && q._q[0] && q._q[0]._col) || (q._col || "");
+    if (String(col).includes("itens") && String(col).startsWith("catalogos_diagnostico")) return { docs: itensDocs };
+    if (String(col).includes("diagnosticos/P607/itens")) return { docs: [{ id: "diag-antigo", data: () => antigo }] };
+    return { docs: [] };
+  });
+  await montar();
+  await clicar(botao("P607"));
+  await act(async () => { await Promise.resolve(); });
+  expect(host.textContent).toContain("Rev. 1");
+  expect(botao("PDF")).toBeTruthy();
+  expect(botao("＋ Novo diagnóstico em branco")).toBeTruthy();
+  await clicar(botao("Nova revisão a partir deste"));
+  expect(host.textContent).toContain("Revisão 2");
+  await clicar(botao("Salvar diagnóstico"));
+  await act(async () => { await Promise.resolve(); });
+  expect(mockSetDoc).toHaveBeenCalledTimes(1);
+  const [ref, payload] = mockSetDoc.mock.calls[0];
+  expect(ref._doc).not.toContain("diag-antigo");
+  expect(payload.baseId).toBe("diag-antigo");
+  expect(payload.respostas["D01.01.01"]).toMatchObject({ status: "nao_conforme", situacao: "Trecho caído" });
+  expect(antigo.respostas["D01.01.01"].status).toBe("nao_conforme");
+});
