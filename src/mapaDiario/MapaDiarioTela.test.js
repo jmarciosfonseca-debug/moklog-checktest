@@ -79,7 +79,7 @@ test("só libera o WhatsApp depois de gravar; se a gravação falhar, não liber
   await montar({ saveMapa: jest.fn(async () => { throw new Error("offline"); }) });
   await clicar(botao("Concluir mapa"));
   expect(host.textContent).not.toContain("Abrir WhatsApp");
-  expect(q('[role="alert"]').textContent).toContain("Não gravou");
+  expect(q('[role="alert"]').textContent).toContain("NÃO GRAVOU");
 });
 test("depois de gravar mostra o texto e o link do WhatsApp", async () => {
   await montar();
@@ -385,4 +385,30 @@ test("FT: 'Ninguém faltou (não teve falta)' é a primeira opção e conclui se
   const postos = io.lancarNaFicha.mock.calls[0][0].postos;
   expect(postos.filter((p) => p.situacao === "falta")).toHaveLength(0);
   expect(postos.find((p) => p.rotulo === "Posto extra")).toMatchObject({ situacao: "ft", detalhe: { semFalta: true } });
+});
+const achaUndefT = (o, p = "") => (o === undefined ? [p] : o && typeof o === "object" ? Object.keys(o).flatMap((k) => achaUndefT(o[k], `${p}/${k}`)) : []);
+test("o mapa que vai para o Firestore não leva undefined (falta/FT/atraso marcados pelos botões)", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
+  await abrirExc("P1 · Vigilante CCO");
+  await clicar(botao("Falta"));
+  await abrirExc("P2 · Vigilante Honda");
+  await clicar(botao("Atraso"));
+  await digitar(q('input[aria-label="Minutos de atraso"]'), "10");
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(1);
+  expect(achaUndefT(salvos[0])).toEqual([]);
+});
+test("editando um mapa enviado: o WhatsApp some até concluir; se não gravar, continua escondido e o erro aparece", async () => {
+  await montar();
+  await clicar(botao("Concluir mapa"));
+  expect(host.textContent).toContain("Abrir WhatsApp");
+  await clicar(botao("Editar mapa"));
+  expect(host.textContent).not.toContain("Abrir WhatsApp");
+  expect(q('pre[aria-label="Texto do mapa"]')).toBeNull();
+  io.saveMapa.mockImplementationOnce(async () => { throw new Error("falhou"); });
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain("NÃO GRAVOU o mapa (falhou)");
+  expect(host.textContent).not.toContain("Abrir WhatsApp");
+  await clicar(botao("Concluir mapa"));
+  expect(host.textContent).toContain("Abrir WhatsApp"); // gravou: libera
 });
