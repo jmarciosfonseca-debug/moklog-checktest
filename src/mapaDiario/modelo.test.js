@@ -9,19 +9,19 @@ test("postos de partida seguem o mapeamento confirmado", () => {
   expect(postosPadrao("P311B", "D").map((p) => p.rotulo)).toEqual(["L1 · Vigilante Líder", "P1 · Vigilante CCO", "P2 · Vigilante Honda"]);
   expect(postosPadrao("P311A", "D").map((p) => p.rotulo)).toEqual(["Vigilante Líder", "Vigilante Apoio", "Vigilante Tático", "Porteiro CCO"]);
   expect(postosPadrao("P311A", "N").map((p) => p.rotulo)).toEqual(["Vigilante Líder", "Vigilante Tático", "Porteiro CCO"]);
-  expect(postosPadrao("P605", "D")[0].rotulo).toBe("Líder/CCO");
-  expect(postosPadrao("P601", "D").find((p) => p.rotulo === "VSPP Apoio/Ronda").horario).toEqual({ inicio: "08:00", fim: "20:00" });
+  expect(postosPadrao("P605", "D").map((p) => p.rotulo)).toEqual(["Líder", "VSPP Apoio", "CCO", "CDA", "Recepção"]);
+  expect(postosPadrao("P601", "D").find((p) => p.rotulo === "VSPP Ronda").horario).toEqual({ inicio: "08:00", fim: "20:00" });
   expect(postosPadrao("P999", "D").length).toBe(3);
   expect(postosPadrao("P607", "D").map((p) => p.rotulo)).toEqual(["Vigilante Honda", "AGP CCO", "Vigilante Pista", "AGP Portaria"]);
   expect(postosPadrao("P607", "N").map((p) => p.rotulo)).toEqual(["Vigilante Honda", "AGP CCO", "Vigilante Pista"]);
   expect(postosPadrao("P505", "D").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO", "VSPP Ronda", "CDA"]);
   expect(postosPadrao("P505", "N").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO", "CDA"]);
   expect(postosPadrao("P260B", "D").map((p) => p.rotulo)).toEqual(["VSPP"]);
-  expect(postosPadrao("P260C", "N").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante"]);
+  expect(postosPadrao("P260C", "N").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante Patrimonial"]);
   expect(postosPadrao("P604", "D").map((p) => p.rotulo)).toContain("Recepção");
   expect(postosPadrao("P605", "D").map((p) => p.rotulo)).toContain("Recepção");
-  expect(postosPadrao("P260A", "D", "2026-10-12").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio 1", "VSPP Apoio 2", "Vigilante CCO"]);
-  expect(postosPadrao("P260A", "D", "2026-10-11").map((p) => p.rotulo)).toEqual(["VSPP Líder", "Vigilante CCO"]);
+  expect(postosPadrao("P260A", "D", "2026-10-12").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO"]);
+  expect(postosPadrao("P260A", "D", "2026-10-11").map((p) => p.rotulo)).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante CCO"]); // apoio todos os dias (2 pessoas se revezam);
 });
 test("mapa novo: rascunho, material sem alteração já marcado, todos presentes", () => {
   const m = mapa();
@@ -113,7 +113,7 @@ describe("texto do WhatsApp", () => {
     expect(t).toContain("*Projeto:* P260-B");
     expect(t).toContain("*Turno:* Noturno 18h00–06h00");
     const p601 = preencher(novoMapa({ projetoId: "P601", data: "2026-10-11", turno: "D", horario: H }), ["a", "b", "c", "d", "e"]);
-    expect(montarTextoWhatsApp(p601)).toContain("• VSPP Apoio/Ronda (08h00–20h00): b");
+    expect(montarTextoWhatsApp(p601)).toContain("• VSPP Ronda (08h00–20h00): c");
   });
   test("link do WhatsApp codifica o texto", () => {
     expect(linkWhatsApp("a b\n*c*")).toBe("https://wa.me/?text=a%20b%0A*c*");
