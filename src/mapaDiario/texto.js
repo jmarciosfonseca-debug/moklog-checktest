@@ -1,5 +1,5 @@
 // Mapa de Equipe diário — texto do WhatsApp (puro).
-// Mantém o jeito do mapa de hoje, mais limpo. P260B e P260C saem com cabeçalho "P260-B"/"P260-C"
+// Títulos em negrito e emoji por assunto (início, efetivo, destaque de falta/FT e informações adicionais abaixo). P260B e P260C saem com cabeçalho "P260-B"/"P260-C"
 // (o P260B envia ao grupo do P260A).
 import { rotuloDia } from "./regras";
 import { ROTULO_SITUACAO, kmRodado } from "./modelo";
@@ -13,48 +13,72 @@ export const rotuloTurno = (turno, horario) => {
   return horario ? `${nome} ${hh(horario.inicio)}–${hh(horario.fim)}` : nome;
 };
 
+const SEPARADOR = "━━━━━━━━━━━━━━";
+const nomeDe = (p) => (p.pessoaNome || "").trim();
+const horarioDe = (p) => (p.horario ? ` (${hh(p.horario.inicio)}–${hh(p.horario.fim)})` : "");
+
+// Linha do efetivo: posto em negrito; a exceção ganha emoji e a palavra em negrito.
 function linhaPosto(p) {
-  const nome = (p.pessoaNome || "").trim();
+  const nome = nomeDe(p);
   const d = p.detalhe || {};
-  const horario = p.horario ? ` (${hh(p.horario.inicio)}–${hh(p.horario.fim)})` : "";
-  const base = `• ${p.rotulo}${horario}: `;
+  const rot = `*${p.rotulo}${horarioDe(p)}:*`;
   switch (p.situacao) {
-    case "vago": return `${base}— sem ninguém no posto`;
-    case "falta": return `${base}${nome} — FALTA`;
-    case "atraso": return `${base}${nome} — atraso${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
-    case "ft": return `${base}${nome} — FT (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : ""}`;
-    case "cobertura": return `${base}${nome}${d.base ? " (Base)" : ""} — cobertura de ${d.deQuem}`;
-    case "troca": return `${base}${nome} — troca de plantão, no lugar de ${d.noLugarDe}`;
-    default: return `${base}${nome}`;
+    case "vago": return `⚪ ${rot} sem ninguém no posto`;
+    case "falta": return `❌ ${rot} ${nome} — *FALTA*`;
+    case "atraso": return `⏰ ${rot} ${nome} — *ATRASO*${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
+    case "ft": return `🔄 ${rot} ${nome} — *FT* (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : ""}`;
+    case "cobertura": return `🤝 ${rot} ${nome}${d.base ? " (Base)" : ""} — *COBERTURA* de ${d.deQuem}`;
+    case "troca": return `🔁 ${rot} ${nome} — *TROCA DE PLANTÃO*, no lugar de ${d.noLugarDe}`;
+    default: return `✅ ${rot} ${nome}`;
   }
 }
 
-// Cada assunto é um bloco; os blocos saem separados por uma linha em branco (no WhatsApp ficava tudo junto).
+// Bloco de destaque: só o que saiu do normal, com o detalhe (quem faltou, quem cobriu).
+function linhaOcorrencia(p, postos) {
+  const nome = nomeDe(p);
+  const d = p.detalhe || {};
+  const onde = `${p.rotulo}${horarioDe(p)}`;
+  switch (p.situacao) {
+    case "vago": return `⚪ *SEM NINGUÉM* — ${onde}`;
+    case "falta": {
+      const ft = (postos || []).find((x) => x.id && x.id === d.porFtDe);
+      return `❌ *FALTA* — ${nome} (${onde})${ft && nomeDe(ft) ? ` — coberta por FT de ${nomeDe(ft)}` : ""}`;
+    }
+    case "atraso": return `⏰ *ATRASO* — ${nome} (${onde})${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
+    case "ft": return `🔄 *FT* — ${nome} (${onde})${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : ""}`;
+    case "cobertura": return `🤝 *COBERTURA* — ${nome}${d.base ? " (Base)" : ""} (${onde}), cobrindo ${d.deQuem}`;
+    case "troca": return `🔁 *TROCA DE PLANTÃO* — ${nome} (${onde}), no lugar de ${d.noLugarDe}`;
+    default: return "";
+  }
+}
+
+// Cada assunto é um bloco com título em negrito e o conteúdo logo abaixo; blocos separados por linha em branco.
 export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
   const blocos = [];
   blocos.push([
-    "*MAPA DE EQUIPE*",
-    `*Projeto:* ${cabecalhoProjeto(mapa.projetoId)}${nomeProjeto ? ` — ${nomeProjeto}` : ""}`,
-    `*Turno:* ${rotuloTurno(mapa.turno, mapa.horario)}`,
-    `*Data:* ${rotuloDia(mapa.data)}, ${dataBR(mapa.data)}`,
+    "📋 *MAPA DE EQUIPE*",
+    SEPARADOR,
+    `🏢 *Projeto:* ${cabecalhoProjeto(mapa.projetoId)}${nomeProjeto ? ` — ${nomeProjeto}` : ""}`,
+    `🕒 *Turno:* ${rotuloTurno(mapa.turno, mapa.horario)}`,
+    `📅 *Data:* ${rotuloDia(mapa.data)}, ${dataBR(mapa.data)}`,
   ]);
-  const eq = ["*Equipe:*"];
-  (mapa.postos || []).forEach((p) => { eq.push(linhaPosto(p)); if (p.obs && p.obs.trim()) eq.push(`   ↳ ${p.obs.trim()}`); });
+  const eq = ["👥 *EFETIVO*"];
+  (mapa.postos || []).forEach((p) => { eq.push(linhaPosto(p)); if (p.obs && p.obs.trim()) eq.push(`      ↳ ${p.obs.trim()}`); });
   blocos.push(eq);
-  const excPostos = (mapa.postos || []).filter((p) => p.situacao !== "presente" && ROTULO_SITUACAO[p.situacao]);
-  blocos.push([`*Faltas/atrasos/FT/trocas:* ${excPostos.length ? excPostos.map((p) => `${p.rotulo} — ${ROTULO_SITUACAO[p.situacao]}`).join("; ") : "Sem ocorrências"}`]);
+  const exc = (mapa.postos || []).filter((p) => p.situacao !== "presente" && linhaOcorrencia(p, mapa.postos));
+  blocos.push(["🚨 *FALTAS / ATRASOS / FT / TROCAS*", ...(exc.length ? exc.map((p) => linhaOcorrencia(p, mapa.postos)) : ["✅ Sem ocorrências"])]);
   const mat = mapa.material || { semAlteracao: true };
-  const exc = (mat.excecoes || []);
-  const m = [];
-  if (mat.semAlteracao && !exc.length) {
-    m.push(`*Material (armamento, munição, rádios):* Sem alteração — conferido e disponível${mat.conferidos ? ` (${mat.conferidos})` : ""}`);
+  const mexc = (mat.excecoes || []);
+  const m = ["🧰 *MATERIAL (armamento, munição, rádios)*"];
+  if (mat.semAlteracao && !mexc.length) {
+    m.push(`✅ Sem alteração — conferido e disponível${mat.conferidos ? ` (${mat.conferidos})` : ""}`);
   } else {
-    m.push("*Material (armamento, munição, rádios):* COM ALTERAÇÃO");
-    exc.forEach((e) => m.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — ${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}: ${(e.obs || "").trim()}`));
-    if ((mat.obs || "").trim()) m.push(`   ↳ ${mat.obs.trim()}`);
+    m.push("⚠️ *COM ALTERAÇÃO*");
+    mexc.forEach((e) => m.push(`• ${e.nome}${e.detalhe ? ` (${e.detalhe})` : ""} — *${e.situacao === "indisponivel" ? "INDISPONÍVEL" : "ANOMALIA"}:* ${(e.obs || "").trim()}`));
+    if ((mat.obs || "").trim()) m.push(`      ↳ ${mat.obs.trim()}`);
   }
   const qs = Object.values(mat.quantidades || {}).filter((q) => q && String(q.qtd).trim());
-  if (qs.length) m.push(`   Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
+  if (qs.length) m.push(`📦 Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
   blocos.push(m);
   // Veículo sem nenhuma leitura não vira linha (antes saía "Veículo 2: —").
   const veic = [];
@@ -64,13 +88,13 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
     if (v.kmAnterior != null && v.kmAnterior !== "") partes.push(`anterior ${v.kmAnterior}`);
     if (v.kmAtual != null && v.kmAtual !== "") partes.push(`atual ${v.kmAtual}`);
     if (r != null) partes.push(`rodado ${r} km`);
-    if (partes.length) veic.push(`*${v.rotulo || "Veículo"}:* ${partes.join(" · ")}`);
+    if (partes.length) veic.push(`• *${v.rotulo || "Veículo"}:* ${partes.join(" · ")}`);
   });
-  if (veic.length) blocos.push(veic);
+  if (veic.length) blocos.push(["🚗 *VEÍCULOS*", ...veic]);
   const s = mapa.supervisao;
-  blocos.push([`*Última visita da supervisão:* ${s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—"}`]);
-  if (mapa.resumo && mapa.resumo.trim()) blocos.push([`*Resumo da passagem:* ${mapa.resumo.trim()}`]);
-  if (mapa.observacoes && mapa.observacoes.trim()) blocos.push([`*Observações:* ${mapa.observacoes.trim()}`]);
+  blocos.push(["🔎 *ÚLTIMA VISITA DA SUPERVISÃO*", s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—"]);
+  if (mapa.resumo && mapa.resumo.trim()) blocos.push(["📝 *RESUMO DA PASSAGEM*", mapa.resumo.trim()]);
+  if (mapa.observacoes && mapa.observacoes.trim()) blocos.push(["💬 *OBSERVAÇÕES*", mapa.observacoes.trim()]);
   return blocos.map((b) => b.join("\n")).join("\n\n");
 }
 

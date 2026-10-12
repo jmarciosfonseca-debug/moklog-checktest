@@ -77,7 +77,7 @@ test("depois de gravar mostra o texto e o link do WhatsApp", async () => {
   expect(host.textContent).toContain("Mapa gravado");
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
   expect(t).toContain("*MAPA DE EQUIPE*");
-  expect(t).toContain("• L1 · Vigilante Líder: Luiz D.");
+  expect(t).toContain("✅ *L1 · Vigilante Líder:* Luiz D.");
   expect(t).toContain("Sem ocorrências");
   expect(q('a[href^="https://wa.me/?text="]')).not.toBeNull();
 });
@@ -90,7 +90,7 @@ test("troca não é FT e exige 'no lugar de quem'", async () => {
   await digitar(q('select[aria-label="Troca no lugar de quem"]'), "d");
   await clicar(botao("Concluir mapa"));
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("• P1 · Vigilante CCO: Marta A. — troca de plantão, no lugar de Joao V.");
+  expect(t).toContain("🔁 *P1 · Vigilante CCO:* Marta A. — *TROCA DE PLANTÃO*, no lugar de Joao V.");
   expect(t).not.toContain("FT (folga trabalhada)");
 });
 test("autosalva o rascunho depois de alterar", async () => {
@@ -125,7 +125,7 @@ test("material: botão Conferir expande a lista do cadastro e anomalia exige obs
   await clicar(botao("Concluir mapa"));
   expect(io.saveMapa).toHaveBeenCalledTimes(1);
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("• Arma 01 (.38 · nº 123) — ANOMALIA: Coronha trincada");
+  expect(t).toContain("• Arma 01 (.38 · nº 123) — *ANOMALIA:* Coronha trincada");
   expect(salvos[0].material.excecoes[0]).toMatchObject({ situacao: "anomalia", obs: "Coronha trincada" });
 });
 test("material: item novo fora do cadastro e voltar para Disponível limpa a exceção", async () => {
@@ -267,8 +267,8 @@ test("FT só no posto extra: pergunta 'Quem faltou?', o posto dele vira Falta e 
   expect(q('button[aria-label="Exceção do posto P1 · Vigilante CCO"]').textContent).toContain("Falta");
   await clicar(botao("Concluir mapa"));
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("P1 · Vigilante CCO: Marta A. — FALTA");
-  expect(t).toContain("Joao V. — FT (folga trabalhada), cobrindo a falta de Marta A.");
+  expect(t).toContain("❌ *P1 · Vigilante CCO:* Marta A. — *FALTA*");
+  expect(t).toContain("Joao V. — *FT* (folga trabalhada), cobrindo a falta de Marta A.");
   const postos = io.lancarNaFicha.mock.calls[0][0].postos;
   expect(postos.find((p) => p.rotulo === "P1 · Vigilante CCO")).toMatchObject({ situacao: "falta" });
   expect(postos.find((p) => p.rotulo === "Posto extra")).toMatchObject({ situacao: "ft", detalhe: { quemFaltouId: "b" } });

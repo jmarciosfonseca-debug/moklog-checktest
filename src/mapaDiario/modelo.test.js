@@ -81,15 +81,15 @@ describe("texto do WhatsApp", () => {
     m = { ...m, veiculos: [{ rotulo: "Moto", kmAnterior: 1200, kmAtual: 1262 }] };
     const t = montarTextoWhatsApp(m, { nomeProjeto: "Mega Itajaí B" });
     expect(t).toContain("*MAPA DE EQUIPE*");
-    expect(t).toContain("*Projeto:* P311B — Mega Itajaí B");
+    expect(t).toContain("🏢 *Projeto:* P311B — Mega Itajaí B");
     expect(t).toContain("*Turno:* Diurno 06h00–18h00");
     expect(t).toContain("*Data:* Domingo, 11/10/2026");
-    expect(t).toContain("• L1 · Vigilante Líder: Luiz D.");
-    expect(t).toContain("*Faltas/atrasos/FT/trocas:* Sem ocorrências");
-    expect(t).toContain("*Material (armamento, munição, rádios):* Sem alteração");
-    expect(t).toContain("*Moto:* anterior 1200 · atual 1262 · rodado 62 km");
-    expect(t).toContain("*Última visita da supervisão:* 09/10/2026 — Marcio (Diurno)");
-    expect(t).toContain("*Resumo da passagem:* Preleção às 06h10, sem alterações.");
+    expect(t).toContain("✅ *L1 · Vigilante Líder:* Luiz D.");
+    expect(t).toContain("🚨 *FALTAS / ATRASOS / FT / TROCAS*\n✅ Sem ocorrências");
+    expect(t).toContain("🧰 *MATERIAL (armamento, munição, rádios)*\n✅ Sem alteração");
+    expect(t).toContain("• *Moto:* anterior 1200 · atual 1262 · rodado 62 km");
+    expect(t).toContain("🔎 *ÚLTIMA VISITA DA SUPERVISÃO*\n09/10/2026 — Marcio (Diurno)");
+    expect(t).toContain("📝 *RESUMO DA PASSAGEM*\nPreleção às 06h10, sem alterações.");
   });
   test("exceções saem no posto e no resumo; troca não é FT", () => {
     const m = preencher(mapa(), ["Ana", "Bia", "Caio"]);
@@ -99,11 +99,11 @@ describe("texto do WhatsApp", () => {
       { ...m.postos[2], situacao: "cobertura", detalhe: { deQuem: "Edu", base: true } },
     ] };
     const t = montarTextoWhatsApp(x);
-    expect(t).toContain("• L1 · Vigilante Líder: Ana — atraso, chegou às 06h20 (20 min)");
-    expect(t).toContain("• P1 · Vigilante CCO: Bia — troca de plantão, no lugar de Dani");
-    expect(t).toContain("• P2 · Vigilante Honda: Caio (Base) — cobertura de Edu");
+    expect(t).toContain("⏰ *L1 · Vigilante Líder:* Ana — *ATRASO*, chegou às 06h20 (20 min)");
+    expect(t).toContain("🔁 *P1 · Vigilante CCO:* Bia — *TROCA DE PLANTÃO*, no lugar de Dani");
+    expect(t).toContain("🤝 *P2 · Vigilante Honda:* Caio (Base) — *COBERTURA* de Edu");
     expect(t).not.toMatch(/Bia.*FT/);
-    expect(t).toContain("L1 · Vigilante Líder — Atraso; P1 · Vigilante CCO — Troca; P2 · Vigilante Honda — Cobertura");
+    expect(t).toContain("🚨 *FALTAS / ATRASOS / FT / TROCAS*\n⏰ *ATRASO* — Ana (L1 · Vigilante Líder), chegou às 06h20 (20 min)\n🔁 *TROCA DE PLANTÃO* — Bia (P1 · Vigilante CCO), no lugar de Dani\n🤝 *COBERTURA* — Caio (Base) (P2 · Vigilante Honda), cobrindo Edu");
   });
   test("P260B/C saem com cabeçalho P260-B/C; noturno e posto com horário próprio", () => {
     expect(cabecalhoProjeto("P260B")).toBe("P260-B");
@@ -111,10 +111,10 @@ describe("texto do WhatsApp", () => {
     expect(cabecalhoProjeto("P260A")).toBe("P260A");
     const m = preencher(novoMapa({ projetoId: "P260B", data: "2026-10-11", turno: "N", horario: { inicio: "18:00", fim: "06:00" } }), ["A", "B", "C"]);
     const t = montarTextoWhatsApp(m);
-    expect(t).toContain("*Projeto:* P260-B");
-    expect(t).toContain("*Turno:* Noturno 18h00–06h00");
+    expect(t).toContain("🏢 *Projeto:* P260-B");
+    expect(t).toContain("🕒 *Turno:* Noturno 18h00–06h00");
     const p601 = preencher(novoMapa({ projetoId: "P601", data: "2026-10-11", turno: "D", horario: H }), ["a", "b", "c", "d", "e"]);
-    expect(montarTextoWhatsApp(p601)).toContain("• VSPP Apoio/Ronda (08h00–20h00): b");
+    expect(montarTextoWhatsApp(p601)).toContain("✅ *VSPP Apoio/Ronda (08h00–20h00):* b");
   });
   test("link do WhatsApp codifica o texto", () => {
     expect(linkWhatsApp("a b\n*c*")).toBe("https://wa.me/?text=a%20b%0A*c*");
@@ -163,8 +163,8 @@ describe("material, armamento e munição", () => {
     m = definirSituacaoMaterial(m, mun, "indisponivel", "Faltam 6 munições");
     const t = montarTextoWhatsApp({ ...base, material: { ...m, obs: "Acionado o armeiro" } });
     expect(t).toContain("COM ALTERAÇÃO");
-    expect(t).toContain("• Arma 01 (.38 · nº 123) — ANOMALIA: Coronha trincada");
-    expect(t).toContain("• Munição .38 (24 un.) — INDISPONÍVEL: Faltam 6 munições");
+    expect(t).toContain("• Arma 01 (.38 · nº 123) — *ANOMALIA:* Coronha trincada");
+    expect(t).toContain("• Munição .38 (24 un.) — *INDISPONÍVEL:* Faltam 6 munições");
     expect(t).toContain("↳ Acionado o armeiro");
     expect(t).not.toContain("Sem alteração — conferido");
   });
@@ -231,13 +231,13 @@ describe("texto do WhatsApp: um bloco por assunto", () => {
     let m = preencher(mapa({ supervisao: { ultimaData: "2026-10-09", supervisor: "Marcio", turno: "Diurno" }, resumo: "Sem novidades." }), ["A", "B", "C"]);
     m = { ...m, veiculos: [{ rotulo: "Moto", kmAnterior: 1200, kmAtual: 1262 }] };
     const blocos = montarTextoWhatsApp(m).split("\n\n");
-    expect(blocos.map((b) => b.split("\n")[0].replace(/\*/g, "").split(":")[0])).toEqual(["MAPA DE EQUIPE", "Equipe", "Faltas/atrasos/FT/trocas", "Material (armamento, munição, rádios)", "Moto", "Última visita da supervisão", "Resumo da passagem"]);
+    expect(blocos.map((b) => b.split("\n")[0].replace(/\*/g, "").trim())).toEqual(["📋 MAPA DE EQUIPE", "👥 EFETIVO", "🚨 FALTAS / ATRASOS / FT / TROCAS", "🧰 MATERIAL (armamento, munição, rádios)", "🚗 VEÍCULOS", "🔎 ÚLTIMA VISITA DA SUPERVISÃO", "📝 RESUMO DA PASSAGEM"]);
     expect(blocos[1].split("\n")).toHaveLength(4); // título + 3 postos
   });
   test("veículo sem nenhuma leitura não vira linha 'Veículo 2: —'", () => {
     const m = { ...preencher(mapa(), ["A", "B", "C"]), veiculos: [{ rotulo: "Moto", kmAtual: 27854 }, { rotulo: "Veículo 2" }] };
     const t = montarTextoWhatsApp(m);
-    expect(t).toContain("*Moto:* atual 27854");
+    expect(t).toContain("• *Moto:* atual 27854");
     expect(t).not.toContain("Veículo 2");
   });
 });
@@ -265,7 +265,7 @@ test("FT exige 'quem faltou' (ou 'ninguém faltou') e não aceita a própria pes
 test("WhatsApp: a FT diz de quem foi a falta coberta", () => {
   const m = mapa();
   const t = montarTextoWhatsApp({ ...m, postos: m.postos.map((p, i) => (i === 0 ? { ...p, pessoaNome: "Rosemeire", situacao: "ft", detalhe: { quemFaltou: "Elaine", quemFaltouId: "e" } } : p)) });
-  expect(t).toContain("Rosemeire — FT (folga trabalhada), cobrindo a falta de Elaine");
+  expect(t).toContain("Rosemeire — *FT* (folga trabalhada), cobrindo a falta de Elaine");
 });
 
 test("FT no posto extra: vincula a falta ao efetivo e desfaz ao sair de FT, remover o extra ou limpar a falta", () => {
