@@ -92,7 +92,9 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
   });
   if (veic.length) blocos.push(["🚗 *VEÍCULOS*", ...veic]);
   const s = mapa.supervisao;
-  blocos.push(["🔎 *ÚLTIMA VISITA DA SUPERVISÃO*", s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—"]);
+  const vis = mapa.visita;
+  blocos.push(["🔎 *ÚLTIMA VISITA DA SUPERVISÃO*", s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—",
+    ...(vis && typeof vis.houve === "boolean" ? [vis.houve ? `Neste turno: visita de ${(vis.supervisor || "").trim()}` : "Neste turno: sem visita"] : [])]);
   if (mapa.resumo && mapa.resumo.trim()) blocos.push(["📝 *RESUMO DA PASSAGEM*", mapa.resumo.trim()]);
   if (mapa.observacoes && mapa.observacoes.trim()) blocos.push(["💬 *OBSERVAÇÕES*", mapa.observacoes.trim()]);
   return blocos.map((b) => b.join("\n")).join("\n\n");

@@ -11,6 +11,7 @@
 import { itensDaBase } from "./materialBase";
 import { chaveMapa } from "./regras";
 import { postosDoProjeto, defDoPosto, projetoPuxaEquipe } from "./postos";
+import { pertenceA } from "../equipe/vinculos";
 
 export const SITUACOES = [
   { id: "presente", rotulo: "Presente" },
@@ -27,6 +28,12 @@ export const ROTULO_SITUACAO = Object.fromEntries(SITUACOES.map((s) => [s.id, s.
 export function postosPadrao(projetoId, turno, dataISO = null) {
   return postosDoProjeto(projetoId, turno, dataISO).map((p) => ({ rotulo: p.rotulo, horario: p.horario || null, lider: !!p.lider, cargos: p.cargos }));
 }
+
+// Moto: P601–P607, P311A/B e P505 têm moto (dos mapas reais); P260A/B/C não têm veículo. Km atual da moto é obrigatório.
+export const PROJETOS_SEM_MOTO = ["P260A", "P260B", "P260C"];
+export const projetoComMoto = (pid) => !!pid && !PROJETOS_SEM_MOTO.includes(pid);
+export const ehMoto = (v) => !!v && (v.id === "moto" || /moto/i.test(v.rotulo || ""));
+export const garantirMoto = (mapa) => (!projetoComMoto(mapa.projetoId) || (mapa.veiculos || []).some(ehMoto) ? mapa : { ...mapa, veiculos: [{ id: "moto", rotulo: "Moto", kmAnterior: null, kmAtual: null }, ...(mapa.veiculos || [])] });
 
 let _seq = 0;
 const novoId = () => `p${Date.now().toString(36)}${(_seq++).toString(36)}`;
@@ -52,13 +59,13 @@ export function novoMapa({ projetoId, data, turno, horario, base = null, agora =
   const veiculos = base && base.veiculos && base.veiculos.length
     ? base.veiculos.map((v) => ({ id: v.id, rotulo: v.rotulo, kmAnterior: v.kmAtual ?? v.kmAnterior ?? null, kmAtual: null }))
     : [];
-  return {
+  return garantirMoto({
     id: chave, projetoId, data, turno, horario: horario || null, status: "rascunho",
     postos, material: { ...materialNovo(), ...(base && base.material && base.material.quantidades ? { quantidades: base.material.quantidades } : {}) }, veiculos,
     preenchidoDe: usaBase ? { data: base.data || null, turno: base.turno || turno } : null,
-    supervisao: null, resumo: "", observacoes: "",
+    supervisao: null, visita: null, resumo: "", observacoes: "",
     criadoEm: agora.toISOString(), atualizadoEm: agora.toISOString(), enviadoEm: null, enviadoPor: "",
-  };
+  });
 }
 
 // ── Material / armamento / munição ────────────────────────────────────────────
@@ -150,6 +157,15 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
     }
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
   });
+  // Obrigatórios: km da moto, resumo da passagem e se houve visita da supervisão neste turno.
+  if (projetoComMoto(mapa.projetoId)) {
+    const moto = (mapa.veiculos || []).find(ehMoto);
+    if (!moto || num(moto.kmAtual) == null || Number.isNaN(num(moto.kmAtual))) erros.push("Moto: informe a quilometragem atual (obrigatório)");
+  }
+  if (!(mapa.resumo || "").trim()) erros.push('Resumo da passagem: escreva o resumo (se não houve nada, escreva "Sem alteração")');
+  const vis = mapa.visita;
+  if (!vis || typeof vis.houve !== "boolean") erros.push("Supervisão: informe se houve visita neste turno (Sim ou Não)");
+  else if (vis.houve && !(vis.supervisor || "").trim()) erros.push("Supervisão: informe quem visitou");
   const mat = mapa.material || materialNovo();
   (mat.excecoes || []).forEach((e) => {
     if (!(e.nome || "").trim()) { erros.push("Material: informe qual item tem anomalia"); return; }
@@ -218,6 +234,26 @@ export function vincularFalta(mapa, ftId, valor, colabs = []) {
     return { ...m, postos: m.postos.map((x) => (x.id === ftId ? { ...x, detalhe: { ...x.detalhe, quemFaltouId: c.id, quemFaltou: c.nome } } : x)) };
   }
   return m;
+}
+
+// Quem é da equipe montada do líder do mapa (12x36) e ficou fora dos postos: candidato natural a "quem faltou".
+const liderDoMapa = (mapa) => (mapa.postos || []).find((p) => p.lider && p.pessoaId);
+export function ausentesDaEquipe(mapa, colabs) {
+  const lp = liderDoMapa(mapa);
+  if (!lp || !projetoPuxaEquipe(mapa.projetoId)) return [];
+  const noMapa = new Set((mapa.postos || []).map((p) => p.pessoaId).filter(Boolean));
+  return (colabs || []).filter((c) => pertenceA(c, lp.pessoaId) && c.id !== lp.pessoaId && !c.emFerias && !noMapa.has(c.id));
+}
+// Pessoa num posto que NÃO é da equipe do líder (12x36 com equipe montada): o app pergunta se é FT/cobertura/troca.
+export function foraDaEquipe(mapa, posto, colabs) {
+  if (!projetoPuxaEquipe(mapa.projetoId) || posto.lider || !posto.pessoaId || posto.situacao !== "presente" || (posto.detalhe && posto.detalhe.livre)) return null;
+  const lp = liderDoMapa(mapa);
+  if (!lp) return null;
+  const membros = (colabs || []).filter((c) => pertenceA(c, lp.pessoaId) && c.id !== lp.pessoaId);
+  if (!membros.length) return null; // líder sem equipe montada: não há como dizer quem é de fora
+  const pessoa = (colabs || []).find((c) => c.id === posto.pessoaId);
+  if (!pessoa || pertenceA(pessoa, lp.pessoaId)) return null;
+  return { pessoa, lider: (colabs || []).find((c) => c.id === lp.pessoaId) || { nome: lp.pessoaNome } };
 }
 
 // Troca a situação de um posto mantendo o vínculo FT ⇄ falta coerente.

@@ -1,9 +1,15 @@
-import { ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
+import { ehMoto, garantirMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 import { postoVazio as postoVazioT } from "./modelo";
 const H = { inicio: "06:00", fim: "18:00" };
 const mapa = (extra = {}) => ({ ...novoMapa({ projetoId: "P311B", data: "2026-10-11", turno: "D", horario: H }), ...extra });
+// Preenche o que é obrigatório para concluir (km da moto, resumo, visita) sem mexer no resto.
+const completo = (m) => {
+  const veic = (m.veiculos || []).some(ehMoto) ? m.veiculos.map((v) => (ehMoto(v) && (v.kmAtual == null || v.kmAtual === "") ? { ...v, kmAnterior: 100, kmAtual: 150 } : v)) : [{ id: "moto", rotulo: "Moto", kmAnterior: 100, kmAtual: 150 }, ...(m.veiculos || [])];
+  return { ...m, resumo: (m.resumo || "").trim() ? m.resumo : "Sem alteração", visita: m.visita || { houve: false, supervisor: "" }, veiculos: projetoComMoto(m.projetoId) ? veic : m.veiculos };
+};
+const valida = (m, ...r) => validarParaConcluir(completo(m), ...r);
 const preencher = (m, nomes) => ({ ...m, postos: m.postos.map((p, i) => ({ ...p, pessoaId: `c${i}`, pessoaNome: nomes[i] })) });
 
 test("postos de partida seguem o mapeamento confirmado", () => {
@@ -40,33 +46,33 @@ test("pré-preenche do mapa anterior: mesmas pessoas, situação zerada e km ant
   expect(m.veiculos[0]).toMatchObject({ kmAnterior: 1200, kmAtual: null });
 });
 test("pode concluir quando todos os postos têm pessoa e nada pendente", () => {
-  expect(validarParaConcluir(preencher(mapa(), ["A", "B", "C"]))).toEqual([]);
+  expect(valida(preencher(mapa(), ["A", "B", "C"]))).toEqual([]);
 });
 test("posto sem pessoa só passa se marcado 'Sem ninguém' (campo vazio não vira falta)", () => {
   const m = mapa();
-  expect(validarParaConcluir(m).length).toBe(3);
+  expect(valida(m).length).toBe(3);
   const ok = { ...m, postos: m.postos.map((p) => ({ ...p, situacao: "vago" })) };
-  expect(validarParaConcluir(ok)).toEqual([]);
+  expect(valida(ok)).toEqual([]);
 });
 test("exceções exigem o detalhe mínimo", () => {
   const m = preencher(mapa(), ["A", "B", "C"]);
   const com = (i, situacao, detalhe) => ({ ...m, postos: m.postos.map((p, k) => (k === i ? { ...p, situacao, detalhe } : p)) });
-  expect(validarParaConcluir(com(0, "atraso", {})).join()).toMatch(/hora de chegada ou os minutos/);
-  expect(validarParaConcluir(com(0, "atraso", { minutos: 15 }))).toEqual([]);
-  expect(validarParaConcluir(com(0, "atraso", { hora: "06:20" }))).toEqual([]);
-  expect(validarParaConcluir(com(1, "cobertura", {})).join()).toMatch(/cobertura de quem/);
-  expect(validarParaConcluir(com(1, "cobertura", { deQuem: "Fulano", base: true })).join()).toBeDefined();
-  expect(validarParaConcluir(com(2, "troca", {})).join()).toMatch(/no lugar de quem/);
-  expect(validarParaConcluir(com(2, "troca", { noLugarDe: "Beto" }))).toEqual([]);
-  expect(validarParaConcluir(com(0, "falta", {}))).toEqual([]);
-  expect(validarParaConcluir(com(0, "ft", { quemFaltouId: "z", quemFaltou: "Z" }))).toEqual([]);
+  expect(valida(com(0, "atraso", {})).join()).toMatch(/hora de chegada ou os minutos/);
+  expect(valida(com(0, "atraso", { minutos: 15 }))).toEqual([]);
+  expect(valida(com(0, "atraso", { hora: "06:20" }))).toEqual([]);
+  expect(valida(com(1, "cobertura", {})).join()).toMatch(/cobertura de quem/);
+  expect(valida(com(1, "cobertura", { deQuem: "Fulano", base: true })).join()).toBeDefined();
+  expect(valida(com(2, "troca", {})).join()).toMatch(/no lugar de quem/);
+  expect(valida(com(2, "troca", { noLugarDe: "Beto" }))).toEqual([]);
+  expect(valida(com(0, "falta", {}))).toEqual([]);
+  expect(valida(com(0, "ft", { quemFaltouId: "z", quemFaltou: "Z" }))).toEqual([]);
 });
 test("quilometragem: rodado = atual − anterior; negativo bloqueia", () => {
   expect(kmRodado({ kmAnterior: 1200, kmAtual: 1262 })).toBe(62);
   expect(kmRodado({ kmAnterior: "1200,5", kmAtual: "1210,5" })).toBe(10);
   expect(kmRodado({ kmAnterior: 1200, kmAtual: null })).toBeNull();
   const m = { ...preencher(mapa(), ["A", "B", "C"]), veiculos: [{ rotulo: "Moto", kmAnterior: 1200, kmAtual: 1100 }] };
-  expect(validarParaConcluir(m).join()).toMatch(/km atual menor/);
+  expect(valida(m).join()).toMatch(/km atual menor/);
 });
 test("exceções e pessoas repetidas", () => {
   const m = preencher(mapa(), ["A", "B", "C"]);
@@ -147,15 +153,15 @@ describe("material, armamento e munição", () => {
     const base = preencher(mapa(), ["A", "B", "C"]);
     const [arma] = itensDeEquipamento(eq);
     const comAnom = { ...base, material: definirSituacaoMaterial(materialNovo(), arma, "anomalia", "") };
-    expect(validarParaConcluir(comAnom).join()).toMatch(/Material — Arma 01: descreva a anomalia/);
+    expect(valida(comAnom).join()).toMatch(/Material — Arma 01: descreva a anomalia/);
     const ok = { ...base, material: definirSituacaoMaterial(materialNovo(), arma, "anomalia", "Coronha trincada") };
-    expect(validarParaConcluir(ok)).toEqual([]);
+    expect(valida(ok)).toEqual([]);
     const indisp = { ...base, material: definirSituacaoMaterial(materialNovo(), arma, "indisponivel", "") };
-    expect(validarParaConcluir(indisp).join()).toMatch(/descreva a indisponibilidade/);
+    expect(valida(indisp).join()).toMatch(/descreva a indisponibilidade/);
     const livre = { ...base, material: { ...materialNovo(), semAlteracao: false, excecoes: [{ id: "livre:x", nome: "", situacao: "anomalia", obs: "x y z" }] } };
-    expect(validarParaConcluir(livre).join()).toMatch(/informe qual item/);
+    expect(valida(livre).join()).toMatch(/informe qual item/);
     const semMarca = { ...base, material: { ...materialNovo(), semAlteracao: false } };
-    expect(validarParaConcluir(semMarca).join()).toMatch(/marque "Sem alteração" ou descreva/);
+    expect(valida(semMarca).join()).toMatch(/marque "Sem alteração" ou descreva/);
   });
   test("no WhatsApp: sem alteração = conferido; com exceção lista item, situação e observação", () => {
     const base = preencher(mapa(), ["A", "B", "C"]);
@@ -259,10 +265,10 @@ describe("resumo que fala de exceção sem posto marcado", () => {
 test("FT exige 'quem faltou' (ou 'ninguém faltou') e não aceita a própria pessoa", () => {
   const base = preencher(mapa(), ["A", "B", "C"]);
   const com = (detalhe) => ({ ...base, postos: base.postos.map((p, i) => (i === 1 ? { ...p, pessoaId: "x", situacao: "ft", detalhe } : p)) });
-  expect(validarParaConcluir(com({})).join("|")).toMatch(/FT cobrindo falta de quem/);
-  expect(validarParaConcluir(com({ quemFaltouId: "y", quemFaltou: "Y" }))).toEqual([]);
-  expect(validarParaConcluir(com({ semFalta: true }))).toEqual([]);
-  expect(validarParaConcluir(com({ quemFaltouId: "x" })).join("|")).toMatch(/própria pessoa/);
+  expect(valida(com({})).join("|")).toMatch(/FT cobrindo falta de quem/);
+  expect(valida(com({ quemFaltouId: "y", quemFaltou: "Y" }))).toEqual([]);
+  expect(valida(com({ semFalta: true }))).toEqual([]);
+  expect(valida(com({ quemFaltouId: "x" })).join("|")).toMatch(/própria pessoa/);
 });
 test("WhatsApp: a FT diz de quem foi a falta coberta", () => {
   const m = mapa();
@@ -281,7 +287,7 @@ test("FT no posto extra: vincula a falta ao efetivo e desfaz ao sair de FT, remo
   const m1 = vincularFalta(m0, "x1", `p:${alvo.id}`);
   expect(m1.postos[1]).toMatchObject({ situacao: "falta", detalhe: { porFtDe: "x1" } });
   expect(m1.postos[3].detalhe).toMatchObject({ quemFaltouId: "c1", quemFaltou: "B", faltaPostoId: alvo.id });
-  expect(validarParaConcluir(m1)).toEqual([]);
+  expect(valida(m1)).toEqual([]);
   // trocar quem faltou desfaz o anterior
   const m2 = vincularFalta(m1, "x1", `p:${base.postos[2].id}`);
   expect(m2.postos[1].situacao).toBe("presente");
@@ -292,6 +298,54 @@ test("FT no posto extra: vincula a falta ao efetivo e desfaz ao sair de FT, remo
   expect(removerPosto(m1, "x1").postos[1].situacao).toBe("presente");
   const m3 = mudarSituacao(m1, alvo.id, "presente");
   expect(m3.postos[3].detalhe.quemFaltouId).toBeUndefined();
-  expect(validarParaConcluir(m3).join("|")).toMatch(/FT cobrindo falta de quem/);
+  expect(valida(m3).join("|")).toMatch(/FT cobrindo falta de quem/);
   expect(desfazerVinculoFalta(m0, "x1")).toEqual(m0);
+});
+
+// ---- fechamento do mapa: equipe, moto, resumo e visita obrigatórios ----
+const EQ = [
+  { id: "L", nome: "Luiz", equipeLiderId: null },
+  { id: "e1", nome: "Eva", equipeLiderId: "L" },
+  { id: "e2", nome: "Edu", equipeLiderId: "L" },
+  { id: "x1", nome: "Xavier", equipeLiderId: "OUTRO" },
+];
+const mapaEq = () => {
+  const m = mapa();
+  return { ...m, postos: m.postos.map((p, i) => ({ ...p, lider: i === 0, pessoaId: i === 0 ? "L" : i === 1 ? "e1" : "", pessoaNome: i === 0 ? "Luiz" : i === 1 ? "Eva" : "" })) };
+};
+test("ausentesDaEquipe: quem é da equipe do líder e ficou fora do mapa", () => {
+  expect(ausentesDaEquipe(mapaEq(), EQ).map((c) => c.id)).toEqual(["e2"]);
+  expect(ausentesDaEquipe({ ...mapaEq(), projetoId: "P260C" }, EQ)).toEqual([]); // 4x2 não puxa equipe
+});
+test("foraDaEquipe: pessoa de outra equipe pede FT/cobertura/troca; da equipe, não", () => {
+  const m = mapaEq();
+  const p2 = { ...m.postos[2], pessoaId: "x1", pessoaNome: "Xavier" };
+  expect(foraDaEquipe(m, p2, EQ).pessoa.id).toBe("x1");
+  expect(foraDaEquipe(m, { ...p2, pessoaId: "e2" }, EQ)).toBeNull();
+  expect(foraDaEquipe(m, { ...p2, detalhe: { livre: true } }, EQ)).toBeNull(); // nome digitado
+  expect(foraDaEquipe(m, { ...p2, situacao: "ft" }, EQ)).toBeNull(); // já marcado
+});
+test("moto: garantirMoto cria a linha e vale para todos menos P260A/B/C", () => {
+  expect(projetoComMoto("P601")).toBe(true);
+  expect(projetoComMoto("P260B")).toBe(false);
+  const m = garantirMoto({ projetoId: "P601", veiculos: [] });
+  expect(m.veiculos.some(ehMoto)).toBe(true);
+  expect(garantirMoto(m)).toBe(m);
+  expect(garantirMoto({ projetoId: "P260C", veiculos: [] }).veiculos).toEqual([]);
+});
+test("concluir exige km da moto, resumo e se houve visita da supervisão", () => {
+  const base = garantirMoto(preencher(mapa(), ["A", "B", "C"]));
+  const erros = validarParaConcluir(base).join(" | ");
+  expect(erros).toContain("Moto: informe a quilometragem atual");
+  expect(erros).toContain("Resumo da passagem");
+  expect(erros).toContain("Supervisão: informe se houve visita");
+  expect(valida(preencher(mapa(), ["A", "B", "C"]))).toEqual([]);
+  const sem = completo(preencher(mapa(), ["A", "B", "C"]));
+  expect(validarParaConcluir({ ...sem, visita: { houve: true, supervisor: "" } }).join(" ")).toContain("informe quem visitou");
+  expect(validarParaConcluir({ ...sem, visita: { houve: true, supervisor: "Marcio" } })).toEqual([]);
+});
+test("WhatsApp traz 'Neste turno' com a visita informada", () => {
+  const m = completo(preencher(mapa(), ["A", "B", "C"]));
+  expect(montarTextoWhatsApp({ ...m, visita: { houve: true, supervisor: "Marcio" } })).toContain("Neste turno: visita de Marcio");
+  expect(montarTextoWhatsApp({ ...m, visita: { houve: false, supervisor: "" } })).toContain("Neste turno: sem visita");
 });
