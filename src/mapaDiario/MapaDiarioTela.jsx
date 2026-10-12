@@ -5,7 +5,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
@@ -132,14 +132,15 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
   const concluir = async () => {
     const contaveis = itensContaveis(itensMat);
-    const erros = validarParaConcluir(mapa, contaveis);
+    const mapaC = completarIdsCobertura(mapa, colabs); // mapa antigo: completa o id de quem foi coberto pelo cadastro
+    const erros = validarParaConcluir(mapaC, contaveis);
     setAvisos(erros);
     if (erros.length) return;
     // Resumo cita extra/FT/falta/atraso sem exceção marcada: avisa uma vez; tocando de novo, envia assim mesmo.
-    const aviso = avisoResumoSemExcecao(mapa);
+    const aviso = avisoResumoSemExcecao(mapaC);
     if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
-    const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapa.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapa.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
+    const final = { ...mapaC, material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
     try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); setEditando(false); }
     catch (e) { setAvisos([`NÃO GRAVOU o mapa (${(e && e.message) || "erro"}). Confira a conexão e toque em Concluir mapa de novo. O WhatsApp só libera depois de gravar.`]); return; }
     // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
@@ -288,7 +289,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                 {p.situacao === "cobertura" && (
                   <div>
                     <div style={S.lab}>Cobrindo quem?</div>
-                    {seletorPessoa("Cobertura de quem", p.detalhe?.deQuem, (n) => setDetalhe(p.id, { deQuem: n }))}
+                    <select aria-label="Cobertura de quem" value={p.detalhe?.deQuemId || (colabs.find((c) => c.nome === p.detalhe?.deQuem) || {}).id || ""} onChange={(e) => alterar((m) => definirCobertoDe(m, p.id, colabs.find((c) => c.id === e.target.value) || null))} style={S.in}>
+                      <option value="">Escolher…</option>
+                      {colabs.map((c) => <option key={c.id} value={c.id}>{nomeCurto(c)}{c.emFerias ? " (férias)" : ""}</option>)}
+                    </select>
+                    {p.detalhe?.deQuem && (
+                      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: cor.txt2, marginTop: 8 }}>
+                        <input type="checkbox" checked={!!p.detalhe?.semFalta} onChange={(e) => alterar((m) => marcarCoberturaSemFalta(m, p.id, e.target.checked))} /> Não foi falta (férias, atestado, folga…)
+                      </label>
+                    )}
+                    {p.detalhe?.deQuem && (
+                      <div style={{ fontSize: 11, color: p.detalhe?.semFalta ? cor.txt2 : "#dc2626", fontWeight: 700, marginTop: 4 }}>
+                        {p.detalhe?.semFalta ? `Nada será lançado na ficha de ${p.detalhe.deQuem}.` : `Ao concluir, a FALTA de ${p.detalhe.deQuem} (${data.split("-").reverse().join("/")}) é lançada na ficha dela(e) automaticamente. Quem cobre não recebe FT.`}
+                      </div>
+                    )}
                     <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: cor.txt2, marginTop: 8 }}>
                       <input type="checkbox" checked={!!p.detalhe?.base} onChange={(e) => setPosto(p.id, { detalhe: { ...p.detalhe, base: e.target.checked, livre: e.target.checked }, pessoaId: "", pessoaNome: "" })} /> Quem cobre é da Base (digitar o nome)
                     </label>
@@ -300,13 +314,14 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                   const aus = ausentesDaEquipe(mapa, colabs).filter((c) => c.id !== p.pessoaId);
                   const idsAus = new Set(aus.map((c) => c.id));
                   const outros = colabs.filter((c) => c.id !== p.pessoaId && !(mapa.postos || []).some((x) => x.pessoaId === c.id) && !idsNoMapa.has(c.id) && !idsAus.has(c.id));
-                  const valor = p.detalhe?.semFalta ? "__ninguem" : p.detalhe?.faltaPostoId ? `p:${p.detalhe.faltaPostoId}` : p.detalhe?.quemFaltouId ? `c:${p.detalhe.quemFaltouId}` : "";
+                  const valor = p.detalhe?.postoVago ? "__vago" : p.detalhe?.semFalta ? "__ninguem" : p.detalhe?.faltaPostoId ? `p:${p.detalhe.faltaPostoId}` : p.detalhe?.quemFaltouId ? `c:${p.detalhe.quemFaltouId}` : "";
                   return (
                     <div>
                       <div style={S.lab}>Quem faltou?</div>
                       <select aria-label="Quem faltou (FT)" value={valor} onChange={(e) => alterar((m) => vincularFalta(m, p.id, e.target.value, colabs))} style={S.in}>
                         <option value="">Escolher quem faltou…</option>
                         <option value="__ninguem">Ninguém faltou (não teve falta)</option>
+                        <option value="__vago">POSTO VAGO (sem titular, não é falta)</option>
                         {aus.length > 0 && <optgroup label="Da equipe, fora do mapa">{aus.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
                         <optgroup label="Efetivo do mapa">
                           {cand.map((x) => <option key={x.id} value={`p:${x.id}`}>{x.pessoaNome || "Sem nome"} — {x.rotulo}</option>)}

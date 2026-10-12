@@ -54,9 +54,10 @@ test("falta coberta por FT, falta só na FT, posto vago, atraso e material", () 
   ], { material: { excecoes: [{ nome: "Moto", situacao: "indisponivel", obs: "pneu" }, { nome: "Rádio HT", situacao: "anomalia" }] } });
   const r = calc({ mapas: { P606: { [ATUAL]: mapa, [ANT]: enviado([]) } } });
   const por = (t) => r.avisos.filter((a) => a.tipo === t);
-  expect(por("falta").map((a) => a.titulo).sort()).toEqual(["Falta de Carlos", "Falta de Elaine"]);
+  expect(por("falta").map((a) => a.titulo).sort()).toEqual(["Falta de Carlos", "Falta de Elaine", "Falta de Gil"]); // Gil: coberto pela Base (Teo) = falta
   expect(por("falta").find((a) => a.titulo.includes("Elaine")).detalhe).toContain("coberta por FT de Rosemeire");
   expect(por("falta").find((a) => a.titulo.includes("Carlos")).detalhe).toContain("coberta por FT de Beto");
+  expect(por("falta").find((a) => a.titulo.includes("Gil")).detalhe).toContain("coberta pela Base: Teo");
   expect(por("vago")[0].titulo).toContain("Ronda");
   expect(por("atraso")[0]).toMatchObject({ sev: "info" });
   expect(por("atraso")[0].detalhe).toContain("20 min");
@@ -66,7 +67,7 @@ test("falta coberta por FT, falta só na FT, posto vago, atraso e material", () 
   expect(por("troca")[0].detalhe).toContain("no lugar de Rui");
   expect(por("cobertura")[0].titulo).toBe("Cobertura (Base): Teo");
   expect(por("cobertura")[0].detalhe).toContain("cobrindo Gil");
-  expect(r.contagem.critico).toBe(3);
+  expect(r.contagem.critico).toBe(4);
 });
 
 test("a falta da FT não duplica quando o posto de falta já existe (por id, nome ou posto)", () => {

@@ -179,10 +179,12 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
     if (p.situacao === "atraso" && !d.minutos && !d.hora) erros.push(`${nome}: informe a hora de chegada ou os minutos de atraso`);
     if (p.situacao === "cobertura") {
       if (!d.deQuem) erros.push(`${nome}: cobertura de quem?`);
+      else if (!d.deQuemId) erros.push(`${nome}: escolha "${d.deQuem}" na lista do cadastro (sem isso a falta não vai para a ficha)`);
+      else if (!d.semFalta && (mapa.postos || []).some((x) => x.id !== p.id && x.pessoaId === d.deQuemId && x.situacao !== "falta")) erros.push(`${nome}: ${d.deQuem} está coberto(a) por falta, mas aparece presente em outro posto — ajuste o mapa`);
       if (d.base && !p.pessoaNome) erros.push(`${nome}: digite o nome de quem da Base está cobrindo`);
     }
     if (p.situacao === "ft") {
-      if (!d.quemFaltouId && !d.quemFaltou && !d.semFalta) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
+      if (!d.quemFaltouId && !d.quemFaltou && !d.semFalta && !d.postoVago) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
       if (d.quemFaltouId && d.quemFaltouId === p.pessoaId) erros.push(`${nome}: quem faltou não pode ser a própria pessoa da FT`);
     }
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
@@ -232,7 +234,7 @@ export const ehPostoExtra = (mapa, p) => !!p && !defDoPosto(mapa.projetoId, mapa
 export const candidatosAFalta = (mapa, ftId) =>
   (mapa.postos || []).filter((x) => x.id !== ftId && (x.pessoaId || (x.pessoaNome || "").trim()) && ["presente", "falta"].includes(x.situacao) && !(x.situacao === "falta" && x.detalhe && x.detalhe.porFtDe && x.detalhe.porFtDe !== ftId));
 
-const semVinculo = (d = {}) => { const { quemFaltouId, quemFaltou, faltaPostoId, semFalta, ...resto } = d; return resto; };
+const semVinculo = (d = {}) => { const { quemFaltouId, quemFaltou, faltaPostoId, semFalta, postoVago, ...resto } = d; return resto; };
 
 export function desfazerVinculoFalta(mapa, ftId) {
   const ft = (mapa.postos || []).find((x) => x.id === ftId);
@@ -245,9 +247,10 @@ export function desfazerVinculoFalta(mapa, ftId) {
   }) };
 }
 
-// valor: "" | "__ninguem" | "p:<postoId>" (efetivo do mapa) | "c:<colabId>" (outro colaborador do projeto)
+// valor: "" | "__ninguem" | "__vago" (posto vago: ninguém faltou, o posto estava sem titular) | "p:<postoId>" (efetivo do mapa) | "c:<colabId>" (outro colaborador do projeto)
 export function vincularFalta(mapa, ftId, valor, colabs = []) {
   let m = desfazerVinculoFalta(mapa, ftId);
+  if (valor === "__vago") return { ...m, postos: m.postos.map((x) => (x.id === ftId ? { ...x, detalhe: { ...x.detalhe, postoVago: true } } : x)) };
   if (valor === "__ninguem") return { ...m, postos: m.postos.map((x) => (x.id === ftId ? { ...x, detalhe: { ...x.detalhe, semFalta: true } } : x)) };
   if (valor && valor.startsWith("p:")) {
     const q = m.postos.find((x) => x.id === valor.slice(2));
@@ -325,4 +328,36 @@ export function semUndefined(v) {
   if (Array.isArray(v)) return v.map(semUndefined);
   if (v && typeof v === "object") return Object.keys(v).reduce((o, k) => { if (v[k] !== undefined) o[k] = semUndefined(v[k]); return o; }, {});
   return v;
+}
+
+// ── Cobertura: quem foi coberto recebe a Falta na ficha, então precisa estar identificado pelo cadastro ──────
+// colab = cadastro escolhido (ou null para limpar). Férias no cadastro já vem como "não foi falta".
+export function definirCobertoDe(mapa, postoId, colab) {
+  return { ...mapa, postos: (mapa.postos || []).map((x) => {
+    if (x.id !== postoId) return x;
+    const { deQuem, deQuemId, semFalta, ...resto } = x.detalhe || {};
+    if (!colab) return { ...x, detalhe: resto };
+    return { ...x, detalhe: { ...resto, deQuem: colab.nome, deQuemId: colab.id, ...(colab.emFerias ? { semFalta: true } : {}) } };
+  }) };
+}
+export function marcarCoberturaSemFalta(mapa, postoId, semFalta) {
+  return { ...mapa, postos: (mapa.postos || []).map((x) => {
+    if (x.id !== postoId) return x;
+    const { semFalta: _s, ...resto } = x.detalhe || {};
+    return { ...x, detalhe: semFalta ? { ...resto, semFalta: true } : resto };
+  }) };
+}
+// Mapa antigo (só o nome em "cobertura de quem"): completa o id quando o nome bate com UM cadastro do projeto.
+export function completarIdsCobertura(mapa, colabs = []) {
+  const norm = (t) => String(t || "").trim().toLowerCase().replace(/\s+/g, " ");
+  let mudou = false;
+  const postos = (mapa.postos || []).map((x) => {
+    const d = x.detalhe || {};
+    if (x.situacao !== "cobertura" || !d.deQuem || d.deQuemId) return x;
+    const achados = colabs.filter((c) => norm(c.nome) === norm(d.deQuem));
+    if (achados.length !== 1) return x;
+    mudou = true;
+    return { ...x, detalhe: { ...d, deQuemId: achados[0].id } };
+  });
+  return mudou ? { ...mapa, postos } : mapa;
 }

@@ -26,8 +26,8 @@ function linhaPosto(p) {
     case "vago": return `⚪ ${rot} sem ninguém no posto`;
     case "falta": return `❌ ${rot} ${nome} — *FALTA*`;
     case "atraso": return `⏰ ${rot} ${nome} — *ATRASO*${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
-    case "ft": return `🔄 ${rot} ${nome} — *FT* (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : ""}`;
-    case "cobertura": return `🤝 ${rot} ${nome}${d.base ? " (Base)" : ""} — *COBERTURA* de ${d.deQuem}`;
+    case "ft": return `🔄 ${rot} ${nome} — *FT* (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
+    case "cobertura": return `🤝 ${rot} ${nome}${d.base ? " (Base)" : ""} — *COBERTURA* de ${d.deQuem}${d.semFalta ? " (não foi falta)" : ""}`;
     case "troca": return `🔁 ${rot} ${nome} — *TROCA DE PLANTÃO*, no lugar de ${d.noLugarDe}`;
     default: return `✅ ${rot} ${nome}`;
   }
@@ -45,8 +45,8 @@ function linhaOcorrencia(p, postos) {
       return `❌ *FALTA* — ${nome} (${onde})${ft && nomeDe(ft) ? ` — coberta por FT de ${nomeDe(ft)}` : ""}`;
     }
     case "atraso": return `⏰ *ATRASO* — ${nome} (${onde})${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
-    case "ft": return `🔄 *FT* — ${nome} (${onde})${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : ""}`;
-    case "cobertura": return `🤝 *COBERTURA* — ${nome}${d.base ? " (Base)" : ""} (${onde}), cobrindo ${d.deQuem}`;
+    case "ft": return `🔄 *FT* — ${nome} (${onde})${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
+    case "cobertura": return `🤝 *COBERTURA* — ${nome}${d.base ? " (Base)" : ""} (${onde}), cobrindo ${d.deQuem}${d.semFalta ? " (não foi falta)" : ""}`;
     case "troca": return `🔁 *TROCA DE PLANTÃO* — ${nome} (${onde}), no lugar de ${d.noLugarDe}`;
     default: return "";
   }
