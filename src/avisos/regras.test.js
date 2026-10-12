@@ -78,11 +78,11 @@ test("a falta da FT não duplica quando o posto de falta já existe (por id, nom
   expect(r.avisos.filter((a) => a.tipo === "falta")).toHaveLength(1);
 });
 
-test("o que acontece no dia (falta, mapa) é de todos; supervisão e férias continuam só do gerencial", () => {
+test("dado de pessoa (falta, mapa, supervisão, férias) só do gerencial/testador; os demais veem só o que é de equipamento", () => {
   const mapa = enviado([posto("c", "CCO", "Elaine", "falta")]);
   const fontes = { mapas: { P606: { [ATUAL]: mapa, [ANT]: null } }, supervisao: { P606: [{ data: "2026-08-01" }] }, ctmk: { P601: { status: "offline", offlineSince: "2026-10-09T10:00:00-03:00" } } };
   expect(calc(fontes, true).avisos.map((a) => a.tipo).sort()).toEqual(["ctmk", "falta", "mapa", "supervisao"]);
-  expect(calc(fontes, false).avisos.map((a) => a.tipo).sort()).toEqual(["ctmk", "falta", "mapa"]);
+  expect(calc(fontes, false).avisos.map((a) => a.tipo)).toEqual(["ctmk"]);
 });
 
 test("KeyAccess vem DESLIGADO por padrão (o botão da Home já mostra); ligado: aberta sem horaFim, ≥ 48 h = crítico, fechada não avisa", () => {
@@ -301,7 +301,7 @@ test("primeiro teste registrado: não inventa comparação", () => {
   expect(tipoT(r).find((a) => a.id.startsWith("teste:")).detalhe).toBe("Primeiro teste registrado — ainda sem comparação");
 });
 
-test("teste semanal vale para todos os perfis; sem dados de teste não aparece nada", () => {
+test("teste semanal (equipamentos) vale para todos os perfis; sem dados de teste não aparece nada", () => {
   expect(tipoT(calcEm(SEG, { testes: T }, true)).length).toBe(tipoT(calcEm(SEG, { testes: T }, false)).length);
   expect(calcEm(SEG, {}, true).avisos).toEqual([]);
   expect(calcEm(SEG, { testes: {} }, true).avisos).toEqual([]);

@@ -62,7 +62,7 @@ export function assinarFontes({ projetos, gerencial, mapasAtivo = true, onDados,
     paradas.push(() => clearInterval(te));
     if (typeof document !== "undefined") { const v = () => { if (document.visibilityState === "visible") lerEquipes(); }; document.addEventListener("visibilitychange", v); paradas.push(() => document.removeEventListener("visibilitychange", v)); }
   }
-  if (mapasAtivo) {
+  if (gerencial && mapasAtivo) {
     esperados += PROJETOS_DO_MAPA.length;
     const por = new Map(); // pid -> { subs: Map(chave -> desligar), lidos, faltam: Set, erros: Map }
     const emitir = (pid, st) => {

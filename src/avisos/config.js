@@ -18,19 +18,19 @@ export const AVISOS_CFG = {
   tickerMax: 10,                                    // quantas manchetes (as mais importantes primeiro) entram na rotação
 };
 
-// gerencial: true = só aparece no perfil gerencial (férias e supervisão). O que acontece no dia (falta, FT, troca, cobertura,
-// posto vago, atraso, mapa) é visto por todos: o app mostra que acompanha tudo (decisão do Marcio, 12/10/2026).
+// gerencial: true = traz dado de pessoa/supervisão; só aparece no perfil gerencial (que inclui o testador/demo).
+// Decisão do Marcio (12/10/2026): NÃO abrir nomes de faltas/FT/etc. para os demais perfis. O teste semanal (equipamentos) é de todos.
 // ordem: dentro da mesma severidade, o que está acontecendo AGORA (falta, posto vago, queda de energia) vem antes do que é crônico.
 export const CATEGORIAS = {
-  falta: { rotulo: "Falta", gerencial: false, ordem: 0 },
-  vago: { rotulo: "Posto vago", gerencial: false, ordem: 0 },
-  atraso: { rotulo: "Atraso", gerencial: false, ordem: 2 },
+  falta: { rotulo: "Falta", gerencial: true, ordem: 0 },
+  vago: { rotulo: "Posto vago", gerencial: true, ordem: 0 },
+  atraso: { rotulo: "Atraso", gerencial: true, ordem: 2 },
   ferias: { rotulo: "Férias", gerencial: true, ordem: 3 },
-  troca: { rotulo: "Troca", gerencial: false, ordem: 2 },
-  cobertura: { rotulo: "Cobertura", gerencial: false, ordem: 2 },
-  ft: { rotulo: "FT", gerencial: false, ordem: 2 },
-  mapa: { rotulo: "Mapa de Equipe", gerencial: false, ordem: 1 },
-  material: { rotulo: "Material no mapa", gerencial: false, ordem: 2 },
+  troca: { rotulo: "Troca", gerencial: true, ordem: 2 },
+  cobertura: { rotulo: "Cobertura", gerencial: true, ordem: 2 },
+  ft: { rotulo: "FT", gerencial: true, ordem: 2 },
+  mapa: { rotulo: "Mapa de Equipe", gerencial: true, ordem: 1 },
+  material: { rotulo: "Material no mapa", gerencial: true, ordem: 2 },
   supervisao: { rotulo: "Supervisão", gerencial: true, ordem: 5 },
   keyaccess: { rotulo: "KeyAccess", gerencial: false, ordem: 2 },
   ctmk: { rotulo: "CTMK", gerencial: false, ordem: 2 },
