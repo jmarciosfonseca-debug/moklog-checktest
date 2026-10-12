@@ -30,7 +30,10 @@ import { Ico } from "./Icones";
 import { normalizarZona, resumirColecaoPerimetral, escolherFontePerimetral } from "./perimetralFontes";
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { avaliarDiagnosticoParaRisco, aplicarDiagnosticoNaMemoria } from "./diagnostico/diagnosticoRisco";
+import { numerosRevisao, filtrosConsultaDiagnosticos } from "./diagnostico/diagnosticoSync";
+import { CATALOGO_REF } from "./diagnostico/catalogoSchema";
 import { classificarVetor, consolidarSite, classificarRiscoOperacional, normalizarFracao, avaliarIluminacao, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { aplicarMotorV2, classificarCFTVGraduado, contarPerimetraisAntigas } from "./riscoMotorV2";
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
@@ -1517,6 +1520,17 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     const extra = !t ? "" : t.estado === "sem" ? `; abrir tratativa${l.dias != null ? ` (${l.dias} dias sem registro)` : ""}` : t.estado === "vencido" ? `; cobrar o retorno do follow-up${t.quando ? ` de ${new Date(t.quando).toLocaleDateString("pt-BR").slice(0, 5)}` : ""}` : "";
     return `<li><b>Restabelecer ${esc(l.nome)}</b>${l.nome.startsWith(l.sistema) ? "" : `, ${esc(l.sistema)}`} — ${esc(l.prazo.toLowerCase())}${l.v.bloqueadorCaido ? " (bloqueador)" : ""}${extra}.</li>`;
   });
+  // Diagnóstico Situacional anexado (só existe se a fonte foi marcada): conta, resultado e recomendações.
+  const dg = geral.diagnostico && geral.diagnostico.ok ? geral.diagnostico : null;
+  const STATUS_DG = { nao_conforme: "Não conforme", ausente_necessario: "Ausente necessário", parcial: "Parcial", sem_dado: "Sem dado" };
+  const diagHTML = dg ? `<div class="bloco">
+      <div class="eyebrow">Diagnóstico Situacional anexado${dg.rotulo ? ` — ${esc(dg.rotulo)}` : ""}${dg.atualizadoEm ? ` · ${esc(new Date(dg.atualizadoEm).toLocaleDateString("pt-BR"))}` : ""}${dg.percentual != null ? ` · ${dg.percentual}% preenchido` : ""}</div>
+      <p class="ar-pq">${dg.subiu ? `O diagnóstico <b>elevou a classificação de ${esc(dg.labelBase)} para ${esc(dg.labelFinal)}</b>: ${esc(dg.motivo.replace(/^Diagnóstico Situacional: /, ""))}.` : `O diagnóstico foi considerado e <b>não alterou a classificação</b> (${esc(dg.labelFinal)}): nenhum item dele impõe nível acima do já apurado pelos testes.`} O diagnóstico só eleva o nível, nunca o reduz.</p>
+      ${dg.recomendacoes.length ? `<table class="ar-tb"><colgroup><col style="width:26%"><col style="width:16%"><col style="width:30%"><col style="width:28%"></colgroup><thead><tr><th>Item do diagnóstico</th><th>Situação</th><th>Encontrado e risco</th><th>Indicação · padrão Moked</th></tr></thead><tbody>
+      ${dg.recomendacoes.slice(0, 14).map((r) => `<tr class="vt-linha"><td><div class="ar-dv">${esc(r.texto)}</div><div class="ar-mu">${esc(r.id)}${r.eleva ? " · eleva o nível" : ""}</div></td><td>${esc(STATUS_DG[r.status] || r.status)}</td><td>${[r.situacao && `<div>${esc(r.situacao)}</div>`, r.impacto && `<div class="ar-mu">${esc(r.impacto)}</div>`].filter(Boolean).join("") || '<span class="ar-mu">sem registro</span>'}</td><td>${r.indicacao ? `<b>${esc(r.indicacao)}</b>` : '<span class="ar-mu">a definir</span>'}${r.padrao ? `<div class="ar-mu">Padrão: ${esc(r.padrao)}</div>` : ""}</td></tr>`).join("")}
+      </tbody></table>${dg.recomendacoes.length > 14 ? `<div class="mais-anexo">Mais ${dg.recomendacoes.length - 14} item(ns) no relatório do Diagnóstico Situacional.</div>` : ""}` : ""}
+      ${dg.semAgravante.length ? `<div class="nota">${dg.semAgravante.map((x) => esc(x.item) + " — " + esc(x.motivo)).join(" · ")}</div>` : ""}
+    </div>` : "";
   const acoesHTML = acoes.length ? `<div class="bloco"><div class="eyebrow">Ações priorizadas</div><ol class="ar-acoes">${acoes.join("")}</ol></div>` : "";
   // base operacional: a mesma do laudo semanal (mesma fórmula e mesmos números)
   let baseHTML = "";
@@ -1774,6 +1788,7 @@ ${novoCSS}</style></head><body>
       ${memoria ? "" : `<div class="soma"><span class="l">Somatório dos vetores</span><span class="r">${somaR}</span></div>`}
       <div class="nota">O documento executivo mostra os fatores que alteram a classe de risco. A relação integral de itens, fontes e evidências permanece no Anexo Técnico separado.</div>
     </div>
+    ${diagHTML}
     <div class="bloco">
       <div class="eyebrow">Matriz de Impacto Operacional e Exposição ao Risco</div>
       <div class="impact-grid">${impactoCardsHTML}</div>
@@ -1849,7 +1864,31 @@ const FONTES_DEF = [
   { key: "rondaVirtual", label: "Ronda Virtual (CFTV)",     desc: "Execução das rondas por câmera" },
   { key: "energia",  label: "Ocorrências de Energia",      desc: "Quedas e estabilidade no período" },
   { key: "equipe",   label: "Mapa de Equipe",              desc: "Brigada e reciclagens do efetivo" },
+  // Opcional (desmarcada por padrão): sem a marca, o motor segue exatamente como antes.
+  { key: "diagnostico", label: "Diagnóstico Situacional", desc: "Anexa o diagnóstico ativo mais recente do projeto. Pode elevar o nível (nunca reduz) e mostra a conta.", opcional: true },
 ];
+
+// Diagnóstico Situacional ativo mais recente do projeto (+ catálogo para saber a criticidade de cada item).
+// Exige o login do Diagnóstico (e-mail e senha): as regras do Firestore negam leitura sem ele.
+async function coletarDiagnostico(pid) {
+  const { getAuth } = await import("firebase/auth"); // sob demanda: só quem marca a fonte carrega o módulo de login
+  const user = getAuth(fbApp).currentUser;
+  if (!user || user.isAnonymous) return { ok: false, temDado: false, motivo: "entre antes no Diagnóstico Situacional com e-mail e senha" };
+  const filtros = filtrosConsultaDiagnosticos({ tipo: "existente", projetoRef: pid }, user.uid).map((a) => where(...a));
+  const snap = await getDocs(query(collection(db, "diagnosticos", pid, "itens"), ...filtros));
+  const todos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const ativos = todos.filter((d) => d.estado !== "arquivado" && d.respostas && Object.keys(d.respostas).length)
+    .sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")));
+  if (!ativos.length) return { ok: false, temDado: false, motivo: "nenhum diagnóstico ativo salvo para este projeto" };
+  const escolhido = ativos[0];
+  const itensSnap = await getDocs(collection(db, "catalogos_diagnostico", CATALOGO_REF.catalogoId, "itens"));
+  const itens = itensSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  if (!itens.length) return { ok: false, temDado: false, motivo: "catálogo do diagnóstico indisponível" };
+  const n = numerosRevisao(todos)[escolhido.id];
+  const total = itens.filter((i) => i.deprecado !== true).length;
+  const resp = Object.keys(escolhido.respostas).filter((k) => escolhido.respostas[k]?.status).length;
+  return { ok: true, temDado: true, id: escolhido.id, respostas: escolhido.respostas, itens, rotulo: n ? `Revisão ${n}` : "", atualizadoEm: escolhido.atualizadoEm || "", percentual: total ? Math.round((resp / total) * 100) : 0 };
+}
 
 // Coleta todas as fontes marcadas para um projeto.
 // Retorna { dados, faltantes: [{key,label,motivo}] }.
@@ -1881,6 +1920,7 @@ async function coletarFontes(project, stored, marcadas) {
     coletarMarcada(marcadas.rondaVirtual, "rondaVirtual", "Ronda Virtual", "ronda virtual", () => coletarRondaVirtual(project.id)),
     coletarMarcada(marcadas.energia, "energia", "Ocorrências de Energia", "energia", () => coletarEnergia(project.id)),
     coletarMarcada(marcadas.equipe, "equipe", "Mapa de Equipe", "equipe", () => coletarEquipe(project.id)),
+    coletarMarcada(marcadas.diagnostico, "diag", "Diagnóstico Situacional", "diagnóstico situacional", () => coletarDiagnostico(project.id)),
     (async () => { dados.keyaccess = await segura("keyaccess", () => coletarKeyAccessInfo(project.id)); })(),
     (async () => { dados.sinistros = await segura("sinistros", () => coletarSinistros(project.id)); })(),
     (async () => { const fu = await segura("tratativas", () => loadFollowups(db, project.id)); dados.followups = fu && fu.ok === false ? {} : (fu || {}); })(),
@@ -1957,8 +1997,12 @@ export function classificarProjeto(project, vetoresEntrada, dados = {}) {
   const motivosMod = [modSin?.motivo, modReg?.motivo].filter(Boolean).join(" · ");
 
   const nivelBase = v2.nivel || matriz.nivel || cons.nivel || RC_NIVEL.BAIXO;
+  // Diagnóstico Situacional (opcional): só entra se a fonte foi marcada; só sobe o nível, nunca reduz.
+  const diagAval = dados.diag?.ok
+    ? avaliarDiagnosticoParaRisco({ respostas: dados.diag.respostas, itens: dados.diag.itens, nivelBase, meta: { diagnosticoId: dados.diag.id, rotulo: dados.diag.rotulo, atualizadoEm: dados.diag.atualizadoEm, percentual: dados.diag.percentual } })
+    : null;
   // Territorial é contextual: não altera a classe operacional.
-  const nivelAjustado = nivelBase;
+  const nivelAjustado = diagAval ? diagAval.nivelFinal : nivelBase;
   const labelAjustado = RC_LABEL[nivelAjustado];
 
   const nBloq = cons.nBloqueadores || 0;
@@ -1971,11 +2015,12 @@ export function classificarProjeto(project, vetoresEntrada, dados = {}) {
     nivelMoked: nivelAjustado, nivelCliente: nivelAjustado,
     labelMoked: labelAjustado, labelCliente: labelAjustado,
     nivel: nivelAjustado,
-    motivoMatriz: v2.motivo || matriz.motivo,
+    motivoMatriz: (diagAval?.subiu ? diagAval.motivo : null) || v2.motivo || matriz.motivo,
     motivoMatrizLegado: matriz.motivo,
     nivelMatrizLegado: matriz.nivel,
     determinante: v2.determinante ? { label: v2.determinante.label, classe: v2.determinante.classeV2, nivel: v2.determinante.nivel } : null,
-    memoria: v2.memoria,
+    memoria: diagAval ? aplicarDiagnosticoNaMemoria(v2.memoria, diagAval) : v2.memoria,
+    diagnostico: diagAval,
     vias: { n: v2.vias.n, nivel: v2.vias.nivel, naoAferido: v2.vias.naoAferido, itens: v2.vias.vias },
     modulador: motivosMod ? { delta: 0, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
     metricas: {
@@ -2036,6 +2081,7 @@ function montarAnalise(project, pacoteLabel, dados, contextos) {
     const perfilTxt = perfilPartes.length ? ` · ${perfilPartes.join(" · ")}` : "";
     fontesUsadas.push({ titulo: "Mapa de Equipe", detalhe: `${dados.equipe.total} colaboradores${perfilTxt}` });
   }
+  if (dados.diag?.ok) fontesUsadas.push({ titulo: "Diagnóstico Situacional", detalhe: `${dados.diag.rotulo ? dados.diag.rotulo + " · " : ""}${dados.diag.percentual}% preenchido${dados.diag.atualizadoEm ? " · " + new Date(dados.diag.atualizadoEm).toLocaleDateString("pt-BR") : ""}` });
   if (dados.keyaccess?.ok) fontesUsadas.push({ titulo: "KeyAccess (informativo)", detalhe: `${dados.keyaccess.total} registro(s) de falha · ${dados.keyaccess.abertas} em aberto · não altera o nível` });
   if (dados.sinistros?.ok) fontesUsadas.push({ titulo: "Histórico de Sinistros", detalhe: dados.sinistros.houve ? "Sinistro registrado" : "Sem sinistro recente" });
   if (dados.regional?.ok) {
@@ -2061,7 +2107,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
 
   const [selProjeto, setSelProjeto] = useState(null);
   const [marcadas, setMarcadas] = useState(() => {
-    const m = {}; FONTES_DEF.forEach((f) => (m[f.key] = true)); return m;
+    const m = {}; FONTES_DEF.forEach((f) => (m[f.key] = !f.opcional)); return m;
   });
   const [contextos, setContextos] = useState({});
   const [estado, setEstado] = useState("idle"); // idle | coletando | aviso | pronto
@@ -2181,7 +2227,7 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
                     <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 1 }}>{f.desc}</div>
                   </div>
                 </div>
-                {on && (
+                {on && !f.opcional && (
                   <input
                     style={S.ctxInput}
                     placeholder={`Contexto de campo p/ ${f.label} (opcional — só aparece se preenchido)`}
