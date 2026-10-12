@@ -6,7 +6,7 @@ import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
 import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe } from "./modelo";
-import { resumoLancamento } from "./ficha";
+import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
 
@@ -35,6 +35,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [avisoEquipe, setAvisoEquipe] = useState("");
   const [avisoReaberto, setAvisoReaberto] = useState("");
   const [fichaMsg, setFichaMsg] = useState(null);
+  const [fichaBusy, setFichaBusy] = useState(false);
   const [confirmouResumo, setConfirmouResumo] = useState(false);
   const [matAberto, setMatAberto] = useState(false);
   const [editando, setEditando] = useState(false); // mapa já enviado reaberto para correção
@@ -143,10 +144,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); return; }
     // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
     setFichaMsg(null);
-    if (io.lancarNaFicha) {
-      try { const r = await io.lancarNaFicha(final); setFichaMsg({ ok: true, texto: resumoLancamento(r, final) }); }
-      catch (e) { setFichaMsg({ ok: false, texto: `Mapa gravado, mas Falta/FT/Atraso NÃO entraram na ficha (${e.message || "erro"}). Toque em Concluir mapa de novo (correção) para tentar outra vez.` }); }
-    }
+    await lancarFicha(final);
+  };
+  // Falta/FT/Atraso → ficha do colaborador. Mostra QUEM recebeu o quê; se falhar, deixa o botão de tentar de novo (o mapa já está gravado).
+  const lancarFicha = async (alvo) => {
+    if (!io.lancarNaFicha) return;
+    setFichaBusy(true);
+    try {
+      const r = await io.lancarNaFicha(alvo);
+      const linhas = descricaoLancamentos(alvo);
+      const semCadastro = r.ignorados > 0 ? ` ${r.ignorados} lançamento(s) não entraram: pessoa não encontrada no cadastro da Equipe.` : "";
+      setFichaMsg({ ok: !r.ignorados, texto: resumoLancamento(r, alvo) + semCadastro, linhas: linhas.length ? [`Lançado na ficha: ${linhas.join(" · ")}`] : [], alvo });
+    } catch (e) {
+      setFichaMsg({ ok: false, erro: true, texto: `Mapa gravado, mas Falta/FT/Atraso NÃO entraram na ficha (${e.message || "erro"}).`, linhas: [], alvo });
+    } finally { setFichaBusy(false); }
   };
 
   const editarMapa = () => { setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(completarPostosFixos(m, colabs))); };
@@ -295,12 +306,12 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                       <div style={S.lab}>Quem faltou?</div>
                       <select aria-label="Quem faltou (FT)" value={valor} onChange={(e) => alterar((m) => vincularFalta(m, p.id, e.target.value, colabs))} style={S.in}>
                         <option value="">Escolher quem faltou…</option>
+                        <option value="__ninguem">Ninguém faltou (não teve falta)</option>
                         {aus.length > 0 && <optgroup label="Da equipe, fora do mapa">{aus.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
                         <optgroup label="Efetivo do mapa">
                           {cand.map((x) => <option key={x.id} value={`p:${x.id}`}>{x.pessoaNome || "Sem nome"} — {x.rotulo}</option>)}
                         </optgroup>
                         {outros.length > 0 && <optgroup label="Outros do projeto">{outros.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
-                        <option value="__ninguem">Ninguém faltou (reforço / vaga)</option>
                       </select>
                       {p.detalhe?.quemFaltou && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>{p.detalhe.faltaPostoId ? "O posto dele passa a Falta. " : ""}A falta vai para a ficha de {p.detalhe.quemFaltou} e a FT para a ficha de {p.pessoaNome || "quem está no posto extra"}.</div>}
                     </div>
@@ -442,7 +453,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           {enviado && (
             <div style={{ ...S.card, borderColor: "#16a34a" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : "Mapa gravado. Agora envie no WhatsApp."}</div>
-              {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}</div>}
+              {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}{(fichaMsg.linhas || []).map((l, i) => <div key={i} style={{ marginTop: 3 }}>{l}</div>)}{fichaMsg.erro && <div style={{ marginTop: 6 }}><button disabled={fichaBusy} onClick={() => lancarFicha(fichaMsg.alvo)} style={S.btn}>{fichaBusy ? "Lançando…" : "Lançar na ficha de novo"}</button></div>}</div>}
               <pre aria-label="Texto do mapa" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, color: cor.txt, background: cor.input, border: `1px solid ${cor.line}`, borderRadius: 10, padding: 10, margin: "0 0 10px" }}>{texto}</pre>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <a href={linkWhatsApp(texto)} target="_blank" rel="noreferrer" style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Abrir WhatsApp</a>

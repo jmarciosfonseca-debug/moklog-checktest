@@ -2,11 +2,11 @@
 // Documentos em equipes/{pid}/mapas/{projeto_AAAA-MM-DD_D|N}: subpasta da Equipe do próprio projeto,
 // que as regras atuais já cobrem (como equipes/{pid}/fv). Não depende de coleção nova.
 import { getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { setDoc } from "../fireGuard";
 import { diasEntre } from "./regras";
 import { isDemo, authFetchEquipe } from "../session";
-import { aplicarNaFicha } from "./ficha";
+import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
 
 const db = () => {
   const app = getApps()[0];
@@ -87,12 +87,26 @@ export async function loadEnviosDoTurno(itens) {
 // Lança Falta/FT/Atraso do mapa na ficha (histórico do colaborador) pelo mesmo endpoint da tela de Equipe,
 // que faz a mescla segura (nada é sobrescrito). Sem exceções novas, não grava nada.
 export async function lancarNaFicha(mapa) {
-  const snap = await getDoc(doc(db(), "equipes", mapa.projetoId));
-  const before = snap.exists() ? snap.data() : { colaboradores: [], desligados: [] };
-  const r = aplicarNaFicha(before, mapa);
-  if (!r.mudou || isDemo()) return r;
-  const resp = await authFetchEquipe("/api/equipe-save", { method: "POST", body: JSON.stringify({ pid: mapa.projetoId, before, after: r.after }) });
-  const res = await resp.json().catch(() => ({}));
-  if (!resp.ok || !res.ok) throw new Error(res.erro || "Não foi possível salvar na ficha.");
-  return r;
+  const ref = doc(db(), "equipes", mapa.projetoId);
+  // Sempre do servidor (nunca do cache do aparelho): a base da mescla tem que ser a ficha de verdade.
+  const ler = async () => { try { return await getDocFromServer(ref); } catch (e) { return getDoc(ref); } };
+  let r = null;
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    const snap = await ler();
+    const before = snap.exists() ? snap.data() : { colaboradores: [], desligados: [] };
+    r = aplicarNaFicha(before, mapa);
+    if (!r.mudou || isDemo()) break;
+    const resp = await authFetchEquipe("/api/equipe-save", { method: "POST", body: JSON.stringify({ pid: mapa.projetoId, before, after: r.after }) });
+    const res = await resp.json().catch(() => ({}));
+    if (resp.status === 409 && tentativa === 0) continue; // alguém mexeu na ficha no meio: relê e tenta de novo
+    if (!resp.ok || !res.ok) throw new Error(res.erro || "Não foi possível salvar na ficha.");
+    break;
+  }
+  if (isDemo()) return r;
+  // Confere de volta no servidor: o que o mapa pede tem que estar na ficha.
+  const conf = await ler();
+  const colabs = (conf.exists() ? conf.data() : {}).colaboradores || [];
+  const faltando = lancamentosDoMapa(mapa).filter((l) => colabs.some((c) => c.id === l.colabId) && !((colabs.find((c) => c.id === l.colabId) || {}).historico || []).some((h) => h && h.id === l.id));
+  if (faltando.length) throw new Error("a gravação não conferiu na ficha");
+  return { ...r, conferido: true };
 }

@@ -358,3 +358,31 @@ test("mapa enviado completo continua travado até 'Editar mapa'", async () => {
   expect(q("fieldset").disabled).toBe(true);
   expect(host.textContent).not.toContain("enviado sem o posto fixo");
 });
+test("ficha: depois de concluir mostra QUEM recebeu o quê; se falhar, 'Lançar na ficha de novo' tenta outra vez sem regravar o mapa", async () => {
+  let ok = false;
+  const lanca = jest.fn(async () => { if (!ok) throw new Error("Sessão expirada"); return { removidos: 0, adicionados: 2, ignorados: 0, conferido: true }; });
+  await montar({ lancarNaFicha: lanca });
+  await abrirExc("P1 · Vigilante CCO");
+  await clicar(botao("Falta"));
+  await clicar(botao("Concluir mapa"));
+  expect(host.textContent).toContain("NÃO entraram na ficha (Sessão expirada)");
+  ok = true;
+  await clicar(botao("Lançar na ficha de novo"));
+  expect(host.textContent).toContain("Lançado na ficha: Falta de Marta A.");
+  expect(io.saveMapa).toHaveBeenCalledTimes(1); // o mapa não foi regravado
+  expect(lanca).toHaveBeenCalledTimes(2);
+});
+test("FT: 'Ninguém faltou (não teve falta)' é a primeira opção e conclui sem falta para ninguém", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
+  await clicar(botao("+ Posto extra"));
+  await digitar(q('select[aria-label="Quem está no posto Posto extra"]'), "d");
+  await clicar(botao("FT"));
+  const sel = q('select[aria-label="Quem faltou (FT)"]');
+  expect([...sel.options].map((o) => o.textContent).slice(0, 2)).toEqual(["Escolher quem faltou…", "Ninguém faltou (não teve falta)"]);
+  await digitar(sel, "__ninguem");
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(1);
+  const postos = io.lancarNaFicha.mock.calls[0][0].postos;
+  expect(postos.filter((p) => p.situacao === "falta")).toHaveLength(0);
+  expect(postos.find((p) => p.rotulo === "Posto extra")).toMatchObject({ situacao: "ft", detalhe: { semFalta: true } });
+});
