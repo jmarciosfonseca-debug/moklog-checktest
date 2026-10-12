@@ -8,6 +8,7 @@ import { consolidar, listaLideres, OCORRENCIAS, MAX_DIAS_PERIODO } from "./conso
 import { loadMapasPeriodo } from "./dados";
 import { gerarConsolidadoMapasHTML } from "../relatorios/consolidadoMapasRelatorio";
 import { abrirParaImpressao } from "../relatorios/padraoMoked";
+import { loadFotosProjeto } from "./fotos";
 
 export function validarPeriodo(de, ate) {
   if (!ehDataISO(de) || !ehDataISO(ate)) return "Informe a data inicial e a final.";
@@ -16,7 +17,7 @@ export function validarPeriodo(de, ate) {
   return "";
 }
 
-export default function ConsolidadoMapas({ dark, nomeProj = (p) => p, projetos = PROJETOS_DO_MAPA, ler = loadMapasPeriodo, abrir = abrirParaImpressao, agora = () => new Date() }) {
+export default function ConsolidadoMapas({ dark, nomeProj = (p) => p, projetos = PROJETOS_DO_MAPA, ler = loadMapasPeriodo, lerFotos = loadFotosProjeto, abrir = abrirParaImpressao, agora = () => new Date() }) {
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#94a3b8" : "#64748b";
   const borda = dark ? "#1e293b" : "#e2e8f0";
@@ -34,6 +35,8 @@ export default function ConsolidadoMapas({ dark, nomeProj = (p) => p, projetos =
   const [ocorrencia, setOcorrencia] = useState("todos");
   const [colaborador, setColaborador] = useState("");
   const [detalhado, setDetalhado] = useState(false);
+  const [comFotos, setComFotos] = useState(true);
+  const [gerando, setGerando] = useState(false);
   const [mapas, setMapas] = useState(null); // null = ainda não buscou
   const [buscando, setBuscando] = useState(false);
   const [erro, setErro] = useState("");
@@ -59,10 +62,20 @@ export default function ConsolidadoMapas({ dark, nomeProj = (p) => p, projetos =
     } finally { setBuscando(false); }
   };
 
-  const baixar = () => {
-    if (!resultado) return;
-    const modo = abrir(gerarConsolidadoMapasHTML({ resultado, nomeProj, projeto: projeto ? { id: projeto, name: "" } : null, detalhado, hoje: agora() }), `consolidado_mapa_equipe_${de}_${ate}.html`);
-    setAviso(modo === "download" ? "O navegador bloqueou a nova aba: o consolidado foi baixado como HTML. Abra o arquivo e toque em \"Imprimir / Salvar PDF\"." : "");
+  const baixar = async () => {
+    if (!resultado || gerando) return;
+    setGerando(true); setAviso("");
+    let fotos = null, semFotos = false;
+    if (comFotos) {
+      // Foto do cadastro de cada projeto que aparece no consolidado. Se não carregar, o PDF sai com as iniciais e a tela avisa.
+      const pids = [...new Set(resultado.mapas.map((m) => m.projetoId))];
+      fotos = {};
+      await Promise.all(pids.map(async (pid) => { try { fotos[pid] = await lerFotos(pid); } catch (e) { semFotos = true; } }));
+    }
+    try {
+      const modo = abrir(gerarConsolidadoMapasHTML({ resultado, nomeProj, projeto: projeto ? { id: projeto, name: "" } : null, detalhado, hoje: agora(), fotos }), `consolidado_mapa_equipe_${de}_${ate}.html`);
+      setAviso([semFotos ? "Algumas fotos não carregaram: essas pessoas saíram com as iniciais." : "", modo === "download" ? "O navegador bloqueou a nova aba: o consolidado foi baixado como HTML. Abra o arquivo e toque em \"Imprimir / Salvar PDF\"." : ""].filter(Boolean).join(" "));
+    } finally { setGerando(false); }
   };
 
   const t = resultado ? resultado.totais : null;
@@ -122,8 +135,11 @@ export default function ConsolidadoMapas({ dark, nomeProj = (p) => p, projetos =
               <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: txt2 }}>
                 <input type="checkbox" checked={detalhado} onChange={(ev) => setDetalhado(ev.target.checked)} /> Detalhar cada mapa no PDF (efetivo, material, km, resumo)
               </label>
-              <button type="button" onClick={baixar} style={{ border: "none", background: "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "#fff", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
-                Baixar consolidado (PDF)
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: txt2 }}>
+                <input type="checkbox" checked={comFotos} onChange={(ev) => setComFotos(ev.target.checked)} /> Incluir fotos dos colaboradores no PDF
+              </label>
+              <button type="button" onClick={baixar} disabled={gerando} style={{ border: "none", background: "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "#fff", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                {gerando ? "Gerando…" : "Baixar consolidado (PDF)"}
               </button>
               {aviso && <div role="status" style={{ color: "#f59e0b", fontSize: 12 }}>{aviso}</div>}
             </>
