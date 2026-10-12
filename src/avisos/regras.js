@@ -4,7 +4,9 @@ import { AVISOS_CFG, CATEGORIAS, SEVERIDADES } from "./config";
 import { turnoVigente, dataBrasilia } from "../mapaDiario/painel";
 import { tqAlvoVigente, tqAlvoTimestamp } from "../iluminacaoTeste";
 import { horarioDoTurno } from "../mapaDiario/horarios";
-import { chaveMapa, inicioDoTurno, somarDias, estadoDoMapa, diasEntre } from "../mapaDiario/regras";
+import { chaveMapa, inicioDoTurno, somarDias, estadoDoMapa, diasEntre, diaDaSemana } from "../mapaDiario/regras";
+import { ocorrenciasDoMapa } from "../mapaDiario/consolidado";
+import { compararTestes } from "./testeSemanal";
 
 const MIN = 60000, HORA = 3600000, DIA = 86400000;
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -29,8 +31,9 @@ const instante = (dataISO, hhmm = "12:00") => {
 };
 const iso = (v) => { if (!v) return null; const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; };
 
-// Plantão em vigor e os anteriores (de 12 em 12 h, até `n`). Sem horário cadastrado = [].
-export function plantoesDoAviso(projetoId, agora, n = AVISOS_CFG.plantoes) {
+// Plantão em vigor e os anteriores (de 12 em 12 h, até `n`), só os que COMEÇARAM há no máximo `janelaH` horas: o que passou
+// disso não é aviso (falta de três dias atrás não interessa a ninguém). O plantão em vigor sempre entra. Sem horário cadastrado = [].
+export function plantoesDoAviso(projetoId, agora, n = AVISOS_CFG.plantoes, janelaH = AVISOS_CFG.janelaPessoasH) {
   const v = turnoVigente(projetoId, agora);
   if (!v) return [];
   const lista = [{ slot: "atual", data: v.data, turno: v.turno, inicio: v.inicio, chave: chaveMapa(projetoId, v.data, v.turno) }];
@@ -41,42 +44,28 @@ export function plantoesDoAviso(projetoId, agora, n = AVISOS_CFG.plantoes) {
     if (!h) break;
     lista.push({ slot: "anterior", data, turno, inicio: inicioDoTurno(data, h.inicio), chave: chaveMapa(projetoId, data, turno) });
   }
-  return lista;
+  const corte = agora.getTime() - janelaH * HORA;
+  return lista.filter((p) => p.slot === "atual" || p.inicio.getTime() >= corte);
 }
 
 const A = (o) => ({ gerencial: !!(CATEGORIAS[o.tipo] || {}).gerencial, desde: null, detalhe: "", ...o });
 
 // ── Mapa de Equipe: falta (inclui a falta coberta por FT), posto vago, atraso, material com alteração ──
+// A FALTA sai de ocorrenciasDoMapa(): a MESMA função do consolidado em PDF (e a mesma regra que lança na ficha). Assim o painel
+// nunca aponta falta que o mapa não tem, nem deixa de apontar a que o líder marcou. Mapa em rascunho também vale (o líder marca
+// durante o turno), mas o aviso diz que o mapa ainda não foi concluído.
 function avisosDoMapa(pid, p, mapa) {
   const out = [];
-  const quando = `Plantão ${turnoNome(p.turno)} ${dataBR(p.data)}`;
+  const rasc = mapa.status !== "enviado";
+  const quando = `Plantão ${turnoNome(p.turno)} ${dataBR(p.data)}${rasc ? " (mapa em rascunho)" : ""}`;
   const base = `${pid}:${p.data}:${p.turno}`;
   const postos = mapa.postos || [];
   const nome = (x) => String((x && x.pessoaNome) || "").trim();
-  const faltas = [];
-  for (const x of postos) {
-    if (x.situacao !== "falta") continue;
-    const d = x.detalhe || {};
-    const ft = postos.find((y) => y.id && y.id === d.porFtDe);
-    faltas.push({ posto: x, pessoa: nome(x) || "Colaborador", ftNome: ft ? nome(ft) : "" });
-  }
-  // FT cobrindo uma falta que o mapa não marcou no posto da pessoa: a falta existe do mesmo jeito (mesma regra da ficha).
-  for (const f of postos.filter((y) => y.situacao === "ft")) {
-    const d = f.detalhe || {};
-    if (d.semFalta || !String(d.quemFaltou || "").trim()) continue;
-    const jaTem = faltas.some((x) => (d.quemFaltouId && x.posto.pessoaId === d.quemFaltouId) || (d.faltaPostoId && x.posto.id === d.faltaPostoId) || x.posto.detalhe?.porFtDe === f.id || norm(x.pessoa) === norm(d.quemFaltou));
-    if (!jaTem) faltas.push({ posto: { id: `ft-${f.id}`, rotulo: f.rotulo }, pessoa: String(d.quemFaltou).trim(), ftNome: nome(f) });
-  }
-  // Cobertura (Base ou colaborador): quem foi coberto faltou (a menos que o líder marque "não foi falta").
-  for (const c of postos.filter((y) => y.situacao === "cobertura")) {
-    const d = c.detalhe || {};
-    const quem = String(d.deQuem || "").trim();
-    if (d.semFalta || !quem) continue;
-    const jaTem = faltas.some((x) => (d.deQuemId && x.posto.pessoaId === d.deQuemId) || norm(x.pessoa) === norm(quem));
-    if (!jaTem) faltas.push({ posto: { id: `cob-${c.id}`, rotulo: c.rotulo }, pessoa: quem, ftNome: "", cobNome: nome(c), base: !!d.base });
-  }
-  for (const f of faltas) {
-    out.push(A({ id: `falta:${base}:${norm(f.pessoa)}`, tipo: "falta", sev: "critico", projetoId: pid, titulo: `Falta de ${f.pessoa}`, detalhe: `${f.posto.rotulo || "Posto"} · ${quando}${f.ftNome ? ` · coberta por FT de ${f.ftNome}` : f.cobNome ? ` · coberta ${f.base ? "pela Base: " : "por "}${f.cobNome}` : " · sem cobertura registrada"}`, desde: p.inicio }));
+  for (const l of ocorrenciasDoMapa({ ...mapa, projetoId: pid, data: p.data, turno: p.turno })) {
+    if (l.tipo !== "falta") continue;
+    const pessoa = String(l.pessoa || "").trim() || "Colaborador";
+    const onde = l.posto && l.posto !== "—" ? l.posto : "";
+    out.push(A({ id: `falta:${base}:${norm(pessoa)}`, tipo: "falta", sev: "critico", projetoId: pid, titulo: `Falta de ${pessoa}`, detalhe: [onde || "Posto", quando].join(" · ") + ` · ${String(l.detalhe || "").trim() || "sem cobertura registrada"}`, desde: p.inicio }));
   }
   for (const x of postos) {
     if (x.situacao === "vago") out.push(A({ id: `vago:${base}:${norm(x.rotulo)}`, tipo: "vago", sev: "critico", projetoId: pid, titulo: `Posto sem ninguém: ${x.rotulo || "posto"}`, detalhe: quando, desde: p.inicio }));
@@ -105,7 +94,7 @@ function avisosDoMapa(pid, p, mapa) {
 function avisosMapas({ agora, mapas, cfg }) {
   const out = [];
   for (const pid of Object.keys(mapas || {})) {
-    for (const p of plantoesDoAviso(pid, agora)) {
+    for (const p of plantoesDoAviso(pid, agora, cfg.plantoes, cfg.janelaPessoasH ?? AVISOS_CFG.janelaPessoasH)) {
       const lido = mapas[pid] ? mapas[pid][p.chave] : undefined;
       if (lido === undefined) continue; // ainda não lido
       const enviado = !!(lido && lido.status === "enviado" && lido.enviadoEm);
@@ -223,14 +212,53 @@ const avisosBolsao = ({ bolsao }) => Object.entries(bolsao || {}).map(([pid, pla
   return n > 0 ? A({ id: `bolsao:${pid}`, tipo: "bolsao", sev: "atencao", projetoId: pid, titulo: `${n} ${n === 1 ? "placa crítica" : "placas críticas"} no bolsão` }) : null;
 }).filter(Boolean);
 
+// ── Teste Semanal ──
+// testes[pid] = { ultima, anterior|null } (ver testeSemanal.js). Entra no painel em duas situações:
+//  1) o teste é recente (≤ recenteDias) e TEM novidade frente à semana anterior (item novo com problema ou resolvido): compara e avisa;
+//  2) o painel não tem mais nada a dizer: puxa o mínimo — o último teste de cada projeto (e a comparação, se houver).
+// Mais um aviso geral: o próximo teste (domingo) "em preparação", ou o andamento do teste de hoje, se hoje é domingo.
+const listaCurta = (xs, n = 2) => `${xs.slice(0, n).join("; ")}${xs.length > n ? ` e mais ${xs.length - n}` : ""}`;
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+function avisosTeste({ agora, testes, cfg }, semOutros) {
+  const entradas = Object.entries(testes || {}).filter(([, t]) => t && t.ultima && t.ultima.data);
+  if (!entradas.length) return [];
+  const hoje = dataBrasilia(agora);
+  const recenteDias = (cfg.testeSemanal || AVISOS_CFG.testeSemanal).recenteDias;
+  const out = [];
+  for (const [pid, t] of entradas) {
+    const u = t.ultima;
+    const cmp = compararTestes(u, t.anterior);
+    const novidade = !!cmp && (cmp.novos.length > 0 || cmp.resolvidos.length > 0);
+    const recente = diasEntre(u.data, hoje) <= recenteDias;
+    if (!((recente && novidade) || semOutros)) continue;
+    const estado = u.inop || u.parcial ? [u.inop ? plural(u.inop, "inoperante", "inoperantes") : "", u.parcial ? `${u.parcial} parcial${u.parcial === 1 ? "" : "is"}` : ""].filter(Boolean).join(", ") : "sem pendência";
+    let detalhe;
+    if (!t.anterior) detalhe = "Primeiro teste registrado — ainda sem comparação";
+    else if (!cmp.novos.length && !cmp.resolvidos.length) detalhe = `Sem mudança desde ${dataBR(t.anterior.data)}${cmp.persistem ? ` · ${plural(cmp.persistem, "item segue pendente", "itens seguem pendentes")}` : ""}`;
+    else detalhe = `Desde ${dataBR(t.anterior.data)}: ${[cmp.novos.length ? `${plural(cmp.novos.length, "novo", "novos")} (${listaCurta(cmp.novos)})` : "", cmp.resolvidos.length ? `${plural(cmp.resolvidos.length, "resolvido", "resolvidos")} (${listaCurta(cmp.resolvidos)})` : "", cmp.deltaPct ? `${cmp.deltaPct > 0 ? "+" : ""}${cmp.deltaPct} p.p.` : ""].filter(Boolean).join(" · ")}`;
+    out.push(A({ id: `teste:${pid}:${u.data}`, tipo: "teste", sev: cmp && cmp.novos.length ? "atencao" : "info", projetoId: pid, titulo: `Último teste semanal (${dataBR(u.data)}): ${u.pct}% · ${estado}`, detalhe, desde: instante(u.data) }));
+  }
+  // Próximo teste: domingo. Se hoje é domingo, mostra quantos projetos já enviaram.
+  const dow = diaDaSemana(hoje);
+  const feitosHoje = entradas.filter(([, t]) => t.ultima.data === hoje).length;
+  if (dow === 0 && feitosHoje < entradas.length) {
+    out.push(A({ id: `teste-hoje:${hoje}`, tipo: "teste", sev: "info", projetoId: "TODOS", titulo: `Teste semanal de hoje (${dataBR(hoje)})`, detalhe: `${feitosHoje} de ${entradas.length} projetos já enviaram` }));
+  } else {
+    const alvo = somarDias(hoje, dow === 0 ? 7 : 7 - dow);
+    out.push(A({ id: `teste-prox:${alvo}`, tipo: "teste", sev: "info", projetoId: "TODOS", titulo: `Próximo teste semanal: domingo ${dataBR(alvo)}`, detalhe: "Teste da semana que vem — já em preparação" }));
+  }
+  return out;
+}
+
 // fontes: ver FONTES em fontes.js. gerencial=false esconde os avisos de pessoas/supervisão.
 export function calcularAvisos({ agora = new Date(), fontes = {}, gerencial = false, cfg = AVISOS_CFG } = {}) {
   const ctx = { agora, cfg, ...fontes };
-  const todos = [
+  const base = [
     ...avisosMapas({ agora, cfg, mapas: fontes.mapas }),
     ...avisosKeyAccess(ctx), ...avisosCtmk(ctx), ...avisosEnergia(ctx), ...avisosManutencao(ctx), ...avisosInop(ctx),
     ...avisosRelatorio(ctx), ...avisosSupervisao(ctx), ...avisosIluminacao(ctx), ...avisosBolsao(ctx), ...avisosFerias(ctx),
   ].filter((a) => gerencial || !a.gerencial);
+  const todos = [...base, ...avisosTeste(ctx, base.length === 0)].filter((a, i, arr) => arr.findIndex((b) => b.id === a.id) === i);
   const ordem = (a) => (CATEGORIAS[a.tipo] || {}).ordem ?? 9;
   todos.sort((a, b) => SEVERIDADES[a.sev] - SEVERIDADES[b.sev] || ordem(a) - ordem(b) || ((a.desde ? a.desde.getTime() : Infinity) - (b.desde ? b.desde.getTime() : Infinity)) || a.projetoId.localeCompare(b.projetoId) || a.id.localeCompare(b.id));
   const avisos = todos.map((a) => ({ ...a, idade: idadeTexto(a.desde, agora) }));

@@ -8,7 +8,9 @@ export const AVISOS_CFG = {
   checklistInop: { criticoDias: 30 },               // equipamento inoperante no último checklist
   checklistAtraso: { atencaoDias: 9, criticoDias: 15 }, // sem relatório semanal
   supervisao: { atencaoDias: 15, criticoDias: 30 }, // sem visita da supervisão
-  plantoes: 3,                                      // plantões lidos por projeto: o atual + os 2 anteriores (cobre o dia e o fim do dia anterior)
+  plantoes: 3,                                      // teto de plantões lidos por projeto (o atual + anteriores); quem manda é a janela abaixo
+  janelaPessoasH: 24,                               // falta, FT, troca, cobertura, posto vago, atraso, material e "mapa não enviado": só de plantões que começaram há ≤ 24 h; depois some (regra do Marcio, 12/10/2026)
+  testeSemanal: { recenteDias: 2 },                 // teste semanal com novidade (comparado à semana anterior) aparece por até 2 dias; sem nada mais no painel, o último teste aparece sempre
   iluminacaoTeste: { criticoDias: 7 },              // teste quinzenal de iluminação pendente há ≥ 7 dias vira crítico
   ferias: { saidaDias: 7, retornoDias: 3 },         // avisa saída nos próximos 7 dias e retorno nos próximos 3
   janelaMapaMin: 60,                                // mesma janela da barra do Mapa de Equipe
@@ -16,7 +18,8 @@ export const AVISOS_CFG = {
   tickerMax: 10,                                    // quantas manchetes (as mais importantes primeiro) entram na rotação
 };
 
-// gerencial: true = traz dado de pessoa/supervisão; só aparece no perfil gerencial.
+// gerencial: true = traz dado de pessoa/supervisão; só aparece no perfil gerencial (que inclui o testador/demo).
+// Decisão do Marcio (12/10/2026): NÃO abrir nomes de faltas/FT/etc. para os demais perfis. O teste semanal (equipamentos) é de todos.
 // ordem: dentro da mesma severidade, o que está acontecendo AGORA (falta, posto vago, queda de energia) vem antes do que é crônico.
 export const CATEGORIAS = {
   falta: { rotulo: "Falta", gerencial: true, ordem: 0 },
@@ -37,5 +40,6 @@ export const CATEGORIAS = {
   relatorio: { rotulo: "Relatório semanal", gerencial: false, ordem: 5 },
   iluminacao: { rotulo: "Iluminação", gerencial: false, ordem: 4 },
   bolsao: { rotulo: "Bolsão", gerencial: false, ordem: 4 },
+  teste: { rotulo: "Teste semanal", gerencial: false, ordem: 6 },
 };
 export const SEVERIDADES = { critico: 0, atencao: 1, info: 2 };
