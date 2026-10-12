@@ -358,3 +358,12 @@ test("completarPostosFixos: devolve o posto fixo que foi tirado, na ordem, e man
   expect(ok.postos[1].pessoaNome).toBe("Sueli");
   expect(completarPostosFixos(m)).toBe(m); // nada a devolver: mesmo objeto
 });
+test("completarPostosFixos: 'Posto extra' presente com pessoa ocupa o posto fixo que faltava (P604)", () => {
+  const m = novoMapa({ projetoId: "P604", data: "2026-10-11", turno: "N", horario: { inicio: "18:00", fim: "06:00" } });
+  const [lid, vspp1, vspp2, cco] = m.postos;
+  const gravado = { ...m, postos: [{ ...lid, pessoaNome: "Rosalvio" }, { ...cco, pessoaNome: "Hillory" }, { ...postoVazioT("Posto extra"), pessoaId: "j", pessoaNome: "Júlio" }, { ...postoVazioT("Posto extra"), pessoaId: "f", pessoaNome: "Floriano" }] };
+  const ok = completarPostosFixos(gravado);
+  expect(ok.postos.map((p) => `${p.rotulo}:${p.pessoaNome}`)).toEqual(["Líder:Rosalvio", "VSPP 1:Júlio", "VSPP 2:Floriano", "CCO:Hillory"]);
+  const ft = { ...gravado, postos: [...gravado.postos.slice(0, 3), { ...gravado.postos[3], situacao: "ft" }] }; // FT de verdade não se mexe
+  expect(completarPostosFixos(ft).postos.map((p) => p.rotulo)).toEqual(["Líder", "VSPP 1", "VSPP 2", "CCO", "Posto extra"]);
+});

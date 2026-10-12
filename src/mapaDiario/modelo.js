@@ -75,10 +75,16 @@ export function completarPostosFixos(mapa) {
   const defs = postosPadrao(pid, turno, mapa.data);
   const postos = mapa.postos || [];
   const usados = new Set();
+  // "Posto extra" comum (presente, com pessoa) é quase sempre um posto fixo que o líder tirou e refez à mão: a pessoa volta para o posto fixo que faltou.
+  const deslocados = postos.filter((p) => !defDoPosto(pid, turno, p.rotulo) && /^posto extra$/i.test((p.rotulo || "").trim()) && p.situacao === "presente" && (p.pessoaId || (p.pessoaNome || "").trim()));
   const fixos = defs.map((d) => {
     const ex = postos.find((p) => !usados.has(p.id) && (defDoPosto(pid, turno, p.rotulo) || {}).rotulo === d.rotulo);
     if (ex) { usados.add(ex.id); return ex; }
-    return postoVazio(d.rotulo, d.horario, { lider: d.lider, cargos: d.cargos });
+    const vazio = postoVazio(d.rotulo, d.horario, { lider: d.lider, cargos: d.cargos });
+    const desl = !d.lider ? deslocados.find((x) => !usados.has(x.id)) : null;
+    if (!desl) return vazio;
+    usados.add(desl.id);
+    return { ...vazio, pessoaId: desl.pessoaId || "", pessoaNome: desl.pessoaNome || "", detalhe: desl.detalhe || {} };
   });
   const extras = postos.filter((p) => !usados.has(p.id));
   const novos = [...fixos, ...extras];
