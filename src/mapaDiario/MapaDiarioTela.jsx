@@ -33,6 +33,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [abertos, setAbertos] = useState({});
   const [itensMat, setItensMat] = useState([]);
   const [avisoEquipe, setAvisoEquipe] = useState("");
+  const [avisoReaberto, setAvisoReaberto] = useState("");
   const [fichaMsg, setFichaMsg] = useState(null);
   const [confirmouResumo, setConfirmouResumo] = useState(false);
   const [matAberto, setMatAberto] = useState(false);
@@ -68,8 +69,16 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           const lc = lp && cs.find((c) => c.id === lp.pessoaId);
           if (lc) { const r = puxarEquipe({ postos: m.postos, lider: lc, colabs: cs, pid, turno, soVazios: !!existente }); m = { ...m, postos: r.postos }; aviso = r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${lc.nome} puxada da montagem em Equipes. Ajuste só o que mudou.`; }
         }
+        // Mapa já ENVIADO por versão antiga, sem algum posto fixo: reabre em edição com os postos de volta (nada é gravado até concluir).
+        const completo = m.status === "enviado" ? completarPostosFixos(m, cs) : null;
+        const reabrir = !!completo && completo !== m;
+        if (reabrir) {
+          const volta = completo.postos.filter((p) => !m.postos.includes(p)).map((p) => p.rotulo);
+          setAvisoReaberto(`Este mapa foi enviado sem o posto fixo (${volta.join(", ")}). Os postos voltaram: confira quem estava em cada um e toque em Concluir mapa.`);
+          setEditando(true);
+        } else setAvisoReaberto("");
         setAvisoEquipe(aviso);
-        setColabs(cs); setMapa(m.status === "enviado" ? m : garantirMoto(completarPostosFixos(m, cs))); setItensMat(itensDeEquipamento(eq, pid, turno));
+        setColabs(cs); setMapa(m.status === "enviado" ? (reabrir ? garantirMoto(completo) : m) : garantirMoto(completarPostosFixos(m, cs))); setItensMat(itensDeEquipamento(eq, pid, turno));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -215,6 +224,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
         {mapa && !carregando && (<>
           <fieldset disabled={!!enviado && !editando} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+          {avisoReaberto && <div role="status" style={{ ...S.card, borderColor: cor.ac, fontSize: 13, color: cor.txt, fontWeight: 600 }}>⚠ {avisoReaberto}</div>}
           <div style={S.card}>
             <div style={S.h}>Equipe do turno</div>
             {!projetoPuxaEquipe(pid) && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Projeto 4x2/5x2: a equipe muda a cada plantão e não é puxada sozinha. Escolha quem está em cada posto.</div>}
