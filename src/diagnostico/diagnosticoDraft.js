@@ -55,3 +55,7 @@ export function writeDraft(storage, key, draft) {
 export function isDiagnosticDataReady(catalogo, profile) {
   return Boolean(catalogo && profile);
 }
+
+export function draftHasResponses(draft) {
+  return Boolean(draft && draft.respostas && Object.keys(draft.respostas).length > 0);
+}

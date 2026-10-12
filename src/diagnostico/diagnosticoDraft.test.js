@@ -42,3 +42,10 @@ describe("rascunho do Diagnóstico Situacional", () => {
     expect(isDiagnosticDataReady({ versao: "1.0.0" }, { role: "gerente" })).toBe(true);
   });
 });
+
+import { draftHasResponses } from "./diagnosticoDraft";
+test("rascunho local só é recuperável quando tem respostas", () => {
+  expect(draftHasResponses(null)).toBe(false);
+  expect(draftHasResponses({ respostas: {} })).toBe(false);
+  expect(draftHasResponses({ respostas: { "D01.01.01": { status: "conforme" } } })).toBe(true);
+});
