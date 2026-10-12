@@ -52,3 +52,15 @@ test("em implantação: sem contador, sem brilho e sem lista, mesmo com mapas pe
 test("o interruptor está ligado (o envio do mapa já existe)", () => {
   expect(require("./ativo").MAPA_DIARIO_ATIVO).toBe(true);
 });
+
+test("cada projeto com plantão em vigor tem o botão Ver que abre a cascata dos mapas", async () => {
+  const resumo = resumoDoPainel({ agora, mapas: PROJETOS_DO_MAPA.map(env) });
+  await mostrar({ resumo, aberto: true });
+  const botoes = [...host.querySelectorAll('[role="button"]')].filter((b) => /Ver/.test(b.textContent));
+  expect(botoes).toHaveLength(PROJETOS_DO_MAPA.length);
+  expect(host.querySelector('[data-testid="ver-mapas"]')).toBeNull();
+  await act(async () => botoes[0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  expect(host.querySelector('[data-testid="ver-mapas"]') || host.textContent.includes("Lendo os mapas")).toBeTruthy();
+  await act(async () => botoes[0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  expect(host.querySelector('[data-testid="ver-mapas"]')).toBeNull();
+});

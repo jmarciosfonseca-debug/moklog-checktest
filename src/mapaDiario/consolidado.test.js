@@ -82,3 +82,31 @@ test("entrada vazia ou malformada não quebra", () => {
   expect(consolidar(null, base).totais.mapas).toBe(0);
   expect(consolidar([null, { status: "enviado" }], base).totais.mapas).toBe(0);
 });
+
+// Mapa antigo do P606 (11/10 noturno): sem a marca de líder e a FT entrou direto no posto CCO; a Elaine só está em "quem faltou".
+const ANTIGO = mapa("P606", "2026-10-11", "N", [
+  posto("l", "Líder", "Luiz Felipe"),
+  posto("c", "CCO", "Rosemeire", "ft", { quemFaltou: "Elaine Farias", quemFaltouId: "e1" }, { obs: "Falta com atestado" }),
+  posto("v", "Vigilante", "Murilo"),
+]);
+test("FT cobrindo falta sempre mostra a falta, mesmo sem posto marcado como falta", () => {
+  const o = ocorrenciasDoMapa(ANTIGO);
+  expect(o.map((x) => x.tipo)).toEqual(["falta", "ft"]);
+  expect(o[0]).toMatchObject({ pessoa: "Elaine Farias", posto: "CCO", derivada: true });
+  expect(o[0].detalhe).toBe("coberta por FT de Rosemeire — Falta com atestado");
+  const r = consolidar([ANTIGO], base);
+  expect(r.totais).toMatchObject({ mapas: 1, falta: 1, ft: 1 });
+  expect(consolidar([ANTIGO], { ...base, ocorrencia: "falta" }).totais.falta).toBe(1);
+  expect(consolidar([ANTIGO], { ...base, colaborador: "elaine" }).ocorrencias.map((x) => x.tipo)).toEqual(["falta", "ft"]);
+});
+test("não duplica a falta quando o posto da falta já está no mapa; FT sem falta não gera falta", () => {
+  expect(ocorrenciasDoMapa(A).filter((x) => x.tipo === "falta")).toHaveLength(1);
+  expect(ocorrenciasDoMapa(A).find((x) => x.tipo === "falta").derivada).toBeUndefined();
+  expect(ocorrenciasDoMapa(E).map((x) => x.tipo)).toEqual(["ft"]);
+  const porNome = mapa("P1", "2026-10-02", "D", [posto("a", "CCO", "Elaine Farias", "falta"), posto("f", "Posto extra", "Rosemeire", "ft", { quemFaltou: "elaine farias" })]);
+  expect(ocorrenciasDoMapa(porNome).filter((x) => x.tipo === "falta")).toHaveLength(1);
+});
+test("líder de mapa antigo (sem marca) sai do posto com Líder no nome", () => {
+  expect(liderDoMapa(ANTIGO)).toBe("Luiz Felipe");
+  expect(consolidar([ANTIGO], { ...base, lider: "Luiz Felipe" }).totais.mapas).toBe(1);
+});
