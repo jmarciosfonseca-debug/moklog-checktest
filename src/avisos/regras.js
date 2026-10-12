@@ -67,8 +67,16 @@ function avisosDoMapa(pid, p, mapa) {
     const jaTem = faltas.some((x) => (d.quemFaltouId && x.posto.pessoaId === d.quemFaltouId) || (d.faltaPostoId && x.posto.id === d.faltaPostoId) || x.posto.detalhe?.porFtDe === f.id || norm(x.pessoa) === norm(d.quemFaltou));
     if (!jaTem) faltas.push({ posto: { id: `ft-${f.id}`, rotulo: f.rotulo }, pessoa: String(d.quemFaltou).trim(), ftNome: nome(f) });
   }
+  // Cobertura (Base ou colaborador): quem foi coberto faltou (a menos que o líder marque "não foi falta").
+  for (const c of postos.filter((y) => y.situacao === "cobertura")) {
+    const d = c.detalhe || {};
+    const quem = String(d.deQuem || "").trim();
+    if (d.semFalta || !quem) continue;
+    const jaTem = faltas.some((x) => (d.deQuemId && x.posto.pessoaId === d.deQuemId) || norm(x.pessoa) === norm(quem));
+    if (!jaTem) faltas.push({ posto: { id: `cob-${c.id}`, rotulo: c.rotulo }, pessoa: quem, ftNome: "", cobNome: nome(c), base: !!d.base });
+  }
   for (const f of faltas) {
-    out.push(A({ id: `falta:${base}:${norm(f.pessoa)}`, tipo: "falta", sev: "critico", projetoId: pid, titulo: `Falta de ${f.pessoa}`, detalhe: `${f.posto.rotulo || "Posto"} · ${quando}${f.ftNome ? ` · coberta por FT de ${f.ftNome}` : " · sem cobertura registrada"}`, desde: p.inicio }));
+    out.push(A({ id: `falta:${base}:${norm(f.pessoa)}`, tipo: "falta", sev: "critico", projetoId: pid, titulo: `Falta de ${f.pessoa}`, detalhe: `${f.posto.rotulo || "Posto"} · ${quando}${f.ftNome ? ` · coberta por FT de ${f.ftNome}` : f.cobNome ? ` · coberta ${f.base ? "pela Base: " : "por "}${f.cobNome}` : " · sem cobertura registrada"}`, desde: p.inicio }));
   }
   for (const x of postos) {
     if (x.situacao === "vago") out.push(A({ id: `vago:${base}:${norm(x.rotulo)}`, tipo: "vago", sev: "critico", projetoId: pid, titulo: `Posto sem ninguém: ${x.rotulo || "posto"}`, detalhe: quando, desde: p.inicio }));
@@ -78,7 +86,7 @@ function avisosDoMapa(pid, p, mapa) {
       out.push(A({ id: `${x.situacao}:${base}:${norm(nome(x) || x.rotulo)}`, tipo: x.situacao, sev: "info", projetoId: pid, titulo: `${x.situacao === "troca" ? "Troca" : d.base ? "Cobertura (Base)" : "Cobertura"}: ${nome(x) || "colaborador"}`, detalhe: [quem ? (x.situacao === "troca" ? `no lugar de ${quem}` : `cobrindo ${quem}`) : "", x.rotulo, quando].filter(Boolean).join(" · "), desde: p.inicio }));
     } else if (x.situacao === "ft") {
       const d = x.detalhe || {};
-      if (!String(d.quemFaltou || "").trim() || d.semFalta) out.push(A({ id: `ft:${base}:${norm(nome(x) || x.rotulo)}`, tipo: "ft", sev: "info", projetoId: pid, titulo: `FT: ${nome(x) || "colaborador"}`, detalhe: ["folga trabalhada", x.rotulo, quando].filter(Boolean).join(" · "), desde: p.inicio }));
+      if (!String(d.quemFaltou || "").trim() || d.semFalta || d.postoVago) out.push(A({ id: `ft:${base}:${norm(nome(x) || x.rotulo)}`, tipo: "ft", sev: "info", projetoId: pid, titulo: `FT: ${nome(x) || "colaborador"}`, detalhe: [d.postoVago ? "cobrindo posto vago" : "folga trabalhada", x.rotulo, quando].filter(Boolean).join(" · "), desde: p.inicio }));
     }
     else if (x.situacao === "atraso") {
       const d = x.detalhe || {};

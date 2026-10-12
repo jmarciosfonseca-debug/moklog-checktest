@@ -1010,6 +1010,11 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
                       <div style={{ fontSize:12, color:"#f1f5f9", fontWeight:600 }}>{fmtDate(h.data)}</div>
                       {h.label && <div style={{ fontSize:10, color:"#94a3b8" }}>{h.label}</div>}
                       {h.detalhe && <div style={{ fontSize:10, color:"#64748b" }}>{h.detalhe}</div>}
+                      {h.origem==="mapa" && (
+                        <div style={{ fontSize:9, color:"#38bdf8", marginTop:2, fontWeight:700 }}>
+                          ● Lançado automaticamente pelo Mapa de Equipe{h.registradoEm?` · ${fmtDate(h.registradoEm.slice(0,10))} ${new Date(h.registradoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:""}
+                        </div>
+                      )}
                       {h.editadoPor && (
                         <div style={{ fontSize:9, color:"#f59e0b", marginTop:2 }}>
                           <Ico n="editar"/> Editado {h.editadoPor==="lider"?"pelo líder":"pelo gerencial"} · {fmtDate(h.editadoEm?.split("T")[0])}

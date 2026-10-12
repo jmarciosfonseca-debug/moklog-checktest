@@ -2,8 +2,10 @@
 // Falta, FT e Atraso informados no mapa viram lançamento no histórico da ficha, uma vez só:
 // o id é determinístico (mapa:{mapaId}:{colaborador}:{tipo}), então concluir de novo ou corrigir o mapa
 // não duplica; se a correção desfaz a exceção, o lançamento que o próprio mapa criou sai.
-// NÃO viram lançamento: cobertura (Base ou colaborador), troca/permuta e "sem ninguém" — ficam só no histórico
-// do mapa. Nome digitado (sem cadastro) e campo vazio também não geram nada. A observação do posto não vai
+// COBERTURA (Base ou colaborador): quem cobre NÃO recebe FT nem nada na ficha (não é do posto); quem foi coberto
+// recebe a FALTA — desde que escolhido do cadastro (deQuemId) e não marcado "não foi falta" (férias, atestado, folga).
+// NÃO viram lançamento: troca/permuta, posto vago e "sem ninguém" — ficam só no histórico do mapa.
+// Nome digitado (sem cadastro) e campo vazio também não geram nada. A observação do posto não vai
 // para a ficha (pode ter dado sensível).
 
 const dataBR = (iso) => iso.split("-").reverse().join("/");
@@ -15,6 +17,15 @@ export function lancamentosDoMapa(mapa) {
   const origem = `mapa de ${dataBR(mapa.data)} (${turno})`;
   const out = [];
   (mapa.postos || []).forEach((p) => {
+    const dc = p.detalhe || {};
+    // Cobertura: a falta é de quem foi coberto, não de quem cobre.
+    if (p.situacao === "cobertura" && dc.deQuemId && !dc.semFalta && dc.deQuemId !== p.pessoaId) {
+      const quem = (p.pessoaNome || "").trim();
+      const por = quem ? ` (coberta ${dc.base ? "pela Base: " : "por "}${quem})` : "";
+      const falta = { id: idDe(mapa.id, dc.deQuemId, "Falta"), colabId: dc.deQuemId, tipo: "Falta", data: mapa.data, detalhe: `Falta no posto ${p.rotulo}${por} — ${origem}`, origem: "mapa", mapaId: mapa.id, diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) };
+      if (!out.some((x) => x.id === falta.id)) out.push(falta);
+      return;
+    }
     const tipo = TIPOS[p.situacao];
     if (!tipo || !p.pessoaId) return;
     let detalhe;
@@ -85,7 +96,9 @@ export function descricaoLancamentos(mapa) {
     const p = (mapa.postos || []).find((x) => x.pessoaId === id && x.pessoaNome);
     if (p) return p.pessoaNome;
     const f = (mapa.postos || []).find((x) => x.detalhe && x.detalhe.quemFaltouId === id);
-    return (f && f.detalhe.quemFaltou) || "colaborador";
+    if (f) return f.detalhe.quemFaltou || "colaborador";
+    const c = (mapa.postos || []).find((x) => x.detalhe && x.detalhe.deQuemId === id);
+    return (c && c.detalhe.deQuem) || "colaborador";
   };
   return lancamentosDoMapa(mapa).map((l) => `${l.tipo} de ${nome(l.colabId)}`);
 }

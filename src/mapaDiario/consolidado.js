@@ -37,9 +37,10 @@ export function detalheDoPosto(p, postos = []) {
     if (ft && nomeDe(ft)) { detalhe = `coberta por FT de ${nomeDe(ft)}`; envolvidos.push(nomeDe(ft)); }
   } else if (p.situacao === "ft") {
     if (d.quemFaltou) { detalhe = `cobrindo a falta de ${d.quemFaltou}`; envolvidos.push(d.quemFaltou); }
+    else if (d.postoVago) detalhe = "cobrindo posto vago";
     else if (d.semFalta) detalhe = "sem falta (folga trabalhada)";
   } else if (p.situacao === "cobertura") {
-    detalhe = `${d.base ? "Base, " : ""}cobrindo ${d.deQuem || "—"}`; envolvidos.push(d.deQuem);
+    detalhe = `${d.base ? "Base, " : ""}cobrindo ${d.deQuem || "—"}${d.semFalta ? " (não foi falta)" : ""}`; envolvidos.push(d.deQuem);
   } else if (p.situacao === "troca") {
     detalhe = `no lugar de ${d.noLugarDe || "—"}`; envolvidos.push(d.noLugarDe);
   } else if (p.situacao === "atraso") {
@@ -76,6 +77,19 @@ export function ocorrenciasDoMapa(mapa) {
     const obs = (p.obs || "").trim();
     const base = `coberta por FT de ${nomeDe(p)}`;
     linhas.push({ ...ctx, tipo: "falta", posto: /^posto extra$/i.test((p.rotulo || "").trim()) ? "—" : (p.rotulo || "—"), pessoa: quem, pessoaId: d.quemFaltouId || "", detalhe: obs ? `${base} — ${obs}` : base, envolvidos: [quem, nomeDe(p)].filter(Boolean), derivada: true });
+  }
+  // Cobertura (Base ou colaborador): quem foi coberto faltou — mesma regra que lança a Falta na ficha dele.
+  for (const p of postos) {
+    if (p.situacao !== "cobertura") continue;
+    const d = p.detalhe || {};
+    const quem = String(d.deQuem || "").trim();
+    if (d.semFalta || !quem) continue;
+    const jaTem = postos.some((x) => x.situacao === "falta" && ((d.deQuemId && x.pessoaId === d.deQuemId) || norm(nomeDe(x)) === norm(quem)))
+      || linhas.some((l) => l.tipo === "falta" && ((d.deQuemId && l.pessoaId === d.deQuemId) || norm(l.pessoa) === norm(quem)));
+    if (jaTem) continue;
+    const obs = (p.obs || "").trim();
+    const base = `coberta ${d.base ? "pela Base: " : "por "}${nomeDe(p)}`;
+    linhas.push({ ...ctx, tipo: "falta", posto: /^posto extra$/i.test((p.rotulo || "").trim()) ? "—" : (p.rotulo || "—"), pessoa: quem, pessoaId: d.deQuemId || "", detalhe: obs ? `${base} — ${obs}` : base, envolvidos: [quem, nomeDe(p)].filter(Boolean), derivada: true });
   }
   const rank = { falta: 0, ft: 1 }; // falta antes da FT que a cobre; o resto mantém a ordem dos postos
   return linhas.map((l, i) => ({ l, i })).sort((a, b) => (rank[a.l.tipo] ?? 2) - (rank[b.l.tipo] ?? 2) || a.i - b.i).map((x) => x.l);

@@ -282,6 +282,35 @@ test("FT: pergunta 'Quem faltou?', o posto dele vira Falta e a falta vai para a 
   expect(postos.find((p) => p.rotulo === "Posto extra")).toMatchObject({ situacao: "ft", detalhe: { quemFaltouId: "b" } });
 });
 
+test("cobertura da Base: escolhe o coberto no cadastro, a tela avisa que a FALTA dele vai para a ficha e o mapa leva o id", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
+  await abrirExc("P1 · Vigilante CCO");
+  await clicar(botao("Cobertura"));
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain("cobertura de quem?");
+  await digitar(q('select[aria-label="Cobertura de quem"]'), "b");
+  expect(host.textContent).toContain("a FALTA de Marta A. (11/10/2026) é lançada na ficha");
+  expect(host.textContent).toContain("Quem cobre não recebe FT");
+  const base = [...host.querySelectorAll("label")].find((l) => /da Base/.test(l.textContent)).querySelector("input");
+  await clicar(base);
+  await digitar(q('input[aria-label="Nome no posto P1 · Vigilante CCO"]'), "Patrícia Rodrigues");
+  await clicar(botao("Concluir mapa"));
+  const enviado = io.lancarNaFicha.mock.calls[0][0].postos.find((p) => p.rotulo === "P1 · Vigilante CCO");
+  expect(enviado).toMatchObject({ situacao: "cobertura", detalhe: { deQuem: "Marta A.", deQuemId: "b", base: true } });
+});
+test("FT: 'POSTO VAGO' aparece em Quem faltou e libera a conclusão sem gerar falta", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
+  await clicar(botao("+ Posto extra"));
+  await digitar(q('select[aria-label="Quem está no posto Posto extra"]'), "d");
+  await clicar(botao("FT"));
+  const sel = q('select[aria-label="Quem faltou (FT)"]');
+  expect([...sel.options].some((o) => o.value === "__vago" && /POSTO VAGO/.test(o.textContent))).toBe(true);
+  await digitar(sel, "__vago");
+  await clicar(botao("Concluir mapa"));
+  expect(q('pre[aria-label="Texto do mapa"]').textContent).toContain("cobrindo posto vago");
+  expect(io.lancarNaFicha.mock.calls[0][0].postos.find((p) => p.rotulo === "Posto extra").detalhe).toMatchObject({ postoVago: true });
+});
+
 // ---- fechamento: obrigatórios, posto fixo x extra, Presente, Editar mapa ----
 test("obrigatórios: sem km da moto, resumo e visita não conclui; preenchidos, conclui", async () => {
   await montar({ __semObrig: true });
