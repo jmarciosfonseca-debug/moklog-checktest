@@ -10,7 +10,7 @@
 
 import { itensDaBase } from "./materialBase";
 import { chaveMapa } from "./regras";
-import { postosDoProjeto, defDoPosto, projetoPuxaEquipe } from "./postos";
+import { postosDoProjeto, defDoPosto, projetoPuxaEquipe, cargoCabe } from "./postos";
 import { pertenceA } from "../equipe/vinculos";
 
 export const SITUACOES = [
@@ -66,6 +66,36 @@ export function novoMapa({ projetoId, data, turno, horario, base = null, agora =
     supervisao: null, visita: null, resumo: "", observacoes: "",
     criadoEm: agora.toISOString(), atualizadoEm: agora.toISOString(), enviadoEm: null, enviadoPor: "",
   });
+}
+
+// Mapa já gravado (ou enviado) que perdeu um posto fixo — ex.: tirado com o antigo "×": devolve o posto vazio, na ordem do escopo.
+// Os postos extras continuam como estão, depois dos fixos.
+export function completarPostosFixos(mapa, colabs = []) {
+  const pid = mapa.projetoId, turno = mapa.turno;
+  const defs = postosPadrao(pid, turno, mapa.data);
+  const postos = mapa.postos || [];
+  const usados = new Set();
+  // "Posto extra" comum (presente, com pessoa) é quase sempre um posto fixo que o líder tirou e refez à mão: a pessoa volta para o posto fixo que faltou.
+  const deslocados = postos.filter((p) => !defDoPosto(pid, turno, p.rotulo) && /^posto extra$/i.test((p.rotulo || "").trim()) && p.situacao === "presente" && (p.pessoaId || (p.pessoaNome || "").trim()));
+  const cargoDe = (x) => ((colabs || []).find((c) => c.id === x.pessoaId) || {}).cargo;
+  const casa = (d, x) => cargoCabe(d, cargoDe(x)); // pelo cargo da pessoa no cadastro
+  const jaTem = (d) => postos.find((p) => !usados.has(p.id) && (defDoPosto(pid, turno, p.rotulo) || {}).rotulo === d.rotulo);
+  const faltam = defs.filter((d) => !jaTem(d));
+  const preenchidos = {};
+  defs.forEach((d) => { const ex = jaTem(d); if (ex) { usados.add(ex.id); preenchidos[d.rotulo] = ex; } });
+  // 1º pelo cargo (vale até para o posto de líder); 2º, o que sobrar vai em ordem para os postos que não são de líder.
+  faltam.forEach((d) => { const x = deslocados.find((y) => !usados.has(y.id) && casa(defDoPosto(pid, turno, d.rotulo) || d, y)); if (x) { usados.add(x.id); preenchidos[d.rotulo] = x; } });
+  faltam.forEach((d) => { if (preenchidos[d.rotulo] || d.lider) return; const x = deslocados.find((y) => !usados.has(y.id)); if (x) { usados.add(x.id); preenchidos[d.rotulo] = x; } });
+  const fixos = defs.map((d) => {
+    const ex = preenchidos[d.rotulo];
+    if (ex && !deslocados.includes(ex)) return ex;
+    const vazio = postoVazio(d.rotulo, d.horario, { lider: d.lider, cargos: d.cargos });
+    return ex ? { ...vazio, pessoaId: ex.pessoaId || "", pessoaNome: ex.pessoaNome || "", detalhe: ex.detalhe || {} } : vazio;
+  });
+  const extras = postos.filter((p) => !usados.has(p.id));
+  const novos = [...fixos, ...extras];
+  const igual = novos.length === postos.length && novos.every((p, i) => p === postos[i]);
+  return igual ? mapa : { ...mapa, postos: novos };
 }
 
 // ── Material / armamento / munição ────────────────────────────────────────────
