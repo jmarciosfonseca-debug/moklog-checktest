@@ -78,3 +78,14 @@ export function resumoLancamento(r, mapa) {
   if (!partes.length && !r.removidos) return "Nenhum lançamento para a ficha neste mapa.";
   return `Ficha atualizada: ${partes.join(", ") || "lançamentos removidos"}${r.removidos ? ` (${r.removidos} desfeito${r.removidos > 1 ? "s" : ""} pela correção)` : ""}.`;
 }
+
+// "Falta de Elaine", "FT de Rosemary"…: o que o mapa pede para a ficha, em palavras, para o líder conferir na tela.
+export function descricaoLancamentos(mapa) {
+  const nome = (id) => {
+    const p = (mapa.postos || []).find((x) => x.pessoaId === id && x.pessoaNome);
+    if (p) return p.pessoaNome;
+    const f = (mapa.postos || []).find((x) => x.detalhe && x.detalhe.quemFaltouId === id);
+    return (f && f.detalhe.quemFaltou) || "colaborador";
+  };
+  return lancamentosDoMapa(mapa).map((l) => `${l.tipo} de ${nome(l.colabId)}`);
+}

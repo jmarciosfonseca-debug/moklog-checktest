@@ -75,3 +75,9 @@ test("FT sem 'quem faltou' ou 'ninguém faltou' só lança a FT; a própria pess
   expect(lancamentosDoMapa(mapa([posto("CCO", "b", "ft", { semFalta: true })])).map((x) => x.tipo)).toEqual(["FT"]);
   expect(lancamentosDoMapa(mapa([posto("CCO", "b", "ft", { quemFaltouId: "b" })])).map((x) => x.tipo)).toEqual(["FT"]);
 });
+test("descricaoLancamentos: diz quem recebe o quê (FT e a falta de quem foi coberto)", () => {
+  const { descricaoLancamentos } = require("./ficha");
+  const m = mapa([posto("P1", "b", "falta", { porFtDe: "x" }), { ...posto("Posto extra", "d", "ft", { quemFaltouId: "b", quemFaltou: "Marta" }), id: "x", pessoaNome: "Joao" }]);
+  m.postos[0].pessoaNome = "Marta";
+  expect(descricaoLancamentos(m).sort()).toEqual(["FT de Joao", "Falta de Marta"]);
+});
