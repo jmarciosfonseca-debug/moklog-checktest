@@ -2,7 +2,7 @@
 // Documentos em equipes/{pid}/mapas/{projeto_AAAA-MM-DD_D|N}: subpasta da Equipe do próprio projeto,
 // que as regras atuais já cobrem (como equipes/{pid}/fv). Não depende de coleção nova.
 import { getApps } from "firebase/app";
-import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { setDoc } from "../fireGuard";
 import { diasEntre } from "./regras";
 import { isDemo, authFetchEquipe } from "../session";
@@ -46,6 +46,17 @@ export async function loadUltimoMapa(pid, turno, antesDe, { gapPar = false } = {
   const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(14)));
   const lista = snap.docs.map((d) => d.data()).filter((m) => m.turno === turno && m.status === "enviado" && m.data < antesDe && (!gapPar || Math.abs(diasEntre(m.data, antesDe)) % 2 === 0));
   return lista[0] || null;
+}
+
+// Consolidado (gerencial): mapas CONCLUÍDOS de vários projetos num período [de, ate] (datas ISO).
+// Filtro de faixa e ordenação no mesmo campo (`data`): não exige índice composto. Se um projeto falhar, a leitura inteira falha
+// (consolidado com projeto faltando seria número errado) — quem chama avisa.
+export async function loadMapasPeriodo(projetos, de, ate) {
+  const por = await Promise.all(projetos.map(async (pid) => {
+    const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), where("data", ">=", de), where("data", "<=", ate), orderBy("data")));
+    return snap.docs.map((d) => ({ projetoId: pid, ...d.data() })).filter((m) => m.status === "enviado");
+  }));
+  return por.flat();
 }
 
 export async function saveMapa(mapa) {
