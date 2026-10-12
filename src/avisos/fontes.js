@@ -1,9 +1,10 @@
 // Painel de Avisos — leitura em tempo real das fontes (somente leitura; nada é gravado).
-// Documentos: onSnapshot (o Firestore avisa na hora em que mudam). Mapas do plantão: releitura a cada 60 s,
-// ao voltar para o app e ao voltar a conexão. Falha de uma fonte é informada; nunca vira "sem avisos".
+// Documentos E mapas do plantão: onSnapshot (o Firestore avisa na hora em que mudam — falta marcada no mapa, central off-line,
+// queda de energia aparecem sem esperar). Os mapas são só os plantões da janela de 24 h; a cada 60 s (e ao voltar para o app ou a
+// conexão) a lista de plantões é recalculada: o que saiu da janela é desligado, o que entrou é ligado, e uma assinatura que caiu é refeita.
+// Falha de uma fonte é informada; nunca vira "sem avisos".
 import { getApps } from "firebase/app";
 import { getFirestore, doc, onSnapshot, getDoc } from "firebase/firestore";
-import { loadMapa } from "../mapaDiario/dados";
 import { PROJETOS_DO_MAPA } from "../mapaDiario/painel";
 import { plantoesDoAviso } from "./regras";
 import { AVISOS_CFG } from "./config";
@@ -61,30 +62,56 @@ export function assinarFontes({ projetos, gerencial, mapasAtivo = true, onDados,
     paradas.push(() => clearInterval(te));
     if (typeof document !== "undefined") { const v = () => { if (document.visibilityState === "visible") lerEquipes(); }; document.addEventListener("visibilitychange", v); paradas.push(() => document.removeEventListener("visibilitychange", v)); }
   }
-  if (gerencial && mapasAtivo) {
+  if (mapasAtivo) {
     esperados += PROJETOS_DO_MAPA.length;
-    const concluidos = new Map(); // plantão anterior já enviado não muda mais: não relê (poupa leituras)
-    const ler = async () => {
-      const agora = new Date();
-      await Promise.all(PROJETOS_DO_MAPA.map(async (pid) => {
-        try {
-          const lidos = {};
-          for (const p of plantoesDoAviso(pid, agora)) {
-            if (p.slot !== "atual" && concluidos.has(p.chave)) { lidos[p.chave] = concluidos.get(p.chave); continue; }
-            const m = (await loadMapa(pid, p.chave)) || null; // null = o documento não existe
-            lidos[p.chave] = m;
-            if (m && m.status === "enviado" && p.slot !== "atual") concluidos.set(p.chave, m);
-          }
-          if (vivo) { onDados("mapas", pid, lidos); onErro("mapas", pid, null); }
-        } catch (e) { if (vivo) onErro("mapas", pid, e); }
-      }));
+    const por = new Map(); // pid -> { subs: Map(chave -> desligar), lidos, faltam: Set, erros: Map }
+    const emitir = (pid, st) => {
+      if (!vivo || st.faltam.size) return; // só entrega quando TODOS os plantões da janela responderam (nunca um mapa pela metade)
+      if (st.erros.size) { onErro("mapas", pid, [...st.erros.values()][0] || new Error("falha")); return; }
+      onDados("mapas", pid, { ...st.lidos });
+      onErro("mapas", pid, null);
     };
-    ler();
-    const t = setInterval(ler, intervaloMapasMs);
-    const aoVoltar = () => { if (typeof document === "undefined" || document.visibilityState === "visible") ler(); };
+    const sincronizar = () => {
+      const agora = new Date();
+      for (const pid of PROJETOS_DO_MAPA) {
+        if (!por.has(pid)) por.set(pid, { subs: new Map(), lidos: {}, faltam: new Set(), erros: new Map() });
+        const st = por.get(pid);
+        const plantoes = plantoesDoAviso(pid, agora, AVISOS_CFG.plantoes, AVISOS_CFG.janelaPessoasH);
+        const chaves = new Set(plantoes.map((p) => p.chave));
+        let mudouJanela = false;
+        for (const [ch, desligar] of [...st.subs]) {
+          if (chaves.has(ch)) continue;
+          try { desligar(); } catch (e) { /* já desligado */ }
+          st.subs.delete(ch); delete st.lidos[ch]; st.faltam.delete(ch); st.erros.delete(ch); mudouJanela = true;
+        }
+        for (const ch of [...st.erros.keys()]) if (!chaves.has(ch)) { st.erros.delete(ch); mudouJanela = true; }
+        for (const p of plantoes) {
+          if (st.subs.has(p.chave)) continue;
+          st.faltam.add(p.chave);
+          st.subs.set(p.chave, onSnapshot(doc(db, "equipes", pid, "mapas", p.chave), (snap) => {
+            st.lidos[p.chave] = snap.exists() ? snap.data() : null; // null = o documento não existe
+            st.faltam.delete(p.chave); st.erros.delete(p.chave);
+            emitir(pid, st);
+          }, (e) => {
+            st.erros.set(p.chave, e || new Error("falha")); st.faltam.delete(p.chave);
+            st.subs.delete(p.chave); // a assinatura caiu: a próxima rodada refaz
+            emitir(pid, st);
+          }));
+        }
+        if (mudouJanela) emitir(pid, st);
+      }
+    };
+    sincronizar();
+    const t = setInterval(sincronizar, intervaloMapasMs);
+    const aoVoltar = () => { if (typeof document === "undefined" || document.visibilityState === "visible") sincronizar(); };
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", aoVoltar);
-    if (typeof window !== "undefined") window.addEventListener("online", ler);
-    paradas.push(() => { clearInterval(t); if (typeof document !== "undefined") document.removeEventListener("visibilitychange", aoVoltar); if (typeof window !== "undefined") window.removeEventListener("online", ler); });
+    if (typeof window !== "undefined") window.addEventListener("online", sincronizar);
+    paradas.push(() => {
+      clearInterval(t);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", aoVoltar);
+      if (typeof window !== "undefined") window.removeEventListener("online", sincronizar);
+      por.forEach((st) => st.subs.forEach((d) => { try { d(); } catch (e) { /* já desligado */ } }));
+    });
   }
   return { esperados, parar: () => { vivo = false; paradas.forEach((p) => { try { p(); } catch (e) { /* já parado */ } }); } };
 }

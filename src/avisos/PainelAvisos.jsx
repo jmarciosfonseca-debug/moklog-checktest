@@ -9,7 +9,7 @@ import { lerVisto, gravarVisto, marcarNovos } from "./visto";
 
 const COR = { critico: "#ef4444", atencao: "#f59e0b", info: "#64748b" };
 const ROTULO_SEV = { critico: "crítico", atencao: "atenção", info: "informativo" };
-const ICONE = { ferias: "guardachuva", troca: "atualizar", cobertura: "usuarios", ft: "calendario", falta: "usuario", vago: "usuarios", atraso: "relogio", mapa: "prancheta", material: "ferramenta", supervisao: "olho", keyaccess: "chave", ctmk: "antena", energia: "raio", manutencao: "ferramenta", inop: "alerta", relatorio: "calendario", iluminacao: "lampada", bolsao: "estacionamento" };
+const ICONE = { ferias: "guardachuva", troca: "atualizar", cobertura: "usuarios", ft: "calendario", falta: "usuario", vago: "usuarios", atraso: "relogio", mapa: "prancheta", material: "ferramenta", supervisao: "olho", keyaccess: "chave", ctmk: "antena", energia: "raio", manutencao: "ferramenta", inop: "alerta", relatorio: "calendario", iluminacao: "lampada", bolsao: "estacionamento", teste: "calendario" };
 // Sorteia até 2 manchetes diferentes (e, havendo mais de 2, diferentes do par que já está na tela).
 export function sortearPar(n, anterior = [], rnd = Math.random) {
   if (n <= 2) return Array.from({ length: n }, (_, i) => i);
@@ -85,9 +85,9 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
         </div>
       )}
 
-      {!carregando && total === 0 && falhas.length === 0 && (
+      {!carregando && contagem.critico === 0 && contagem.atencao === 0 && falhas.length === 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px 2px", color: "#22c55e", fontSize: 13, fontWeight: 700 }}>
-          <span style={{ display: "flex", fontSize: 18 }}><Ico n="checkCirculo" /></span> Tudo em dia — nenhum aviso agora.
+          <span style={{ display: "flex", fontSize: 18 }}><Ico n="checkCirculo" /></span> {total === 0 ? "Tudo em dia — nenhum aviso agora." : "Tudo em dia — nada crítico agora."}
         </div>
       )}
 
@@ -113,7 +113,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
 
 // Container: lê as fontes em tempo real, calcula, marca "novo" e entrega à tela.
 // ctmkData/pendencias/ultimoRelatorio já vivem na Home (tempo real); as demais fontes são assinadas aqui.
-export default function PainelAvisos({ dark = true, gerencial = false, projetos = [], ctmkData = {}, pendencias = [], ultimoRelatorio = {}, nomeProj, onAbrir, assinar = assinarFontes, mapasAtivo = true, storage, cfg }) {
+export default function PainelAvisos({ dark = true, gerencial = false, projetos = [], ctmkData = {}, pendencias = [], ultimoRelatorio = {}, testes = {}, nomeProj, onAbrir, assinar = assinarFontes, mapasAtivo = true, storage, cfg }) {
   const [agora, setAgora] = useState(() => new Date());
   const [dados, setDados] = useState({});
   const [falhasMap, setFalhasMap] = useState({});
@@ -155,8 +155,8 @@ export default function PainelAvisos({ dark = true, gerencial = false, projetos 
   const carregando = esperados === null || recebidos < esperados;
   const falhas = useMemo(() => [...new Set(Object.values(falhasMap))], [falhasMap]);
   const { avisos, contagem } = useMemo(
-    () => calcularAvisos({ agora, gerencial, cfg: cfg || AVISOS_CFG, fontes: { ...dados, ctmk: ctmkData, pendencias, ultimoRelatorio } }),
-    [agora, gerencial, dados, ctmkData, pendencias, ultimoRelatorio, cfg]
+    () => calcularAvisos({ agora, gerencial, cfg: cfg || AVISOS_CFG, fontes: { ...dados, ctmk: ctmkData, pendencias, ultimoRelatorio, testes } }),
+    [agora, gerencial, dados, ctmkData, pendencias, ultimoRelatorio, testes, cfg]
   );
   const marcados = useMemo(() => marcarNovos(avisos, vistoBase.current.v), [avisos]);
 

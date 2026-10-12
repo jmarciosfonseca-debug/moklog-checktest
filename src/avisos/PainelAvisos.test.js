@@ -114,3 +114,24 @@ test("visto: grava ids atuais; storage quebrado não derruba", () => {
   expect(marcarNovos([{ id: "a" }], null)[0].novo).toBe(false);
   expect(marcarNovos([{ id: "a" }, { id: "b" }], { ids: ["a"] }).map((a) => a.novo)).toEqual([false, true]);
 });
+
+test("central off-line marcada agora aparece na hora (a prop da Home muda) e some quando volta", async () => {
+  const props = { assinar: fake(), storage: memoria() };
+  await montar({ ...props, ctmkData: { P601: { status: "online" } } });
+  await dados("manutencao", "P601", []); await dados("energia", "P601", []);
+  expect(aviso()).toHaveLength(0);
+  await montar({ ...props, ctmkData: { P601: { status: "offline", offlineSince: new Date().toISOString() } } });
+  expect(aviso().some((t) => t.includes("CTMK off-line") && t.includes("P601"))).toBe(true);
+  await montar({ ...props, ctmkData: { P601: { status: "online" } } });
+  expect(aviso().some((t) => t.includes("CTMK"))).toBe(false);
+});
+
+test("sem nada crítico, o painel diz 'tudo em dia' e ainda mostra o último teste semanal e o próximo", async () => {
+  const ano = (d) => d.toLocaleDateString("sv-SE");
+  const ontem = ano(new Date(Date.now() - 86400000)), antes = ano(new Date(Date.now() - 8 * 86400000));
+  const t = (data, pct) => ({ data, pct, total: 10, inop: 0, parcial: 0, itens: {} });
+  await montar({ assinar: fake(), storage: memoria(), testes: { P601: { ultima: t(ontem, 100), anterior: t(antes, 100) } } });
+  await dados("manutencao", "P601", []); await dados("energia", "P601", []);
+  expect(host.textContent).toContain("Tudo em dia");
+  expect(host.textContent).toContain("teste semanal");
+});

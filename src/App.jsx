@@ -155,6 +155,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import PainelMapasEquipe from "./mapaDiario/PainelMapasEquipe";
 import PainelAvisos from "./avisos/PainelAvisos";
+import { testesDoHistorico } from "./avisos/testeSemanal";
 import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
@@ -3593,6 +3594,8 @@ export default function App(){
     Object.keys(PROJECTS).forEach(pid=>{ const datas=(stored[pid]?.history??[]).map(r=>r?.meta?.date).filter(Boolean).sort(); o[pid]=datas.length?datas[datas.length-1]:null; });
     return o;
   },[stored]);
+  // Último teste semanal de cada projeto × o da semana anterior (o painel compara e avisa o que mudou)
+  const avisosTestes = useMemo(()=>testesDoHistorico(PROJECTS, stored, { resolveStatus, computeHealth }),[stored]);
   useEffect(()=>{
     if(!loaded) return;
     const ids=Object.keys(PROJECTS);
@@ -4631,9 +4634,9 @@ export default function App(){
           </button>
 
           <PainelAvisos dark={dark} gerencial={hasGerencial()} projetos={Object.keys(PROJECTS)} ctmkData={ctmkData}
-            pendencias={avisosPendencias} ultimoRelatorio={avisosUltimoRelatorio}
+            pendencias={avisosPendencias} ultimoRelatorio={avisosUltimoRelatorio} testes={avisosTestes}
             nomeProj={(pid)=>PROJECTS[pid]?.name?`${pid} · ${PROJECTS[pid].name}`:pid}
-            onAbrir={(a)=>{ const pid=a.projetoId||""; setJatinoxSel(null); setHomeGroup(pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>
+            onAbrir={(a)=>{ const pid=a.projetoId||""; if(pid==="TODOS") return; setJatinoxSel(null); setHomeGroup(pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>
         </div>
 
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
