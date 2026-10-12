@@ -3733,7 +3733,8 @@ export default function App(){
   // Módulos que antes abriam sem PIN (Ambulância, Inquilinos, Ronda VSPP, Acesso Transportadoras):
   // agora exigem sessão do projeto (PIN de líder) ou gerencial. Sem sessão → PIN do projeto e, ao liberar, abre o módulo.
   const pendenteAposPin=useRef(null);
-  const comPin=(pid,abrir)=>{ if(checkAuth(pid)){abrir();return;} pendenteAposPin.current=abrir; if(PROJECTS[pid]) setProject(PROJECTS[pid]); setScreen("pin_gate"); };
+  const [pinAlvo,setPinAlvo]=useState(null); // projeto do PIN quando ele não está em PROJECTS (Jatinox B/C): não troca o projeto aberto
+  const comPin=(pid,abrir)=>{ if(checkAuth(pid)){abrir();return;} pendenteAposPin.current=abrir; if(PROJECTS[pid]){ setPinAlvo(null); setProject(PROJECTS[pid]); } else setPinAlvo({id:pid,name:(JATINOX_SUBS[pid]||{}).name||pid}); setScreen("pin_gate"); };
   const grantAuth=(pid,mode="lider")=>{grantSession(mode,pid);setProjectAuth(prev=>({...prev,[pid]:{mode,ts:Date.now()}}));};
   // modo já liberado para o projeto (null se sessão expirada/inexistente) — usado pelos módulos CCO/Equipe/Equipamentos/Empresas
   const getProjectAuthMode=(pid)=>getAccess(pid);
@@ -4057,7 +4058,7 @@ export default function App(){
   );
 
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
-  if(screen==="pin_gate") return <ProjectPinGate project={project} onSuccess={(mode)=>{grantAuth(project.id,mode||"lider");setScreen(project.id==="P260A"?"p260a_home":"home");const f=pendenteAposPin.current;pendenteAposPin.current=null;if(f)setTimeout(f,0);}} onBack={()=>setScreen("home")}/>;
+  if(screen==="pin_gate"){ const alvo=pinAlvo||project; return <ProjectPinGate project={alvo} onSuccess={(mode)=>{grantAuth(alvo.id,mode||"lider");setPinAlvo(null);setScreen(!pinAlvo&&alvo.id==="P260A"?"p260a_home":"home");const f=pendenteAposPin.current;pendenteAposPin.current=null;if(f)setTimeout(f,0);}} onBack={()=>{pendenteAposPin.current=null;setPinAlvo(null);setScreen("home");}}/>; }
 
   // ── Tela dedicada do P260A (checklist semanal Jatinox) — mesmo padrão visual dos projetos de grupo
   if(screen==="p260a_home"&&project?.id==="P260A") {

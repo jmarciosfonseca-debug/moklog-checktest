@@ -14,10 +14,10 @@ const colabs = [
   { id: "c", nome: "Ari A.", cargo: "Vigilante Ronda", turno: "Diurno", emFerias: false },
   { id: "d", nome: "Joao V.", cargo: "Vigilante Ronda", turno: "Folguista", emFerias: false },
 ];
-const BASE601 = { postos: [["Líder", "a"], ["VSPP Apoio", "b"], ["VSPP P1", "c"], ["CCO", "d"], ["CDA", "a2"]].map(([rotulo, id]) => ({ rotulo, pessoaId: id, pessoaNome: id })), veiculos: [] };
+const BASE601 = { postos: [["Líder", "a"], ["VSPP Apoio", "b"], ["VSPP Ronda", "c"], ["CCO", "d"], ["CDA", "a2"]].map(([rotulo, id]) => ({ rotulo, pessoaId: id, pessoaNome: id })), veiculos: [] };
 let host, root, io, salvos;
 const montar = async (extraTodo = {}) => {
-  const { __pid, ...extra } = extraTodo;
+  const { __pid, __semObrig, ...extra } = extraTodo;
   salvos = [];
   io = {
     loadColaboradores: jest.fn(async () => colabs),
@@ -30,6 +30,16 @@ const montar = async (extraTodo = {}) => {
   };
   await act(async () => root.render(<MapaDiarioTela project={{ id: __pid || "P311B", name: "Mega Itajaí B" }} dark onBack={() => {}} io={io} agoraFn={() => AGORA} />));
   await act(async () => { await Promise.resolve(); });
+  if (!__semObrig) await obrigatorios();
+};
+// km da moto, resumo e "houve visita?" agora são obrigatórios: os testes que concluem já abrem com eles preenchidos.
+const obrigatorios = async () => {
+  const km = host.querySelector('input[aria-label^="Km atual"]');
+  if (km) await digitar(km, "27900");
+  const r = host.querySelector('textarea[aria-label="Resumo da passagem"]');
+  if (r && !r.value) await digitar(r, "Sem alteração");
+  const nao = [...host.querySelectorAll("button")].find((b) => b.textContent.trim() === "Não houve");
+  if (nao) await act(async () => nao.click());
 };
 beforeEach(() => { jest.useFakeTimers("modern"); jest.setSystemTime(AGORA); host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host); });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); jest.useRealTimers(); });
@@ -77,7 +87,7 @@ test("depois de gravar mostra o texto e o link do WhatsApp", async () => {
   expect(host.textContent).toContain("Mapa gravado");
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
   expect(t).toContain("*MAPA DE EQUIPE*");
-  expect(t).toContain("• L1 · Vigilante Líder: Luiz D.");
+  expect(t).toContain("✅ *L1 · Vigilante Líder:* Luiz D.");
   expect(t).toContain("Sem ocorrências");
   expect(q('a[href^="https://wa.me/?text="]')).not.toBeNull();
 });
@@ -90,7 +100,7 @@ test("troca não é FT e exige 'no lugar de quem'", async () => {
   await digitar(q('select[aria-label="Troca no lugar de quem"]'), "d");
   await clicar(botao("Concluir mapa"));
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("• P1 · Vigilante CCO: Marta A. — troca de plantão, no lugar de Joao V.");
+  expect(t).toContain("🔁 *P1 · Vigilante CCO:* Marta A. — *TROCA DE PLANTÃO*, no lugar de Joao V.");
   expect(t).not.toContain("FT (folga trabalhada)");
 });
 test("autosalva o rascunho depois de alterar", async () => {
@@ -125,7 +135,7 @@ test("material: botão Conferir expande a lista do cadastro e anomalia exige obs
   await clicar(botao("Concluir mapa"));
   expect(io.saveMapa).toHaveBeenCalledTimes(1);
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
-  expect(t).toContain("• Arma 01 (.38 · nº 123) — ANOMALIA: Coronha trincada");
+  expect(t).toContain("• Arma 01 (.38 · nº 123) — *ANOMALIA:* Coronha trincada");
   expect(salvos[0].material.excecoes[0]).toMatchObject({ situacao: "anomalia", obs: "Coronha trincada" });
 });
 test("material: item novo fora do cadastro e voltar para Disponível limpa a exceção", async () => {
@@ -248,4 +258,88 @@ test("resumo cita extra sem exceção marcada: avisa uma vez e só envia no segu
   await clicar(botao("Concluir mapa"));
   expect(io.saveMapa).toHaveBeenCalledTimes(1);
   expect(q('pre[aria-label="Texto do mapa"]')).not.toBeNull();
+});
+
+test("FT: pergunta 'Quem faltou?', o posto dele vira Falta e a falta vai para a ficha dele", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
+  await clicar(botao("+ Posto extra"));
+  await digitar(q('select[aria-label="Quem está no posto Posto extra"]'), "d");
+  await clicar(botao("FT"));
+  expect(host.textContent).toContain("Quem faltou?");
+  const sel = q('select[aria-label="Quem faltou (FT)"]');
+  await clicar(botao("Concluir mapa"));
+  expect(q('[role="alert"]').textContent).toContain("FT cobrindo falta de quem?");
+  const optB = [...sel.options].find((o) => o.value.startsWith("p:") && o.textContent.includes("Marta A."));
+  expect(optB).toBeTruthy();
+  await digitar(sel, optB.value);
+  expect(q('button[aria-label="Exceção do posto P1 · Vigilante CCO"]').textContent).toContain("Falta");
+  await clicar(botao("Concluir mapa"));
+  const t = q('pre[aria-label="Texto do mapa"]').textContent;
+  expect(t).toContain("❌ *P1 · Vigilante CCO:* Marta A. — *FALTA*");
+  expect(t).toContain("Joao V. — *FT* (folga trabalhada), cobrindo a falta de Marta A.");
+  const postos = io.lancarNaFicha.mock.calls[0][0].postos;
+  expect(postos.find((p) => p.rotulo === "P1 · Vigilante CCO")).toMatchObject({ situacao: "falta" });
+  expect(postos.find((p) => p.rotulo === "Posto extra")).toMatchObject({ situacao: "ft", detalhe: { quemFaltouId: "b" } });
+});
+
+// ---- fechamento: obrigatórios, posto fixo x extra, Presente, Editar mapa ----
+test("obrigatórios: sem km da moto, resumo e visita não conclui; preenchidos, conclui", async () => {
+  await montar({ __semObrig: true });
+  await clicar(botao("Concluir mapa"));
+  const t = q('[role="alert"]').textContent;
+  expect(t).toContain("Moto: informe a quilometragem atual");
+  expect(t).toContain("Resumo da passagem");
+  expect(t).toContain("Supervisão: informe se houve visita");
+  expect(io.saveMapa).not.toHaveBeenCalled();
+  await obrigatorios();
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(1);
+  expect(salvos[0].visita).toMatchObject({ houve: false });
+});
+test("posto fixo não tem X; só o posto extra pode ser removido", async () => {
+  await montar();
+  expect(q('button[aria-label^="Remover posto L1"]')).toBeNull();
+  await clicar(botao("+ Posto extra"));
+  const x = q('button[aria-label="Remover posto Posto extra"]');
+  expect(x).toBeTruthy();
+  await clicar(x);
+  expect(q('button[aria-label="Remover posto Posto extra"]')).toBeNull();
+});
+test("com nome escolhido o botão do posto mostra 'Presente' (verde); falta muda o texto", async () => {
+  await montar();
+  expect(q('button[aria-label="Exceção do posto L1 · Vigilante Líder"]').textContent).toContain("Presente");
+  await abrirExc("L1 · Vigilante Líder");
+  await clicar(botao("Falta"));
+  expect(q('button[aria-label="Exceção do posto L1 · Vigilante Líder"]').textContent).toContain("Falta");
+});
+test("Editar mapa: depois de concluir o formulário trava; Editar libera e conclui de novo", async () => {
+  await montar();
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(1);
+  expect(q("fieldset").disabled).toBe(true);
+  expect(botao("Concluir mapa")).toBeUndefined();
+  await clicar(botao("Editar mapa"));
+  expect(q("fieldset").disabled).toBe(false);
+  await clicar(botao("Concluir mapa"));
+  expect(io.saveMapa).toHaveBeenCalledTimes(2);
+  expect(q("fieldset").disabled).toBe(true);
+});
+test("12x36: pessoa de fora da equipe → pergunta 'É FT?'; FT sozinho já escolhe quem faltou da equipe", async () => {
+  await montar({ loadUltimoMapa: jest.fn(async () => null), loadColaboradores: jest.fn(async () => colabsEq) });
+  await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
+  await digitar(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]'), "d"); // Joao V. não é da equipe do Luiz
+  expect(host.textContent).toContain("Joao V. não é da equipe de Luiz D.");
+  await clicar(botao("É FT"));
+  expect(host.textContent).toContain("Quem faltou?");
+  const sel = q('select[aria-label="Quem faltou (FT)"]');
+  expect(sel.value).toMatch(/^[cp]:/); // só sobrou Ari A. da equipe, fora do mapa → já vem escolhido
+  expect(sel.selectedOptions[0].textContent).toContain("Ari A.");
+  expect(host.textContent).not.toContain("não é da equipe de Luiz D.");
+});
+test("12x36: 'É da equipe' dispensa o aviso", async () => {
+  await montar({ loadUltimoMapa: jest.fn(async () => null), loadColaboradores: jest.fn(async () => colabsEq) });
+  await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
+  await digitar(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]'), "d");
+  await clicar(botao("É da equipe"));
+  expect(host.textContent).not.toContain("não é da equipe de Luiz D.");
 });

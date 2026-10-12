@@ -10,27 +10,32 @@ const CCO = ["Vig CCO", "Porteiro CCO"];
 const APOIO = ["VSPP Apoio", "Vigilante Apoio"];
 const VIG = ["Vigilante", "VSPP Apoio", "Vigilante Apoio"];
 const h0820 = { inicio: "08:00", fim: "20:00" };
+const h0817 = { inicio: "08:00", fim: "17:00" }; // recepcionista 5x2
 
 const P = (rotulo, cargos, extra = {}) => ({ rotulo, cargos, ...extra });
 const lider = (rotulo, cargos = LIDER, extra = {}) => P(rotulo, cargos, { lider: true, ...extra });
 
 const GENERICO = [lider("Líder"), P("CCO", CCO), P("Vigilante", VIG)];
+// P602 e P606: líder, CCO e vigilante de apoio, todos 24h (dimensionamento do Marcio).
+const TRES_POSTOS = [lider("Líder"), P("CCO", CCO), P("Vigilante Apoio", VIG, { legado: ["Vigilante"] })];
 
 export const POSTOS = {
   P601: {
-    D: [lider("Líder"), P("VSPP Apoio/Ronda", APOIO, { horario: h0820, legado: ["VSPP Apoio"] }), P("VSPP P1", APOIO), P("CCO", CCO), P("CDA", ["CDA"])],
+    // Apoio (12h) e Ronda (12h, 08–20) são dois postos diurnos; "VSPP P1" era o apoio.
+    D: [lider("Líder"), P("VSPP Apoio", APOIO, { legado: ["VSPP P1"] }), P("VSPP Ronda", APOIO, { horario: h0820, legado: ["VSPP Apoio/Ronda"] }), P("CCO", CCO), P("CDA", ["CDA"])],
     N: [lider("Líder"), P("CCO", CCO), P("CDA", ["CDA"])],
   },
-  P602: { D: GENERICO, N: GENERICO },
+  P602: { D: TRES_POSTOS, N: TRES_POSTOS },
   P604: {
-    D: [lider("Líder"), P("VSPP 1", APOIO), P("VSPP 2", APOIO), P("CCO", CCO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"], { dias: [1, 2, 3, 4, 5] })],
+    D: [lider("Líder"), P("VSPP 1", APOIO), P("VSPP 2", APOIO), P("CCO", CCO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"], { dias: [1, 2, 3, 4, 5], horario: h0817 })],
     N: [lider("Líder"), P("VSPP 1", APOIO), P("VSPP 2", APOIO), P("CCO", CCO)],
   },
+  // P605: líder, apoio e CCO são três postos 24h; CDA (12h) e recepção (5x2, 08–17) só de dia.
   P605: {
-    D: [lider("Líder/CCO", [...LIDER, ...CCO]), P("VSPP", APOIO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"], { dias: [1, 2, 3, 4, 5] })],
-    N: [lider("Líder/CCO", [...LIDER, ...CCO]), P("VSPP", APOIO)],
+    D: [lider("Líder", LIDER, { legado: ["Líder/CCO"] }), P("VSPP Apoio", APOIO, { legado: ["VSPP"] }), P("CCO", CCO), P("CDA", ["CDA"]), P("Recepção", ["Recepção"], { dias: [1, 2, 3, 4, 5], horario: h0817 })],
+    N: [lider("Líder", LIDER, { legado: ["Líder/CCO"] }), P("VSPP Apoio", APOIO, { legado: ["VSPP"] }), P("CCO", CCO)],
   },
-  P606: { D: GENERICO, N: GENERICO },
+  P606: { D: TRES_POSTOS, N: TRES_POSTOS },
   // P607 não tem posto de líder: a hierarquia é Honda (ronda), AGP CCO, Vigilante pista e AGP portaria (só de dia).
   P607: {
     D: [lider("Vigilante Honda", ["Vigilante Ronda"]), P("AGP CCO", ["AGP CCO"]), P("Vigilante Pista", ["Vigilante Apoio"]), P("AGP Portaria", ["AGP"])],
@@ -46,18 +51,18 @@ export const POSTOS = {
     N: [lider("L1 · Vigilante Líder", ["Vigilante Líder"], { legado: ["L1"] }), P("P1 · Vigilante CCO", ["Vig CCO"], { legado: ["P1"] }), P("P2 · Vigilante Honda", ["Vigilante Ronda", "Vigilante Apoio"], { legado: ["P2"] })],
   },
   P505: {
-    D: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("VSPP Ronda", APOIO, { horario: h0820 }), P("CDA", ["CDA"])],
+    D: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("VSPP Ronda", APOIO, { horario: h0820, dias: [1, 2, 3, 4, 5] }), P("CDA", ["CDA"])], // Ronda (Honda): 5x2, 12h, segunda a sexta
     N: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("CDA", ["CDA"])],
   },
-  // P260A: dois VSPP de apoio de segunda a sexta (5x2), só de dia.
+  // P260A: VSPP Líder e Vigilante CCO (24h, 4x2) + dois postos VSPP 1 e 2 (12h, 5x2, segunda a sexta), só de dia.
   P260A: {
-    D: [lider("VSPP Líder"), P("VSPP Apoio 1", APOIO, { dias: [1, 2, 3, 4, 5] }), P("VSPP Apoio 2", APOIO, { dias: [1, 2, 3, 4, 5] }), P("Vigilante CCO", CCO)],
+    D: [lider("VSPP Líder"), P("VSPP 1", APOIO, { dias: [1, 2, 3, 4, 5], legado: ["VSPP Apoio 1"] }), P("VSPP 2", APOIO, { dias: [1, 2, 3, 4, 5], legado: ["VSPP Apoio 2"] }), P("Vigilante CCO", CCO)],
     N: [lider("VSPP Líder"), P("Vigilante CCO", CCO)],
   },
   // P260B: um posto só por turno.
   P260B: { D: [lider("VSPP", [...LIDER, ...APOIO])], N: [lider("VSPP", [...LIDER, ...APOIO])] },
-  // P260C: um VSPP líder e um vigilante; sem CCO nem portaria.
-  P260C: { D: [lider("VSPP Líder"), P("Vigilante", VIG)], N: [lider("VSPP Líder"), P("Vigilante", VIG)] },
+  // P260C: VSPP líder (4x2) e vigilante patrimonial (12x36); sem CCO nem portaria.
+  P260C: { D: [lider("VSPP Líder"), P("Vigilante Patrimonial", VIG, { legado: ["Vigilante"] })], N: [lider("VSPP Líder"), P("Vigilante Patrimonial", VIG, { legado: ["Vigilante"] })] },
 };
 
 // 12x36 com equipe montada por líder (Equipe → Montagem). P505 e P260A/B/C são 4x2/5x2: a equipe muda a cada

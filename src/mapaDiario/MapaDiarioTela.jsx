@@ -5,7 +5,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe } from "./modelo";
 import { resumoLancamento } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import * as dados from "./dados";
@@ -36,6 +36,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [fichaMsg, setFichaMsg] = useState(null);
   const [confirmouResumo, setConfirmouResumo] = useState(false);
   const [matAberto, setMatAberto] = useState(false);
+  const [editando, setEditando] = useState(false); // mapa já enviado reaberto para correção
+  const [ignorados, setIgnorados] = useState({}); // avisos "não é da equipe" dispensados (posto:pessoa)
   const carregadoRef = useRef(false);
   const timer = useRef(null);
 
@@ -45,7 +47,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   useEffect(() => {
     let vivo = true;
     carregadoRef.current = false;
-    setCarregando(true); setErro(""); setAvisos([]);
+    setCarregando(true); setErro(""); setAvisos([]); setEditando(false);
     (async () => {
       try {
         const [cs, existente] = await Promise.all([io.loadColaboradores(pid, data), io.loadMapa(pid, chaveMapa(pid, data, turno))]);
@@ -67,7 +69,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           if (lc) { const r = puxarEquipe({ postos: m.postos, lider: lc, colabs: cs, pid, turno, soVazios: !!existente }); m = { ...m, postos: r.postos }; aviso = r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${lc.nome} puxada da montagem em Equipes. Ajuste só o que mudou.`; }
         }
         setAvisoEquipe(aviso);
-        setColabs(cs); setMapa(m); setItensMat(itensDeEquipamento(eq, pid, turno));
+        setColabs(cs); setMapa(m.status === "enviado" ? m : garantirMoto(m)); setItensMat(itensDeEquipamento(eq, pid, turno));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -128,7 +130,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
     const final = { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapa.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapa.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapa.enviadoEm || agora, revisoes: mapa.enviadoEm ? [...(mapa.revisoes || []), { em: agora }] : (mapa.revisoes || []) };
-    try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); }
+    try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); setEditando(false); }
     catch (e) { setAvisos(["Não gravou. Confira a conexão e toque em Concluir de novo (o WhatsApp só libera depois de gravar)."]); return; }
     // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
     setFichaMsg(null);
@@ -138,6 +140,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     }
   };
 
+  const editarMapa = () => { setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(m)); };
   const texto = mapa ? montarTextoWhatsApp(mapa, { nomeProjeto: project?.name || "" }) : "";
   const copiar = async () => { try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch (e) { setAvisos(["Não consegui copiar; use o botão do WhatsApp."]); } };
   const enviado = mapa && mapa.status === "enviado";
@@ -159,6 +162,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
       <option value="__outro">Outro (digitar nome)</option>
     </>
   );
+  const corSituacao = (p) => {
+    if (p.situacao === "presente") return (p.pessoaId || (p.pessoaNome || "").trim()) ? { color: "#16a34a", borderColor: "#16a34a", fontWeight: 800 } : { color: cor.txt2, borderColor: cor.line };
+    const c = p.situacao === "falta" ? "#dc2626" : cor.ac;
+    return { color: c, borderColor: c, fontWeight: 800 };
+  };
+  // Troca a situação do posto. FT: se só uma pessoa da equipe do líder ficou fora do mapa, ela é "quem faltou" (automático).
+  const marcarSituacao = (p, nova) => alterar((m) => {
+    let n = mudarSituacao(m, p.id, nova);
+    if (nova === "ft" && p.situacao !== "ft") {
+      const aus = ausentesDaEquipe(n, colabs).filter((c) => c.id !== p.pessoaId);
+      if (aus.length === 1) n = vincularFalta(n, p.id, `c:${aus[0].id}`, colabs);
+    }
+    return n;
+  });
   const seletorPessoa = (rotulo, valor, onChange) => (
     <select aria-label={rotulo} value={colabs.find((c) => c.nome === valor) ? colabs.find((c) => c.nome === valor).id : ""} onChange={(e) => onChange(colabs.find((c) => c.id === e.target.value)?.nome || "")} style={S.in}>
       <option value="">Escolher…</option>
@@ -197,6 +214,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         {erro && <div role="alert" style={{ ...S.card, color: "#dc2626", fontSize: 13 }}>{erro}</div>}
 
         {mapa && !carregando && (<>
+          <fieldset disabled={!!enviado && !editando} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={S.card}>
             <div style={S.h}>Equipe do turno</div>
             {!projetoPuxaEquipe(pid) && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Projeto 4x2/5x2: a equipe muda a cada plantão e não é puxada sozinha. Escolha quem está em cada posto.</div>}
@@ -217,12 +235,27 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                       <select aria-label={`Quem está no posto ${p.rotulo}`} value={p.pessoaId || ""} onChange={(e) => escolherPessoa(p.id, e.target.value)} style={S.in}>{opcoesPessoa()}</select>
                     )}
                   </div>
-                  <button aria-label={`Exceção do posto ${p.rotulo}`} aria-expanded={p.situacao !== "presente" || !!abertos[p.id]} onClick={() => setAbertos((a) => ({ ...a, [p.id]: !a[p.id] }))} style={{ ...S.btn, padding: "6px 9px", color: p.situacao === "presente" ? cor.txt2 : cor.ac, borderColor: p.situacao === "presente" ? cor.line : cor.ac }}>{p.situacao === "presente" ? "Exceção" : ROTULO_SITUACAO[p.situacao]}</button>
-                  <button aria-label={`Remover posto ${p.rotulo}`} onClick={() => alterar((m) => ({ ...m, postos: m.postos.filter((x) => x.id !== p.id) }))} style={{ ...S.btn, padding: "6px 9px" }}>×</button>
+                  <button aria-label={`Exceção do posto ${p.rotulo}`} aria-expanded={p.situacao !== "presente" || !!abertos[p.id]} onClick={() => setAbertos((a) => ({ ...a, [p.id]: !a[p.id] }))} style={{ ...S.btn, padding: "6px 9px", ...corSituacao(p) }}>{p.situacao === "presente" ? ((p.pessoaId || (p.pessoaNome || "").trim()) ? "✓ Presente" : "Exceção") : ROTULO_SITUACAO[p.situacao]}</button>
+                  {ehPostoExtra(mapa, p) && <button aria-label={`Remover posto ${p.rotulo}`} onClick={() => alterar((m) => removerPosto(m, p.id))} style={{ ...S.btn, padding: "6px 9px" }}>×</button>}
                 </div>
+                {(() => {
+                  const f = foraDaEquipe(mapa, p, colabs);
+                  if (!f || ignorados[`${p.id}:${p.pessoaId}`]) return null;
+                  return (
+                    <div role="status" style={{ marginTop: 8, border: `1px solid ${cor.ac}`, borderRadius: 10, padding: "8px 10px", fontSize: 12, color: cor.txt }}>
+                      <div style={{ fontWeight: 700, marginBottom: 6 }}>⚠ {f.pessoa.nome} não é da equipe de {f.lider.nome}. É FT, cobertura ou troca?</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button onClick={() => marcarSituacao(p, "ft")} style={S.chip(false, cor.ac)}>É FT</button>
+                        <button onClick={() => marcarSituacao(p, "cobertura")} style={S.chip(false, cor.ac)}>É cobertura</button>
+                        <button onClick={() => marcarSituacao(p, "troca")} style={S.chip(false, cor.ac)}>É troca</button>
+                        <button onClick={() => setIgnorados((x) => ({ ...x, [`${p.id}:${p.pessoaId}`]: true }))} style={S.chip(false, cor.txt2)}>É da equipe</button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {(p.situacao !== "presente" || abertos[p.id]) && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                   {SITUACOES.map((s) => (
-                    <button key={s.id} aria-pressed={p.situacao === s.id} onClick={() => setPosto(p.id, { situacao: s.id, detalhe: { livre: p.detalhe?.livre } })} style={S.chip(p.situacao === s.id, s.id === "presente" ? "#16a34a" : s.id === "falta" ? "#dc2626" : cor.ac)}>{s.rotulo}</button>
+                    <button key={s.id} aria-pressed={p.situacao === s.id} onClick={() => marcarSituacao(p, s.id)} style={S.chip(p.situacao === s.id, s.id === "presente" ? "#16a34a" : s.id === "falta" ? "#dc2626" : cor.ac)}>{s.rotulo}</button>
                   ))}
                 </div>}
                 {p.situacao === "atraso" && (
@@ -240,6 +273,29 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     </label>
                   </div>
                 )}
+                {p.situacao === "ft" && (() => {
+                  const cand = candidatosAFalta(mapa, p.id);
+                  const idsNoMapa = new Set(cand.map((x) => x.pessoaId).filter(Boolean));
+                  const aus = ausentesDaEquipe(mapa, colabs).filter((c) => c.id !== p.pessoaId);
+                  const idsAus = new Set(aus.map((c) => c.id));
+                  const outros = colabs.filter((c) => c.id !== p.pessoaId && !(mapa.postos || []).some((x) => x.pessoaId === c.id) && !idsNoMapa.has(c.id) && !idsAus.has(c.id));
+                  const valor = p.detalhe?.semFalta ? "__ninguem" : p.detalhe?.faltaPostoId ? `p:${p.detalhe.faltaPostoId}` : p.detalhe?.quemFaltouId ? `c:${p.detalhe.quemFaltouId}` : "";
+                  return (
+                    <div>
+                      <div style={S.lab}>Quem faltou?</div>
+                      <select aria-label="Quem faltou (FT)" value={valor} onChange={(e) => alterar((m) => vincularFalta(m, p.id, e.target.value, colabs))} style={S.in}>
+                        <option value="">Escolher quem faltou…</option>
+                        {aus.length > 0 && <optgroup label="Da equipe, fora do mapa">{aus.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
+                        <optgroup label="Efetivo do mapa">
+                          {cand.map((x) => <option key={x.id} value={`p:${x.id}`}>{x.pessoaNome || "Sem nome"} — {x.rotulo}</option>)}
+                        </optgroup>
+                        {outros.length > 0 && <optgroup label="Outros do projeto">{outros.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
+                        <option value="__ninguem">Ninguém faltou (reforço / vaga)</option>
+                      </select>
+                      {p.detalhe?.quemFaltou && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>{p.detalhe.faltaPostoId ? "O posto dele passa a Falta. " : ""}A falta vai para a ficha de {p.detalhe.quemFaltou} e a FT para a ficha de {p.pessoaNome || "quem está no posto extra"}.</div>}
+                    </div>
+                  );
+                })()}
                 {p.situacao === "troca" && (
                   <div>
                     <div style={S.lab}>No lugar de quem?</div>
@@ -251,7 +307,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                 )}
               </div>
             ))}
-            <button onClick={() => alterar((m) => ({ ...m, postos: [...m.postos, postoVazio("Posto extra")] }))} style={{ ...S.btn, marginTop: 6 }}>+ Posto</button>
+            <button onClick={() => { const novo = postoVazio("Posto extra"); setAbertos((a) => ({ ...a, [novo.id]: true })); alterar((m) => ({ ...m, postos: [...m.postos, novo] })); }} style={{ ...S.btn, marginTop: 6 }}>+ Posto extra</button>
           </div>
 
           <div style={S.card}>
@@ -340,7 +396,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
             <div style={S.h}>Veículos (odômetro)</div>
             {mapa.veiculos.map((v, i) => (
               <div key={v.id || i} style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
-                <div style={{ flex: 1 }}><div style={S.lab}>{v.rotulo || "Veículo"} · anterior {v.kmAnterior ?? "—"}</div>
+                <div style={{ flex: 1 }}><div style={S.lab}>{v.rotulo || "Veículo"} · anterior {v.kmAnterior ?? "—"}{ehMoto(v) && projetoComMoto(pid) ? " · obrigatório" : ""}</div>
                   <input type="number" inputMode="decimal" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual" value={v.kmAtual ?? ""} onChange={(e) => alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: e.target.value } : x)) }))} style={S.in} /></div>
                 <div style={{ fontSize: 12, color: cor.txt2, minWidth: 70 }}>{kmRodado(v) != null ? `rodou ${kmRodado(v)} km` : ""}</div>
               </div>
@@ -354,28 +410,39 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
               {mapa.supervisao?.ultimaData ? `${dataBR(mapa.supervisao.ultimaData)}${mapa.supervisao.supervisor ? ` — ${mapa.supervisao.supervisor}` : ""}${mapa.supervisao.turno ? ` (${mapa.supervisao.turno})` : ""}` : "Sem visita registrada"}
             </div>
             <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>Vem do registro de Supervisão da CCO.</div>
+            <div style={S.lab}>Houve visita da supervisão neste turno? (obrigatório)</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button aria-pressed={mapa.visita?.houve === true} onClick={() => alterar((m) => ({ ...m, visita: { ...(m.visita || {}), houve: true } }))} style={S.chip(mapa.visita?.houve === true, "#16a34a")}>Sim, houve visita</button>
+              <button aria-pressed={mapa.visita?.houve === false} onClick={() => alterar((m) => ({ ...m, visita: { houve: false, supervisor: "" } }))} style={S.chip(mapa.visita?.houve === false, "#16a34a")}>Não houve</button>
+            </div>
+            {mapa.visita?.houve === true && <input aria-label="Quem visitou" placeholder="Nome de quem visitou" value={mapa.visita?.supervisor || ""} onChange={(e) => alterar((m) => ({ ...m, visita: { ...(m.visita || {}), houve: true, supervisor: e.target.value } }))} style={{ ...S.in, marginTop: 8 }} />}
           </div>
 
           <div style={S.card}>
-            <div style={S.h}>Resumo da passagem</div>
-            <textarea aria-label="Resumo da passagem" rows={3} placeholder="Preleção, ocorrências, pendências para o próximo turno" value={mapa.resumo} onChange={(e) => { setConfirmouResumo(false); alterar((m) => ({ ...m, resumo: e.target.value })); }} style={S.in} />
+            <div style={S.h}>Resumo da passagem (obrigatório)</div>
+            <textarea aria-label="Resumo da passagem" rows={3} placeholder='Preleção, ocorrências, pendências para o próximo turno. Se não houve nada, escreva: Sem alteração' value={mapa.resumo} onChange={(e) => { setConfirmouResumo(false); alterar((m) => ({ ...m, resumo: e.target.value })); }} style={S.in} />
           </div>
+
+          </fieldset>
 
           {avisos.length > 0 && <div role="alert" style={{ ...S.card, borderColor: "#dc2626" }}>{avisos.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#dc2626", marginBottom: 4 }}>{a}</div>)}</div>}
 
-          {!enviado && <button onClick={concluir} style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#111", border: "none", borderRadius: 14, padding: "15px 16px", fontSize: 15, fontWeight: 900, cursor: "pointer" }}>Concluir mapa</button>}
+          {(!enviado || editando) && <button onClick={concluir} style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#111", border: "none", borderRadius: 14, padding: "15px 16px", fontSize: 15, fontWeight: 900, cursor: "pointer" }}>Concluir mapa</button>}
 
           {enviado && (
             <div style={{ ...S.card, borderColor: "#16a34a" }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", marginBottom: 8 }}>Mapa gravado. Agora envie no WhatsApp.</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : "Mapa gravado. Agora envie no WhatsApp."}</div>
               {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}</div>}
               <pre aria-label="Texto do mapa" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, color: cor.txt, background: cor.input, border: `1px solid ${cor.line}`, borderRadius: 10, padding: 10, margin: "0 0 10px" }}>{texto}</pre>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <a href={linkWhatsApp(texto)} target="_blank" rel="noreferrer" style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>Abrir WhatsApp</a>
                 <button onClick={copiar} style={S.btn}>{copiado ? "Copiado" : "Copiar texto"}</button>
               </div>
-              <div style={{ fontSize: 11, color: cor.txt2, marginTop: 8 }}>Para corrigir, altere os campos acima e toque em Concluir mapa de novo; a correção fica registrada.</div>
-              <button onClick={concluir} style={{ ...S.btn, marginTop: 8 }}>Concluir mapa de novo (correção)</button>
+              {!editando && <>
+                <div style={{ fontSize: 11, color: cor.txt2, marginTop: 8 }}>Mapa arquivado neste dia. Se algo mudou (alguém saiu, outra pessoa entrou), toque em Editar mapa, corrija e conclua de novo; a correção fica registrada.</div>
+                <button onClick={editarMapa} style={{ ...S.btn, marginTop: 8 }}>Editar mapa</button>
+              </>}
+              {editando && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>Editando o mapa enviado. Corrija os campos e toque em Concluir mapa.</div>}
             </div>
           )}
         </>)}
