@@ -1,6 +1,6 @@
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
 import { getDocsSeguro } from "./lerServidor";
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { aplicarTema, definirTema, temaSalvo, proximoTema, iconeTema } from "./temaClaro";
 import { avisarFalhaServidor } from "./avisoSalvar";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
@@ -32,7 +32,8 @@ import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
 import { montarHTMLExecutivo } from "./relatorios/executivoRelatorio";
 import { itensDoEstado, falhasPorSistema } from "./relatorios/metricas";
-import { baixarHtml } from "./relatorios/padraoMoked";
+import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
+import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 
@@ -153,6 +154,7 @@ class ErrorBoundary extends React.Component {
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import PainelMapasEquipe from "./mapaDiario/PainelMapasEquipe";
+import PainelAvisos from "./avisos/PainelAvisos";
 import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
@@ -1479,68 +1481,9 @@ function computeScore360(base, ex) {
 }
 
 function gerarPDFVisao360(rows, mediaGeral, grupoLabel) {
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  const hora = new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-  const tituloGrupo = grupoLabel ? `Grupo ${grupoLabel}` : "Consolidado Interno Moked";
-  const medal = (i)=> i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}º`;
-  const scoreColor = (s)=> s>=90?"#15803d":s>=75?"#d97706":"#dc2626";
-  const rowsHtml = rows.map((r,i)=>`
-    <tr style="${r.score<75?'background:#fff8f8':''}">
-      <td style="text-align:center;font-weight:800">${medal(i)}</td>
-      <td style="font-weight:800">${r.id}<div style="font-weight:400;font-size:10px;color:#64748b">${r.name}</div></td>
-      <td style="text-align:center"><span style="font-size:18px;font-weight:900;color:${scoreColor(r.score)}">${r.score}</span><span style="font-size:10px;color:#94a3b8">/100</span></td>
-      <td style="text-align:center;color:#64748b">${r.base}%</td>
-      <td style="text-align:center">${r.ilumDeficientes>0?`<span style="color:#dc2626;font-weight:800">💡 ${r.ilumDeficientes}</span>`:(r.ilumTotal>0?'<span style="color:#15803d;font-weight:700">✓ 0</span>':'<span style="color:#cbd5e1">—</span>')}</td>
-      <td style="text-align:center">${r.energiaAberta?'<span style="color:#dc2626;font-weight:900">⚡ EM ABERTO</span>':(r.energiaQuedas7d>0?`<span style="color:#d97706;font-weight:800">⚡ ${r.energiaQuedas7d} (7d)</span>`:'<span style="color:#15803d;font-weight:700">✓ 0</span>')}</td>
-      <td style="font-size:10px;color:#64748b">${r.penalidades.length? r.penalidades.map(p=>`<div>−${p.val} · ${p.label}</div>`).join("") : '<span style="color:#15803d;font-weight:700">✓ Sem penalidades</span>'}</td>
-    </tr>`).join("");
-  const html = `<!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><title>Visão 360 — ${hoje}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:20px;color:#1e293b;font-size:13px}
-  .header{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:#fff;padding:18px 22px;border-radius:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-  table{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
-  th{background:#1e293b;color:#fff;padding:8px 10px;text-align:left;font-size:10px;text-transform:uppercase}
-  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
-  .legend{font-size:10px;color:#94a3b8;margin-top:10px;line-height:1.6}
-  .footer{text-align:center;margin-top:14px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-  @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
-</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="background:#1e3a8a;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
-</div>
-<div class="header">
-  <div>
-    <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
-    <h1 style="font-size:19px;font-weight:900;margin-bottom:3px">🎯 Visão 360 — ${tituloGrupo}</h1>
-    <p style="font-size:12px;opacity:.85">Saúde operacional consolidada: checklist + CTMK + KeyAccess + Bolsão + Perimetral + Ronda VSPP</p>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:30px;font-weight:900">${mediaGeral}<span style="font-size:13px;opacity:.7">/100</span></div>
-    <div style="font-size:10px;opacity:.8">MÉDIA DO GRUPO · ${hoje} ${hora}</div>
-  </div>
-</div>
-<table>
-  <thead><tr><th style="width:44px;text-align:center">Pos.</th><th>Planta</th><th style="text-align:center;width:80px">Score 360</th><th style="text-align:center;width:70px">Checklist</th><th style="text-align:center;width:80px">💡 Iluminação</th><th style="text-align:center;width:90px">⚡ Energia</th><th>Penalidades aplicadas</th></tr></thead>
-  <tbody>${rowsHtml}</tbody>
-</table>
-<div class="legend">
-  <strong>Como o score é calculado:</strong> parte do % do último checklist semanal e desconta penalidades por pendências ativas nos demais módulos —
-  CTMK off-line (−${SCORE360_CFG.ctmkPorDia}/dia, máx −${SCORE360_CFG.ctmkMax}) · falha KeyAccess aberta (−${SCORE360_CFG.keyAccess} cada, máx −${SCORE360_CFG.keyAccessMax}) ·
-  placa crítica no bolsão (−${SCORE360_CFG.bolsaoCritico} cada, máx −${SCORE360_CFG.bolsaoMax}) · zona perimetral com problema (−${SCORE360_CFG.perimetralZona} cada, máx −${SCORE360_CFG.perimetralMax}) ·
-  Ronda VSPP abaixo de 90% (−${SCORE360_CFG.rondaMedia}) ou de 60% (−${SCORE360_CFG.rondaBaixa}).
-</div>
-<div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · Visão 360 Executiva</div>
-  <div style="margin-top:3px">José Fonseca · ${hoje} ${hora}</div>
-</div>
-</body></html>`;
-  const blob=new Blob([html],{type:"text/html"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download=`visao360_${grupoLabel?grupoLabel.toLowerCase()+"_":""}${hoje.replace(/\//g,"-")}.html`;
-  a.click(); URL.revokeObjectURL(url);
+  const hoje = new Date();
+  const html = gerarVisao360HTML({ rows, media: mediaGeral, grupoLabel, cfg: SCORE360_CFG, hoje });
+  abrirParaImpressao(html, `visao360_${grupoLabel?grupoLabel.toLowerCase()+"_":""}${hoje.toLocaleDateString("sv-SE")}.html`);
 }
 
 // Computa o score 360 de UM projeto (para a Auditoria Operacional), reusando
@@ -3643,6 +3586,13 @@ export default function App(){
 
   // ── Monitor de falhas KeyAccess ainda abertas (sem horaFim) — alimenta o banner da Home
   const [keyAccessOpenCount, setKeyAccessOpenCount] = useState(0);
+  // ── Painel de Avisos: insumos do checklist (equipamento inoperante, relatório semanal atrasado) calculados do `stored` em tempo real
+  const avisosPendencias = useMemo(()=>getAllPendencies(stored).map(p=>({projetoId:p.project.id,cat:p.cat,item:p.item,status:p.status,days:p.days})),[stored]);
+  const avisosUltimoRelatorio = useMemo(()=>{
+    const o={};
+    Object.keys(PROJECTS).forEach(pid=>{ const datas=(stored[pid]?.history??[]).map(r=>r?.meta?.date).filter(Boolean).sort(); o[pid]=datas.length?datas[datas.length-1]:null; });
+    return o;
+  },[stored]);
   useEffect(()=>{
     if(!loaded) return;
     const ids=Object.keys(PROJECTS);
@@ -4680,27 +4630,10 @@ export default function App(){
             <span style={{color:keyAccessOpenCount>0?"#ef4444":"#94a3b8",fontSize:18,flexShrink:0}}>›</span>
           </button>
 
-          {(()=>{
-            const allP=Object.values(PROJECTS);
-            const valid=allP.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.slice(-1)[0];return last?computeHealth(p,last.state):null;}).filter(Boolean);
-            if(!valid.length) return null;
-            const avg=Math.round(valid.reduce((a,h)=>a+h.pct,0)/valid.length);
-            const totalInop=valid.reduce((a,h)=>a+h.inop,0);
-            return(
-              <div style={{marginTop:10,background:T.saudeBg,border:"1px solid #22c55e2e",borderRadius:14,padding:"12px 14px",boxShadow:T.saudeShadow}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div style={{fontSize:11,color:T.saudeLabel,fontWeight:700}}>Saúde Geral da Operação</div>
-                  <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    {totalInop>0&&<span style={{fontSize:11,color:"#ef4444",fontWeight:700}}><Ico n="pontoVermelho"/> {totalInop} inop</span>}
-                    <span style={{fontSize:17,fontWeight:900,color:avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444",textShadow:`0 0 12px ${avg>=90?"#22c55e":avg>=70?"#f59e0b":"#ef4444"}55`}}>{avg}%</span>
-                  </div>
-                </div>
-                <div style={{height:6,background:T.track,borderRadius:4,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${avg}%`,background:`linear-gradient(90deg,${avg>=90?"#16a34a,#22c55e":avg>=70?"#d97706,#f59e0b":"#dc2626,#ef4444"})`,borderRadius:4,boxShadow:`0 0 12px ${avg>=90?"#22c55e":"#f59e0b"}66`}}/>
-                </div>
-              </div>
-            );
-          })()}
+          <PainelAvisos dark={dark} gerencial={hasGerencial()} projetos={Object.keys(PROJECTS)} ctmkData={ctmkData}
+            pendencias={avisosPendencias} ultimoRelatorio={avisosUltimoRelatorio}
+            nomeProj={(pid)=>PROJECTS[pid]?.name?`${pid} · ${PROJECTS[pid].name}`:pid}
+            onAbrir={(a)=>{ const pid=a.projetoId||""; setJatinoxSel(null); setHomeGroup(pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>
         </div>
 
         <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
