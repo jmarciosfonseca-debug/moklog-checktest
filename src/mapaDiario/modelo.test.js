@@ -367,3 +367,11 @@ test("completarPostosFixos: 'Posto extra' presente com pessoa ocupa o posto fixo
   const ft = { ...gravado, postos: [...gravado.postos.slice(0, 3), { ...gravado.postos[3], situacao: "ft" }] }; // FT de verdade não se mexe
   expect(completarPostosFixos(ft).postos.map((p) => p.rotulo)).toEqual(["Líder", "VSPP 1", "VSPP 2", "CCO", "Posto extra"]);
 });
+test("completarPostosFixos (P607): três 'Posto extra' voltam para Honda, AGP CCO e Pista pelo cargo", () => {
+  const m = novoMapa({ projetoId: "P607", data: "2026-10-11", turno: "N", horario: { inicio: "18:00", fim: "06:00" } });
+  expect(m.postos.map((p) => p.rotulo)).toEqual(["Vigilante Honda", "AGP CCO", "Vigilante Pista"]);
+  const cs = [{ id: "m", cargo: "AGP CCO" }, { id: "c", cargo: "Vigilante Apoio" }, { id: "r", cargo: "Vigilante Ronda" }];
+  const extra = (id, nome) => ({ ...postoVazioT("Posto extra"), pessoaId: id, pessoaNome: nome });
+  const ok = completarPostosFixos({ ...m, postos: [extra("m", "Marco"), extra("c", "Cremildo"), extra("r", "Maria")] }, cs);
+  expect(ok.postos.map((p) => `${p.rotulo}:${p.pessoaNome}`)).toEqual(["Vigilante Honda:Maria", "AGP CCO:Marco", "Vigilante Pista:Cremildo"]);
+});

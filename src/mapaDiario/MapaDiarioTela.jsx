@@ -69,7 +69,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           if (lc) { const r = puxarEquipe({ postos: m.postos, lider: lc, colabs: cs, pid, turno, soVazios: !!existente }); m = { ...m, postos: r.postos }; aviso = r.semEquipe ? `${lc.nome} ainda não tem equipe montada em Equipes: escolha quem está em cada posto.` : `Equipe de ${lc.nome} puxada da montagem em Equipes. Ajuste só o que mudou.`; }
         }
         setAvisoEquipe(aviso);
-        setColabs(cs); setMapa(m.status === "enviado" ? m : garantirMoto(completarPostosFixos(m))); setItensMat(itensDeEquipamento(eq, pid, turno));
+        setColabs(cs); setMapa(m.status === "enviado" ? m : garantirMoto(completarPostosFixos(m, cs))); setItensMat(itensDeEquipamento(eq, pid, turno));
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -140,7 +140,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     }
   };
 
-  const editarMapa = () => { setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(completarPostosFixos(m))); };
+  const editarMapa = () => { setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(completarPostosFixos(m, colabs))); };
   const texto = mapa ? montarTextoWhatsApp(mapa, { nomeProjeto: project?.name || "" }) : "";
   const copiar = async () => { try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch (e) { setAvisos(["Não consegui copiar; use o botão do WhatsApp."]); } };
   const enviado = mapa && mapa.status === "enviado";
