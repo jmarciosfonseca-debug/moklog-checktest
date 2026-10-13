@@ -1,6 +1,10 @@
 // ── MokLog CheckTest — generatePDF.js
 // Laudo semanal, consolidado e comparativo de grupo — todos no padrão Moked (relatorios/padraoMoked.js).
 // THEMES: logo/nome da empresa de segurança por projeto (usado no cabeçalho dos documentos).
+import QRCode from "qrcode";
+import { hasGerencial } from "./session";
+import { linkLiberado } from "./followupLink/config";
+import { gerencial, urlDoLink } from "./followupLink/api";
 import { canonicalFollowupKey } from "./followups";
 import { itensDoEstado, resumo, classificar, diasEntre, estadoTratativa, DIAS_FOLLOWUP_VENCIDO } from "./relatorios/metricas";
 import { montarLaudoSemanal } from "./relatorios/laudoSemanal";
@@ -169,9 +173,22 @@ export const MOKED_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATkAAAB
 
 // ── LAUDO TÉCNICO SEMANAL — padrão Moked (relatorios/laudoSemanal.js). Assinatura mantida para os chamadores.
 // photos e inquilinosInfo são aceitos por compatibilidade (o laudo nunca os imprimiu).
+// QR do link de follow-up (piloto): falha silenciosa, o PDF sai igual sem ele.
+async function qrDoFollowup(pid) {
+  try {
+    if (!linkLiberado(pid) || !hasGerencial()) return null;
+    const { links } = await gerencial("listar", { pid });
+    const l = (links || []).find((x) => x.papel === "manutencao");
+    if (!l) return null;
+    const url = urlDoLink(l.token);
+    return { url, qr: await QRCode.toDataURL(url, { margin: 1, width: 200 }) };
+  } catch { return null; }
+}
+
 export async function generatePDF(project, state, meta, photos, ctmkInfo, inquilinosInfo, energiaInfo, followupsInfo) {
   if(!project||!state||!meta) return;
-  const html = montarLaudoSemanal(project, state, meta, { ctmkInfo, energiaInfo, followupsInfo, hoje: new Date() });
+  const linkFollowup = await qrDoFollowup(project.id);
+  const html = montarLaudoSemanal(project, state, meta, { ctmkInfo, energiaInfo, followupsInfo, linkFollowup, hoje: new Date() });
   abrirParaImpressao(html, `laudo_${project.id}_${meta.date||"relatorio"}.html`);
 }
 
