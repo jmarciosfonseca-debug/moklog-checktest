@@ -74,19 +74,59 @@ export function calcularTreinamento(colaborador, catalogo, hoje) {
   return validos.length / obrigatorios.length * 100;
 }
 
+// Desligados SEM duplicidade: mesma pessoa não pode contar duas vezes no turnover.
+//  - mesmo id (ou, sem id, mesmo nome) = mesma pessoa: vale o desligamento mais recente;
+//  - mesmo nome com ids diferentes e mesma data de saída = registro lançado em duplicidade;
+//  - quem consta como ATIVO com o mesmo id não está desligado (registro velho que sobrou).
+const chaveNome = (c) => String(c?.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+export function desligadosUnicos(desligados, ativos = []) {
+  const idsAtivos = new Set((ativos || []).map(c => c && c.id).filter(Boolean));
+  const lista = (Array.isArray(desligados) ? desligados : []).filter(c => c && typeof c === 'object');
+  const porPessoa = new Map();
+  const ignorados = [];
+  lista.forEach((c, i) => {
+    if (c.id && idsAtivos.has(c.id)) { ignorados.push({ ...c, motivoIgnorado: 'consta como ativo' }); return; }
+    const chave = c.id ? `id:${c.id}` : `nome:${chaveNome(c) || `#${i}`}`;
+    const atual = porPessoa.get(chave);
+    if (!atual) { porPessoa.set(chave, c); return; }
+    const maisRecente = String(c.desligadoEm || '') > String(atual.desligadoEm || '');
+    ignorados.push({ ...(maisRecente ? atual : c), motivoIgnorado: 'registro duplicado' });
+    if (maisRecente) porPessoa.set(chave, c);
+  });
+  // ids diferentes, mesmo nome e mesma data de saída: um só desligamento
+  const vistos = new Map();
+  const unicos = [];
+  for (const c of porPessoa.values()) {
+    const n = chaveNome(c);
+    const k = n && c.desligadoEm ? `${n}|${c.desligadoEm}` : null;
+    if (k && vistos.has(k)) { ignorados.push({ ...c, motivoIgnorado: 'registro duplicado' }); continue; }
+    if (k) vistos.set(k, true);
+    unicos.push(c);
+  }
+  return { unicos, ignorados, duplicadosIgnorados: ignorados.length };
+}
+
+// Turnover dos últimos 12 meses = saídas ÷ efetivo médio × 100.
+//  efetivo médio = (efetivo no início + efetivo hoje) ÷ 2; efetivo no início = ativos hoje − entradas + saídas (janela de 12 meses).
 export function calcularEstabilidade(equipe, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
   const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - 1);
   const ativos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo');
-  const desligados = equipe.desligados || [];
+  const { unicos: desligados, duplicadosIgnorados } = desligadosUnicos(equipe.desligados, ativos);
   const naJanela = d => d !== null && d >= +inicio && d <= fim;
   const saidas = desligados.filter(c => naJanela(data(c.desligadoEm))).length;
   const entradas = ativos.filter(c => naJanela(data(c.dataContratacao))).length;
-  const efetivoMedio = (ativos.length * 2 + saidas - entradas) / 2;
-  const incompleto = desligados.some(c => data(c.desligadoEm) === null) || ativos.some(c => data(c.dataContratacao) === null);
+  const efetivoInicial = ativos.length - entradas + saidas;
+  const efetivoMedio = (ativos.length + efetivoInicial) / 2;
+  const semDataSaida = desligados.filter(c => data(c.desligadoEm) === null).length;
+  const semDataEntrada = ativos.filter(c => data(c.dataContratacao) === null).length;
+  const incompleto = semDataSaida > 0 || semDataEntrada > 0;
   const turnover = incompleto || efetivoMedio < 3 ? null : saidas / efetivoMedio * 100;
-  return { efetivoMedio, desligados12m: saidas, turnover, estabilidade: turnover === null ? null : Math.max(0, 100 - 2 * turnover) };
+  const motivoNaoAferido = turnover !== null ? null : incompleto
+    ? `${semDataEntrada ? `${semDataEntrada} ativo(s) sem data de admissão` : ''}${semDataEntrada && semDataSaida ? ' e ' : ''}${semDataSaida ? `${semDataSaida} desligado(s) sem data de saída` : ''}`
+    : 'efetivo médio abaixo de 3';
+  return { efetivoMedio, efetivoInicial, ativosHoje: ativos.length, entradas12m: entradas, desligados12m: saidas, duplicadosIgnorados, turnover, motivoNaoAferido, estabilidade: turnover === null ? null : Math.max(0, 100 - 2 * turnover) };
 }
 
 export function agregarEquipe(individuos, estabilidade) {

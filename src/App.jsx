@@ -166,6 +166,9 @@ import { useResumoFollowup } from "./followupLink/useResumoFollowup";
 import { gerarLinksFaltantes } from "./followupLink/gerarTodos";
 import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno, PROJETOS_LIBERADOS } from "./followupLink/config";
 import { gerencial as chamarFollowupLink } from "./followupLink/api";
+import { desligadosUnicos } from "./equipe/maturidade";
+import { ocupacaoDoQuadro, totalQuadro, ORDEM_PROJETOS } from "./equipe/quadroPrevisto";
+import { montarMatrizEfetivo } from "./relatorios/matrizEfetivo";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
@@ -2698,6 +2701,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const [viaCascata, setViaCascata] = useState(false); // abriu Colaboradores pela lista recolhível → voltar cai no Registros
   const [fuPid, setFuPid] = useState(null);
   const [fuGerando, setFuGerando] = useState(false);
+  const [matrizGerando, setMatrizGerando] = useState(false);
   const [fuMsg, setFuMsg] = useState("");
   const pendFuReg = useMemo(()=> hasGerencial() ? getAllPendencies(stored).filter(x=>linkLiberado(x.project.id)) : [], [stored]);
   const { resumo: fuResumoReg, totalNovos: fuTotalNovos, recarregar: recarregarFuReg } = useResumoFollowup({ db, pendencias: pendFuReg, ativo: hasGerencial() });
@@ -2775,7 +2779,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           });
           // Estabilidade: só desligamentos com data VÁLIDA e não-futura, nos últimos 90 dias.
           const temDesligadosField = Array.isArray(eqData.desligados);
-          const desl90 = temDesligadosField ? eqData.desligados.filter(d=>{
+          const desl90 = temDesligadosField ? desligadosUnicos(eqData.desligados, cols).unicos.filter(d=>{
             if(!d||!d.desligadoEm) return false;
             const de=new Date(d.desligadoEm).getTime();
             return !isNaN(de) && de<=hojeMs && (hojeMs-de) <= 90*DIA;
@@ -3083,11 +3087,28 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                             style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 8px", borderBottom:`1px solid ${dark?"#0f172a":"#eef2f7"}`, cursor:"pointer" }}>
                             <span style={{ width:7, height:7, borderRadius:"50%", background:n>0?"#0ea5e9":"#334155", flexShrink:0 }}/>
                             <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{p.id} <span style={{ color:txt2, fontWeight:400 }}>— {p.name||""}</span></div>
-                            {n>0 ? <span style={{ fontSize:10.5, fontWeight:700, color:"#0ea5e9" }}>{n} ativo(s)</span> : null}
+                            {totalQuadro(p.id)>0
+                              ? <span style={{ fontSize:10.5, fontWeight:700, color:(n||0)<totalQuadro(p.id)?"#f59e0b":"#0ea5e9" }}>{n||0}/{totalQuadro(p.id)}{(n||0)<totalQuadro(p.id)?` · ${totalQuadro(p.id)-(n||0)} vaga(s)`:""}</span>
+                              : (n>0 ? <span style={{ fontSize:10.5, fontWeight:700, color:"#0ea5e9" }}>{n} ativo(s)</span> : null)}
                             <span style={{ color:txt2, fontSize:16 }}>›</span>
                           </div>
                         );
                       })}
+                      <button type="button" disabled={matrizGerando} onClick={async()=>{
+                        setMatrizGerando(true);
+                        try{
+                          const ocupacoes={};
+                          await Promise.all(ORDEM_PROJETOS.map(async pid=>{
+                            let d=null;
+                            try{ const snap=await getDoc(doc(db,"equipes",pid)); if(snap.exists()) d=snap.data(); }catch(e){}
+                            if(!d){ try{ const l=localStorage.getItem(`equipe_${pid}`); if(l) d=JSON.parse(l); }catch(e){} }
+                            if(d) ocupacoes[pid]=ocupacaoDoQuadro(pid,d.colaboradores||[]);
+                          }));
+                          const nomes=Object.fromEntries(ORDEM_PROJETOS.map(pid=>[pid,PROJECTS[pid]?.name||""]));
+                          const hoje=new Date();
+                          abrirParaImpressao(montarMatrizEfetivo({ nomes, ocupacoes, hoje }), `matriz_efetivo_${hoje.toLocaleDateString("sv-SE")}.html`);
+                        } finally { setMatrizGerando(false); }
+                      }} style={{ width:"100%", marginTop:10, background:"#0369a1", color:"#fff", border:"none", borderRadius:10, padding:"11px", fontSize:13, fontWeight:700, cursor:"pointer", opacity:matrizGerando?.6:1 }}>{matrizGerando?"Gerando...":"Matriz de efetivo (PDF) — postos, escalas e vagas"}</button>
                     </div>
                   )}
                 </div>

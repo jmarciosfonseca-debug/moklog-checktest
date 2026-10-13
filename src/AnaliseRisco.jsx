@@ -40,6 +40,8 @@ import { aplicarMotorV2, classificarCFTVGraduado, contarPerimetraisAntigas } fro
 import { coletarSinistros, moduladorSinistro } from "./Sinistros";
 import { loadFollowups, canonicalFollowupKey } from "./followups";
 import { itensDoEstado, resumo, falhasPorSistema, estadoTratativa } from "./relatorios/metricas";
+import { calcularEstabilidade } from "./equipe/maturidade";
+import { totalQuadro } from "./equipe/quadroPrevisto";
 import { getTheme } from "./generatePDF";
 import { coletarRegional, moduladorRegional } from "./regionalConfig";
 import { gerarMapaCriticidadeHTML, gerarLeituraTerritorialHTML } from "./MapaCriticidade";
@@ -540,11 +542,17 @@ async function coletarEquipe(pid) {
     // Ativos ficam em `colaboradores`; desligados ficam num array SEPARADO
     // `desligados` (Equipe.jsx move o colaborador ao desligar). Contamos dali.
     const colabs = todos.filter((c) => (c.status || "ativo") !== "desligado");
-    const desligados = Array.isArray(data.desligados) ? data.desligados.length : 0;
+    // Turnover: mesmo cálculo do Mapa de Equipe (12 meses, efetivo médio, sem duplicidade de desligados).
+    const d0 = new Date();
+    const hojeISO = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, "0")}-${String(d0.getDate()).padStart(2, "0")}`;
+    const est = calcularEstabilidade({ colaboradores: todos, desligados: data.desligados }, hojeISO);
+    const desligados = est.desligados12m;
     if (!colabs.length) return { ok: false, temDado: false, motivo: "sem colaboradores ativos" };
-    // Turnover = desligados / (ativos + desligados) no quadro do período.
-    const baseQuadro = colabs.length + desligados;
-    const turnoverPct = baseQuadro > 0 ? Math.round((desligados / baseQuadro) * 100) : 0;
+    const turnoverPct = est.turnover === null ? null : Math.round(est.turnover);
+    // Quadro previsto (matriz de dimensionamento): turnover sobre os postos e vagas abertas.
+    const quadro = totalQuadro(pid);
+    const turnoverQuadroPct = quadro ? Math.round((desligados / quadro) * 100) : null;
+    const vagas = quadro ? Math.max(0, quadro - colabs.length) : null;
     let brigadaNaoAplicada = 0, reciclagemVencida = 0, reciclagemAlerta = 0;
     colabs.forEach((c) => {
       const temBrigada = (c.historico || []).some((h) =>
@@ -574,7 +582,7 @@ async function coletarEquipe(pid) {
       afastado: !!liderRaw.afastamentoAberto || (liderRaw.status || "ativo") === "afastado",
       coberturaAtiva: !!liderRaw.coberturaAtiva,
     } : null;
-    return { ok: true, temDado: true, total: colabs.length, desligados, turnoverPct, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca, lider };
+    return { ok: true, temDado: true, total: colabs.length, desligados, turnoverPct, efetivoMedio: est.efetivoMedio, entradas12m: est.entradas12m, duplicadosIgnorados: est.duplicadosIgnorados, quadro, turnoverQuadroPct, vagas, motivoTurnover: est.motivoNaoAferido, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca, lider };
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler equipe" }; }
 }
 
@@ -1423,13 +1431,20 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     const armadaX = psx.armada === "sim";
     const ccoX = psx.ccoDedicada === "sim";
     const compl = [armadaX ? "armada" : null, ccoX ? "CCO 24h" : null].filter(Boolean).join(" · ") || "efetivo ativo";
-    // Turnover real, derivado dos desligados do período.
-    if (equipe.turnoverPct != null && equipe.desligados != null) {
+    // Turnover dos últimos 12 meses: sobre o quadro previsto (matriz de dimensionamento) quando houver; o efetivo médio real vai junto.
+    if (equipe.turnoverQuadroPct != null && equipe.desligados != null) {
+      fcards.push({
+        n: `${equipe.turnoverQuadroPct}%`,
+        l: "Turnover · 12 meses",
+        s: `${equipe.desligados} deslig. ÷ quadro de ${equipe.quadro} postos${equipe.turnoverPct != null ? ` (efetivo médio real: ${equipe.turnoverPct}%)` : ""} · ${equipe.total} ativos, ${equipe.vagas} vaga(s) · ${compl}`,
+      });
+    } else if (equipe.turnoverPct != null && equipe.desligados != null) {
       const desl = equipe.desligados;
+      const medio = Math.round(equipe.efetivoMedio * 10) / 10;
       fcards.push({
         n: `${equipe.turnoverPct}%`,
-        l: "Turnover no período",
-        s: `${desl} deslig. em ${equipe.total + desl} · ${equipe.total} ativos · ${compl}`,
+        l: "Turnover · 12 meses",
+        s: `${desl} deslig. ÷ efetivo médio ${String(medio).replace(".", ",")} · ${equipe.total} ativos · ${compl}`,
       });
     } else {
       fcards.push({ n: `${equipe.total}`, l: "Efetivo ativo", s: compl });
