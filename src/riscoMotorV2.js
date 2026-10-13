@@ -28,11 +28,11 @@ export const PERFIL_BARREIRAS = {
   P601:  { nome: "Golgi Cajamar",  vias: ["bollard", "bolard", "pino"], cancelaAS: true },
   P604:  { nome: "Golgi Jundiaí",  vias: ["bollard", "bolard", "pino"], cancelaAS: true },
   P605:  { nome: "Golgi Dutra",    vias: ["bollard", "bolard", "pino"], cancelaAS: true },
-  P602:  { nome: "Golgi Mauá",     vias: ["garra"] },
-  P505:  { nome: "Klog Guarulhos", vias: ["garra", "dilacerador"] },
+  P602:  { nome: "Golgi Mauá",     vias: ["garra", "dilacerador"] },
+  P505:  { nome: "Klog Guarulhos", vias: ["garra", "dilacerador"], cancelaTransponivel: true },
   P311A: { nome: "Mega Curitiba",  vias: ["dilacerador"], cancelaTransponivel: true },
   P311B: { nome: "Mega Itajaí",    vias: ["dilacerador"], cancelaTransponivel: true },
-  P606:  { nome: "Golgi Caxias",   vias: ["dilacerador"], cancelaAS: true },
+  P606:  { nome: "Golgi Caxias",   vias: ["garra", "dilacerador"] },
   P607:  { nome: "Golgi Brasília", vias: [], naoAferido: true },
 };
 

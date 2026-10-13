@@ -242,3 +242,14 @@ describe("regras unitárias v2", () => {
     expect(classificarCFTVGraduado({ inop: 3, total: 100, piorDias: 300, nivelBase: NIVEL.BAIXO }).nivel).toBe(NIVEL.BAIXO);
   });
 });
+
+describe("perfil de barreiras ditado pelo Marcio (13/10/2026)", () => {
+  test("P601/P604/P605: cancela AS + bollard · P602/P606: eclusa (garra) + dilacerador · P311A/B: cancela comum + dilacerador · P505: cancela comum + eclusa + dilacerador · P607: só eclusa", () => {
+    for (const p of ["P601", "P604", "P605"]) { expect(PERFIL_BARREIRAS[p].cancelaAS).toBe(true); expect(PERFIL_BARREIRAS[p].vias).toContain("bollard"); }
+    for (const p of ["P602", "P606"]) { expect(PERFIL_BARREIRAS[p].vias).toEqual(["garra", "dilacerador"]); expect(PERFIL_BARREIRAS[p].cancelaAS).toBeFalsy(); }
+    for (const p of ["P311A", "P311B"]) { expect(PERFIL_BARREIRAS[p].vias).toEqual(["dilacerador"]); expect(PERFIL_BARREIRAS[p].cancelaTransponivel).toBe(true); }
+    expect(PERFIL_BARREIRAS.P505.vias).toEqual(["garra", "dilacerador"]);
+    expect(PERFIL_BARREIRAS.P505.cancelaTransponivel).toBe(true);
+    expect(PERFIL_BARREIRAS.P607.vias).toEqual([]);
+  });
+});
