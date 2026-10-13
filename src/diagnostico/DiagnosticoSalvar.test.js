@@ -141,3 +141,18 @@ test("nova revisão a partir de um diagnóstico salvo: copia as respostas, guard
   expect(payload.respostas["D01.01.01"]).toMatchObject({ status: "nao_conforme", situacao: "Trecho caído" });
   expect(antigo.respostas["D01.01.01"].status).toBe("nao_conforme");
 });
+
+test("Concluir diagnóstico: só habilita com todos os itens respondidos e grava estado 'concluido'", async () => {
+  window.confirm = jest.fn(() => true);
+  await montar();
+  await clicar(botao("P607"));
+  await act(async () => { await Promise.resolve(); });
+  expect(botao("Concluir").disabled).toBe(true); // nada respondido ainda
+  await clicar(botao("CConforme"));
+  await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+  expect(botao("Concluir diagnóstico").disabled).toBe(false);
+  await clicar(botao("Concluir diagnóstico"));
+  await act(async () => { await Promise.resolve(); });
+  expect(mockSetDoc).toHaveBeenCalledTimes(1);
+  expect(mockSetDoc.mock.calls[0][1]).toMatchObject({ projetoRef: "P607", estado: "concluido" });
+});

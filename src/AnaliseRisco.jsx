@@ -33,6 +33,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { avaliarDiagnosticoParaRisco, aplicarDiagnosticoNaMemoria } from "./diagnostico/diagnosticoRisco";
 import { numerosRevisao, filtrosConsultaDiagnosticos } from "./diagnostico/diagnosticoSync";
+import { escolherDiagnosticoConcluido, motivoSemConcluido, resumoModelo2, blocosModelo2, refModelo2 } from "./diagnostico/analiseRiscoModelo2";
 import { CATALOGO_REF } from "./diagnostico/catalogoSchema";
 import { classificarVetor, consolidarSite, classificarRiscoOperacional, normalizarFracao, avaliarIluminacao, NIVEL as RC_NIVEL, NIVEL_LABEL as RC_LABEL } from "./riscoConfig";
 import { aplicarMotorV2, classificarCFTVGraduado, contarPerimetraisAntigas } from "./riscoMotorV2";
@@ -1530,7 +1531,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       ${dg.recomendacoes.slice(0, 14).map((r) => `<tr class="vt-linha"><td><div class="ar-dv">${esc(r.texto)}</div><div class="ar-mu">${esc(r.id)}${r.eleva ? " · eleva o nível" : ""}</div></td><td>${esc(STATUS_DG[r.status] || r.status)}</td><td>${[r.situacao && `<div>${esc(r.situacao)}</div>`, r.impacto && `<div class="ar-mu">${esc(r.impacto)}</div>`].filter(Boolean).join("") || '<span class="ar-mu">sem registro</span>'}</td><td>${r.indicacao ? `<b>${esc(r.indicacao)}</b>` : '<span class="ar-mu">a definir</span>'}${r.padrao ? `<div class="ar-mu">Padrão: ${esc(r.padrao)}</div>` : ""}</td></tr>`).join("")}
       </tbody></table>${dg.recomendacoes.length > 14 ? `<div class="mais-anexo">Mais ${dg.recomendacoes.length - 14} item(ns) no relatório do Diagnóstico Situacional.</div>` : ""}` : ""}
       ${dg.semAgravante.length ? `<div class="nota">${dg.semAgravante.map((x) => esc(x.item) + " — " + esc(x.motivo)).join(" · ")}</div>` : ""}
-    </div>` : "";
+    </div>${blocosModelo2(dg.modelo2, esc)}` : "";
   const acoesHTML = acoes.length ? `<div class="bloco"><div class="eyebrow">Ações priorizadas</div><ol class="ar-acoes">${acoes.join("")}</ol></div>` : "";
   // base operacional: a mesma do laudo semanal (mesma fórmula e mesmos números)
   let baseHTML = "";
@@ -1549,10 +1550,10 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   }
   const theme = getTheme(project.id) || {};
   const topoHTML = `<header class="ar-topo"><div class="ar-logos"><img src="${MOKED_LOGO}" class="ar-lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="ar-sep"></span><img src="${theme.empresaLogo}" class="ar-lg" alt="${esc(theme.empresaNome || "")}">` : ""}</div>
-    <div class="ar-meta"><div><b>Análise de Risco</b> · Nº ${esc(ref)}</div><div>Emissão ${esc(hoje)} · José Fonseca</div><div>Período ${esc(periodo)} · ${nFontes} ${nFontes === 1 ? "fonte" : "fontes"}</div></div></header>
+    <div class="ar-meta"><div><b>Análise de Risco</b> · Nº ${esc(dg ? refModelo2(ref) : ref)}</div><div>Emissão ${esc(hoje)} · José Fonseca</div><div>Período ${esc(periodo)} · ${nFontes} ${nFontes === 1 ? "fonte" : "fontes"}</div></div></header>
     <div class="ar-regua"></div>
     <h1 class="ar-h1">Análise de Risco de Segurança</h1>
-    <p class="ar-sub"><b>${esc(project.id)} — ${esc(project.name || "")}</b>${ts?.ok ? ` · base: laudo semanal de ${esc(ts.data || "")}` : ""}${fontesUsadas.length ? ` · ${fontesUsadas.map((f) => esc(f.titulo)).join(" · ")}` : ""}</p>
+    <p class="ar-sub"><b>${esc(project.id)} — ${esc(project.name || "")}</b>${dg ? " · Modelo 2 — com Diagnóstico Situacional" : ""}${ts?.ok ? ` · base: laudo semanal de ${esc(ts.data || "")}` : ""}${fontesUsadas.length ? ` · ${fontesUsadas.map((f) => esc(f.titulo)).join(" · ")}` : ""}</p>
     <section class="ar-hero"><div><div class="ar-lb">Classificação do ativo</div><div class="ar-cls" style="color:${corVeredito}">${esc(labelGeral)}</div>
       <div class="regua">${reguaCells}</div><div class="regualeg"><span>menor exposição</span><span>maior exposição</span></div></div>
       <div><div class="ar-lb">Por que</div>${porQueHTML}</div></section>`;
@@ -1865,7 +1866,7 @@ const FONTES_DEF = [
   { key: "energia",  label: "Ocorrências de Energia",      desc: "Quedas e estabilidade no período" },
   { key: "equipe",   label: "Mapa de Equipe",              desc: "Brigada e reciclagens do efetivo" },
   // Opcional (desmarcada por padrão): sem a marca, o motor segue exatamente como antes.
-  { key: "diagnostico", label: "Diagnóstico Situacional", desc: "Anexa o diagnóstico ativo mais recente do projeto. Pode elevar o nível (nunca reduz) e mostra a conta.", opcional: true },
+  { key: "diagnostico", label: "Diagnóstico Situacional", desc: "Usa só diagnóstico CONCLUÍDO do projeto (botão \"Concluir diagnóstico\"). Gera o relatório Modelo 2: o de sempre + seções do Diagnóstico. Pode elevar o nível (nunca reduz) e mostra a conta. Sem marcar, sai o relatório padrão.", opcional: true },
 ];
 
 // Diagnóstico Situacional ativo mais recente do projeto (+ catálogo para saber a criticidade de cada item).
@@ -1877,17 +1878,20 @@ async function coletarDiagnostico(pid) {
   const filtros = filtrosConsultaDiagnosticos({ tipo: "existente", projetoRef: pid }, user.uid).map((a) => where(...a));
   const snap = await getDocs(query(collection(db, "diagnosticos", pid, "itens"), ...filtros));
   const todos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const ativos = todos.filter((d) => d.estado !== "arquivado" && d.respostas && Object.keys(d.respostas).length)
-    .sort((a, b) => String(b.atualizadoEm || "").localeCompare(String(a.atualizadoEm || "")));
-  if (!ativos.length) return { ok: false, temDado: false, motivo: "nenhum diagnóstico ativo salvo para este projeto" };
-  const escolhido = ativos[0];
-  const itensSnap = await getDocs(collection(db, "catalogos_diagnostico", CATALOGO_REF.catalogoId, "itens"));
+  // Só diagnóstico CONCLUÍDO entra (13/10/2026): rascunho não alimenta a Análise de Risco.
+  const escolhido = escolherDiagnosticoConcluido(todos);
+  if (!escolhido) return { ok: false, temDado: false, motivo: motivoSemConcluido(todos) };
+  const rootRef = doc(db, "catalogos_diagnostico", CATALOGO_REF.catalogoId);
+  const [rootSnap, itensSnap] = await Promise.all([getDoc(rootRef), getDocs(collection(rootRef, "itens"))]);
+  const catalogo = rootSnap.exists() ? rootSnap.data() : null;
   const itens = itensSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
   if (!itens.length) return { ok: false, temDado: false, motivo: "catálogo do diagnóstico indisponível" };
   const n = numerosRevisao(todos)[escolhido.id];
   const total = itens.filter((i) => i.deprecado !== true).length;
   const resp = Object.keys(escolhido.respostas).filter((k) => escolhido.respostas[k]?.status).length;
-  return { ok: true, temDado: true, id: escolhido.id, respostas: escolhido.respostas, itens, rotulo: n ? `Revisão ${n}` : "", atualizadoEm: escolhido.atualizadoEm || "", percentual: total ? Math.round((resp / total) * 100) : 0 };
+  let modelo2 = null;
+  try { if (catalogo) modelo2 = resumoModelo2({ catalogo, itens, diag: escolhido, todos, projetoRef: pid }); } catch { modelo2 = null; }
+  return { ok: true, temDado: true, id: escolhido.id, respostas: escolhido.respostas, itens, rotulo: n ? `Revisão ${n}` : "", atualizadoEm: escolhido.atualizadoEm || "", percentual: total ? Math.round((resp / total) * 100) : 0, modelo2 };
 }
 
 // Coleta todas as fontes marcadas para um projeto.
@@ -2020,7 +2024,7 @@ export function classificarProjeto(project, vetoresEntrada, dados = {}) {
     nivelMatrizLegado: matriz.nivel,
     determinante: v2.determinante ? { label: v2.determinante.label, classe: v2.determinante.classeV2, nivel: v2.determinante.nivel } : null,
     memoria: diagAval ? aplicarDiagnosticoNaMemoria(v2.memoria, diagAval) : v2.memoria,
-    diagnostico: diagAval,
+    diagnostico: diagAval ? { ...diagAval, modelo2: dados.diag?.modelo2 || null } : null,
     vias: { n: v2.vias.n, nivel: v2.vias.nivel, naoAferido: v2.vias.naoAferido, itens: v2.vias.vias },
     modulador: motivosMod ? { delta: 0, motivo: motivosMod, de: nivelBase, para: nivelAjustado } : null,
     metricas: {
