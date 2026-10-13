@@ -11,7 +11,7 @@ export const comQuemInfo = (id) => COM_QUEM[id] || COM_QUEM.manutencao;
 
 // Situações que a empresa de manutenção pode informar.
 export const SITUACOES_MANUTENCAO = [
-  { id: "aguardando", label: "Diagnóstico / aguardando", dica: "Já verificou ou agendou a visita" },
+  { id: "aguardando", label: "Análise do técnico (sem proposta)", dica: "Verificado, ainda sem proposta. Continua com você" },
   { id: "proposta", label: "Proposta enviada", dica: "Informe o número e o valor" },
   { id: "execucao", label: "Em execução", dica: "Serviço em andamento" },
   { id: "executado", label: "Serviço executado", dica: "Concluído; a Moked confere" },
@@ -20,6 +20,19 @@ export const SITUACOES_MANUTENCAO = [
 export const ROTULO_STATUS = {
   aguardando: "Diagnóstico / aguardando", proposta: "Proposta enviada", aprovado: "Aprovado pela administração",
   execucao: "Em execução", executado: "Serviço executado", reprovado: "Reprovado pela administração", resolvido: "Resolvido",
+};
+
+// Item que está com a manutenção e não tem retorno há muito tempo (a Moked precisa cobrar).
+export const DIAS_SEM_RETORNO = 7;
+export function diasSemRetorno(reg, agora = Date.now()) {
+  const ultima = reg && Array.isArray(reg.entries) ? reg.entries[0] : null;
+  const t = ultima && Date.parse(ultima.em);
+  return Number.isFinite(t) ? Math.max(0, Math.floor((agora - t) / 86400000)) : null; // null = nunca houve retorno
+}
+export const semRetorno = (comQuem, reg, agora = Date.now()) => {
+  if (comQuem !== "manutencao") return false;
+  const d = diasSemRetorno(reg, agora);
+  return d === null || d >= DIAS_SEM_RETORNO;
 };
 
 // Aviso quando a Moked precisa agir: usado nos painéis.

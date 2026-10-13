@@ -162,7 +162,7 @@ import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo, excluirEntrada, editarEntrada, concluirFollowup } from "./followups";
 import GestaoLinks from "./followupLink/GestaoLinks";
-import { linkLiberado, comQuemInfo } from "./followupLink/config";
+import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno } from "./followupLink/config";
 import { gerencial as chamarFollowupLink } from "./followupLink/api";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
@@ -2225,7 +2225,7 @@ function PendenciesScreen({stored, onBack}) {
                               <span><Ico n="prancheta"/> {fu?"Atualizar / ver tratativas":"Registrar follow-up"}</span>
                               {fuInfo&&<span style={{color:fuInfo.color,fontWeight:800}}>{fuInfo.label}</span>}
                             </button>
-                            {fu?.comQuem&&!fu.resolvido&&<div style={{marginTop:5,fontSize:10,fontWeight:800,color:comQuemInfo(fu.comQuem).fundo}}>● {comQuemInfo(fu.comQuem).label}{fu.pendenteValidacao?" — aguardando sua conferência":""}</div>}
+                            {fu?.comQuem&&!fu.resolvido&&<div style={{marginTop:5,fontSize:10,fontWeight:800,color:comQuemInfo(fu.comQuem).fundo}}>● {comQuemInfo(fu.comQuem).label}{fu.pendenteValidacao?" — aguardando sua conferência":""}{semRetorno(fu.comQuem,fu)?` — sem retorno há ${diasSemRetorno(fu)} dias`:""}</div>}
                             {painelAberto&&<div style={{marginTop:8,padding:"10px",border:"1px solid #1e293b",borderRadius:8,background:"#060c18"}}>
                               {podeGerenciar?<>
                                 <label style={{display:"block",fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>STATUS DA TRATATIVA</label>

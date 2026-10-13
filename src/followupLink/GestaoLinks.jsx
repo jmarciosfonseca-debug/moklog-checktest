@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { gerencial, urlDoLink } from "./api";
-import { comQuemInfo, resumoPorMao, ROTULO_STATUS } from "./config";
+import { comQuemInfo, resumoPorMao, ROTULO_STATUS, semRetorno, diasSemRetorno, DIAS_SEM_RETORNO } from "./config";
 import { loadFollowups, canonicalFollowupKey, concluirFollowup } from "../followups";
 
 const K = { card: "#060c18", borda: "#1e293b", texto: "#f1f5f9", mudo: "#94a3b8", marca: "#cc2222" };
@@ -75,6 +75,7 @@ export default function GestaoLinks({ db, project, pendencias, onFechar }) {
   const comItem = itens.map((i) => ({ ...i, reg: mapa[i.key] || null, comQuem: mapa[i.key]?.comQuem || "manutencao", resolvido: !!mapa[i.key]?.resolvido })).filter((i) => !i.resolvido);
   const contagem = resumoPorMao(comItem);
   const naFila = comItem.filter((i) => i.comQuem === "moked");
+  const parados = comItem.filter((i) => semRetorno(i.comQuem, i.reg)); // com a manutenção e sem retorno há DIAS_SEM_RETORNO dias ou mais
   const linkDe = (papel) => links.find((l) => l.papel === papel);
 
   const acao = async (key, fn) => { setBusy(key); setErro(""); try { await fn(); await carregar(); } catch (e) { setErro(e.message); } finally { setBusy(""); } };
@@ -115,6 +116,18 @@ export default function GestaoLinks({ db, project, pendencias, onFechar }) {
               <button type="button" style={{ ...btn, color: "#4ade80" }} disabled={busy === i.key} onClick={() => { if (window.confirm("Marcar este item como concluído?")) acao(i.key, () => concluirFollowup(db, pid, i.key)); }}>Concluir</button>
             </div>
           </div>); })}
+
+        {parados.length > 0 && (
+          <div style={{ background: "#1c1407", border: "1px solid #78350f", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#fbbf24" }}>Com a manutenção sem retorno há {DIAS_SEM_RETORNO}+ dias ({parados.length})</div>
+            {parados.slice(0, 8).map((i) => { const d = diasSemRetorno(i.reg); return (
+              <div key={i.key} style={{ fontSize: 12, color: "#e2e8f0", marginTop: 4 }}>• {i.item && i.item !== "—" ? i.item : i.cat} <span style={{ color: K.mudo }}>{d === null ? "— nunca teve retorno" : `— último retorno há ${d} dias`}</span></div>); })}
+            {parados.length > 8 && <div style={{ fontSize: 11, color: K.mudo, marginTop: 4 }}>e mais {parados.length - 8}…</div>}
+            {linkDe("manutencao") && <button type="button" style={{ ...btn, marginTop: 8 }} onClick={async () => {
+              const msg = `Olá! No ${project.id} - ${project.name} há ${parados.length} item(ns) aguardando retorno da manutenção. Por favor, acesse o link e informe a situação de cada um (análise do técnico, proposta ou execução): ${urlDoLink(linkDe("manutencao").token)}`;
+              try { await navigator.clipboard.writeText(msg); setErro(""); window.alert("Mensagem de cobrança copiada. Cole no WhatsApp ou e-mail."); } catch { window.prompt("Copie a mensagem:", msg); }
+            }}>Copiar mensagem de cobrança</button>}
+          </div>)}
 
         <div style={{ fontSize: 12, fontWeight: 800, color: K.texto, margin: "14px 0 6px" }}>Links</div>
         <BlocoLink titulo="Link da empresa de manutenção" ajuda="Ela vê os itens em aberto, informa situação, proposta (nº e valor) e usa Concluir e enviar."

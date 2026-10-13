@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import PaginaExterna, { prepararEnvios } from "./PaginaExterna";
 import { recalcularRegistro } from "../followups";
 import { montarLaudoSemanal } from "../relatorios/laudoSemanal";
-import { resumoPorMao, linkLiberado } from "./config";
+import { resumoPorMao, linkLiberado, semRetorno, diasSemRetorno } from "./config";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -114,4 +114,23 @@ test("urlDoLink: domínios vercel.app (inclusive preview) saem pelo domínio pri
   const t = "a".repeat(43);
   expect(urlDoLink(t, "https://moklog-checktest-git-x-marcio.vercel.app")).toBe(`https://moklog-checktest.vercel.app/?fu=${t}`);
   expect(urlDoLink(t, "https://app.moked.com.br")).toBe(`https://app.moked.com.br/?fu=${t}`);
+});
+
+test("sem proposta: análise do técnico mantém o item com a manutenção, e a Moked vê quem está sem retorno", () => {
+  const agora = Date.parse("2026-10-20T12:00:00Z");
+  const reg = (dias) => ({ entries: [{ status: "aguardando", em: new Date(agora - dias * 86400000).toISOString() }] });
+  expect(semRetorno("manutencao", reg(2), agora)).toBe(false);
+  expect(semRetorno("manutencao", reg(7), agora)).toBe(true);
+  expect(semRetorno("manutencao", null, agora)).toBe(true); // nunca teve retorno
+  expect(semRetorno("moked", reg(30), agora)).toBe(false); // bola com a Moked não é atraso da manutenção
+  expect(semRetorno("administracao", reg(30), agora)).toBe(false);
+  expect(diasSemRetorno(reg(9), agora)).toBe(9);
+});
+
+test("laudo semanal: análise do técnico sem proposta aparece como tal", () => {
+  const project = { id: "P601", name: "Golgi Cajamar", categories: [{ id: "cftv", label: "06 - CFTV", type: "items", itemLabels: ["CF35"] }] };
+  const state = { cftv: [{ status: "inop", since: "2026-10-01", note: "Sem imagem" }] };
+  const fu = { "06cftv__cf35": { key: "06cftv__cf35", statusAtual: "aguardando", comQuem: "manutencao", entries: [{ id: "1", status: "aguardando", em: "2026-10-12T10:00:00Z", texto: "Fonte queimada", responsavel: "Cancelas Brasil" }] } };
+  const html = montarLaudoSemanal(project, state, { date: "2026-10-13" }, { followupsInfo: fu, hoje: new Date("2026-10-13T12:00:00Z") });
+  expect(html).toContain("Com a manutenção — análise do técnico, sem proposta");
 });

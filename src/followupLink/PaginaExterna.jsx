@@ -52,14 +52,23 @@ function Cabecalho({ item }) {
   );
 }
 
+// Linha de situação: deixa claro com quem o item está e o que falta para avançar.
+function SituacaoAtual({ item }) {
+  const h = item.historico[0];
+  if (!h) return <div style={{ marginTop: 8, fontSize: 12, color: "#b45309", fontWeight: 700 }}>Sem retorno ainda — informe a situação abaixo.</div>;
+  const sugestao = h.status === "aguardando" ? "Continua com você: falta proposta ou execução." : h.status === "aprovado" ? "Proposta aprovada: pode executar." : h.status === "reprovado" ? "Proposta reprovada: ajuste ou envie nova análise." : h.status === "execucao" ? "Em execução: informe quando for executado." : "";
+  return <div style={{ marginTop: 8, fontSize: 12, color: C.mudo }}>Último retorno em <b style={{ color: C.texto }}>{fmtData(h.em)}</b> — {ROTULO_STATUS[h.status] || h.status}. {sugestao}</div>;
+}
+
 function CartaoManutencao({ item, valor, onChange }) {
   const v = valor || { status: "", texto: "", propostaNumero: "", propostaValor: "", previsao: "" };
   const set = (p) => onChange({ ...v, ...p });
   return (
     <div style={{ background: C.card, border: `1px solid ${v.status ? C.marca : C.borda}`, borderRadius: 12, padding: 14, marginBottom: 10 }}>
       <Cabecalho item={item} />
-      <Historico itens={item.historico} />
-      <span style={rotuloCampo}>Situação atual</span>
+      <SituacaoAtual item={item} />
+      <Historico itens={item.historico.slice(0, 3)} />
+      <span style={rotuloCampo}>Nova atualização</span>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 6 }}>
         {SITUACOES_MANUTENCAO.map((s) => (
           <button key={s.id} type="button" onClick={() => set({ status: v.status === s.id ? "" : s.id })}
@@ -79,9 +88,9 @@ function CartaoManutencao({ item, valor, onChange }) {
           )}
           <span style={rotuloCampo}>{v.status === "proposta" ? "Observação (opcional)" : "O que foi verificado / feito *"}</span>
           <textarea style={{ ...campo, resize: "vertical" }} rows={3} maxLength={1000} value={v.texto} onChange={(e) => set({ texto: e.target.value })}
-            placeholder={v.status === "aguardando" ? "Ex.: Fonte queimada; técnico agendado para quinta." : v.status === "execucao" ? "Ex.: Haste trocada; falta calibrar o sensor." : v.status === "executado" ? "Ex.: Cancela substituída e testada em 3 ciclos." : "Escopo resumido da proposta"} />
+            placeholder={v.status === "aguardando" ? "Ex.: Técnico verificou: fonte queimada. Aguardando orçamento; sem proposta ainda." : v.status === "execucao" ? "Ex.: Haste trocada; falta calibrar o sensor." : v.status === "executado" ? "Ex.: Cancela substituída e testada em 3 ciclos." : "Escopo resumido da proposta"} />
           {v.status !== "executado" && (
-            <><span style={rotuloCampo}>Previsão (opcional)</span><input style={campo} type="date" value={v.previsao} onChange={(e) => set({ previsao: e.target.value })} /></>
+            <><span style={rotuloCampo}>{v.status === "aguardando" ? "Previsão da proposta ou execução (opcional)" : "Previsão (opcional)"}</span><input style={campo} type="date" value={v.previsao} onChange={(e) => set({ previsao: e.target.value })} /></>
           )}
         </>
       )}
