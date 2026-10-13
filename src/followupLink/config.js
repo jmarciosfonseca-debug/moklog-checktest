@@ -1,6 +1,6 @@
-// Link de follow-up externo — piloto P601. Manter a lista igual à de api/ai/lib/followupLink.js.
-export const PILOTO_PIDS = ["P601"];
-export const linkLiberado = (pid) => PILOTO_PIDS.includes(pid);
+// Link de follow-up externo — projetos do teste semanal. Manter a lista igual à de api/ai/lib/followupLink.js (há teste que confere).
+export const PROJETOS_LIBERADOS = ["P601", "P602", "P604", "P605", "P606", "P607", "P311A", "P311B", "P505", "P260A", "P260B", "P260C"];
+export const linkLiberado = (pid) => PROJETOS_LIBERADOS.includes(pid);
 
 export const COM_QUEM = {
   manutencao: { label: "Com a manutenção", cor: "#b45309", fundo: "#fef3c7" },

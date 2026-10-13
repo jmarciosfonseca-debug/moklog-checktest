@@ -1,4 +1,4 @@
-// Painel da Moked para o follow-up externo (piloto P601): gera/revoga links, mostra com quem está cada item
+// Painel da Moked para o follow-up externo (todos os projetos do teste semanal): gera/revoga links, mostra com quem está cada item
 // e deixa a Moked encaminhar à administração, devolver à manutenção ou concluir.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
@@ -32,9 +32,9 @@ function BlocoLink({ titulo, ajuda, papel, link, pid, nomeProjeto, itens, onMudo
       <div style={{ fontSize: 11, color: K.mudo, marginBottom: 8 }}>{ajuda}</div>
       {!link ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 90px auto", gap: 6, alignItems: "end" }}>
-          <div><div style={{ fontSize: 10, color: K.mudo, fontWeight: 700 }}>{papel === "manutencao" ? "EMPRESA DE MANUTENÇÃO" : "ADMINISTRAÇÃO / PROPRIETÁRIO"}</div><input style={inp} value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nome (aparece nas tratativas)" maxLength={80} /></div>
+          <div><div style={{ fontSize: 10, color: K.mudo, fontWeight: 700 }}>{papel === "manutencao" ? "EMPRESA DE MANUTENÇÃO" : "ADMINISTRAÇÃO / PROPRIETÁRIO"}</div><input style={inp} value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nome (opcional, aparece nas tratativas)" maxLength={80} /></div>
           <div><div style={{ fontSize: 10, color: K.mudo, fontWeight: 700 }}>VALIDADE</div><select style={inp} value={dias} onChange={(e) => setDias(Number(e.target.value))}>{[7, 15, 30, 60].map((d) => <option key={d} value={d}>{d} dias</option>)}</select></div>
-          <button type="button" disabled={busy || !empresa.trim()} style={{ ...btnPrim, opacity: busy || !empresa.trim() ? 0.5 : 1 }}
+          <button type="button" disabled={busy} style={{ ...btnPrim, opacity: busy ? 0.5 : 1 }}
             onClick={() => rodar(() => gerencial("criar", { pid, papel, empresa: empresa.trim(), projetoNome: nomeProjeto, dias, itens }))}>Gerar link</button>
         </div>
       ) : (
@@ -88,7 +88,7 @@ export default function GestaoLinks({ db, project, pendencias, onFechar }) {
       <div style={{ background: "#04080f", border: `1px solid ${K.borda}`, borderRadius: 14, width: "100%", maxWidth: 720, height: "fit-content", padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: K.texto }}>Follow-up externo · {pid} <span style={{ fontSize: 10, color: "#fbbf24", border: "1px solid #fbbf24", borderRadius: 6, padding: "1px 5px", marginLeft: 6 }}>PILOTO</span></div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: K.texto }}>Follow-up externo · {pid}</div>
             <div style={{ fontSize: 11, color: K.mudo }}>Quem está com a bola em cada pendência e os links para manutenção e administração.</div>
           </div>
           <button type="button" style={btn} onClick={onFechar}>Fechar</button>

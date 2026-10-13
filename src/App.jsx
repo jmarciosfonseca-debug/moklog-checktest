@@ -163,7 +163,8 @@ import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo, excluirEntrada, editarEntrada, concluirFollowup } from "./followups";
 import GestaoLinks from "./followupLink/GestaoLinks";
 import { useResumoFollowup } from "./followupLink/useResumoFollowup";
-import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno, PILOTO_PIDS } from "./followupLink/config";
+import { gerarLinksFaltantes } from "./followupLink/gerarTodos";
+import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno, PROJETOS_LIBERADOS } from "./followupLink/config";
 import { gerencial as chamarFollowupLink } from "./followupLink/api";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
@@ -1965,7 +1966,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             </div>}
           </div>
           {linkLiberado(p.id)&&hasGerencial()&&<div style={{background:"#060c18",border:"1px solid #1d4ed8",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-            <div><div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}><Ico n="elo"/> Follow-up externo <span style={{fontSize:10,color:"#fbbf24"}}>PILOTO</span></div><div style={{fontSize:11,color:"#94a3b8"}}>Link para manutenção e administração preencherem as tratativas</div></div>
+            <div><div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}><Ico n="elo"/> Follow-up externo</div><div style={{fontSize:11,color:"#94a3b8"}}>Link para manutenção e administração preencherem as tratativas</div></div>
             <button onClick={()=>setFuPainelPid(p.id)} style={{...S.sm,fontSize:11,padding:"6px 12px",background:"#1d4ed8",border:"1px solid #1d4ed8",color:"white"}}>Abrir</button>
           </div>}
           {modalFu}
@@ -2696,6 +2697,8 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   const toggleRh = (k)=> setRhExpand(o=>({...o, [k]:!o[k]}));
   const [viaCascata, setViaCascata] = useState(false); // abriu Colaboradores pela lista recolhível → voltar cai no Registros
   const [fuPid, setFuPid] = useState(null);
+  const [fuGerando, setFuGerando] = useState(false);
+  const [fuMsg, setFuMsg] = useState("");
   const pendFuReg = useMemo(()=> hasGerencial() ? getAllPendencies(stored).filter(x=>linkLiberado(x.project.id)) : [], [stored]);
   const { resumo: fuResumoReg, totalNovos: fuTotalNovos, recarregar: recarregarFuReg } = useResumoFollowup({ db, pendencias: pendFuReg, ativo: hasGerencial() });
   useEffect(()=>{
@@ -3243,7 +3246,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               );
             })()}
 
-            {hasGerencial() && PILOTO_PIDS.length>0 && (()=>{
+            {hasGerencial() && PROJETOS_LIBERADOS.length>0 && (()=>{
               const aberto = !!rhExpand.fu;
               return (
                 <div style={{ background:dark?"linear-gradient(135deg,#04140c,#060c18)":cardBg, border:`2px solid ${fuTotalNovos>0?"#22c55e66":(dark?"#16a34a4d":"#bbf7d0")}`, borderRadius:16, padding:"14px 18px",
@@ -3261,7 +3264,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                   </div>
                   {aberto && (
                     <div style={{ marginTop:11 }}>
-                      {PILOTO_PIDS.map(pid=>{
+                      {PROJETOS_LIBERADOS.map(pid=>{
                         const r = fuResumoReg[pid] || { novos:0, parados:0, comMoked:0, comAdm:0, comManut:0 };
                         const chip = (n, rot, cor)=> n>0 ? <span key={rot} style={{ fontSize:10, fontWeight:800, color:cor, background:cor+"1c", border:`1px solid ${cor}44`, padding:"2px 8px", borderRadius:20 }}>{n} {rot}</span> : null;
                         return (
@@ -3283,7 +3286,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                           </div>
                         );
                       })}
-                      <div style={{ fontSize:9, color:txt2, marginTop:7, fontStyle:"italic" }}>Cada projeto tem seus próprios links (empresas diferentes). Hoje só P601 está liberado — piloto.</div>
+                      <button type="button" disabled={fuGerando} onClick={async()=>{ setFuGerando(true); setFuMsg(""); try{ const r=await gerarLinksFaltantes({ pendencias:getAllPendencies(stored), nomeDe:(pid)=>PROJECTS[pid]?.name||pid }); setFuMsg(r.criados?`${r.criados} link(s) gerado(s) em ${r.projetos.length} projeto(s). Abra o projeto para copiar o link ou o QR.`:"Todos os projetos já têm os dois links."); }catch(e){ setFuMsg(e.message||"Não foi possível gerar."); } finally{ setFuGerando(false); } }}
+                        style={{ width:"100%", marginTop:10, background:"#1d4ed8", color:"#fff", border:"none", borderRadius:10, padding:"11px", fontSize:13, fontWeight:700, cursor:"pointer", opacity:fuGerando?.6:1 }}>{fuGerando?"Gerando…":"Gerar links que faltam (todos os projetos)"}</button>
+                      {fuMsg && <div style={{ fontSize:11, color:txt2, marginTop:6 }}>{fuMsg}</div>}
+                      <div style={{ fontSize:9, color:txt2, marginTop:7, fontStyle:"italic" }}>Cada projeto tem seus próprios links (empresas diferentes). Link próprio da manutenção e da administração em cada projeto.</div>
                     </div>
                   )}
                 </div>

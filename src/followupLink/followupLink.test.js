@@ -4,7 +4,8 @@ import { createRoot } from "react-dom/client";
 import PaginaExterna, { prepararEnvios } from "./PaginaExterna";
 import { recalcularRegistro } from "../followups";
 import { montarLaudoSemanal } from "../relatorios/laudoSemanal";
-import { resumoPorMao, linkLiberado, semRetorno, diasSemRetorno } from "./config";
+import { resumoPorMao, linkLiberado, semRetorno, diasSemRetorno, PROJETOS_LIBERADOS } from "./config";
+import { gerarLinksFaltantes } from "./gerarTodos";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -20,9 +21,11 @@ test("prepararEnvios: só envia o preenchido; proposta exige nº; demais exigem 
   expect(faltando.map((f) => f.key)).toEqual(["d", "e"]);
 });
 
-test("piloto: só P601 liberado; contagem por mão", () => {
-  expect(linkLiberado("P601")).toBe(true);
-  expect(linkLiberado("P602")).toBe(false);
+test("liberado para todos os projetos do teste semanal (cliente e servidor com a mesma lista); contagem por mão", () => {
+  const servidor = require("../../api/ai/lib/followupLink").LIBERADOS;
+  expect([...PROJETOS_LIBERADOS].sort()).toEqual([...servidor].sort());
+  ["P601", "P602", "P604", "P605", "P606", "P607", "P311A", "P311B", "P505", "P260A", "P260B", "P260C"].forEach((p) => expect(linkLiberado(p)).toBe(true));
+  expect(linkLiberado("P999")).toBe(false);
   expect(resumoPorMao([{ comQuem: "moked" }, { comQuem: "administracao" }, {}, { comQuem: "manutencao" }])).toEqual({ manutencao: 2, moked: 1, administracao: 1 });
 });
 
@@ -133,4 +136,18 @@ test("laudo semanal: análise do técnico sem proposta aparece como tal", () => 
   const fu = { "06cftv__cf35": { key: "06cftv__cf35", statusAtual: "aguardando", comQuem: "manutencao", entries: [{ id: "1", status: "aguardando", em: "2026-10-12T10:00:00Z", texto: "Fonte queimada", responsavel: "Cancelas Brasil" }] } };
   const html = montarLaudoSemanal(project, state, { date: "2026-10-13" }, { followupsInfo: fu, hoje: new Date("2026-10-13T12:00:00Z") });
   expect(html).toContain("Com a manutenção — análise do técnico, sem proposta");
+});
+
+test("gerar links que faltam: cria só o que não existe, com os itens do último teste de cada projeto", async () => {
+  const chamadas = [];
+  const existentes = { P601: [{ papel: "manutencao" }, { papel: "administracao" }], P602: [{ papel: "manutencao" }] };
+  const chamar = async (acao, corpo) => { chamadas.push([acao, corpo]); return acao === "listar" ? { links: existentes[corpo.pid] || [] } : { ok: true }; };
+  const pendencias = [{ project: { id: "P602" }, cat: "06 - CFTV", item: "CF35", status: "inop", since: "2026-10-01" }];
+  const r = await gerarLinksFaltantes({ pendencias, nomeDe: (pid) => "Projeto " + pid, chamar });
+  const criar = chamadas.filter(([a]) => a === "criar").map(([, c]) => c);
+  expect(r.criados).toBe(1 + 2 * (PROJETOS_LIBERADOS.length - 2));
+  expect(criar.some((c) => c.pid === "P601")).toBe(false);
+  expect(criar.filter((c) => c.pid === "P602").map((c) => c.papel)).toEqual(["administracao"]);
+  expect(criar.find((c) => c.pid === "P602").itens).toHaveLength(1);
+  expect(criar.find((c) => c.pid === "P604").itens).toEqual([]);
 });
