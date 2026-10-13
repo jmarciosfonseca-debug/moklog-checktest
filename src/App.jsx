@@ -160,7 +160,10 @@ import { temDocumentos } from "./documentos/catalogo";
 import { testesDoHistorico } from "./avisos/testeSemanal";
 import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
-import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo } from "./followups";
+import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo, excluirEntrada, editarEntrada, concluirFollowup } from "./followups";
+import GestaoLinks from "./followupLink/GestaoLinks";
+import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno } from "./followupLink/config";
+import { gerencial as chamarFollowupLink } from "./followupLink/api";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
@@ -1611,6 +1614,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   };
   const [groupCompScreen,setGroupCompScreen]=useState(null); const [selWeeks,setSelWeeks]=useState(new Set());
   const [sessionTime,setSessionTime]=useState(Date.now());
+  const [fuPainel,setFuPainel]=useState(false);
   const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
   useEffect(()=>{
     const loadVL = async () => {
@@ -1942,6 +1946,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
               <button onClick={()=>navigator.clipboard.writeText(viewUrl)} style={{...S.sm,fontSize:11,width:"100%"}}><Ico n="prancheta"/> Copiar Link</button>
             </div>}
           </div>
+          {linkLiberado(p.id)&&hasGerencial()&&<div style={{background:"#060c18",border:"1px solid #1d4ed8",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <div><div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}><Ico n="elo"/> Follow-up externo <span style={{fontSize:10,color:"#fbbf24"}}>PILOTO</span></div><div style={{fontSize:11,color:"#94a3b8"}}>Link para manutenção e administração preencherem as tratativas</div></div>
+            <button onClick={()=>setFuPainel(true)} style={{...S.sm,fontSize:11,padding:"6px 12px",background:"#1d4ed8",border:"1px solid #1d4ed8",color:"white"}}>Abrir</button>
+          </div>}
+          {fuPainel&&linkLiberado(p.id)&&<GestaoLinks db={db} project={p} pendencias={getAllPendencies(stored).filter(x=>x.project.id===p.id)} onFechar={()=>setFuPainel(false)}/>}
           {sel.length>=2&&<>
             <button onClick={async()=>{const fu=await loadFollowups(db,p.id).catch(()=>({}));generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")),{followups:fu});}}
             style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:6,fontSize:14}}>
@@ -2061,6 +2070,7 @@ function PendenciesScreen({stored, onBack}) {
   const [fuOpen, setFuOpen] = useState(null);
   const [fuForm, setFuForm] = useState({status:"aguardando", texto:"", link:""});
   const [fuSaving, setFuSaving] = useState(false);
+  const [fuEdit, setFuEdit] = useState(null); // {id, texto, status} — edição inline de uma tratativa
   const podeGerenciar = hasGerencial();
   const toggleProj = (pid) => setOpenProj(o=>({...o,[pid]:!o[pid]}));
 
@@ -2109,6 +2119,13 @@ function PendenciesScreen({stored, onBack}) {
     }finally{
       setFuSaving(false);
     }
+  };
+  const recarregarFu = async (pid) => { const m = await loadFollowups(db, pid).catch(()=>null); if(m) setFollowups(prev=>({...prev,[pid]:m})); };
+  const rodarFu = async (pid, fn) => {
+    setFuSaving(true);
+    try{ const novo = await fn(); if(novo && typeof novo==="object") setFollowups(prev=>({...prev,[pid]:novo})); else await recarregarFu(pid); }
+    catch(e){ alert(`Não foi possível concluir a ação. ${e?.message||e}`); }
+    finally{ setFuSaving(false); }
   };
   const all = getAllPendencies(stored);
   const filtered = filter === "all" ? all : filter === "critical" ? all.filter(p => p.status === "inop") : all.filter(p => p.status === "partial");
@@ -2208,6 +2225,7 @@ function PendenciesScreen({stored, onBack}) {
                               <span><Ico n="prancheta"/> {fu?"Atualizar / ver tratativas":"Registrar follow-up"}</span>
                               {fuInfo&&<span style={{color:fuInfo.color,fontWeight:800}}>{fuInfo.label}</span>}
                             </button>
+                            {fu?.comQuem&&!fu.resolvido&&<div style={{marginTop:5,fontSize:10,fontWeight:800,color:comQuemInfo(fu.comQuem).fundo}}>● {comQuemInfo(fu.comQuem).label}{fu.pendenteValidacao?" — aguardando sua conferência":""}{semRetorno(fu.comQuem,fu)?` — sem retorno há ${diasSemRetorno(fu)} dias`:""}</div>}
                             {painelAberto&&<div style={{marginTop:8,padding:"10px",border:"1px solid #1e293b",borderRadius:8,background:"#060c18"}}>
                               {podeGerenciar?<>
                                 <label style={{display:"block",fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:4}}>STATUS DA TRATATIVA</label>
@@ -2217,13 +2235,31 @@ function PendenciesScreen({stored, onBack}) {
                                 <textarea value={fuForm.texto} onChange={e=>setFuForm(f=>({...f,texto:e.target.value}))} placeholder="Descreva a tratativa, responsável e próximo passo..." rows={3} style={{...S.inp,width:"100%",resize:"vertical",marginBottom:7}}/>
                                 <input value={fuForm.link} onChange={e=>setFuForm(f=>({...f,link:e.target.value}))} placeholder="Link de evidência, chamado ou orçamento (opcional)" style={{...S.inp,width:"100%",marginBottom:7}}/>
                                 <button type="button" disabled={fuSaving} onClick={()=>salvarFollowup(p)} style={{...S.primaryBtn,width:"100%",fontSize:11,opacity:fuSaving?.65:1}}>{fuSaving?"Salvando...":<><Ico n="disquete"/>{" Salvar follow-up"}</>}</button>
+                                {fu&&!fu.resolvido&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:7}}>
+                                  {linkLiberado(p.project.id)&&fu.comQuem!=="administracao"&&<button type="button" disabled={fuSaving} onClick={()=>rodarFu(p.project.id,async()=>{await chamarFollowupLink("mover",{pid:p.project.id,key:getFuKey(p),para:"administracao"});})} style={{...S.sm,fontSize:11}}>Encaminhar à administração</button>}
+                                  {linkLiberado(p.project.id)&&fu.comQuem&&fu.comQuem!=="manutencao"&&<button type="button" disabled={fuSaving} onClick={()=>rodarFu(p.project.id,async()=>{await chamarFollowupLink("mover",{pid:p.project.id,key:getFuKey(p),para:"manutencao"});})} style={{...S.sm,fontSize:11}}>Devolver à manutenção</button>}
+                                  <button type="button" disabled={fuSaving} onClick={()=>{ if(window.confirm("Marcar este item como concluído?")) rodarFu(p.project.id,()=>concluirFollowup(db,p.project.id,getFuKey(p))); }} style={{...S.sm,fontSize:11,color:"#4ade80"}}>Marcar como concluído</button>
+                                </div>}
                               </>:<div style={{fontSize:11,color:"#94a3b8"}}>Somente o perfil gerencial pode registrar tratativas.</div>}
                               <div style={{fontSize:10,color:"#94a3b8",fontWeight:800,marginTop:10,marginBottom:5}}><Ico n="prancheta"/> Tratativas registradas ({fu?.entries?.length||0})</div>
                               {(fu?.entries||[]).length===0?<div style={{fontSize:11,color:"#64748b"}}>Nenhuma tratativa registrada.</div>:(fu.entries||[]).map((entry,idx)=>{
                                 const info=statusInfo(entry.status);
                                 return <div key={entry.id||idx} style={{borderTop:"1px solid #0f172a",padding:"7px 0"}}>
                                   <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:10,fontWeight:800,color:info.color}}>{info.label}</span><span style={{fontSize:10,color:"#64748b"}}>{entry.em?new Date(entry.em).toLocaleString("pt-BR"):"—"}</span></div>
-                                  {entry.texto&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:3,whiteSpace:"pre-wrap"}}>{entry.texto}</div>}
+                                  {entry.proposta&&<div style={{fontSize:11,color:"#38bdf8",marginTop:3}}>Proposta nº {entry.proposta.numero}{entry.proposta.valor?` · ${entry.proposta.valor}`:""}{entry.previsao?` · previsão ${entry.previsao}`:""}</div>}
+                                  {entry.origem==="link"&&<div style={{fontSize:10,color:"#64748b"}}>Informado pelo link — {entry.responsavel||"externo"}</div>}
+                                  {fuEdit&&fuEdit.id===entry.id?<div style={{marginTop:5}}>
+                                    <select value={fuEdit.status} onChange={e=>setFuEdit(f=>({...f,status:e.target.value}))} style={{...S.inp,width:"100%",marginBottom:5}}>{FOLLOWUP_STATUS.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select>
+                                    <textarea value={fuEdit.texto} onChange={e=>setFuEdit(f=>({...f,texto:e.target.value}))} rows={3} style={{...S.inp,width:"100%",marginBottom:5}}/>
+                                    <div style={{display:"flex",gap:6}}>
+                                      <button type="button" disabled={fuSaving} onClick={()=>rodarFu(p.project.id,async()=>{const r=await editarEntrada(db,p.project.id,getFuKey(p),entry.id,{texto:fuEdit.texto.trim(),status:fuEdit.status});setFuEdit(null);return r;})} style={{...S.sm,fontSize:11}}>Salvar edição</button>
+                                      <button type="button" onClick={()=>setFuEdit(null)} style={{...S.sm,fontSize:11}}>Cancelar</button>
+                                    </div>
+                                  </div>:entry.texto&&<div style={{fontSize:11,color:"#cbd5e1",marginTop:3,whiteSpace:"pre-wrap"}}>{entry.texto}</div>}
+                                  {podeGerenciar&&entry.id&&!(fuEdit&&fuEdit.id===entry.id)&&<div style={{display:"flex",gap:10,marginTop:4}}>
+                                    <button type="button" onClick={()=>setFuEdit({id:entry.id,texto:entry.texto||"",status:entry.status||"aguardando"})} style={{background:"none",border:0,color:"#94a3b8",fontSize:10,cursor:"pointer",padding:0}}>Editar</button>
+                                    <button type="button" disabled={fuSaving} onClick={()=>{ if(window.confirm("Excluir esta tratativa?")) rodarFu(p.project.id,()=>excluirEntrada(db,p.project.id,getFuKey(p),entry.id)); }} style={{background:"none",border:0,color:"#f87171",fontSize:10,cursor:"pointer",padding:0}}>Excluir</button>
+                                  </div>}
                                   {entry.link&&<a href={entry.link} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#38bdf8",wordBreak:"break-all"}}>Abrir evidência ↗</a>}
                                 </div>;
                               })}

@@ -8,8 +8,9 @@ import { canonicalFollowupKey } from "../followups";
 
 const COR = { ok: "#374151", wa: "#D97706", da: "#B91C1C" };
 const faixa = (pct) => (pct >= 95 ? "ok" : pct >= 85 ? "wa" : "da");
-const FU_ROTULO = { aguardando: "Aguardando retorno", proposta: "Proposta enviada", aprovado: "Aprovado", execucao: "Em execução", resolvido: "Resolvido" };
-const FU_CLASSE = { aguardando: "wa", proposta: "in", aprovado: "in", execucao: "wa", resolvido: "ok" };
+const COM_QUEM_ROTULO = { manutencao: "Com a manutenção", moked: "Com a Moked", administracao: "Aguardando aprovação da administração" };
+const FU_ROTULO = { aguardando: "Aguardando retorno", proposta: "Proposta enviada", aprovado: "Aprovado", execucao: "Em execução", executado: "Serviço executado", reprovado: "Reprovado", resolvido: "Resolvido" };
+const FU_CLASSE = { aguardando: "wa", proposta: "in", aprovado: "in", execucao: "wa", executado: "in", reprovado: "da", resolvido: "ok" };
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 // "S1 Outubro": semana do mês contada a partir do primeiro domingo (mesma regra do app).
@@ -39,13 +40,13 @@ export function pendenciasDoLaudo(project, itens, followupsInfo, hoje = new Date
     let trat = null;
     if (reg && !reg.resolvido) {
       const entries = Array.isArray(reg.entries) ? reg.entries : Array.isArray(reg.registros) ? reg.registros : [];
-      if (entries.length || reg.statusAtual) trat = { statusAtual: reg.statusAtual || "aguardando", entries };
+      if (entries.length || reg.statusAtual) trat = { statusAtual: reg.statusAtual || "aguardando", entries, comQuem: reg.comQuem || "" };
     }
     return { ...x, dias: diasEntre(x.since, hoje), trat };
   }).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
 }
 
-export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, energiaInfo = null, followupsInfo = null, hoje = new Date() } = {}) {
+export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, energiaInfo = null, followupsInfo = null, linkFollowup = null, hoje = new Date() } = {}) {
   const itens = itensDoEstado(project, state);
   const r = resumo(itens);
   const saude = Math.round(r.saude * 10) / 10;
@@ -106,7 +107,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
       <td>${p.note && p.note !== "--" ? escHTML(p.note) : '<span class="mk-nao">Sem descrição registrada</span>'}</td>
       <td class="mk-num">${p.dias != null ? `<b class="${p.dias > 180 ? "mk-da" : p.dias >= 30 ? "mk-wa" : ""}">${p.dias} d</b>` : '<span class="mk-nao">—</span>'}${p.since ? `<div class="mk-mu">desde ${dataBR(p.since)}</div>` : ""}</td>
       <td>${pill(p.status)}</td>
-      <td>${p.trat ? `<span class="mk-b mk-b-${FU_CLASSE[p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual] || "wa"}">${escHTML(FU_ROTULO[p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual] || "Aguardando retorno")}</span>` : '<span class="mk-nao">Sem tratativa</span>'}</td></tr>`;
+      <td>${p.trat ? `<span class="mk-b mk-b-${FU_CLASSE[p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual] || "wa"}">${escHTML(FU_ROTULO[p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual] || "Aguardando retorno")}</span>${COM_QUEM_ROTULO[p.trat.comQuem] ? `<div class="mk-mu mk-sm">${COM_QUEM_ROTULO[p.trat.comQuem]}${p.trat.comQuem === "manutencao" && (p.trat.entries[0] || {}).status === "aguardando" ? " — análise do técnico, sem proposta" : ""}</div>` : ""}` : '<span class="mk-nao">Sem tratativa</span>'}</td></tr>`;
     if (!p.trat || !p.trat.entries.length) return linha;
     const itensTrat = p.trat.entries.map((e) => {
       const st = e.status || p.trat.statusAtual;
@@ -114,14 +115,16 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
       const d = quando ? new Date(quando) : null;
       const quandoFmt = d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "";
       const dias = diasEntre(quando, hoje);
-      return `<div class="ls-tr"><span class="mk-b mk-b-${FU_CLASSE[st] || "wa"}">${escHTML(FU_ROTULO[st] || "Aguardando retorno")}</span><span class="mk-mu mk-sm">${quandoFmt}${e.responsavel ? ` · ${escHTML(e.responsavel)}` : ""}${dias != null && dias > DIAS_FOLLOWUP_VENCIDO ? ` · <span class="mk-inv">há ${dias} dias</span>` : ""}</span>${e.texto ? `<div>${escHTML(e.texto)}</div>` : ""}${e.link ? `<div class="mk-sm" style="word-break:break-all">↳ <a href="${escHTML(e.link)}" style="color:#1D4ED8">${escHTML(e.link)}</a></div>` : ""}</div>`;
+      return `<div class="ls-tr"><span class="mk-b mk-b-${FU_CLASSE[st] || "wa"}">${escHTML(FU_ROTULO[st] || "Aguardando retorno")}</span><span class="mk-mu mk-sm">${quandoFmt}${e.responsavel ? ` · ${escHTML(e.responsavel)}` : ""}${dias != null && dias > DIAS_FOLLOWUP_VENCIDO ? ` · <span class="mk-inv">há ${dias} dias</span>` : ""}</span>${e.proposta && e.proposta.numero ? `<div class="mk-sm"><b>Proposta nº ${escHTML(e.proposta.numero)}</b>${e.proposta.valor ? ` · ${escHTML(e.proposta.valor)}` : ""}${e.previsao ? ` · previsão ${escHTML(e.previsao)}` : ""}</div>` : ""}${e.texto ? `<div>${escHTML(e.texto)}</div>` : ""}${e.link ? `<div class="mk-sm" style="word-break:break-all">↳ <a href="${escHTML(e.link)}" style="color:#1D4ED8">${escHTML(e.link)}</a></div>` : ""}</div>`;
     }).join("");
     return linha + `<tr class="ls-trl"><td colspan="5"><div class="ls-trw"><div class="mk-lb" style="margin-bottom:4px">Tratativas registradas (${p.trat.entries.length})</div>${itensTrat}</div></td></tr>`;
   }).join("");
+  // QR do link de follow-up da empresa de manutenção (só quando a gestão gera o PDF e há link ativo).
+  const blocoLink = linkFollowup && linkFollowup.url ? `<div class="ls-qr">${linkFollowup.qr ? `<img src="${escHTML(linkFollowup.qr)}" alt="QR Code do follow-up" width="86" height="86">` : ""}<div><div class="mk-lb">Atualização de follow-up pela empresa de manutenção</div><div class="mk-sm">Escaneie o QR Code ou acesse o link, informe a situação de cada item (diagnóstico, proposta nº e valor, execução) e toque em <b>Concluir e enviar</b>.</div><div class="mk-sm" style="word-break:break-all"><a href="${escHTML(linkFollowup.url)}" style="color:#1D4ED8">${escHTML(linkFollowup.url)}</a></div></div></div>` : "";
   const pendencias = `<section><div class="mk-h2">Pendências e tratativas <span class="mk-mu">· ${pend.length} ${pend.length === 1 ? "item" : "itens"}, por tempo em aberto</span></div>
     ${pend.length ? `<table class="mk-tb"><colgroup><col style="width:24%"><col style="width:30%"><col style="width:12%"><col style="width:13%"><col style="width:21%"></colgroup>
       <thead><tr><th>Dispositivo</th><th>Diagnóstico</th><th class="mk-num">Em aberto</th><th>Status</th><th>Tratativa</th></tr></thead><tbody>${linhasPend}</tbody></table>
-      <div class="mk-nota">Itens inoperantes e parciais em ordem decrescente de tempo em aberto. As tratativas vêm do registro de follow-up da gestão Moked; itens resolvidos deixam de ser exibidos. Follow-up há mais de ${DIAS_FOLLOWUP_VENCIDO} dias sem atualização é marcado como vencido.</div>`
+      <div class="mk-nota">Itens inoperantes e parciais em ordem decrescente de tempo em aberto. As tratativas vêm do registro de follow-up da gestão Moked; itens resolvidos deixam de ser exibidos. Follow-up há mais de ${DIAS_FOLLOWUP_VENCIDO} dias sem atualização é marcado como vencido.</div>${blocoLink}`
     : `<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-kl">pendências</div><div class="mk-mu mk-sm">Todos os dispositivos operacionais nesta verificação.</div></div>`}</section>`;
 
   // ── Energia (últimos 7 dias)
@@ -143,6 +146,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
   const css = `<style>
 .ls-vg{display:flex;gap:14px;align-items:center}.ls-leg{font-size:8.8pt;color:#374151;display:grid;gap:4px}.ls-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}.ls-leg span{color:#6B7280}
 .ls-fb{display:flex;align-items:center;gap:6px}.ls-ft{display:flex;gap:2px;flex:1;height:8px}.ls-ft span{display:block;height:8px;border-radius:2px}
+.ls-qr{display:flex;gap:12px;align-items:center;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;margin-top:8px;break-inside:avoid}.ls-qr img{flex:none}
 .ls-trl td{padding:0 6px 6px;border-bottom:1px solid #EEF0F3}.ls-trw{border-left:2.5px solid #111827;background:#F9FAFB;padding:6px 10px;border-radius:0 6px 6px 0}.ls-tr{margin:3px 0 5px;font-size:8.8pt}.ls-tr .mk-b{margin-right:6px}
 .ls-info{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #E5E7EB;border-radius:8px;overflow:hidden}.ls-i{padding:7px 10px;border-right:1px solid #EEF0F3;border-bottom:1px solid #EEF0F3;font-size:9.4pt;font-weight:600}.ls-i:nth-child(4n){border-right:none}.ls-i:nth-last-child(-n+4){border-bottom:none}
 .ls-leg i,.ls-ft span,.ls-trw{-webkit-print-color-adjust:exact;print-color-adjust:exact}

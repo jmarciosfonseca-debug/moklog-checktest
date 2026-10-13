@@ -22,6 +22,8 @@ export const FOLLOWUP_STATUS = [
   { id: "proposta",   label: "Proposta enviada",   color: "#38bdf8" },
   { id: "aprovado",   label: "Aprovado",           color: "#a78bfa" },
   { id: "execucao",   label: "Em execução",        color: "#f5b942" },
+  { id: "executado",  label: "Serviço executado (validar)", color: "#22d3ee" },
+  { id: "reprovado",  label: "Reprovado pela administração", color: "#ef4444" },
   { id: "resolvido",  label: "Resolvido",          color: "#3fbf7f" },
 ];
 export const statusInfo = (id) => FOLLOWUP_STATUS.find(s => s.id === id) || FOLLOWUP_STATUS[0];
@@ -68,6 +70,53 @@ export async function addFollowup(db, projectId, key, { status, texto, link, res
   const registros = Object.values(novoMapa);
   await setDoc(doc(db, "followups", projectId), { registros, updatedAt: new Date().toISOString() });
   return novoMapa;
+}
+
+// Recalcula o cabeçalho do registro a partir das entradas (usado após editar/excluir/concluir).
+export function recalcularRegistro(reg) {
+  const entries = Array.isArray(reg && reg.entries) ? reg.entries : [];
+  const ultima = entries[0] || null;
+  return {
+    ...reg,
+    entries,
+    statusAtual: ultima ? ultima.status : "aguardando",
+    resolvido: !!ultima && ultima.status === "resolvido",
+    resolvidoEm: ultima && ultima.status === "resolvido" ? ultima.em : "",
+  };
+}
+
+async function gravarRegistro(db, projectId, key, mudar) {
+  const mapa = await loadFollowups(db, projectId);
+  const atual = mapa[key];
+  if (!atual) return mapa;
+  const novo = mudar(atual);
+  const novoMapa = { ...mapa };
+  if (novo) novoMapa[key] = novo; else delete novoMapa[key];
+  await setDoc(doc(db, "followups", projectId), { registros: Object.values(novoMapa), updatedAt: new Date().toISOString() });
+  return novoMapa;
+}
+
+// Gerencial: apagar uma tratativa (se não sobrar nenhuma, o registro some e o item volta a "Sem tratativa").
+export const excluirEntrada = (db, projectId, key, entryId) => gravarRegistro(db, projectId, key, (reg) => {
+  const entries = (reg.entries || []).filter((e) => e.id !== entryId);
+  return entries.length ? recalcularRegistro({ ...reg, entries }) : null;
+});
+
+// Gerencial: corrigir texto/status/link de uma tratativa.
+export const editarEntrada = (db, projectId, key, entryId, campos) => gravarRegistro(db, projectId, key, (reg) =>
+  recalcularRegistro({ ...reg, entries: (reg.entries || []).map((e) => (e.id === entryId ? { ...e, ...campos, editadoEm: new Date().toISOString() } : e)) }));
+
+// Gerencial: concluir o item a qualquer momento.
+export async function concluirFollowup(db, projectId, key, texto = "Concluído pela gestão Moked.") {
+  const mapa = await addFollowup(db, projectId, key, { status: "resolvido", texto, responsavel: "Gerencial" });
+  const reg = mapa[key];
+  if (reg && reg.comQuem) {
+    const sem = { ...reg, comQuem: "moked", pendenteValidacao: false };
+    const novo = { ...mapa, [key]: sem };
+    await setDoc(doc(db, "followups", projectId), { registros: Object.values(novo), updatedAt: new Date().toISOString() });
+    return novo;
+  }
+  return mapa;
 }
 
 export function isResolvido(followupsMap, key) {
