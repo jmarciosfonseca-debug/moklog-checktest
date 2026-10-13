@@ -127,7 +127,7 @@ const ESPERADO = {
   P505:  { nivel: NIVEL.CRITICO,  determinante: /GARRA DE TIGRE/i, vias: 3 },
   P604:  { nivel: NIVEL.CRITICO,  determinante: /ALARME PERIMETRAL/i, vias: 2 },
   P607:  { nivel: NIVEL.CRITICO,  determinante: /ALARME PERIMETRAL/i, vias: 0 },
-  P605:  { nivel: NIVEL.CRITICO,  determinante: /PÂNICO FIXO/i, vias: 1 },
+  P605:  { nivel: NIVEL.CRITICO,  determinante: /CANCELAS AS/i, vias: 1 }, // 13/10: o CRÍTICO vem de cancela AS (1 via) + perímetro (zona 04); o pânico fixo não é o motivo
   P602:  { nivel: NIVEL.CRITICO,  determinante: /GARRAS/i, vias: 2 },
   P311B: { nivel: NIVEL.ELEVADO,  determinante: /DILACERADORES/i, vias: 1 },
   P606:  { nivel: NIVEL.ELEVADO,  determinante: /CFTV/i, vias: 0 },
@@ -191,12 +191,13 @@ describe("motor v2 — os 9 laudos de 04/10/2026", () => {
     expect(r.geral.nivel).toBe(NIVEL.MODERADO);
   });
 
-  test("P505: pânico fixo 'não sobe para a central' é trava de site, mas o 'por quê' lidera pela garra (maior aging)", () => {
+  test("P505: pânico fixo 'não sobe para a central' vale ELEVADO (sozinho não leva a CRÍTICO) e o 'por quê' lidera pela garra (maior aging)", () => {
     const r = CASOS.P505();
     const fixo = r.vetores.find((v) => /PÂNICO FIXO/.test(v.label));
     expect(fixo.travaTipo).toBe("panicoFixoInoperante");
-    expect(fixo.nivel).toBe(NIVEL.CRITICO);
-    expect(r.geral.memoria.linhas.map((l) => l.classe).slice(0, 3)).toEqual(["Bloqueador", "Bloqueador", "Bloqueador"]);
+    expect(fixo.nivel).toBe(NIVEL.ELEVADO);
+    expect(r.geral.memoria.linhas[0].classe).toBe("Bloqueador");
+    expect(r.geral.memoria.linhas.find((l) => /PÂNICO FIXO/.test(l.fato)).classe).toBe("Tático");
     expect(r.geral.memoria.linhas[0].fato).toMatch(/Unidade 04 \(232 d\)/);
   });
 
@@ -240,5 +241,26 @@ describe("regras unitárias v2", () => {
     expect(classificarCFTVGraduado({ inop: 8, total: 74, piorDias: 3 }).nivel).toBe(NIVEL.ELEVADO);   // ≥ 10 %
     expect(classificarCFTVGraduado({ inop: 6, total: 200, piorDias: 3, perimetraisAntigas: 2 }).nivel).toBe(NIVEL.ELEVADO);
     expect(classificarCFTVGraduado({ inop: 3, total: 100, piorDias: 300, nivelBase: NIVEL.BAIXO }).nivel).toBe(NIVEL.BAIXO);
+  });
+});
+
+describe("perfil de barreiras ditado pelo Marcio (13/10/2026)", () => {
+  test("P601/P604/P605: cancela AS + bollard · P602/P606: eclusa (garra) + dilacerador · P311A/B: cancela comum + dilacerador · P505: cancela comum + eclusa + dilacerador · P607: só eclusa", () => {
+    for (const p of ["P601", "P604", "P605"]) { expect(PERFIL_BARREIRAS[p].cancelaAS).toBe(true); expect(PERFIL_BARREIRAS[p].vias).toContain("bollard"); }
+    for (const p of ["P602", "P606"]) { expect(PERFIL_BARREIRAS[p].vias).toEqual(["garra", "dilacerador"]); expect(PERFIL_BARREIRAS[p].cancelaAS).toBeFalsy(); }
+    for (const p of ["P311A", "P311B"]) { expect(PERFIL_BARREIRAS[p].vias).toEqual(["dilacerador"]); expect(PERFIL_BARREIRAS[p].cancelaTransponivel).toBe(true); }
+    expect(PERFIL_BARREIRAS.P505.vias).toEqual(["garra", "dilacerador"]);
+    expect(PERFIL_BARREIRAS.P505.cancelaTransponivel).toBe(true);
+    expect(PERFIL_BARREIRAS.P607.vias).toEqual([]);
+  });
+});
+
+describe("pânico fixo sozinho não eleva a CRÍTICO (Marcio, 13/10/2026)", () => {
+  test("P605 com só o pânico fixo do CCO sem reportar → ELEVADO, nunca CRÍTICO; cancela/perímetro/bollard seguem mandando no CRÍTICO", () => {
+    const r = rodar("P605", "Golgi Dutra", [
+      P("panic_fix", "20 - PÂNICO FIXO", "CCO", 34, "PARCIAL", "Não reportou"),
+    ], { "20 - PÂNICO FIXO": 1 });
+    expect(r.geral.nivel).toBe(NIVEL.ELEVADO);
+    expect(r.geral.nivel).not.toBe(NIVEL.CRITICO);
   });
 });
