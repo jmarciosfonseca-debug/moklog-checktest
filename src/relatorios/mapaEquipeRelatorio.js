@@ -1,7 +1,7 @@
 // Mapa de Equipe — padrão Moked (compacto: resumo + fichas em 3 colunas).
 // Toda a aritmética vem de equipe/maturidade.js (mesmo motor da tela).
 import { documentoMoked, escHTML as esc, dataBR } from './padraoMoked';
-import { calcularMapaEquipe, rotuloTreinamentos, notaTreinamentos, TITULO_TREINAMENTOS, CONFIG_MATURIDADE } from '../equipe/maturidade';
+import { calcularMapaEquipe, rotuloTreinamentos, notaTreinamentos, TITULO_TREINAMENTOS, CONFIG_MATURIDADE, desligadosUnicos } from '../equipe/maturidade';
 
 export const ROTULOS = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Obrigatórios', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
 const ROTULOS_CURTOS = { assiduidade: 'Assiduidade', ft: 'Folga trab.', treinamento: 'Obrigatórios', reciclagem: 'Reciclagem', tempoCasa: 'Tempo casa' };
@@ -124,14 +124,14 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const tr = modelo.treinamentos;
   const catalogo = Array.isArray(equipe.treinamentosEsperados) ? equipe.treinamentosEsperados.filter(t => t && String(t.nome || '').trim()) : [];
   const inicio = new Date(`${hoje}T12:00:00`); inicio.setFullYear(inicio.getFullYear() - 1);
-  const desligados = incluirDesligados ? (equipe.desligados || []).filter(c => c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
+  const desligados = incluirDesligados ? desligadosUnicos(equipe.desligados, (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo')).unicos.filter(c => c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
   const alertas = modelo.alertas;
 
   const kpis = `<div class="mk-kpis eq-kpis">
     <div class="mk-k"><div class="mk-kl">Efetivo ativo</div><div class="mk-kv">${modelo.individuos.length}</div><div class="mk-nota">${modelo.quantidadeAferida} com índice aferido${fichas.length !== modelo.individuos.length ? ` · ${fichas.length} nas fichas` : ''}</div></div>
     <div class="mk-k"><div class="mk-kl">${esc(TITULO_TREINAMENTOS)}</div><div class="mk-kv ${tr.comRegistro ? '' : 'mk-mu'}" style="font-size:${tr.comRegistro ? '15pt' : '10pt'}">${tr.comRegistro ? `${tr.comRegistro12m} de ${tr.total} · ${pct(tr.percentual12m)}` : esc(rotuloTreinamentos(tr))}</div><div class="mk-nota">${tr.comRegistro ? 'colaboradores com treinamento registrado na ficha · ' : ''}${esc(notaTreinamentos(tr))}</div></div>
     <div class="mk-k"><div class="mk-kl">Maturidade da equipe</div><div class="mk-kv" style="color:${corNota(modelo.indice)}">${nota(modelo.indice)}</div><div class="mk-nota"><b>${esc(modelo.classe)}</b> · 0–100</div></div>
-    <div class="mk-k"><div class="mk-kl">Turnover · últimos 12 meses</div><div class="mk-kv">${pct(modelo.turnover)}</div><div class="mk-nota">${modelo.desligados12m} desligamento(s) · estabilidade ${nota(modelo.estabilidade)}${modelo.turnover === null ? ' · base insuficiente' : ''}</div></div>
+    <div class="mk-k"><div class="mk-kl">Turnover · últimos 12 meses</div><div class="mk-kv">${pct(modelo.turnover)}</div><div class="mk-nota">${modelo.desligados12m} desligamento(s) ÷ efetivo médio ${String(Math.round(modelo.efetivoMedio * 10) / 10).replace('.', ',')} · estabilidade ${nota(modelo.estabilidade)}${modelo.turnover === null ? ' · base insuficiente' : ''}</div></div>
   </div>`;
 
   const resumo = `<section class="eq-resumo">
@@ -155,7 +155,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
 
   const desligadosHTML = desligados.length ? `<h2 class="mk-h2">Desligados nos últimos 12 meses <span class="mk-mu">· ${desligados.length}</span></h2><div class="eq-deslig">${desligados.map(c => `<div><b>${esc(c.nome)}</b> <span class="mk-mu">${esc(c.cargo || '')} · ${dataBR(c.desligadoEm)}</span></div>`).join('')}</div>` : '';
 
-  const comoLer = `<p class="mk-nota eq-comoler"><b>Como ler.</b> Índice individual e maturidade (0–100) descrevem os registros disponíveis no MokLog; não medem diretamente competência ou conhecimento do posto. Assiduidade: faltas e atrasos na janela aferida (justificada conta metade) · Folga trabalhada: FT registradas (positivo) · Obrigatórios: conclusão do catálogo esperado (sem catálogo = não aferido) · Reciclagem: alerta a ${CONFIG_MATURIDADE.reciclagemAlertaDias} dias do vencimento · Tempo de casa: pela admissão. Eixo sem fonte sai do cálculo; afastados há mais de 30 dias ficam fora da média. "Treinamentos aplicados" conta pessoas com registro na ficha nos últimos 12 meses; antigos ou sem data ficam como histórico.</p>`;
+  const comoLer = `<p class="mk-nota eq-comoler"><b>Como ler.</b> Índice individual e maturidade (0–100) descrevem os registros disponíveis no MokLog; não medem diretamente competência ou conhecimento do posto. Assiduidade: faltas e atrasos na janela aferida (justificada conta metade) · Folga trabalhada: FT registradas (positivo) · Obrigatórios: conclusão do catálogo esperado (sem catálogo = não aferido) · Reciclagem: alerta a ${CONFIG_MATURIDADE.reciclagemAlertaDias} dias do vencimento · Tempo de casa: pela admissão. Eixo sem fonte sai do cálculo; afastados há mais de 30 dias ficam fora da média. "Treinamentos aplicados" conta pessoas com registro na ficha nos últimos 12 meses; antigos ou sem data ficam como histórico. Turnover: desligamentos dos últimos 12 meses ÷ efetivo médio (efetivo de 12 meses atrás + efetivo atual, ÷ 2); cada pessoa conta uma vez, mesmo com registro duplicado.</p>`;
 
   const css = `<style>
   .eq-empresa{height:32px;max-width:150px;object-fit:contain;margin:0 0 6px}

@@ -166,6 +166,7 @@ import { useResumoFollowup } from "./followupLink/useResumoFollowup";
 import { gerarLinksFaltantes } from "./followupLink/gerarTodos";
 import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno, PROJETOS_LIBERADOS } from "./followupLink/config";
 import { gerencial as chamarFollowupLink } from "./followupLink/api";
+import { desligadosUnicos } from "./equipe/maturidade";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
@@ -2775,7 +2776,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
           });
           // Estabilidade: só desligamentos com data VÁLIDA e não-futura, nos últimos 90 dias.
           const temDesligadosField = Array.isArray(eqData.desligados);
-          const desl90 = temDesligadosField ? eqData.desligados.filter(d=>{
+          const desl90 = temDesligadosField ? desligadosUnicos(eqData.desligados, cols).unicos.filter(d=>{
             if(!d||!d.desligadoEm) return false;
             const de=new Date(d.desligadoEm).getTime();
             return !isNaN(de) && de<=hojeMs && (hojeMs-de) <= 90*DIA;
