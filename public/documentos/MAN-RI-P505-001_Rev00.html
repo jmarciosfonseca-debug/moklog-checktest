@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Manual de Bolso — Segurança P505</title>
+<meta name="description" content="Manual de bolso da equipe de segurança do Posto P505 (KLOG Guarulhos), com base no Regulamento Interno. Uso offline.">
+<style>
+  :root{
+    --navy:#0B2545; --navy-2:#13315C; --gold:#C9A227; --gold-2:#A8841C;
+    --bg:#F3F5F8; --card:#FFFFFF; --ink:#141B2B; --muted:#5B6474; --line:#DEE3EB;
+    --soft:#EEF2F7;
+    --barrar:#B42318; --barrar-bg:#FDECEA;
+    --orientar:#9A6B00; --orientar-bg:#FFF5D6;
+    --fiscal:#1E40AF; --fiscal-bg:#E6ECFB;
+    --registrar:#475467; --registrar-bg:#EAECF0;
+    --acionar:#6D28D9; --acionar-bg:#EFE8FD;
+    --limite:#0F766E; --limite-bg:#DDF3F0;
+    --ok:#1B7F4B; --focus:#C9A227;
+    --radius:14px; --shadow:0 1px 2px rgba(11,37,69,.06),0 6px 18px rgba(11,37,69,.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0D1420; --card:#15202F; --ink:#E8ECF3; --muted:#9AA6B8; --line:#263448; --soft:#1C2A3C;
+      --barrar:#F97066; --barrar-bg:#3A1612;
+      --orientar:#F2C14E; --orientar-bg:#3A2E0E;
+      --fiscal:#8AB4FF; --fiscal-bg:#172545;
+      --registrar:#C0C8D4; --registrar-bg:#2A3444;
+      --acionar:#C4A6FF; --acionar-bg:#2B1F4A;
+      --limite:#5FD3C5; --limite-bg:#0F3330;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0D1420; --card:#15202F; --ink:#E8ECF3; --muted:#9AA6B8; --line:#263448; --soft:#1C2A3C;
+    --barrar:#F97066; --barrar-bg:#3A1612;
+    --orientar:#F2C14E; --orientar-bg:#3A2E0E;
+    --fiscal:#8AB4FF; --fiscal-bg:#172545;
+    --registrar:#C0C8D4; --registrar-bg:#2A3444;
+    --acionar:#C4A6FF; --acionar-bg:#2B1F4A;
+    --limite:#5FD3C5; --limite-bg:#0F3330;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;overflow-x:hidden}
+  a{color:inherit}
+  button{font:inherit;cursor:pointer}
+
+  /* Header */
+  .hdr{background:linear-gradient(160deg,var(--navy) 0%,var(--navy-2) 100%);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:20;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  .hdr .row{display:flex;align-items:center;gap:10px}
+  .hdr .mark{width:34px;height:34px;border-radius:9px;background:var(--gold);color:var(--navy);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.5px;flex:0 0 auto}
+  .hdr h1{font-size:18px;white-space:nowrap;margin:0;line-height:1.2;font-weight:700}
+  .hdr .sub{font-size:11.5px;opacity:.85;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw}
+  .hdr .home{margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:7px 10px;font-size:13px}
+  .search{margin-top:10px;position:relative}
+  .search input{width:100%;border:0;border-radius:11px;padding:11px 38px 11px 12px;font-size:16px;background:#fff;color:#141B2B;outline:none}
+  .search input:focus{box-shadow:0 0 0 3px var(--gold)}
+  .search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:#E6E9EF;color:#333;border-radius:8px;width:28px;height:28px;display:none}
+  .search.has .clr{display:block}
+
+  .wrap{padding:14px 16px calc(96px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
+
+  /* Intro band */
+  .intro{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow)}
+  .intro p{margin:0;font-size:14px;color:var(--muted)}
+  .intro strong{color:var(--ink)}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+
+  /* Tags */
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:4px 8px;border-radius:999px;line-height:1}
+  .tag::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .t-barrar{color:var(--barrar);background:var(--barrar-bg)}
+  .t-orientar{color:var(--orientar);background:var(--orientar-bg)}
+  .t-fiscal{color:var(--fiscal);background:var(--fiscal-bg)}
+  .t-registrar{color:var(--registrar);background:var(--registrar-bg)}
+  .t-acionar{color:var(--acionar);background:var(--acionar-bg)}
+  .t-limite{color:var(--limite);background:var(--limite-bg)}
+
+  /* Dashboard grid */
+  h2.sec{font-size:13px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media (min-width:560px){.grid{grid-template-columns:repeat(3,1fr)}}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px;text-align:left;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:6px;min-height:92px;position:relative;color:var(--ink)}
+  .tile:active{transform:scale(.985)}
+  .tile .ico{font-size:22px;line-height:1}
+  .tile .nm{font-weight:700;font-size:14px;line-height:1.2}
+  .tile .ct{font-size:12px;color:var(--muted)}
+  .tile .bar{position:absolute;left:12px;right:12px;bottom:0;height:3px;border-radius:3px 3px 0 0;background:var(--gold)}
+  .tile.lim .bar{background:var(--limite)}
+
+  /* Quick filter */
+  .filters{display:flex;gap:8px;margin:12px 0 0;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .filters::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600}
+  .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  :root[data-theme="dark"] .chip.on,
+  .chip.on{}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .chip.on{background:var(--gold);color:#141B2B;border-color:var(--gold)} }
+  :root[data-theme="dark"] .chip.on{background:var(--gold);color:#141B2B;border-color:var(--gold)}
+
+  /* Sections */
+  section.blk{margin-top:22px;scroll-margin-top:140px}
+  .blk-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .blk-h .ico{font-size:22px}
+  .blk-h h3{margin:0;font-size:17px;line-height:1.2}
+  .blk-h .cap{font-size:12px;color:var(--muted);display:block;margin-top:2px}
+  .blk-h .top{margin-left:auto;border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:8px;padding:5px 9px;font-size:12px}
+
+  /* Items */
+  .item{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden;scroll-margin-top:140px}
+  .item.pri{border-left:4px solid var(--gold)}
+  .item .head{display:flex;gap:10px;align-items:flex-start;padding:12px 12px 10px;width:100%;background:none;border:0;text-align:left;color:var(--ink)}
+  .item .head .tt{font-weight:700;font-size:15px;line-height:1.25;flex:1}
+  .item .head .chev{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--soft);display:grid;place-items:center;color:var(--muted);font-size:12px;transition:transform .2s}
+  .item.open .head .chev{transform:rotate(180deg)}
+  .item .tags{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px}
+  .item .do{padding:0 12px 12px;font-size:14px;color:var(--ink)}
+  .item .do b{color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px}
+  .item .body{display:none;border-top:1px dashed var(--line);padding:12px;background:var(--soft)}
+  .item.open .body{display:block}
+  .ri-ref{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  blockquote.ri{margin:0;padding:10px 12px;background:var(--card);border-left:3px solid var(--gold);border-radius:8px;font-size:14px;line-height:1.5;color:var(--ink);user-select:text;-webkit-user-select:text}
+  .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .btn{border:0;border-radius:10px;padding:10px 12px;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:6px;flex:1 1 auto;justify-content:center}
+  .btn.p{background:var(--navy);color:#fff}
+  .btn.s{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn.p{background:var(--gold);color:#141B2B} }
+  :root[data-theme="dark"] .btn.p{background:var(--gold);color:#141B2B}
+  .btn.done{background:var(--ok)!important;color:#fff!important}
+  .item.hide{display:none}
+  .empty{display:none;text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
+  .empty.show{display:block}
+
+  /* Limits block */
+  .lim-list{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:4px 12px}
+  .lim-list .li{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .lim-list .li:last-child{border-bottom:0}
+  .lim-list .li .x{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--limite-bg);color:var(--limite);display:grid;place-items:center;font-weight:800;font-size:13px}
+
+  /* Footer / notes */
+  .note{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--muted)}
+  .note b{color:var(--ink)}
+  footer{margin-top:16px;text-align:center;font-size:12px;color:var(--muted)}
+
+  /* Toast */
+  .toast{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#141B2B;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:all .25s;z-index:50;max-width:92vw;text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* Back-to-top */
+  .fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:46px;height:46px;border-radius:50%;background:var(--gold);color:var(--navy);border:0;box-shadow:0 6px 16px rgba(0,0,0,.25);font-size:18px;font-weight:800;display:none;z-index:40}
+  .fab.show{display:block}
+
+  /* Modal fallback for copy */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:60;padding:0}
+  .modal.show{display:flex}
+  .sheet{background:var(--card);color:var(--ink);width:100%;max-width:720px;border-radius:16px 16px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+  .sheet h4{margin:0 0 8px;font-size:15px}
+  .sheet textarea{width:100%;min-height:160px;border:1px solid var(--line);border-radius:10px;padding:10px;font:14px/1.45 inherit;background:var(--soft);color:var(--ink)}
+  .sheet .acts{margin-top:10px}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="row">
+    <div class="mark">P505</div>
+    <div>
+      <h1>Manual de Bolso · Segurança</h1>
+      <div class="sub">KLOG Guarulhos · Regulamento Interno (minuta CMD_001) · Rev. 00 · 07/10/2026</div>
+    </div>
+    <button class="home" onclick="goHome()" aria-label="Voltar ao painel">Painel</button>
+  </div>
+  <div class="search" id="searchWrap">
+    <input id="q" type="search" placeholder="Buscar situação… (ex.: carreta, regata, capacete)" autocomplete="off" inputmode="search">
+    <button class="clr" onclick="clearSearch()" aria-label="Limpar busca">✕</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="intro" id="top">
+    <p><strong>Regra-mãe:</strong> a equipe só age sobre o que o Regulamento Interno prevê. Cada situação abaixo traz a ação da segurança e o <strong>texto literal do RI</strong>, pronto para copiar e colar no relatório de ocorrência.</p>
+    <div class="legend">
+      <span class="tag t-barrar">Barrar</span>
+      <span class="tag t-orientar">Orientar</span>
+      <span class="tag t-fiscal">Fiscalizar</span>
+      <span class="tag t-registrar">Registrar</span>
+      <span class="tag t-acionar">Acionar</span>
+      <span class="tag t-limite">Limite</span>
+    </div>
+  </div>
+
+  <h2 class="sec">Painel</h2>
+  <div class="grid" id="grid"></div>
+
+  <div class="filters" id="filters">
+    <button class="chip on" data-f="all" onclick="setFilter('all',this)">Tudo</button>
+    <button class="chip" data-f="pri" onclick="setFilter('pri',this)">★ Prioritários</button>
+    <button class="chip" data-f="barrar" onclick="setFilter('barrar',this)">Barrar</button>
+    <button class="chip" data-f="orientar" onclick="setFilter('orientar',this)">Orientar</button>
+    <button class="chip" data-f="fiscal" onclick="setFilter('fiscal',this)">Fiscalizar</button>
+    <button class="chip" data-f="acionar" onclick="setFilter('acionar',this)">Acionar</button>
+    <button class="chip" data-f="registrar" onclick="setFilter('registrar',this)">Registrar</button>
+  </div>
+
+  <div id="sections"></div>
+  <div class="empty" id="empty">Nenhuma situação encontrada. Tente outra palavra (ex.: "veículo", "visitante", "doca").</div>
+
+  <div class="note">
+    <b>Ressalva de numeração.</b> A minuta do RI usa numeração automática; as referências aqui são por <b>capítulo</b>. Ao sair a versão final numerada, atualizar os números de item neste manual.
+    <br><br>
+    <b>Como usar no relatório.</b> Toque na situação → <i>Copiar para relatório</i> → cole no registro de ocorrência (2Control) ou no e-mail. O texto sai com capítulo + trecho literal entre aspas.
+  </div>
+
+  <footer>Moked do Brasil · Gestão de Segurança P505 · Documento de uso interno da equipe operacional</footer>
+</main>
+
+<button class="fab" id="fab" onclick="goHome()" aria-label="Voltar ao topo">↑</button>
+<div class="toast" id="toast">Copiado</div>
+
+<div class="modal" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="sheet">
+    <h4>Copie o texto abaixo</h4>
+    <textarea id="modalTxt" readonly></textarea>
+    <div class="acts">
+      <button class="btn p" onclick="selectAllModal()">Selecionar tudo</button>
+      <button class="btn s" onclick="closeModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== Dados: Regulamento Interno KLOG Guarulhos (minuta CMD_001) ===== */
+const RI_NOME = "Regulamento Interno do KLOG Guarulhos (minuta CMD_001)";
+
+const CAPS = {
+  2:  "Cap. 2 – Da Administração das Áreas Comuns",
+  3:  "Cap. 3 – Horário de Funcionamento",
+  4:  "Cap. 4 – Do Controle de Acesso e da Circulação de Funcionários, Visitantes e Prestadores de Serviços",
+  6:  "Cap. 6 – Manutenção / Obras dos Galpões",
+  7:  "Cap. 7 – Áreas e Equipamentos de Uso Comum",
+  8:  "Cap. 8 – Área Administrativa e Refeitório",
+  9:  "Cap. 9 – Do Recebimento de Correspondências e Encomendas",
+  10: "Cap. 10 – Dos Galpões",
+  11: "Cap. 11 – Da Manutenção do AVCB e Prevenção de Incêndios",
+  12: "Cap. 12 – Remoção e Transporte de Lixo",
+  15: "Cap. 15 – Segurança das Áreas Comuns",
+  16: "Cap. 16 – Da Forma de Atuação da Segurança e do Escopo de Atuação",
+  18: "Cap. 18 – Água e Esgoto",
+  19: "Cap. 19 – Garagens",
+  20: "Cap. 20 – Carga e Descarga",
+  23: "Cap. 23 – Da Proibição de Serviços Particulares",
+  24: "Cap. 24 – Multas",
+  25: "Cap. 25 – Disposições Gerais"
+};
+
+const TAGN = {barrar:"Barrar",orientar:"Orientar",fiscal:"Fiscalizar",registrar:"Registrar",acionar:"Acionar",limite:"Limite"};
+
+/* Blocos (ordem do painel) */
+const BLOCOS = [
+  {id:"pessoas",  ico:"🪪", nome:"Acesso de pessoas",          cap:"Cap. 4 e 15"},
+  {id:"veiculos", ico:"🚛", nome:"Caminhões e veículos",       cap:"Cap. 4, 10 e 20"},
+  {id:"vedados",  ico:"⛔", nome:"Acessos vedados",            cap:"Cap. 4, 9 e 16"},
+  {id:"publico",  ico:"⚖️", nome:"Poder público",              cap:"Cap. 4 e 9"},
+  {id:"comuns",   ico:"🏭", nome:"Áreas comuns e circulação",  cap:"Cap. 7, 12 e 15"},
+  {id:"estac",    ico:"🅿️", nome:"Estacionamento",             cap:"Cap. 15 e 19"},
+  {id:"incendio", ico:"🧯", nome:"Incêndio e CFTV",            cap:"Cap. 11, 15 e 18"},
+  {id:"galpoes",  ico:"🏢", nome:"Galpões e áreas restritas",  cap:"Cap. 8, 10 e 16"},
+  {id:"limites",  ico:"🚧", nome:"Limites de atuação",         cap:"Cap. 4, 10, 15, 16, 20 e 23", lim:true},
+  {id:"base",     ico:"📎", nome:"Base para relatórios",       cap:"Cap. 2, 3, 24 e 25"}
+];
+
+/* Itens */
+const ITENS = [
+/* ---------- PESSOAS ---------- */
+{b:"pessoas", pri:true, t:"Pessoa sem cadastro facial ou sem liberação do Associado", tags:["barrar"],
+ do:"Não libera. Acesso só com cadastro prévio e foto na plataforma. Sem liberação do Associado, não entra — orientar a pessoa a contatar o Representante.",
+ cap:4, ri:"Os funcionários, colaboradores e prestadores de serviços dos Associados, bem como os respectivos veículos, deverão ser previamente cadastrados através da plataforma web do software de gestão do sistema de controle de acesso, mediante o preenchimento das informações e captura da imagem (foto) dos usuários para o reconhecimento facial."},
+
+{b:"pessoas", pri:true, t:"Acesso fora do horário cadastrado", tags:["fiscal","acionar"],
+ do:"Verificar se há liberação via software pelo Associado. Sem liberação, só entra acompanhado por Representante que venha pessoalmente à portaria.",
+ cap:4, ri:"Caberá ao Associado responsável pelo Galpão indicar os horários em que cada funcionário ou colaborador poderá ingressar no Klog Guarulhos, sendo que o acesso fora do horário previamente cadastrado apenas será autorizado desde que observado o procedimento previsto nos itens 4.1.2 e 4.1.3 ou através do acompanhamento direto de um Representante, conforme adiante definido, que deverá se dirigir até a portaria para solicitar tal liberação. [...] Para que funcionários, colaboradores, visitantes e/ou prestadores de serviços dos Associados possam, fora do horário cadastrado, ter acesso ao Klog Guarulhos, será necessária autorização pelo Associado, o que se dará mediante solicitação/aprovação via software de controle de acesso."},
+
+{b:"pessoas", pri:true, t:"Visitante ou prestador na portaria", tags:["registrar","fiscal"],
+ do:"Exigir documento com foto e registrar. Confirmar liberação do Associado (agendamento ou totem de check-in). Sem liberação do Associado, não entra.",
+ cap:4, ri:"Será permitido o acesso de Visitantes e Prestadores de Serviço ao Klog Guarulhos através do uso da plataforma web do software de controle de acesso, onde será de responsabilidade da Empresa (Associado) realizar o cadastro prévio e/ou autorizar através dos usuários (colaboradores autorizados). [...] Caso a Empresa (Associado) não realize a liberação via plataforma web do controle de acesso a Administração não permitirá o acesso ao Klog Guarulhos. [...] Antes do contato com o Representante do Galpão que receberá o visitante, este deverá apresentar na portaria, para registro, documento comprobatório de identificação pessoal com foto."},
+
+{b:"pessoas", pri:true, t:"Visitante recusa apresentar documento", tags:["barrar","acionar"],
+ do:"Não libera. Só entra se o Responsável do Galpão vier à portaria e o acompanhar até o Galpão. Acionar o Representante.",
+ cap:4, ri:"Caso o visitante se recuse a apresentar seu documento de identificação pessoal com foto para cadastro, nos termos do item 4.6.1 e seguintes, a Administração somente autorizará seu ingresso se o Responsável do Galpão a ser visitado comparecer à portaria para acompanhar o visitante até o respectivo Galpão."},
+
+{b:"pessoas", pri:true, t:"Capacete, boné ou adorno cobrindo o rosto na portaria", tags:["orientar","barrar"],
+ do:"Orientar a retirar antes do reconhecimento facial. Persistindo, não libera.",
+ cap:4, ri:"Por motivo de segurança, na área de acesso ao Klog Guarulhos, notadamente na área de portaria, se faz proibida a utilização de capacete, bonés ou qualquer outro equipamento ou adorno que impeça a completa visualização da face do visitante, funcionário, colaborador e/ou prestador de serviço do Associado."},
+
+{b:"pessoas", t:"Motociclista a pé com capacete / pilotando sem capacete", tags:["orientar"],
+ do:"A pé no interior: capacete fora. Pilotando nas vias internas: capacete obrigatório.",
+ cap:4, ri:"Não é permitido aos motociclistas o uso de capacete quando este estiver andando a pé no interior do Klog Guarulhos, sendo obrigatória, contudo, a utilização de capacete, na hipótese de condução de motocicleta nas vias de circulação internas."},
+
+{b:"pessoas", pri:true, t:"Menor de 18 anos tentando entrar", tags:["barrar","fiscal"],
+ do:"Proibido, salvo aprendiz com identificação e cadastro como colaborador do Associado. Verificar documento.",
+ cap:4, ri:"É terminantemente proibida a entrada de menores de 18 (dezoito) anos, exceto na qualidade de aprendiz, devendo apresentar identificação apropriada, bem como estar devidamente cadastrado como funcionário, colaborador ou prestador de serviços dos Associados."},
+
+{b:"pessoas", t:"Menor como visitante", tags:["fiscal","registrar"],
+ do:"Só acompanhado de pai/mãe ou responsável legal. Documento de ambos (adulto e menor). Registrar.",
+ cap:4, ri:"O acesso de menores de idade, na condição de visitante, só será permitido se o menor estiver acompanhado por quaisquer dos pais ou pelo responsável legal, devendo ambos estarem devidamente identificados pela Administração, sendo obrigatória a apresentação dos respectivos documentos de identidade dos pais ou do responsável legal, bem como do menor."},
+
+{b:"pessoas", t:"Pedestre passando pela pista de veículos / fora da catraca", tags:["orientar","barrar"],
+ do:"Pedestre entra só pela catraca/torniquete com facial. Orientar a usar calçadas e faixas.",
+ cap:4, ri:"O acesso de pedestres será realizado através dos torniquetes/catracas localizados na portaria, mediante uso de tecnologia de reconhecimento facial. [...] Salvo os casos comunicados previamente à Administração do Klog Guarulhos, fica expressamente vedado o trânsito de pessoas pelas entradas e saída de automóveis. [...] A circulação de pedestres deverá ser realizada somente pelas calçadas e faixas de pedestres dispostas no Klog Guarulhos."},
+
+{b:"pessoas", t:"Segurança particular do Associado circulando em área comum", tags:["fiscal","orientar"],
+ do:"Pessoal de segurança próprio do Associado fica dentro do Galpão. Em área comum, orientar a retornar — salvo circunstância especial.",
+ cap:16, ri:"A permanência do pessoal de segurança particular dos Associados somente será permitida no interior de seus respectivos Galpões, sendo vedada sua permanência nas áreas comuns do Klog Guarulhos, salvo quando circunstâncias especiais assim o exigirem."},
+
+{b:"pessoas", t:"Segurança pessoal armada acompanhando diretor/representante", tags:["fiscal","registrar"],
+ do:"Verificar porte e registro da arma atualizados. Registrar identidade do agente junto à equipe de segurança.",
+ cap:16, ri:"Havendo necessidade de utilização de segurança pessoal armada para funcionários, diretores ou representantes de quaisquer Associados, os respectivos encarregados deverão possuir seus portes de arma devidamente atualizados, bem como o registro da arma, quando for o caso, devendo, outrossim, informar sua identidade pessoal ao setor de segurança da Administração."},
+
+/* ---------- VEÍCULOS ---------- */
+{b:"veiculos", pri:true, t:"Desengate de carreta, carreta estacionada ou pernoitando", tags:["barrar","fiscal"],
+ do:"Proibido em qualquer área. Impedir o desengate; se encontrado em ronda, acionar o Associado para remoção e registrar.",
+ cap:4, ri:"É expressamente proibido o desengate da carreta do cavalo mecânico em qualquer área do Klog Guarulhos, bem como o estacionamento e a pernoite em referida área."},
+
+{b:"veiculos", pri:true, t:"Caminhão chegando à portaria", tags:["fiscal","registrar"],
+ do:"Condutor apresenta documento pessoal e da empresa/Associado que representa. Registrar. Caminhão entra só com o motorista.",
+ cap:4, ri:"O condutor do veículo deverá se identificar junto à portaria do Klog Guarulhos, mediante a apresentação dos documentos de identificação pessoais e da empresa e/ou Associado que representa. [...] A Administração permitirá o acesso de motoristas e ajudantes, após autorização do Representante, obedecendo as mesmas condições previstas para o ingresso de visitantes. O acesso dos ajudantes deverá ocorrer pelas catracas e/ou torniquetes, sendo que o caminhão acessará o Klog Guarulhos somente com o motorista."},
+
+{b:"veiculos", pri:true, t:"Ajudantes ou acompanhantes dentro do veículo", tags:["fiscal","barrar"],
+ do:"Todos desembarcam e entram a pé pela catraca, com documento. Reembarcam só após o veículo passar a eclusa. Se não cumprirem, o veículo não entra.",
+ cap:4, ri:"Todos e quaisquer veículos que acessarem o Klog Guarulhos deverão fazê-lo apenas e tão somente com o motorista embarcado. Os acompanhantes que estiverem nos veículos deverão desembarcar e dirigir-se a pé até a portaria para a identificação e liberação de entrada pelas catracas e/ou torniquetes, podendo embarcarem de volta no veículo somente após a passagem deste pela eclusa. [...] Caso o procedimento ora estabelecido não seja respeitado pelo condutor ou pelas demais pessoas no interior do veículo, a Administração não permitirá que o veículo ingresse no Klog Guarulhos."},
+
+{b:"veiculos", pri:true, t:"Inspeção de veículo na entrada", tags:["fiscal","barrar"],
+ do:"Inspeção visual do interior, porta-malas e baú/carroceria — com autorização do condutor, que abre o compartimento. Recusou? Negar ingresso, veículo sai para área externa e o Associado é comunicado.",
+ cap:4, ri:"Para acesso ao Klog Guarulhos, caberá à equipe de segurança do Klog Guarulhos, a seu critério e em observância às boas práticas de prevenção, adotar uma das seguintes providências: (i) realizar a inspeção visual do interior do veículo bem como porta-malas e baú/carroceria, mediante prévia autorização do respectivo proprietário ou condutor; ou (ii) negar o ingresso do veículo às dependências do Klog Guarulhos, que deverá se retirar para área externa do Klog Guarulhos, caso em que o Associado será imediatamente comunicado, para que, em área externa ao Klog Guarulhos, este ou um Representante proceda à verificação interna do veículo e, estando regular, autorize expressamente sua entrada. [...] O porta-malas ou compartimento de carga deverá ser obrigatoriamente aberto pelo proprietário ou condutor do veículo."},
+
+{b:"veiculos", pri:true, t:"Trajes inadequados (regata, sem camisa, short, sandália, boné, gorro, camisa de time)", tags:["orientar","barrar"],
+ do:"Orientar que o traje não é permitido nas dependências. Persistindo, não libera e comunica o Associado.",
+ cap:4, ri:"O condutor do veículo/caminhão, uma vez autorizado a ingressar no Klog Guarulhos, [...] deverá se dirigir diretamente para a área de carga e descarga do Galpão ocupado pelo correspondente Associado, não sendo permitido o uso de trajes não adequados nas dependências do Klog Guarulhos, tais como: sandálias, shorts, bonés, gorros, camisas de time, sem camisa ou de camiseta regata."},
+
+{b:"veiculos", t:"Vidro com película / chegada à noite", tags:["orientar"],
+ do:"Película: abaixar os vidros ao aproximar do portão. À noite: faróis ou lanternas baixos para leitura da placa.",
+ cap:4, ri:"Os veículos com películas nos vidros, ao aproximarem do portão de entrada, deverão abaixar os vidros. [...] Durante a noite, os veículos que chegarem à portaria deverão colocar faróis ou lanternas baixos para facilitar o monitoramento e a identificação da respectiva placa."},
+
+{b:"veiculos", t:"Veículo de colaborador sem cadastro ou acima das vagas do Associado", tags:["fiscal","barrar"],
+ do:"Veículo entra só se cadastrado pelo Associado na plataforma e dentro das vagas atribuídas. Sem vaga, não entra.",
+ cap:4, ri:"Os funcionários, colaboradores e prestadores de serviços dos Associados poderão ingressar no Klog Guarulhos com seus veículos, desde que previamente cadastrados junto à Administração, respeitando a quantidade de vagas atribuídas a cada Associado conforme estabelecido nos respectivos contratos de locação. O cadastramento e liberação de veículos deverá ser realizado pelo próprio Associado via software de controle de acesso e será garantido às pessoas/veículos liberados mediante disponibilidade de vagas internas."},
+
+{b:"veiculos", t:"Caminhão parado fora da área de carga/descarga do Galpão", tags:["orientar","fiscal"],
+ do:"Condutor deve ir direto à área de carga e descarga do Galpão do Associado. Orientar e acionar o Associado se persistir.",
+ cap:4, ri:"O condutor do veículo/caminhão, uma vez autorizado a ingressar no Klog Guarulhos, terá o acesso liberado através do sistema de reconhecimento facial, que lhe permitirá acessar o Klog Guarulhos com o veículo, devendo se dirigir diretamente para a área de carga e descarga do Galpão ocupado pelo correspondente Associado."},
+
+/* ---------- VEDADOS ---------- */
+{b:"vedados", pri:true, t:"Entregador, motoboy ou motorista de aplicativo querendo entrar", tags:["barrar","acionar"],
+ do:"Não entra, qualquer que seja a entrega. Acionar o solicitante para receber pessoalmente na portaria.",
+ cap:4, ri:"É vedado a entrada de entregadores/motociclistas ou motoristas de aplicativo nas dependências internas do Klog Guarulhos, independentemente da natureza da entrega, tais como alimentos, jornais, medicamentos, produtos de farmácia, lavanderia, dentre outros. O Associado que houver solicitado a entrega deverá dirigir-se pessoalmente à portaria para proceder ao recebimento da encomenda ou serviço correspondente, vedada qualquer exceção a esta regra sem a prévia e expressa autorização da Administração."},
+
+{b:"vedados", pri:true, t:"Táxi ou carro de aplicativo buscando passageiro", tags:["orientar","barrar"],
+ do:"Veículo aguarda nas imediações da portaria. Não entra para buscar no Galpão, salvo exceção previamente aprovada pela Administração. Solicitante informa placa/código do veículo.",
+ cap:4, ri:"O Associado ou solicitante de serviço de transporte por táxi ou por meio de aplicativo deverá informar à portaria o código de identificação do veículo ou outro sinal característico que permita sua inequívoca identificação. [...] O veículo solicitado deverá aguardar o passageiro nas imediações da portaria principal do Klog Guarulhos, sendo expressamente vedado o seu ingresso às dependências internas para acesso direto ao Galpão onde se encontra o solicitante, salvo casos específicos que deverão ser submetidos para análise prévia da administração, juntamente com justificativa que comprove que o passageiro não é apto a dirigir-se até a portaria."},
+
+{b:"vedados", t:"Emergência: veículo externo precisa entrar", tags:["registrar","fiscal"],
+ do:"Só com requerimento escrito e termo assinado pelo solicitante (disponibilizado pela Administração). Mesmo assim, cadastro e identificação do condutor valem.",
+ cap:4, ri:"Em situações excepcionais, devidamente caracterizadas como emergenciais, o ingresso do veículo poderá ser autorizado, desde que o solicitante apresente requerimento por escrito e assine termo específico disponibilizado pela Administração, responsabilizando-se integralmente pelas consequências decorrentes da autorização. [...] O veículo autorizado deverá observar rigorosamente todos os procedimentos de controle de acesso e segurança adotados pelo Klog Guarulhos, inclusive quanto ao cadastro prévio e à identificação documental do condutor."},
+
+{b:"vedados", pri:true, t:"Vendedor, corretor, cobrador, ambulante, pedinte, pesquisa ou doações", tags:["barrar"],
+ do:"Não entra sem autorização da Administração.",
+ cap:4, ri:"É vedada a entrada no Klog Guarulhos de corretores, agenciadores, cobradores, vendedores de produtos e serviços, compradores de objetos usados e jornais, ambulantes e pedintes, assim como de pessoas com o fim de angariar donativos e afins, sem a devida autorização da Administração."},
+
+{b:"vedados", pri:true, t:"Veículo de escolta armada", tags:["barrar"],
+ do:"Não entra no empreendimento nem nos bolsões. Aguarda do lado de fora.",
+ cap:16, ri:"É proibida a entrada de veículos de Escolta Armada no interior do Klog Guarulhos, bem como o acesso de tais veículos aos bolsões de estacionamento do empreendimento. Veículos de Escolta Armada devem aguardar do lado de fora do empreendimento."},
+
+{b:"vedados", t:"Animal tentando entrar / circulando", tags:["barrar","orientar"],
+ do:"Não permitido sem autorização prévia da Administração.",
+ cap:7, ri:"Não será permitida a entrada ou permanência de animais no Klog Guarulhos, exceto se previamente autorizado pela Administração."},
+
+{b:"vedados", pri:true, t:"Botijão de GLP entrando", tags:["barrar"],
+ do:"Proibida a entrada. Barrar e registrar.",
+ cap:11, ri:"É expressamente proibida a entrada de botijões de gás liquefeito de petróleo (GLP) nas dependências do Klog Guarulhos."},
+
+{b:"vedados", t:"Drone ou aeronave operando sobre o condomínio", tags:["barrar","acionar"],
+ do:"Operação não permitida. Identificar o operador se possível, orientar a encerrar e comunicar a Administração.",
+ cap:19, ri:"Não será permitida a operação de aeronaves de qualquer porte, nas instalações do Klog Guarulhos."},
+
+/* ---------- PODER PÚBLICO ---------- */
+{b:"publico", pri:true, t:"Oficial de justiça, fiscal, auditor ou agente público na portaria", tags:["registrar","acionar"],
+ do:"Verificar identificação funcional, cadastrar na portaria e acionar o Representante do Galpão. Sem Representante designado, acompanhamento por funcionário da Administração.",
+ cap:4, ri:"É permitido o acesso de oficiais de justiça, fiscais, auditores e/ou quaisquer representantes do poder público, quando devidamente identificados como tais, no Klog Guarulhos, devendo cada Associado designar um Representante para o recebimento destas pessoas, sendo que na ausência de designação, o acesso destas pessoas ao Klog Guarulhos poderá ser feito com o acompanhamento de um funcionário da Administração. [...] Os agentes do poder público também deverão apresentar seus documentos de identificação pessoal e serem cadastrados pela portaria, previamente ao ingresso no Klog Guarulhos."},
+
+{b:"publico", pri:true, t:"Agente público recusa cadastro", tags:["barrar","acionar"],
+ do:"Comunicar imediatamente a Administração. Sem cadastro, acesso vedado.",
+ cap:4, ri:"Em caso de recusa de cadastramento por parte de autoridade pública ou de agentes do poder público, a Administração deverá ser imediatamente comunicada, sendo vedado, nessa hipótese, o acesso dos referidos agentes às dependências do Klog Guarulhos."},
+
+{b:"publico", t:"Abordado por agente público pedindo informações", tags:["orientar"],
+ do:"Prestar as informações solicitadas, sem omitir dados do empreendimento ou dos Associados. Comunicar a liderança.",
+ cap:4, ri:"Os funcionários do Klog Guarulhos, bem como seus prestadores de serviços, quando abordados por agentes do poder público, deverão prestar as informações solicitadas, não podendo omitir quaisquer dados relativos ao Klog Guarulhos ou aos Associados."},
+
+{b:"publico", t:"Citação, mandado ou intimação em nome de Associado", tags:["barrar","acionar"],
+ do:"Portaria não recebe. Acionar o Representante do Associado para que receba pessoalmente.",
+ cap:9, ri:"A portaria ou a Administração não tem autorização para receber citações, mandados judiciais, intimações ou quaisquer documentos desta natureza emitidos pelos órgãos do poder público, em nome de qualquer dos Associados."},
+
+/* ---------- ÁREAS COMUNS ---------- */
+{b:"comuns", pri:true, t:"Pessoa sentada ou deitada em calçada, corredor, doca ou jardim", tags:["orientar"],
+ do:"Orientar que o local não é destinado a isso. Reincidência: registrar e comunicar o Associado.",
+ cap:7, ri:"É proibido permanecer sentado ou deitado nas calçadas, corredores, docas e jardins ou outro qualquer local da área de uso comum."},
+
+{b:"comuns", t:"Área comum usada como área de trabalho", tags:["orientar","fiscal"],
+ do:"Orientar a cessar e comunicar o Associado.",
+ cap:7, ri:"As áreas de uso comum não podem ser utilizadas como área de trabalho."},
+
+{b:"comuns", pri:true, t:"Refeição junto a caminhão/veículo ou 'cozinha' de carreta aberta", tags:["orientar","barrar"],
+ do:"Orientar a usar área destinada. Cozinhar em carreta é expressamente proibido — impedir.",
+ cap:7, ri:"Não é permitido fazer refeições junto aos caminhões e veículos ou em qualquer outra área de uso comum não destinada para este exclusivo fim. [...] É expressamente proibido abrir a “cozinha” de carretas nas dependências do Klog para cozinhar."},
+
+{b:"comuns", pri:true, t:"Material armazenado nas docas (pallets, resíduos, inflamáveis)", tags:["fiscal","acionar"],
+ do:"Registrar em ronda e acionar o Associado para remoção. Inflamável: comunicar a Administração de imediato.",
+ cap:7, ri:"É expressamente proibido armazenamento de qualquer tipo de material na área das docas dos galpões como pallets, resíduos operacionais de qualquer natureza e qualquer material que possa ser considerado como inflamável."},
+
+{b:"comuns", t:"Lixo, entulho ou objetos deixados em área comum", tags:["fiscal","acionar"],
+ do:"Registrar e acionar o Associado responsável para remoção.",
+ cap:12, ri:"Não é permitido, mesmo que temporariamente, depositar lixo, detritos ou objetos nas áreas comuns do Klog Guarulhos."},
+
+{b:"comuns", t:"Bicicleta circulando na calçada ou estacionada em área comum", tags:["orientar"],
+ do:"Orientar: circula pela rua, estaciona em área privativa do Associado.",
+ cap:7, ri:"Bicicletas deverão estacionar em área privativa, sendo obrigatório seu deslocamento pela rua e não pela calçada."},
+
+{b:"comuns", t:"Maçarico, solda ou produto químico em uso", tags:["fiscal","acionar"],
+ do:"Maçarico exige aviso à Administração com 48 h. Sem aviso confirmado, orientar a parar e comunicar a Administração.",
+ cap:7, ri:"O uso do maçarico deverá ser comunicado à Administração com no mínimo 48 horas de antecedência."},
+
+{b:"comuns", t:"Pontas de cigarro, objetos jogados, leilão ou venda em área comum", tags:["orientar"],
+ do:"Orientar a cessar. Reincidência: registrar e comunicar o Associado.",
+ cap:7, ri:"É vedado aos Associados, seus funcionários, colaboradores, visitantes ou prestadores de serviços: [...] atirar pontas de cigarro, água e qualquer outro objeto pelas janelas, ou ainda nos corredores, escadas, saguão [...]; promover leilões, exposições ou vendas nas áreas comuns."},
+
+{b:"comuns", t:"Placa, faixa, toldo ou comunicação visual instalada sem autorização", tags:["fiscal","acionar"],
+ do:"Registrar em ronda e comunicar a Administração.",
+ cap:7, ri:"É proibida a instalação de totens, toldos, insulfilme, persianas, placas, faixas, comunicação visual de qualquer tipo, bem como modificar a pintura, colocar grades e/ou portas, equipamentos de ar-condicionado, telecomunicação etc., nas áreas externas dos Galpões ou na área de uso comum, sem a expressa autorização da Administração."},
+
+{b:"comuns", t:"Manutenção da ordem e orientação ao público", tags:["orientar","fiscal"],
+ do:"Competência da segurança em todo o horário de funcionamento, nas áreas comuns.",
+ cap:15, ri:"Compete ao setor de segurança do Klog Guarulhos a manutenção da ordem durante todo o período e horários de funcionamento, e a orientação ao público no interior do Klog Guarulhos no que se refere às áreas comuns."},
+
+/* ---------- ESTACIONAMENTO ---------- */
+{b:"estac", pri:true, t:"Veículo em alta velocidade (>20 km/h) ou sem farol", tags:["orientar","fiscal"],
+ do:"Orientar o condutor. Reincidência: registrar placa e comunicar o Associado.",
+ cap:19, ri:"A velocidade máxima permitida no interior da garagem do Klog Guarulhos será de 20 km/h, e a circulação deverá ser feita obrigatoriamente com faróis acesos. [...] Os Associados devem respeitar as sinalizações de velocidade e demais placas obrigatórias que estiverem fixadas no local."},
+
+{b:"estac", pri:true, t:"Veículo estacionado irregular, perigoso ou obstruindo via", tags:["fiscal","acionar"],
+ do:"Segurança disciplina o uso do estacionamento e faz retirar o veículo. Acionar o condutor/Associado; registrar.",
+ cap:15, ri:"O setor de segurança, por meio de pessoal habilitado orientará e disciplinará o acesso, manobra e uso da área de estacionamento, mantendo sempre desimpedidas as vias de circulação, fazendo retirar imediatamente qualquer veículo conduzido de forma perigosa, estacionado em desacordo com as normas, ou que, a critério da Administração, revele-se inconveniente ao sossego dos demais Associados ou ao uso regular do local."},
+
+{b:"estac", t:"Conserto, pintura ou manutenção de veículo na vaga", tags:["orientar","barrar"],
+ do:"Proibido, exceto reparo emergencial. Orientar a cessar; não guardar objetos na vaga.",
+ cap:19, ri:"Fica terminantemente proibida a execução de consertos (com exceção de reparos emergenciais), pintura e manutenção dos automóveis e caminhões nas vagas destinadas a estacionamento ou, ainda, nelas guardar qualquer objeto, mesmo que temporariamente."},
+
+{b:"estac", t:"Associado ocupando mais vagas que o contratado", tags:["fiscal","acionar"],
+ do:"Registrar e comunicar a Administração.",
+ cap:19, ri:"Na guarda e estacionamento de caminhões e veículos leves nas docas/vagas de garagens do Klog Guarulhos, os Associados deverão observar, com exatidão, o número de vagas de uso comum que lhes forem atribuídas em seus respectivos contratos de locação."},
+
+{b:"estac", t:"Pedestre circulando pela entrada/saída de veículos", tags:["orientar"],
+ do:"Orientar a usar calçadas e faixas.",
+ cap:19, ri:"Salvo os casos comunicados previamente à Administração, fica expressamente vedado o trânsito de pessoas pelas entradas e saídas de automóveis e caminhões."},
+
+/* ---------- INCÊNDIO E CFTV ---------- */
+{b:"incendio", pri:true, t:"Saída de emergência, escada ou acesso obstruído", tags:["fiscal","acionar"],
+ do:"Competência direta da segurança: manter livre. Fazer desobstruir; registrar e comunicar o Associado.",
+ cap:15, ri:"Compete ao setor de segurança do Klog Guarulhos manter sempre livre as escadas e saídas de emergência, impedir a obstrução, ou embaraço no interior do Klog Guarulhos e em seus acessos e dependências."},
+
+{b:"incendio", pri:true, t:"Mangueira ou hidrante usado para lavar área ou veículo", tags:["barrar","fiscal"],
+ do:"Impedir imediatamente. Registrar e comunicar a Administração.",
+ cap:18, ri:"É terminantemente proibida a utilização de qualquer item do sistema de combate a incêndio para finalidade diversa a que se destina, a exemplo da utilização de mangueiras e hidrantes para lavagem de áreas de uso específico ou veículos."},
+
+{b:"incendio", t:"Combustível de empilhadeira armazenado em área externa", tags:["fiscal","acionar"],
+ do:"Registrar em ronda e comunicar o Associado e a Administração.",
+ cap:10, ri:"É expressamente vedado o armazenamento externo de qualquer tipo de combustível destinado ao abastecimento desses equipamentos [empilhadeiras]."},
+
+{b:"incendio", t:"Descarte de óleo, químico ou efluente em bueiro, grelha ou ralo", tags:["barrar","acionar"],
+ do:"Impedir e comunicar a Administração de imediato. Registrar com foto.",
+ cap:18, ri:"É terminantemente proibido destinar às redes coletoras pluviais e de esgoto quaisquer produtos químicos tóxicos, óleos combustíveis, lubrificantes ou de cozinha, ou qualquer tipo de produto líquido inflamável, bem como lançar pelo vaso sanitário, pelas pias ou demais tubulações, materiais ou dejetos que possam obstruir os encanamentos e esgotos do Klog Guarulhos."},
+
+{b:"incendio", pri:true, t:"Pessoa filmando ou fotografando área comum", tags:["orientar","barrar"],
+ do:"Vedado sem autorização prévia da Administração (pedido por escrito com 48 h). Orientar a parar; persistindo, registrar.",
+ cap:15, ri:"Exceto pelo sistema de CFTV acima mencionado, qualquer realização de filmagem ou de fotografias internas ao Klog Guarulhos, em suas áreas comuns, deverão ser solicitadas previamente, por escrito, à Administração com 48 horas de antecedência, para a devida liberação, sendo vedado fotografar ou filmar nas dependências do Klog Guarulhos sem prévia autorização da Administração."},
+
+{b:"incendio", pri:true, t:"Pedido de imagens do CFTV ou de acesso à sala de CFTV", tags:["barrar","acionar"],
+ do:"Não fornecer imagens nem permitir acesso à sala. Encaminhar o pedido à Administração (visualização presencial, 2 dias úteis, sem cópia). Cópia só por ordem judicial/autoridade.",
+ cap:15, ri:"O Associado que desejar verificar uma ocorrência através das imagens gravadas pelo CFTV deverá fazê-lo de forma presencial na administração após solicitação com 2 dias úteis de antecedência, sendo obrigatório o fornecimento das mesmas por parte da Administração somente em caso de notificação judicial ou exigência de autoridade competente. A única forma de acesso dos Associados às imagens solicitadas será através das imagens de gravação visualizadas na administração sem o fornecimento de cópias, especificamente com relação ao período solicitado, sendo vedada o acesso do solicitante à sala de CFTV sem prévia autorização da Administração."},
+
+{b:"incendio", t:"Base do monitoramento por CFTV (LGPD)", tags:["registrar"],
+ do:"Áreas comuns monitoradas e gravadas 24 h. Fornecimento de imagens segue a LGPD. Áreas privativas dos Galpões não são cobertas pelo CFTV do condomínio.",
+ cap:15, ri:"O Klog Guarulhos será monitorado 24 horas por dia, em suas áreas comuns, por sistema de circuito fechado de TV (“CFTV”), desde os portões de entrada passando pela rua central, áreas de estacionamento comum e de caminhões, e fundos, sendo autorizada à Administração a gravar todas as imagens captadas, ou as que julgar necessárias, em prol da segurança do Klog Guarulhos. O fornecimento das imagens do sistema de CFTV seguirá conforme normas da Lei Geral de Proteção de Dados."},
+
+{b:"incendio", pri:true, t:"Ato ou fato que ameace a segurança", tags:["acionar","registrar"],
+ do:"Comunicar imediatamente à central/CCO e à Administração pelo canal próprio. Registrar ocorrência.",
+ cap:15, ri:"Qualquer ato ou fato que comprometa ou ameace a segurança do Klog Guarulhos, Associados ou funcionários, deverá ser imediatamente comunicado à equipe de segurança ou à Administração, mediante utilização do sistema próprio de comunicação ou alarme."},
+
+{b:"incendio", pri:true, t:"Objeto ou documento achado", tags:["registrar","acionar"],
+ do:"Registrar em livro próprio e encaminhar à Administração (guarda de até 2 meses). Origem suspeita: Administração aciona autoridade.",
+ cap:15, ri:"Quaisquer objetos ou documentos encontrados nas dependências do Klog Guarulhos deverão ser encaminhados à Administração, anotando-se em livro próprio o achado, que ficará à disposição do interessado por até 2 (dois) meses. [...] Havendo suspeita quanto a origem do objeto encontrado, a Administração comunicará o fato à autoridade competente."},
+
+/* ---------- GALPÕES E RESTRITAS ---------- */
+{b:"galpoes", pri:true, t:"Pessoa pernoitando ou alojada no Galpão", tags:["fiscal","acionar"],
+ do:"Proibido para qualquer pessoa, inclusive colaborador do Associado. Registrar e comunicar o Associado e a Administração.",
+ cap:10, ri:"É terminantemente proibido o pernoite de qualquer pessoa, ainda que funcionário, colaborador ou prestador de serviços do Associado no Galpão, não sendo permitida a criação de alojamentos."},
+
+{b:"galpoes", t:"Inflamáveis, explosivos, tóxicos ou químicos sem aprovação", tags:["fiscal","acionar"],
+ do:"Se identificado em ronda, registrar e comunicar a Administração. Manuseio/armazenamento exige aprovação prévia e licenças.",
+ cap:10, ri:"O manuseio e o armazenamento de produtos inflamáveis sólidos, líquidos ou gasosos, produtos explosivos, tóxicos, radioativos, biológicos e químicos, só será permitido após a aprovação prévia da Administração e obtenção das devidas autorizações e licenças/certificações dos órgãos públicos competentes."},
+
+{b:"galpoes", pri:true, t:"Não autorizado tentando entrar na sala da Administração, CCO ou depósitos", tags:["barrar"],
+ do:"Acesso só para autorizados pela Administração ou prestadores formalmente contratados.",
+ cap:8, ri:"É expressamente vedado o ingresso ou acesso, às dependências destinadas à guarda de materiais e equipamentos de segurança, limpeza, jardinagem e afins, por pessoas não autorizadas pela Administração ou que não estejam formalmente vinculadas à prestação de serviços contratados, salvo mediante autorização prévia e expressa. [...] É proibido o acesso de pessoas não autorizadas pela Administração, ou de prestadores de serviços não contratados formalmente, à sala destinada à Administração do Klog Guarulhos, salvo se previamente autorizado, de forma expressa."},
+
+{b:"galpoes", t:"Marmita ou lanche próprio no refeitório", tags:["orientar"],
+ do:"Refeitório é exclusivo para refeições da operadora. Orientar a usar o espaço interno do Associado.",
+ cap:8, ri:"É proibida a utilização do espaço do refeitório para consumo de refeições não fornecidas pela operadora tais como marmitex, marmitas, lanches, etc. Competirá a cada associado a disponibilização de espaço interno em sua área privativa para tal finalidade."},
+
+{b:"galpoes", t:"Correspondência recebida na portaria", tags:["registrar"],
+ do:"Registrar em livro de recebimento. Entrega só ao Associado ou pessoa indicada, com assinatura na retirada. Portaria não entrega nos Galpões.",
+ cap:9, ri:"As correspondências, cartas registradas, Sedex, revistas, telegramas etc., serão recebidos pela portaria do Klog Guarulhos e deverão ser retiradas diariamente pelos Associados ou por pessoa por estes expressamente indicada. A Administração não será responsável por efetuar a entrega de correspondências de qualquer natureza nos Galpões. [...] O recebimento de correspondências [...] estará condicionado ao devido registro em livro específico de registro de recebimento, mantido pela portaria, o qual deverá ser assinado no ato da retirada pelo Associado ou por pessoa por ele expressamente indicada."},
+
+{b:"galpoes", t:"Encomenda ou material que exige conferência", tags:["barrar","acionar"],
+ do:"Portaria não recebe encomendas (só da Administração). Comunicar o Associado para vir receber e conferir na portaria.",
+ cap:9, ri:"É expressamente proibido o recebimento e/ou entrega de encomendas pelos funcionários do Klog Guarulhos, exceto quando destinadas à própria Administração. [...] abrange ainda o recebimento de todo e qualquer documento e/ou material que demande a conferência do conteúdo e/ou quantidade, sendo que, neste caso, a Administração comunicará o Associado sobre a entrega para que este vá até a portaria e tome as medidas necessárias para o devido recebimento."},
+
+/* ---------- LIMITES ---------- */
+{b:"limites", t:"Não fazer revista pessoal", tags:["limite"],
+ do:"Nenhum tipo de revista pessoal. Inspeção é só visual, de veículo, com autorização do condutor.",
+ cap:4, ri:"Não será efetuado qualquer tipo de revista pessoal pelos seguranças do Klog Guarulhos."},
+
+{b:"limites", t:"Não manobrar, estacionar ou conduzir veículo de Associado", tags:["limite"],
+ do:"Salvo emergência e com autorização da Administração.",
+ cap:15, ri:"É terminantemente proibido aos funcionários do Klog Guarulhos manobrar, estacionar ou conduzir veículos de Associados, salvo em caso emergencial e quando autorizado pela Administração."},
+
+{b:"limites", t:"Não guardar cópia de chave de Galpão", tags:["limite"],
+ do:"Nem a Administração, nem seus funcionários, nem prestadores podem receber ou manter chaves dos Galpões.",
+ cap:10, ri:"É vedado à Administração, seus funcionários e prestadores de serviço do Klog Guarulhos receber e manter em seu poder cópia das chaves dos Galpões."},
+
+{b:"limites", t:"Não prestar serviço particular a Associado", tags:["limite"],
+ do:"Vigilante das áreas comuns não faz favores ou tarefas para inquilinos, salvo deliberação em Assembleia.",
+ cap:23, ri:"Fica expressamente proibida a realização, por empregados de empresas prestadoras de serviços designados para atuar nas áreas comuns do Klog Guarulhos, de quaisquer atividades de natureza particular em benefício de qualquer dos Associados, salvo nos casos excepcionalmente deliberados e aprovados em Assembleia Geral."},
+
+{b:"limites", t:"Segurança patrimonial dentro do Galpão é do Associado", tags:["limite"],
+ do:"Escopo da equipe: controle de acesso, rondas internas, alarme perimetral e CFTV das áreas comuns. O interior do Galpão é responsabilidade do inquilino.",
+ cap:16, ri:"A empresa de segurança contratada pela Associação visa a execução de procedimentos básicos de controle de acesso, rondas internas e monitoramento de alarmes perimetrais e CFTV com foco na segurança da edificação e seus usuários. [...] Competirá a cada Associado, a segurança patrimonial de suas áreas privativas mediante pessoal próprio ou empresa especializada em acordo com o risco de sua operação e valor agregado do inventário armazenado no interior da unidade."},
+
+{b:"limites", t:"Conferência de carga e material é do Associado", tags:["limite"],
+ do:"A equipe fiscaliza entradas e saídas de carga nos pátios; receber e conferir mercadoria é do Associado.",
+ cap:20, ri:"Caberá exclusivamente aos Associados a fiscalização, o recebimento e a conferência de todo material que lhes for destinado, assumindo integral responsabilidade por seu imediato encaminhamento ao respectivo Galpão de destino."},
+
+{b:"limites", t:"Vigilância não transfere responsabilidade por danos", tags:["limite"],
+ do:"Útil em ocorrências com reclamação de dano a veículo ou bem: a vigilância não transfere responsabilidade ao condomínio.",
+ cap:15, ri:"A existência de vigilância permanente não importa em transferir ao Klog Guarulhos a responsabilidade por qualquer dano físico ou patrimonial sofridos pelos Associados nos seus respectivos Galpões ou nas áreas de uso comum, inclusive e principalmente na área destinada ao estacionamento."},
+
+/* ---------- BASE ---------- */
+{b:"base", t:"Atribuições da segurança (escopo formal)", tags:["registrar"],
+ do:"Para fundamentar relatórios: o RI atribui à segurança o controle de acesso, a central, a fiscalização de pessoas e cargas e a coordenação da Brigada.",
+ cap:15, ri:"O serviço de segurança deverá: dirigir, orientar, controlar e coordenar as atividades de controle de acesso ao Klog Guarulhos, bem como a central de segurança; fiscalizar a circulação de pessoas no interior do Klog Guarulhos resguardadas as normas de segurança própria de cada Associado; fiscalizar as entradas e saídas de cargas nas áreas e pátios externos do Klog Guarulhos, através de medidas de segurança efetivas e permanentes; e providenciar e coordenar a formação e manutenção da Brigada de Incêndio, observando a legislação específica."},
+
+{b:"base", t:"Associado responde por seus funcionários, prestadores e visitantes", tags:["registrar"],
+ do:"Em toda ocorrência envolvendo terceiro ligado a um inquilino, citar este item: a responsabilidade é do Associado.",
+ cap:4, ri:"O Associado será responsável por seus funcionários, colaboradores e/ou prestadores de serviços, bem como por seus visitantes, que ingressarem no Klog Guarulhos, respondendo, inclusive, por danos ou prejuízos causados por estes, quando estes estiverem no Klog Guarulhos e pelo tempo em que perdurar sua permanência."},
+
+{b:"base", t:"Situação não prevista no RI", tags:["acionar"],
+ do:"Não improvisar. Registrar e acionar a Administração, que tem competência para suspender ou impedir qualquer prática nociva, mesmo não listada.",
+ cap:2, ri:"Caberá exclusivamente à Administração e à Associação suspender ou impedir a prática de qualquer ato, ainda que não expressamente vedado neste Regulamento Interno, sempre que, a seu exclusivo critério, tal prática se revelar nociva aos interesses do Klog Guarulhos ou incompatível com os métodos e diretrizes por ele adotados."},
+
+{b:"base", t:"Multas por infração ao RI", tags:["registrar"],
+ do:"Consequência prevista para o Associado infrator — citar no relatório quando houver reincidência.",
+ cap:24, ri:"O Associado que, transitória ou eventualmente, infringir qualquer dispositivo do Estatuto da Associação ou do Regulamento Interno, ficará sujeito à incidência de penalidade aplicada de forma progressiva, equivalente à multa no valor de (i) R$ 2.500,00 (dois mil e quinhentos reais) na primeira infração, (ii) R$ 5.000,00 (cinco mil reais) na segunda infração e (iii) no montante equivalente ao valor da contribuição do mês anterior, relativa ao Galpão do Associado inadimplente, sem prejuízo das demais consequências civis e criminais de seu ato."},
+
+{b:"base", t:"Danos ao condomínio devem ser ressarcidos", tags:["registrar"],
+ do:"Em ocorrência de dano (cancela, cerca, piso, sinalização), identificar o causador e registrar — o RI prevê ressarcimento integral.",
+ cap:25, ri:"Todos os danos causados ao Klog Guarulhos, sejam nas áreas comuns ou nos Galpões, deverão ser integralmente ressarcidos por seus respectivos causadores. Não sendo possível a identificação do responsável, os custos decorrentes do referido dano serão suportados por todos os Associados."},
+
+{b:"base", t:"Horários de funcionamento", tags:["registrar"],
+ do:"Portaria: 24 h, todos os dias. Administração: segunda a sexta, 8h às 17h.",
+ cap:3, ri:"A portaria do Klog Guarulhos permanecerá funcionando de segunda-feira a segunda-feira, pelo período de 24hs, ininterruptamente [...]. A Administração permanecerá aberta de segunda-feira a sexta-feira das 8h00min às 17h00min."}
+];
+
+/* ===== Render ===== */
+const $ = s => document.querySelector(s);
+let FILTER = "all";
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function renderGrid(){
+  const g = $("#grid"); g.innerHTML = "";
+  BLOCOS.forEach(b=>{
+    const n = ITENS.filter(i=>i.b===b.id).length;
+    const p = ITENS.filter(i=>i.b===b.id && i.pri).length;
+    const el = document.createElement("button");
+    el.className = "tile"+(b.lim?" lim":"");
+    el.setAttribute("aria-label", b.nome);
+    el.innerHTML = `<div class="ico">${b.ico}</div><div class="nm">${esc(b.nome)}</div><div class="ct">${n} ${n===1?"situação":"situações"}${p?` · ${p} ★`:""}</div><div class="bar"></div>`;
+    el.onclick = ()=>{ document.getElementById("sec-"+b.id).scrollIntoView({behavior:"smooth",block:"start"}); };
+    g.appendChild(el);
+  });
+}
+
+function renderSections(){
+  const root = $("#sections"); root.innerHTML = "";
+  BLOCOS.forEach(b=>{
+    const sec = document.createElement("section");
+    sec.className = "blk"; sec.id = "sec-"+b.id;
+    sec.innerHTML = `<div class="blk-h"><div class="ico">${b.ico}</div><div><h3>${esc(b.nome)}</h3><span class="cap">${esc(b.cap)}</span></div><button class="top" onclick="goHome()">Painel</button></div>`;
+    ITENS.filter(i=>i.b===b.id).forEach((it,idx)=>{
+      const id = `${b.id}-${idx}`;
+      const art = document.createElement("article");
+      art.className = "item"+(it.pri?" pri":"");
+      art.id = "it-"+id;
+      art.dataset.tags = it.tags.join(" ");
+      art.dataset.pri = it.pri?"1":"0";
+      art.dataset.text = (it.t+" "+it.do+" "+it.ri+" "+CAPS[it.cap]).toLowerCase();
+      art.innerHTML = `
+        <button class="head" onclick="toggle('${id}')" aria-expanded="false">
+          <div class="tt">${it.pri?'<span style="color:var(--gold)">★</span> ':''}${esc(it.t)}</div>
+          <div class="chev">▾</div>
+        </button>
+        <div class="tags">${it.tags.map(t=>`<span class="tag t-${t}">${TAGN[t]}</span>`).join("")}</div>
+        <div class="do"><b>O que a segurança faz</b>${esc(it.do)}</div>
+        <div class="body">
+          <div class="ri-ref">${esc(CAPS[it.cap])}</div>
+          <blockquote class="ri">“${esc(it.ri)}”</blockquote>
+          <div class="acts">
+            <button class="btn p" onclick="copyReport('${id}',this)">📋 Copiar para relatório</button>
+            <button class="btn s" onclick="copyQuote('${id}',this)">Só o trecho</button>
+          </div>
+        </div>`;
+      art._data = it;
+      sec.appendChild(art);
+    });
+    root.appendChild(sec);
+  });
+}
+
+function toggle(id){
+  const el = document.getElementById("it-"+id);
+  const open = el.classList.toggle("open");
+  el.querySelector(".head").setAttribute("aria-expanded", open?"true":"false");
+}
+
+function reportText(it){
+  return `Base regulamentar — ${RI_NOME}, ${CAPS[it.cap]}:\n“${it.ri}”`;
+}
+
+async function doCopy(text, btn){
+  let ok = false;
+  try{
+    if(navigator.clipboard && window.isSecureContext){ await navigator.clipboard.writeText(text); ok = true; }
+  }catch(e){ ok = false; }
+  if(!ok){
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly",""); ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+      ok = document.execCommand("copy"); document.body.removeChild(ta);
+    }catch(e){ ok = false; }
+  }
+  if(ok){
+    toast("Copiado — cole no relatório");
+    if(btn){ const old = btn.innerHTML; btn.classList.add("done"); btn.innerHTML = "✓ Copiado"; setTimeout(()=>{btn.classList.remove("done"); btn.innerHTML = old;},1600); }
+  } else {
+    openModal(text);
+  }
+}
+
+function copyReport(id, btn){ const it = document.getElementById("it-"+id)._data; doCopy(reportText(it), btn); }
+function copyQuote(id, btn){ const it = document.getElementById("it-"+id)._data; doCopy(`“${it.ri}” (${CAPS[it.cap]})`, btn); }
+
+/* Toast */
+let tT;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(tT); tT=setTimeout(()=>t.classList.remove("show"),1800); }
+
+/* Modal fallback */
+function openModal(text){ $("#modalTxt").value = text; $("#modal").classList.add("show"); setTimeout(selectAllModal, 50); }
+function closeModal(){ $("#modal").classList.remove("show"); }
+function selectAllModal(){ const ta=$("#modalTxt"); ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length); }
+
+/* Filters + search */
+function setFilter(f, btn){
+  FILTER = f;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on", c===btn));
+  applyFilter();
+}
+function applyFilter(){
+  const q = $("#q").value.trim().toLowerCase();
+  $("#searchWrap").classList.toggle("has", q.length>0);
+  let visible = 0;
+  document.querySelectorAll(".item").forEach(el=>{
+    let show = true;
+    if(FILTER==="pri") show = el.dataset.pri==="1";
+    else if(FILTER!=="all") show = el.dataset.tags.split(" ").includes(FILTER);
+    if(show && q) show = el.dataset.text.includes(q);
+    el.classList.toggle("hide", !show);
+    if(show) visible++;
+    if(q && show) el.classList.add("open"); else if(q==="" ) {/* keep state */}
+  });
+  document.querySelectorAll("section.blk").forEach(sec=>{
+    const any = sec.querySelectorAll(".item:not(.hide)").length>0;
+    sec.style.display = any ? "" : "none";
+  });
+  $("#empty").classList.toggle("show", visible===0);
+  if(q && visible>0){
+    const first = document.querySelector(".item:not(.hide)");
+    if(first && window.scrollY < 10){ /* don't jump on first keystroke */ }
+  }
+}
+function clearSearch(){ $("#q").value=""; applyFilter(); $("#q").focus(); }
+function goHome(){ window.scrollTo({top:0,behavior:"smooth"}); }
+
+/* Back-to-top visibility */
+window.addEventListener("scroll", ()=>{ $("#fab").classList.toggle("show", window.scrollY>400); }, {passive:true});
+
+/* Init */
+renderGrid(); renderSections();
+$("#q").addEventListener("input", applyFilter);
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ closeModal(); } });
+</script>
+</body>
+</html>
