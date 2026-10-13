@@ -162,7 +162,8 @@ import MapaDiarioTela from "./mapaDiario/MapaDiarioTela";
 import { setDoc } from "./fireGuard";
 import { loadFollowups, addFollowup, canonicalFollowupKey, FOLLOWUP_STATUS, statusInfo, excluirEntrada, editarEntrada, concluirFollowup } from "./followups";
 import GestaoLinks from "./followupLink/GestaoLinks";
-import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno } from "./followupLink/config";
+import { useResumoFollowup } from "./followupLink/useResumoFollowup";
+import { linkLiberado, comQuemInfo, semRetorno, diasSemRetorno, PILOTO_PIDS } from "./followupLink/config";
 import { gerencial as chamarFollowupLink } from "./followupLink/api";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
@@ -1088,6 +1089,19 @@ function HealthRing({ pct, size=56 }) {
   );
 }
 
+// Aviso de follow-up nos cards: só aparece quando há algo que pede a atenção da Moked.
+function FuChip({ r, onClick }) {
+  if (!r || (!r.novos && !r.parados)) return null;
+  const base = { fontSize:10, fontWeight:800, borderRadius:20, padding:"3px 9px", border:"1px solid" };
+  return (
+    <div onClick={onClick} style={{ marginTop:8, display:"flex", gap:6, flexWrap:"wrap", alignItems:"center" }}>
+      {r.novos>0 && <span style={{ ...base, color:"#4ade80", background:"rgba(34,197,94,.12)", borderColor:"rgba(34,197,94,.45)" }}>● {r.novos} retorno{r.novos>1?"s":""} de follow-up</span>}
+      {r.parados>0 && <span style={{ ...base, color:"#fbbf24", background:"rgba(245,158,11,.1)", borderColor:"rgba(245,158,11,.4)" }}>{r.parados} sem retorno</span>}
+      <span style={{ fontSize:10, color:"#38bdf8", fontWeight:700 }}>abrir ›</span>
+    </div>
+  );
+}
+
 function CtmkBadge({ info, onToggle, size="normal" }) {
   const status = info?.status || "online";
   const isOff = status === "offline";
@@ -1614,7 +1628,11 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   };
   const [groupCompScreen,setGroupCompScreen]=useState(null); const [selWeeks,setSelWeeks]=useState(new Set());
   const [sessionTime,setSessionTime]=useState(Date.now());
-  const [fuPainel,setFuPainel]=useState(false);
+  const [fuPainelPid,setFuPainelPid]=useState(null);
+  const pendFu=useMemo(()=>hasGerencial()?getAllPendencies(stored).filter(x=>linkLiberado(x.project.id)):[],[stored]);
+  const {resumo:fuResumo,recarregar:recarregarFuResumo}=useResumoFollowup({db,pendencias:pendFu,ativo:hasGerencial()});
+  const fecharFuPainel=()=>{setFuPainelPid(null);recarregarFuResumo();};
+  const modalFu=fuPainelPid&&linkLiberado(fuPainelPid)?<GestaoLinks db={db} project={PROJECTS[fuPainelPid]||{id:fuPainelPid}} pendencias={getAllPendencies(stored).filter(x=>x.project.id===fuPainelPid)} onFechar={fecharFuPainel}/>:null;
   const [viewLinks,setViewLinks]=useState(()=>{try{return JSON.parse(localStorage.getItem("moklog_viewlinks")||"{}");}catch{return{};}});
   useEffect(()=>{
     const loadVL = async () => {
@@ -1948,9 +1966,9 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
           </div>
           {linkLiberado(p.id)&&hasGerencial()&&<div style={{background:"#060c18",border:"1px solid #1d4ed8",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
             <div><div style={{fontSize:12,fontWeight:700,color:"#f1f5f9"}}><Ico n="elo"/> Follow-up externo <span style={{fontSize:10,color:"#fbbf24"}}>PILOTO</span></div><div style={{fontSize:11,color:"#94a3b8"}}>Link para manutenção e administração preencherem as tratativas</div></div>
-            <button onClick={()=>setFuPainel(true)} style={{...S.sm,fontSize:11,padding:"6px 12px",background:"#1d4ed8",border:"1px solid #1d4ed8",color:"white"}}>Abrir</button>
+            <button onClick={()=>setFuPainelPid(p.id)} style={{...S.sm,fontSize:11,padding:"6px 12px",background:"#1d4ed8",border:"1px solid #1d4ed8",color:"white"}}>Abrir</button>
           </div>}
-          {fuPainel&&linkLiberado(p.id)&&<GestaoLinks db={db} project={p} pendencias={getAllPendencies(stored).filter(x=>x.project.id===p.id)} onFechar={()=>setFuPainel(false)}/>}
+          {modalFu}
           {sel.length>=2&&<>
             <button onClick={async()=>{const fu=await loadFollowups(db,p.id).catch(()=>({}));generateConsolidatedPDF(p,sel.map(i=>hist[i]).sort((a,b)=>(a.meta?.date||"").localeCompare(b.meta?.date||"")),{followups:fu});}}
             style={{...S.primaryBtn,width:"100%",background:"linear-gradient(135deg,#7c3aed,#6d28d9)",marginBottom:6,fontSize:14}}>
@@ -2054,9 +2072,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
         </div>
         {(()=>{const allPend=getAllPendencies(stored);return allPend.length>0?(<div style={{background:"radial-gradient(120% 160% at 0% 0%, rgba(239,68,68,.2), rgba(239,68,68,.03) 60%), #0a1322",border:"1px solid rgba(239,68,68,.4)",boxShadow:"inset 0 1px 0 rgba(255,255,255,.06)",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:8}} onClick={()=>setPendScreen(true)}><div style={{fontSize:12,fontWeight:700,color:"#ef4444"}}><Ico n="pontoVermelho"/> {allPend.filter(p=>p.status==="inop").length} Inop · <Ico n="alerta"/> {allPend.filter(p=>p.status==="partial").length} Parcial</div><span style={{color:"#ef4444",fontSize:14,fontWeight:700}}>Ver →</span></div>):null;})()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}</div>);})}
+          {allProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.length?hist[hist.length-1]:null;const h=last?computeHealth(p,last.state):null;const color=h?h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444":"#334155";return(<div key={p.id} onClick={()=>setSelProject(p)} style={{background:"#060c18",border:`1px solid ${h?color+"44":"#0f172a"}`,borderRadius:12,padding:"14px 16px",cursor:"pointer"}}><div style={{display:"flex",alignItems:"center",gap:12}}>{h?<HealthRing pct={h.pct} size={50}/>:<div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}<div style={{flex:1}}><div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{p.id} – {p.name}</div>{h?<div style={{fontSize:11,color:"#64748b",marginTop:2}}>Ultimo: {fmtDate(last.meta?.date)} · {h.inop} inop</div>:<div style={{fontSize:11,color:"#94a3b8"}}>Sem registros</div>}</div><CtmkBadge info={ctmkData[p.id]} onToggle={()=>setCtmkConfirm({pid:p.id, status: ctmkData[p.id]?.status||"online", allowDateEdit:true, offlineSince:ctmkData[p.id]?.offlineSince||null})} size="small"/></div>{h&&<div style={{marginTop:8,height:4,background:"#0f172a",borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/></div>}{hasGerencial()&&linkLiberado(p.id)&&<FuChip r={fuResumo[p.id]} onClick={(e)=>{e.stopPropagation();setFuPainelPid(p.id);}}/>}</div>);})}
         </div>
       </div>
+      {modalFu}
       {confirmDel&&(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}><div style={{background:"#060c18",border:"1px solid #ef4444",borderRadius:14,padding:"24px 20px",maxWidth:320,width:"100%",textAlign:"center"}}><div style={{fontSize:15,fontWeight:700,color:"#f1f5f9",marginBottom:6}}>Excluir relatorio?</div><div style={{fontSize:12,color:"#94a3b8",marginBottom:20}}>{confirmDel.projectId} — {fmtDate(confirmDel.date)}</div><div style={{display:"flex",gap:8}}><button onClick={()=>{onDeleteReport(confirmDel.projectId,confirmDel.idx);setConfirmDel(null);}} style={{...S.primaryBtn,flex:1,background:"linear-gradient(135deg,#b91c1c,#991b1b)",fontSize:14}}>Excluir</button><button onClick={()=>setConfirmDel(null)} style={{...S.secBtn,flex:1,fontSize:14}}>Cancelar</button></div></div></div>)}
       {ctmkConfirm&&<CtmkConfirmModal confirm={ctmkConfirm} project={{id:ctmkConfirm.pid}} onCancel={()=>setCtmkConfirm(null)} onConfirm={(date)=>{onToggleCtmk(ctmkConfirm.pid,date);setCtmkConfirm(null);}}/>}
     </div>
@@ -2675,6 +2694,10 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   // Controla quais listas expansíveis da Central de Recursos estão abertas.
   const [rhExpand, setRhExpand] = useState({ mat:true }); // cascata de pendências já abre ao entrar
   const toggleRh = (k)=> setRhExpand(o=>({...o, [k]:!o[k]}));
+  const [viaCascata, setViaCascata] = useState(false); // abriu Colaboradores pela lista recolhível → voltar cai no Registros
+  const [fuPid, setFuPid] = useState(null);
+  const pendFuReg = useMemo(()=> hasGerencial() ? getAllPendencies(stored).filter(x=>linkLiberado(x.project.id)) : [], [stored]);
+  const { resumo: fuResumoReg, totalNovos: fuTotalNovos, recarregar: recarregarFuReg } = useResumoFollowup({ db, pendencias: pendFuReg, ativo: hasGerencial() });
   useEffect(()=>{
     let alive = true;
     // BARREIRA DE ESCOPO: a varredura consolidada (todos os projetos) só roda
@@ -2701,6 +2724,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       let advNoHistorico=0, reciclagemVencida=0, reciclagemSemData=0, voltamFerias=0, materialPendente=0, projsSemEquipe=0;
       const voltamDetalhe=[];
       const colabCountsAcc={};
+      const equipPorProj={};
       // Detalhes para as listas expansíveis (lote B)
       const feriasDetalhe=[];        // {nome, projeto, retorno}
       const reciclVencidaNomes=[];   // {nome, projeto, cargo, ultima}
@@ -2762,7 +2786,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
         const { data: eqpData } = await loadEquipData(p.id, { db, doc, getDoc, getCache: getCacheEqp });
         if(eqpData){
           const c = contarEquip(eqpData);
-          if(c.total>0){ totalEquip += c.total; inop += c.inop; parcial += c.parcial; projsEquip++; }
+          if(c.total>0){ totalEquip += c.total; inop += c.inop; parcial += c.parcial; projsEquip++; equipPorProj[p.id] = { total:c.total, inop:c.inop, parcial:c.parcial }; }
         }
       }));
       veteranos.sort((a,b)=>b.meses-a.meses);
@@ -2770,7 +2794,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
       estabilidade.sort((a,b)=> (a.taxa-b.taxa) || (a.desligados90d-b.desligados90d));
       if(alive) setColabCounts(colabCountsAcc);
       if(alive) setDashStats({
-        ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip,
+        ativos, feriasHoje, projsColab, inop, parcial, totalEquip, projsEquip, equipPorProj,
         veteranos,                                  // lista completa (cascata mostra todos)
         estabilidade,
         advNoHistorico, reciclagemVencida, reciclagemSemData, voltamFerias, materialPendente, projsSemEquipe,
@@ -2836,7 +2860,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
   if(subScreen==="colaboradores" && selProject) {
     return (
       <EquipeReadOnly project={selProject} dark={dark} stored={stored}
-        onBack={()=>{ setSelProject(null); }}
+        onBack={()=>{ setSelProject(null); if(viaCascata){ setSubScreen(null); setViaCascata(false); } }}
         onToggleTheme={onToggleTheme}
         onOpenFull={()=>onEquipe(selProject)}/>
     );
@@ -3018,35 +3042,54 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               );
             })()}
 
-            <button onClick={()=>{ setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); }}
-              style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
-                boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={dark?"#001a2e":"#e0f2fe"} txt={dark?"#38bdf8":"#0369a1"}/>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
-                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsColab} projeto(s) com equipe cadastrada`:"Carregando equipes..."}</div>
-                </div>
-                <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>
-              </div>
-              {st&&(
-                <>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:11}}>
-                    <Badge cor="#22c55e"><Ico n="pontoVerde"/> {st.ativos} ativo(s)</Badge>
-                    <Badge cor="#0ea5e9"><Ico n="guardachuva"/> {st.feriasHoje} em férias</Badge>
+            {(()=>{
+              const ger = hasGerencial();
+              const aberto = ger && !!rhExpand.colab;
+              const abrirLista = ()=>{ setViaCascata(false); setPinAuth(false); setPinInput(""); setPinErr(false); setSubScreen("colaboradores"); };
+              const resumo = st ? `${st.ativos} ativo(s) · ${st.feriasHoje} em férias${disp!==null?` · ${disp}% disponível`:""}` : "Carregando equipes...";
+              return (
+                <div style={{ background:dark?"linear-gradient(135deg,#07101f,#060c18)":cardBg, border:`2px solid ${dark?"#0ea5e94d":"#bae6fd"}`, borderRadius:16, padding:"14px 18px",
+                  boxShadow:dark?"0 0 16px #0ea5e918, inset 0 1px 0 #0ea5e922":"none", animation:"mkFadeIn .35s ease both" }}>
+                  <div onClick={ger?()=>toggleRh("colab"):abrirLista} style={{display:"flex",alignItems:"center",gap:14,cursor:"pointer"}}>
+                    <IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={dark?"#001a2e":"#e0f2fe"} txt={dark?"#38bdf8":"#0369a1"}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:16, fontWeight:800, color:dark?"#0ea5e9":"#0369a1" }}>Colaboradores</div>
+                      <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{ger?resumo:(st?`${st.projsColab} projeto(s) com equipe cadastrada`:"Carregando equipes...")}</div>
+                    </div>
+                    {ger
+                      ? <span style={{ fontSize:11, color:txt2, display:"inline-block", transform:aberto?"rotate(90deg)":"none", transition:"transform .15s", flexShrink:0 }}>▶</span>
+                      : <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>}
                   </div>
-                  {disp!==null&&(
-                    <>
-                      <Bar pct={disp} cor="#0ea5e9"/>
-                      <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-                        <span style={{fontSize:9,color:txt2,fontWeight:700}}>DISPONIBILIDADE HOJE</span>
-                        <span style={{fontSize:9,fontWeight:800,color:"#0ea5e9"}}>{disp}%</span>
+                  {aberto && st && (
+                    <div style={{ marginTop:11 }}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        <Badge cor="#22c55e"><Ico n="pontoVerde"/> {st.ativos} ativo(s)</Badge>
+                        <Badge cor="#0ea5e9"><Ico n="guardachuva"/> {st.feriasHoje} em férias</Badge>
                       </div>
-                    </>
+                      {disp!==null && (<>
+                        <Bar pct={disp} cor="#0ea5e9"/>
+                        <div style={{display:"flex",justifyContent:"space-between",marginTop:3,marginBottom:8}}>
+                          <span style={{fontSize:9,color:txt2,fontWeight:700}}>DISPONIBILIDADE HOJE</span>
+                          <span style={{fontSize:9,fontWeight:800,color:"#0ea5e9"}}>{disp}%</span>
+                        </div>
+                      </>)}
+                      {allProjects.map(p=>{
+                        const n = (p.id in colabCounts) ? colabCounts[p.id] : null;
+                        return (
+                          <div key={p.id} onClick={()=>{ setViaCascata(true); setSelProject(p); setSubScreen("colaboradores"); }}
+                            style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 8px", borderBottom:`1px solid ${dark?"#0f172a":"#eef2f7"}`, cursor:"pointer" }}>
+                            <span style={{ width:7, height:7, borderRadius:"50%", background:n>0?"#0ea5e9":"#334155", flexShrink:0 }}/>
+                            <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{p.id} <span style={{ color:txt2, fontWeight:400 }}>— {p.name||""}</span></div>
+                            {n>0 ? <span style={{ fontSize:10.5, fontWeight:700, color:"#0ea5e9" }}>{n} ativo(s)</span> : null}
+                            <span style={{ color:txt2, fontSize:16 }}>›</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
-                </>
-              )}
-            </button>
+                </div>
+              );
+            })()}
 
 {/* ══ CENTRAL DE RECURSOS — RH (somente leitura, atrás do PIN gerencial) ══ */}
             {hasGerencial() && st && (st.advNoHistorico>0||st.reciclagemVencida>0||st.reciclagemSemData>0||st.voltamFerias>0||st.materialPendente>0||st.projsSemEquipe>0) && (()=>{
@@ -3141,47 +3184,116 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
               </div>);
             })()}
 
-            <button onClick={()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");}}
-              style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"18px 20px", cursor:"pointer", textAlign:"left",
-                boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none"), animation:"mkFadeIn .35s ease both", animationDelay:"60ms" }}>
-              <div style={{display:"flex",alignItems:"center",gap:14}}>
-                <div style={{ width:48, height:48, borderRadius:14, background:"transparent", border:"none", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"none", position:"relative" }}>
-                  <IconeModulo n="escudo" cor="#f59e0b" arq="equipamentos" bg={dark?"#1a1000":"#fffbeb"} txt={dark?"#fbbf24":"#b45309"}/>
-                  {st&&st.inop>0&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444",animation:"regPulse 1.4s ease-in-out infinite"}}/>}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
-                  <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{st?`${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} equipamento(s) cadastrado(s)`:"Carregando inventário..."}</div>
-                </div>
-                <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>
-              </div>
-              {st&&(
-                <>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:11}}>
-                    {st.inop===0&&st.parcial===0
-                      ? <Badge cor="#22c55e"><Ico n="checkCirculo"/> Tudo operacional</Badge>
-                      : (<>
-                          {st.inop>0&&<Badge cor="#ef4444" pulse><Ico n="pontoVermelho"/> {st.inop} inop</Badge>}
-                          {st.parcial>0&&<Badge cor="#f59e0b"><Ico n="alerta"/> {st.parcial} parcial</Badge>}
-                        </>)
-                    }
+            {(()=>{
+              const ger = hasGerencial();
+              const aberto = ger && !!rhExpand.equip;
+              const abrirLista = ()=>{setEquipPinAuth(false);setEquipPinInput("");setEquipPinErr(false);setSubScreen("equipamentos");};
+              const corOk = okPct===null?"#22c55e":okPct>=90?"#22c55e":okPct>=70?"#f59e0b":"#ef4444";
+              const resumoEq = !st ? "Carregando inventário..." : ger
+                ? `${st.totalEquip} equipamento(s) · ${st.inop>0||st.parcial>0?`${st.inop} inop · ${st.parcial} parcial`:"tudo operacional"}${okPct!==null?` · ${okPct}%`:""}`
+                : `${st.projsEquip} projeto(s) com inventário · ${st.totalEquip} equipamento(s) cadastrado(s)`;
+              return (
+                <div style={{ background:dark?"linear-gradient(135deg,#120d02,#060c18)":cardBg, border:`2px solid ${st&&st.inop>0?"#ef444466":(dark?"#f59e0b4d":"#fde68a")}`, borderRadius:16, padding:"14px 18px",
+                  boxShadow:st&&st.inop>0?"0 0 16px #ef444433":(dark?"0 0 16px #f59e0b14, inset 0 1px 0 #f59e0b22":"none"), animation:"mkFadeIn .35s ease both", animationDelay:"60ms" }}>
+                  <div onClick={ger?()=>toggleRh("equip"):abrirLista} style={{display:"flex",alignItems:"center",gap:14,cursor:"pointer"}}>
+                    <div style={{ width:48, height:48, borderRadius:14, background:"transparent", border:"none", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, boxShadow:"none", position:"relative" }}>
+                      <IconeModulo n="escudo" cor="#f59e0b" arq="equipamentos" bg={dark?"#1a1000":"#fffbeb"} txt={dark?"#fbbf24":"#b45309"}/>
+                      {st&&st.inop>0&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 6px #ef4444",animation:"regPulse 1.4s ease-in-out infinite"}}/>}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:16, fontWeight:800, color:dark?"#f59e0b":"#d97706" }}>Equipamentos</div>
+                      <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{resumoEq}</div>
+                    </div>
+                    {ger
+                      ? <span style={{ fontSize:11, color:txt2, display:"inline-block", transform:aberto?"rotate(90deg)":"none", transition:"transform .15s", flexShrink:0 }}>▶</span>
+                      : <span style={{ color:txt2, fontSize:20, flexShrink:0 }}>›</span>}
                   </div>
-                  {okPct!==null&&(
-                    <>
-                      <Bar pct={okPct} cor={okPct>=90?"#22c55e":okPct>=70?"#f59e0b":"#ef4444"}/>
-                      <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-                        <span style={{fontSize:9,color:txt2,fontWeight:700}}>OPERACIONAIS</span>
-                        <span style={{fontSize:9,fontWeight:800,color:okPct>=90?"#22c55e":okPct>=70?"#f59e0b":"#ef4444"}}>{okPct}%</span>
+                  {aberto && st && (
+                    <div style={{ marginTop:11 }}>
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                        {st.inop===0&&st.parcial===0
+                          ? <Badge cor="#22c55e"><Ico n="checkCirculo"/> Tudo operacional</Badge>
+                          : (<>
+                              {st.inop>0&&<Badge cor="#ef4444" pulse><Ico n="pontoVermelho"/> {st.inop} inop</Badge>}
+                              {st.parcial>0&&<Badge cor="#f59e0b"><Ico n="alerta"/> {st.parcial} parcial</Badge>}
+                            </>)}
                       </div>
-                    </>
+                      {okPct!==null && (<>
+                        <Bar pct={okPct} cor={corOk}/>
+                        <div style={{display:"flex",justifyContent:"space-between",marginTop:3,marginBottom:8}}>
+                          <span style={{fontSize:9,color:txt2,fontWeight:700}}>OPERACIONAIS</span>
+                          <span style={{fontSize:9,fontWeight:800,color:corOk}}>{okPct}%</span>
+                        </div>
+                      </>)}
+                      {Object.entries(st.equipPorProj||{}).map(([pid,c])=>(
+                        <div key={pid} onClick={()=>onEquipamentos(PROJECTS[pid]||{id:pid})}
+                          style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 8px", borderBottom:`1px solid ${dark?"#0f172a":"#eef2f7"}`, cursor:"pointer" }}>
+                          <span style={{ width:7, height:7, borderRadius:"50%", background:c.inop>0?"#ef4444":c.parcial>0?"#f59e0b":"#22c55e", flexShrink:0 }}/>
+                          <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{pid} <span style={{ color:txt2, fontWeight:400 }}>— {PROJECTS[pid]?.name||""}</span></div>
+                          {c.inop>0 && <span style={{ fontSize:10.5, fontWeight:800, color:"#ef4444" }}>{c.inop} inop</span>}
+                          {c.parcial>0 && <span style={{ fontSize:10.5, fontWeight:800, color:"#f59e0b" }}>{c.parcial} parcial</span>}
+                          {c.inop===0&&c.parcial===0 && <span style={{ fontSize:10.5, color:txt2 }}>{c.total} ok</span>}
+                          <span style={{ color:txt2, fontSize:16 }}>›</span>
+                        </div>
+                      ))}
+                      <div onClick={abrirLista} style={{ textAlign:"center", fontSize:11, color:"#38bdf8", fontWeight:700, cursor:"pointer", padding:"9px 0 1px" }}>Ver listagem completa ›</div>
+                    </div>
                   )}
-                </>
-              )}
-            </button>
+                </div>
+              );
+            })()}
+
+            {hasGerencial() && PILOTO_PIDS.length>0 && (()=>{
+              const aberto = !!rhExpand.fu;
+              return (
+                <div style={{ background:dark?"linear-gradient(135deg,#04140c,#060c18)":cardBg, border:`2px solid ${fuTotalNovos>0?"#22c55e66":(dark?"#16a34a4d":"#bbf7d0")}`, borderRadius:16, padding:"14px 18px",
+                  boxShadow:fuTotalNovos>0?"0 0 16px #22c55e33":"none", animation:"mkFadeIn .35s ease both", animationDelay:"90ms" }}>
+                  <div onClick={()=>toggleRh("fu")} style={{display:"flex",alignItems:"center",gap:14,cursor:"pointer"}}>
+                    <div style={{ width:48, height:48, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, fontSize:26, color:"#22c55e", position:"relative" }}>
+                      <Ico n="elo"/>
+                      {fuTotalNovos>0&&<span style={{position:"absolute",top:-3,right:-3,width:10,height:10,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e",animation:"regPulse 1.4s ease-in-out infinite"}}/>}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:16, fontWeight:800, color:dark?"#4ade80":"#15803d" }}>Follow-up — devolutiva</div>
+                      <div style={{ fontSize:11, color:txt2, marginTop:2 }}>{fuTotalNovos>0?`${fuTotalNovos} retorno(s) novo(s) das empresas`:"Retorno das empresas por projeto"}</div>
+                    </div>
+                    <span style={{ fontSize:11, color:txt2, display:"inline-block", transform:aberto?"rotate(90deg)":"none", transition:"transform .15s", flexShrink:0 }}>▶</span>
+                  </div>
+                  {aberto && (
+                    <div style={{ marginTop:11 }}>
+                      {PILOTO_PIDS.map(pid=>{
+                        const r = fuResumoReg[pid] || { novos:0, parados:0, comMoked:0, comAdm:0, comManut:0 };
+                        const chip = (n, rot, cor)=> n>0 ? <span key={rot} style={{ fontSize:10, fontWeight:800, color:cor, background:cor+"1c", border:`1px solid ${cor}44`, padding:"2px 8px", borderRadius:20 }}>{n} {rot}</span> : null;
+                        return (
+                          <div key={pid} onClick={()=>setFuPid(pid)}
+                            style={{ padding:"9px 8px", borderBottom:`1px solid ${dark?"#0f172a":"#eef2f7"}`, cursor:"pointer" }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                              <span style={{ width:7, height:7, borderRadius:"50%", background:r.novos>0?"#22c55e":"#334155", flexShrink:0 }}/>
+                              <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{pid} <span style={{ color:txt2, fontWeight:400 }}>— {PROJECTS[pid]?.name||""}</span></div>
+                              <span style={{ color:txt2, fontSize:16 }}>›</span>
+                            </div>
+                            <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginTop:5, paddingLeft:15 }}>
+                              {chip(r.novos,"retorno(s) novo(s)","#22c55e")}
+                              {chip(r.parados,"sem retorno","#f59e0b")}
+                              {chip(r.comMoked,"com a Moked","#a78bfa")}
+                              {chip(r.comAdm,"com a administração","#38bdf8")}
+                              {chip(r.comManut,"com a manutenção","#94a3b8")}
+                              {r.novos+r.parados+r.comMoked+r.comAdm+r.comManut===0 && <span style={{ fontSize:10, color:txt2 }}>nenhum item em aberto</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div style={{ fontSize:9, color:txt2, marginTop:7, fontStyle:"italic" }}>Cada projeto tem seus próprios links (empresas diferentes). Hoje só P601 está liberado — piloto.</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             </>);
           })()}
         </div>
       </div>
+      {fuPid && linkLiberado(fuPid) && <GestaoLinks db={db} project={PROJECTS[fuPid]||{id:fuPid}} pendencias={getAllPendencies(stored).filter(x=>x.project.id===fuPid)} onFechar={()=>{ setFuPid(null); recarregarFuReg(); }}/>}
     </div>
   );
 }

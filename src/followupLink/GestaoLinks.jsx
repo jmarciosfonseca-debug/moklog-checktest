@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { gerencial, urlDoLink } from "./api";
 import { comQuemInfo, resumoPorMao, ROTULO_STATUS, semRetorno, diasSemRetorno, DIAS_SEM_RETORNO } from "./config";
-import { loadFollowups, canonicalFollowupKey, concluirFollowup } from "../followups";
+import { loadFollowups, canonicalFollowupKey, concluirFollowup, marcarRetornosVistos } from "../followups";
 
 const K = { card: "#060c18", borda: "#1e293b", texto: "#f1f5f9", mudo: "#94a3b8", marca: "#cc2222" };
 const btn = { background: "#0f172a", color: K.texto, border: `1px solid ${K.borda}`, borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
@@ -75,6 +75,8 @@ export default function GestaoLinks({ db, project, pendencias, onFechar }) {
   const comItem = itens.map((i) => ({ ...i, reg: mapa[i.key] || null, comQuem: mapa[i.key]?.comQuem || "manutencao", resolvido: !!mapa[i.key]?.resolvido })).filter((i) => !i.resolvido);
   const contagem = resumoPorMao(comItem);
   const naFila = comItem.filter((i) => i.comQuem === "moked");
+  const novos = comItem.filter((i) => i.reg && i.reg.retornoNovo);
+  const novosForaDaFila = novos.filter((i) => i.comQuem !== "moked"); // retornos que não exigem ação (ex.: análise do técnico)
   const parados = comItem.filter((i) => semRetorno(i.comQuem, i.reg)); // com a manutenção e sem retorno há DIAS_SEM_RETORNO dias ou mais
   const linkDe = (papel) => links.find((l) => l.papel === papel);
 
@@ -101,11 +103,25 @@ export default function GestaoLinks({ db, project, pendencias, onFechar }) {
             </div>); })}
         </div>
 
+        {novos.length > 0 && (
+          <div style={{ background: "#052e16", border: "1px solid #166534", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, fontSize: 12, fontWeight: 800, color: "#4ade80" }}>● {novos.length} retorno(s) novo(s) das empresas</div>
+              <button type="button" style={btn} disabled={busy === "vistos"} onClick={() => acao("vistos", () => marcarRetornosVistos(db, pid))}>Marcar como visto</button>
+            </div>
+            {novosForaDaFila.map((i) => { const u = ultima(i.reg); return (
+              <div key={i.key} style={{ fontSize: 12, color: "#e2e8f0", marginTop: 6 }}>
+                <b>{i.item && i.item !== "—" ? i.item : i.cat}</b> — {u ? (ROTULO_STATUS[u.status] || u.status) : ""}{u && u.responsavel ? ` · ${u.responsavel}` : ""}
+                {u && u.texto && <div style={{ color: "#cbd5e1", whiteSpace: "pre-wrap" }}>{u.texto}</div>}
+              </div>); })}
+            {naFila.some((i) => i.reg && i.reg.retornoNovo) && <div style={{ fontSize: 11, color: K.mudo, marginTop: 6 }}>Propostas e serviços executados aparecem abaixo, em "Para a Moked agir".</div>}
+          </div>
+        )}
         <div style={{ fontSize: 12, fontWeight: 800, color: K.texto, margin: "4px 0 6px" }}>Para a Moked agir ({naFila.length})</div>
         {!naFila.length && <div style={{ fontSize: 12, color: K.mudo, marginBottom: 10 }}>Nada aguardando a Moked. Quando a manutenção enviar uma proposta ou um serviço executado, aparece aqui.</div>}
         {naFila.map((i) => { const u = ultima(i.reg); return (
           <div key={i.key} style={{ background: K.card, border: `1px solid ${K.borda}`, borderRadius: 10, padding: 10, marginBottom: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: K.texto }}>{i.item && i.item !== "—" ? i.item : i.cat} <span style={{ fontWeight: 400, color: K.mudo }}>{i.item && i.item !== "—" ? `· ${i.cat}` : ""}</span></div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: K.texto }}>{i.reg && i.reg.retornoNovo && <span style={{ fontSize: 9, color: "#052e16", background: "#4ade80", borderRadius: 5, padding: "1px 5px", marginRight: 6 }}>NOVO</span>}{i.item && i.item !== "—" ? i.item : i.cat} <span style={{ fontWeight: 400, color: K.mudo }}>{i.item && i.item !== "—" ? `· ${i.cat}` : ""}</span></div>
             {u && <div style={{ fontSize: 12, color: K.mudo, margin: "4px 0 8px" }}>
               <b style={{ color: K.texto }}>{ROTULO_STATUS[u.status] || u.status}</b>{u.proposta ? ` · proposta nº ${u.proposta.numero}${u.proposta.valor ? ` · ${u.proposta.valor}` : ""}` : ""}{u.previsao ? ` · previsão ${u.previsao}` : ""} · {u.responsavel}
               {u.texto && <div style={{ color: "#cbd5e1", whiteSpace: "pre-wrap" }}>{u.texto}</div>}
