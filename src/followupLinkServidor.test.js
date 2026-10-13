@@ -60,6 +60,9 @@ test("manutenção envia proposta: exige número, vai para a Moked e sai da mão
   expect(reg(db, itens[0].key)).toMatchObject({ comQuem: "moked", pendenteValidacao: true, statusAtual: "proposta" });
   expect(reg(db, itens[0].key).entries[0]).toMatchObject({ origem: "link", responsavel: "Cancelas Brasil", proposta: { numero: "XYZ-123", valor: "R$ 12.500,00" } });
   expect(reg(db, itens[1].key)).toMatchObject({ comQuem: "manutencao", pendenteValidacao: false });
+  // todo envio da empresa acende o aviso de "retorno novo" para a Moked
+  expect(reg(db, itens[0].key)).toMatchObject({ retornoNovo: true });
+  expect(reg(db, itens[1].key)).toMatchObject({ retornoNovo: true });
   // já está com a Moked: não dá para reenviar
   await expect(L.enviar(db, manut.token, [{ key: itens[0].key, status: "execucao", texto: "x" }], T0)).rejects.toThrow("já foi enviado");
 });
@@ -75,10 +78,10 @@ test("Moked encaminha; só a administração decide; aprovado volta à manutenç
   await L.enviar(db, manut.token, [{ key: itens[0].key, status: "proposta", propostaNumero: "9", texto: "t" }], T0);
   await expect(L.decidir(db, adm.token, { key: itens[0].key, decisao: "aprovado" }, T0)).rejects.toThrow("não está aguardando a administração");
   await L.mover(db, { pid: "P601", key: itens[0].key, para: "administracao" }, T0);
-  expect(reg(db, itens[0].key)).toMatchObject({ comQuem: "administracao" });
+  expect(reg(db, itens[0].key)).toMatchObject({ comQuem: "administracao", retornoNovo: false }); // Moked já viu e agiu
   await expect(L.decidir(db, manut.token, { key: itens[0].key, decisao: "aprovado" }, T0)).rejects.toThrow("não permite aprovar");
   await L.decidir(db, adm.token, { key: itens[0].key, decisao: "aprovado", texto: "Ok, pode executar" }, T0);
-  expect(reg(db, itens[0].key)).toMatchObject({ comQuem: "manutencao", statusAtual: "aprovado" });
+  expect(reg(db, itens[0].key)).toMatchObject({ comQuem: "manutencao", statusAtual: "aprovado", retornoNovo: true });
   // reprovação em outro item
   await L.enviar(db, manut.token, [{ key: itens[1].key, status: "proposta", propostaNumero: "10", texto: "t" }], T0);
   await L.mover(db, { pid: "P601", key: itens[1].key, para: "administracao" }, T0);

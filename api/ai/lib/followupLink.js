@@ -162,7 +162,7 @@ async function enviar(db, token, envios, agora = Date.now()) {
       const passaAdiante = e.status === "proposta" || e.status === "executado";
       const { key, ...resto } = e;
       const entrada = novaEntrada({ ...resto, responsavel: data.empresa || "Manutenção", origem: "link", papel: "manutencao" }, agora);
-      lista = aplicarEntrada(lista, key, entrada, { comQuem: passaAdiante ? "moked" : "manutencao", pendenteValidacao: passaAdiante });
+      lista = aplicarEntrada(lista, key, entrada, { comQuem: passaAdiante ? "moked" : "manutencao", pendenteValidacao: passaAdiante, retornoNovo: true, retornoEm: iso(agora) });
     }
     return lista;
   });
@@ -180,7 +180,7 @@ async function decidir(db, token, { key, decisao, texto }, agora = Date.now()) {
     const atual = registros.find((r) => r && r.key === k);
     if (comQuemDe(atual) !== "administracao") throw new Erro(409, "Este item não está aguardando a administração.");
     const entrada = novaEntrada({ status: decisao, texto: txt(texto, 500), responsavel: data.empresa || "Administração", origem: "link", papel: "administracao" }, agora);
-    return aplicarEntrada(registros, k, entrada, { comQuem: decisao === "aprovado" ? "manutencao" : "moked", pendenteValidacao: decisao === "reprovado" });
+    return aplicarEntrada(registros, k, entrada, { comQuem: decisao === "aprovado" ? "manutencao" : "moked", pendenteValidacao: decisao === "reprovado", retornoNovo: true, retornoEm: iso(agora) });
   });
   return { ok: true };
 }
@@ -250,7 +250,7 @@ async function mover(db, { pid, key, para, texto }, agora = Date.now()) {
     const atual = registros.find((r) => r && r.key === k);
     const status = (atual && atual.statusAtual) || "aguardando";
     const entrada = novaEntrada({ status, texto: txt(texto, 500) || rotulo, responsavel: "Moked", origem: "gerencial", papel: "moked" }, agora);
-    return aplicarEntrada(registros, k, entrada, { comQuem: para, pendenteValidacao: false });
+    return aplicarEntrada(registros, k, entrada, { comQuem: para, pendenteValidacao: false, retornoNovo: false });
   });
   return { ok: true };
 }

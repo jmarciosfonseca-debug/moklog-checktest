@@ -35,6 +35,20 @@ export const semRetorno = (comQuem, reg, agora = Date.now()) => {
   return d === null || d >= DIAS_SEM_RETORNO;
 };
 
+// Resumo por projeto para os sinais do app (card do projeto, Registros): só conta itens ainda em aberto.
+export function resumirProjeto(chavesAbertas = [], mapa = {}, agora = Date.now()) {
+  const r = { novos: 0, parados: 0, comMoked: 0, comAdm: 0, comManut: 0 };
+  chavesAbertas.forEach((k) => {
+    const reg = mapa[k] || null;
+    if (reg && reg.resolvido) return;
+    const q = reg && reg.comQuem ? reg.comQuem : "manutencao";
+    if (reg && reg.retornoNovo) r.novos += 1;
+    if (q === "moked") r.comMoked += 1; else if (q === "administracao") r.comAdm += 1; else r.comManut += 1;
+    if (semRetorno(q, reg, agora)) r.parados += 1;
+  });
+  return r;
+}
+
 // Aviso quando a Moked precisa agir: usado nos painéis.
 export function resumoPorMao(itens = []) {
   const r = { manutencao: 0, moked: 0, administracao: 0 };

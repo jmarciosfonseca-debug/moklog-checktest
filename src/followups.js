@@ -106,6 +106,16 @@ export const excluirEntrada = (db, projectId, key, entryId) => gravarRegistro(db
 export const editarEntrada = (db, projectId, key, entryId, campos) => gravarRegistro(db, projectId, key, (reg) =>
   recalcularRegistro({ ...reg, entries: (reg.entries || []).map((e) => (e.id === entryId ? { ...e, ...campos, editadoEm: new Date().toISOString() } : e)) }));
 
+// Gerencial: marca como vistos os retornos novos que a empresa/administração enviou pelo link.
+export async function marcarRetornosVistos(db, projectId) {
+  const mapa = await loadFollowups(db, projectId);
+  if (!Object.values(mapa).some((r) => r && r.retornoNovo)) return mapa;
+  const novo = {};
+  Object.entries(mapa).forEach(([k, r]) => { novo[k] = r && r.retornoNovo ? { ...r, retornoNovo: false } : r; });
+  await setDoc(doc(db, "followups", projectId), { registros: Object.values(novo), updatedAt: new Date().toISOString() });
+  return novo;
+}
+
 // Gerencial: concluir o item a qualquer momento.
 export async function concluirFollowup(db, projectId, key, texto = "Concluído pela gestão Moked.") {
   const mapa = await addFollowup(db, projectId, key, { status: "resolvido", texto, responsavel: "Gerencial" });
