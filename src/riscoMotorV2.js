@@ -216,7 +216,8 @@ export function aplicarMotorV2({ pid, vetores = [], pend = [], matriz = null, da
       return v;
     }
 
-    // 3. Pânico móvel = Tático; 0/N → piso MODERADO. Fixo sem comunicação = trava CRÍTICO.
+    // 3. Pânico móvel = Tático; 0/N → piso MODERADO. Fixo sem comunicação = ELEVADO (Marcio, 13/10/2026:
+    //    "apenas o pânico não deve elevar para crítico"; CRÍTICO vem de cancela, perímetro e bollard/garra/dilacerador).
     if (RE_PANICO_MOVEL.test(cat)) {
       v.classeV2 = "Tático"; v.bloqueadorCaido = false; v.observacaoManutencao = false;
       const todos = v.total && v.inop >= v.total;
@@ -226,9 +227,9 @@ export function aplicarMotorV2({ pid, vetores = [], pend = [], matriz = null, da
       return v;
     }
     if (RE_PANICO_FIXO.test(cat) && v.grupo === "teste") {
-      v.classeV2 = "Bloqueador"; v.bloqueadorCaido = true; v.observacaoManutencao = false;
-      v.travaTipo = "panicoFixoInoperante"; v.nivel = NIVEL.CRITICO;
-      v.regraV2 = "pânico fixo sem comunicação (inclui 'não reportou') → trava de site → CRÍTICO";
+      v.classeV2 = "Tático"; v.bloqueadorCaido = false; v.observacaoManutencao = false;
+      v.travaTipo = "panicoFixoInoperante"; v.nivel = NIVEL.ELEVADO;
+      v.regraV2 = "pânico fixo sem comunicação (inclui 'não reportou') → ELEVADO (sozinho não leva a CRÍTICO)";
       return v;
     }
 
@@ -243,7 +244,7 @@ export function aplicarMotorV2({ pid, vetores = [], pend = [], matriz = null, da
 
   const incl = ajustados.filter((v) => v.incluirCliente !== false && !v.observacaoManutencao && !v.rebaixadoPorRonda);
   const maxVetor = incl.reduce((m, v) => Math.max(m, Number(v.nivel) || 0), NIVEL.BAIXO);
-  const travas = incl.filter((v) => v.travaTipo === "panicoFixoInoperante" || v.travaTipo === "perimetroTotal30d");
+  const travas = incl.filter((v) => v.travaTipo === "perimetroTotal30d");
   let nivel = Math.max(matrizNivel, avaliacao.nivel, maxVetor, travas.length ? NIVEL.CRITICO : NIVEL.BAIXO);
   if (nivel < NIVEL.BAIXO) nivel = NIVEL.BAIXO;
 
@@ -304,7 +305,7 @@ export function aplicarMotorV2({ pid, vetores = [], pend = [], matriz = null, da
   const motivo = determinante
     ? (determinante.viasTransponiveis
         ? `${descreverVias(determinante.viasTransponiveis)} (${rotuloCat(determinante.label).toLowerCase()})`
-        : determinante.travaTipo === "panicoFixoInoperante" ? "pânico fixo sem comunicação (trava de site)"
+        : determinante.travaTipo === "panicoFixoInoperante" ? "pânico fixo sem comunicação"
         : matrizNivel === nivel && matriz?.motivo ? matriz.motivo
         : `${(determinante.classeV2 || "vetor").toLowerCase()} ${rotuloCat(determinante.label).toLowerCase()} em ${NIVEL_LABEL[determinante.nivel]}`)
     : (matriz?.motivo || "somente observações/manutenção");
