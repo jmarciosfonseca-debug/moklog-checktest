@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { hasGerencial } from "./session";
 import { linkLiberado } from "./followupLink/config";
 import { gerencial, urlDoLink } from "./followupLink/api";
+import { garantirLinkManutencao } from "./followupLink/garantirLink";
 import { canonicalFollowupKey } from "./followups";
 import { itensDoEstado, resumo, classificar, diasEntre, estadoTratativa, DIAS_FOLLOWUP_VENCIDO } from "./relatorios/metricas";
 import { montarLaudoSemanal } from "./relatorios/laudoSemanal";
@@ -173,23 +174,28 @@ export const MOKED_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAATkAAAB
 
 // ── LAUDO TÉCNICO SEMANAL — padrão Moked (relatorios/laudoSemanal.js). Assinatura mantida para os chamadores.
 // photos e inquilinosInfo são aceitos por compatibilidade (o laudo nunca os imprimiu).
-// QR do link de follow-up (piloto): falha silenciosa, o PDF sai igual sem ele.
-async function qrDoFollowup(pid) {
+// QR do link de follow-up: o laudo garante um link FUNCIONAL do próprio projeto (cria/renova se preciso).
+// Se não for possível, o PDF sai igual e o motivo é avisado (nunca falha em silêncio).
+async function qrDoFollowup(project, state, meta) {
   try {
-    if (!linkLiberado(pid) || !hasGerencial()) return null;
-    const { links } = await gerencial("listar", { pid });
-    const l = (links || []).find((x) => x.papel === "manutencao");
-    if (!l) return null;
-    const url = urlDoLink(l.token);
+    const r = await garantirLinkManutencao({
+      project, itens: itensDoEstado(project, state), nomeProjeto: project.name,
+      gerencialAtivo: hasGerencial(), chamar: gerencial, dataTeste: meta && meta.date ? String(meta.date) : "",
+    });
+    if (!r.link) return { aviso: linkLiberado(project.id) && hasGerencial() ? r.motivo : "" };
+    const url = urlDoLink(r.link.token);
     return { url, qr: await QRCode.toDataURL(url, { margin: 1, width: 200 }) };
-  } catch { return null; }
+  } catch (e) {
+    return { aviso: `Não foi possível gerar o QR do follow-up (${(e && e.message) || "erro"}). O PDF foi gerado sem ele.` };
+  }
 }
 
 export async function generatePDF(project, state, meta, photos, ctmkInfo, inquilinosInfo, energiaInfo, followupsInfo) {
   if(!project||!state||!meta) return;
-  const linkFollowup = await qrDoFollowup(project.id);
-  const html = montarLaudoSemanal(project, state, meta, { ctmkInfo, energiaInfo, followupsInfo, linkFollowup, hoje: new Date() });
+  const fu = await qrDoFollowup(project, state, meta);
+  const html = montarLaudoSemanal(project, state, meta, { ctmkInfo, energiaInfo, followupsInfo, linkFollowup: fu.url ? fu : null, hoje: new Date() });
   abrirParaImpressao(html, `laudo_${project.id}_${meta.date||"relatorio"}.html`);
+  if (fu.aviso) setTimeout(() => { try { window.alert(fu.aviso); } catch { /* sem alerta */ } }, 400);
 }
 
 // ── RELATÓRIO CONSOLIDADO (múltiplas semanas)
