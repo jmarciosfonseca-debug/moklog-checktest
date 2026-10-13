@@ -1,5 +1,5 @@
 // Link de follow-up para empresas externas (manutenção) e administração do cliente.
-// Piloto: P601. Tudo passa pelo servidor (Firebase Admin): a página pública nunca fala direto com o Firestore.
+// Tudo passa pelo servidor (Firebase Admin): a página pública nunca fala direto com o Firestore.
 //
 // Fluxo (dito pelo Marcio, 13/10/2026):
 //   manutenção preenche e "Concluir e enviar" → o item sai da mão dela e cai na Moked (comQuem = "moked");
@@ -7,7 +7,7 @@
 //   a administração aprova/reprova no link dela → aprovado volta para a manutenção executar; reprovado volta para a Moked.
 const crypto = require("crypto");
 
-const PILOTO = ["P601"]; // projetos liberados; ampliar aqui e em src/followupLink/config.js
+const LIBERADOS = ["P601", "P602", "P604", "P605", "P606", "P607", "P311A", "P311B", "P505", "P260A", "P260B", "P260C"]; // projetos do teste semanal; manter igual a src/followupLink/config.js
 const PAPEIS = ["manutencao", "administracao"];
 const COLECAO = "followup_links";
 const DIAS_PADRAO = 15;
@@ -187,12 +187,12 @@ async function decidir(db, token, { key, decisao, texto }, agora = Date.now()) {
 
 // ── ações da Moked (sessão gerencial) ────────────────────────────────────────
 async function criar(db, { pid, papel, empresa, projetoNome, dias, itens }, agora = Date.now()) {
-  if (!PILOTO.includes(pid)) throw new Erro(403, "Link de follow-up ainda não liberado para este projeto (piloto).");
+  if (!LIBERADOS.includes(pid)) throw new Erro(403, "Link de follow-up não liberado para este projeto.");
   if (!PAPEIS.includes(papel)) throw new Erro(400, "Tipo de link inválido.");
   const d = Math.min(DIAS_MAX, Math.max(1, Math.floor(Number(dias) || DIAS_PADRAO)));
   const token = novoToken();
   const doc = {
-    pid, papel, empresa: txt(empresa, 80), projetoNome: txt(projetoNome, 80), token,
+    pid, papel, empresa: txt(empresa, 80) || (papel === "manutencao" ? "Empresa de manutenção" : "Administração"), projetoNome: txt(projetoNome, 80), token,
     criadoEm: iso(agora), expiraEm: iso(agora + d * 86400000), revogado: false,
     itens: sanitizarItens(itens), itensEm: iso(agora),
   };
@@ -201,7 +201,7 @@ async function criar(db, { pid, papel, empresa, projetoNome, dias, itens }, agor
 }
 
 async function listar(db, pid) {
-  if (!PILOTO.includes(pid)) return [];
+  if (!LIBERADOS.includes(pid)) return [];
   const snap = await db.collection(COLECAO).where("pid", "==", pid).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     .filter((l) => !l.revogado)
@@ -231,7 +231,7 @@ async function renovar(db, { pid, id, dias }, agora = Date.now()) {
 
 // Atualiza a lista de itens em aberto de todos os links ativos do projeto (chamado ao abrir o painel).
 async function sincronizar(db, { pid, itens }, agora = Date.now()) {
-  if (!PILOTO.includes(pid)) return { atualizados: 0 };
+  if (!LIBERADOS.includes(pid)) return { atualizados: 0 };
   const limpos = sanitizarItens(itens);
   const snap = await db.collection(COLECAO).where("pid", "==", pid).get();
   const ativos = snap.docs.filter((d) => !d.data().revogado);
@@ -241,7 +241,7 @@ async function sincronizar(db, { pid, itens }, agora = Date.now()) {
 
 // Moked move o item entre as mãos: encaminhar à administração, devolver à manutenção, ficar com a Moked.
 async function mover(db, { pid, key, para, texto }, agora = Date.now()) {
-  if (!PILOTO.includes(pid)) throw new Erro(403, "Projeto fora do piloto.");
+  if (!LIBERADOS.includes(pid)) throw new Erro(403, "Projeto sem follow-up externo.");
   if (!COM_QUEM.includes(para)) throw new Erro(400, "Destino inválido.");
   const k = txt(key, 200);
   if (!k) throw new Erro(400, "Item inválido.");
@@ -256,7 +256,7 @@ async function mover(db, { pid, key, para, texto }, agora = Date.now()) {
 }
 
 module.exports = {
-  Erro, PILOTO, PAPEIS, COLECAO, DIAS_PADRAO, STATUS_MANUTENCAO,
+  Erro, LIBERADOS, PAPEIS, COLECAO, DIAS_PADRAO, STATUS_MANUTENCAO,
   novoToken, hashToken, tokenValido, sanitizarItens, comQuemDe, montarVisao, pegarRegistros,
   obterLink, ver, enviar, decidir, criar, listar, revogar, renovar, sincronizar, mover,
 };

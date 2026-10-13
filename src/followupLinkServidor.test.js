@@ -1,4 +1,4 @@
-// Link de follow-up (piloto P601): token, validade, papéis e passagem de bastão manutenção → Moked → administração.
+// Link de follow-up (todos os projetos do teste semanal): token, validade, papéis e passagem de bastão manutenção → Moked → administração.
 const L = require("../api/ai/lib/followupLink");
 
 function banco() {
@@ -33,9 +33,11 @@ async function preparar() {
 }
 const reg = (db, key) => db.dados["followups/P601"].registros.find((r) => r.key === key);
 
-test("só gera link para projeto do piloto e guarda o token só como hash no id", async () => {
+test("só gera link para projeto liberado, nome da empresa é opcional e o token fica só como hash no id", async () => {
   const db = banco();
-  await expect(L.criar(db, { pid: "P602", papel: "manutencao", itens }, T0)).rejects.toThrow("piloto");
+  await expect(L.criar(db, { pid: "P999", papel: "manutencao", itens }, T0)).rejects.toThrow("não liberado");
+  const semNome = await L.criar(db, { pid: "P602", papel: "administracao", itens: [] }, T0);
+  expect(semNome.empresa).toBe("Administração");
   const { manut } = await preparar();
   expect(L.tokenValido(manut.token)).toBe(true);
   expect(manut.id).toBe(L.hashToken(manut.token));
