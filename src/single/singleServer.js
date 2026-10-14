@@ -15,6 +15,16 @@ function unidadesDoAtivo(v){
 }
 function ativos(v){const out=lista(v).map(a=>{const un=unidadesDoAtivo(a.unidades);return {id:id(a.id),familiaId:a.familiaId==null?null:id(a.familiaId),custom:a.custom===true,nome:texto(a.nome),grupo:texto(a.grupo),total:un?un.length:inteiro(a.total),...(un?{unidades:un}:{})};});
 if(out.some(a=>!a.nome)||new Set(out.map(a=>a.id)).size!==out.length)throw erro(400,"Ativos repetidos ou sem nome.");return out;}
+function limparRespostas(entrada,agora){
+ if(!entrada||typeof entrada!=="object"||Array.isArray(entrada))throw erro(400,"Diagnóstico inválido.");
+ const respostas={};
+ for(const [key,r] of Object.entries(entrada)){
+  if(!/^[a-zA-Z0-9_.-]{1,100}$/.test(key)||["__proto__","constructor","prototype"].includes(key)||!r||!["conforme","parcial","nao_conforme","ausente_necessario","na","sem_dado"].includes(r.status))throw erro(400,"Resposta inválida.");
+  respostas[key]={status:r.status,updatedAt:agora};
+  for(const field of ["situacao","impacto","indicacao","observacao"])if(r[field]!=null)respostas[key][field]=texto(r[field],10000);
+ }
+ return respostas;
+}
 function permitido(p,u){return p.orgId==="moked"&&p.modulo==="single"&&(p.criadoPorUid===u.uid||(u.role==="gerente"&&u.scopeAll===true));}
 async function executar(db,u,b){
  if(!u||!["gerente","auditor"].includes(u.role))throw erro(403,"Perfil sem permissão.");
@@ -23,6 +33,49 @@ async function executar(db,u,b){
   let q=db.collection("single_projetos");
   if(!(u.role==="gerente"&&u.scopeAll===true))q=q.where("criadoPorUid","==",u.uid);
   const docs=(await q.limit(200).get()).docs.map(s=>s.data()).filter(p=>permitido(p,u));return {projetos:docs};
+ }
+
+ if(action==="diagnosticos_novos"){
+  // Diagnósticos de "Projeto novo" do próprio usuário (chave novo_<uid>_<slug>_<ts>): base do vínculo automático por nome.
+  const prefixo="novo_"+u.uid+"_";
+  const refs=(await db.collection("diagnosticos").listDocuments()).filter(r=>String(r.id).startsWith(prefixo)).slice(0,100);
+  const out=[];
+  for(const r of refs){
+   const docs=(await r.collection("itens").limit(20).get()).docs.map(x=>({id:x.id,...x.data()})).filter(d=>d.tipo==="novo"&&d.autorUid===u.uid);
+   if(!docs.length)continue;
+   docs.sort((a,b)=>String(b.atualizadoEm||"").localeCompare(String(a.atualizadoEm||"")));
+   out.push({chave:r.id,rotuloLivre:String(docs[0].rotuloLivre||""),itens:docs.map(d=>({id:d.id,estado:d.estado||"rascunho",atualizadoEm:d.atualizadoEm||"",respondidos:Object.keys(d.respostas||{}).length}))});
+  }
+  return {diagnosticos:out};
+ }
+ if(action==="importar_diagnostico"){
+  const chave=id(b.chave),pidImp=id(b.pid);
+  if(!/^sg_/.test(pidImp))throw erro(400,"Projeto Single inválido.");
+  if(!chave.startsWith("novo_"+u.uid+"_"))throw erro(403,"Só é possível importar diagnóstico criado pelo próprio usuário.");
+  const origem=(await db.collection("diagnosticos").doc(chave).collection("itens").limit(50).get()).docs.map(x=>({id:x.id,...x.data()})).filter(d=>d.tipo==="novo"&&d.autorUid===u.uid&&d.respostas&&typeof d.respostas==="object"&&Object.keys(d.respostas).length);
+  if(!origem.length)throw erro(404,"Diagnóstico de origem vazio ou inexistente.");
+  const projRef=db.collection("single_projetos").doc(pidImp);
+  return db.runTransaction(async tx=>{
+   const profile=await tx.get(db.collection("usuarios").doc(u.uid));
+   if(!profile.exists||profile.data().active!==true||profile.data().role!==u.role)throw erro(403,"Perfil revogado.");
+   const ident={...profile.data(),uid:u.uid};
+   const ps=await tx.get(projRef),old=ps.exists?ps.data():null;
+   if(!old||!permitido(old,ident))throw erro(403,"Projeto sem permissão.");
+   if(old.estado==="arquivado")throw erro(409,"Projeto arquivado.");
+   if(!Number.isSafeInteger(b.revisao)||b.revisao!==(old.revisao||0))throw erro(409,"Outra gravação alterou este registro. Seu rascunho foi preservado; recarregue antes de importar.");
+   if(old.diagnosticoImportado&&old.diagnosticoImportado.chave===chave)throw erro(409,"Este diagnóstico já foi importado para o Single.");
+   const alvos=origem.map(d=>db.collection("diagnosticos").doc(pidImp).collection("itens").doc(d.id));
+   const existentes=await Promise.all(alvos.map(r=>tx.get(r)));
+   const agora=new Date().toISOString();
+   origem.forEach((d,i)=>{
+    if(existentes[i].exists)return;
+    tx.set(alvos[i],{tipo:"novo",projetoRef:null,rotuloLivre:old.nome,grupo:null,estado:d.estado==="arquivado"?"arquivado":"rascunho",respostas:limparRespostas(d.respostas,agora),
+     catalogoId:texto(d.catalogoId||"mestre"),versaoCatalogo:texto(String(d.versaoCatalogo||"1")),autorUid:u.uid,criadoEm:d.criadoEm||agora,atualizadoEm:agora,arquivadoEm:d.estado==="arquivado"?agora:null,importadoDe:chave,revisao:1});
+   });
+   const next={...old,diagnosticoImportado:{chave,rotuloLivre:String(origem[0].rotuloLivre||""),em:agora,itens:origem.length},revisao:(old.revisao||0)+1,atualizadoEm:agora};
+   tx.set(projRef,next);
+   return {data:next,importados:origem.length};
+  });
  }
  const catalogo=action==="catalogo_ler"||action==="catalogo_salvar";
  const pid=catalogo?null:id(b.pid);
@@ -51,13 +104,8 @@ async function executar(db,u,b){
    target=db.collection("diagnosticos").doc(pid).collection("itens").doc(id(b.diagnosticoId));
    const ds=await tx.get(target);current=ds.exists?ds.data():null;
    const input=b.data||{};
-   if(!["rascunho","arquivado"].includes(input.estado)||!input.respostas||typeof input.respostas!=="object"||Array.isArray(input.respostas))throw erro(400,"Diagnóstico inválido.");
-   const respostas={};
-   for(const [key,r] of Object.entries(input.respostas)){
-    if(!/^[a-zA-Z0-9_.-]{1,100}$/.test(key)||["__proto__","constructor","prototype"].includes(key)||!r||!["conforme","parcial","nao_conforme","ausente_necessario","na","sem_dado"].includes(r.status))throw erro(400,"Resposta inválida.");
-    respostas[key]={status:r.status,updatedAt:agora};
-    for(const field of ["situacao","impacto","indicacao","observacao"])if(r[field]!=null)respostas[key][field]=texto(r[field],10000);
-   }
+   if(!["rascunho","arquivado"].includes(input.estado))throw erro(400,"Diagnóstico inválido.");
+   const respostas=limparRespostas(input.respostas,agora);
    next={tipo:"novo",projetoRef:null,rotuloLivre:old.nome,grupo:null,estado:input.estado,respostas,
     catalogoId:current?.catalogoId||texto(input.catalogoId),versaoCatalogo:current?.versaoCatalogo||texto(input.versaoCatalogo),
     autorUid:current?.autorUid||u.uid,criadoEm:current?.criadoEm||agora,arquivadoEm:input.estado==="arquivado"?agora:null};

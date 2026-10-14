@@ -7,6 +7,10 @@ import {draftKey,lerDraft,salvarDraft,hoje,novoId} from "./singleDraft";
 import {imprimirSingle} from "./pdfSingle";
 import "./single.css";
 // Catálogo gravado em versão antiga (v1, famílias agrupadas) não vale mais: usa o v2 e preserva a revisão do servidor.
+// Chave de comparação do nome do cliente: sem acento, caixa ou pontuação (PXXX 123 = pxxx123).
+export const chaveNome=n=>String(n||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const acharDiagnostico=(lista,nome)=>{const k=chaveNome(nome);return k?(lista||[]).find(d=>chaveNome(d.rotuloLivre)===k):null;};
+const totalRespondidos=d=>(d?.itens||[]).reduce((s,i)=>s+(i.respondidos||0),0);
 const catalogoVigente=d=>d&&d.versao===VERSAO?d:{familias,versao:VERSAO,revisao:d?.revisao||0};
 export default function SingleApp({auth,profile,onBack,onDiagnostico, onInicio}){
  const store=useMemo(()=>criarStore(auth),[auth]);
@@ -15,10 +19,12 @@ export default function SingleApp({auth,profile,onBack,onDiagnostico, onInicio})
  const [tab,setTab]=useState("Cenário"),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [form,setForm]=useState({nome:"",codigo:"",responsavel:"",dataVistoria:hoje()}),[draftReady,setDraftReady]=useState(false);
  const [catalogMode,setCatalogMode]=useState(false);
+ const [diagNovos,setDiagNovos]=useState([]),[importar,setImportar]=useState(true);
  const userId=auth.currentUser?.uid;
  async function run(fn){if(busy)return;setBusy(true);setError("");setNotice("");try{await fn();}catch(e){setError(e.message||"Não foi possível concluir. Rascunho preservado.");}finally{setBusy(false);}}
  const refresh=async()=>{const [ps,cat]=await Promise.all([store.listar(),store.lerCatalogo()]);setProjects(ps.projetos);setCatalog(catalogoVigente(cat.data));};
- useEffect(()=>{let active=true;(async()=>{try{const [ps,cat]=await Promise.all([store.listar(),store.lerCatalogo()]);if(active){setProjects(ps.projetos);setCatalog(catalogoVigente(cat.data));}}catch(e){if(active)setError(e.message);}})();return()=>{active=false;};},[store]);
+ useEffect(()=>{let active=true;(async()=>{try{const [ps,cat]=await Promise.all([store.listar(),store.lerCatalogo()]);if(active){setProjects(ps.projetos);setCatalog(catalogoVigente(cat.data));}}catch(e){if(active)setError(e.message);}
+  try{const dn=await store.diagnosticosNovos();if(active)setDiagNovos(dn.diagnosticos||[]);}catch(e){/* vínculo é opcional: sem ele o Single funciona normalmente */}})();return()=>{active=false;};},[store]);
  useEffect(()=>{if(project&&draftReady&&!salvarDraft(localStorage,draftKey(userId,project.id),{project,assets,inspection}))setError("Armazenamento local cheio ou indisponível. Não saia antes de salvar no servidor.");},[project,assets,inspection,userId,draftReady]);
  async function open(p0){
    setDraftReady(false);
@@ -56,13 +62,18 @@ export default function SingleApp({auth,profile,onBack,onDiagnostico, onInicio})
  try{if(inspection)calculated=calcularInspecao(inspection);}catch(e){calcError=e.message;}
  const previous=inspection?anteriorConcluida(history,inspection):null;
  const changes=calculated?variacao(calculated,previous):[];
+ const diagEncontrado=acharDiagnostico(diagNovos,form.nome);
+ const diagDoProjeto=project&&!project.diagnosticoImportado?acharDiagnostico(diagNovos,project.nome):null;
  const field=(key,label,type="text")=><label>{label}<input required={key==="nome"||key==="dataVistoria"} type={type} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/></label>;
  const setUnit=(item,uid,p)=>change(item.id,"unidades",item.unidades.map(u=>u.id===uid?{...u,...p}:u));
  const updateFailure=(item,index,key,value)=>change(item.id,"falhas",item.falhas.map((f,n)=>n===index?{...f,[key]:value}:f));
  return <main className="single"><header><button onClick={onBack}>← Diagnóstico</button>{onInicio&&<button onClick={onInicio}>Início</button>}<h1>Single · Relatório Situacional</h1><p>Cliente avulso · famílias configuráveis · histórico preservado</p></header>
  {error&&<div role="alert" className="single-error">{error}<button disabled={busy} onClick={()=>run(refresh)}>Reconsultar servidor</button><p>Não sobrescrevemos seu rascunho ao reconsultar. Em conflito, abra novamente o registro após preservar sua versão.</p></div>}
  {notice&&<p role="status">{notice}</p>}{error&&project&&<button disabled={busy} onClick={()=>run(recarregar)}>Reabrir versão do servidor (preservar cópia local)</button>}
- {!project?<><section><h2>+ Novo projeto (Single)</h2><form onSubmit={e=>{e.preventDefault();run(async()=>{const r=await store.criarSingle(novoId(form.nome),form);setProjects(xs=>[r.data,...xs]);await open(r.data);setForm({nome:"",codigo:"",responsavel:"",dataVistoria:hoje()});});}}>{field("nome","Cliente")}{field("codigo","Código opcional")}{field("responsavel","Responsável")}{field("dataVistoria","Data da vistoria","date")}<button disabled={busy}>Criar projeto</button></form></section><section><h2>Projetos Single</h2>{projects.length===0&&<p>Nenhum Single listado.</p>}{projects.map(p=><button className="single-project" key={p.id} disabled={busy} onClick={()=>run(()=>open(p))}>{p.nome} · {p.estado}</button>)}</section>
+ {!project?<><section><h2>+ Novo projeto (Single)</h2><form onSubmit={e=>{e.preventDefault();run(async()=>{const r=await store.criarSingle(novoId(form.nome),form);setProjects(xs=>[r.data,...xs]);
+   let aberto=r.data,msg="";
+   if(diagEncontrado&&importar){try{const imp=await store.importarDiagnostico(r.data,diagEncontrado.chave);aberto=imp.data;setProjects(xs=>xs.map(p=>p.id===aberto.id?aberto:p));msg="Diagnóstico de "+diagEncontrado.rotuloLivre+" importado ("+totalRespondidos(diagEncontrado)+" resposta(s)).";}catch(e){msg="Single criado, mas o diagnóstico não foi importado: "+e.message+" Use a aba Diagnóstico para tentar de novo.";}}
+   await open(aberto);if(msg)setNotice(msg);setForm({nome:"",codigo:"",responsavel:"",dataVistoria:hoje()});});}}>{field("nome","Cliente")}{diagEncontrado&&<p className="single-hint" role="status"><label><input type="checkbox" checked={importar} onChange={e=>setImportar(e.target.checked)}/> Encontrei o diagnóstico de <strong>{diagEncontrado.rotuloLivre}</strong> ({totalRespondidos(diagEncontrado)} resposta(s)). Importar ao criar o Single.</label></p>}{field("codigo","Código opcional")}{field("responsavel","Responsável")}{field("dataVistoria","Data da vistoria","date")}<button disabled={busy}>Criar projeto</button></form></section><section><h2>Projetos Single</h2>{projects.length===0&&<p>Nenhum Single listado.</p>}{projects.map(p=><button className="single-project" key={p.id} disabled={busy} onClick={()=>run(()=>open(p))}>{p.nome} · {p.estado}</button>)}</section>
  {profile.role==="gerente"&&<section><button onClick={()=>setCatalogMode(!catalogMode)}>Editar catálogo mestre</button>{catalogMode&&<><p>Renomear não altera inspeções antigas. O catálogo inicial é provisório; salvar confirma as famílias exibidas.</p>{catalog.familias.map((f,n)=><div className="single-catalog" key={f.id}><input aria-label={"Nome "+f.nome} value={f.nome} onChange={e=>setCatalog(c=>({...c,familias:c.familias.map(x=>x.id===f.id?{...x,nome:e.target.value}:x)}))}/><input aria-label={"Grupo "+f.nome} value={f.grupo} onChange={e=>setCatalog(c=>({...c,familias:c.familias.map(x=>x.id===f.id?{...x,grupo:e.target.value}:x)}))}/><label><input type="checkbox" checked={f.ativo} onChange={e=>setCatalog(c=>({...c,familias:c.familias.map(x=>x.id===f.id?{...x,ativo:e.target.checked}:x)}))}/>Ativo</label><button disabled={n===0} onClick={()=>setCatalog(c=>{const a=[...c.familias];[a[n-1],a[n]]=[a[n],a[n-1]];return {...c,familias:a};})}>↑</button></div>)}<button onClick={()=>setCatalog(c=>({...c,familias:[...c.familias,{id:crypto.randomUUID(),nome:"Nova família",grupo:"Personalizado",ativo:true,sinonimos:[]}]}))}>+ Família</button><button disabled={busy} onClick={()=>run(async()=>{const r=await store.editarCatalogo(catalog);setCatalog(r.data);setNotice("Catálogo salvo.");})}>Salvar catálogo</button></>}</section>}</>:
  <><section><button onClick={()=>{setProject(null);setDraftReady(false);}}>← Lista de Singles</button><h2>{project.nome}</h2><p>{project.estado==="arquivado"?"Arquivado — somente consulta":"Rascunho local automático; clique Salvar para enviar."}</p><nav>{["Cenário","Relatório","Diagnóstico"].map(t=><button aria-pressed={tab===t} key={t} onClick={()=>setTab(t)}>{t}</button>)}</nav></section>
  {tab==="Cenário"&&<section><h2>Cenário do cliente</h2><CenarioAtivos catalog={catalog} assets={assets} setAssets={setAssets} disabled={project.estado==="arquivado"}/>
@@ -78,7 +89,9 @@ export default function SingleApp({auth,profile,onBack,onDiagnostico, onInicio})
  {calcError&&<p role="alert" className="single-error">{calcError}</p>}<label>Observações<textarea value={inspection.observacoes} onChange={e=>setInspection({...inspection,observacoes:e.target.value})}/></label><label>Estado<select value={inspection.estado} onChange={e=>setInspection({...inspection,estado:e.target.value})}><option value="rascunho">Rascunho</option><option value="concluida">Concluída</option></select></label>
  <button disabled={busy||!!calcError||project.estado==="arquivado"} onClick={()=>run(async()=>{const r=await store.salvarInspecao(project.id,inspection);setInspection(r.data);setHistory(xs=>[r.data,...xs.filter(i=>i.id!==r.data.id)].sort((a,b)=>b.data.localeCompare(a.data)));setNotice("Vistoria salva.");})}>Salvar vistoria</button>
  <button disabled={!!calcError} onClick={()=>{try{imprimirSingle(project,inspection,previous);}catch(e){setError(e.message);}}}>Relatório / PDF</button></>}</section>}
- {tab==="Diagnóstico"&&<section><h2>Diagnóstico Situacional</h2><p>Abrir a avaliação existente vinculada a este cliente, sem alterar os projetos legados.</p><button onClick={()=>onDiagnostico(project)}>Abrir diagnóstico deste Single</button></section>}</>}
+ {tab==="Diagnóstico"&&<section><h2>Diagnóstico Situacional</h2><p>Abrir a avaliação existente vinculada a este cliente, sem alterar os projetos legados.</p>{project.diagnosticoImportado&&<p role="status">Diagnóstico importado de <strong>{project.diagnosticoImportado.rotuloLivre}</strong> em {String(project.diagnosticoImportado.em||"").slice(8,10)}/{String(project.diagnosticoImportado.em||"").slice(5,7)} ({project.diagnosticoImportado.itens} item(ns)).</p>}
+ {diagDoProjeto&&project.estado!=="arquivado"&&<p><button disabled={busy||ativosAlterados} onClick={()=>run(async()=>{const imp=await store.importarDiagnostico(project,diagDoProjeto.chave);setProject(imp.data);setProjects(xs=>xs.map(p=>p.id===imp.data.id?imp.data:p));setNotice("Diagnóstico de "+diagDoProjeto.rotuloLivre+" importado.");})}>Importar diagnóstico "{diagDoProjeto.rotuloLivre}" ({totalRespondidos(diagDoProjeto)} resposta(s))</button>{ativosAlterados&&<span className="single-hint"> Salve o cenário antes.</span>}</p>}
+ <button onClick={()=>onDiagnostico(project)}>Abrir diagnóstico deste Single</button></section>}</>}
  </main>;
 }
 
