@@ -26,6 +26,12 @@ export function turnoVigente(projetoId, agora) {
   return melhor;
 }
 
+// Ocorrências que pintam a bolinha de amarelo no painel: FT, falta, atraso e troca.
+export const SITUACOES_OCORRENCIA = ["falta", "ft", "atraso", "troca"];
+export function contarOcorrencias(mapa) {
+  return (mapa?.postos || []).filter((x) => SITUACOES_OCORRENCIA.includes(x?.situacao)).length;
+}
+
 // Brilha para o gerencial: cobrança (até 1 h) e pendente. "aguardando" e "enviado" não.
 export const brilha = (estado) => estado === "cobranca" || estado === "pendente";
 
@@ -41,7 +47,7 @@ export function resumoDoPainel({ agora, mapas = [], projetos = PROJETOS_DO_MAPA,
     const m = porChave.get(chaveMapa(projetoId, v.data, v.turno));
     const enviadoEm = m && m.enviadoEm ? new Date(m.enviadoEm) : null;
     const estado = estadoDoMapa({ inicio: v.inicio, agora, enviadoEm, janelaMin });
-    return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, enviadoEm, estado, brilha: brilha(estado), enviado: estado === "enviado" };
+    return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, enviadoEm, estado, brilha: brilha(estado), enviado: estado === "enviado", ocorrencias: m?.ocorrencias || 0 };
   });
   const ordem = { pendente: 0, cobranca: 1, aguardando: 2, enviado: 3, "sem-horario": 4 };
   itens.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.projetoId.localeCompare(b.projetoId));

@@ -5,6 +5,7 @@ import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { setDoc } from "../fireGuard";
 import { diasEntre } from "./regras";
+import { contarOcorrencias } from "./painel";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
 import { semUndefined } from "./modelo";
@@ -91,7 +92,7 @@ export async function loadUltimaVisita(pid) {
 export async function loadEnviosDoTurno(itens) {
   const res = await Promise.all(itens.map(async ({ projetoId, data, turno, chave }) => {
     const m = await loadMapa(projetoId, chave);
-    return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null };
+    return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null, ocorrencias: m && m.status === "enviado" ? contarOcorrencias(m) : 0 };
   }));
   return res;
 }

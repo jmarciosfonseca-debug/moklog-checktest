@@ -39,11 +39,18 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [confirmouResumo, setConfirmouResumo] = useState(false);
   const [matAberto, setMatAberto] = useState(false);
   const [editando, setEditando] = useState(false); // mapa já enviado reaberto para correção
+  const [, setTicue] = useState(0); // re-render periódico: plantão em vigor e banner ficam atuais mesmo com a aba aberta da véspera
   const [ignorados, setIgnorados] = useState({}); // avisos "não é da equipe" dispensados (posto:pessoa)
   const carregadoRef = useRef(false);
   const timer = useRef(null);
 
   const horario = horarioDoTurno(pid, turno);
+  useEffect(() => { const t = setInterval(() => setTicue((n) => n + 1), 30000); return () => clearInterval(t); }, []);
+  // Plantão em vigor AGORA (recalculado a cada render): se a tela ficou aberta de um plantão para o outro,
+  // ou a data foi trocada, o líder vê o aviso — e o Concluir exige confirmação explícita.
+  const vigente = turnoVigente(pid, agoraFn());
+  const foraDoVigente = !!vigente && (data !== vigente.data || turno !== vigente.turno);
+  const rotuloPlantao = (d, t) => `${rotuloDia(d)}, ${dataBR(d)} · ${t === "N" ? "Noturno" : "Diurno"}`;
 
   // Carrega equipe + mapa (existente ou novo pré-preenchido) quando muda dia/turno.
   useEffect(() => {
@@ -131,6 +138,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   };
 
   const concluir = async () => {
+    // Enviar no plantão errado deixa o painel "Pendente" e o WhatsApp sai com a data errada: só com confirmação explícita.
+    if (foraDoVigente && !window.confirm(`Este mapa é de ${rotuloPlantao(data, turno)}, mas o plantão em vigor é ${rotuloPlantao(vigente.data, vigente.turno)}.\n\nConcluir mesmo assim NO PLANTÃO ANTIGO? (Para o plantão de agora, cancele e toque em "Ir para o plantão em vigor".)`)) return;
     const contaveis = itensContaveis(itensMat);
     const mapaC = completarIdsCobertura(mapa, colabs); // mapa antigo: completa o id de quem foi coberto pelo cadastro
     const erros = validarParaConcluir(mapaC, contaveis);
@@ -224,6 +233,12 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           <div style={{ fontSize: 12, color: cor.txt2, marginTop: 8 }}>
             {rotuloDia(data)}, {dataBR(data)} · {rotuloTurno(turno, horario)}
           </div>
+          {foraDoVigente && (
+            <div role="alert" style={{ marginTop: 8, background: "#78350f22", border: "1.5px solid #f59e0b88", borderRadius: 10, padding: "8px 10px", fontSize: 12, color: "#fbbf24", fontWeight: 700 }}>
+              Atenção: este mapa é de {rotuloPlantao(data, turno)}. O plantão em vigor é {rotuloPlantao(vigente.data, vigente.turno)}.
+              <button onClick={() => { setData(vigente.data); setTurno(vigente.turno); }} style={{ display: "block", marginTop: 6, background: "#f59e0b", border: "none", borderRadius: 8, color: "#1a1203", fontWeight: 800, padding: "7px 10px", cursor: "pointer", fontSize: 12 }}>Ir para o plantão em vigor</button>
+            </div>
+          )}
           {prazo && (
             <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, color: prazo === "enviado" ? "#16a34a" : prazo === "pendente" ? "#dc2626" : prazo === "cobranca" ? "#f59e0b" : cor.txt2 }}>
               {prazo === "enviado" ? "Mapa enviado" : prazo === "cobranca" ? "Enviar agora: a equipe já assumiu" : prazo === "pendente" ? "Mapa pendente" : "Aguardando a equipe assumir"}

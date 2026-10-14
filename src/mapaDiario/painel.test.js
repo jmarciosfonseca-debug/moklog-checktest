@@ -1,4 +1,4 @@
-import { turnoVigente, resumoDoPainel, PROJETOS_DO_MAPA, dataBrasilia } from "./painel";
+import { turnoVigente, resumoDoPainel, PROJETOS_DO_MAPA, dataBrasilia, contarOcorrencias } from "./painel";
 
 const em = (s) => new Date(`${s}-03:00`);
 
@@ -58,4 +58,22 @@ describe("contador do gerencial", () => {
   test("mapa malformado é ignorado sem derrubar o painel", () => {
     expect(() => resumoDoPainel({ agora: em("2026-10-11T09:00:00"), mapas: [{ projetoId: "", data: "x", turno: "Z" }] })).not.toThrow();
   });
+});
+
+test("ocorrências do mapa (FT/falta/atraso/troca) chegam ao painel para a bolinha amarela", () => {
+  expect(contarOcorrencias({ postos: [{ situacao: "presente" }, { situacao: "ft" }, { situacao: "falta" }, { situacao: "troca" }, { situacao: "atraso" }, { situacao: "cobertura" }] })).toBe(4);
+  expect(contarOcorrencias({ postos: [{ situacao: "presente" }] })).toBe(0);
+  expect(contarOcorrencias(null)).toBe(0);
+  const agora = new Date("2026-10-14T22:30:00.000Z"); // 19:30 em Brasília: noturno de 14/10 em vigor
+  const r = resumoDoPainel({ agora, mapas: [{ projetoId: "P311B", data: "2026-10-14", turno: "N", enviadoEm: "2026-10-14T21:30:00.000Z", ocorrencias: 1 }], projetos: ["P311B", "P505"] });
+  const p311b = r.itens.find((i) => i.projetoId === "P311B");
+  expect(p311b.estado).toBe("enviado");
+  expect(p311b.ocorrencias).toBe(1);
+  expect(r.itens.find((i) => i.projetoId === "P505").ocorrencias).toBe(0);
+});
+
+test("BUG P311B: mapa concluído no plantão de ontem não conta como enviado no plantão em vigor", () => {
+  const agora = new Date("2026-10-14T22:56:00.000Z"); // 19:56 de quarta 14/10
+  const r = resumoDoPainel({ agora, mapas: [{ projetoId: "P311B", data: "2026-10-13", turno: "N", enviadoEm: "2026-10-14T21:15:00.000Z" }], projetos: ["P311B"] });
+  expect(r.itens[0].estado).toBe("pendente"); // o painel está certo: o envio caiu na chave errada — a trava agora é na tela
 });
