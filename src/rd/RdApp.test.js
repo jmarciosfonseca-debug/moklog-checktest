@@ -65,6 +65,27 @@ test("fluxo Jundiaí: abre com GPS e projeção, chegada fecha sem abrir a volta
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
+test("abriu o projeto errado: Voltar fecha a escolha de destino e o trecho aberto pode ser cancelado", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  const confirmar = jest.spyOn(window, "confirm").mockReturnValue(true);
+  try {
+    await montar(host, root);
+    await clicar(host, "Sair de casa — abrir o dia");
+    expect(botao(host, "← Voltar")).toBeDefined();                          // dentro da escolha, o voltar é contextual
+    await clicar(host, "← Voltar");
+    expect(botao(host, "Sair de casa — abrir o dia")).toBeDefined();        // fechou a cascata sem sair do RD
+    expect(botao(host, "← Início")).toBeDefined();
+    await clicar(host, "Sair de casa — abrir o dia");
+    await clicar(host, "MK602");
+    await clicar(host, "Abrir trecho (crava hora e local)");
+    expect(host.textContent).toContain("Em deslocamento · MK Home → MK602");
+    await clicar(host, "Abri por engano — cancelar este trecho");
+    expect(host.textContent).not.toContain("Em deslocamento ·");
+    expect(host.textContent).toContain("Trecho cancelado");
+    expect(botao(host, "Sair de casa — abrir o dia")).toBeDefined();        // volta ao estado inicial do dia
+  } finally { confirmar.mockRestore(); await act(async () => root.unmount()); host.remove(); }
+});
+
 test("destino novo: prefixo MK fixo, só o número; relatório escapa HTML e traz permanência", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   try {

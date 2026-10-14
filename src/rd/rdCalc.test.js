@@ -1,3 +1,4 @@
+import { agoraLocalISO } from "./rdGeo";
 import {
   listarDestinos, normalizarCodigoNovo, kmDoTrecho, herdarKmInicial, origemAtual, trechoAberto,
   projetarKmFinal, pedagiosSugeridos, memoriaAposTrecho, pendenciasDoDestino, memoriaAposVisita,
@@ -65,4 +66,13 @@ test("totais e permanência: tempo no cliente é da chegada até a abertura do t
   expect(t).toMatchObject({ km: 121, pedagios: 10, gastos: 35, trechos: 2 });
   expect(t.inicio).toBe("2026-10-14T09:00:00.000Z");
   expect(t.fim).toBe("2026-10-14T14:30:00.000Z");
+});
+
+test("marcação grava hora LOCAL do aparelho, nunca UTC (bug das 22h06 às 19h06)", () => {
+  const em = agoraLocalISO(new Date("2026-10-14T22:06:00.000Z"));          // 19:06 em São Paulo quando o fuso é -03:00
+  expect(em).toMatch(/[+-]\d{2}:\d{2}$/);
+  expect(em.endsWith("Z")).toBe(false);
+  const off = -new Date().getTimezoneOffset();
+  const esperada = new Date(new Date("2026-10-14T22:06:00.000Z").getTime() + off * 60000).toISOString().slice(11, 16);
+  expect(em.slice(11, 16)).toBe(esperada);                                  // HH:MM exibido = hora local
 });

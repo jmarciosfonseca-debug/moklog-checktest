@@ -127,8 +127,9 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
 
   if (!pronto) return <main className="rd"><header><button onClick={onBack}>← Início</button><h1>MK RD</h1></header><p role="status">Abrindo o dia…</p></main>;
 
+  const voltar = () => { if (abrindo) setAbrindo(null); else onBack(); };
   return <main className="rd">
-    <header><button onClick={onBack}>← Início</button><h1>MK RD · Relatório Diário</h1>
+    <header><button onClick={voltar}>{abrindo ? "← Voltar" : "← Início"}</button><h1>MK RD · Relatório Diário</h1>
       <p>{dataBR(data)} · {dia.estado === "fechado" ? "dia fechado" : aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}
@@ -155,6 +156,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
         <label>Km final (painel)<input inputMode="decimal" placeholder={projecaoAberto != null ? String(projecaoAberto) : ""} value={kmChegada ?? ""} onChange={(e) => setKmChegada(e.target.value)} /></label>
         {projecaoAberto != null && (kmChegada == null || kmChegada === "") && <button className="rd-link" onClick={() => setKmChegada(String(projecaoAberto))}>Usar projeção</button>}
         <button className="rd-principal" disabled={busy} onClick={() => run(fecharTrecho)}>Cheguei — fechar o trecho</button>
+        <p><button className="rd-link" disabled={busy} onClick={() => { if (!window.confirm("Cancelar este trecho? Use quando abriu por engano (projeto errado). A marcação de saída é descartada.")) return; run(async () => { const novoDia = { ...dia, trechos: dia.trechos.filter((t) => t.id !== aberto.id) }; setDia(novoDia); setKmChegada(null); await salvar(novoDia); setNotice("Trecho cancelado. Abra de novo com o destino certo."); }); }}>Abri por engano — cancelar este trecho</button></p>
       </div>
     </section>}
 
