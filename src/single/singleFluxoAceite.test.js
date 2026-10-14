@@ -10,12 +10,12 @@ function banco(){
  const query=(prefix,filters=[],lim=Infinity)=>({
   where:(f,op,v)=>query(prefix,[...filters,[f,op,v]],lim),limit:n=>query(prefix,filters,n),
   get:async()=>({docs:Object.keys(values).filter(k=>k.startsWith(prefix+"/")&&!k.slice(prefix.length+1).includes("/"))
-   .map(k=>({id:k.split("/").pop(),data:()=>clone(values[k])})).filter(d=>filters.every(([f,op,v])=>op==="=="&&d.data()[f]===v)).slice(0,lim)})});
+   .map(k=>({id:k.split("/").pop(),ref:{path:k},data:()=>clone(values[k])})).filter(d=>filters.every(([f,op,v])=>op==="=="&&d.data()[f]===v)).slice(0,lim)})});
  const ref=path=>({path,collection:n=>({doc:id=>ref(path+"/"+n+"/"+id),...query(path+"/"+n)}),get:async()=>snap(path)});
  const snap=p=>({exists:values[p]!=null,data:()=>values[p]==null?undefined:clone(values[p])});
  return {values,get writes(){return writes;},collection:n=>({doc:id=>ref(n+"/"+id),...query(n)}),
-  runTransaction:async fn=>{for(let t=0;t<8;t++){let pending;const v=version;const r=await fn({get:async x=>snap(x.path),set:(x,d)=>{pending=[x.path,clone(d)];}});
-   if(v!==version)continue;if(pending){values[pending[0]]=pending[1];version++;writes++;}return r;}throw Error("retry");}};
+  runTransaction:async fn=>{for(let t=0;t<8;t++){let pending,dels=[];const v=version;const r=await fn({get:async x=>snap(x.path),set:(x,d)=>{pending=[x.path,clone(d)];},delete:x=>{dels.push(x.path);}});
+   if(v!==version)continue;if(pending){values[pending[0]]=pending[1];version++;writes++;}if(dels.length){dels.forEach(k=>delete values[k]);version++;writes++;}return r;}throw Error("retry");}};
 }
 const G={uid:"g",role:"gerente",scopeAll:true},A={uid:"a",role:"auditor"},B={uid:"b",role:"auditor"};
 const PID="sg_cliente_1";
@@ -88,4 +88,31 @@ test("A7 diagnóstico: gravar, listar, recusar revisão antiga e isolar auditor"
  await expect(executar(db,A,cmd)).rejects.toMatchObject({status:409});
  await expect(executar(db,B,{acao:"diagnosticos",pid:PID})).rejects.toMatchObject({status:403});
  expect(Object.keys(db.values).every(k=>k.startsWith("usuarios/")||k.startsWith("single_projetos/")||k.startsWith("diagnosticos/sg_"))).toBe(true);
+});
+
+test("A9 excluir: só gerente apaga; leva vistorias e diagnóstico copiado; revisão velha é recusada; legado e outros ficam",async()=>{
+ const db=banco();await preparar(db,A);await executar(db,A,vistoria("i1","2026-10-03",todos()));
+ await executar(db,G,{acao:"criar",pid:"sg_outro",revisao:0,data:{nome:"Outro",responsavel:"E",dataVistoria:"2026-10-03"}});
+ db.values[`diagnosticos/${PID}/itens/d1`]={tipo:"novo",respostas:{}};
+ db.values["diagnosticos/novo_a_x_1/itens/d1"]={tipo:"novo",respostas:{}};   // origem do diagnóstico: intocada
+ const p=(await executar(db,G,{acao:"listar"})).projetos.find(x=>x.id===PID);
+ await expect(executar(db,A,{acao:"excluir",pid:PID,revisao:p.revisao})).rejects.toMatchObject({status:403});
+ await expect(executar(db,G,{acao:"excluir",pid:PID,revisao:p.revisao-1})).rejects.toMatchObject({status:409});
+ await expect(executar(db,G,{acao:"excluir",pid:"projeto_x",revisao:1})).rejects.toMatchObject({status:400});
+ expect(db.values[`single_projetos/${PID}`]).toBeDefined();
+ const r=await executar(db,G,{acao:"excluir",pid:PID,revisao:p.revisao});
+ expect(r).toMatchObject({excluido:PID,vistorias:2});
+ expect(db.values[`single_projetos/${PID}`]).toBeUndefined();
+ expect(db.values[`single_projetos/${PID}/inspecoes/i1`]).toBeUndefined();
+ expect(db.values[`diagnosticos/${PID}/itens/d1`]).toBeUndefined();
+ expect(db.values["single_projetos/sg_outro"]).toBeDefined();
+ expect(db.values["diagnosticos/novo_a_x_1/itens/d1"]).toBeDefined();
+ expect((await executar(db,G,{acao:"listar"})).projetos.map(x=>x.id)).toEqual(["sg_outro"]);
+});
+test("A9b excluir também apaga Single arquivado",async()=>{
+ const db=banco();await preparar(db);
+ const p=(await executar(db,G,{acao:"listar"})).projetos[0];
+ const arq=await executar(db,G,{acao:"arquivar",pid:PID,revisao:p.revisao});
+ await executar(db,G,{acao:"excluir",pid:PID,revisao:arq.data.revisao});
+ expect(db.values[`single_projetos/${PID}`]).toBeUndefined();
 });
