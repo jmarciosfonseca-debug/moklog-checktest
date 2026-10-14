@@ -1,4 +1,6 @@
-.rd{max-width:720px;margin:0 auto;padding:14px 14px 60px;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif}
+/* O RD carrega o próprio fundo escuro: contraste garantido no tema claro e no escuro do app. */
+.rd{max-width:720px;margin:0 auto;padding:14px 14px 60px;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;position:relative;min-height:100vh;box-sizing:border-box}
+.rd::before{content:"";position:fixed;inset:0;background:#04080f;z-index:-1}
 .rd header{margin-bottom:12px}
 .rd header h1{font-size:20px;margin:6px 0 2px}
 .rd header p{color:#94a3b8;font-size:12px;margin:0}
@@ -50,3 +52,5 @@
 .rd-veiculo button[aria-pressed="true"]{border-color:#2563eb;background:#1d4ed822}
 .rd-comprovante{background:transparent;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:7px 9px;cursor:pointer;font-size:13px;flex-shrink:0}
 .rd-comprovante.ok{border-color:#22c55e77;color:#86efac}
+.rd-lembrete input{border-color:#b4530966}
+.rd-lembrete input::placeholder{color:#fbbf24aa}

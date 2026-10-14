@@ -31,6 +31,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   const [abrindo, setAbrindo] = useState(null); // {origem,destino,kmInicial,novoCodigo}
   const [kmChegada, setKmChegada] = useState(null);
   const [atividadeNova, setAtividadeNova] = useState("");
+  const [lembreteNovo, setLembreteNovo] = useState("");
   const [config, setConfig] = useState(false);
   const [dias, setDias] = useState([]);
   const [pronto, setPronto] = useState(false);
@@ -197,6 +198,10 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
         <div className="rd-linha">
           <input aria-label="Nova atividade" placeholder="O que foi tratado…" value={atividadeNova} onChange={(e) => setAtividadeNova(e.target.value)} />
           <button disabled={!atividadeNova.trim()} onClick={() => { mudarTrecho(fechadoAtual.id, { atividades: [...(fechadoAtual.atividades || []), { texto: atividadeNova.trim(), status: null }] }); setAtividadeNova(""); }}>+ Registrar</button>
+        </div>
+        <div className="rd-linha rd-lembrete">
+          <input aria-label="Lembrete para a próxima visita" placeholder="Lembrete para a PRÓXIMA visita neste projeto…" value={lembreteNovo} onChange={(e) => setLembreteNovo(e.target.value)} />
+          <button disabled={!lembreteNovo.trim()} onClick={() => { mudarTrecho(fechadoAtual.id, { atividades: [...(fechadoAtual.atividades || []), { texto: lembreteNovo.trim(), status: "aberto" }] }); setLembreteNovo(""); setNotice("Lembrete guardado: aparece quando você voltar a este projeto."); }}>+ Lembrete</button>
         </div>
         <label>Observações da visita<textarea value={fechadoAtual.obs || ""} onChange={(e) => mudarTrecho(fechadoAtual.id, { obs: e.target.value })} /></label>
         <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setNotice("Visita salva."); })}>Salvar visita</button>

@@ -140,3 +140,22 @@ test("RD do dia embute os comprovantes buscados pelo fotoId", async () => {
   expect(html).toContain("🏍");
   expect(htmlRd(dia, {}, "m", {})).not.toContain("Comprovantes");   // sem foto, sem seção
 });
+
+test("campo direto de lembrete para a próxima visita cria tratativa em aberto", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  mockStore.listarInspecoes = undefined;
+  try {
+    await montar(host, root);
+    await clicar(host, "Sair de casa — abrir o dia");
+    await clicar(host, "MK604");
+    await clicar(host, "Abrir trecho (crava hora e local)");
+    await digitar([...host.querySelectorAll("label")].find((l) => l.textContent.includes("Km final")).querySelector("input"), "10");
+    await clicar(host, "Cheguei — fechar o trecho");
+    await digitar(host.querySelector('[aria-label="Lembrete para a próxima visita"]'), "Reunião agendada para semana que vem");
+    await clicar(host, "+ Lembrete");
+    expect(host.textContent).toContain("Lembrete guardado");
+    await clicar(host, "Salvar visita");
+    const dia = mockStore.salvar.mock.calls.at(-1)[0].dia;
+    expect(dia.trechos[0].atividades).toEqual([{ texto: "Reunião agendada para semana que vem", status: "aberto" }]);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
