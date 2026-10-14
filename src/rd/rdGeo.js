@@ -31,9 +31,17 @@ export async function resolverEndereco(gps, request = typeof fetch !== "undefine
 
 export const linkMapa = (gps) => (gps ? `https://www.google.com/maps?q=${gps.lat},${gps.lng}` : null);
 
-// Marco completo de uma marcação: horário sempre; GPS e endereço quando o aparelho permitir.
+// Horário no fuso do aparelho (nunca UTC): "2026-10-14T19:06:12.000-03:00".
+export function agoraLocalISO(agora = new Date()) {
+  const off = -agora.getTimezoneOffset();
+  const s = Math.abs(off), sinal = off >= 0 ? "+" : "-";
+  const local = new Date(agora.getTime() + off * 60000);
+  return local.toISOString().slice(0, -1) + sinal + String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+}
+
+// Marco completo de uma marcação: horário local sempre; GPS e endereço quando o aparelho permitir.
 export async function criarMarco(deps = {}) {
   const gps = await capturarPosicao(deps.nav, deps.timeoutMs);
   const endereco = gps ? await resolverEndereco(gps, deps.request) : null;
-  return { em: new Date().toISOString(), ...(gps ? { gps } : {}), ...(endereco ? { endereco } : {}) };
+  return { em: agoraLocalISO(), ...(gps ? { gps } : {}), ...(endereco ? { endereco } : {}) };
 }

@@ -16,13 +16,15 @@ function marco(v) {
     out.gps = { lat, lng, acc: Number.isFinite(Number(v.gps.acc)) ? Math.round(Number(v.gps.acc)) : null };
   }
   if (v.endereco != null) out.endereco = texto(v.endereco, 300);
+  if (v.editado === true) out.editado = true;   // horário ajustado manualmente pelo consultor
   return out;
 }
-const valorItem = (p) => ({ descricao: texto(p.descricao, 120), valor: numOuNulo(p.valor) });
+const valorItem = (p) => ({ descricao: texto(p.descricao, 120), valor: numOuNulo(p.valor), ...(p.fotoId ? { fotoId: texto(p.fotoId, 40) } : {}) });
 function trecho(t) {
   const out = {
     id: texto(t.id, 40) || null,
     origem: codigo(t.origem), destino: codigo(t.destino),
+    veiculo: t.veiculo === "moto" ? "moto" : "carro",
     kmInicial: numOuNulo(t.kmInicial), kmFinal: numOuNulo(t.kmFinal),
     abertura: marco(t.abertura), chegada: marco(t.chegada),
     pedagios: lista(t.pedagios, 20).map(valorItem), gastos: lista(t.gastos, 20).map(valorItem),
@@ -50,7 +52,8 @@ function memoria(v) {
     if (!/^MK[A-Z0-9_]{1,12}$/.test(k) || Object.keys(pendencias).length >= 100) throw erro(400, "Pendência inválida.");
     pendencias[k] = lista(ps, 30).map((p) => ({ texto: texto(p.texto, 1000), desde: dataISO(p.desde) }));
   }
-  const config = { valorKm: numOuNulo(v?.config?.valorKm), valorDiaria: numOuNulo(v?.config?.valorDiaria) };
+  const config = { valorKm: numOuNulo(v?.config?.valorKm), valorKmMoto: numOuNulo(v?.config?.valorKmMoto), valorDiaria: numOuNulo(v?.config?.valorDiaria) };
+  const fd = parseInt(v?.config?.fechamentoDia, 10); if (fd >= 1 && fd <= 28) config.fechamentoDia = fd;
   const destinosExtras = lista(v?.destinosExtras, 100).map((d) => ({ codigo: codigo(d.codigo), sub: texto(d.sub, 60) || "Fora da rotina" }));
   return { rotas, pendencias, destinosExtras, config };
 }
@@ -63,6 +66,34 @@ async function executar(db, u, b) {
     const refDia = db.collection("rd_dias").doc(u.uid + "_" + data);
     const [sd, sm] = await Promise.all([refDia.get(), refMem.get()]);
     return { dia: sd.exists ? sd.data() : null, memoria: sm.exists ? sm.data() : null };
+  }
+  if (action === "foto_salvar") {
+    // Comprovante de gasto: documento imutável fora do dia (o dia guarda só o fotoId).
+    const fotoId = (() => { const v = b.fotoId; if (typeof v !== "string" || !/^[a-z0-9]{6,40}$/.test(v)) throw erro(400, "Identificador de foto inválido."); return v; })();
+    const b64 = b.b64;
+    if (typeof b64 !== "string" || b64.length > 250000 || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(b64)) throw erro(400, "Foto inválida ou grande demais (comprovante deve sair comprimido do aparelho).");
+    const ref = db.collection("rd_comprovantes").doc(u.uid + "_" + fotoId);
+    const atual = await ref.get();
+    if (atual.exists) return { fotoId };                 // imutável: regravar é ignorado
+    await ref.set({ uid: u.uid, b64, em: new Date().toISOString() });
+    return { fotoId };
+  }
+  if (action === "fotos_ler") {
+    const ids = lista(b.ids, 40).map((v) => { if (typeof v !== "string" || !/^[a-z0-9]{6,40}$/.test(v)) throw erro(400, "Identificador de foto inválido."); return v; });
+    const docs = await Promise.all(ids.map((id2) => db.collection("rd_comprovantes").doc(u.uid + "_" + id2).get()));
+    const fotos = {};
+    docs.forEach((d, i) => { if (d.exists && d.data().uid === u.uid) fotos[ids[i]] = d.data().b64; });
+    return { fotos };
+  }
+  if (action === "periodo") {
+    // Dias completos do período de fechamento (ex.: 19/08 a 18/09) para o consolidado.
+    const de = dataISO(b.de), ate = dataISO(b.ate);
+    if (de > ate) throw erro(400, "Período invertido.");
+    const docs = (await db.collection("rd_dias").where("uid", "==", u.uid).limit(200).get()).docs.map((s2) => s2.data())
+      .filter((d) => d.data >= de && d.data <= ate);
+    docs.sort((a, b2) => String(a.data).localeCompare(String(b2.data)));
+    const sm = await refMem.get();
+    return { dias: docs, memoria: sm.exists ? sm.data() : null };
   }
   if (action === "dias") {
     const docs = (await db.collection("rd_dias").where("uid", "==", u.uid).limit(120).get()).docs.map((s) => s.data());
