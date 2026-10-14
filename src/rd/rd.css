@@ -44,3 +44,4 @@
 .rd-dias button{background:#0a1322;border:1px solid #334155;border-radius:9px;color:#cbd5e1;padding:6px 9px;font-size:11.5px}
 .rd-dias button[aria-pressed="true"]{border-color:#2563eb}
 @media print{.rd{display:none}}
+.rd-hora{width:auto !important;display:inline-block;margin:0 2px;padding:3px 6px;font-size:13px}

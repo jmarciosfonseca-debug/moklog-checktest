@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { criarRdStore } from "./rdStore";
 import { criarMarco, linkMapa } from "./rdGeo";
 import { imprimirRd } from "./rdPdf";
+import { imprimirConsolidado } from "./rdConsolidado";
 import {
   listarDestinos, rotuloDestino, normalizarCodigoNovo, novoIdTrecho, hojeISO, dataBR,
   trechoAberto, ultimoFechado, origemAtual, herdarKmInicial, kmDoTrecho, projetarKmFinal,
@@ -12,8 +13,11 @@ import {
 import "./rd.css";
 
 const chaveDraft = (uid, data) => `rd:v1:${uid}:${data}`;
-const Marco = ({ rotulo, marco }) => !marco ? null : (
-  <p className="rd-marco">{rotulo} <strong>{horaDe(marco)}</strong>{marco.endereco ? ` · ${marco.endereco}` : ""}{marco.gps ? <> · <a href={linkMapa(marco.gps)} target="_blank" rel="noopener noreferrer">mapa</a></> : " · sem localização"}</p>
+const comHora = (marco, hhmm) => (!marco || !/^\d{2}:\d{2}$/.test(hhmm) ? marco : { ...marco, em: marco.em.slice(0, 11) + hhmm + marco.em.slice(16), editado: true });
+const Marco = ({ rotulo, marco, onHora }) => !marco ? null : (
+  <p className="rd-marco">{rotulo} {onHora
+    ? <input className="rd-hora" type="time" aria-label={"Horário " + rotulo.toLowerCase()} value={horaDe(marco)} onChange={(e) => onHora(comHora(marco, e.target.value))} />
+    : <strong>{horaDe(marco)}</strong>}{marco.editado ? " (editado)" : ""}{marco.endereco ? ` · ${marco.endereco}` : ""}{marco.gps ? <> · <a href={linkMapa(marco.gps)} target="_blank" rel="noopener noreferrer">mapa</a></> : " · sem localização"}</p>
 );
 
 export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
@@ -96,14 +100,23 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     setNotice(`Chegada em ${rotuloDestino(mem, t.destino)} cravada às ${horaDe(marco)}. O dia fica em aberto aqui até você abrir o próximo trecho.`);
   }
 
+  const diaFechamento = () => { const d = parseInt(mem?.config?.fechamentoDia, 10); return d >= 1 && d <= 28 ? d : 18; };
+  const periodoAtual = (ate) => { const f = diaFechamento(); const fim = new Date(ate + "T12:00:00Z"); const ini = new Date(fim); if (fim.getUTCDate() <= f) ini.setUTCMonth(ini.getUTCMonth() - 1); ini.setUTCDate(f + 1); return { de: ini.toISOString().slice(0, 10), ate }; };
+  async function gerarConsolidado(ate) {
+    const { de } = periodoAtual(ate);
+    const r = await store.periodo(de, ate);
+    imprimirConsolidado(r.dias || [], r.memoria || mem, auth?.currentUser?.email || "");
+  }
   async function fecharDia() {
-    if (!window.confirm("Fechar o dia e gerar o RD?")) return;
+    const ultimoDoCiclo = Number(data.slice(8, 10)) === diaFechamento();
+    if (!window.confirm("Fechar o dia e gerar o RD?" + (ultimoDoCiclo ? "\n\nHoje é o dia de fechamento do período: o consolidado do mês também será gerado." : ""))) return;
     let novaMem = mem;
     for (const t of dia.trechos) if ((t.atividades || []).length) novaMem = memoriaAposVisita(novaMem, t.destino, t.atividades, data);
     const novoDia = { ...dia, estado: "fechado" };
     setDia(novoDia); setMem(novaMem);
     await salvar(novoDia, novaMem);
     imprimirRd(novoDia, novaMem, auth?.currentUser?.email || "");
+    if (ultimoDoCiclo) { try { await gerarConsolidado(data); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
   }
 
   const projecao = abrindo ? projetarKmFinal(mem, abrindo.origem, abrindo.novoCodigo != null ? normalizarCodigoNovo(abrindo.novoCodigo) || "" : abrindo.destino, abrindo.kmInicial) : null;
@@ -122,7 +135,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
 
     {aberto && <section className="rd-card rd-atual">
       <h2>Em deslocamento · {rotuloDestino(mem, aberto.origem)} → {rotuloDestino(mem, aberto.destino)}</h2>
-      <Marco rotulo="Saída" marco={aberto.abertura} />
+      <Marco rotulo="Saída" marco={aberto.abertura} onHora={(m) => mudarTrecho(aberto.id, { abertura: m })} />
       <label>Km inicial (painel)<input inputMode="decimal" value={aberto.kmInicial ?? ""} onChange={(e) => mudarTrecho(aberto.id, { kmInicial: e.target.value })} /></label>
       {projecaoAberto != null && <p className="rd-dica">Projeção de chegada: <strong>{kmFmt(projecaoAberto)}</strong> (média das viagens anteriores).</p>}
       <h3>Pedágios do trecho</h3>
@@ -148,7 +161,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     {!aberto && dia.estado !== "fechado" && <section className="rd-card">
       {fechadoAtual && <>
         <h2>Você está em {rotuloDestino(mem, fechadoAtual.destino)}</h2>
-        <Marco rotulo="Chegada" marco={fechadoAtual.chegada} />
+        <Marco rotulo="Chegada" marco={fechadoAtual.chegada} onHora={(m) => mudarTrecho(fechadoAtual.id, { chegada: m })} />
         {pendencias.length > 0 && <div className="rd-pend"><strong>Pendente da última visita:</strong>
           {pendencias.map((p, i) => <p key={i}>⚠ {p.texto} <em>(desde {dataBR(p.desde)})</em>
             <button className="rd-link" onClick={() => mudarTrecho(fechadoAtual.id, { atividades: [...(fechadoAtual.atividades || []), { texto: p.texto, status: "finalizado", desde: p.desde }] })}>dar baixa</button></p>)}
@@ -198,11 +211,13 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
 
     <section className="rd-card">
       <button className="rd-link" onClick={() => setConfig(!config)}>Configurar ▾</button>
-      {config && <div className="rd-linha">
+      {config && <><div className="rd-linha">
         <label>Valor do km (R$)<input inputMode="decimal" value={mem?.config?.valorKm ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorKm: e.target.value } })} /></label>
         <label>Diária (R$)<input inputMode="decimal" value={mem?.config?.valorDiaria ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorDiaria: e.target.value } })} /></label>
+        <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 18} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), fechamentoDia: e.target.value } })} /></label>
         <button disabled={busy} onClick={() => run(async () => { await salvar(dia, mem); setNotice("Configuração salva."); })}>Salvar</button>
-      </div>}
+      </div>
+      <button className="rd-link" disabled={busy} onClick={() => run(() => gerarConsolidado(data))}>Gerar consolidado do período atual (PDF)</button></>}
       {dias.length > 0 && <><h3>Dias anteriores</h3><div className="rd-dias">{dias.slice(0, 14).map((d) => <button key={d.data} aria-pressed={d.data === data} onClick={() => setData(d.data)}>{dataBR(d.data)} · {d.trechos} trecho(s)</button>)}{data !== hojeISO() && <button onClick={() => setData(hojeISO())}>Voltar para hoje</button>}</div></>}
     </section>
   </main>;

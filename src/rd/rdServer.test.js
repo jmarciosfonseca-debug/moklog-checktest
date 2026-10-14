@@ -44,6 +44,22 @@ test("isolamento por usuário: cada um só vê os próprios dias; lista ordenada
   expect((await executar(db, A, { acao: "ler", data: "2026-10-13" })).dia).toBeNull();
 });
 
+test("periodo devolve os dias completos do intervalo com a memória, só do próprio usuário", async () => {
+  const db = banco();
+  for (const d of ["2026-08-19", "2026-08-20", "2026-09-18", "2026-09-19"]) await executar(db, G, { acao: "salvar", data: d, revisao: 0, dia: { estado: "fechado", trechos: [T] } });
+  await executar(db, A, { acao: "salvar", data: "2026-08-25", revisao: 0, dia: { estado: "fechado", trechos: [{ ...T, id: "tA" }] } });
+  const r = await executar(db, G, { acao: "periodo", de: "2026-08-20", ate: "2026-09-18" });
+  expect(r.dias.map((d) => d.data)).toEqual(["2026-08-20", "2026-09-18"]);
+  expect(r.dias[0].trechos).toHaveLength(1);
+  await expect(executar(db, G, { acao: "periodo", de: "2026-09-18", ate: "2026-08-20" })).rejects.toMatchObject({ status: 400 });
+});
+
+test("horário editado pelo consultor é preservado", async () => {
+  const db = banco();
+  const r = await executar(db, G, { acao: "salvar", data: "2026-10-14", revisao: 0, dia: { estado: "aberto", trechos: [{ ...T, abertura: { ...T.abertura, editado: true } }] } });
+  expect(r.dia.trechos[0].abertura.editado).toBe(true);
+});
+
 test("validações: dois trechos abertos, destino inválido e data inválida são recusados", async () => {
   const db = banco();
   await expect(executar(db, G, { acao: "salvar", data: "2026-10-14", revisao: 0, dia: { estado: "aberto", trechos: [T, { ...T, id: "t2" }] } })).rejects.toMatchObject({ status: 400 });

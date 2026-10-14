@@ -16,6 +16,7 @@ function marco(v) {
     out.gps = { lat, lng, acc: Number.isFinite(Number(v.gps.acc)) ? Math.round(Number(v.gps.acc)) : null };
   }
   if (v.endereco != null) out.endereco = texto(v.endereco, 300);
+  if (v.editado === true) out.editado = true;   // horário ajustado manualmente pelo consultor
   return out;
 }
 const valorItem = (p) => ({ descricao: texto(p.descricao, 120), valor: numOuNulo(p.valor) });
@@ -63,6 +64,16 @@ async function executar(db, u, b) {
     const refDia = db.collection("rd_dias").doc(u.uid + "_" + data);
     const [sd, sm] = await Promise.all([refDia.get(), refMem.get()]);
     return { dia: sd.exists ? sd.data() : null, memoria: sm.exists ? sm.data() : null };
+  }
+  if (action === "periodo") {
+    // Dias completos do período de fechamento (ex.: 19/08 a 18/09) para o consolidado.
+    const de = dataISO(b.de), ate = dataISO(b.ate);
+    if (de > ate) throw erro(400, "Período invertido.");
+    const docs = (await db.collection("rd_dias").where("uid", "==", u.uid).limit(200).get()).docs.map((s2) => s2.data())
+      .filter((d) => d.data >= de && d.data <= ate);
+    docs.sort((a, b2) => String(a.data).localeCompare(String(b2.data)));
+    const sm = await refMem.get();
+    return { dias: docs, memoria: sm.exists ? sm.data() : null };
   }
   if (action === "dias") {
     const docs = (await db.collection("rd_dias").where("uid", "==", u.uid).limit(120).get()).docs.map((s) => s.data());
