@@ -15,7 +15,7 @@ test("tela abre cenário, calcula 90% e 87,5%, rejeita excesso e salva uma visto
  const click=async t=>{const el=[...host.querySelectorAll("button")].find(b=>b.textContent.includes(t));expect(el).toBeDefined();await act(async()=>el.dispatchEvent(new MouseEvent("click",{bubbles:true})));};
  try{
  await act(async()=>root.render(<SingleApp auth={{currentUser:{uid:"u"}}} profile={{role:"auditor"}} onBack={()=>{}} onDiagnostico={()=>{}}/>));
- await click("Condomínio Teste");await click("Iniciar vistoria");
+ await click("Condomínio Teste");await click("Preencher a vistoria");
  const set=async(el,v)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(el,v);el.dispatchEvent(new Event("input",{bubbles:true}));});};
  const fs=[...host.querySelectorAll("fieldset")];const a=fs[0].querySelectorAll("input");
  await set(a[0],"4");await set(a[1],"6");await set(fs[1].querySelectorAll("input")[1],"1");

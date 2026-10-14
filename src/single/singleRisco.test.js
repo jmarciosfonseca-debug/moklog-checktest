@@ -27,7 +27,7 @@ const cenarioBase = () => [
 
 test("perfil de barreiras sai só dos itens cadastrados (total > 0) e eclusa não conta como via", () => {
   expect(perfilDoSingle(cenarioBase())).toMatchObject({ vias: ["dilacerador"], cancelaAS: false, cancelaTransponivel: true, naoAferido: false });
-  const completo = perfilDoSingle([item("vei_bollards", "Bollards / pinos", "Veículos", 5), item("vei_cancelas_as", "Cancelas de alta segurança", "Veículos", 2), item("vei_cancelas", "Cancelas comuns", "Veículos", 2), item("vei_dilaceradores", "Dilaceradores", "Veículos", 0)]);
+  const completo = perfilDoSingle([item("vei_bollards", "Bollards", "Veículos", 5), item("vei_pinos", "Pinos", "Veículos", 3), item("vei_cancelas_as", "Cancelas de alta segurança", "Veículos", 2), item("vei_cancelas", "Cancelas comuns", "Veículos", 2), item("vei_dilaceradores", "Dilaceradores", "Veículos", 0)]);
   expect(completo.vias).toEqual(["bollard", "bolard", "pino"]);
   expect(completo).toMatchObject({ cancelaAS: true, cancelaTransponivel: false });
   const semVia = perfilDoSingle([item("ecl_garras", "Garras de tigre das eclusas", "Eclusas", 6), item("cftv_fixas", "Câmeras fixas", "CFTV e CCO", 10)]);
