@@ -1,11 +1,19 @@
 // Server only. No client imports. Admin transactions enforce revision checks.
-const {calcularInspecao, inteiro} = require("./singleCalc");
+const {calcularInspecao, inteiro, STATUS_UNIDADE} = require("./singleCalc");
 function erro(status,message){return Object.assign(new Error(message),{status});}
 function texto(v,max=200){if(typeof v!=="string"||v.length>max)throw erro(400,"Texto inválido.");return v.trim();}
 function id(v){if(typeof v!=="string"||!/^[-a-zA-Z0-9_]{1,120}$/.test(v))throw erro(400,"Identificador inválido.");return v;}
 function data(v){const s=texto(v,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||isNaN(Date.parse(s))||new Date(s+"T12:00:00Z").toISOString().slice(0,10)!==s)throw erro(400,"Data inválida.");return s;}
 function lista(v){if(!Array.isArray(v)||v.length>200)throw erro(400,"Lista inválida (máximo 200).");return v;}
-function ativos(v){const out=lista(v).map(a=>({id:id(a.id),familiaId:a.familiaId==null?null:id(a.familiaId),custom:a.custom===true,nome:texto(a.nome),grupo:texto(a.grupo),total:inteiro(a.total)}));
+function listaUnidades(v){if(v==null)return [];if(!Array.isArray(v)||v.length>1000)throw erro(400,"Lista de unidades inválida (máximo 1000).");return v;}
+function unidadesDoAtivo(v){
+ if(v==null)return null;
+ if(!Array.isArray(v)||v.length>1000)throw erro(400,"Lista de unidades inválida (máximo 1000).");
+ const out=v.map(u=>({id:id(u.id),nome:texto(u.nome,80)}));
+ if(out.some(u=>!u.nome)||new Set(out.map(u=>u.id)).size!==out.length)throw erro(400,"Unidades repetidas ou sem nome.");
+ return out.length?out:null;
+}
+function ativos(v){const out=lista(v).map(a=>{const un=unidadesDoAtivo(a.unidades);return {id:id(a.id),familiaId:a.familiaId==null?null:id(a.familiaId),custom:a.custom===true,nome:texto(a.nome),grupo:texto(a.grupo),total:un?un.length:inteiro(a.total),...(un?{unidades:un}:{})};});
 if(out.some(a=>!a.nome)||new Set(out.map(a=>a.id)).size!==out.length)throw erro(400,"Ativos repetidos ou sem nome.");return out;}
 function permitido(p,u){return p.orgId==="moked"&&p.modulo==="single"&&(p.criadoPorUid===u.uid||(u.role==="gerente"&&u.scopeAll===true));}
 async function executar(db,u,b){
@@ -65,7 +73,15 @@ async function executar(db,u,b){
    if(template.some(t=>inteiro(t.total)>0&&!keyed.has(t.id)))throw erro(400,"Vistoria incompleta: envie todas as famílias do cenário.");
    const itens=template.map(a=>{
     const s=keyed.get(a.id)||{};
-    return {...a,parcial:inteiro(s.parcial),inoperante:inteiro(s.inoperante),falhas:lista(s.falhas||[]).map(f=>{
+    let unidades;
+    if(Array.isArray(a.unidades)&&a.unidades.length){
+     const sup=listaUnidades(s.unidades),porId=new Map(sup.map(x=>[id(x.id),x]));
+     if(porId.size!==sup.length||sup.some(x=>!a.unidades.some(t=>t.id===x.id)))throw erro(400,"Unidade fora do cenário.");
+     unidades=a.unidades.map(t=>{const x=porId.get(t.id)||{};const status=x.status==null?"operante":x.status;
+      if(!STATUS_UNIDADE.includes(status))throw erro(400,"Status de unidade inválido.");
+      return {id:t.id,nome:t.nome,status,...(status!=="operante"?{desde:x.desde?data(x.desde):null,nota:texto(x.nota||"",500)}:{})};});
+    }
+    return {...a,...(unidades?{unidades}:{}),parcial:inteiro(s.parcial),inoperante:inteiro(s.inoperante),falhas:lista(s.falhas||[]).map(f=>{
      if(!["baixa","media","alta"].includes(f.criticidade))throw erro(400,"Criticidade inválida.");
      return {descricao:texto(f.descricao,1000),qtd:inteiro(f.qtd),criticidade:f.criticidade,desde:data(f.desde)};
     })};
@@ -84,7 +100,7 @@ async function executar(db,u,b){
   else{
    const fs=lista(b.data?.familias).map((f,i)=>({id:id(f.id),grupo:texto(f.grupo),nome:texto(f.nome),ordem:i,ativo:f.ativo!==false,sinonimos:lista(f.sinonimos||[]).map(x=>texto(x))}));
    if(new Set(fs.map(x=>x.id)).size!==fs.length||fs.some(f=>!f.nome))throw erro(400,"Famílias inválidas.");
-   next={versao:"single-v1",familias:fs};
+   next={versao:texto(b.data?.versao||"single-v1",40),familias:fs};
   }
   if(!Number.isSafeInteger(b.revisao)||b.revisao!==(current?.revisao||0))throw erro(409,"Outra gravação alterou este registro. Seu rascunho foi preservado; recarregue antes de salvar.");
   next={...next,revisao:(current?.revisao||0)+1,atualizadoEm:agora};
