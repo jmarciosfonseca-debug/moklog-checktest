@@ -4,6 +4,7 @@ import { criarRdStore } from "./rdStore";
 import { criarMarco, linkMapa } from "./rdGeo";
 import { imprimirRd } from "./rdPdf";
 import { imprimirConsolidado } from "./rdConsolidado";
+import { comprimirFoto, novoIdFoto } from "./rdFoto";
 import {
   listarDestinos, rotuloDestino, normalizarCodigoNovo, novoIdTrecho, hojeISO, dataBR,
   trechoAberto, ultimoFechado, origemAtual, herdarKmInicial, kmDoTrecho, projetarKmFinal,
@@ -20,7 +21,7 @@ const Marco = ({ rotulo, marco, onHora }) => !marco ? null : (
     : <strong>{horaDe(marco)}</strong>}{marco.editado ? " (editado)" : ""}{marco.endereco ? ` · ${marco.endereco}` : ""}{marco.gps ? <> · <a href={linkMapa(marco.gps)} target="_blank" rel="noopener noreferrer">mapa</a></> : " · sem localização"}</p>
 );
 
-export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
+export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprimirFotoFn = comprimirFoto }) {
   const store = useMemo(() => criarRdStore(auth), [auth]);
   const uid = auth?.currentUser?.uid || "anon";
   const [data, setData] = useState(hojeISO());
@@ -69,8 +70,17 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
   const destinos = listarDestinos(mem);
   const mudarTrecho = (id, patch) => setDia((d) => ({ ...d, trechos: d.trechos.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
 
+  // Comprovante do gasto: foto comprimida no aparelho, salva fora do dia; o item guarda só o fotoId.
+  function Comprovante({ item, onFoto }) {
+    const id = "cp" + (item.fotoId || Math.random().toString(36).slice(2, 8));
+    return item.fotoId
+      ? <button className="rd-comprovante ok" title="Comprovante anexado — toque para remover" onClick={() => { if (window.confirm("Remover o comprovante deste lançamento?")) onFoto(null); }}>✓ 📎</button>
+      : <label className="rd-comprovante" title="Anexar comprovante (foto)">📎<input type="file" accept="image/*" capture="environment" aria-label="Anexar comprovante" style={{ display: "none" }} id={id}
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; run(async () => { const b64 = await comprimirFotoFn(f); const fotoId = novoIdFoto(); await store.salvarFoto(fotoId, b64); onFoto(fotoId); setNotice("Comprovante anexado."); }); }} /></label>;
+  }
+
   function iniciarAbertura() {
-    setAbrindo({ origem: estou, destino: "", kmInicial: herdarKmInicial(dia) ?? "", novoCodigo: null });
+    setAbrindo({ origem: estou, destino: "", kmInicial: herdarKmInicial(dia) ?? "", novoCodigo: null, veiculo: ultimoFechado(dia)?.veiculo || "carro" });
   }
 
   async function abrirTrecho() {
@@ -78,7 +88,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     if (!destino) { setError("Escolha o destino."); return; }
     const marco = await criarMarcoFn();
     const t = {
-      id: novoIdTrecho(), origem: abrindo.origem, destino,
+      id: novoIdTrecho(), origem: abrindo.origem, destino, veiculo: abrindo.veiculo || "carro",
       kmInicial: abrindo.kmInicial === "" ? null : abrindo.kmInicial, kmFinal: null,
       abertura: marco, chegada: null,
       pedagios: pedagiosSugeridos(mem, abrindo.origem, destino), gastos: [], atividades: [], obs: "",
@@ -107,6 +117,12 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     const r = await store.periodo(de, ate);
     imprimirConsolidado(r.dias || [], r.memoria || mem, auth?.currentUser?.email || "");
   }
+  async function imprimirComFotos(d, m) {
+    const ids = (d.trechos || []).flatMap((t) => [...(t.pedagios || []), ...(t.gastos || [])]).map((x) => x.fotoId).filter(Boolean);
+    let fotos = {};
+    if (ids.length) { try { fotos = (await store.lerFotos(ids.slice(0, 40))).fotos || {}; } catch { fotos = {}; } }
+    imprimirRd(d, m, auth?.currentUser?.email || "", fotos);
+  }
   async function fecharDia() {
     const ultimoDoCiclo = Number(data.slice(8, 10)) === diaFechamento();
     if (!window.confirm("Fechar o dia e gerar o RD?" + (ultimoDoCiclo ? "\n\nHoje é o dia de fechamento do período: o consolidado do mês também será gerado." : ""))) return;
@@ -115,7 +131,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     const novoDia = { ...dia, estado: "fechado" };
     setDia(novoDia); setMem(novaMem);
     await salvar(novoDia, novaMem);
-    imprimirRd(novoDia, novaMem, auth?.currentUser?.email || "");
+    await imprimirComFotos(novoDia, novaMem);
     if (ultimoDoCiclo) { try { await gerarConsolidado(data); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
   }
 
@@ -143,6 +159,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
       {(aberto.pedagios || []).map((p, i) => <div className="rd-linha" key={i}>
         <input aria-label={"Pedágio " + (i + 1)} value={p.descricao} onChange={(e) => mudarTrecho(aberto.id, { pedagios: aberto.pedagios.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)) })} />
         <input aria-label={"Valor pedágio " + (i + 1)} inputMode="decimal" value={p.valor ?? ""} onChange={(e) => mudarTrecho(aberto.id, { pedagios: aberto.pedagios.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)) })} />
+        <Comprovante item={p} onFoto={(fotoId) => mudarTrecho(aberto.id, { pedagios: aberto.pedagios.map((x, j) => (j === i ? { ...x, ...(fotoId ? { fotoId } : { fotoId: undefined }) } : x)) })} />
         <button onClick={() => mudarTrecho(aberto.id, { pedagios: aberto.pedagios.filter((_, j) => j !== i) })}>×</button>
       </div>)}
       <button className="rd-link" onClick={() => mudarTrecho(aberto.id, { pedagios: [...(aberto.pedagios || []), { descricao: "Pedágio", valor: "" }] })}>+ Pedágio</button>
@@ -150,6 +167,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
       {(aberto.gastos || []).map((g, i) => <div className="rd-linha" key={"g" + i}>
         <input aria-label={"Gasto " + (i + 1)} placeholder="Descrição" value={g.descricao} onChange={(e) => mudarTrecho(aberto.id, { gastos: aberto.gastos.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)) })} />
         <input aria-label={"Valor gasto " + (i + 1)} inputMode="decimal" value={g.valor ?? ""} onChange={(e) => mudarTrecho(aberto.id, { gastos: aberto.gastos.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)) })} />
+        <Comprovante item={g} onFoto={(fotoId) => mudarTrecho(aberto.id, { gastos: aberto.gastos.map((x, j) => (j === i ? { ...x, ...(fotoId ? { fotoId } : { fotoId: undefined }) } : x)) })} />
         <button onClick={() => mudarTrecho(aberto.id, { gastos: aberto.gastos.filter((_, j) => j !== i) })}>×</button>
       </div>)}
       <div className="rd-chegada">
@@ -192,6 +210,9 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
         </div>
         {abrindo.novoCodigo != null && <label>Número do projeto<span className="rd-prefixo">MK</span><input aria-label="Número do projeto novo" autoFocus value={abrindo.novoCodigo} onChange={(e) => setAbrindo({ ...abrindo, novoCodigo: e.target.value })} placeholder="077" /></label>}
         <label>Km inicial (painel)<input inputMode="decimal" value={abrindo.kmInicial} onChange={(e) => setAbrindo({ ...abrindo, kmInicial: e.target.value })} /></label>
+        <div className="rd-veiculo" role="group" aria-label="Fator do trecho">
+          {[["carro", "🚗 Carro"], ["moto", "🏍 Moto"]].map(([v, r]) => <button key={v} aria-pressed={(abrindo.veiculo || "carro") === v} onClick={() => setAbrindo({ ...abrindo, veiculo: v })}>{r}</button>)}
+        </div>
         {projecao != null && <p className="rd-dica">Já conheço esse caminho: projeção de chegada <strong>{kmFmt(projecao)}</strong>, pedágios da última ida pré-preenchidos (edite se houve reajuste).</p>}
         <div className="rd-acoes"><button onClick={() => setAbrindo(null)}>Cancelar</button>
         <button className="rd-principal" disabled={busy} onClick={() => run(abrirTrecho)}>Abrir trecho (crava hora e local)</button></div>
@@ -201,7 +222,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     </section>}
 
     {dia.estado === "fechado" && <section className="rd-card"><h2>Dia fechado</h2>
-      <button className="rd-principal" onClick={() => { try { imprimirRd(dia, mem, auth?.currentUser?.email || ""); } catch (e) { setError(e.message); } }}>Gerar RD (PDF)</button>
+      <button className="rd-principal" disabled={busy} onClick={() => run(() => imprimirComFotos(dia, mem))}>Gerar RD (PDF)</button>
       <button className="rd-link" disabled={busy} onClick={() => run(async () => { const novoDia = { ...dia, estado: "aberto" }; setDia(novoDia); await salvar(novoDia); setNotice("Dia reaberto."); })}>Reabrir o dia</button>
     </section>}
 
@@ -214,7 +235,8 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco }) {
     <section className="rd-card">
       <button className="rd-link" onClick={() => setConfig(!config)}>Configurar ▾</button>
       {config && <><div className="rd-linha">
-        <label>Valor do km (R$)<input inputMode="decimal" value={mem?.config?.valorKm ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorKm: e.target.value } })} /></label>
+        <label>Km carro (R$)<input inputMode="decimal" value={mem?.config?.valorKm ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorKm: e.target.value } })} /></label>
+        <label>Km moto (R$)<input inputMode="decimal" value={mem?.config?.valorKmMoto ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorKmMoto: e.target.value } })} /></label>
         <label>Diária (R$)<input inputMode="decimal" value={mem?.config?.valorDiaria ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorDiaria: e.target.value } })} /></label>
         <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 18} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), fechamentoDia: e.target.value } })} /></label>
         <button disabled={busy} onClick={() => run(async () => { await salvar(dia, mem); setNotice("Configuração salva."); })}>Salvar</button>

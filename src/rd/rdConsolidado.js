@@ -37,14 +37,14 @@ export function dedicacaoDoTrecho(dia, i) {
 export function consolidarPeriodo(dias, memoria) {
   const ordenados = [...(dias || [])].filter((d) => d?.trechos?.length).sort((a, b) => String(a.data).localeCompare(String(b.data)));
   const porProjeto = {}, despesasPorTipo = {}, kmPorDia = [], agenda = [];
-  let horas = 0, km = 0, despesas = 0, diasCampo = 0, registros = 0;
+  let horas = 0, km = 0, kmMoto = 0, despesas = 0, diasCampo = 0, registros = 0;
   for (const dia of ordenados) {
     let kmDia = 0, campo = false;
     dia.trechos.forEach((t, i) => {
       registros++;
       const ded = dedicacaoDoTrecho(dia, i);
       horas += ded;
-      const kmT = kmDoTrecho(t) || 0; kmDia += kmT;
+      const kmT = kmDoTrecho(t) || 0; kmDia += kmT; if (t.veiculo === "moto") kmMoto += kmT;
       const gastosT = [...(t.pedagios || []), ...(t.gastos || [])];
       for (const g of gastosT) { const v = num(g.valor); if (!v) continue; despesas += v; const tipo = tipoClassificado(g.descricao); despesasPorTipo[tipo] = (despesasPorTipo[tipo] || 0) + v; }
       if (ehHomeOffice(t)) {
@@ -67,11 +67,14 @@ export function consolidarPeriodo(dias, memoria) {
   const projetos = Object.entries(porProjeto).map(([codigo, p]) => ({ codigo, horas: Math.round(p.horas * 10) / 10, visitas: p.visitas })).sort((a, b) => b.horas - a.horas);
   const visitas = projetos.reduce((a, p) => a + p.visitas, 0);
   const valorKm = memoria?.config?.valorKm != null && memoria?.config?.valorKm !== "" ? num(memoria.config.valorKm) : null;
-  const reembolsoKm = valorKm != null ? Math.round(km * valorKm * 100) / 100 : null;
+  const valorKmMoto = memoria?.config?.valorKmMoto != null && memoria?.config?.valorKmMoto !== "" ? num(memoria.config.valorKmMoto) : null;
+  const kmArr = Math.round(km * 10) / 10, kmMotoArr = Math.round(kmMoto * 10) / 10, kmCarro = Math.round((kmArr - kmMotoArr) * 10) / 10;
+  // Reembolso por fator: carro e moto têm valores diferentes; km de moto sem valor configurado usa o do carro.
+  const reembolsoKm = valorKm != null ? Math.round((kmCarro * valorKm + kmMotoArr * (valorKmMoto ?? valorKm)) * 100) / 100 : null;
   return {
     de: ordenados[0]?.data || null, ate: ordenados[ordenados.length - 1]?.data || null,
     registros, dias: ordenados.length, diasCampo, visitas,
-    horas: Math.round(horas * 10) / 10, km: Math.round(km * 10) / 10,
+    horas: Math.round(horas * 10) / 10, km: kmArr, kmCarro, kmMoto: kmMotoArr, valorKmMoto,
     despesas: Math.round(despesas * 100) / 100, despesasPorTipo, reembolsoKm, valorKm,
     totalGeral: reembolsoKm != null ? Math.round((reembolsoKm + despesas) * 100) / 100 : null,
     projetos, maisVisitado: projetos[0]?.codigo || null, kmPorDia, agenda,
@@ -146,9 +149,9 @@ export function htmlConsolidado(c, memoria, consultor) {
   <img src="${LOGO_MOKED_30}" alt="Moked 30 anos"/></header>
   <div class="cards">
    ${card(horas1(c.horas), "horas registradas")}
-   ${card(esc(kmFmt(c.km)), "rodados")}
+   ${card(esc(kmFmt(c.km)), c.kmMoto > 0 ? `rodados · carro ${esc(kmFmt(c.kmCarro))} / moto ${esc(kmFmt(c.kmMoto))}` : "rodados")}
    ${card(esc(brl(c.despesas)), "despesas do período")}
-   ${card(c.reembolsoKm != null ? esc(brl(c.reembolsoKm)) : "—", c.valorKm != null ? `reembolso de km (${esc(kmFmt(c.km))} × ${esc(brl(c.valorKm))})` : "reembolso de km: defina o valor em Configurar")}
+   ${card(c.reembolsoKm != null ? esc(brl(c.reembolsoKm)) : "—", c.valorKm == null ? "reembolso de km: defina o valor em Configurar" : c.kmMoto > 0 ? `reembolso de km (carro ${esc(brl(c.valorKm))}/km · moto ${esc(brl(c.valorKmMoto ?? c.valorKm))}/km)` : `reembolso de km (${esc(kmFmt(c.km))} × ${esc(brl(c.valorKm))})`)}
    ${c.totalGeral != null ? card(esc(brl(c.totalGeral)), "total a reembolsar (km + despesas)") : ""}
    ${card(String(c.diasCampo), "dias em campo")}
    ${card(String(c.visitas), "visitas in loco")}

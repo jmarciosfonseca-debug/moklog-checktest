@@ -45,3 +45,8 @@
 .rd-dias button[aria-pressed="true"]{border-color:#2563eb}
 @media print{.rd{display:none}}
 .rd-hora{width:auto !important;display:inline-block;margin:0 2px;padding:3px 6px;font-size:13px}
+.rd-veiculo{display:flex;gap:8px;margin:8px 0}
+.rd-veiculo button{flex:1;background:#0a1322;border:1.5px solid #334155;border-radius:10px;color:#f1f5f9;padding:9px;font-size:13px}
+.rd-veiculo button[aria-pressed="true"]{border-color:#2563eb;background:#1d4ed822}
+.rd-comprovante{background:transparent;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:7px 9px;cursor:pointer;font-size:13px;flex-shrink:0}
+.rd-comprovante.ok{border-color:#22c55e77;color:#86efac}

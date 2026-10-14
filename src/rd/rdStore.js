@@ -13,6 +13,8 @@ export function criarRdStore(auth,request=fetch){
   ler:(data)=>call("ler",{data}),
   dias:()=>call("dias"),
   periodo:(de,ate)=>call("periodo",{de,ate}),
+  salvarFoto:(fotoId,b64)=>call("foto_salvar",{fotoId,b64}),
+  lerFotos:(ids)=>call("fotos_ler",{ids}),
   salvar:({data,revisao,dia,memoria,memoriaRevisao})=>call("salvar",{data,revisao,dia,...(memoria?{memoria,memoriaRevisao}:{})})
  };
 }

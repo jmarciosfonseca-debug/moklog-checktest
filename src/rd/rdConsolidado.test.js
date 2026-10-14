@@ -50,3 +50,15 @@ test("agenda do período classifica visita, retorno e home office; HTML traz car
   expect(html2).toContain("reembolso de km");
   expect(html2).toContain("Em aberto:");
 });
+
+test("reembolso separa carro e moto pelos valores configurados", () => {
+  const diasV = [{ data: "2026-08-20", estado: "fechado", trechos: [
+    tr("2026-08-20", "MK_HOME", "MK604", "06:00", "10:00", 0, 100),
+    tr("2026-08-20", "MK604", "MK_HOME", "12:00", "13:00", 100, 200, { veiculo: "moto" }),
+  ] }];
+  const c = consolidarPeriodo(diasV, { config: { valorKm: "1,10", valorKmMoto: "0,70" } });
+  expect(c.kmCarro).toBe(100); expect(c.kmMoto).toBe(100);
+  expect(c.reembolsoKm).toBe(180);                                   // 100×1,10 + 100×0,70
+  const semMoto = consolidarPeriodo(diasV, { config: { valorKm: "1,10" } });
+  expect(semMoto.reembolsoKm).toBe(220);                             // moto sem valor próprio usa o do carro
+});

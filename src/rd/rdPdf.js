@@ -13,13 +13,13 @@ const local = (m) => {
   return partes.join(" · ");
 };
 
-export function htmlRd(dia, memoria, consultor) {
+export function htmlRd(dia, memoria, consultor, fotos = {}) {
   const ts = dia?.trechos || [];
   const perm = permanencias(dia);
   const tot = totaisDoDia(dia);
   const linhas = ts.map((t, i) => {
     const pedagios = (t.pedagios || []).reduce((a, p) => a + (Number(String(p.valor).replace(",", ".")) || 0), 0);
-    return `<tr><td>${esc(rotuloDestino(memoria, t.origem))} → ${esc(rotuloDestino(memoria, t.destino))}</td><td>${local(t.abertura)}</td><td>${local(t.chegada)}</td><td>${esc(kmFmt(kmDoTrecho(t)))}</td><td>${pedagios ? esc(brl(pedagios)) : "—"}</td><td>${perm[i] == null ? "—" : esc(minutosFmt(perm[i]))}</td></tr>`;
+    return `<tr><td>${esc(rotuloDestino(memoria, t.origem))} → ${esc(rotuloDestino(memoria, t.destino))}${t.veiculo === "moto" ? " 🏍" : ""}</td><td>${local(t.abertura)}</td><td>${local(t.chegada)}</td><td>${esc(kmFmt(kmDoTrecho(t)))}</td><td>${pedagios ? esc(brl(pedagios)) : "—"}</td><td>${perm[i] == null ? "—" : esc(minutosFmt(perm[i]))}</td></tr>`;
   }).join("");
   const visitas = ts.filter((t) => (t.atividades || []).length || t.obs).map((t) => `
    <section class="vis"><h3>${esc(rotuloDestino(memoria, t.destino))}</h3>
@@ -34,6 +34,7 @@ export function htmlRd(dia, memoria, consultor) {
   table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #d6dde4;padding:6px 8px;font-size:11px;text-align:center}th{background:#f1f5f9}
   td:first-child{text-align:left;font-weight:700}a{color:#2563eb;text-decoration:none}
   .tot{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px}.tot div{border:1px solid #d6dde4;border-radius:8px;padding:8px 14px}.tot strong{display:block;font-size:15px}
+  .cps{display:flex;flex-wrap:wrap;gap:12px}.cps figure{margin:0;width:200px}.cps img{width:100%;border:1px solid #d6dde4;border-radius:6px}.cps figcaption{font-size:9.5px;color:#475569;margin-top:3px}
   .at{margin:3px 0}.st-aberto{color:#b45309;font-weight:700}.st-finalizado{color:#15803d}.obs{color:#475569;font-style:italic}
   footer{margin-top:26px;border-top:1px solid #c7ced5;padding-top:8px;font-size:10px;color:#64748b}</style></head><body>
   <header><div><h1>MK RD · Relatório Diário</h1><div>${esc(dataBR(dia?.data))}${consultor ? " · " + esc(consultor) : ""}</div></div><img src="${LOGO_MOKED_30}" alt="Moked 30 anos"/></header>
@@ -48,6 +49,11 @@ export function htmlRd(dia, memoria, consultor) {
   </div>
   ${visitas ? `<h2>02 Visitas e tratativas</h2>${visitas}` : ""}
   ${dia?.obs ? `<h2>Observações do dia</h2><p>${esc(dia.obs)}</p>` : ""}
+  ${(() => {
+    const itens = ts.flatMap((t) => [...(t.pedagios || []), ...(t.gastos || [])].filter((x) => x.fotoId && fotos[x.fotoId]).map((x) => ({ ...x, rota: rotuloDestino(memoria, t.origem) + " → " + rotuloDestino(memoria, t.destino) })));
+    if (!itens.length) return "";
+    return `<h2>Comprovantes</h2><div class="cps">` + itens.map((x) => `<figure><img src="${fotos[x.fotoId]}" alt="Comprovante"/><figcaption>${esc(x.descricao || "Gasto")} · ${esc(brl(Number(String(x.valor).replace(",", ".")) || 0))}<br/>${esc(x.rota)}</figcaption></figure>`).join("") + `</div>`;
+  })()}
   <footer>Horários e localizações cravados pelo aparelho no momento de cada marcação. Documento gerado pelo MokLog CheckTest · MK RD.</footer>
   </body></html>`;
 }

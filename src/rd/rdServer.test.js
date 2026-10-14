@@ -7,7 +7,7 @@ function banco() {
     where: (f, op, v) => query(prefix, [...filters, [f, op, v]], lim), limit: (n) => query(prefix, filters, n),
     get: async () => ({ docs: Object.keys(values).filter((k) => k.startsWith(prefix + "/") && !k.slice(prefix.length + 1).includes("/"))
       .map((k) => ({ id: k.split("/").pop(), data: () => clone(values[k]) })).filter((d) => filters.every(([f, op, v]) => op === "==" && d.data()[f] === v)).slice(0, lim) }) });
-  const ref = (path) => ({ path, get: async () => snap(path) });
+  const ref = (path) => ({ path, get: async () => snap(path), set: async (d) => { values[path] = clone(d); } });
   const snap = (p) => ({ exists: values[p] != null, data: () => (values[p] == null ? undefined : clone(values[p])) });
   return { values, collection: (n) => ({ doc: (id) => ref(n + "/" + id), ...query(n) }),
     runTransaction: async (fn) => { for (let t = 0; t < 8; t++) { const sets = []; const v = version; const r = await fn({ get: async (x) => snap(x.path), set: (x, d) => sets.push([x.path, clone(d)]) }); if (v !== version) continue; sets.forEach(([k, d]) => { values[k] = d; }); if (sets.length) version++; return r; } throw Error("retry"); } };
@@ -66,4 +66,27 @@ test("validações: dois trechos abertos, destino inválido e data inválida sã
   await expect(executar(db, G, { acao: "salvar", data: "2026-10-14", revisao: 0, dia: { estado: "aberto", trechos: [{ ...T, destino: "P604" }] } })).rejects.toMatchObject({ status: 400 });
   await expect(executar(db, G, { acao: "ler", data: "14/10/2026" })).rejects.toMatchObject({ status: 400 });
   await expect(executar(db, { uid: "x", role: "equipe" }, { acao: "ler", data: "2026-10-14" })).rejects.toMatchObject({ status: 403 });
+});
+
+test("comprovante: salva comprimido, é imutável, só o dono lê; foto inválida é recusada", async () => {
+  const db = banco();
+  const b64 = "data:image/jpeg;base64," + "A".repeat(2000);
+  const r = await executar(db, G, { acao: "foto_salvar", fotoId: "fabc123", b64 });
+  expect(r.fotoId).toBe("fabc123");
+  await executar(db, G, { acao: "foto_salvar", fotoId: "fabc123", b64: "data:image/jpeg;base64,BBBB" }); // regravar é ignorado
+  expect(db.values["rd_comprovantes/g_fabc123"].b64).toBe(b64);
+  expect((await executar(db, G, { acao: "fotos_ler", ids: ["fabc123", "fnada99"] })).fotos).toEqual({ fabc123: b64 });
+  expect((await executar(db, A, { acao: "fotos_ler", ids: ["fabc123"] })).fotos).toEqual({});
+  await expect(executar(db, G, { acao: "foto_salvar", fotoId: "fx1234", b64: "data:text/html;base64,AAAA" })).rejects.toMatchObject({ status: 400 });
+  await expect(executar(db, G, { acao: "foto_salvar", fotoId: "fx1234", b64: "data:image/jpeg;base64," + "A".repeat(260000) })).rejects.toMatchObject({ status: 400 });
+});
+
+test("gasto com fotoId e trecho com veículo moto são preservados", async () => {
+  const db = banco();
+  const t2 = { ...T, veiculo: "moto", gastos: [{ descricao: "Estacionamento", valor: 20, fotoId: "fabc123" }] };
+  const r = await executar(db, G, { acao: "salvar", data: "2026-10-14", revisao: 0, dia: { estado: "aberto", trechos: [t2] } });
+  expect(r.dia.trechos[0].veiculo).toBe("moto");
+  expect(r.dia.trechos[0].gastos[0].fotoId).toBe("fabc123");
+  const semV = await executar(db, G, { acao: "salvar", data: "2026-10-15", revisao: 0, dia: { estado: "aberto", trechos: [{ ...T }] } });
+  expect(semV.dia.trechos[0].veiculo).toBe("carro");   // padrão
 });

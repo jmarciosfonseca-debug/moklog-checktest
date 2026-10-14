@@ -4,7 +4,7 @@ import RdApp from "./RdApp";
 import { htmlRd } from "./rdPdf";
 
 jest.mock("./rdStore", () => ({ criarRdStore: () => mockStore }));
-const mockStore = { ler: jest.fn(), dias: jest.fn(), salvar: jest.fn() };
+const mockStore = { ler: jest.fn(), dias: jest.fn(), salvar: jest.fn(), salvarFoto: jest.fn(), lerFotos: jest.fn() };
 let marcoSeq;
 const criarMarcoFn = async () => marcoSeq.shift();
 
@@ -22,7 +22,8 @@ beforeEach(() => {
   mockStore.salvar.mockImplementation(async ({ dia, memoria }) => ({ dia: { ...dia, revisao: ++rev }, memoria: memoria ? { ...memoria, revisao: 4 } : null }));
 });
 
-const montar = async (host, root) => act(async () => root.render(<RdApp auth={{ currentUser: { uid: "u", email: "m@moked" } }} onBack={() => {}} criarMarcoFn={criarMarcoFn} />));
+const comprimirFotoFn = async () => "data:image/jpeg;base64,FOTOPEQ";
+const montar = async (host, root) => act(async () => root.render(<RdApp auth={{ currentUser: { uid: "u", email: "m@moked" } }} onBack={() => {}} criarMarcoFn={criarMarcoFn} comprimirFotoFn={comprimirFotoFn} />));
 const botao = (host, t) => [...host.querySelectorAll("button")].find((b) => b.textContent.includes(t));
 const clicar = (host, t) => { const b = botao(host, t); expect(b).toBeDefined(); return act(async () => b.dispatchEvent(new MouseEvent("click", { bubbles: true }))); };
 const digitar = (el, v) => act(async () => { const d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value"); d.set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -106,4 +107,36 @@ test("destino novo: prefixo MK fixo, só o número; relatório escapa HTML e tra
   expect(html).not.toContain("<script>x");
   expect(html).toContain("Em aberto:");
   expect(html).toContain("R$"); // km + despesas com valor do km configurado
+});
+
+test("fator moto na abertura e comprovante anexado ao pedágio (foto comprimida vira fotoId no lançamento)", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  mockStore.salvarFoto.mockResolvedValue({ fotoId: "x" });
+  try {
+    await montar(host, root);
+    await clicar(host, "Sair de casa — abrir o dia");
+    await clicar(host, "🏍 Moto");
+    await clicar(host, "MK604");
+    await clicar(host, "Abrir trecho (crava hora e local)");
+    expect(mockStore.salvar.mock.calls[0][0].dia.trechos[0].veiculo).toBe("moto");
+    const anexo = host.querySelector('[aria-label="Anexar comprovante"]');
+    expect(anexo).toBeDefined();
+    await act(async () => {
+      Object.defineProperty(anexo, "files", { value: [new File(["x"], "recibo.jpg", { type: "image/jpeg" })], configurable: true });
+      anexo.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(mockStore.salvarFoto).toHaveBeenCalledWith(expect.stringMatching(/^f[a-z0-9]+$/), "data:image/jpeg;base64,FOTOPEQ");
+    expect(host.textContent).toContain("Comprovante anexado");
+    expect(host.querySelector(".rd-comprovante.ok")).not.toBeNull();
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("RD do dia embute os comprovantes buscados pelo fotoId", async () => {
+  const { htmlRd } = require("./rdPdf");
+  const dia = { data: "2026-10-14", estado: "fechado", trechos: [{ id: "t1", origem: "MK_HOME", destino: "MK604", veiculo: "moto", kmInicial: 0, kmFinal: 10, abertura: { em: "2026-10-14T06:00:00.000-03:00" }, chegada: { em: "2026-10-14T07:00:00.000-03:00" }, pedagios: [{ descricao: "Pedágio", valor: 5, fotoId: "fabc" }], gastos: [], atividades: [], obs: "" }] };
+  const html = htmlRd(dia, {}, "m", { fabc: "data:image/jpeg;base64,FOTO" });
+  expect(html).toContain("Comprovantes");
+  expect(html).toContain("data:image/jpeg;base64,FOTO");
+  expect(html).toContain("🏍");
+  expect(htmlRd(dia, {}, "m", {})).not.toContain("Comprovantes");   // sem foto, sem seção
 });
