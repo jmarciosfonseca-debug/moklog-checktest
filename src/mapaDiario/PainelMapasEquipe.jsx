@@ -41,15 +41,17 @@ export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p)
         <div style={{ marginTop: 10 }}>
           {resumo.itens.map((i) => {
             const podeVer = !!i.data && (i.turno === "D" || i.turno === "N");
+            const comOcorrencia = i.estado === "enviado" && i.ocorrencias > 0;   // verde = completo; amarelo = tem FT/falta/atraso/troca
+            const corItem = comOcorrencia ? "#eab308" : COR[i.estado];
             const aberta = ver === i.projetoId;
             return (
               <div key={i.projetoId} style={{ borderTop: `1px solid ${dark ? "#0f172a" : "#eef2f7"}` }}>
                 <div onClick={podeVer ? () => setVer(aberta ? null : i.projetoId) : undefined} role={podeVer ? "button" : undefined} aria-expanded={podeVer ? aberta : undefined}
                   style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 0", cursor: podeVer ? "pointer" : "default" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: COR[i.estado], flexShrink: 0, animation: i.brilha ? "mkMapaBrilho 1.4s ease-in-out infinite" : "none" }} />
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: corItem, flexShrink: 0, animation: i.brilha ? "mkMapaBrilho 1.4s ease-in-out infinite" : "none" }} />
                   <div style={{ flex: 1, fontSize: 12.5, color: txt, fontWeight: 700 }}>{nomeProj(i.projetoId)}</div>
                   <span style={{ fontSize: 11, color: txt2 }}>{i.turno === "N" ? "Noturno" : i.turno === "D" ? "Diurno" : ""}</span>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: COR[i.estado] }}>{ROTULO[i.estado]}{i.enviadoEm ? ` ${hhmm(i.enviadoEm)}` : ""}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: corItem }}>{ROTULO[i.estado]}{i.enviadoEm ? ` ${hhmm(i.enviadoEm)}` : ""}{comOcorrencia ? ` · ${i.ocorrencias} ocorrência${i.ocorrencias > 1 ? "s" : ""}` : ""}</span>
                   {podeVer && <span style={{ fontSize: 11, fontWeight: 800, color: "#a78bfa", border: "1px solid #7c3aed66", borderRadius: 6, padding: "1px 7px" }}>Ver {aberta ? "⌄" : "›"}</span>}
                 </div>
                 {aberta && podeVer && <VerMapasProjeto projetoId={i.projetoId} data={i.data} turno={i.turno} dark={dark} />}
