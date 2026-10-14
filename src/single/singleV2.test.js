@@ -2,12 +2,12 @@ import React,{act} from "react";
 import {createRoot} from "react-dom/client";
 import CenarioAtivos,{gerarNomes} from "./CenarioAtivos";
 import {htmlSingle} from "./pdfSingle";
-const {familias,classificar}=require("./catalogoV2");
+const {familias,classificar,semOrigemReal}=require("./catalogoV2");
 const {inventario}=require("./catalogoCobertura.cjs");
 const {calcularFamilia,calcularInspecao}=require("./singleCalc");
 const {executar}=require("./singleServer");
 
-test("catálogo v2: itens separados, ids únicos e cobertura total dos 137 rótulos reais",()=>{
+test("catálogo v3: itens separados, ids únicos e cobertura total dos 137 rótulos reais",()=>{
  expect(new Set(familias.map(f=>f.id)).size).toBe(familias.length);
  expect(familias.length).toBeGreaterThanOrEqual(50);
  const all=inventario().map(x=>({...x,v2:classificar(x.nome,x.tipo)}));
@@ -16,7 +16,10 @@ test("catálogo v2: itens separados, ids únicos e cobertura total dos 137 rótu
  const ids=new Set(familias.map(f=>f.id));
  expect(all.every(x=>x.v2==="fora_v1"||ids.has(x.v2))).toBe(true);
  const usados=new Set(all.map(x=>x.v2));
- expect(familias.filter(f=>!usados.has(f.id))).toEqual([]);
+ expect(familias.filter(f=>!usados.has(f.id)&&!semOrigemReal.includes(f.id))).toEqual([]);
+ expect(semOrigemReal.every(id=>ids.has(id))).toBe(true);
+ // nenhum nome com "/": um nome = uma coisa que existe ou não existe
+ expect(familias.filter(f=>f.nome.includes("/"))).toEqual([]);
 });
 test("itens que antes eram juntados agora são separados",()=>{
  const id=l=>classificar(l);
@@ -24,6 +27,9 @@ test("itens que antes eram juntados agora são separados",()=>{
  expect(id("06 - CFTV FIXAS")).not.toBe(id("06B - CFTV SPEED DOME"));
  expect(id("04 - PÂNICO FIXO")).not.toBe(id("04B - PÂNICO MÓVEL"));
  expect(id("20 - TOTENS")).not.toBe(id("19 - TABLETS KEYACCESS"));
+ expect(id("INTERNET")).not.toBe("inf_link_dados");
+ expect(id("04 - BOLLARDS / PINOS")).toBe("vei_bollards");
+ expect(familias.map(f=>f.id)).toEqual(expect.arrayContaining(["vei_bollards","vei_pinos","inf_internet","inf_link_dados","cftv_mesa","cftv_botoeira_cco"]));
 });
 test("cálculo com lista nominal: status por unidade define total e pendências",()=>{
  const unidades=gerarNomes("CF",150).map((nome,i)=>({id:"u"+i,nome,status:i<10?"inoperante":i<14?"parcial":"operante"}));
@@ -70,22 +76,36 @@ test("PDF agrupa por grupo e lista pendências por unidade",()=>{
  const html=htmlSingle({nome:"Cliente X",id:"sg_v2"},{id:"i",data:"2026-10-13",responsavel:"G",estado:"concluida",itens:[{id:"c",nome:"Câmeras fixas",grupo:"CFTV e CCO",total:2,unidades:[{id:"a",nome:"CF01",status:"inoperante",desde:"2026-10-01",nota:"Sem imagem"},{id:"b",nome:"CF02",status:"operante"}]}]});
  expect(html).toContain("CFTV e CCO");expect(html).toContain("Pendências por unidade");expect(html).toContain("CF01");expect(html).toContain("Sem imagem");expect(html).not.toContain(">CF02<");
 });
-test("tela do cenário: quantidade, gerar nomes e lista nominal define o total",async()=>{
+test("passo 1: marcar o item cria a lista com quantidade; desmarcar remove; nomes são opcionais e a quantidade continua editável",async()=>{
  global.IS_REACT_ACT_ENVIRONMENT=true;
  const host=document.createElement("div");document.body.appendChild(host);const root=createRoot(host);
  let assets=[];const catalog={familias:familias.slice(0,3).map(f=>({...f})),revisao:0};
  const Harness=()=>{const [a,setA]=React.useState([]);assets=a;return <CenarioAtivos catalog={catalog} assets={a} setAssets={setA} disabled={false}/>;};
  const set=async(el,val)=>{await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(el,val);el.dispatchEvent(new Event("input",{bubbles:true}));});};
  const click=async t=>{const el=[...host.querySelectorAll("button")].find(b=>b.textContent.includes(t));expect(el).toBeDefined();await act(async()=>el.dispatchEvent(new MouseEvent("click",{bubbles:true})));};
+ const marcar=async nome=>{await act(async()=>host.querySelector('input[aria-label="Tem '+nome+'"]').dispatchEvent(new MouseEvent("click",{bubbles:true})));};
+ const confirmar=jest.spyOn(window,"confirm").mockReturnValue(true);
  try{
   await act(async()=>root.render(<Harness/>));
-  const first=host.querySelector('input[aria-label^="Quantidade"]');
-  await set(first,"4");expect(assets[0].total).toBe("4");
-  await click("Nomear unidades");
-  await set(host.querySelector('input[placeholder="ex.: CF"]'),"TQ");
+  // nada marcado: nada existe e nenhum campo de quantidade aparece
+  expect(assets).toEqual([]);expect(host.querySelectorAll('input[aria-label^="Quantidade"]').length).toBe(0);
+  expect(host.textContent).toContain("Nenhum item marcado");
+  await marcar("Torniquetes");
+  expect(assets).toHaveLength(1);expect(assets[0]).toMatchObject({id:"ped_torniquetes",total:1});
+  const qtd=host.querySelector('input[aria-label="Quantidade Torniquetes"]');expect(qtd).not.toBeNull();
+  await set(qtd,"4");expect(assets[0].total).toBe(4);
+  expect(host.textContent).toContain("1 item(ns) marcado(s)");expect(host.textContent).toContain("4 ativo(s)");
+  // não há status (operante/parcial/inoperante) no passo 1
+  expect(host.textContent).not.toMatch(/Inoperante|Parcial/);
+  await click("Dar nome às unidades");
   await click("Gerar 4 nome(s)");
-  expect(assets[0].unidades.map(x=>x.nome)).toEqual(["TQ01","TQ02","TQ03","TQ04"]);expect(assets[0].total).toBe(4);
-  await click("✕");expect(assets[0].unidades).toHaveLength(3);expect(assets[0].total).toBe(3);
-  expect(host.textContent).toContain("3 ativos em 1 item");
- }finally{await act(async()=>root.unmount());host.remove();}
+  expect(assets[0].unidades.map(x=>x.nome)).toEqual(["Torniquetes 01","Torniquetes 02","Torniquetes 03","Torniquetes 04"]);expect(assets[0].total).toBe(4);
+  // quantidade segue editável com a lista: aumenta continuando a sequência, diminui tirando do fim
+  await set(host.querySelector('input[aria-label="Quantidade Torniquetes"]'),"6");
+  expect(assets[0].unidades.map(x=>x.nome).slice(4)).toEqual(["Torniquetes 05","Torniquetes 06"]);expect(assets[0].total).toBe(6);
+  await set(host.querySelector('input[aria-label="Quantidade Torniquetes"]'),"2");
+  expect(assets[0].unidades).toHaveLength(2);
+  await click("Apagar os nomes");expect(assets[0].unidades).toBeUndefined();expect(assets[0].total).toBe(2);
+  await marcar("Torniquetes");expect(assets).toEqual([]);
+ }finally{confirmar.mockRestore();await act(async()=>root.unmount());host.remove();}
 });

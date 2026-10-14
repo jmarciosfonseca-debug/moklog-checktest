@@ -15,7 +15,8 @@ const idDoItem = (a) => (a.familiaId && !a.custom ? a.familiaId : classificar(a.
 export function perfilDoSingle(itens = []) {
   const ids = new Set(itens.filter((a) => (Number(a.total) || 0) > 0).map(idDoItem));
   const vias = [];
-  if (ids.has("vei_bollards")) vias.push("bollard", "bolard", "pino");
+  if (ids.has("vei_bollards")) vias.push("bollard", "bolard");
+  if (ids.has("vei_pinos")) vias.push("pino");
   if (ids.has("vei_dilaceradores")) vias.push("dilacerador");
   const cancelaAS = ids.has("vei_cancelas_as");
   const cancelaTransponivel = !cancelaAS && ids.has("vei_cancelas");

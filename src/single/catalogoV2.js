@@ -1,27 +1,29 @@
-// Catálogo Single v2 — itens SEPARADOS, um a um (decisão do Marcio, 13/10/2026): nada de agrupar cancela, dilacerador e portão.
+// Catálogo Single v3 — itens SEPARADOS, um a um (decisão do Marcio, 13/10 e 14/10/2026): nada de agrupar cancela, dilacerador e portão,
+// nem de nomes com "/" (internet / link, bollard / pino...). Um nome = uma coisa que existe ou não existe no cliente.
 // Origem: os 137 rótulos reais dos testes semanais dos parques (ver catalogoCobertura.cjs). O catálogo é editável pelo gerente;
 // o que não existir aqui o usuário acrescenta como "ativo personalizado".
 const { classificar: classificarV1, normalizar } = require("./catalogoAtivos");
 
-const VERSAO = "single-v2";
+const VERSAO = "single-v3";
 const rows = [
-  ["ped_torniquetes", "Pedestres", "Torniquetes / catracas"],
+  ["ped_torniquetes", "Pedestres", "Torniquetes"],
   ["ped_qr_torniquetes", "Pedestres", "Leitores QR dos torniquetes"],
   ["ped_facial", "Pedestres", "Leitores faciais"],
   ["ped_qr_eclusas", "Pedestres", "Leitores QR das eclusas"],
-  ["ped_qr_cancelas", "Pedestres", "Leitores QR das cancelas / vias"],
+  ["ped_qr_cancelas", "Pedestres", "Leitores QR das cancelas"],
   ["ped_qr_outros", "Pedestres", "Leitores QR (outros locais)"],
   ["ped_keyaccess", "Pedestres", "Sistema KeyAccess"],
   ["ped_totens", "Pedestres", "Totens de autoatendimento"],
   ["ped_tablets", "Pedestres", "Tablets"],
-  ["ecl_portas", "Eclusas", "Eclusas (portas / abertura pelo CCO)"],
+  ["ecl_portas", "Eclusas", "Eclusas"],
   ["ecl_garras", "Eclusas", "Garras de tigre das eclusas"],
   ["ecl_giroflex", "Eclusas", "Giroflex das eclusas"],
   ["ecl_eletroimas", "Eclusas", "Eletroímãs das eclusas"],
   ["vei_cancelas_as", "Veículos", "Cancelas de alta segurança"],
-  ["vei_cancelas", "Veículos", "Cancelas comuns (administrativas / acesso)"],
+  ["vei_cancelas", "Veículos", "Cancelas comuns"],
   ["vei_dilaceradores", "Veículos", "Dilaceradores"],
-  ["vei_bollards", "Veículos", "Bollards / pinos"],
+  ["vei_bollards", "Veículos", "Bollards"],
+  ["vei_pinos", "Veículos", "Pinos"],
   ["vei_portoes", "Veículos", "Portões (folhas)"],
   ["vei_motores", "Veículos", "Motores dos portões"],
   ["vei_botoeiras", "Veículos", "Botoeiras"],
@@ -29,30 +31,32 @@ const rows = [
   ["vei_antiesmag", "Veículos", "Sensores anti-esmagamento"],
   ["vei_semaforos", "Veículos", "Semáforos"],
   ["vei_pictogramas", "Veículos", "Pictogramas"],
-  ["vei_farois", "Veículos", "Faróis / LED das cancelas"],
+  ["vei_farois", "Veículos", "Faróis das cancelas"],
   ["vei_sirenes", "Veículos", "Sirenes"],
   ["vei_campainhas", "Veículos", "Campainhas"],
   ["cftv_fixas", "CFTV e CCO", "Câmeras fixas"],
   ["cftv_speed", "CFTV e CCO", "Câmeras speed dome"],
   ["cftv_monitores", "CFTV e CCO", "Monitores do CFTV"],
   ["cco_monitores_acesso", "CFTV e CCO", "Monitores do controle de acesso"],
-  ["cco_televisores", "CFTV e CCO", "Televisores / monitores de recepção"],
+  ["cco_televisores", "CFTV e CCO", "Televisores de recepção"],
   ["cftv_joystick", "CFTV e CCO", "Joysticks"],
-  ["cftv_mesa", "CFTV e CCO", "Mesas controladoras / botoeiras do CCO"],
-  ["cftv_computadores", "CFTV e CCO", "Computadores / CPU"],
+  ["cftv_mesa", "CFTV e CCO", "Mesas controladoras"],
+  ["cftv_botoeira_cco", "CFTV e CCO", "Botoeiras do CCO"],
+  ["cftv_computadores", "CFTV e CCO", "Computadores"],
   ["cftv_nobreaks", "CFTV e CCO", "Nobreaks"],
   ["per_alarme", "Perímetro", "Alarme perimetral (zonas)"],
   ["per_cerca", "Perímetro", "Cerca elétrica"],
   ["per_alpha", "Perímetro", "Alpha Sense"],
-  ["ala_incendio", "Alarmes", "Alarme de incêndio / SDAI"],
+  ["ala_incendio", "Alarmes", "Alarme de incêndio"],
   ["ala_paradox", "Alarmes", "Alarme patrimonial (Paradox)"],
   ["ala_panico_fixo", "Alarmes", "Botões de pânico fixos"],
   ["ala_panico_movel", "Alarmes", "Botões de pânico móveis"],
   ["ala_alertas", "Alarmes", "Recebimento de alertas externos"],
   ["com_telefonia", "Comunicação", "Telefones"],
-  ["com_interfones", "Comunicação", "Interfones / intercomunicadores"],
+  ["com_interfones", "Comunicação", "Interfones"],
   ["com_video_porteiro", "Comunicação", "Vídeo porteiro"],
-  ["inf_internet", "Infraestrutura", "Internet / link de dados"],
+  ["inf_internet", "Infraestrutura", "Internet"],
+  ["inf_link_dados", "Infraestrutura", "Link de dados"],
   ["inf_ar", "Infraestrutura", "Ar-condicionado"],
   ["inf_cofres", "Infraestrutura", "Cofres"],
 ];
@@ -83,7 +87,7 @@ const regras = [
   [/^(farol|farois)/, "vei_farois"],
   [/^cancela/, "vei_cancelas"],
   [/(dilacerador|garra de tigre)/, "vei_dilaceradores"],
-  [/(bollard|pino)/, "vei_bollards"],
+  [/(bollard|pino)/, (s) => (/pino/.test(s) && !/bollard/.test(s) ? "vei_pinos" : "vei_bollards")],
   [/semaforo/, "vei_semaforos"],
   [/^pictograma/, "vei_pictogramas"],
   [/^sirene/, "vei_sirenes"],
@@ -115,4 +119,7 @@ function classificar(label, type) {
   return "revisar";
 }
 
-module.exports = { familias, classificar, versao: VERSAO, VERSAO };
+// Itens que existem no catálogo mas não têm rótulo próprio nos testes semanais dos parques (vieram de nomes que antes eram agrupados com "/").
+const semOrigemReal = ["vei_pinos", "cftv_botoeira_cco", "inf_link_dados"];
+
+module.exports = { familias, classificar, versao: VERSAO, VERSAO, semOrigemReal };
