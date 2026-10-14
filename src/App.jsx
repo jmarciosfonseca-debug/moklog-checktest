@@ -169,6 +169,8 @@ import { gerencial as chamarFollowupLink } from "./followupLink/api";
 import { desligadosUnicos } from "./equipe/maturidade";
 import { ocupacaoDoQuadro, totalQuadro, ORDEM_PROJETOS } from "./equipe/quadroPrevisto";
 import { montarMatrizEfetivo } from "./relatorios/matrizEfetivo";
+import { carregarOcupacoes } from "./equipe/carregarOcupacoes";
+import LedVaga from "./equipe/LedVaga";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
@@ -3088,7 +3090,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                             <span style={{ width:7, height:7, borderRadius:"50%", background:n>0?"#0ea5e9":"#334155", flexShrink:0 }}/>
                             <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{p.id} <span style={{ color:txt2, fontWeight:400 }}>— {p.name||""}</span></div>
                             {totalQuadro(p.id)>0
-                              ? <span style={{ fontSize:10.5, fontWeight:700, color:(n||0)<totalQuadro(p.id)?"#f59e0b":"#0ea5e9" }}>{n||0}/{totalQuadro(p.id)}{(n||0)<totalQuadro(p.id)?` · ${totalQuadro(p.id)-(n||0)} vaga(s)`:""}</span>
+                              ? <span style={{ fontSize:10.5, fontWeight:700, color:(n||0)<totalQuadro(p.id)?"#f59e0b":"#0ea5e9" }}><LedVaga vagas={totalQuadro(p.id)-(n||0)} tamanho={7}/>{n||0}/{totalQuadro(p.id)}{(n||0)<totalQuadro(p.id)?` · ${totalQuadro(p.id)-(n||0)} vaga(s)`:""}</span>
                               : (n>0 ? <span style={{ fontSize:10.5, fontWeight:700, color:"#0ea5e9" }}>{n} ativo(s)</span> : null)}
                             <span style={{ color:txt2, fontSize:16 }}>›</span>
                           </div>
@@ -3097,13 +3099,11 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                       <button type="button" disabled={matrizGerando} onClick={async()=>{
                         setMatrizGerando(true);
                         try{
-                          const ocupacoes={};
-                          await Promise.all(ORDEM_PROJETOS.map(async pid=>{
-                            let d=null;
-                            try{ const snap=await getDoc(doc(db,"equipes",pid)); if(snap.exists()) d=snap.data(); }catch(e){}
-                            if(!d){ try{ const l=localStorage.getItem(`equipe_${pid}`); if(l) d=JSON.parse(l); }catch(e){} }
-                            if(d) ocupacoes[pid]=ocupacaoDoQuadro(pid,d.colaboradores||[]);
-                          }));
+                          const ocupacoes=await carregarOcupacoes(async pid=>{
+                            try{ const snap=await getDoc(doc(db,"equipes",pid)); if(snap.exists()) return snap.data(); }catch(e){}
+                            try{ const l=localStorage.getItem(`equipe_${pid}`); if(l) return JSON.parse(l); }catch(e){}
+                            return null;
+                          });
                           const nomes=Object.fromEntries(ORDEM_PROJETOS.map(pid=>[pid,PROJECTS[pid]?.name||""]));
                           const hoje=new Date();
                           abrirParaImpressao(montarMatrizEfetivo({ nomes, ocupacoes, hoje }), `matriz_efetivo_${hoje.toLocaleDateString("sv-SE")}.html`);
@@ -4139,7 +4139,7 @@ export default function App(){
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
   if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} projects={PROJECTS} projectGroups={{golgi:["P601","P602","P604","P605","P606","P607"],mega:["P311A","P311B"],klog:["P505"]}} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
   if(mapaDiarioProject) return <ErrorBoundary moduleName="Mapa de Equipe diário"><MapaDiarioTela project={mapaDiarioProject} dark={dark} onBack={()=>setMapaDiarioProject(null)}/></ErrorBoundary>;
-  if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)}/></ErrorBoundary>;
+  if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)} nomesProjetos={Object.fromEntries(ORDEM_PROJETOS.map(pid=>[pid,PROJECTS[pid]?.name||""]))}/></ErrorBoundary>;
   if(showRegistros) return <ErrorBoundary moduleName="Registros"><RegistrosMenu dark={dark} stored={stored} onToggleTheme={()=>setDark(!dark)} onAcessos={()=>{setShowRegistros(false);setAcessoScreen("list");setShowAcesso(true);}} onEquipe={(p)=>{setShowRegistros(false);setEquipeProject(p);setShowEquipe(true);}} onEquipamentos={(p)=>{setShowRegistros(false);setEquipamentosProject(p);setShowEquipamentos(true);}} onBack={()=>setShowRegistros(false)}/></ErrorBoundary>;
   if(showAcessoCCO&&acessoCCOProject) return <ErrorBoundary moduleName="Acesso CCO"><AcessoCCO project={acessoCCOProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcessoCCO(false);setAcessoCCOProject(null);setAcessoCCOAbas(null);}} sharedAuth={getProjectAuthMode(acessoCCOProject.id)} onAuthGranted={(mode)=>grantAuth(acessoCCOProject.id,mode)} abasPermitidas={acessoCCOAbas}/></ErrorBoundary>;
   if(showOcorrencias&&ocorrenciasProject) return <ErrorBoundary moduleName="Ocorrências"><Ocorrencias project={ocorrenciasProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowOcorrencias(false);setOcorrenciasProject(null);}} sharedAuth={getProjectAuthMode(ocorrenciasProject.id)} onAuthGranted={(mode)=>grantAuth(ocorrenciasProject.id,mode)}/></ErrorBoundary>;

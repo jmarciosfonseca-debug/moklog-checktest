@@ -54,6 +54,9 @@ import { calcularMapaEquipe } from './equipe/maturidade';
 import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
 import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
 import { abrirParaImpressao } from './relatorios/padraoMoked';
+import QuadroEfetivo from './equipe/QuadroEfetivo';
+import { carregarOcupacoes } from './equipe/carregarOcupacoes';
+import { montarMatrizEfetivo } from './relatorios/matrizEfetivo';
 import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats, alvosAguardando, resumoAprovacao, aprovarNaEquipe} from "./equipeSolicitacoes";
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas, PainelAprovacoesLider} from "./EquipeWhats";
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
@@ -1945,7 +1948,7 @@ export function ContadorEquipe({ projectId }){
   return <div data-pendente="1" style={{fontSize:10,color:"#f59e0b",marginTop:3,fontWeight:700}}><Ico n="calendario"/> Checar a equipe: {feitos}/{num} · fecha dom 23:59</div>;
 }
 
-function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted, fotosApi }) {
+function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, sharedAuth, onAuthGranted, fotosApi, nomesProjetos }) {
   const fotosMapa = fotosApi.mapa, definirFoto = fotosApi.definir;
   const [equipeData, setEquipeData] = useState({ colaboradores:[], desligados:[] });
   const referenciarFotos = fotosApi.referenciar;
@@ -1975,6 +1978,22 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const [showDesligados, setShowDesligados] = useState(false);
   const [selPDF, setSelPDF] = useState([]); // ids selecionados para PDF
   const [pdfComDesligados, setPdfComDesligados] = useState(false); // incluir desligados no PDF
+  const [matrizGerando, setMatrizGerando] = useState(false);
+  // Matriz de Dimensionamento de Efetivo (todas as unidades). O projeto aberto usa os dados em tela; os demais vêm do servidor.
+  const gerarMatriz = async () => {
+    setMatrizGerando(true);
+    try {
+      const ocupacoes = await carregarOcupacoes(async pid => {
+        if (pid === project.id) return equipeData;
+        try { const snap = await getDoc(doc(db, "equipes", pid)); if (snap.exists()) return snap.data(); } catch (e) { /* tenta o cache local */ }
+        try { const l = localStorage.getItem(`equipe_${pid}`); if (l) return JSON.parse(l); } catch (e) { /* sem cache */ }
+        return null;
+      });
+      const hoje = new Date();
+      const modo = abrirParaImpressao(montarMatrizEfetivo({ nomes: nomesProjetos || {}, ocupacoes, hoje }), `matriz_efetivo_${hoje.toLocaleDateString("sv-SE")}.html`);
+      if (modo === "download") alert("O navegador bloqueou a nova aba. A Matriz de efetivo foi baixada como HTML: abra o arquivo e toque em \"Imprimir / Salvar PDF\".");
+    } finally { setMatrizGerando(false); }
+  };
   const [modoSel, setModoSel] = useState(false); // modo seleção PDF
   const [editHistItem, setEditHistItem] = useState(null); // item do histórico em edição
   const [encerrarModal, setEncerrarModal] = useState(null); // {entry} quando encerrando afastamento
@@ -2641,6 +2660,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
 
+          {adminAuth && <QuadroEfetivo projectId={project.id} equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} dark={dark} gerando={matrizGerando} onMatriz={gerarMatriz} />}
           {adminAuth && <MaturidadeResumo dark={dark} equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} />}
           {adminAuth && <ConfiguracaoMaturidade key={project.id} dark={dark} equipe={equipeData} onSave={patch => save({ ...equipeData, ...patch })} />}
           {/* Barra de auth */}
