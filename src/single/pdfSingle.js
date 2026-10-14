@@ -20,3 +20,11 @@ export function imprimirSingle(p,i,a){
  if(!win)throw new Error("Permita a abertura da janela do relatório.");
  win.document.open();win.document.write(htmlSingle(p,i,a));win.document.close();
 }
+
+export function baixarHtmlSingle(p,i,a){
+ const html=htmlSingle(p,i,a);
+ const nome=String(p.nome||"single").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40)||"single";
+ const url=URL.createObjectURL(new Blob([html],{type:"text/html;charset=utf-8"}));
+ const el=document.createElement("a");el.href=url;el.download="Relatorio-Single-"+nome+"-"+String(i.data||"").slice(0,10)+".html";
+ document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}

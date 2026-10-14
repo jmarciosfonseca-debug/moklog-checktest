@@ -14,6 +14,7 @@ export function criarStore(auth,request=fetch){
   criarSingle:(pid,data)=>call("criar",{pid,data,revisao:0}),
   salvarAtivos:(p,ativos)=>call("ativos",{pid:p.id,revisao:p.revisao,data:{ativos}}),
   arquivar:p=>call("arquivar",{pid:p.id,revisao:p.revisao}),
+  excluir:p=>call("excluir",{pid:p.id,revisao:p.revisao}),
   salvarInspecao:(pid,inspecao)=>call("inspecao",{pid,inspecaoId:inspecao.id,revisao:inspecao.revisao||0,data:inspecao}),
   listarInspecoes:pid=>call("inspecoes",{pid}),
   listarDiagnosticos:pid=>call("diagnosticos",{pid}),

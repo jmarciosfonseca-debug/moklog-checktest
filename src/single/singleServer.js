@@ -77,6 +77,24 @@ async function executar(db,u,b){
    return {data:next,importados:origem.length};
   });
  }
+ if(action==="excluir"){
+  // Exclusão definitiva: só gerente. Apaga o Single, suas vistorias e o diagnóstico copiado para ele. O diagnóstico de origem (projeto novo) não é tocado.
+  if(u.role!=="gerente")throw erro(403,"Somente o gerente pode excluir um Single.");
+  const pidEx=id(b.pid);
+  if(!/^sg_/.test(pidEx))throw erro(400,"Projeto Single inválido.");
+  const projEx=db.collection("single_projetos").doc(pidEx);
+  const filhos=[...(await projEx.collection("inspecoes").limit(200).get()).docs.map(x=>x.ref),...(await db.collection("diagnosticos").doc(pidEx).collection("itens").limit(200).get()).docs.map(x=>x.ref)];
+  return db.runTransaction(async tx=>{
+   const profile=await tx.get(db.collection("usuarios").doc(u.uid));
+   if(!profile.exists||profile.data().active!==true||profile.data().role!==u.role)throw erro(403,"Perfil revogado.");
+   const ps=await tx.get(projEx),old=ps.exists?ps.data():null;
+   if(!old||!permitido(old,{...profile.data(),uid:u.uid}))throw erro(403,"Projeto sem permissão.");
+   if(!Number.isSafeInteger(b.revisao)||b.revisao!==(old.revisao||0))throw erro(409,"Outra gravação alterou este registro. Reabra o projeto antes de excluir.");
+   filhos.forEach(r=>tx.delete(r));
+   tx.delete(projEx);
+   return {excluido:pidEx,vistorias:filhos.length};
+  });
+ }
  const catalogo=action==="catalogo_ler"||action==="catalogo_salvar";
  const pid=catalogo?null:id(b.pid);
  if(pid&&!/^sg_/.test(pid))throw erro(400,"Projeto Single inválido.");

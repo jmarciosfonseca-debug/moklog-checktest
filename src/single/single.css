@@ -4,3 +4,6 @@
 .single-passos{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.single .single-passos button{flex:1;min-width:130px;margin:0;background:#e6edf2;color:#174d70;font-weight:600}.single .single-passos button[aria-pressed=true]{background:#174d70;color:#fff}
 .single-item{border-bottom:1px solid #eef1f4;padding:6px 8px;border-radius:6px}.single-item.on{background:#f1f8f4}.single-item-linha{display:flex;align-items:center;gap:10px}.single .single-item-nome{flex:1;display:flex;align-items:center;gap:10px;margin:0;font-size:16px;cursor:pointer}.single .single-item-nome input{width:22px;height:22px;padding:0}.single-item:not(.on) .single-item-nome{color:#5d6d7d}.single .single-qtd{width:92px;flex:0 0 92px;text-align:center;font-weight:700;font-size:16px}
 .single-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.single .single-principal{background:#1b7a4b;font-weight:700}.single-vazio{padding:12px;border:1px dashed #acbac7;border-radius:8px;color:#59697b}.single .single-nome-livre{margin:4px 0}
+.single-gerir{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.single-gerir button{padding:6px 12px}
+.single-perigo{color:#a11d1d;border-color:#a11d1d}
