@@ -170,6 +170,7 @@ import { desligadosUnicos } from "./equipe/maturidade";
 import { ocupacaoDoQuadro, totalQuadro, ORDEM_PROJETOS } from "./equipe/quadroPrevisto";
 import { montarMatrizEfetivo } from "./relatorios/matrizEfetivo";
 import { carregarOcupacoes } from "./equipe/carregarOcupacoes";
+import LedVaga from "./equipe/LedVaga";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
@@ -3089,7 +3090,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
                             <span style={{ width:7, height:7, borderRadius:"50%", background:n>0?"#0ea5e9":"#334155", flexShrink:0 }}/>
                             <div style={{ flex:1, fontSize:12.5, color:txt, fontWeight:600 }}>{p.id} <span style={{ color:txt2, fontWeight:400 }}>— {p.name||""}</span></div>
                             {totalQuadro(p.id)>0
-                              ? <span style={{ fontSize:10.5, fontWeight:700, color:(n||0)<totalQuadro(p.id)?"#f59e0b":"#0ea5e9" }}>{n||0}/{totalQuadro(p.id)}{(n||0)<totalQuadro(p.id)?` · ${totalQuadro(p.id)-(n||0)} vaga(s)`:""}</span>
+                              ? <span style={{ fontSize:10.5, fontWeight:700, color:(n||0)<totalQuadro(p.id)?"#f59e0b":"#0ea5e9" }}><LedVaga vagas={totalQuadro(p.id)-(n||0)} tamanho={7}/>{n||0}/{totalQuadro(p.id)}{(n||0)<totalQuadro(p.id)?` · ${totalQuadro(p.id)-(n||0)} vaga(s)`:""}</span>
                               : (n>0 ? <span style={{ fontSize:10.5, fontWeight:700, color:"#0ea5e9" }}>{n} ativo(s)</span> : null)}
                             <span style={{ color:txt2, fontSize:16 }}>›</span>
                           </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { ocupacaoDoQuadro, turnoverSobreQuadro } from './quadroPrevisto';
 import { calcularMapaEquipe } from './maturidade';
 import { paleta } from './MaturidadeResumo';
+import LedVaga from './LedVaga';
 
 // Quadro de efetivo do projeto: postos previstos x ativos x vagas (gabarito Moked) e turnover sobre o quadro.
 export default function QuadroEfetivo({ projectId, equipe, hoje, dark = true, gerando = false, onMatriz }) {
@@ -15,9 +16,9 @@ export default function QuadroEfetivo({ projectId, equipe, hoje, dark = true, ge
   const completo = ocup.vagas === 0;
   const cor = completo ? '#22c55e' : '#f59e0b';
   const porPosto = ocup.semPosto === 0;
-  return <details style={{ border: `1px solid ${c.bd}`, borderRadius: 10, padding: 12, background: c.bg, color: c.fg }}>
+  return <details open={!completo} style={{ border: `1px solid ${completo ? c.bd : '#ef444488'}`, borderRadius: 10, padding: 12, background: c.bg, color: c.fg }}>
     <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
-      Quadro de efetivo: {ocup.ativos}/{ocup.previsto}
+      <LedVaga vagas={ocup.vagas} />Quadro de efetivo: {ocup.ativos}/{ocup.previsto}
       <span style={{ color: cor }}>{completo ? ' · quadro completo' : ` · ${ocup.vagas} vaga(s)`}</span>
       {ocup.excedente > 0 && <span style={{ color: '#f59e0b' }}> · {ocup.excedente} acima do previsto</span>}
     </summary>

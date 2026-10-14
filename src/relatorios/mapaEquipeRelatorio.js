@@ -1,7 +1,7 @@
 // Mapa de Equipe — padrão Moked (compacto: resumo + fichas em 3 colunas).
 // Toda a aritmética vem de equipe/maturidade.js (mesmo motor da tela).
 import { documentoMoked, escHTML as esc, dataBR } from './padraoMoked';
-import { totalQuadro, turnoverSobreQuadro } from '../equipe/quadroPrevisto';
+import { totalQuadro, turnoverSobreQuadro, ocupacaoDoQuadro } from '../equipe/quadroPrevisto';
 import { calcularMapaEquipe, rotuloTreinamentos, notaTreinamentos, TITULO_TREINAMENTOS, CONFIG_MATURIDADE, desligadosUnicos } from '../equipe/maturidade';
 
 export const ROTULOS = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Obrigatórios', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
@@ -130,6 +130,15 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const desligados = incluirDesligados ? desligadosUnicos(equipe.desligados, (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo')).unicos.filter(c => c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
   const alertas = modelo.alertas;
 
+  // Escopo considerado: postos, regime, escala e pessoas previstas (matriz de dimensionamento) + alerta de posto vago.
+  const ocup = ocupacaoDoQuadro(project?.id, equipe.colaboradores || []);
+  const porPosto = !!ocup && ocup.semPosto === 0;
+  const escopo = ocup ? `<section class="eq-escopo${ocup.vagas ? ' eq-escopo-vago' : ''}">
+    <div class="eq-esc-t"><b>Escopo considerado</b> <span class="mk-mu">· ${ocup.previsto} colaboradores previstos em ${ocup.linhas.reduce((s, l) => s + (l.postos || 1), 0)} posto(s)${ocup.excedente ? ` · ${ocup.excedente} acima do previsto` : ''}</span></div>
+    <div class="eq-esc-g">${ocup.linhas.map(l => `<div class="eq-esc-i${porPosto && l.vagas ? ' eq-esc-v' : ''}"><b>${l.postos || 1} posto${(l.postos || 1) > 1 ? 's' : ''} de ${esc(String(l.cargo).replace(/\s*\(\d+ postos?\)/i, ''))}</b> · ${esc(l.regime)} · ${esc(l.escala)}<br><span class="mk-mu">${l.qtd} pessoa(s): ${esc(l.composicao)}</span>${porPosto ? ` <b class="${l.vagas ? 'eq-v' : 'eq-ok'}">${l.ocupados}/${l.qtd}${l.vagas ? ` · ${l.vagas} vaga(s)` : ''}</b>` : ''}</div>`).join('')}</div>
+    ${ocup.vagas ? `<div class="eq-vago"><i class="eq-led"></i><b>POSTO VAGO:</b> ${ocup.vagas} vaga(s) em aberto em relação ao escopo (${ocup.ativos} ativos de ${ocup.previsto} previstos).${porPosto ? '' : ' Vaga por posto não detalhada: há cargo cadastrado que não identifica um posto único.'}</div>` : `<div class="eq-completo">Quadro completo: ${ocup.ativos} ativos para ${ocup.previsto} previstos.</div>`}
+  </section>` : '';
+
   const kpis = `<div class="mk-kpis eq-kpis">
     <div class="mk-k"><div class="mk-kl">Efetivo ativo</div><div class="mk-kv">${modelo.individuos.length}</div><div class="mk-nota">${quadro ? `de ${quadro} postos · ${Math.max(0, quadro - modelo.individuos.length)} vaga(s) · ` : ''}${modelo.quantidadeAferida} com índice aferido${fichas.length !== modelo.individuos.length ? ` · ${fichas.length} nas fichas` : ''}</div></div>
     <div class="mk-k"><div class="mk-kl">${esc(TITULO_TREINAMENTOS)}</div><div class="mk-kv ${tr.comRegistro ? '' : 'mk-mu'}" style="font-size:${tr.comRegistro ? '15pt' : '10pt'}">${tr.comRegistro ? `${tr.comRegistro12m} de ${tr.total} · ${pct(tr.percentual12m)}` : esc(rotuloTreinamentos(tr))}</div><div class="mk-nota">${tr.comRegistro ? 'colaboradores com treinamento registrado na ficha · ' : ''}${esc(notaTreinamentos(tr))}</div></div>
@@ -163,6 +172,9 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const css = `<style>
   .eq-empresa{height:32px;max-width:150px;object-fit:contain;margin:0 0 6px}
   .eq-kpis{grid-template-columns:1.1fr 1.9fr 1.1fr 1.3fr;gap:6px;margin-bottom:6px}.eq-kpis .mk-k{padding:5px 9px}.eq-kpis .mk-kv{font-size:14pt}.eq-kpis .mk-nota{margin-top:2px;line-height:1.25}
+  .eq-escopo{border:1px solid #E5E7EB;border-radius:8px;padding:5px 10px;margin-bottom:6px;page-break-inside:avoid;break-inside:avoid}.eq-escopo-vago{border-color:#FCA5A5}
+  .eq-esc-t{font-size:9pt;margin-bottom:3px}.eq-esc-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 12px;font-size:7.6pt;line-height:1.25}.eq-esc-i{padding:1px 0}.eq-esc-v{background:#FEF2F2}.eq-v{color:#B91C1C}.eq-ok{color:#15803D}
+  .eq-vago{margin-top:4px;padding:3px 6px;border-radius:4px;background:#FEF2F2;color:#991B1B;font-size:8pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}.eq-led{display:inline-block;width:8px;height:8px;border-radius:50%;background:#DC2626;margin-right:5px;vertical-align:middle}.eq-completo{margin-top:4px;font-size:7.8pt;color:#15803D}
   .eq-resumo{display:grid;grid-template-columns:210px 1fr 1fr;gap:10px;border:1px solid #E5E7EB;border-radius:8px;padding:5px 10px;margin-bottom:5px;page-break-inside:avoid}
   .eq-resumo svg{max-height:112px;width:auto;max-width:100%}
   .eq-top{margin:3px 0 0;padding-left:16px;font-size:8.4pt}.eq-top li{margin:1px 0}.eq-alertas{margin:3px 0 0;padding-left:14px;font-size:7.8pt;line-height:1.3}.eq-alertas li{margin:1px 0}
@@ -187,7 +199,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const fim = `<section class="eq-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div></div>
     <div class="eq-ass"><div class="mk-linha"></div><b>José Fonseca</b> · Consultor de Segurança · Moked Consulting Security · jose.fonseca@moked.com.br</div></section>`;
   // "Como ler" + assinatura formam um bloco indivisível (~25 mm): a assinatura nunca fica sozinha numa folha.
-  const corpo = `${css}${empresa.logo ? `<img class="eq-empresa" src="${esc(empresa.logo)}" alt="${esc(empresa.empresa || '')}">` : ''}${kpis}${resumo}${grade}${descricoesHTML}${desligadosHTML}<div class="mk-fecho">${comoLer}${fim}</div>`;
+  const corpo = `${css}${empresa.logo ? `<img class="eq-empresa" src="${esc(empresa.logo)}" alt="${esc(empresa.empresa || '')}">` : ''}${escopo}${kpis}${resumo}${grade}${descricoesHTML}${desligadosHTML}<div class="mk-fecho">${comoLer}${fim}</div>`;
   return documentoMoked({
     project, titulo: 'Mapa de Equipe',
     subtitulo: `${esc(project.id)} · ${esc(project.name || '')} · referência ${dataBR(hoje)} · motor de maturidade v1`,

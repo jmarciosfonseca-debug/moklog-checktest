@@ -32,3 +32,24 @@ describe('carregarOcupacoes', () => {
     expect(o.P311A.ativos).toBe(1);
   });
 });
+
+describe('Mapa de Equipe — escopo considerado e posto vago', () => {
+  const { gerarMapaEquipeHTML } = require('../relatorios/mapaEquipeRelatorio');
+  const base = (cols) => gerarMapaEquipeHTML({ project: { id: 'P311A', name: 'Mega CL Curitiba' }, equipe: { colaboradores: cols, desligados: [] }, hoje: '2026-10-13' });
+  it('lista postos, escala e pessoas e alerta posto vago', () => {
+    const cols = [...'abcd'].map((i) => ativo(`l${i}`, 'Vigilante Líder')).concat([...'abcd'].map((i) => ativo(`p${i}`, 'Porteiro CCO')), [...'abcd'].map((i) => ativo(`r${i}`, 'Vigilante Ronda')));
+    const html = base(cols);
+    expect(html).toContain('Escopo considerado');
+    expect(html).toContain('1 posto de Vigilante Líder');
+    expect(html).toContain('24h contínuo');
+    expect(html).toContain('POSTO VAGO');
+    expect(html).toContain('2 vaga(s) em aberto');
+    expect(html).toContain('0/2');
+  });
+  it('quadro completo não alerta vaga', () => {
+    const cols = [...'abcd'].map((i) => ativo(`l${i}`, 'Vigilante Líder')).concat([...'abcd'].map((i) => ativo(`p${i}`, 'Porteiro CCO')), [...'abcd'].map((i) => ativo(`r${i}`, 'Vigilante Ronda')), ['a', 'b'].map((i) => ativo(`x${i}`, 'Vigilante Apoio')).flat());
+    const html = base(cols);
+    expect(html).toContain('Quadro completo: 14 ativos para 14 previstos');
+    expect(html).not.toContain('POSTO VAGO');
+  });
+});
