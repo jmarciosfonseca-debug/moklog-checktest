@@ -36,6 +36,7 @@ import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
 import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
+const RdApp=React.lazy(()=>import("./rd/RdApp"));
 
 // ── Hook de conectividade
 function useOnlineStatus() {
@@ -3534,6 +3535,7 @@ export default function App(){
   const botaoMapaDiario=(proj)=>(<button onClick={()=>comPin(proj.id,()=>setMapaDiarioProject({id:proj.id,name:proj.name}))} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"14px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="mapa-equipe" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Mapa de Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Mapa diário do turno</div></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>);
   const [showRegistros,setShowRegistros]=useState(false);
   const [showDiagnostico,setShowDiagnostico]=useState(false);
+  const [showRd,setShowRd]=useState(false);
   const [showAcessoCCO,setShowAcessoCCO]=useState(false);
   const [acessoCCOProject,setAcessoCCOProject]=useState(null);
   const [acessoCCOAbas,setAcessoCCOAbas]=useState(null); // filtro de abas p/ Jatinox B/C (Supervisão+Manutenção)
@@ -4137,6 +4139,7 @@ export default function App(){
   );
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
+  if(showRd) return <ErrorBoundary moduleName="MK RD"><React.Suspense fallback={<p style={{color:"#94a3b8",padding:20}}>Abrindo o MK RD…</p>}><RdApp auth={auth} onBack={()=>setShowRd(false)}/></React.Suspense></ErrorBoundary>;
   if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} projects={PROJECTS} projectGroups={{golgi:["P601","P602","P604","P605","P606","P607"],mega:["P311A","P311B"],klog:["P505"]}} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
   if(mapaDiarioProject) return <ErrorBoundary moduleName="Mapa de Equipe diário"><MapaDiarioTela project={mapaDiarioProject} dark={dark} onBack={()=>setMapaDiarioProject(null)}/></ErrorBoundary>;
   if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)} nomesProjetos={Object.fromEntries(ORDEM_PROJETOS.map(pid=>[pid,PROJECTS[pid]?.name||""]))}/></ErrorBoundary>;
@@ -4755,6 +4758,12 @@ export default function App(){
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:T.diagTxt}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:T.diagSub,marginTop:3}}>Catálogo publicado · rascunho local</div></div>
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
+          {hasGerencial()&&<button onClick={()=>setShowRd(true)}
+            style={{marginBottom:10,width:"100%",background:T.diagBg,border:`1.5px solid ${T.diagBorder}`,borderRadius:18,padding:"16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:T.diagShadow}}>
+            <IconeModulo n="calendario" cor="#f59e0b" arq="mkrd" bg="#f59e0b14" txt="#f59e0b"/>
+            <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:T.diagTxt}}>MK RD · Relatório Diário</div><div style={{fontSize:11,color:T.diagSub,marginTop:3}}>Trechos do dia · km · visitas · GPS</div></div>
+            <span style={{color:T.diagArrow,fontSize:20}}>›</span>
+          </button>}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {[
               {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#559ba4", ids:["P601","P602","P604","P605","P606","P607"]},
