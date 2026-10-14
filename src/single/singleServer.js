@@ -69,7 +69,7 @@ async function executar(db,u,b){
    const agora=new Date().toISOString();
    origem.forEach((d,i)=>{
     if(existentes[i].exists)return;
-    tx.set(alvos[i],{tipo:"novo",projetoRef:null,rotuloLivre:old.nome,grupo:null,estado:d.estado==="arquivado"?"arquivado":"rascunho",respostas:limparRespostas(d.respostas,agora),
+    tx.set(alvos[i],{tipo:"novo",projetoRef:null,rotuloLivre:old.nome,grupo:null,estado:["arquivado","concluido"].includes(d.estado)?d.estado:"rascunho",respostas:limparRespostas(d.respostas,agora),
      catalogoId:texto(d.catalogoId||"mestre"),versaoCatalogo:texto(String(d.versaoCatalogo||"1")),autorUid:u.uid,criadoEm:d.criadoEm||agora,atualizadoEm:agora,arquivadoEm:d.estado==="arquivado"?agora:null,importadoDe:chave,revisao:1});
    });
    const next={...old,diagnosticoImportado:{chave,rotuloLivre:String(origem[0].rotuloLivre||""),em:agora,itens:origem.length},revisao:(old.revisao||0)+1,atualizadoEm:agora};
@@ -104,8 +104,10 @@ async function executar(db,u,b){
    target=db.collection("diagnosticos").doc(pid).collection("itens").doc(id(b.diagnosticoId));
    const ds=await tx.get(target);current=ds.exists?ds.data():null;
    const input=b.data||{};
-   if(!["rascunho","arquivado"].includes(input.estado))throw erro(400,"Diagnóstico inválido.");
+   if(!["rascunho","concluido","arquivado"].includes(input.estado))throw erro(400,"Diagnóstico inválido.");
    const respostas=limparRespostas(input.respostas,agora);
+   // "Concluído" é o que libera o Modelo 2 da Análise de Risco; o catálogo completo é conferido na tela, aqui exige ao menos uma resposta.
+   if(input.estado==="concluido"&&!Object.keys(respostas).length)throw erro(400,"Não há como concluir um diagnóstico sem respostas.");
    next={tipo:"novo",projetoRef:null,rotuloLivre:old.nome,grupo:null,estado:input.estado,respostas,
     catalogoId:current?.catalogoId||texto(input.catalogoId),versaoCatalogo:current?.versaoCatalogo||texto(input.versaoCatalogo),
     autorUid:current?.autorUid||u.uid,criadoEm:current?.criadoEm||agora,arquivadoEm:input.estado==="arquivado"?agora:null};

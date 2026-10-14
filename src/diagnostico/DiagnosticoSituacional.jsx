@@ -252,7 +252,7 @@ export default function DiagnosticoSituacional({ auth, db, dark, onToggleTheme, 
   const relatorio=useMemo(()=>montarRel(respostas,{id:projetoContexto?.diagnosticoId||null,estado:projetoContexto?.estado||"rascunho",baseId:projetoContexto?.baseId||null}),[montarRel,respostas,projetoContexto]);
   // Concluir: só quando TODOS os itens foram respondidos (qualquer status conta). Só um diagnóstico concluído entra na Análise de Risco (2º modelo).
   const diagCompleto=relatorio.total>0&&relatorio.respondidos===relatorio.total;
-  const podeConcluir=!projetoContexto?.single&&projetoContexto?.tipo==="existente";
+  const podeConcluir=projetoContexto?.tipo==="existente"||projetoContexto?.tipo==="novo"||!!projetoContexto?.single;
   const concluirDiagnostico=()=>{if(!diagCompleto)return;if(!window.confirm("Concluir este diagnóstico? Ele passa a poder ser anexado à Análise de Risco. Se você editar depois, ele volta a rascunho até ser concluído de novo."))return;salvarDiagnostico("concluido");};
   const ROTULO_ESTADO={rascunho:"Rascunho",concluido:"Concluído",arquivado:"Arquivado"};
   const exportarPdf=()=>{setExportError("");try{const rel=montarRel(respostas,{id:projetoContexto?.diagnosticoId||null,estado:projetoContexto?.estado||"rascunho",baseId:projetoContexto?.baseId||null});abrirParaImpressao(gerarDiagnosticoHTML(rel),nomeArquivoDiagnostico(rel,"html"));}catch(e){console.error("[diagnostico] falha ao gerar PDF",e);setExportError("Não foi possível gerar o PDF neste aparelho.");}};

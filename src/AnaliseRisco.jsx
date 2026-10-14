@@ -175,7 +175,7 @@ function ehPreponderante(label) {
 // ═════════════════════════════════════════════════════════════
 
 // ── FONTE 1: Teste Semanal (state do último history) ─────────
-function coletarTesteSemanal(project, stored) {
+export function coletarTesteSemanal(project, stored) {
   const hist = stored?.[project.id]?.history ?? [];
   if (!hist.length) return { ok: false, temDado: false, motivo: "sem relatório semanal registrado" };
   const last = hist[hist.length - 1];
@@ -1315,7 +1315,9 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     : `<div class="impact-empty">Nenhum vetor determinante de impacto foi identificado no período. Manter monitoramento e rotinas preventivas.</div>`;
   const conexaoTerritorial = regional?.ok
     ? `<div class="impact-territorial"><b>Conexão territorial.</b> Os efeitos acima podem ganhar relevância quando coincidem com os vetores documentados no entorno de ${esc(regional.municipioUF || project.id)}. O território contextualiza a urgência, mas não altera sozinho a classificação operacional.</div>`
-    : `<div class="impact-territorial"><b>Conexão territorial.</b> A classificação permanece baseada exclusivamente nas evidências operacionais. O cruzamento com o entorno será complementado quando o levantamento territorial deste ativo estiver concluído.</div>`;
+    : project.single
+      ? `<div class="impact-territorial"><b>Conexão territorial.</b> Cliente avulso (Single): não há levantamento territorial cadastrado. O entorno entra apenas como contexto e nunca altera a classe, que se baseia nas evidências operacionais.</div>`
+      : `<div class="impact-territorial"><b>Conexão territorial.</b> A classificação permanece baseada exclusivamente nas evidências operacionais. O cruzamento com o entorno será complementado quando o levantamento territorial deste ativo estiver concluído.</div>`;
 
   // ── Diagnóstico territorial (seção nativa, mapa embutido) ──
   // Campos reais do regionalConfig: quadrantes[{lado,regiao,grau,vetores[{desc}]}], protecao[].
@@ -1414,7 +1416,9 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
           ${mapaDataUrl ? `<div class="mapa-cap">Figura — mapa de referência do ${esc(project.id)}. O diagnóstico territorial interpretativo permanece em elaboração.</div>` : ""}
           <div class="terr-pend">
             <div class="tp-ico">🛈</div>
-            <div class="tp-txt">O <b>diagnóstico territorial</b> deste ativo está <b>em elaboração</b> e será incorporado a este documento assim que concluído. A classificação de risco acima considera exclusivamente os <b>vetores operacionais</b> apurados no período; o entorno será somado como fator contextual quando o levantamento oficial estiver disponível.</div>
+            <div class="tp-txt">${project.single
+              ? "Cliente avulso (<b>Single</b>): <b>não há diagnóstico territorial cadastrado</b>. A classificação de risco considera exclusivamente os <b>vetores operacionais</b> da vistoria e do Diagnóstico Situacional; o entorno, quando levantado, entra só como contexto e <b>não altera a classe</b>."
+              : "O <b>diagnóstico territorial</b> deste ativo está <b>em elaboração</b> e será incorporado a este documento assim que concluído. A classificação de risco acima considera exclusivamente os <b>vetores operacionais</b> apurados no período; o entorno será somado como fator contextual quando o levantamento oficial estiver disponível."}</div>
           </div>
         </div>
       </div>
@@ -1458,7 +1462,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   const conclusaoForca = nivelGeral === NIVEIS.BAIXO
     ? "Essa solidez sustenta a classificação atual e permite tratar eventuais itens de manutenção de forma programada, sem caracterizá-los como vetores determinantes."
     : "Essa solidez torna a correção dos vetores acima <b>rápida e viável</b>, com prioridade proporcional à classificação apurada.";
-  const forcaTxt = `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} cobertura consistente. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b> e a ` : "A "}maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde de equipamentos)` : ""}. ${conclusaoForca}`;
+  const forcaSingle = `A maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde dos equipamentos na vistoria do Single)` : ""}. Equipe e território não foram aferidos neste documento. ${conclusaoForca}`;
+  const forcaTxt = project.single ? forcaSingle : `A base operacional é <b>robusta</b>: efetivo${armada ? " <b>armado</b>," : ""}${cco ? " <b>CCO dedicada 24h</b> e" : ""} cobertura consistente. ${rv?.ok ? `A ronda virtual roda a <b>${rv.pct}%</b> e a ` : "A "}maioria dos sistemas opera normalmente${ts?.ok ? ` (<b>${ts.pct}%</b> de saúde de equipamentos)` : ""}. ${conclusaoForca}`;
 
   // ── Régua (marca o nível) ──
   const reguaCells = [
@@ -1563,12 +1568,13 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       <div class="ar-sd">Saúde <b>${Math.round(rb.saude)}%</b> <span class="ar-mu">(igual ao laudo)</span></div></div></div></div>
       <div><div class="ar-lb">Onde estão as falhas · ${rb.parcial + rb.inop} ${rb.parcial + rb.inop === 1 ? "item" : "itens"}</div>${barras}</div></section>`;
   }
-  const theme = getTheme(project.id) || {};
+  // Single: cliente avulso não herda logo/tema de nenhum projeto (getTheme cai no P601).
+  const theme = project.single ? {} : (getTheme(project.id) || {});
   const topoHTML = `<header class="ar-topo"><div class="ar-logos"><img src="${MOKED_LOGO}" class="ar-lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="ar-sep"></span><img src="${theme.empresaLogo}" class="ar-lg" alt="${esc(theme.empresaNome || "")}">` : ""}</div>
     <div class="ar-meta"><div><b>Análise de Risco</b> · Nº ${esc(dg ? refModelo2(ref) : ref)}</div><div>Emissão ${esc(hoje)} · José Fonseca</div><div>Período ${esc(periodo)} · ${nFontes} ${nFontes === 1 ? "fonte" : "fontes"}</div></div></header>
     <div class="ar-regua"></div>
     <h1 class="ar-h1">Análise de Risco de Segurança</h1>
-    <p class="ar-sub"><b>${esc(project.id)} — ${esc(project.name || "")}</b>${dg ? " · Modelo 2 — com Diagnóstico Situacional" : ""}${ts?.ok ? ` · base: laudo semanal de ${esc(ts.data || "")}` : ""}${fontesUsadas.length ? ` · ${fontesUsadas.map((f) => esc(f.titulo)).join(" · ")}` : ""}</p>
+    <p class="ar-sub"><b>${esc(project.id)}${project.name && project.name !== project.id ? ` — ${esc(project.name)}` : ""}</b>${dg ? " · Modelo 2 — com Diagnóstico Situacional" : ""}${ts?.ok ? ` · base: laudo semanal de ${esc(ts.data || "")}` : ""}${fontesUsadas.length ? ` · ${fontesUsadas.map((f) => esc(f.titulo)).join(" · ")}` : ""}</p>
     <section class="ar-hero"><div><div class="ar-lb">Classificação do ativo</div><div class="ar-cls" style="color:${corVeredito}">${esc(labelGeral)}</div>
       <div class="regua">${reguaCells}</div><div class="regualeg"><span>menor exposição</span><span>maior exposição</span></div></div>
       <div><div class="ar-lb">Por que</div>${porQueHTML}</div></section>`;
@@ -1894,6 +1900,12 @@ async function coletarDiagnostico(pid) {
   const snap = await getDocs(query(collection(db, "diagnosticos", pid, "itens"), ...filtros));
   const todos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   // Só diagnóstico CONCLUÍDO entra (13/10/2026): rascunho não alimenta a Análise de Risco.
+  return montarDadoDiagnostico(todos, { projetoRef: pid });
+}
+
+// Monta o dado do Diagnóstico para a Análise de Risco a partir dos documentos já lidos (Firestore direto ou API do Single).
+// Só diagnóstico CONCLUÍDO entra; o catálogo vem de catalogos_diagnostico/{catalogoId}.
+export async function montarDadoDiagnostico(todos, { projetoRef = "", nomeProjeto = "" } = {}) {
   const escolhido = escolherDiagnosticoConcluido(todos);
   if (!escolhido) return { ok: false, temDado: false, motivo: motivoSemConcluido(todos) };
   const rootRef = doc(db, "catalogos_diagnostico", CATALOGO_REF.catalogoId);
@@ -1905,7 +1917,7 @@ async function coletarDiagnostico(pid) {
   const total = itens.filter((i) => i.deprecado !== true).length;
   const resp = Object.keys(escolhido.respostas).filter((k) => escolhido.respostas[k]?.status).length;
   let modelo2 = null;
-  try { if (catalogo) modelo2 = resumoModelo2({ catalogo, itens, diag: escolhido, todos, projetoRef: pid }); } catch { modelo2 = null; }
+  try { if (catalogo) modelo2 = resumoModelo2({ catalogo, itens, diag: escolhido, todos, projetoRef, nomeProjeto }); } catch { modelo2 = null; }
   return { ok: true, temDado: true, id: escolhido.id, respostas: escolhido.respostas, itens, rotulo: n ? `Revisão ${n}` : "", atualizadoEm: escolhido.atualizadoEm || "", percentual: total ? Math.round((resp / total) * 100) : 0, modelo2 };
 }
 
@@ -2007,7 +2019,7 @@ export function classificarProjeto(project, vetoresEntrada, dados = {}) {
   // tático, consolidado >= maior vetor, "por quê" pelo vetor de maior classe
   // e memória de cálculo em soma. A matriz histórica entra como um dos
   // insumos; o resultado nunca fica abaixo dela nem do maior vetor.
-  const v2 = aplicarMotorV2({ pid: project.id, vetores, pend: dados.ts?.pend || [], matriz, dataTeste: dados.ts?.data || "" });
+  const v2 = aplicarMotorV2({ pid: project.id, vetores, pend: dados.ts?.pend || [], matriz, dataTeste: dados.ts?.data || "", perfil: project.perfilBarreiras || null });
   vetores = v2.vetores.sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
 
   // Moduladores (sinistro + regional) — contexto, nunca alteram a classe.
@@ -2054,7 +2066,7 @@ export function classificarProjeto(project, vetoresEntrada, dados = {}) {
 }
 
 // Monta a lista de vetores + base documental a partir dos dados coletados.
-function montarAnalise(project, pacoteLabel, dados, contextos) {
+export function montarAnalise(project, pacoteLabel, dados, contextos) {
   let vetores = [];
   const dataUlt = dados.ts?.ok ? dados.ts.data : hojeBR();
 

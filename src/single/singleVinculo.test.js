@@ -45,6 +45,12 @@ test("importar_diagnostico copia as respostas para o Single e registra a origem"
  expect(db.values[`diagnosticos/${chave}/itens/seg`].respostas).toEqual(resp); // origem intacta
  await expect(executar(db,ua,{acao:"importar_diagnostico",pid:p.id,chave,revisao:r.data.revisao})).rejects.toMatchObject({status:409});
 });
+test("importar_diagnostico preserva o estado 'concluido' do diagnóstico de origem",async()=>{
+ const o=origem();o[`diagnosticos/${chave}/itens/seg`].estado="concluido";
+ const db=banco(o);const p=(await criar(db)).data;
+ await executar(db,ua,{acao:"importar_diagnostico",pid:p.id,chave,revisao:p.revisao});
+ expect(db.values["diagnosticos/sg_pxxx/itens/seg"].estado).toBe("concluido");
+});
 test("importar_diagnostico recusa chave de outro usuário, revisão velha e origem vazia",async()=>{
  const db=banco({...origem(),"diagnosticos/novo_a_vazio_z/itens/seg":{tipo:"novo",rotuloLivre:"Vazio",respostas:{},autorUid:"a"}});const p=(await criar(db)).data;
  await expect(executar(db,ua,{acao:"importar_diagnostico",pid:p.id,chave:"novo_b_outro_x",revisao:p.revisao})).rejects.toMatchObject({status:403});

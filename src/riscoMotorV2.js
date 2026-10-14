@@ -67,8 +67,8 @@ const ehTransponivel = (p) => {
 
 // Avalia as vias transponíveis de um projeto a partir das pendências do
 // Teste Semanal ({ catLabel, itemLabel, status, dias, note }).
-export function avaliarViasTransponiveis(pid, pend = []) {
-  const perfil = perfilBarreiras(pid);
+export function avaliarViasTransponiveis(pid, pend = [], perfilProprio = null) {
+  const perfil = perfilProprio || perfilBarreiras(pid);
   const vias = [];
   const semAgravante = [];
   for (const p of pend) {
@@ -144,8 +144,9 @@ const rotuloCat = (label) => String(label || "").replace(/^\d+[A-Z]?\s*-\s*/, ""
 // pendências do Teste Semanal e o resultado da matriz histórica. Devolve
 // vetores ajustados, nível consolidado, vetor determinante e a memória
 // de cálculo em forma de soma.
-export function aplicarMotorV2({ pid, vetores = [], pend = [], matriz = null, dataTeste = "" }) {
-  const avaliacao = avaliarViasTransponiveis(pid, pend);
+export function aplicarMotorV2({ pid, vetores = [], pend = [], matriz = null, dataTeste = "", perfil: perfilProprio = null }) {
+  // `perfilProprio`: projeto sem entrada em PERFIL_BARREIRAS (Single) traz o perfil montado dos itens cadastrados.
+  const avaliacao = avaliarViasTransponiveis(pid, pend, perfilProprio);
   const perfil = avaliacao.perfil;
   const viasPorCat = new Map();
   avaliacao.vias.forEach((via) => {
