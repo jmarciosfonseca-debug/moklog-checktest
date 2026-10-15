@@ -48,6 +48,8 @@ test("fluxo fluido: toque no destino abre; visita no mesmo card com chavinha e l
     const chaveAdm = host.querySelector('[aria-label="Contato com a administração"]');
     await act(async () => { chaveAdm.click(); });
     await digitar(host.querySelector('[aria-label="Observação contato com a administração"]'), "Alinhamento geral");
+    // km rodado calculado em tempo real, antes mesmo de fechar
+    expect(host.textContent).toContain("rodou 74 km");
     // cheguei: fecha com o km cravado, sem digitar nada
     await clicar(host, "Cheguei — fechar o trecho");
     expect(host.textContent).toContain("Você está em MK602");
@@ -119,13 +121,59 @@ test("em casa com o dia rodado aparece Fechar o dia; Configurar fica atrás do �
   ] }, memoria: { revisao: 3 } });
   try {
     await montar(host, root);
-    expect(botao(host, "Fechar o dia e gerar o RD")).toBeDefined();
+    expect(botao(host, "Salvar e arquivar o dia — gerar o RD")).toBeDefined();
+    expect(host.textContent).toContain("rodou 74 km");                // km do trecho calculado na chegada
     expect(host.textContent).not.toContain("Km carro (R$)");          // configuração fora da tela do dia
     await clicar(host, "⚙");
     expect(host.textContent).toContain("MK RD · Configurar");
-    expect(porLabel(host, "Km carro")).toBeDefined();
+    // a configuração salva sozinha ao digitar (sem botão de salvar)
+    expect(botao(host, "Salvar configuração")).toBeUndefined();
+    await digitar(porLabel(host, "Km carro"), "1,10");
+    await act(async () => { await new Promise((r) => setTimeout(r, 1400)); });
+    const cfg = mockStore.salvar.mock.calls.at(-1)[0];
+    expect(cfg.memoria.config.valorKm).toBe("1,10");
+    expect(host.textContent).toContain("Configuração salva");
     await clicar(host, "← Voltar ao dia");
     expect(host.textContent).toContain("Você está em MK Home");
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("salvar e arquivar: confirma o km final, fecha o dia e abre a pasta de RDs arquivados", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  mockStore.ler.mockResolvedValue({ dia: { data: "2026-10-15", estado: "aberto", revisao: 2, trechos: [
+    { id: "t1", origem: "MK_HOME", destino: "MK602", veiculo: "carro", kmInicial: 100, kmFinal: 174, abertura: { em: "2026-10-15T05:14:00.000-03:00" }, chegada: { em: "2026-10-15T06:16:00.000-03:00" }, pedagios: [], gastos: [], atividades: [{ texto: "Trocar a fechadura", status: "aberto" }], obs: "" },
+    { id: "t2", origem: "MK602", destino: "MK_HOME", veiculo: "carro", kmInicial: 174, kmFinal: 248, abertura: { em: "2026-10-15T06:17:00.000-03:00" }, chegada: { em: "2026-10-15T07:20:00.000-03:00" }, pedagios: [], gastos: [], atividades: [], obs: "" },
+  ] }, memoria: { revisao: 3 } });
+  mockStore.dias.mockResolvedValue({ dias: [{ data: "2026-10-15", estado: "fechado", trechos: 2 }, { data: "2026-10-14", estado: "fechado", trechos: 4 }] });
+  const confirmar = jest.spyOn(window, "confirm").mockReturnValue(true);
+  const abrirJanela = jest.spyOn(window, "open").mockReturnValue({ document: { open: () => {}, write: () => {}, close: () => {} } });
+  try {
+    await montar(host, root);
+    await clicar(host, "Salvar e arquivar o dia — gerar o RD");
+    expect(confirmar.mock.calls.at(-1)[0]).toContain("Km final do dia: 248");          // "quilometragem final está correta?"
+    const salvo = mockStore.salvar.mock.calls.at(-1)[0];
+    expect(salvo.dia.estado).toBe("fechado");
+    expect(salvo.memoria.pendencias.MK602[0].texto).toBe("Trocar a fechadura");        // lembrete vira pendência p/ próxima visita
+    expect(host.textContent).toContain("salvo e arquivado");
+    // pasta de arquivados: a listinha dos dias, com estado
+    await clicar(host, "🗂 Ver RDs arquivados");
+    expect(host.textContent).toContain("MK RD · Arquivados");
+    expect(host.textContent).toContain("14/10/2026");
+    expect(host.textContent).toContain("Arquivado");
+    // abrir o RD do dia 14 direto da lista
+    await clicar(host, "14/10/2026");
+    expect(mockStore.ler.mock.calls.at(-1)[0]).toBe("2026-10-14");
+  } finally { confirmar.mockRestore(); abrirJanela.mockRestore(); await act(async () => root.unmount()); host.remove(); }
+});
+
+test("tema acompanha o app: claro ganha .rd-claro, escuro fica no padrão", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<RdApp auth={{ currentUser: { uid: "u" } }} onBack={() => {}} dark={false} criarMarcoFn={criarMarcoFn} comprimirFotoFn={comprimirFotoFn} />));
+    expect(host.querySelector("main.rd.rd-claro")).not.toBeNull();
+    await act(async () => root.render(<RdApp auth={{ currentUser: { uid: "u" } }} onBack={() => {}} dark criarMarcoFn={criarMarcoFn} comprimirFotoFn={comprimirFotoFn} />));
+    expect(host.querySelector("main.rd.rd-claro")).toBeNull();
+    expect(host.querySelector("main.rd")).not.toBeNull();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 

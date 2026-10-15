@@ -3,7 +3,7 @@
 // • a visita (chavinhas de administração/equipe, tratativas, lembretes) fica no MESMO card, disponível desde a saída;
 // • fechou o trecho → a escolha do próximo destino já aparece embaixo: um toque no destino abre o trecho;
 // • Configurar (valores de km, fechamento, dias anteriores) fica atrás do ⚙, fora do caminho do dia.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { criarRdStore } from "./rdStore";
 import { criarMarco, linkMapa } from "./rdGeo";
 import { imprimirRd } from "./rdPdf";
@@ -29,7 +29,11 @@ const Marco = ({ rotulo, marco, onHora }) => !marco ? null : (
 const TRATATIVAS_PADRAO = [["adm", "Contato com a administração"], ["equipe", "Contato com a equipe"]];
 const obsDaTag = (t, tag, rotulo) => { const a = (t.atividades || []).find((x) => x.tag === tag); if (!a) return null; return a.texto.startsWith(rotulo + " — ") ? a.texto.slice(rotulo.length + 3) : ""; };
 
-export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprimirFotoFn = comprimirFoto }) {
+// Km rodado em tempo real: número a partir do que está digitado no painel.
+const kmNum = (v) => { if (v == null || v === "") return null; const n = Number(String(v).replace(",", ".")); return Number.isFinite(n) ? n : null; };
+const rodadoEntre = (ini, fim) => { const a = kmNum(ini), b = kmNum(fim); return a != null && b != null && b >= a ? b - a : null; };
+
+export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarMarco, comprimirFotoFn = comprimirFoto }) {
   const store = useMemo(() => criarRdStore(auth), [auth]);
   const uid = auth?.currentUser?.uid || "anon";
   const [data, setData] = useState(hojeISO());
@@ -46,6 +50,9 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   const [dias, setDias] = useState([]);
   const [pronto, setPronto] = useState(false);
   const [expandido, setExpandido] = useState(null); // trecho antigo aberto na linha do dia
+  const [arquivo, setArquivo] = useState(false);    // pasta "RDs arquivados"
+  const cfgTimer = useRef(null);                    // a configuração salva sozinha (debounce)
+  const tema = "rd" + (dark ? "" : " rd-claro");    // acompanha o tema do app
 
   async function run(fn) { if (busy) return; setBusy(true); setError(""); setNotice(""); try { await fn(); } catch (e) { setError(e.message || "Não foi possível concluir. Rascunho local preservado."); } finally { setBusy(false); } }
 
@@ -136,15 +143,33 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   }
   async function fecharDia() {
     const ultimoDoCiclo = Number(data.slice(8, 10)) === diaFechamento();
-    if (!window.confirm("Fechar o dia e gerar o RD?" + (ultimoDoCiclo ? "\n\nHoje é o dia de fechamento do período: o consolidado do mês também será gerado." : ""))) return;
+    // Confirmação do km final do dia antes de arquivar: "quilometragem final está correta?"
+    const ultimoT = dia.trechos[dia.trechos.length - 1];
+    const perguntaKm = ultimoT?.kmFinal != null && ultimoT.kmFinal !== "" ? `Km final do dia: ${ultimoT.kmFinal} — confere com o painel?\n\n` : "";
+    if (!window.confirm(perguntaKm + "Salvar e arquivar o dia? O RD é gerado e o dia vai para a pasta de RDs arquivados." + (ultimoDoCiclo ? "\n\nHoje é o dia de fechamento do período: o consolidado do mês também será gerado." : ""))) return;
     let novaMem = mem;
     for (const t of dia.trechos) if ((t.atividades || []).length) novaMem = memoriaAposVisita(novaMem, t.destino, t.atividades, data);
     const novoDia = { ...dia, estado: "fechado" };
     setDia(novoDia); setMem(novaMem);
     await salvar(novoDia, novaMem);
+    try { const d = await store.dias(); setDias(d.dias || []); } catch { /* lista atualiza na próxima */ }
+    setNotice(`RD de ${dataBR(data)} salvo e arquivado. Os lembretes em aberto reaparecem na próxima visita a cada projeto.`);
     await imprimirComFotos(novoDia, novaMem);
     if (ultimoDoCiclo) { try { await gerarConsolidado(data); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
   }
+
+  // Configuração salva sozinha (1,2 s após a última tecla). Nesta fase os valores são do consultor;
+  // na evolução, a edição passa a ser exclusiva da gerência Moked.
+  const mudarConfig = (patch) => {
+    const novaMem = { ...mem, config: { ...(mem?.config || {}), ...patch } };
+    setMem(novaMem);
+    clearTimeout(cfgTimer.current);
+    cfgTimer.current = setTimeout(async () => {
+      try { await salvar(dia, novaMem); setNotice("Configuração salva."); }
+      catch (e) { setError("A configuração não salvou: " + (e.message || "erro") + " Mexa num valor para tentar de novo."); }
+    }, 1200);
+  };
+  useEffect(() => () => clearTimeout(cfgTimer.current), []);
 
   // ── Blocos reutilizáveis (funções de render — ver nota acima) ────────────────
   const renderGastos = (t) => <>
@@ -179,7 +204,8 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
       <h3>Visita · {rotuloDestino(mem, t.destino)}</h3>
       {pend.length > 0 && <div className="rd-pend"><strong>Pendente da última visita:</strong>
         {pend.map((p, i) => <p key={i}>⚠ {p.texto} <em>(desde {dataBR(p.desde)})</em>
-          <button className="rd-link" onClick={() => mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: p.texto, status: "finalizado", desde: p.desde }] })}>dar baixa</button></p>)}
+          <button className="rd-link" onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: p.texto, status: "finalizado", desde: p.desde }] }); setNotice("Concluído: sai da lista de pendências quando o dia for arquivado."); }}>✓ Concluir</button></p>)}
+        <p className="rd-micro">O que não for concluído continua pendente e reaparece na próxima visita.</p>
       </div>}
       {TRATATIVAS_PADRAO.map(([tag, rotulo]) => {
         const obs = obsDaTag(t, tag, rotulo);
@@ -230,36 +256,50 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   const tot = totaisDoDia(dia);
   const perm = permanencias(dia);
 
-  if (!pronto) return <main className="rd"><header><button onClick={onBack}>← Início</button><h1>MK RD</h1></header><p role="status">Abrindo o dia…</p></main>;
+  if (!pronto) return <main className={tema}><header><button onClick={onBack}>← Início</button><h1>MK RD</h1></header><p role="status">Abrindo o dia…</p></main>;
+
+  // ── Pasta "RDs arquivados": a listinha dos dias, para abrir, conferir e ajustar ─
+  if (arquivo) return <main className={tema}>
+    <header><button onClick={() => setArquivo(false)}>← Voltar ao dia</button><h1>MK RD · Arquivados</h1>
+      <p>Toque num dia para abrir o RD dele — dá para conferir, gerar o PDF e, se precisar, reabrir e ajustar.</p></header>
+    {error && <div role="alert" className="rd-erro">{error}</div>}
+    <section className="rd-card">
+      {data !== hojeISO() && <button className="rd-link" onClick={() => { setData(hojeISO()); setArquivo(false); }}>↩ Voltar para o dia de hoje</button>}
+      {dias.length === 0 && <p className="rd-micro">Nenhum RD arquivado ainda. Feche um dia com "Salvar e arquivar" e ele aparece aqui.</p>}
+      {dias.map((d) => <button key={d.data} className="rd-arq-item" onClick={() => { setData(d.data); setArquivo(false); }}>
+        <div><strong>{dataBR(d.data)}</strong><span>{d.trechos} trecho{d.trechos === 1 ? "" : "s"}</span></div>
+        <em className={d.estado === "fechado" ? "ok" : "andamento"}>{d.estado === "fechado" ? "Arquivado" : "Em aberto"}</em>
+      </button>)}
+    </section>
+  </main>;
 
   // ── Tela de configuração (fora do fluxo do dia) ──────────────────────────────
-  if (config) return <main className="rd">
+  if (config) return <main className={tema}>
     <header><button onClick={() => setConfig(false)}>← Voltar ao dia</button><h1>MK RD · Configurar</h1></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}
     <section className="rd-card">
       <div className="rd-linha">
-        <label>Km carro (R$)<input inputMode="decimal" value={mem?.config?.valorKm ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorKm: e.target.value } })} /></label>
-        <label>Km moto (R$)<input inputMode="decimal" value={mem?.config?.valorKmMoto ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorKmMoto: e.target.value } })} /></label>
+        <label>Km carro (R$)<input inputMode="decimal" value={mem?.config?.valorKm ?? ""} onChange={(e) => mudarConfig({ valorKm: e.target.value })} /></label>
+        <label>Km moto (R$)<input inputMode="decimal" value={mem?.config?.valorKmMoto ?? ""} onChange={(e) => mudarConfig({ valorKmMoto: e.target.value })} /></label>
       </div>
       <div className="rd-linha">
-        <label>Diária (R$)<input inputMode="decimal" value={mem?.config?.valorDiaria ?? ""} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), valorDiaria: e.target.value } })} /></label>
-        <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 18} onChange={(e) => setMem({ ...mem, config: { ...(mem?.config || {}), fechamentoDia: e.target.value } })} /></label>
+        <label>Diária (R$)<input inputMode="decimal" value={mem?.config?.valorDiaria ?? ""} onChange={(e) => mudarConfig({ valorDiaria: e.target.value })} /></label>
+        <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 18} onChange={(e) => mudarConfig({ fechamentoDia: e.target.value })} /></label>
       </div>
-      <button disabled={busy} onClick={() => run(async () => { await salvar(dia, mem); setNotice("Configuração salva."); })}>Salvar configuração</button>
+      <p className="rd-micro">Os valores salvam sozinhos ao digitar. Nesta fase de teste a configuração é sua; na evolução, só a gerência Moked edita.</p>
       <button className="rd-link" disabled={busy} onClick={() => run(() => gerarConsolidado(data))}>Gerar consolidado do período atual (PDF)</button>
     </section>
-    {dias.length > 0 && <section className="rd-card"><h3>Dias anteriores</h3><div className="rd-dias">{dias.slice(0, 14).map((d) => <button key={d.data} aria-pressed={d.data === data} onClick={() => { setData(d.data); setConfig(false); }}>{dataBR(d.data)} · {d.trechos} trecho(s)</button>)}{data !== hojeISO() && <button onClick={() => { setData(hojeISO()); setConfig(false); }}>Voltar para hoje</button>}</div></section>}
   </main>;
 
   // ── Tela do dia: os trechos em LINHA (como o RD do 2CONTROL) ─────────────────
   // Um card por trecho, em ordem cronológica. Os antigos ficam recolhidos num resumo de uma
   // linha e abrem num toque para corrigir hora, km, gastos e visita; o trecho atual (em
   // deslocamento ou a visita de agora) fica sempre expandido no fim da linha.
-  return <main className="rd">
+  return <main className={tema}>
     <header><button onClick={onBack}>← Início</button>
-      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button></h1>
-      <p>{dataBR(data)} · {dia.estado === "fechado" ? "dia fechado" : aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
+      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={() => { setArquivo(true); store.dias().then((d) => setDias(d.dias || [])).catch(() => {}); }}>🗂</button></h1>
+      <p>{dataBR(data)} · {dia.estado === "fechado" ? "RD arquivado" : aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}
     {dia.trechos.length > 0 && <p className="rd-totais">Dia em linha · {dia.trechos.length} trecho{dia.trechos.length > 1 ? "s" : ""} · {kmFmt(tot.km)} · pedágios {brl(tot.pedagios)}{tot.gastos ? ` · gastos ${brl(tot.gastos)}` : ""}</p>}
@@ -272,6 +312,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
           <label>Km inicial (painel)<input inputMode="decimal" value={t.kmInicial ?? ""} onChange={(e) => mudarTrecho(t.id, { kmInicial: e.target.value })} /></label>
           <label>Km final (painel)<input inputMode="decimal" className={kmChegada == null && projecaoAberto != null ? "rd-cravado" : ""} value={kmFinalEfetivo} onChange={(e) => setKmChegada(e.target.value)} /></label>
         </div>
+        {(() => { const r = rodadoEntre(t.kmInicial, kmFinalEfetivo); return r != null ? <p className="rd-rodado">Saiu com {t.kmInicial} · chega com {kmFinalEfetivo} → rodou {kmFmt(r)}</p> : null; })()}
         {projecaoAberto != null && <p className="rd-dica">Rota conhecida: km final já cravado em <strong>{kmFmt(projecaoAberto)}</strong> — confira no painel e corrija se precisar.</p>}
         {renderGastos(t)}
         {t.destino !== "MK_HOME" && renderVisita(t)}
@@ -282,10 +323,11 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
       if (!aberto && dia.estado !== "fechado" && fechadoAtual && t.id === fechadoAtual.id) return <section className="rd-card rd-atual" key={t.id}>
         <h2>Você está em {rotuloDestino(mem, t.destino)}</h2>
         <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
+        {(() => { const r = rodadoEntre(t.kmInicial, t.kmFinal); return r != null ? <p className="rd-rodado">Trecho: saiu com {t.kmInicial} · chegou com {t.kmFinal} → rodou {kmFmt(r)}</p> : null; })()}
         {t.destino !== "MK_HOME" && renderVisita(t)}
         <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setNotice("Visita salva."); })}>Salvar visita</button>
         {estou === "MK_HOME"
-          ? <button className="rd-fechar" disabled={busy} onClick={() => run(fecharDia)}>Fechar o dia e gerar o RD</button>
+          ? <button className="rd-fechar" disabled={busy} onClick={() => run(fecharDia)}>Salvar e arquivar o dia — gerar o RD</button>
           : renderProximoDestino("Para onde agora?")}
       </section>;
 
@@ -314,9 +356,11 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
       {renderProximoDestino("Sair de casa — para onde?")}
     </section>}
 
-    {dia.estado === "fechado" && <section className="rd-card"><h2>Dia fechado</h2>
+    {dia.estado === "fechado" && <section className="rd-card rd-arquivado"><h2>✓ RD de {dataBR(data)} salvo e arquivado</h2>
+      <p className="rd-micro">O dia está guardado na pasta de RDs arquivados. Os trechos acima são só para conferência; para mexer, reabra o dia.</p>
       <button className="rd-principal" disabled={busy} onClick={() => run(() => imprimirComFotos(dia, mem))}>Gerar RD (PDF)</button>
-      <button className="rd-link" disabled={busy} onClick={() => run(async () => { const novoDia = { ...dia, estado: "aberto" }; setDia(novoDia); await salvar(novoDia); setNotice("Dia reaberto."); })}>Reabrir o dia</button>
+      <button className="rd-link" onClick={() => { setArquivo(true); store.dias().then((d) => setDias(d.dias || [])).catch(() => {}); }}>🗂 Ver RDs arquivados</button>
+      <button className="rd-link" disabled={busy} onClick={() => run(async () => { const novoDia = { ...dia, estado: "aberto" }; setDia(novoDia); await salvar(novoDia); setNotice("Dia reaberto para ajuste. Arquive de novo quando terminar."); })}>Reabrir para ajustar</button>
     </section>}
   </main>;
 }

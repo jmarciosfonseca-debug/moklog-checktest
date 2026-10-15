@@ -4149,7 +4149,7 @@ export default function App(){
   );
 
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
-  if(showRd) return <ErrorBoundary moduleName="MK RD"><React.Suspense fallback={<p style={{color:"#94a3b8",padding:20}}>Abrindo o MK RD…</p>}><RdApp auth={auth} onBack={()=>setShowRd(false)}/></React.Suspense></ErrorBoundary>;
+  if(showRd) return <ErrorBoundary moduleName="MK RD"><React.Suspense fallback={<p style={{color:"#94a3b8",padding:20}}>Abrindo o MK RD…</p>}><RdApp auth={auth} dark={dark} onBack={()=>setShowRd(false)}/></React.Suspense></ErrorBoundary>;
   if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} projects={PROJECTS} projectGroups={{golgi:["P601","P602","P604","P605","P606","P607"],mega:["P311A","P311B"],klog:["P505"]}} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
   if(mapaDiarioProject) return <ErrorBoundary moduleName="Mapa de Equipe diário"><MapaDiarioTela project={mapaDiarioProject} dark={dark} onBack={()=>setMapaDiarioProject(null)}/></ErrorBoundary>;
   if(showEquipe&&equipeProject) return <ErrorBoundary moduleName="Equipe"><EquipeApp project={equipeProject} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowEquipe(false);setEquipeProject(null);}} sharedAuth={getProjectAuthMode(equipeProject.id)} onAuthGranted={(mode)=>grantAuth(equipeProject.id,mode)} nomesProjetos={Object.fromEntries(ORDEM_PROJETOS.map(pid=>[pid,PROJECTS[pid]?.name||""]))}/></ErrorBoundary>;
