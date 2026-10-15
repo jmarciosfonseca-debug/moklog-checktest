@@ -106,8 +106,12 @@ async function executar(db, u, b) {
   const nextDia = dia(b.dia, u.uid, data);
   const nextMem = b.memoria == null ? null : memoria(b.memoria);
   return db.runTransaction(async (tx) => {
-    const profile = await tx.get(db.collection("usuarios").doc(u.uid));
-    if (!profile.exists || profile.data().active !== true || profile.data().role !== u.role) throw erro(403, "Perfil revogado.");
+    // Acesso via PIN gerencial sem perfil cadastrado em `usuarios` (identidade "gerencial"): o token
+    // já foi validado pelo servidor de acesso; não há documento de perfil para reconferir.
+    if (!u.viaPin) {
+      const profile = await tx.get(db.collection("usuarios").doc(u.uid));
+      if (!profile.exists || profile.data().active !== true || profile.data().role !== u.role) throw erro(403, "Perfil revogado.");
+    }
     const sd = await tx.get(refDia); const atualDia = sd.exists ? sd.data() : null;
     if (atualDia && atualDia.uid !== u.uid) throw erro(403, "Dia de outro usuário.");
     if (!Number.isSafeInteger(b.revisao) || b.revisao !== (atualDia?.revisao || 0)) throw erro(409, "Outra gravação alterou este dia. Reabra antes de salvar; seu rascunho local foi preservado.");

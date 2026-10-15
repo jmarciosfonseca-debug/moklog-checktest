@@ -90,3 +90,13 @@ test("gasto com fotoId e trecho com veículo moto são preservados", async () =>
   const semV = await executar(db, G, { acao: "salvar", data: "2026-10-15", revisao: 0, dia: { estado: "aberto", trechos: [{ ...T }] } });
   expect(semV.dia.trechos[0].veiculo).toBe("carro");   // padrão
 });
+
+test("acesso via PIN gerencial sem perfil em usuarios (identidade 'gerencial') grava e lê normalmente", async () => {
+  const db = banco();
+  const P = { uid: "gerencial", role: "gerente", viaPin: true };   // api/rd.js monta isso quando o token é do PIN do app
+  const r = await executar(db, P, { acao: "salvar", data: "2026-10-15", revisao: 0, dia: { estado: "aberto", trechos: [T] } });
+  expect(r.dia.revisao).toBe(1);
+  expect((await executar(db, P, { acao: "ler", data: "2026-10-15" })).dia.trechos).toHaveLength(1);
+  // sem viaPin, o mesmo uid sem perfil cadastrado continua barrado
+  await expect(executar(db, { uid: "gerencial", role: "gerente" }, { acao: "salvar", data: "2026-10-16", revisao: 0, dia: { estado: "aberto", trechos: [T] } })).rejects.toMatchObject({ status: 403 });
+});

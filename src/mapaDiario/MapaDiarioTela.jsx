@@ -8,6 +8,7 @@ import { horarioDoTurno } from "./horarios";
 import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
+import { isDemo } from "../session";
 import * as dados from "./dados";
 
 const dataBR = (iso) => iso.split("-").reverse().join("/");
@@ -150,7 +151,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
     const final = { ...mapaC, material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
-    try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo("Enviado e salvo"); setEditando(false); }
+    try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e salvo"); setEditando(false); }
     catch (e) { setAvisos([`NÃO GRAVOU o mapa (${(e && e.message) || "erro"}). Confira a conexão e toque em Concluir mapa de novo. O WhatsApp só libera depois de gravar.`]); return; }
     // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
     setFichaMsg(null);
@@ -246,6 +247,11 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           )}
         </div>
 
+        {isDemo() && (
+          <div role="alert" style={{ ...S.card, borderColor: "#dc2626", color: "#dc2626", fontSize: 13, fontWeight: 700 }}>
+            Sessão de DEMONSTRAÇÃO: nada é gravado no banco. O mapa vai parecer concluído neste aparelho, mas o painel gerencial continuará "Pendente". Para valer, saia e entre com o PIN do projeto.
+          </div>
+        )}
         {carregando && <div style={{ ...S.card, color: cor.txt2, fontSize: 13 }}>Abrindo o mapa…</div>}
         {erro && <div role="alert" style={{ ...S.card, color: "#dc2626", fontSize: 13 }}>{erro}</div>}
 
@@ -482,7 +488,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
           {enviado && (
             <div style={{ ...S.card, borderColor: "#16a34a" }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : "Mapa gravado. Agora envie no WhatsApp."}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: isDemo() ? "#dc2626" : "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : isDemo() ? "DEMONSTRAÇÃO: o mapa NÃO foi gravado no banco." : "Mapa gravado. Agora envie no WhatsApp."}</div>
               {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}{(fichaMsg.linhas || []).map((l, i) => <div key={i} style={{ marginTop: 3 }}>{l}</div>)}{fichaMsg.erro && <div style={{ marginTop: 6 }}><button disabled={fichaBusy} onClick={() => lancarFicha(fichaMsg.alvo)} style={S.btn}>{fichaBusy ? "Lançando…" : "Lançar na ficha de novo"}</button></div>}</div>}
               {!editando && <>
               <pre aria-label="Texto do mapa" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, color: cor.txt, background: cor.input, border: `1px solid ${cor.line}`, borderRadius: 10, padding: 10, margin: "0 0 10px" }}>{texto}</pre>
