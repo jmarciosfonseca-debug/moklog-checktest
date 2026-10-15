@@ -45,11 +45,13 @@ export function resumoDoPainel({ agora, mapas = [], projetos = PROJETOS_DO_MAPA,
     const v = turnoVigente(projetoId, agora);
     if (!v) return { projetoId, estado: "sem-horario", brilha: false, enviado: false };
     const m = porChave.get(chaveMapa(projetoId, v.data, v.turno));
+    // Leitura do servidor falhou para ESTE projeto: dizer "sem leitura" — nunca Pendente falso.
+    if (m?.erroLeitura) return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, estado: "sem-leitura", brilha: false, enviado: false, ocorrencias: 0 };
     const enviadoEm = m && m.enviadoEm ? new Date(m.enviadoEm) : null;
     const estado = estadoDoMapa({ inicio: v.inicio, agora, enviadoEm, janelaMin });
     return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, enviadoEm, estado, brilha: brilha(estado), enviado: estado === "enviado", ocorrencias: m?.ocorrencias || 0 };
   });
-  const ordem = { pendente: 0, cobranca: 1, aguardando: 2, enviado: 3, "sem-horario": 4 };
+  const ordem = { pendente: 0, cobranca: 1, "sem-leitura": 2, aguardando: 3, enviado: 4, "sem-horario": 5 };
   itens.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.projetoId.localeCompare(b.projetoId));
   return {
     enviados: itens.filter((i) => i.enviado).length,

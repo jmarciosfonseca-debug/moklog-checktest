@@ -60,10 +60,28 @@ export async function loadMapasPeriodo(projetos, de, ate) {
   return por.flat();
 }
 
+// Nunca deixar uma gravação pendurada sem resposta: no posto o sinal oscila e o setDoc pode
+// ficar esperando para sempre — o líder fica no escuro e o mapa "some" (bug de campo 15/10).
+const comTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => { setTimeout(() => rej(new Error(msg)), ms); })]);
+
 export async function saveMapa(mapa) {
   const agora = new Date().toISOString();
   const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
-  await setDoc(doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id), doc_);
+  await comTimeout(setDoc(doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id), doc_), 8000, "Sem resposta do servidor — confira a conexão.");
+  return doc_;
+}
+
+// ENVIO OFICIAL do mapa (Concluir): grava e CONFIRMA lendo de volta DO SERVIDOR.
+// Só com a confirmação o WhatsApp é liberado — acaba o "enviei mas o painel ficou Pendente":
+// ou o mapa está comprovadamente no servidor, ou o líder é avisado na hora de que não chegou.
+export async function enviarMapa(mapa, { timeoutMs = 12000 } = {}) {
+  const agora = new Date().toISOString();
+  const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
+  const ref = doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id);
+  await comTimeout(setDoc(ref, doc_), timeoutMs, "o mapa NÃO chegou ao servidor (sem conexão)");
+  if (isDemo()) return doc_;                                  // demonstração: nada vai ao banco mesmo
+  const conf = await comTimeout(getDocFromServer(ref), timeoutMs, "gravou, mas não deu para CONFIRMAR no servidor");
+  if (!conf.exists() || conf.data().atualizadoEm !== agora) throw new Error("a confirmação no servidor não bateu");
   return doc_;
 }
 
@@ -89,10 +107,17 @@ export async function loadUltimaVisita(pid) {
 }
 
 // Para a barra do gerencial: o mapa do turno em vigor de cada projeto, lido por id (sem consulta).
+// SEMPRE do servidor: cache nunca decide quem está Pendente. Falhou a leitura de um projeto?
+// Ele volta marcado como "sem leitura" — nunca como Pendente falso.
 export async function loadEnviosDoTurno(itens) {
   const res = await Promise.all(itens.map(async ({ projetoId, data, turno, chave }) => {
-    const m = await loadMapa(projetoId, chave);
-    return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null, ocorrencias: m && m.status === "enviado" ? contarOcorrencias(m) : 0 };
+    try {
+      const snap = await getDocFromServer(doc(db(), "equipes", projetoId, "mapas", chave));
+      const m = snap.exists() ? corrigirRondaNosRotulos(snap.data()) : null;
+      return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null, ocorrencias: m && m.status === "enviado" ? contarOcorrencias(m) : 0 };
+    } catch (e) {
+      return { projetoId, data, turno, erroLeitura: true };
+    }
   }));
   return res;
 }

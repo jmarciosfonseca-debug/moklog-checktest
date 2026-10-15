@@ -77,3 +77,16 @@ test("BUG P311B: mapa concluído no plantão de ontem não conta como enviado no
   const r = resumoDoPainel({ agora, mapas: [{ projetoId: "P311B", data: "2026-10-13", turno: "N", enviadoEm: "2026-10-14T21:15:00.000Z" }], projetos: ["P311B"] });
   expect(r.itens[0].estado).toBe("pendente"); // o painel está certo: o envio caiu na chave errada — a trava agora é na tela
 });
+
+test("leitura que falhou vira 'Sem leitura agora' — nunca Pendente falso (bug de campo 15/10)", () => {
+  const agora = new Date("2026-10-15T23:30:00.000Z"); // 20:30 em Brasília, noturno em vigor
+  const r = resumoDoPainel({ agora, projetos: ["P602", "P607"], mapas: [
+    { projetoId: "P602", data: "2026-10-15", turno: "N", erroLeitura: true },
+    { projetoId: "P607", data: "2026-10-15", turno: "N", enviadoEm: "2026-10-15T21:42:00.000Z" },
+  ] });
+  const p602 = r.itens.find((i) => i.projetoId === "P602");
+  expect(p602.estado).toBe("sem-leitura");
+  expect(p602.brilha).toBe(false);                      // não pisca cobrança por falha de leitura
+  expect(r.pendentes.map((i) => i.projetoId)).not.toContain("P602");
+  expect(r.itens.find((i) => i.projetoId === "P607").estado).toBe("enviado");
+});
