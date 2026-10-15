@@ -246,3 +246,41 @@ test("fator moto e comprovante no pedágio; RD do dia embute comprovantes e sai 
   expect(html).toContain("Lembretes para a próxima visita");
   expect(html).toContain("Imprimir / Salvar PDF");                     // barra de salvar no topo
 });
+
+test("atividades em casa: voltou para MK Home e registra o que fez; home office abre pelo próprio MK Home, sem exigir km", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  mockStore.ler.mockResolvedValue({ dia: { data: "2026-10-15", estado: "aberto", revisao: 2, trechos: [
+    { id: "t1", origem: "MK_HOME", destino: "MK602", veiculo: "carro", kmInicial: 100, kmFinal: 174, abertura: { em: "2026-10-15T05:14:00.000-03:00" }, chegada: { em: "2026-10-15T06:16:00.000-03:00" }, pedagios: [], gastos: [], atividades: [], obs: "" },
+    { id: "t2", origem: "MK602", destino: "MK_HOME", veiculo: "carro", kmInicial: 174, kmFinal: 248, abertura: { em: "2026-10-15T12:00:00.000-03:00" }, chegada: { em: "2026-10-15T14:15:00.000-03:00" }, pedagios: [], gastos: [], atividades: [], obs: "" },
+  ] }, memoria: { revisao: 3 } });
+  try {
+    await montar(host, root);
+    // chegou em casa: o card oferece o registro das atividades, não a visita
+    expect(host.textContent).toContain("Atividades em casa (home office)");
+    await digitar(host.querySelector('[aria-label="Nova atividade em casa"]'), "MK311 — contato com o líder e a emp. de segurança");
+    await clicar(host, "+ Registrar");
+    expect(host.textContent).toContain("MK311 — contato com o líder");
+    await clicar(host, "Salvar atividades");
+    const salvo = mockStore.salvar.mock.calls.at(-1)[0];
+    expect(salvo.dia.trechos[1].atividades[0]).toEqual({ texto: "MK311 — contato com o líder e a emp. de segurança", status: null });
+  } finally { await act(async () => root.unmount()); host.remove(); }
+
+  // dia seguinte, home office: MK Home aparece na cascata mesmo estando em casa, e fecha sem km
+  const host2 = document.createElement("div"); document.body.appendChild(host2); const root2 = createRoot(host2);
+  mockStore.ler.mockResolvedValue({ dia: null, memoria: { revisao: 3 } });
+  marcoSeq = [
+    { em: "2026-10-16T08:00:00.000-03:00", gps: { lat: -23.6, lng: -46.7, acc: 10 }, endereco: "Taboão da Serra - SP" },
+    { em: "2026-10-16T17:30:00.000-03:00", gps: { lat: -23.6, lng: -46.7, acc: 10 }, endereco: "Taboão da Serra - SP" },
+  ];
+  try {
+    await montar(host2, root2);
+    expect(host2.textContent).toContain("Home office — trabalhar de casa");
+    await clicar(host2, "MK Home");
+    expect(host2.textContent).toContain("Home office · trabalhando de casa");
+    expect(host2.textContent).toContain("Atividades em casa (home office)");
+    await clicar(host2, "Encerrar — fechar o período em casa");     // sem km: não pode travar
+    const fechado = mockStore.salvar.mock.calls.at(-1)[0];
+    expect(fechado.dia.trechos[0].destino).toBe("MK_HOME");
+    expect(fechado.dia.trechos[0].chegada.em).toBe("2026-10-16T17:30:00.000-03:00");
+  } finally { await act(async () => root2.unmount()); host2.remove(); }
+});

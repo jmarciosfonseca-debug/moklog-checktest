@@ -8,11 +8,11 @@ export const DESTINOS_FIXOS = [
 ];
 
 export const DESTINOS_PROJETOS = [
-  ["MK260A", "Jatinox Embu A"], ["MK260B", "Jatinox Embu B"], ["MK260C", "Jatinox Embu C"],
+  ["MK260A", "Jatinox Matriz"], ["MK260B", "Jatinox Barão"], ["MK260C", "Jatinox Indaiatuba"],
   ["MK311A", "Mega CL Curitiba"], ["MK311B", "Mega CL Itajaí"],
-  ["MK505", "Klog Embu"],
-  ["MK601", "Golgi Seropédica"], ["MK602", "Golgi Mauá I"], ["MK604", "Golgi Jundiaí"],
-  ["MK605", "Golgi Mauá II"], ["MK606", "Golgi Cajamar"], ["MK607", "Golgi Guarulhos"],
+  ["MK505", "Klog Guarulhos"],
+  ["MK601", "Golgi Cajamar"], ["MK602", "Golgi Mauá I"], ["MK604", "Golgi Jundiaí"],
+  ["MK605", "Golgi Dutra"], ["MK606", "Golgi Duque de Caxias"], ["MK607", "Golgi Brasília"],
 ].map(([codigo, sub]) => ({ codigo, rotulo: codigo, sub }));
 
 export const normalizarCodigoNovo = (entrada) => {

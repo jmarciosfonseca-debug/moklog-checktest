@@ -54,6 +54,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   const [novoCodigo, setNovoCodigo] = useState(null);   // "MK novo…" aberto
   const [kmChegada, setKmChegada] = useState(null);     // null = projeção cravada
   const [lembreteNovo, setLembreteNovo] = useState("");
+  const [atividadeNova, setAtividadeNova] = useState("");  // registro de atividade em casa (home office)
   const [config, setConfig] = useState(false);
   const [dias, setDias] = useState([]);
   const [pronto, setPronto] = useState(false);
@@ -133,9 +134,10 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   const kmFinalEfetivo = kmChegada != null ? kmChegada : (projecaoAberto != null ? String(projecaoAberto) : "");
 
   async function fecharTrecho() {
-    if (kmFinalEfetivo === "") { setError("Informe o km final do painel."); return; }
+    const homeOffice = aberto.origem === "MK_HOME" && aberto.destino === "MK_HOME";   // sem deslocamento: km é opcional
+    if (kmFinalEfetivo === "" && !homeOffice) { setError("Informe o km final do painel."); return; }
     const marco = await criarMarcoFn();
-    const t = { ...aberto, kmFinal: kmFinalEfetivo, chegada: marco };
+    const t = { ...aberto, kmFinal: kmFinalEfetivo === "" ? null : kmFinalEfetivo, chegada: marco };
     const novoDia = { ...dia, trechos: dia.trechos.map((x) => (x.id === t.id ? t : x)) };
     const novaMem = memoriaAposTrecho(mem, t);
     setDia(novoDia); setMem(novaMem); setKmChegada(null);
@@ -262,6 +264,22 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     </>;
   };
 
+  // Em casa também se trabalha: registros livres de atividade (com projeto no texto, ex.
+  // "MK311 — contato com o líder"), um embaixo do outro, para o RD ter o contexto do home office.
+  const renderAtividadesCasa = (t) => <>
+    <h3>Atividades em casa (home office)</h3>
+    {(t.atividades || []).filter((a) => !a.tag).map((a, i) => <div className="rd-atv" key={i}>
+      <span>{a.texto}</span>
+      <button aria-label={"Remover atividade " + (i + 1)} onClick={() => mudarTrecho(t.id, { atividades: t.atividades.filter((x) => x !== a) })}>×</button>
+    </div>)}
+    <div className="rd-linha">
+      <textarea rows={linhasDe(atividadeNova)} aria-label="Nova atividade em casa" placeholder="Ex.: MK311 — contato com o líder e a emp. de segurança…" value={atividadeNova} onChange={(e) => setAtividadeNova(e.target.value)} />
+      <button disabled={!atividadeNova.trim()} onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: atividadeNova.trim(), status: null }] }); setAtividadeNova(""); }}>+ Registrar</button>
+    </div>
+    <p className="rd-micro">Cada registro entra no RD do dia com o projeto que você citar no texto.</p>
+    <label>Observações (opcional)<textarea rows={linhasDe(t.obs)} value={t.obs || ""} onChange={(e) => mudarTrecho(t.id, { obs: e.target.value })} /></label>
+  </>;
+
   // Leitura da visita: texto corrido, estilo 2C (sem formulário).
   const renderLeituraVisita = (t) => {
     const blocos = [];
@@ -286,7 +304,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       {(t.gastos || []).some((g) => kmNum(g.valor)) && <span>Gastos <b>{brl((t.gastos || []).reduce((a, g) => a + (kmNum(g.valor) || 0), 0))}</b></span>}
       <span><b>{t.veiculo === "moto" ? "Moto" : "Carro"}</b></span>
     </div>
-    {t.destino !== "MK_HOME" && renderLeituraVisita(t)}
+    {renderLeituraVisita(t)}
     {podeEditar && <button className="rd-link" onClick={() => setEditTrecho(t.id)}>✎ Editar este trecho</button>}
   </>;
 
@@ -299,7 +317,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       <label>Km final (painel)<input inputMode="decimal" value={t.kmFinal ?? ""} onChange={(e) => mudarTrecho(t.id, { kmFinal: e.target.value })} /></label>
     </div>
     {renderGastos(t)}
-    {t.destino !== "MK_HOME" && renderVisita(t)}
+    {t.destino !== "MK_HOME" ? renderVisita(t) : renderAtividadesCasa(t)}
     <button className="rd-principal" disabled={busy} onClick={() => run(async () => { await salvar(dia); setEditTrecho(null); setNotice("Trecho atualizado."); })}>Salvar alterações</button>
   </>;
 
@@ -313,7 +331,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       </div>
     </div>
     <div className="rd-dest">
-      {destinos.filter((d) => d.codigo !== estou).map((d) => <button key={d.codigo} disabled={busy} onClick={() => run(() => abrirPara(d.codigo))}><strong>{d.rotulo}</strong><span>{d.sub}</span></button>)}
+      {destinos.filter((d) => d.codigo !== estou || d.codigo === "MK_HOME").map((d) => <button key={d.codigo} disabled={busy} onClick={() => run(() => abrirPara(d.codigo))}><strong>{d.rotulo}</strong><span>{d.codigo === "MK_HOME" && estou === "MK_HOME" ? "Home office — trabalhar de casa" : d.sub}</span></button>)}
       <button aria-pressed={novoCodigo != null} onClick={() => setNovoCodigo(novoCodigo == null ? "" : null)}><strong>Novo…</strong><span>Projeto fora da lista</span></button>
     </div>
     {novoCodigo != null && <div className="rd-linha"><span className="rd-prefixo">MK</span>
@@ -448,7 +466,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
 
     {dia.trechos.map((t, i) => {
       if (aberto && t.id === aberto.id) return <section className="rd-card rd-atual" key={t.id}>
-        <h2>Em deslocamento · {rotuloDestino(mem, t.origem)} → {rotuloDestino(mem, t.destino)}{t.veiculo === "moto" ? " · 🏍" : ""}</h2>
+        <h2>{t.origem === "MK_HOME" && t.destino === "MK_HOME" ? "Home office · trabalhando de casa" : `Em deslocamento · ${rotuloDestino(mem, t.origem)} → ${rotuloDestino(mem, t.destino)}${t.veiculo === "moto" ? " · Moto" : ""}`}</h2>
         <Marco rotulo="Saída" marco={t.abertura} onHora={(m) => mudarTrecho(t.id, { abertura: m })} />
         <div className="rd-kmpar">
           <label>Km inicial (painel)<input inputMode="decimal" value={t.kmInicial ?? ""} onChange={(e) => mudarTrecho(t.id, { kmInicial: e.target.value })} /></label>
@@ -457,8 +475,8 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         {(() => { const r = rodadoEntre(t.kmInicial, kmFinalEfetivo); return r != null ? <p className="rd-rodado">Saiu com {t.kmInicial} · chega com {kmFinalEfetivo} → rodou {kmFmt(r)}</p> : null; })()}
         {projecaoAberto != null && <p className="rd-dica">Rota conhecida: km final já cravado em <strong>{kmFmt(projecaoAberto)}</strong> — confira no painel e corrija se precisar.</p>}
         {renderGastos(t)}
-        {t.destino !== "MK_HOME" && renderVisita(t)}
-        <button className="rd-principal" disabled={busy} onClick={() => run(fecharTrecho)}>Cheguei — fechar o trecho</button>
+        {t.destino !== "MK_HOME" ? renderVisita(t) : renderAtividadesCasa(t)}
+        <button className="rd-principal" disabled={busy} onClick={() => run(fecharTrecho)}>{t.origem === "MK_HOME" && t.destino === "MK_HOME" ? "Encerrar — fechar o período em casa" : "Cheguei — fechar o trecho"}</button>
         <p><button className="rd-link" disabled={busy} onClick={() => { if (!window.confirm("Cancelar este trecho? Use quando abriu por engano (projeto errado). A marcação de saída é descartada.")) return; run(async () => { const novoDia = { ...dia, trechos: dia.trechos.filter((x) => x.id !== t.id) }; setDia(novoDia); setKmChegada(null); await salvar(novoDia); setNotice("Trecho cancelado. Abra de novo com o destino certo."); }); }}>Abri por engano — cancelar este trecho</button></p>
       </section>;
 
@@ -466,8 +484,8 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         <h2>Você está em {rotuloDestino(mem, t.destino)}</h2>
         <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
         {(() => { const r = rodadoEntre(t.kmInicial, t.kmFinal); return r != null ? <p className="rd-rodado">Trecho: saiu com {t.kmInicial} · chegou com {t.kmFinal} → rodou {kmFmt(r)}</p> : null; })()}
-        {t.destino !== "MK_HOME" && renderVisita(t)}
-        <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setNotice("Visita salva."); })}>Salvar visita</button>
+        {t.destino !== "MK_HOME" ? renderVisita(t) : renderAtividadesCasa(t)}
+        <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setNotice(t.destino === "MK_HOME" ? "Atividades salvas." : "Visita salva."); })}>{t.destino === "MK_HOME" ? "Salvar atividades" : "Salvar visita"}</button>
         {estou === "MK_HOME"
           ? <button className="rd-fechar" disabled={busy} onClick={() => run(fecharDia)}>Salvar e arquivar o dia — gerar o RD</button>
           : renderProximoDestino("Para onde agora?")}
