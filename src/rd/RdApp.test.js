@@ -4,7 +4,7 @@ import RdApp from "./RdApp";
 import { htmlRd } from "./rdPdf";
 
 jest.mock("./rdStore", () => ({ criarRdStore: () => mockStore }));
-const mockStore = { ler: jest.fn(), dias: jest.fn(), salvar: jest.fn(), salvarFoto: jest.fn(), lerFotos: jest.fn() };
+const mockStore = { ler: jest.fn(), dias: jest.fn(), salvar: jest.fn(), salvarFoto: jest.fn(), lerFotos: jest.fn(), excluir: jest.fn() };
 let marcoSeq;
 const criarMarcoFn = async () => marcoSeq.shift();
 const comprimirFotoFn = async () => "data:image/jpeg;base64,FOTOPEQ";
@@ -149,20 +149,26 @@ test("salvar e arquivar: confirma o km final, fecha o dia e abre a pasta de RDs 
   const abrirJanela = jest.spyOn(window, "open").mockReturnValue({ document: { open: () => {}, write: () => {}, close: () => {} } });
   try {
     await montar(host, root);
+    mockStore.excluir.mockResolvedValue({ excluido: "2026-10-14" });
     await clicar(host, "Salvar e arquivar o dia — gerar o RD");
     expect(confirmar.mock.calls.at(-1)[0]).toContain("Km final do dia: 248");          // "quilometragem final está correta?"
     const salvo = mockStore.salvar.mock.calls.at(-1)[0];
     expect(salvo.dia.estado).toBe("fechado");
     expect(salvo.memoria.pendencias.MK602[0].texto).toBe("Trocar a fechadura");        // lembrete vira pendência p/ próxima visita
-    expect(host.textContent).toContain("salvo e arquivado");
-    // pasta de arquivados: a listinha dos dias, com estado
-    await clicar(host, "🗂 Ver RDs arquivados");
+    // arquivou → cai DIRETO na pastinha, com o aviso
     expect(host.textContent).toContain("MK RD · Arquivados");
+    expect(host.textContent).toContain("salvo e arquivado");
     expect(host.textContent).toContain("14/10/2026");
-    expect(host.textContent).toContain("Arquivado");
-    // abrir o RD do dia 14 direto da lista
-    await clicar(host, "14/10/2026");
-    expect(mockStore.ler.mock.calls.at(-1)[0]).toBe("2026-10-14");
+    expect(host.textContent).toContain("✓ Arquivado");
+    // fase de teste: apagar um RD da lista (o do dia 14)
+    const apagar = host.querySelector('[aria-label="Apagar o RD de 14/10/2026"]');
+    await act(async () => apagar.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(mockStore.excluir).toHaveBeenCalledWith("2026-10-14");
+    expect(host.textContent).toContain("RD de 14/10/2026 apagado");
+    expect(host.querySelector('[aria-label="Apagar o RD de 14/10/2026"]')).toBeNull(); // saiu da lista
+    // abrir o RD de um dia direto da lista
+    await clicar(host, "15/10/2026");
+    expect(host.textContent).toContain("RD de 15/10/2026 salvo e arquivado");
   } finally { confirmar.mockRestore(); abrirJanela.mockRestore(); await act(async () => root.unmount()); host.remove(); }
 });
 
@@ -212,5 +218,6 @@ test("fator moto e comprovante no pedágio continuam no fluxo novo; RD do dia em
   const html = htmlRd(dia, {}, "m", { fabc: "data:image/jpeg;base64,FOTO" });
   expect(html).toContain("Comprovantes");
   expect(html).toContain("🏍");
-  expect(html).toContain("Contato com a administração — Alinhamento");
+  expect(html).toContain("Contato com a administração");   // título da chavinha em destaque…
+  expect(html).toContain("— Alinhamento");                  // …com a observação ao lado
 });

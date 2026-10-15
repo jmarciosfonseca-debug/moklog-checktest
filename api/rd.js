@@ -30,5 +30,5 @@ module.exports=async(req,res)=>{
  try{body=typeof req.body==="string"?JSON.parse(req.body):req.body;if(!body||Buffer.byteLength(JSON.stringify(body))>500000)throw Error();}
  catch{return res.status(400).json({ok:false,erro:"Pedido inválido ou muito grande."});}
  try{return res.status(200).json({ok:true,...await executar(db,user,body)});}
- catch(e){const status=e.status||503;return res.status(status).json({ok:false,erro:status<500?e.message:"Não foi possível salvar. Seu rascunho local foi mantido; tente novamente."});}
+ catch(e){const status=e.status||503;if(status>=500)console.error("rd: falha interna",{acao:body?.acao,erro:e&&e.message});return res.status(status).json({ok:false,erro:status<500?e.message:"Não foi possível salvar. Seu rascunho local foi mantido; tente novamente."});}
 };

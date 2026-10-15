@@ -150,10 +150,12 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     let novaMem = mem;
     for (const t of dia.trechos) if ((t.atividades || []).length) novaMem = memoriaAposVisita(novaMem, t.destino, t.atividades, data);
     const novoDia = { ...dia, estado: "fechado" };
-    setDia(novoDia); setMem(novaMem);
+    // Primeiro GRAVA; só então a tela diz "arquivado". Se o servidor recusar, o dia continua
+    // aberto na tela (nunca "salvo e arquivado" com erro em cima).
     await salvar(novoDia, novaMem);
     try { const d = await store.dias(); setDias(d.dias || []); } catch { /* lista atualiza na próxima */ }
-    setNotice(`RD de ${dataBR(data)} salvo e arquivado. Os lembretes em aberto reaparecem na próxima visita a cada projeto.`);
+    setArquivo(true); // já leva para a pastinha, com o aviso
+    setNotice(`✓ RD de ${dataBR(data)} salvo e arquivado. Lembretes em aberto reaparecem na próxima visita a cada projeto.`);
     await imprimirComFotos(novoDia, novaMem);
     if (ultimoDoCiclo) { try { await gerarConsolidado(data); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
   }
@@ -214,13 +216,14 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
           {obs != null && <input className="rd-toggle-obs" aria-label={"Observação " + rotulo.toLowerCase()} placeholder="Observação (opcional)…" value={obs} onChange={(e) => mudarObsToggle(tag, rotulo, e.target.value)} />}
         </div>;
       })}
-      {(t.atividades || []).filter((a) => !a.tag).map((a, i) => <div className="rd-atv" key={i}>
-        <span>{a.texto}</span>
+      {(t.atividades || []).filter((a) => !a.tag).map((a, i) => <div className={"rd-atv" + (a.status === "aberto" ? " rd-atv-aberta" : "")} key={i}>
+        <span>{a.status === "aberto" ? "⚠ " : a.status === "finalizado" ? "✓ " : ""}{a.texto}</span>
         <select aria-label={"Situação " + (i + 1)} value={a.status || ""} onChange={(e) => mudarTrecho(t.id, { atividades: t.atividades.map((x) => (x === a ? { ...x, status: e.target.value || null } : x)) })}>
-          <option value="">— sem marca —</option><option value="aberto">Em aberto</option><option value="finalizado">Finalizado</option>
+          <option value="">— sem marca —</option><option value="aberto">Em aberto (lembrete)</option><option value="finalizado">Finalizado</option>
         </select>
         <button onClick={() => mudarTrecho(t.id, { atividades: t.atividades.filter((x) => x !== a) })}>×</button>
       </div>)}
+      {(t.atividades || []).some((a) => !a.tag && a.status === "aberto") && <p className="rd-micro">⚠ O que está "Em aberto" vira lembrete: reaparece na sua próxima visita a {rotuloDestino(mem, t.destino)}.</p>}
       <div className="rd-linha">
         <input aria-label="Nova atividade" placeholder="O que mais foi tratado…" value={atividadeNova} onChange={(e) => setAtividadeNova(e.target.value)} />
         <button disabled={!atividadeNova.trim()} onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: atividadeNova.trim(), status: null }] }); setAtividadeNova(""); }}>+ Registrar</button>
@@ -261,15 +264,27 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   // ── Pasta "RDs arquivados": a listinha dos dias, para abrir, conferir e ajustar ─
   if (arquivo) return <main className={tema}>
     <header><button onClick={() => setArquivo(false)}>← Voltar ao dia</button><h1>MK RD · Arquivados</h1>
-      <p>Toque num dia para abrir o RD dele — dá para conferir, gerar o PDF e, se precisar, reabrir e ajustar.</p></header>
+      <p>Toque num dia para abrir o RD dele — conferir, gerar o PDF e, se precisar, reabrir e ajustar.</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
+    {notice && <p role="status" className="rd-aviso">{notice}</p>}
     <section className="rd-card">
       {data !== hojeISO() && <button className="rd-link" onClick={() => { setData(hojeISO()); setArquivo(false); }}>↩ Voltar para o dia de hoje</button>}
       {dias.length === 0 && <p className="rd-micro">Nenhum RD arquivado ainda. Feche um dia com "Salvar e arquivar" e ele aparece aqui.</p>}
-      {dias.map((d) => <button key={d.data} className="rd-arq-item" onClick={() => { setData(d.data); setArquivo(false); }}>
-        <div><strong>{dataBR(d.data)}</strong><span>{d.trechos} trecho{d.trechos === 1 ? "" : "s"}</span></div>
-        <em className={d.estado === "fechado" ? "ok" : "andamento"}>{d.estado === "fechado" ? "Arquivado" : "Em aberto"}</em>
-      </button>)}
+      {dias.map((d) => <div key={d.data} className="rd-arq-linha">
+        <button className="rd-arq-item" onClick={() => { setData(d.data); setArquivo(false); }}>
+          <div><strong>{dataBR(d.data)}</strong><span>{d.trechos} trecho{d.trechos === 1 ? "" : "s"}</span></div>
+          <em className={d.estado === "fechado" ? "ok" : "andamento"}>{d.estado === "fechado" ? "✓ Arquivado" : "Em aberto"}</em>
+        </button>
+        <button className="rd-arq-apagar" aria-label={"Apagar o RD de " + dataBR(d.data)} disabled={busy}
+          onClick={() => { if (!window.confirm(`Apagar o RD de ${dataBR(d.data)}? (fase de teste — depois de aprovado, RD enviado será definitivo)`)) return; run(async () => {
+            await store.excluir(d.data);
+            setDias((xs) => xs.filter((x) => x.data !== d.data));
+            try { localStorage.removeItem(chaveDraft(uid, d.data)); } catch { /* sem draft */ }
+            if (d.data === data) { setDia({ data, estado: "aberto", trechos: [] }); setDiaRev(0); }
+            setNotice(`RD de ${dataBR(d.data)} apagado.`);
+          }); }}>🗑</button>
+      </div>)}
+      <p className="rd-micro">Fase de teste: apagar é permitido. Na evolução, RD enviado fica definitivo — só consulta.</p>
     </section>
   </main>;
 

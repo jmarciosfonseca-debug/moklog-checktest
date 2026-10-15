@@ -7,10 +7,11 @@ function banco() {
     where: (f, op, v) => query(prefix, [...filters, [f, op, v]], lim), limit: (n) => query(prefix, filters, n),
     get: async () => ({ docs: Object.keys(values).filter((k) => k.startsWith(prefix + "/") && !k.slice(prefix.length + 1).includes("/"))
       .map((k) => ({ id: k.split("/").pop(), data: () => clone(values[k]) })).filter((d) => filters.every(([f, op, v]) => op === "==" && d.data()[f] === v)).slice(0, lim) }) });
-  const ref = (path) => ({ path, get: async () => snap(path), set: async (d) => { values[path] = clone(d); } });
+  const ref = (path) => ({ path, get: async () => snap(path), set: async (d) => { values[path] = clone(d); }, delete: async () => { delete values[path]; } });
   const snap = (p) => ({ exists: values[p] != null, data: () => (values[p] == null ? undefined : clone(values[p])) });
   return { values, collection: (n) => ({ doc: (id) => ref(n + "/" + id), ...query(n) }),
-    runTransaction: async (fn) => { for (let t = 0; t < 8; t++) { const sets = []; const v = version; const r = await fn({ get: async (x) => snap(x.path), set: (x, d) => sets.push([x.path, clone(d)]) }); if (v !== version) continue; sets.forEach(([k, d]) => { values[k] = d; }); if (sets.length) version++; return r; } throw Error("retry"); } };
+    // Como o Firestore de verdade: ler depois de escrever derruba a transação (bug de campo 15/10).
+    runTransaction: async (fn) => { for (let t = 0; t < 8; t++) { const sets = []; const v = version; const r = await fn({ get: async (x) => { if (sets.length) throw Error("Firestore transactions require all reads to be executed before all writes."); return snap(x.path); }, set: (x, d) => sets.push([x.path, clone(d)]) }); if (v !== version) continue; sets.forEach(([k, d]) => { values[k] = d; }); if (sets.length) version++; return r; } throw Error("retry"); } };
 }
 const G = { uid: "g", role: "gerente", scopeAll: true }, A = { uid: "a", role: "auditor" };
 const T = { id: "t1", origem: "MK_HOME", destino: "MK604", kmInicial: 100, kmFinal: null, abertura: { em: "2026-10-14T09:00:00.000Z", gps: { lat: -23.55, lng: -46.63, acc: 12 }, endereco: "Taboão da Serra - SP" }, chegada: null, pedagios: [], gastos: [], atividades: [], obs: "" };
@@ -99,4 +100,14 @@ test("acesso via PIN gerencial sem perfil em usuarios (identidade 'gerencial') g
   expect((await executar(db, P, { acao: "ler", data: "2026-10-15" })).dia.trechos).toHaveLength(1);
   // sem viaPin, o mesmo uid sem perfil cadastrado continua barrado
   await expect(executar(db, { uid: "gerencial", role: "gerente" }, { acao: "salvar", data: "2026-10-16", revisao: 0, dia: { estado: "aberto", trechos: [T] } })).rejects.toMatchObject({ status: 403 });
+});
+
+test("excluir (fase de teste): apaga o RD do próprio usuário; o de outro usuário é barrado", async () => {
+  const db = banco();
+  await executar(db, G, { acao: "salvar", data: "2026-10-14", revisao: 0, dia: { estado: "fechado", trechos: [T] } });
+  await executar(db, A, { acao: "salvar", data: "2026-10-14", revisao: 0, dia: { estado: "fechado", trechos: [{ ...T, id: "tA" }] } });
+  expect((await executar(db, G, { acao: "excluir", data: "2026-10-14" })).excluido).toBe("2026-10-14");
+  expect(db.values["rd_dias/g_2026-10-14"]).toBeUndefined();
+  expect(db.values["rd_dias/a_2026-10-14"]).toBeDefined();   // o do auditor fica
+  expect((await executar(db, G, { acao: "dias" })).dias).toHaveLength(0);
 });
