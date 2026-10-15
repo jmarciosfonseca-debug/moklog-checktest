@@ -70,20 +70,81 @@ function fmtData(d){ if(!d) return "—"; try { return new Date(d+"T12:00:00").t
 function todayStrLocal(){ return new Date().toLocaleDateString("sv-SE"); }
 function newId(){ try { return crypto.randomUUID(); } catch { return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 
+// Mescla servidor + aparelho: checagem só do aparelho (gravação que falhou antes) NUNCA é descartada;
+// placas ficam com a versão de última vista mais recente. Antes, o dado do servidor sobrescrevia o local.
+export function mesclarDados(servidor, local){
+  const sv = servidor||{}, lc = local||{};
+  const porId = new Map();
+  for(const c of [...(sv.checagens||[]), ...(lc.checagens||[])]) if(c && c.id && !porId.has(c.id)) porId.set(c.id, c);
+  const checagens = [...porId.values()].sort((a,b)=>(a.criadoEm||"").localeCompare(b.criadoEm||""));
+  const placas = { ...(sv.placas||{}) };
+  for(const [k,v] of Object.entries(lc.placas||{})){
+    const atual = placas[k];
+    if(!atual || String(v.ultimaVista||"") > String(atual.ultimaVista||"")) placas[k] = v;
+  }
+  return { placas, checagens };
+}
 async function loadDados(projectId){
-  let data = null;
+  let servidor = null;
   try {
     const snap = await getDoc(doc(db,"bolsao_inquilinos",projectId));
-    if(snap.exists()){ data = snap.data(); try { localStorage.setItem(`bolsao_inq_${projectId}`, JSON.stringify(data)); } catch(e){} }
+    if(snap.exists()) servidor = snap.data();
   } catch(e){}
-  if(!data){ try { const l = localStorage.getItem(`bolsao_inq_${projectId}`); if(l) data = JSON.parse(l); } catch(e){} }
-  data = data || {};
-  return { placas: data.placas||{}, checagens: data.checagens||[] };
+  let local = null;
+  try { const l = localStorage.getItem(`bolsao_inq_${projectId}`); if(l) local = JSON.parse(l); } catch(e){}
+  const data = mesclarDados(servidor, local);
+  try { localStorage.setItem(`bolsao_inq_${projectId}`, JSON.stringify(data)); } catch(e){}
+  return data;
+}
+// Fotos NÃO cabem no documento principal (limite de 1 MB do Firestore derrubava TODA gravação do projeto
+// depois de semanas de rondas). Cada foto vira um documento próprio em bolsao_inquilinos/{pid}/fotos/{id};
+// a checagem guarda só as referências. Checagens antigas com foto embutida migram aqui no primeiro salvamento.
+const fotoCacheMem = {};
+export async function separarFotos(projectId, checagens, gravarFoto){
+  const gravar = gravarFoto || (async (fid, b64)=>{ await setDoc(doc(db,"bolsao_inquilinos",projectId,"fotos",fid), { data:b64, criadoEm:new Date().toISOString() }); });
+  const out = [];
+  for(const c of checagens||[]){
+    const inline = (c.fotos||[]).filter(f=>typeof f==="string" && f.startsWith("data:image/"));
+    if(!inline.length){ out.push(c); continue; }
+    const refs = [...(c.fotoRefs||[])], restantes = [];
+    for(const b64 of inline){
+      const fid = `f${Date.now().toString(36)}${Math.random().toString(36).slice(2,8)}`;
+      try { await gravar(fid, b64); refs.push(fid); fotoCacheMem[`${projectId}/${fid}`]=b64; }
+      catch(e){ restantes.push(b64); }                 // falhou: a foto fica embutida para não se perder
+    }
+    out.push({ ...c, fotoRefs:refs, ...(restantes.length?{fotos:restantes}:{fotos:[]}) });
+  }
+  return out;
+}
+export async function carregarFotoRef(projectId, fid){
+  const chave = `${projectId}/${fid}`;
+  if(fotoCacheMem[chave]) return fotoCacheMem[chave];
+  try {
+    const snap = await getDoc(doc(db,"bolsao_inquilinos",projectId,"fotos",fid));
+    const b64 = snap.exists() ? snap.data().data : null;
+    if(b64) fotoCacheMem[chave]=b64;
+    return b64;
+  } catch(e){ return null; }
+}
+function FotosChecagem({ projectId, c, dark }){
+  const [refs,setRefs]=useState([]);
+  useEffect(()=>{ let vivo=true; (async()=>{
+    const ids=c.fotoRefs||[]; if(!ids.length) return;
+    const b64s=(await Promise.all(ids.map(fid=>carregarFotoRef(projectId,fid)))).filter(Boolean);
+    if(vivo) setRefs(b64s);
+  })(); return ()=>{vivo=false;}; },[projectId,c]);
+  const todas=[...(c.fotos||[]).filter(f=>typeof f==="string"&&f.startsWith("data:image/")),...refs];
+  if(!todas.length) return null;
+  return <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
+    {todas.map((f,i)=><img key={i} src={f} alt="" style={{width:56,height:56,objectFit:"cover",borderRadius:6,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}/>)}
+  </div>;
 }
 async function saveDados(projectId, data){
-  const payload = { ...data, updatedAt:new Date().toISOString() };
+  const checagens = await separarFotos(projectId, data.checagens);
+  const payload = { placas:data.placas, checagens, updatedAt:new Date().toISOString() };
   try { await setDoc(doc(db,"bolsao_inquilinos",projectId), payload); } catch(e){ avisarFalhaServidor("Checagem de Bolsão", e); }
   try { localStorage.setItem(`bolsao_inq_${projectId}`, JSON.stringify(payload)); } catch(e){}
+  return payload;
 }
 
 function comprimirFoto(file){
@@ -133,7 +194,15 @@ function upsertPlaca(placas, placaDigitadaBruta, inquilino, tipo, nowIso){
   return { ...placas, [placa]:entry };
 }
 
-function gerarPdfBolsao(project, placas, checagens){ baixarBolsao({project, placas, checagens}); }
+async function gerarPdfBolsao(project, placas, checagens){
+  const resolvidas = await Promise.all((checagens||[]).map(async (c)=>{
+    const refs = c.fotoRefs||[];
+    if(!refs.length) return c;
+    const extras = (await Promise.all(refs.map(fid=>carregarFotoRef(project.id,fid)))).filter(Boolean);
+    return { ...c, fotos:[...(c.fotos||[]), ...extras] };
+  }));
+  baixarBolsao({project, placas, checagens:resolvidas});
+}
 
 function getStyles(dark){
   return {
@@ -259,12 +328,13 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
     const next = { placas:placasAtualizadas, checagens:[...data.checagens, checagem] };
     setSaving(true);
     setData(next);
-    await saveDados(project.id, next);
+    const gravado = await saveDados(project.id, next);
+    setData(gravado);
     setSaving(false);
     setScreen("list");
   };
 
-  const baixarPdf = async () => { setGerandoPdf(true); gerarPdfBolsao(project, data.placas, data.checagens); setGerandoPdf(false); };
+  const baixarPdf = async () => { setGerandoPdf(true); try { await gerarPdfBolsao(project, data.placas, data.checagens); } finally { setGerandoPdf(false); } };
 
   if(screen==="pin") return <PinGate project={project} dark={dark} onBack={onBack} onSuccess={(l)=>{grantSession(l,project.id);setAuthLevel(l);setScreen("list");onAuthGranted?.(l);}}/>;
   if(loading) return <div style={{...S.page,alignItems:"center",justifyContent:"center"}}><div style={{...S.txt2,fontSize:13}}>Carregando bolsão…</div></div>;
@@ -390,11 +460,7 @@ export default function BolsaoInquilinos({ project, onBack, dark, onToggleTheme,
             </div>
             <div style={{fontSize:11,...S.txt2,marginTop:2}}>Líder: {c.lider}</div>
             <div style={{fontSize:11,...S.txt2}}>{(c.itens||[]).map(i=>`${i.placa} (${i.inquilino})`).join(", ")}</div>
-            {(c.fotos||[]).length>0 && (
-              <div style={{display:"flex",gap:6,marginTop:8}}>
-                {c.fotos.map((f,i)=><img key={i} src={f} alt="" style={{width:56,height:56,objectFit:"cover",borderRadius:6,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}/>)}
-              </div>
-            )}
+            <FotosChecagem projectId={project.id} c={c} dark={dark}/>
           </div>
         ))}
       </div>
