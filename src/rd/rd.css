@@ -97,3 +97,9 @@
 .rd-arq-item em{margin-left:auto;font-style:normal;font-size:11px;font-weight:800;border-radius:7px;padding:3px 8px;flex-shrink:0}
 .rd-arq-item em.ok{color:#16a34a;border:1px solid #16a34a55}
 .rd-arq-item em.andamento{color:#b45309;border:1px solid #b4530955}
+.rd-arq-linha{display:flex;gap:8px;align-items:stretch}
+.rd-arq-linha .rd-arq-item{flex:1}
+.rd-arq-apagar{background:transparent;border:1px solid #ef444455;border-radius:12px;color:#dc2626;padding:0 12px;margin-top:8px;cursor:pointer;flex-shrink:0}
+.rd-atv-aberta{background:#b4530914;border:1px solid #b4530944;border-radius:10px;padding:7px 9px}
+.rd-atv-aberta span{color:#b45309;font-weight:700}
+.rd:not(.rd-claro) .rd-atv-aberta span{color:#fbbf24}

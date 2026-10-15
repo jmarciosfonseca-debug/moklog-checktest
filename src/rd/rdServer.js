@@ -100,33 +100,48 @@ async function executar(db, u, b) {
     docs.sort((a, b2) => String(b2.data).localeCompare(String(a.data)));
     return { dias: docs.slice(0, 62).map((d) => ({ data: d.data, estado: d.estado, trechos: (d.trechos || []).length })) };
   }
+  if (action === "excluir") {
+    // Fase de teste: o consultor apaga um RD da pasta. Na evolução (RD aprovado/enviado),
+    // esta ação sai — enviado é definitivo e fica só para consulta.
+    const data = dataISO(b.data);
+    const ref = db.collection("rd_dias").doc(u.uid + "_" + data);
+    const s = await ref.get();
+    if (s.exists && s.data().uid !== u.uid) throw erro(403, "Dia de outro usuário.");
+    if (s.exists) await ref.delete();
+    return { excluido: data };
+  }
   if (action !== "salvar") throw erro(400, "Ação inválida.");
   const data = dataISO(b.data);
   const refDia = db.collection("rd_dias").doc(u.uid + "_" + data);
   const nextDia = dia(b.dia, u.uid, data);
   const nextMem = b.memoria == null ? null : memoria(b.memoria);
   return db.runTransaction(async (tx) => {
-    // Acesso via PIN gerencial sem perfil cadastrado em `usuarios` (identidade "gerencial"): o token
-    // já foi validado pelo servidor de acesso; não há documento de perfil para reconferir.
-    if (!u.viaPin) {
-      const profile = await tx.get(db.collection("usuarios").doc(u.uid));
-      if (!profile.exists || profile.data().active !== true || profile.data().role !== u.role) throw erro(403, "Perfil revogado.");
-    }
-    const sd = await tx.get(refDia); const atualDia = sd.exists ? sd.data() : null;
+    // ATENÇÃO: no Firestore do servidor TODAS as leituras vêm antes de QUALQUER escrita na transação —
+    // ler depois de escrever derruba a transação inteira ("all reads before all writes"). Era por isso
+    // que todo salvar que levava a memória junto (fechar trecho, arquivar o dia, configuração) falhava.
+    // Acesso via PIN gerencial sem perfil em `usuarios` (identidade "gerencial"): o token já foi
+    // validado pelo servidor de acesso; não há documento de perfil para reconferir.
+    const [profile, sd, sm] = await Promise.all([
+      u.viaPin ? null : tx.get(db.collection("usuarios").doc(u.uid)),
+      tx.get(refDia),
+      nextMem ? tx.get(refMem) : null,
+    ]);
+    if (profile && (!profile.exists || profile.data().active !== true || profile.data().role !== u.role)) throw erro(403, "Perfil revogado.");
+    const atualDia = sd.exists ? sd.data() : null;
     if (atualDia && atualDia.uid !== u.uid) throw erro(403, "Dia de outro usuário.");
     if (!Number.isSafeInteger(b.revisao) || b.revisao !== (atualDia?.revisao || 0)) throw erro(409, "Outra gravação alterou este dia. Reabra antes de salvar; seu rascunho local foi preservado.");
     const agora = new Date().toISOString();
     const gravadoDia = { ...nextDia, revisao: (atualDia?.revisao || 0) + 1, atualizadoEm: agora };
     if (Buffer.byteLength(JSON.stringify(gravadoDia), "utf8") > 400000) throw erro(400, "Dia muito grande. Reduza as observações.");
-    tx.set(refDia, gravadoDia);
     let gravadoMem = null;
     if (nextMem) {
-      const sm = await tx.get(refMem); const atualMem = sm.exists ? sm.data() : null;
+      const atualMem = sm.exists ? sm.data() : null;
       if (!Number.isSafeInteger(b.memoriaRevisao) || b.memoriaRevisao !== (atualMem?.revisao || 0)) throw erro(409, "A memória de rotas mudou em outro aparelho. Reabra o RD.");
       gravadoMem = { ...nextMem, uid: u.uid, revisao: (atualMem?.revisao || 0) + 1, atualizadoEm: agora };
       if (Buffer.byteLength(JSON.stringify(gravadoMem), "utf8") > 400000) throw erro(400, "Memória muito grande.");
-      tx.set(refMem, gravadoMem);
     }
+    tx.set(refDia, gravadoDia);
+    if (gravadoMem) tx.set(refMem, gravadoMem);
     return { dia: gravadoDia, memoria: gravadoMem };
   });
 }
