@@ -42,8 +42,11 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [editando, setEditando] = useState(false); // mapa já enviado reaberto para correção
   const [, setTicue] = useState(0); // re-render periódico: plantão em vigor e banner ficam atuais mesmo com a aba aberta da véspera
   const [ignorados, setIgnorados] = useState({}); // avisos "não é da equipe" dispensados (posto:pessoa)
+  const [enviando, setEnviando] = useState(false);   // Concluir em andamento (gravando + confirmando no servidor)
+  const [reenvioPendente, setReenvioPendente] = useState(0); // nº de tentativas automáticas já feitas
   const carregadoRef = useRef(false);
   const timer = useRef(null);
+  const reenvio = useRef(null);                      // { timer, mapa } do reenvio automático
 
   const horario = horarioDoTurno(pid, turno);
   useEffect(() => { const t = setInterval(() => setTicue((n) => n + 1), 30000); return () => clearInterval(t); }, []);
@@ -151,12 +154,40 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
     const final = { ...mapaC, material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
-    try { const gravado = await io.saveMapa(final); setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e salvo"); setEditando(false); }
-    catch (e) { setAvisos([`NÃO GRAVOU o mapa (${(e && e.message) || "erro"}). Confira a conexão e toque em Concluir mapa de novo. O WhatsApp só libera depois de gravar.`]); return; }
-    // Falta, FT e atraso entram na ficha do colaborador (sem duplicar). Se falhar, o mapa e o WhatsApp seguem valendo.
-    setFichaMsg(null);
-    await lancarFicha(final);
+    await enviarComConfirmacao(final);
+  }
+  // Envio OFICIAL: grava e CONFIRMA no servidor antes de liberar o WhatsApp. Sem confirmação,
+  // o líder vê na hora que NÃO chegou — e a tela tenta de novo sozinha a cada 20 s.
+  const enviarComConfirmacao = async (final) => {
+    setEnviando(true);
+    const enviar = io.enviarMapa || io.saveMapa;      // fallback p/ ambientes antigos
+    try {
+      const gravado = await enviar(final);
+      pararReenvio();
+      setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
+      setFichaMsg(null);
+      await lancarFicha(final);                       // Falta/FT/atraso → ficha (sem duplicar)
+    } catch (e) {
+      setAvisos([`SEM CONFIRMAÇÃO DO SERVIDOR: ${(e && e.message) || "erro"}. O mapa ficou neste aparelho e o WhatsApp NÃO foi liberado. Mantenha esta tela aberta: vou tentar de novo sozinho a cada 20 segundos — ou toque em Concluir mapa quando o sinal voltar.`]);
+      agendarReenvio(final);
+    } finally { setEnviando(false); }
   };
+  const pararReenvio = () => { if (reenvio.current) { clearInterval(reenvio.current.timer); reenvio.current = null; } setReenvioPendente(0); };
+  const agendarReenvio = (final) => {
+    if (reenvio.current) { reenvio.current.mapa = final; return; }
+    reenvio.current = { mapa: final, timer: setInterval(async () => {
+      setReenvioPendente((n) => n + 1);
+      const enviar = io.enviarMapa || io.saveMapa;
+      try {
+        const gravado = await enviar(reenvio.current.mapa);
+        pararReenvio();
+        setMapa(gravado); setSalvo("Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
+        setFichaMsg(null);
+        await lancarFicha(gravado);
+      } catch (e) { /* segue tentando enquanto a tela estiver aberta */ }
+    }, 20000) };
+  };
+  useEffect(() => () => { if (reenvio.current) clearInterval(reenvio.current.timer); }, []);;
   // Falta/FT/Atraso → ficha do colaborador. Mostra QUEM recebeu o quê; se falhar, deixa o botão de tentar de novo (o mapa já está gravado).
   const lancarFicha = async (alvo) => {
     if (!io.lancarNaFicha) return;
@@ -484,11 +515,12 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
           {avisos.length > 0 && <div role="alert" style={{ ...S.card, borderColor: "#dc2626" }}>{avisos.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#dc2626", marginBottom: 4 }}>{a}</div>)}</div>}
 
-          {(!enviado || editando) && <button onClick={concluir} style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", color: "#111", border: "none", borderRadius: 14, padding: "15px 16px", fontSize: 15, fontWeight: 900, cursor: "pointer" }}>Concluir mapa</button>}
+          {(!enviado || editando) && <button onClick={concluir} disabled={enviando} style={{ background: enviando ? "#78716c" : "linear-gradient(135deg,#f59e0b,#d97706)", color: "#111", border: "none", borderRadius: 14, padding: "15px 16px", fontSize: 15, fontWeight: 900, cursor: enviando ? "wait" : "pointer" }}>{enviando ? "Gravando e confirmando no servidor…" : "Concluir mapa"}</button>}
+          {reenvioPendente > 0 && <div role="status" style={{ ...S.card, borderColor: "#f59e0b", color: "#b45309", fontSize: 13, fontWeight: 700 }}>Tentando enviar automaticamente… (tentativa {reenvioPendente}). O WhatsApp libera assim que o servidor confirmar.</div>}
 
           {enviado && (
             <div style={{ ...S.card, borderColor: "#16a34a" }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: isDemo() ? "#dc2626" : "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : isDemo() ? "DEMONSTRAÇÃO: o mapa NÃO foi gravado no banco." : "Mapa gravado. Agora envie no WhatsApp."}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: isDemo() ? "#dc2626" : "#16a34a", marginBottom: 8 }}>{editando ? "Mapa em edição." : isDemo() ? "DEMONSTRAÇÃO: o mapa NÃO foi gravado no banco." : "Mapa confirmado no servidor. Agora envie no WhatsApp."}</div>
               {fichaMsg && <div role="status" style={{ fontSize: 12, color: fichaMsg.ok ? cor.txt2 : "#f59e0b", marginBottom: 8 }}>{fichaMsg.texto}{(fichaMsg.linhas || []).map((l, i) => <div key={i} style={{ marginTop: 3 }}>{l}</div>)}{fichaMsg.erro && <div style={{ marginTop: 6 }}><button disabled={fichaBusy} onClick={() => lancarFicha(fichaMsg.alvo)} style={S.btn}>{fichaBusy ? "Lançando…" : "Lançar na ficha de novo"}</button></div>}</div>}
               {!editando && <>
               <pre aria-label="Texto do mapa" style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, color: cor.txt, background: cor.input, border: `1px solid ${cor.line}`, borderRadius: 10, padding: 10, margin: "0 0 10px" }}>{texto}</pre>

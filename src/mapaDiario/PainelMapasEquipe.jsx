@@ -10,8 +10,8 @@ import { MAPA_DIARIO_ATIVO } from "./ativo";
 import ConsolidadoMapas from "./ConsolidadoMapas";
 import VerMapasProjeto from "./VerMapasProjeto";
 
-const COR = { enviado: "#16a34a", aguardando: "#64748b", cobranca: "#f59e0b", pendente: "#dc2626", "sem-horario": "#64748b" };
-const ROTULO = { enviado: "Enviado", aguardando: "Aguardando", cobranca: "Enviar agora", pendente: "Pendente", "sem-horario": "Sem horário" };
+const COR = { enviado: "#16a34a", aguardando: "#64748b", cobranca: "#f59e0b", pendente: "#dc2626", "sem-horario": "#64748b", "sem-leitura": "#94a3b8" };
+const ROTULO = { enviado: "Enviado", aguardando: "Aguardando", cobranca: "Enviar agora", pendente: "Pendente", "sem-horario": "Sem horário", "sem-leitura": "Sem leitura agora" };
 const hhmm = (d) => d ? new Date(d.getTime() - 3 * 3600000).toISOString().slice(11, 16) : "";
 
 export function PainelMapasView({ resumo, erro, carregando, dark, nomeProj = (p) => p, aberto, onToggle, emImplantacao = false, extra = null }) {

@@ -79,12 +79,12 @@ test("só libera o WhatsApp depois de gravar; se a gravação falhar, não liber
   await montar({ saveMapa: jest.fn(async () => { throw new Error("offline"); }) });
   await clicar(botao("Concluir mapa"));
   expect(host.textContent).not.toContain("Abrir WhatsApp");
-  expect(q('[role="alert"]').textContent).toContain("NÃO GRAVOU");
+  expect(q('[role="alert"]').textContent).toContain("SEM CONFIRMAÇÃO DO SERVIDOR");
 });
 test("depois de gravar mostra o texto e o link do WhatsApp", async () => {
   await montar();
   await clicar(botao("Concluir mapa"));
-  expect(host.textContent).toContain("Mapa gravado");
+  expect(host.textContent).toContain("Mapa confirmado no servidor");
   const t = q('pre[aria-label="Texto do mapa"]').textContent;
   expect(t).toContain("*MAPA DE EQUIPE*");
   expect(t).toContain("✅ *L1 · Vigilante Líder:* Luiz D.");
@@ -436,7 +436,7 @@ test("editando um mapa enviado: o WhatsApp some até concluir; se não gravar, c
   expect(q('pre[aria-label="Texto do mapa"]')).toBeNull();
   io.saveMapa.mockImplementationOnce(async () => { throw new Error("falhou"); });
   await clicar(botao("Concluir mapa"));
-  expect(q('[role="alert"]').textContent).toContain("NÃO GRAVOU o mapa (falhou)");
+  expect(q('[role="alert"]').textContent).toContain("SEM CONFIRMAÇÃO DO SERVIDOR: falhou");
   expect(host.textContent).not.toContain("Abrir WhatsApp");
   await clicar(botao("Concluir mapa"));
   expect(host.textContent).toContain("Abrir WhatsApp"); // gravou: libera
