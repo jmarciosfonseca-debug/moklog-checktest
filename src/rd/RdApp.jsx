@@ -45,6 +45,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   const [config, setConfig] = useState(false);
   const [dias, setDias] = useState([]);
   const [pronto, setPronto] = useState(false);
+  const [expandido, setExpandido] = useState(null); // trecho antigo aberto na linha do dia
 
   async function run(fn) { if (busy) return; setBusy(true); setError(""); setNotice(""); try { await fn(); } catch (e) { setError(e.message || "Não foi possível concluir. Rascunho local preservado."); } finally { setBusy(false); } }
 
@@ -81,12 +82,13 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   const destinos = listarDestinos(mem);
   const mudarTrecho = (id, patch) => setDia((d) => ({ ...d, trechos: d.trechos.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
 
-  function Comprovante({ item, onFoto }) {
-    return item.fotoId
-      ? <button className="rd-comprovante ok" title="Comprovante anexado — toque para remover" onClick={() => { if (window.confirm("Remover o comprovante deste lançamento?")) onFoto(null); }}>✓ 📎</button>
-      : <label className="rd-comprovante" title="Anexar comprovante (foto)">📎<input type="file" accept="image/*" capture="environment" aria-label="Anexar comprovante" style={{ display: "none" }}
-          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; run(async () => { const b64 = await comprimirFotoFn(f); const fotoId = novoIdFoto(); await store.salvarFoto(fotoId, b64); onFoto(fotoId); setNotice("Comprovante anexado."); }); }} /></label>;
-  }
+  // IMPORTANTE: os blocos abaixo são FUNÇÕES de render (chamadas direto no JSX), nunca componentes
+  // declarados dentro do RdApp. Componente interno ganha identidade nova a cada render: o React
+  // desmonta e remonta os inputs a cada letra digitada e o teclado do celular cai (bug de campo 15/10).
+  const renderComprovante = (item, onFoto) => item.fotoId
+    ? <button className="rd-comprovante ok" title="Comprovante anexado — toque para remover" onClick={() => { if (window.confirm("Remover o comprovante deste lançamento?")) onFoto(null); }}>✓ 📎</button>
+    : <label className="rd-comprovante" title="Anexar comprovante (foto)">📎<input type="file" accept="image/*" capture="environment" aria-label="Anexar comprovante" style={{ display: "none" }}
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; run(async () => { const b64 = await comprimirFotoFn(f); const fotoId = novoIdFoto(); await store.salvarFoto(fotoId, b64); onFoto(fotoId); setNotice("Comprovante anexado."); }); }} /></label>;
 
   // Um toque no destino abre o trecho na hora (km herdado, veículo lembrado, GPS cravado).
   async function abrirPara(destino) {
@@ -144,19 +146,19 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
     if (ultimoDoCiclo) { try { await gerarConsolidado(data); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
   }
 
-  // ── Blocos reutilizáveis ─────────────────────────────────────────────────────
-  const Gastos = ({ t }) => <>
+  // ── Blocos reutilizáveis (funções de render — ver nota acima) ────────────────
+  const renderGastos = (t) => <>
     <h3>Pedágios e gastos do trecho</h3>
     {(t.pedagios || []).map((p, i) => <div className="rd-linha" key={"p" + i}>
       <input aria-label={"Pedágio " + (i + 1)} value={p.descricao} onChange={(e) => mudarTrecho(t.id, { pedagios: t.pedagios.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)) })} />
       <input aria-label={"Valor pedágio " + (i + 1)} inputMode="decimal" value={p.valor ?? ""} onChange={(e) => mudarTrecho(t.id, { pedagios: t.pedagios.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)) })} />
-      <Comprovante item={p} onFoto={(fotoId) => mudarTrecho(t.id, { pedagios: t.pedagios.map((x, j) => (j === i ? { ...x, ...(fotoId ? { fotoId } : { fotoId: undefined }) } : x)) })} />
+      {renderComprovante(p, (fotoId) => mudarTrecho(t.id, { pedagios: t.pedagios.map((x, j) => (j === i ? { ...x, ...(fotoId ? { fotoId } : { fotoId: undefined }) } : x)) }))}
       <button onClick={() => mudarTrecho(t.id, { pedagios: t.pedagios.filter((_, j) => j !== i) })}>×</button>
     </div>)}
     {(t.gastos || []).map((g, i) => <div className="rd-linha" key={"g" + i}>
       <input aria-label={"Gasto " + (i + 1)} placeholder="Descrição" value={g.descricao} onChange={(e) => mudarTrecho(t.id, { gastos: t.gastos.map((x, j) => (j === i ? { ...x, descricao: e.target.value } : x)) })} />
       <input aria-label={"Valor gasto " + (i + 1)} inputMode="decimal" value={g.valor ?? ""} onChange={(e) => mudarTrecho(t.id, { gastos: t.gastos.map((x, j) => (j === i ? { ...x, valor: e.target.value } : x)) })} />
-      <Comprovante item={g} onFoto={(fotoId) => mudarTrecho(t.id, { gastos: t.gastos.map((x, j) => (j === i ? { ...x, ...(fotoId ? { fotoId } : { fotoId: undefined }) } : x)) })} />
+      {renderComprovante(g, (fotoId) => mudarTrecho(t.id, { gastos: t.gastos.map((x, j) => (j === i ? { ...x, ...(fotoId ? { fotoId } : { fotoId: undefined }) } : x)) }))}
       <button onClick={() => mudarTrecho(t.id, { gastos: t.gastos.filter((_, j) => j !== i) })}>×</button>
     </div>)}
     <button className="rd-link" onClick={() => mudarTrecho(t.id, { pedagios: [...(t.pedagios || []), { descricao: "Pedágio", valor: "" }] })}>+ Pedágio</button>
@@ -164,7 +166,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   </>;
 
   // Visita no MESMO card: chavinhas, lembretes pendentes, tratativas livres, lembrete novo e observações.
-  const Visita = ({ t }) => {
+  const renderVisita = (t) => {
     const pend = pendenciasDoDestino(mem, t.destino).filter((p) => !(t.atividades || []).some((a) => a.texto === p.texto));
     const marcarToggle = (tag, rotulo, ligada) => {
       const sem = (t.atividades || []).filter((a) => a.tag !== tag);
@@ -206,7 +208,7 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
   };
 
   // Cascata do próximo destino, inline: um toque abre o trecho.
-  const ProximoDestino = ({ titulo }) => <>
+  const renderProximoDestino = (titulo) => <>
     <h3>{titulo}</h3>
     <div className="rd-kmpar">
       <label>Km inicial (painel)<input inputMode="decimal" value={kmPartida ?? (herdarKmInicial(dia) ?? "")} onChange={(e) => setKmPartida(e.target.value)} /></label>
@@ -250,49 +252,71 @@ export default function RdApp({ auth, onBack, criarMarcoFn = criarMarco, comprim
     {dias.length > 0 && <section className="rd-card"><h3>Dias anteriores</h3><div className="rd-dias">{dias.slice(0, 14).map((d) => <button key={d.data} aria-pressed={d.data === data} onClick={() => { setData(d.data); setConfig(false); }}>{dataBR(d.data)} · {d.trechos} trecho(s)</button>)}{data !== hojeISO() && <button onClick={() => { setData(hojeISO()); setConfig(false); }}>Voltar para hoje</button>}</div></section>}
   </main>;
 
-  // ── Tela do dia ──────────────────────────────────────────────────────────────
+  // ── Tela do dia: os trechos em LINHA (como o RD do 2CONTROL) ─────────────────
+  // Um card por trecho, em ordem cronológica. Os antigos ficam recolhidos num resumo de uma
+  // linha e abrem num toque para corrigir hora, km, gastos e visita; o trecho atual (em
+  // deslocamento ou a visita de agora) fica sempre expandido no fim da linha.
   return <main className="rd">
     <header><button onClick={onBack}>← Início</button>
       <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button></h1>
       <p>{dataBR(data)} · {dia.estado === "fechado" ? "dia fechado" : aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}
+    {dia.trechos.length > 0 && <p className="rd-totais">Dia em linha · {dia.trechos.length} trecho{dia.trechos.length > 1 ? "s" : ""} · {kmFmt(tot.km)} · pedágios {brl(tot.pedagios)}{tot.gastos ? ` · gastos ${brl(tot.gastos)}` : ""}</p>}
 
-    {aberto && <section className="rd-card rd-atual">
-      <h2>Em deslocamento · {rotuloDestino(mem, aberto.origem)} → {rotuloDestino(mem, aberto.destino)}{aberto.veiculo === "moto" ? " · 🏍" : ""}</h2>
-      <Marco rotulo="Saída" marco={aberto.abertura} onHora={(m) => mudarTrecho(aberto.id, { abertura: m })} />
-      <div className="rd-kmpar">
-        <label>Km inicial (painel)<input inputMode="decimal" value={aberto.kmInicial ?? ""} onChange={(e) => mudarTrecho(aberto.id, { kmInicial: e.target.value })} /></label>
-        <label>Km final (painel)<input inputMode="decimal" className={kmChegada == null && projecaoAberto != null ? "rd-cravado" : ""} value={kmFinalEfetivo} onChange={(e) => setKmChegada(e.target.value)} /></label>
-      </div>
-      {projecaoAberto != null && <p className="rd-dica">Rota conhecida: km final já cravado em <strong>{kmFmt(projecaoAberto)}</strong> — confira no painel e corrija se precisar.</p>}
-      <Gastos t={aberto} />
-      {aberto.destino !== "MK_HOME" && <Visita t={aberto} />}
-      <button className="rd-principal" disabled={busy} onClick={() => run(fecharTrecho)}>Cheguei — fechar o trecho</button>
-      <p><button className="rd-link" disabled={busy} onClick={() => { if (!window.confirm("Cancelar este trecho? Use quando abriu por engano (projeto errado). A marcação de saída é descartada.")) return; run(async () => { const novoDia = { ...dia, trechos: dia.trechos.filter((t) => t.id !== aberto.id) }; setDia(novoDia); setKmChegada(null); await salvar(novoDia); setNotice("Trecho cancelado. Abra de novo com o destino certo."); }); }}>Abri por engano — cancelar este trecho</button></p>
-    </section>}
+    {dia.trechos.map((t, i) => {
+      if (aberto && t.id === aberto.id) return <section className="rd-card rd-atual" key={t.id}>
+        <h2>Em deslocamento · {rotuloDestino(mem, t.origem)} → {rotuloDestino(mem, t.destino)}{t.veiculo === "moto" ? " · 🏍" : ""}</h2>
+        <Marco rotulo="Saída" marco={t.abertura} onHora={(m) => mudarTrecho(t.id, { abertura: m })} />
+        <div className="rd-kmpar">
+          <label>Km inicial (painel)<input inputMode="decimal" value={t.kmInicial ?? ""} onChange={(e) => mudarTrecho(t.id, { kmInicial: e.target.value })} /></label>
+          <label>Km final (painel)<input inputMode="decimal" className={kmChegada == null && projecaoAberto != null ? "rd-cravado" : ""} value={kmFinalEfetivo} onChange={(e) => setKmChegada(e.target.value)} /></label>
+        </div>
+        {projecaoAberto != null && <p className="rd-dica">Rota conhecida: km final já cravado em <strong>{kmFmt(projecaoAberto)}</strong> — confira no painel e corrija se precisar.</p>}
+        {renderGastos(t)}
+        {t.destino !== "MK_HOME" && renderVisita(t)}
+        <button className="rd-principal" disabled={busy} onClick={() => run(fecharTrecho)}>Cheguei — fechar o trecho</button>
+        <p><button className="rd-link" disabled={busy} onClick={() => { if (!window.confirm("Cancelar este trecho? Use quando abriu por engano (projeto errado). A marcação de saída é descartada.")) return; run(async () => { const novoDia = { ...dia, trechos: dia.trechos.filter((x) => x.id !== t.id) }; setDia(novoDia); setKmChegada(null); await salvar(novoDia); setNotice("Trecho cancelado. Abra de novo com o destino certo."); }); }}>Abri por engano — cancelar este trecho</button></p>
+      </section>;
 
-    {!aberto && dia.estado !== "fechado" && <section className="rd-card">
-      {fechadoAtual ? <>
-        <h2>Você está em {rotuloDestino(mem, fechadoAtual.destino)}</h2>
-        <Marco rotulo="Chegada" marco={fechadoAtual.chegada} onHora={(m) => mudarTrecho(fechadoAtual.id, { chegada: m })} />
-        {fechadoAtual.destino !== "MK_HOME" && <Visita t={fechadoAtual} />}
+      if (!aberto && dia.estado !== "fechado" && fechadoAtual && t.id === fechadoAtual.id) return <section className="rd-card rd-atual" key={t.id}>
+        <h2>Você está em {rotuloDestino(mem, t.destino)}</h2>
+        <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
+        {t.destino !== "MK_HOME" && renderVisita(t)}
         <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setNotice("Visita salva."); })}>Salvar visita</button>
         {estou === "MK_HOME"
           ? <button className="rd-fechar" disabled={busy} onClick={() => run(fecharDia)}>Fechar o dia e gerar o RD</button>
-          : <ProximoDestino titulo="Para onde agora?" />}
-      </> : <ProximoDestino titulo="Sair de casa — para onde?" />}
+          : renderProximoDestino("Para onde agora?")}
+      </section>;
+
+      const ab = expandido === t.id;
+      return <section className="rd-card rd-trecho" key={t.id}>
+        <button className="rd-trecho-head" aria-expanded={ab} onClick={() => setExpandido(ab ? null : t.id)}>
+          <div><strong>{i + 1} · {rotuloDestino(mem, t.origem)} → {rotuloDestino(mem, t.destino)}{t.veiculo === "moto" ? " 🏍" : ""}</strong>
+            <span>{horaDe(t.abertura)}{t.chegada ? ` – ${horaDe(t.chegada)}` : ""} · {kmFmt(kmDoTrecho(t))}{perm[i] != null ? ` · ficou ${minutosFmt(perm[i])}` : ""}</span></div>
+          <em>{ab ? "⌄" : "›"}</em>
+        </button>
+        {ab && <>
+          <Marco rotulo="Saída" marco={t.abertura} onHora={(m) => mudarTrecho(t.id, { abertura: m })} />
+          <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
+          <div className="rd-kmpar">
+            <label>Km inicial (painel)<input inputMode="decimal" value={t.kmInicial ?? ""} onChange={(e) => mudarTrecho(t.id, { kmInicial: e.target.value })} /></label>
+            <label>Km final (painel)<input inputMode="decimal" value={t.kmFinal ?? ""} onChange={(e) => mudarTrecho(t.id, { kmFinal: e.target.value })} /></label>
+          </div>
+          {renderGastos(t)}
+          {t.destino !== "MK_HOME" && renderVisita(t)}
+          <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setExpandido(null); setNotice("Trecho atualizado."); })}>Salvar alterações</button>
+        </>}
+      </section>;
+    })}
+
+    {dia.trechos.length === 0 && dia.estado !== "fechado" && <section className="rd-card rd-atual">
+      {renderProximoDestino("Sair de casa — para onde?")}
     </section>}
 
     {dia.estado === "fechado" && <section className="rd-card"><h2>Dia fechado</h2>
       <button className="rd-principal" disabled={busy} onClick={() => run(() => imprimirComFotos(dia, mem))}>Gerar RD (PDF)</button>
       <button className="rd-link" disabled={busy} onClick={() => run(async () => { const novoDia = { ...dia, estado: "aberto" }; setDia(novoDia); await salvar(novoDia); setNotice("Dia reaberto."); })}>Reabrir o dia</button>
-    </section>}
-
-    {dia.trechos.length > 0 && <section className="rd-card"><h2>Trechos de hoje · {kmFmt(tot.km)} · pedágios {brl(tot.pedagios)}</h2>
-      {dia.trechos.map((t, i) => <p className="rd-resumo" key={t.id}>
-        <strong>{rotuloDestino(mem, t.origem)} → {rotuloDestino(mem, t.destino)}</strong>{t.veiculo === "moto" ? " 🏍" : ""} · saída {horaDe(t.abertura)} · {t.chegada ? `chegada ${horaDe(t.chegada)} · ${kmFmt(kmDoTrecho(t))}` : "em deslocamento"}{perm[i] != null ? ` · permanência ${minutosFmt(perm[i])}` : ""}
-      </p>)}
     </section>}
   </main>;
 }
