@@ -28,7 +28,7 @@ function trecho(t) {
     kmInicial: numOuNulo(t.kmInicial), kmFinal: numOuNulo(t.kmFinal),
     abertura: marco(t.abertura), chegada: marco(t.chegada),
     pedagios: lista(t.pedagios, 20).map(valorItem), gastos: lista(t.gastos, 20).map(valorItem),
-    atividades: lista(t.atividades, 40).map((a) => ({ texto: texto(a.texto, 1000), status: ["aberto", "finalizado"].includes(a.status) ? a.status : null, ...(a.desde ? { desde: dataISO(a.desde) } : {}) })),
+    atividades: lista(t.atividades, 40).map((a) => ({ texto: texto(a.texto, 1000), status: ["aberto", "finalizado"].includes(a.status) ? a.status : null, ...(a.desde ? { desde: dataISO(a.desde) } : {}), ...(a.tag ? { tag: texto(a.tag, 20) } : {}) })),
     obs: texto(t.obs, 4000),
   };
   if (!out.id || !out.abertura) throw erro(400, "Trecho sem identificação ou abertura.");

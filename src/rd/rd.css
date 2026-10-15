@@ -54,3 +54,17 @@
 .rd-comprovante.ok{border-color:#22c55e77;color:#86efac}
 .rd-lembrete input{border-color:#b4530966}
 .rd-lembrete input::placeholder{color:#fbbf24aa}
+.rd-engrenagem{float:right;background:transparent;border:1px solid #334155;border-radius:10px;color:#94a3b8;padding:4px 10px;font-size:16px;cursor:pointer}
+.rd-kmpar{display:flex;gap:10px}
+.rd-kmpar>label{flex:1}
+.rd-kmpar .rd-veiculo{flex:1;align-items:flex-end;margin:8px 0 0}
+.rd-cravado{border-color:#f59e0b88 !important;color:#fbbf24 !important}
+.rd-toggle{margin:8px 0}
+.rd-chave{display:flex !important;align-items:center;gap:10px;font-size:13.5px !important;color:#e2e8f0 !important;cursor:pointer}
+.rd-chave input{position:absolute;opacity:0;width:0;height:0;margin:0}
+.rd-chave i{width:40px;height:22px;border-radius:11px;background:#1e293b;border:1px solid #334155;position:relative;flex-shrink:0;transition:background .15s}
+.rd-chave i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#64748b;transition:left .15s,background .15s}
+.rd-chave input:checked+i{background:#1d4ed8;border-color:#2563eb}
+.rd-chave input:checked+i::after{left:20px;background:#fff}
+.rd-toggle-obs{margin-top:6px}
+.rd-micro{font-size:11px;color:#64748b;margin:6px 0 0}
