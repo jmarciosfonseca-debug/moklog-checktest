@@ -68,3 +68,10 @@
 .rd-chave input:checked+i::after{left:20px;background:#fff}
 .rd-toggle-obs{margin-top:6px}
 .rd-micro{font-size:11px;color:#64748b;margin:6px 0 0}
+.rd-totais{font-size:12px;color:#94a3b8;margin:0 2px 10px;font-weight:700}
+.rd-trecho{padding:10px 14px}
+.rd-trecho-head{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:none;color:#e2e8f0;padding:2px 0;text-align:left;cursor:pointer}
+.rd-trecho-head>div{flex:1;min-width:0}
+.rd-trecho-head strong{font-size:13.5px;display:block}
+.rd-trecho-head span{display:block;font-size:11.5px;color:#94a3b8;margin-top:2px}
+.rd-trecho-head em{font-style:normal;color:#64748b;font-size:17px;flex-shrink:0}

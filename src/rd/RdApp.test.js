@@ -66,6 +66,51 @@ test("fluxo fluido: toque no destino abre; visita no mesmo card com chavinha e l
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
+test("digitar não derruba o teclado: o MESMO nó de input sobrevive a cada letra (sem remontagem)", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await montar(host, root);
+    await digitar(porLabel(host, "Km inicial"), "242323");
+    await clicar(host, "MK602");
+    // liga a chavinha e digita na observação letra a letra, como no celular
+    await act(async () => { host.querySelector('[aria-label="Contato com a administração"]').click(); });
+    const obs = host.querySelector('[aria-label="Observação contato com a administração"]');
+    obs.focus();
+    for (const v of ["S", "Si", "Sim"]) {
+      await digitar(obs, v);
+      expect(host.querySelector('[aria-label="Observação contato com a administração"]')).toBe(obs); // mesmo nó do DOM
+      expect(document.activeElement).toBe(obs);                                                      // foco (teclado) de pé
+    }
+    // o mesmo vale para atividade livre, lembrete e observações da visita
+    const atv = host.querySelector('[aria-label="Nova atividade"]');
+    atv.focus();
+    await digitar(atv, "Ronda");
+    expect(host.querySelector('[aria-label="Nova atividade"]')).toBe(atv);
+    expect(document.activeElement).toBe(atv);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("dia em linha (como o RD 2C): trecho antigo vira card recolhido de uma linha e abre num toque para corrigir", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await montar(host, root);
+    await digitar(porLabel(host, "Km inicial"), "242323");
+    await clicar(host, "MK602");
+    await clicar(host, "Cheguei — fechar o trecho");
+    await clicar(host, "MK Home");                       // abre a volta: o trecho 1 vira linha recolhida
+    expect(host.textContent).toContain("Dia em linha · 2 trechos");
+    expect(host.textContent).toContain("1 · MK Home → MK602");
+    expect(host.textContent).toContain("05:14 – 06:16");
+    expect(host.textContent).not.toContain("Visita · MK602");   // recolhido: sem formulário na tela
+    const head = host.querySelector('.rd-trecho-head');
+    await act(async () => head.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(host.textContent).toContain("Visita · MK602");        // expandiu: dá para corrigir hora, km, gastos e visita
+    expect(botao(host, "Salvar alterações")).toBeDefined();
+    await act(async () => head.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(host.textContent).not.toContain("Salvar alterações"); // recolheu de novo
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
 test("em casa com o dia rodado aparece Fechar o dia; Configurar fica atrás do ⚙, fora da tela do dia", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   mockStore.ler.mockResolvedValue({ dia: { data: "2026-10-15", estado: "aberto", revisao: 2, trechos: [
