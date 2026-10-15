@@ -5,6 +5,13 @@ import { linkMapa } from "./rdGeo";
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const hhmm = (m) => esc(horaDe(m));
 
+// Barra fixa no topo da página gerada: um botão claro de Imprimir / Salvar PDF (some na impressão).
+export const CSS_BARRA_PDF = `.rd-pbar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:12px;background:#0f172a;color:#e2e8f0;border-radius:0 0 10px 10px;padding:10px 16px;margin:-24px -24px 18px}
+.rd-pbar span{flex:1;font-size:12px}
+.rd-pbar button{background:#d55a26;border:none;border-radius:8px;color:#fff;font-weight:800;padding:9px 18px;font-size:13px;cursor:pointer}
+@media print{.rd-pbar{display:none}}`;
+export const barraPdf = (nome) => `<div class="rd-pbar"><span>${esc(nome)}</span><button onclick="window.print()">Imprimir / Salvar PDF</button></div>`;
+
 export function htmlRd(dia, memoria, consultor, fotos = {}) {
   const ts = dia?.trechos || [];
   const perm = permanencias(dia);
@@ -18,7 +25,7 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
   const linhas = ts.map((t, i) => {
     const pedagios = (t.pedagios || []).reduce((a, p) => a + (Number(String(p.valor).replace(",", ".")) || 0), 0);
     return `<tr>
-     <td class="rota"><b>${i + 1}</b><div>${esc(rotuloDestino(memoria, t.origem))} → ${esc(rotuloDestino(memoria, t.destino))}<small>${t.veiculo === "moto" ? "🏍 Moto" : "🚗 Carro"}</small></div></td>
+     <td class="rota"><b>${i + 1}</b><div>${esc(rotuloDestino(memoria, t.origem))} → ${esc(rotuloDestino(memoria, t.destino))}<small>${t.veiculo === "moto" ? "Moto" : "Carro"}</small></div></td>
      <td class="mrc">${marco2(t.abertura)}</td><td class="mrc">${marco2(t.chegada)}</td>
      <td class="num">${esc(kmFmt(kmDoTrecho(t)))}</td><td class="num">${pedagios ? esc(brl(pedagios)) : "—"}</td><td class="num">${perm[i] == null ? "—" : esc(minutosFmt(perm[i]))}</td></tr>`;
   }).join("");
@@ -27,7 +34,7 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
    <section class="vis"><h3>${esc(rotuloDestino(memoria, t.destino))}</h3>
    ${(t.atividades || []).filter((a) => a.status !== "aberto").map((a) => {
     const [titulo, resto] = a.texto.includes(" — ") ? [a.texto.slice(0, a.texto.indexOf(" — ")), a.texto.slice(a.texto.indexOf(" — ") + 3)] : [null, a.texto];
-    return `<p class="at st-${a.status || "neutro"}">${a.status === "finalizado" ? "✔ Concluído: " : ""}${titulo ? `<b>${esc(titulo)}</b> — ` : ""}${esc(resto)}</p>`;
+    return `<p class="at st-${a.status || "neutro"}">${a.status === "finalizado" ? "Concluído: " : ""}${titulo ? `<b>${esc(titulo)}</b> — ` : ""}${esc(resto)}</p>`;
    }).join("")}
    ${t.obs ? `<p class="obs">${esc(t.obs)}</p>` : ""}</section>`).join("");
   const kmValor = memoria?.config?.valorKm;
@@ -52,7 +59,9 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
   .lem{background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:10px 14px;margin-top:12px}
   .lem h3{color:#b45309}.lem p{margin:4px 0;color:#7c2d12}.lem b{color:#b45309}
   .cps{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}.cps figure{margin:0;width:200px}.cps img{width:100%;border:1px solid #d6dde4;border-radius:6px}.cps figcaption{font-size:9.5px;color:#475569;margin-top:3px}
-  footer{margin-top:26px;border-top:1px solid #c7ced5;padding-top:8px;font-size:9.5px;color:#64748b}</style></head><body>
+  footer{margin-top:26px;border-top:1px solid #c7ced5;padding-top:8px;font-size:9.5px;color:#64748b}
+  ${CSS_BARRA_PDF}</style></head><body>
+  ${barraPdf(`MK RD · ${dataBR(dia?.data)} — toque no botão para salvar em PDF`)}
   <header><div><h1>MK RD · Relatório Diário</h1><div class="sub">${esc(dataBR(dia?.data))}${consultor ? " · " + esc(consultor) : ""}</div></div><img src="${LOGO_MOKED_30}" alt="Moked 30 anos"/></header>
   <h2>01 · Trechos do dia</h2>
   <table><thead><tr><th>Trecho</th><th>Saída</th><th>Chegada</th><th class="num">Km</th><th class="num">Pedágios</th><th class="num">Permanência</th></tr></thead><tbody>${linhas || '<tr><td colspan="6">Sem trechos.</td></tr>'}</tbody></table>
@@ -64,7 +73,7 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
    ${reembolso != null ? `<div>Km + despesas<strong>${esc(brl(reembolso))}</strong></div>` : ""}
   </div>
   ${visitas ? `<h2>02 · Visitas e tratativas</h2>${visitas}` : ""}
-  ${lembretes.length ? `<h2>03 · Lembretes para a próxima visita</h2><div class="lem"><h3>⚠ Em aberto — reaparecem automaticamente na próxima visita</h3>${lembretes.map((l) => `<p><b>${esc(l.destino)}:</b> ${esc(l.texto)}</p>`).join("")}</div>` : ""}
+  ${lembretes.length ? `<h2>03 · Lembretes para a próxima visita</h2><div class="lem"><h3>Em aberto — reaparecem automaticamente na próxima visita</h3>${lembretes.map((l) => `<p><b>${esc(l.destino)}:</b> ${esc(l.texto)}</p>`).join("")}</div>` : ""}
   ${dia?.obs ? `<h2>Observações do dia</h2><p>${esc(dia.obs)}</p>` : ""}
   ${(() => {
     const itens = ts.flatMap((t) => [...(t.pedagios || []), ...(t.gastos || [])].filter((x) => x.fotoId && fotos[x.fotoId]).map((x) => ({ ...x, rota: rotuloDestino(memoria, t.origem) + " → " + rotuloDestino(memoria, t.destino) })));

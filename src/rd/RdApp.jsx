@@ -1,13 +1,15 @@
-// MK RD — dia em trechos encadeados, numa página só e sem travas:
-// • o card do trecho traz km inicial e km final LADO A LADO (o final já vem cravado pela projeção da rota — é só conferir);
-// • a visita (chavinhas de administração/equipe, tratativas, lembretes) fica no MESMO card, disponível desde a saída;
-// • fechou o trecho → a escolha do próximo destino já aparece embaixo: um toque no destino abre o trecho;
-// • Configurar (valores de km, fechamento, dias anteriores) fica atrás do ⚙, fora do caminho do dia.
+// MK RD — padrão aprovado pelo Marcio (15/10):
+// • abrir o RD é SEMPRE o painel de iniciar a próxima visita (tela 0); dia arquivado vira uma
+//   linha discreta e vive na pasta de RDs arquivados — abrir um destino reabre o dia sozinho;
+// • visita enxuta no modelo 2C: 4 chavinhas (administração, equipe, emp. de segurança e
+//   seg. eletrônica) com caixa de texto que cresce em cascata + lembrete + observações. Só;
+// • consulta é LEITURA (texto corrido, estilo 2C); o formulário aparece só no "Editar";
+// • pasta com período De/Até, resumo na hora e consolidado do intervalo.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { criarRdStore } from "./rdStore";
 import { criarMarco, linkMapa } from "./rdGeo";
 import { imprimirRd } from "./rdPdf";
-import { imprimirConsolidado } from "./rdConsolidado";
+import { imprimirConsolidado, consolidarPeriodo } from "./rdConsolidado";
 import { comprimirFoto, novoIdFoto } from "./rdFoto";
 import {
   listarDestinos, rotuloDestino, normalizarCodigoNovo, novoIdTrecho, hojeISO, dataBR,
@@ -25,9 +27,16 @@ const Marco = ({ rotulo, marco, onHora }) => !marco ? null : (
     : <strong>{horaDe(marco)}</strong>}{marco.editado ? " (editado)" : ""}{marco.endereco ? ` · ${marco.endereco}` : ""}{marco.gps ? <> · <a href={linkMapa(marco.gps)} target="_blank" rel="noopener noreferrer">mapa</a></> : " · sem localização"}</p>
 );
 
-// Chavinhas da visita: um toque liga, a observação abre do lado. Guardadas como atividades com tag.
-const TRATATIVAS_PADRAO = [["adm", "Contato com a administração"], ["equipe", "Contato com a equipe"]];
+// Chavinhas da visita (modelo 2C). Guardadas como atividades com tag: "Rótulo — texto".
+const TRATATIVAS_PADRAO = [
+  ["adm", "Contato com a administração", "Administração"],
+  ["equipe", "Contato com a equipe", "Equipe"],
+  ["segemp", "Contato com emp. de segurança", "Emp. de segurança"],
+  ["segel", "Contato com seg. eletrônica", "Seg. eletrônica"],
+];
 const obsDaTag = (t, tag, rotulo) => { const a = (t.atividades || []).find((x) => x.tag === tag); if (!a) return null; return a.texto.startsWith(rotulo + " — ") ? a.texto.slice(rotulo.length + 3) : ""; };
+// Caixa em cascata: o nº de linhas acompanha o texto (nunca rola para o lado).
+const linhasDe = (s) => Math.min(10, Math.max(2, Math.ceil(String(s || "").length / 38) + (String(s || "").split("\n").length - 1)));
 
 // Km rodado em tempo real: número a partir do que está digitado no painel.
 const kmNum = (v) => { if (v == null || v === "") return null; const n = Number(String(v).replace(",", ".")); return Number.isFinite(n) ? n : null; };
@@ -44,15 +53,18 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   const [veiculo, setVeiculo] = useState(null);         // null = último usado
   const [novoCodigo, setNovoCodigo] = useState(null);   // "MK novo…" aberto
   const [kmChegada, setKmChegada] = useState(null);     // null = projeção cravada
-  const [atividadeNova, setAtividadeNova] = useState("");
   const [lembreteNovo, setLembreteNovo] = useState("");
   const [config, setConfig] = useState(false);
   const [dias, setDias] = useState([]);
   const [pronto, setPronto] = useState(false);
-  const [expandido, setExpandido] = useState(null); // trecho antigo aberto na linha do dia
-  const [arquivo, setArquivo] = useState(false);    // pasta "RDs arquivados"
-  const cfgTimer = useRef(null);                    // a configuração salva sozinha (debounce)
-  const tema = "rd" + (dark ? "" : " rd-claro");    // acompanha o tema do app
+  const [expandido, setExpandido] = useState(null);   // trecho antigo aberto na linha do dia
+  const [editTrecho, setEditTrecho] = useState(null); // trecho em edição (formulário); fora dele, leitura
+  const [arquivo, setArquivo] = useState(false);      // pasta "RDs arquivados"
+  const [consulta, setConsulta] = useState(false);    // RD aberto pela pasta (modo leitura)
+  const [per, setPer] = useState(null);               // período da pasta {de, ate}
+  const [perDias, setPerDias] = useState(null);       // dias completos do período (para resumo e consolidado)
+  const cfgTimer = useRef(null);                      // a configuração salva sozinha (debounce)
+  const tema = "rd" + (dark ? "" : " rd-claro");      // acompanha o tema do app
 
   async function run(fn) { if (busy) return; setBusy(true); setError(""); setNotice(""); try { await fn(); } catch (e) { setError(e.message || "Não foi possível concluir. Rascunho local preservado."); } finally { setBusy(false); } }
 
@@ -87,6 +99,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   const estou = origemAtual(dia);
   const fechadoAtual = ultimoFechado(dia);
   const destinos = listarDestinos(mem);
+  const hoje = data === hojeISO();
   const mudarTrecho = (id, patch) => setDia((d) => ({ ...d, trechos: d.trechos.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
 
   // IMPORTANTE: os blocos abaixo são FUNÇÕES de render (chamadas direto no JSX), nunca componentes
@@ -98,6 +111,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; run(async () => { const b64 = await comprimirFotoFn(f); const fotoId = novoIdFoto(); await store.salvarFoto(fotoId, b64); onFoto(fotoId); setNotice("Comprovante anexado."); }); }} /></label>;
 
   // Um toque no destino abre o trecho na hora (km herdado, veículo lembrado, GPS cravado).
+  // Dia já arquivado? Reabre sozinho e a linha continua (trecho 3, 4…) — arquiva de novo no fim.
   async function abrirPara(destino) {
     const kmInicial = kmPartida != null && kmPartida !== "" ? kmPartida : (herdarKmInicial(dia) ?? "");
     const marco = await criarMarcoFn();
@@ -107,10 +121,11 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       abertura: marco, chegada: null,
       pedagios: pedagiosSugeridos(mem, estou, destino), gastos: [], atividades: [], obs: "",
     };
-    const novoDia = { ...dia, trechos: [...dia.trechos, t] };
+    const reabriu = dia.estado === "fechado";
+    const novoDia = { ...dia, estado: "aberto", trechos: [...dia.trechos, t] };
     setDia(novoDia); setKmPartida(null); setNovoCodigo(null); setKmChegada(null);
     await salvar(novoDia);
-    setNotice(`Trecho aberto para ${rotuloDestino(mem, destino)} às ${horaDe(marco)}${marco.gps ? "" : " (sem localização)"}.`);
+    setNotice(`Trecho aberto para ${rotuloDestino(mem, destino)} às ${horaDe(marco)}${marco.gps ? "" : " (sem localização)"}.${reabriu ? " O dia reabriu e continua a linha — arquive de novo no fim." : ""}`);
   }
 
   const projecaoAberto = aberto ? projetarKmFinal(mem, aberto.origem, aberto.destino, aberto.kmInicial) : null;
@@ -130,11 +145,6 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
 
   const diaFechamento = () => { const d = parseInt(mem?.config?.fechamentoDia, 10); return d >= 1 && d <= 28 ? d : 18; };
   const periodoAtual = (ate) => { const f = diaFechamento(); const fim = new Date(ate + "T12:00:00Z"); const ini = new Date(fim); if (fim.getUTCDate() <= f) ini.setUTCMonth(ini.getUTCMonth() - 1); ini.setUTCDate(f + 1); return { de: ini.toISOString().slice(0, 10), ate }; };
-  async function gerarConsolidado(ate) {
-    const { de } = periodoAtual(ate);
-    const r = await store.periodo(de, ate);
-    imprimirConsolidado(r.dias || [], r.memoria || mem, auth?.currentUser?.email || "");
-  }
   async function imprimirComFotos(d, m) {
     const ids = (d.trechos || []).flatMap((t) => [...(t.pedagios || []), ...(t.gastos || [])]).map((x) => x.fotoId).filter(Boolean);
     let fotos = {};
@@ -150,15 +160,32 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     let novaMem = mem;
     for (const t of dia.trechos) if ((t.atividades || []).length) novaMem = memoriaAposVisita(novaMem, t.destino, t.atividades, data);
     const novoDia = { ...dia, estado: "fechado" };
-    // Primeiro GRAVA; só então a tela diz "arquivado". Se o servidor recusar, o dia continua
-    // aberto na tela (nunca "salvo e arquivado" com erro em cima).
+    // Primeiro GRAVA; só então a tela diz "arquivado".
     await salvar(novoDia, novaMem);
     try { const d = await store.dias(); setDias(d.dias || []); } catch { /* lista atualiza na próxima */ }
-    setArquivo(true); // já leva para a pastinha, com o aviso
-    setNotice(`✓ RD de ${dataBR(data)} salvo e arquivado. Lembretes em aberto reaparecem na próxima visita a cada projeto.`);
+    abrirPasta(); // já leva para a pastinha, com o aviso
+    setNotice(`RD de ${dataBR(data)} salvo e arquivado. Lembretes em aberto reaparecem na próxima visita a cada projeto.`);
     await imprimirComFotos(novoDia, novaMem);
-    if (ultimoDoCiclo) { try { await gerarConsolidado(data); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
+    if (ultimoDoCiclo) { try { const p = periodoAtual(data); const r = await store.periodo(p.de, p.ate); imprimirConsolidado(r.dias || [], r.memoria || mem, auth?.currentUser?.email || ""); } catch (e) { setError("RD do dia gerado; o consolidado falhou: " + e.message); } }
   }
+
+  // ── Pasta: período De/Até com resumo na hora ─────────────────────────────────
+  const carregarPeriodo = async (p) => {
+    setPerDias(null);
+    try { const r = await store.periodo(p.de, p.ate); setPerDias(r.dias || []); } catch { setPerDias([]); }
+  };
+  function abrirPasta() {
+    const p = per || periodoAtual(hojeISO());
+    setPer(p); setArquivo(true); setConsulta(false);
+    store.dias().then((d) => setDias(d.dias || [])).catch(() => {});
+    carregarPeriodo(p);
+  }
+  const mudarPeriodo = (p) => { setPer(p); carregarPeriodo(p); };
+  const atalhos = () => {
+    const h = hojeISO();
+    const d7 = new Date(h + "T12:00:00Z"); d7.setUTCDate(d7.getUTCDate() - 6);
+    return [["Período atual", periodoAtual(h)], ["Últimos 7 dias", { de: d7.toISOString().slice(0, 10), ate: h }], ["Este mês", { de: h.slice(0, 8) + "01", ate: h }]];
+  };
 
   // Configuração salva sozinha (1,2 s após a última tecla). Nesta fase os valores são do consultor;
   // na evolução, a edição passa a ser exclusiva da gerência Moked.
@@ -192,7 +219,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     <button className="rd-link" onClick={() => mudarTrecho(t.id, { gastos: [...(t.gastos || []), { descricao: "", valor: "" }] })}>+ Outro gasto</button>
   </>;
 
-  // Visita no MESMO card: chavinhas, lembretes pendentes, tratativas livres, lembrete novo e observações.
+  // Visita ENXUTA (modelo 2C): pendências → 4 chavinhas com caixa em cascata → lembrete → observações.
   const renderVisita = (t) => {
     const pend = pendenciasDoDestino(mem, t.destino).filter((p) => !(t.atividades || []).some((a) => a.texto === p.texto));
     const marcarToggle = (tag, rotulo, ligada) => {
@@ -202,10 +229,12 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     const mudarObsToggle = (tag, rotulo, obs) => {
       mudarTrecho(t.id, { atividades: (t.atividades || []).map((a) => (a.tag === tag ? { ...a, texto: obs ? `${rotulo} — ${obs}` : rotulo } : a)) });
     };
+    const lembretes = (t.atividades || []).filter((a) => !a.tag && a.status === "aberto");
+    const legadas = (t.atividades || []).filter((a) => !a.tag && a.status !== "aberto");
     return <>
       <h3>Visita · {rotuloDestino(mem, t.destino)}</h3>
       {pend.length > 0 && <div className="rd-pend"><strong>Pendente da última visita:</strong>
-        {pend.map((p, i) => <p key={i}>⚠ {p.texto} <em>(desde {dataBR(p.desde)})</em>
+        {pend.map((p, i) => <p key={i}>{p.texto} <em>(desde {dataBR(p.desde)})</em>
           <button className="rd-link" onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: p.texto, status: "finalizado", desde: p.desde }] }); setNotice("Concluído: sai da lista de pendências quando o dia for arquivado."); }}>✓ Concluir</button></p>)}
         <p className="rd-micro">O que não for concluído continua pendente e reaparece na próxima visita.</p>
       </div>}
@@ -213,28 +242,66 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         const obs = obsDaTag(t, tag, rotulo);
         return <div className="rd-toggle" key={tag}>
           <label className="rd-chave"><input type="checkbox" role="switch" aria-label={rotulo} checked={obs != null} onChange={(e) => marcarToggle(tag, rotulo, e.target.checked)} /><i /><span>{rotulo}</span></label>
-          {obs != null && <input className="rd-toggle-obs" aria-label={"Observação " + rotulo.toLowerCase()} placeholder="Observação (opcional)…" value={obs} onChange={(e) => mudarObsToggle(tag, rotulo, e.target.value)} />}
+          {obs != null && <textarea className="rd-toggle-obs" rows={linhasDe(obs)} aria-label={"Observação " + rotulo.toLowerCase()} placeholder="O que foi tratado…" value={obs} onChange={(e) => mudarObsToggle(tag, rotulo, e.target.value)} />}
         </div>;
       })}
-      {(t.atividades || []).filter((a) => !a.tag).map((a, i) => <div className={"rd-atv" + (a.status === "aberto" ? " rd-atv-aberta" : "")} key={i}>
-        <span>{a.status === "aberto" ? "⚠ " : a.status === "finalizado" ? "✓ " : ""}{a.texto}</span>
-        <select aria-label={"Situação " + (i + 1)} value={a.status || ""} onChange={(e) => mudarTrecho(t.id, { atividades: t.atividades.map((x) => (x === a ? { ...x, status: e.target.value || null } : x)) })}>
-          <option value="">— sem marca —</option><option value="aberto">Em aberto (lembrete)</option><option value="finalizado">Finalizado</option>
-        </select>
-        <button onClick={() => mudarTrecho(t.id, { atividades: t.atividades.filter((x) => x !== a) })}>×</button>
+      {legadas.map((a, i) => <div className="rd-atv" key={"l" + i}>
+        <span>{a.status === "finalizado" ? "✓ " : ""}{a.texto}</span>
+        <button aria-label={"Remover registro " + (i + 1)} onClick={() => mudarTrecho(t.id, { atividades: t.atividades.filter((x) => x !== a) })}>×</button>
       </div>)}
-      {(t.atividades || []).some((a) => !a.tag && a.status === "aberto") && <p className="rd-micro">⚠ O que está "Em aberto" vira lembrete: reaparece na sua próxima visita a {rotuloDestino(mem, t.destino)}.</p>}
-      <div className="rd-linha">
-        <input aria-label="Nova atividade" placeholder="O que mais foi tratado…" value={atividadeNova} onChange={(e) => setAtividadeNova(e.target.value)} />
-        <button disabled={!atividadeNova.trim()} onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: atividadeNova.trim(), status: null }] }); setAtividadeNova(""); }}>+ Registrar</button>
-      </div>
+      {lembretes.map((a, i) => <div className="rd-atv rd-atv-aberta" key={"a" + i}>
+        <span>{a.texto}</span>
+        <button aria-label={"Remover lembrete " + (i + 1)} onClick={() => mudarTrecho(t.id, { atividades: t.atividades.filter((x) => x !== a) })}>×</button>
+      </div>)}
+      {lembretes.length > 0 && <p className="rd-micro">Lembrete guardado: reaparece na sua próxima visita a {rotuloDestino(mem, t.destino)}.</p>}
       <div className="rd-linha rd-lembrete">
-        <input aria-label="Lembrete para a próxima visita" placeholder="Lembrete para a PRÓXIMA visita…" value={lembreteNovo} onChange={(e) => setLembreteNovo(e.target.value)} />
-        <button disabled={!lembreteNovo.trim()} onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: lembreteNovo.trim(), status: "aberto" }] }); setLembreteNovo(""); setNotice("Lembrete guardado: aparece quando você voltar a este projeto."); }}>+ Lembrete</button>
+        <textarea rows={linhasDe(lembreteNovo)} aria-label="Lembrete para a próxima visita" placeholder="Lembrete para a PRÓXIMA visita…" value={lembreteNovo} onChange={(e) => setLembreteNovo(e.target.value)} />
+        <button disabled={!lembreteNovo.trim()} onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: lembreteNovo.trim(), status: "aberto" }] }); setLembreteNovo(""); }}>+ Lembrete</button>
       </div>
-      <label>Observações da visita<textarea value={t.obs || ""} onChange={(e) => mudarTrecho(t.id, { obs: e.target.value })} /></label>
+      <label>Observações da visita (opcional)<textarea rows={linhasDe(t.obs)} value={t.obs || ""} onChange={(e) => mudarTrecho(t.id, { obs: e.target.value })} /></label>
     </>;
   };
+
+  // Leitura da visita: texto corrido, estilo 2C (sem formulário).
+  const renderLeituraVisita = (t) => {
+    const blocos = [];
+    for (const [tag, rotulo, curto] of TRATATIVAS_PADRAO) {
+      const obs = obsDaTag(t, tag, rotulo);
+      if (obs != null) blocos.push(<p className="rd-lp" key={tag}><b>{curto} —</b> {obs || "realizado."}</p>);
+    }
+    (t.atividades || []).filter((a) => !a.tag && a.status !== "aberto").forEach((a, i) => blocos.push(<p className="rd-lp" key={"g" + i}>{a.status === "finalizado" ? "✓ Concluído: " : ""}{a.texto}</p>));
+    (t.atividades || []).filter((a) => !a.tag && a.status === "aberto").forEach((a, i) => blocos.push(<p className="rd-lp rd-lp-aberto" key={"a" + i}><b>Lembrete:</b> {a.texto}</p>));
+    if (t.obs) blocos.push(<p className="rd-lp rd-lp-obs" key="obs">{t.obs}</p>);
+    return blocos;
+  };
+
+  // Card de trecho em LEITURA: cabeçalho + chips + visita em texto; "Editar" abre o formulário.
+  const renderCorpoLeitura = (t, podeEditar) => <>
+    <Marco rotulo="Saída" marco={t.abertura} />
+    <Marco rotulo="Chegada" marco={t.chegada} />
+    <div className="rd-chips">
+      {t.kmInicial != null && <span>Km <b>{t.kmInicial}{t.kmFinal != null ? ` → ${t.kmFinal}` : ""}</b></span>}
+      {kmDoTrecho(t) != null && <span>Rodou <b>{kmFmt(kmDoTrecho(t))}</b></span>}
+      {(t.pedagios || []).length > 0 && <span>Pedágios <b>{brl((t.pedagios || []).reduce((a, p) => a + (kmNum(p.valor) || 0), 0))}</b></span>}
+      {(t.gastos || []).some((g) => kmNum(g.valor)) && <span>Gastos <b>{brl((t.gastos || []).reduce((a, g) => a + (kmNum(g.valor) || 0), 0))}</b></span>}
+      <span><b>{t.veiculo === "moto" ? "Moto" : "Carro"}</b></span>
+    </div>
+    {t.destino !== "MK_HOME" && renderLeituraVisita(t)}
+    {podeEditar && <button className="rd-link" onClick={() => setEditTrecho(t.id)}>✎ Editar este trecho</button>}
+  </>;
+
+  // Formulário completo do trecho (horas, km, gastos, visita) com Salvar.
+  const renderFormTrecho = (t) => <>
+    <Marco rotulo="Saída" marco={t.abertura} onHora={(m) => mudarTrecho(t.id, { abertura: m })} />
+    <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
+    <div className="rd-kmpar">
+      <label>Km inicial (painel)<input inputMode="decimal" value={t.kmInicial ?? ""} onChange={(e) => mudarTrecho(t.id, { kmInicial: e.target.value })} /></label>
+      <label>Km final (painel)<input inputMode="decimal" value={t.kmFinal ?? ""} onChange={(e) => mudarTrecho(t.id, { kmFinal: e.target.value })} /></label>
+    </div>
+    {renderGastos(t)}
+    {t.destino !== "MK_HOME" && renderVisita(t)}
+    <button className="rd-principal" disabled={busy} onClick={() => run(async () => { await salvar(dia); setEditTrecho(null); setNotice("Trecho atualizado."); })}>Salvar alterações</button>
+  </>;
 
   // Cascata do próximo destino, inline: um toque abre o trecho.
   const renderProximoDestino = (titulo) => <>
@@ -258,35 +325,63 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
 
   const tot = totaisDoDia(dia);
   const perm = permanencias(dia);
+  const cabecalhoTrecho = (t, i) => <>
+    <strong>{i + 1} · {rotuloDestino(mem, t.origem)} → {rotuloDestino(mem, t.destino)}{t.veiculo === "moto" ? " 🏍" : ""}</strong>
+    <span>{horaDe(t.abertura)}{t.chegada ? ` – ${horaDe(t.chegada)}` : ""} · {kmFmt(kmDoTrecho(t))}{perm[i] != null ? ` · ficou ${minutosFmt(perm[i])}` : ""}</span>
+  </>;
 
   if (!pronto) return <main className={tema}><header><button onClick={onBack}>← Início</button><h1>MK RD</h1></header><p role="status">Abrindo o dia…</p></main>;
 
-  // ── Pasta "RDs arquivados": a listinha dos dias, para abrir, conferir e ajustar ─
-  if (arquivo) return <main className={tema}>
-    <header><button onClick={() => setArquivo(false)}>← Voltar ao dia</button><h1>MK RD · Arquivados</h1>
-      <p>Toque num dia para abrir o RD dele — conferir, gerar o PDF e, se precisar, reabrir e ajustar.</p></header>
-    {error && <div role="alert" className="rd-erro">{error}</div>}
-    {notice && <p role="status" className="rd-aviso">{notice}</p>}
-    <section className="rd-card">
-      {data !== hojeISO() && <button className="rd-link" onClick={() => { setData(hojeISO()); setArquivo(false); }}>↩ Voltar para o dia de hoje</button>}
-      {dias.length === 0 && <p className="rd-micro">Nenhum RD arquivado ainda. Feche um dia com "Salvar e arquivar" e ele aparece aqui.</p>}
-      {dias.map((d) => <div key={d.data} className="rd-arq-linha">
-        <button className="rd-arq-item" onClick={() => { setData(d.data); setArquivo(false); }}>
-          <div><strong>{dataBR(d.data)}</strong><span>{d.trechos} trecho{d.trechos === 1 ? "" : "s"}</span></div>
-          <em className={d.estado === "fechado" ? "ok" : "andamento"}>{d.estado === "fechado" ? "✓ Arquivado" : "Em aberto"}</em>
-        </button>
-        <button className="rd-arq-apagar" aria-label={"Apagar o RD de " + dataBR(d.data)} disabled={busy}
-          onClick={() => { if (!window.confirm(`Apagar o RD de ${dataBR(d.data)}? (fase de teste — depois de aprovado, RD enviado será definitivo)`)) return; run(async () => {
-            await store.excluir(d.data);
-            setDias((xs) => xs.filter((x) => x.data !== d.data));
-            try { localStorage.removeItem(chaveDraft(uid, d.data)); } catch { /* sem draft */ }
-            if (d.data === data) { setDia({ data, estado: "aberto", trechos: [] }); setDiaRev(0); }
-            setNotice(`RD de ${dataBR(d.data)} apagado.`);
-          }); }}>🗑</button>
-      </div>)}
-      <p className="rd-micro">Fase de teste: apagar é permitido. Na evolução, RD enviado fica definitivo — só consulta.</p>
-    </section>
-  </main>;
+  // ── Pasta "RDs arquivados": período De/Até, resumo e a listinha dos dias ─────
+  if (arquivo) {
+    const resumo = perDias ? consolidarPeriodo(perDias, mem) : null;
+    const infoDia = {};
+    for (const d of perDias || []) infoDia[d.data] = {
+      km: (d.trechos || []).reduce((a, t) => a + (kmDoTrecho(t) || 0), 0),
+      projetos: [...new Set((d.trechos || []).map((t) => t.destino).filter((x) => x !== "MK_HOME" && x !== "MK_OFFICE"))].map((c) => rotuloDestino(mem, c)).join(" · "),
+    };
+    return <main className={tema}>
+      <header><button onClick={() => { setArquivo(false); setConsulta(false); setData(hojeISO()); }}>← Voltar ao dia</button><h1>MK RD · Arquivados</h1>
+        <p>Escolha o período para o resumo e o consolidado; toque num dia para abrir o RD dele.</p></header>
+      {error && <div role="alert" className="rd-erro">{error}</div>}
+      {notice && <p role="status" className="rd-aviso">{notice}</p>}
+      <section className="rd-card">
+        <div className="rd-kmpar">
+          <label>De<input type="date" aria-label="Período: de" value={per?.de || ""} onChange={(e) => e.target.value && mudarPeriodo({ ...per, de: e.target.value })} /></label>
+          <label>Até<input type="date" aria-label="Período: até" value={per?.ate || ""} onChange={(e) => e.target.value && mudarPeriodo({ ...per, ate: e.target.value })} /></label>
+        </div>
+        <div className="rd-dias" style={{ marginTop: 8 }}>
+          {atalhos().map(([rotulo, p]) => <button key={rotulo} aria-pressed={per?.de === p.de && per?.ate === p.ate} onClick={() => mudarPeriodo(p)}>{rotulo}</button>)}
+        </div>
+        {resumo && resumo.dias > 0 && <div className="rd-chips" style={{ marginTop: 10 }}>
+          <span>Dias <b>{resumo.dias}</b></span><span>Km <b>{kmFmt(resumo.km)}</b></span>
+          <span>Despesas <b>{brl(resumo.despesas)}</b></span>
+          {resumo.reembolsoKm != null && <span>Reembolso km <b>{brl(resumo.reembolsoKm)}</b></span>}
+          {resumo.totalGeral != null && <span className="rd-chip-total">Total geral <b>{brl(resumo.totalGeral)}</b></span>}
+        </div>}
+        {perDias === null && <p className="rd-micro">Calculando o período…</p>}
+        <button className="rd-principal" disabled={busy || !perDias || !perDias.length} onClick={() => run(async () => { imprimirConsolidado(perDias, mem, auth?.currentUser?.email || ""); })}>Gerar consolidado do período (PDF)</button>
+      </section>
+      <section className="rd-card">
+        {dias.length === 0 && <p className="rd-micro">Nenhum RD ainda. Feche um dia com "Salvar e arquivar" e ele aparece aqui.</p>}
+        {dias.map((d) => <div key={d.data} className="rd-arq-linha">
+          <button className="rd-arq-item" onClick={() => { setData(d.data); setConsulta(true); setArquivo(false); setEditTrecho(null); }}>
+            <div><strong>{dataBR(d.data)}</strong><span>{d.trechos} trecho{d.trechos === 1 ? "" : "s"}{infoDia[d.data] ? ` · ${kmFmt(infoDia[d.data].km)}${infoDia[d.data].projetos ? ` · ${infoDia[d.data].projetos}` : ""}` : ""}</span></div>
+            <em className={d.estado === "fechado" ? "ok" : "andamento"}>{d.estado === "fechado" ? "✓ Arquivado" : "Em aberto"}</em>
+          </button>
+          <button className="rd-arq-apagar" aria-label={"Apagar o RD de " + dataBR(d.data)} disabled={busy}
+            onClick={() => { if (!window.confirm(`Apagar o RD de ${dataBR(d.data)}? (fase de teste — depois de aprovado, RD enviado será definitivo)`)) return; run(async () => {
+              await store.excluir(d.data);
+              setDias((xs) => xs.filter((x) => x.data !== d.data));
+              try { localStorage.removeItem(chaveDraft(uid, d.data)); } catch { /* sem draft */ }
+              if (d.data === data) { setDia({ data, estado: "aberto", trechos: [] }); setDiaRev(0); }
+              setNotice(`RD de ${dataBR(d.data)} apagado.`);
+            }); }}>🗑</button>
+        </div>)}
+        <p className="rd-micro">Fase de teste: apagar é permitido. Na evolução, RD enviado fica definitivo — só consulta.</p>
+      </section>
+    </main>;
+  }
 
   // ── Tela de configuração (fora do fluxo do dia) ──────────────────────────────
   if (config) return <main className={tema}>
@@ -303,18 +398,50 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 18} onChange={(e) => mudarConfig({ fechamentoDia: e.target.value })} /></label>
       </div>
       <p className="rd-micro">Os valores salvam sozinhos ao digitar. Nesta fase de teste a configuração é sua; na evolução, só a gerência Moked edita.</p>
-      <button className="rd-link" disabled={busy} onClick={() => run(() => gerarConsolidado(data))}>Gerar consolidado do período atual (PDF)</button>
     </section>
   </main>;
 
-  // ── Tela do dia: os trechos em LINHA (como o RD do 2CONTROL) ─────────────────
-  // Um card por trecho, em ordem cronológica. Os antigos ficam recolhidos num resumo de uma
-  // linha e abrem num toque para corrigir hora, km, gastos e visita; o trecho atual (em
-  // deslocamento ou a visita de agora) fica sempre expandido no fim da linha.
+  // ── Consulta: RD aberto pela pasta (ou de outro dia) — LEITURA, estilo 2C ────
+  if (consulta || !hoje) {
+    const reaberto = dia.estado !== "fechado";
+    return <main className={tema}>
+      <header><button onClick={abrirPasta}>← Arquivados</button>
+        <h1>RD de {dataBR(data)}</h1>
+        <p>{dia.estado === "fechado" ? "✓ Arquivado" : "Reaberto para ajuste"} · {dia.trechos.length} trecho{dia.trechos.length === 1 ? "" : "s"} · {kmFmt(tot.km)} · despesas {brl(tot.pedagios + tot.gastos)}</p></header>
+      {error && <div role="alert" className="rd-erro">{error}</div>}
+      {notice && <p role="status" className="rd-aviso">{notice}</p>}
+      {dia.trechos.map((t, i) => <section className="rd-card" key={t.id}>
+        <div className="rd-trecho-head" style={{ cursor: "default" }}><div>{cabecalhoTrecho(t, i)}</div></div>
+        {editTrecho === t.id ? renderFormTrecho(t) : renderCorpoLeitura(t, reaberto)}
+      </section>)}
+      <section className="rd-card rd-arquivado">
+        <button className="rd-principal" disabled={busy} onClick={() => run(() => imprimirComFotos(dia, mem))}>Gerar RD (PDF)</button>
+        {!reaberto && <button className="rd-link" disabled={busy} onClick={() => run(async () => { const novoDia = { ...dia, estado: "aberto" }; setDia(novoDia); await salvar(novoDia); setNotice("Dia reaberto: toque em Editar no trecho que precisa de ajuste e arquive de novo."); })}>Reabrir para ajustar</button>}
+        {reaberto && <button className="rd-fechar" disabled={busy} onClick={() => run(fecharDia)}>Salvar e arquivar de novo</button>}
+      </section>
+    </main>;
+  }
+
+  // ── Tela 0: dia de hoje já arquivado → painel pronto para a próxima visita ──
+  if (dia.estado === "fechado") return <main className={tema}>
+    <header><button onClick={onBack}>← Início</button>
+      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={abrirPasta}>🗂</button></h1>
+      <p>{dataBR(data)} · pronto para a próxima visita</p></header>
+    {error && <div role="alert" className="rd-erro">{error}</div>}
+    {notice && <p role="status" className="rd-aviso">{notice}</p>}
+    <section className="rd-card rd-atual">{renderProximoDestino(estou === "MK_HOME" ? "Sair de casa — para onde?" : `Sair de ${rotuloDestino(mem, estou)} — para onde?`)}</section>
+    <button className="rd-arq-item" onClick={() => { setConsulta(true); setEditTrecho(null); }}>
+      <div><strong>RD de hoje já arquivado</strong><span>{dia.trechos.length} trecho{dia.trechos.length === 1 ? "" : "s"} · {kmFmt(tot.km)} — tocar para abrir (também na pasta 🗂)</span></div>
+      <em className="ok">✓ Arquivado</em>
+    </button>
+    <p className="rd-micro" style={{ margin: "8px 2px" }}>Saiu de novo? Toque no destino: o dia reabre sozinho e a linha continua (trecho {dia.trechos.length + 1}…).</p>
+  </main>;
+
+  // ── Tela do dia (trabalho): os trechos em LINHA ──────────────────────────────
   return <main className={tema}>
     <header><button onClick={onBack}>← Início</button>
-      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={() => { setArquivo(true); store.dias().then((d) => setDias(d.dias || [])).catch(() => {}); }}>🗂</button></h1>
-      <p>{dataBR(data)} · {dia.estado === "fechado" ? "RD arquivado" : aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
+      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={abrirPasta}>🗂</button></h1>
+      <p>{dataBR(data)} · {aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}
     {dia.trechos.length > 0 && <p className="rd-totais">Dia em linha · {dia.trechos.length} trecho{dia.trechos.length > 1 ? "s" : ""} · {kmFmt(tot.km)} · pedágios {brl(tot.pedagios)}{tot.gastos ? ` · gastos ${brl(tot.gastos)}` : ""}</p>}
@@ -335,7 +462,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         <p><button className="rd-link" disabled={busy} onClick={() => { if (!window.confirm("Cancelar este trecho? Use quando abriu por engano (projeto errado). A marcação de saída é descartada.")) return; run(async () => { const novoDia = { ...dia, trechos: dia.trechos.filter((x) => x.id !== t.id) }; setDia(novoDia); setKmChegada(null); await salvar(novoDia); setNotice("Trecho cancelado. Abra de novo com o destino certo."); }); }}>Abri por engano — cancelar este trecho</button></p>
       </section>;
 
-      if (!aberto && dia.estado !== "fechado" && fechadoAtual && t.id === fechadoAtual.id) return <section className="rd-card rd-atual" key={t.id}>
+      if (!aberto && fechadoAtual && t.id === fechadoAtual.id) return <section className="rd-card rd-atual" key={t.id}>
         <h2>Você está em {rotuloDestino(mem, t.destino)}</h2>
         <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
         {(() => { const r = rodadoEntre(t.kmInicial, t.kmFinal); return r != null ? <p className="rd-rodado">Trecho: saiu com {t.kmInicial} · chegou com {t.kmFinal} → rodou {kmFmt(r)}</p> : null; })()}
@@ -348,34 +475,16 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
 
       const ab = expandido === t.id;
       return <section className="rd-card rd-trecho" key={t.id}>
-        <button className="rd-trecho-head" aria-expanded={ab} onClick={() => setExpandido(ab ? null : t.id)}>
-          <div><strong>{i + 1} · {rotuloDestino(mem, t.origem)} → {rotuloDestino(mem, t.destino)}{t.veiculo === "moto" ? " 🏍" : ""}</strong>
-            <span>{horaDe(t.abertura)}{t.chegada ? ` – ${horaDe(t.chegada)}` : ""} · {kmFmt(kmDoTrecho(t))}{perm[i] != null ? ` · ficou ${minutosFmt(perm[i])}` : ""}</span></div>
+        <button className="rd-trecho-head" aria-expanded={ab} onClick={() => { setExpandido(ab ? null : t.id); if (ab) setEditTrecho(null); }}>
+          <div>{cabecalhoTrecho(t, i)}</div>
           <em>{ab ? "⌄" : "›"}</em>
         </button>
-        {ab && <>
-          <Marco rotulo="Saída" marco={t.abertura} onHora={(m) => mudarTrecho(t.id, { abertura: m })} />
-          <Marco rotulo="Chegada" marco={t.chegada} onHora={(m) => mudarTrecho(t.id, { chegada: m })} />
-          <div className="rd-kmpar">
-            <label>Km inicial (painel)<input inputMode="decimal" value={t.kmInicial ?? ""} onChange={(e) => mudarTrecho(t.id, { kmInicial: e.target.value })} /></label>
-            <label>Km final (painel)<input inputMode="decimal" value={t.kmFinal ?? ""} onChange={(e) => mudarTrecho(t.id, { kmFinal: e.target.value })} /></label>
-          </div>
-          {renderGastos(t)}
-          {t.destino !== "MK_HOME" && renderVisita(t)}
-          <button className="rd-link" disabled={busy} onClick={() => run(async () => { await salvar(dia); setExpandido(null); setNotice("Trecho atualizado."); })}>Salvar alterações</button>
-        </>}
+        {ab && (editTrecho === t.id ? renderFormTrecho(t) : renderCorpoLeitura(t, true))}
       </section>;
     })}
 
-    {dia.trechos.length === 0 && dia.estado !== "fechado" && <section className="rd-card rd-atual">
+    {dia.trechos.length === 0 && <section className="rd-card rd-atual">
       {renderProximoDestino("Sair de casa — para onde?")}
-    </section>}
-
-    {dia.estado === "fechado" && <section className="rd-card rd-arquivado"><h2>✓ RD de {dataBR(data)} salvo e arquivado</h2>
-      <p className="rd-micro">O dia está guardado na pasta de RDs arquivados. Os trechos acima são só para conferência; para mexer, reabra o dia.</p>
-      <button className="rd-principal" disabled={busy} onClick={() => run(() => imprimirComFotos(dia, mem))}>Gerar RD (PDF)</button>
-      <button className="rd-link" onClick={() => { setArquivo(true); store.dias().then((d) => setDias(d.dias || [])).catch(() => {}); }}>🗂 Ver RDs arquivados</button>
-      <button className="rd-link" disabled={busy} onClick={() => run(async () => { const novoDia = { ...dia, estado: "aberto" }; setDia(novoDia); await salvar(novoDia); setNotice("Dia reaberto para ajuste. Arquive de novo quando terminar."); })}>Reabrir para ajustar</button>
     </section>}
   </main>;
 }

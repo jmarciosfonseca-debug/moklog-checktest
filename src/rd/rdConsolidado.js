@@ -8,6 +8,7 @@
 //   do km em Configurar, o reembolso de km = km rodados × valor.
 import { LOGO_MOKED_30 } from "../fvLogo";
 import { kmDoTrecho, rotuloDestino, listarDestinos, brl, kmFmt, dataBR } from "./rdCalc";
+import { CSS_BARRA_PDF, barraPdf } from "./rdPdf";
 
 const num = (v) => { const n = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
 const horas1 = (h) => (Math.round(h * 10) / 10).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " h";
@@ -64,7 +65,10 @@ export function consolidarPeriodo(dias, memoria) {
     km += kmDia; if (campo) diasCampo++;
     kmPorDia.push({ data: dia.data, km: Math.round(kmDia * 10) / 10 });
   }
-  const projetos = Object.entries(porProjeto).map(([codigo, p]) => ({ codigo, horas: Math.round(p.horas * 10) / 10, visitas: p.visitas })).sort((a, b) => b.horas - a.horas);
+  // Do MAIS para o MENOS visitado (pedido do Marcio); empate decide pelas horas.
+  const projetos = Object.entries(porProjeto).map(([codigo, p]) => ({ codigo, horas: Math.round(p.horas * 10) / 10, visitas: p.visitas })).sort((a, b) => b.visitas - a.visitas || b.horas - a.horas);
+  // Projetos da carteira que ficaram SEM visita no período (fora MK Home/Office e extras já visitados).
+  const semVisita = listarDestinos(memoria).map((d) => d.codigo).filter((c) => c !== "MK_HOME" && c !== "MK_OFFICE" && !porProjeto[c]);
   const visitas = projetos.reduce((a, p) => a + p.visitas, 0);
   const valorKm = memoria?.config?.valorKm != null && memoria?.config?.valorKm !== "" ? num(memoria.config.valorKm) : null;
   const valorKmMoto = memoria?.config?.valorKmMoto != null && memoria?.config?.valorKmMoto !== "" ? num(memoria.config.valorKmMoto) : null;
@@ -77,12 +81,12 @@ export function consolidarPeriodo(dias, memoria) {
     horas: Math.round(horas * 10) / 10, km: kmArr, kmCarro, kmMoto: kmMotoArr, valorKmMoto,
     despesas: Math.round(despesas * 100) / 100, despesasPorTipo, reembolsoKm, valorKm,
     totalGeral: reembolsoKm != null ? Math.round((reembolsoKm + despesas) * 100) / 100 : null,
-    projetos, maisVisitado: projetos[0]?.codigo || null, kmPorDia, agenda,
+    projetos, semVisita, maisVisitado: projetos[0]?.codigo || null, kmPorDia, agenda,
   };
 }
 
 function resumoTrecho(t) {
-  const partes = (t.atividades || []).map((a) => (a.status === "aberto" ? "⚠ Em aberto: " : "") + a.texto);
+  const partes = (t.atividades || []).map((a) => (a.status === "aberto" ? "Em aberto: " : (a.status === "finalizado" ? "Concluído: " : "")) + a.texto);
   if (t.obs) partes.push(t.obs);
   return partes.join(" · ");
 }
@@ -143,7 +147,8 @@ export function htmlConsolidado(c, memoria, consultor) {
   td.n,th.n{text-align:right;white-space:nowrap}td.c{white-space:nowrap}
   .ab{color:#b45309;font-weight:700}
   footer{margin-top:24px;border-top:1px solid #c7ced5;padding-top:8px;font-size:10px;color:#64748b;line-height:1.6}
-  </style></head><body>
+  ${CSS_BARRA_PDF}</style></head><body>
+  ${barraPdf(`MK RD · Consolidado ${dataBR(c.de)} a ${dataBR(c.ate)} — toque no botão para salvar em PDF`)}
   <header><div><h1>MK RD · Consolidado do período</h1><div>${esc(dataBR(c.de))} a ${esc(dataBR(c.ate))}${consultor ? " · " + esc(consultor) : ""}</div>
   <p class="intro">Fechamento do Relatório Diário: horas, deslocamentos, visitas e custos do período, apurados das marcações do app. As horas de cada projeto contam da abertura do trecho (saída de casa) até a saída do cliente.</p></div>
   <img src="${LOGO_MOKED_30}" alt="Moked 30 anos"/></header>
@@ -163,6 +168,7 @@ export function htmlConsolidado(c, memoria, consultor) {
   <div class="col"><h2>Horas e visitas por projeto</h2>
   <p class="nota">Horas dedicadas: da saída de casa (abertura do trecho) até a saída do cliente — viagem + permanência.</p>
   ${c.projetos.map((p) => `<div class="linha"><b>${esc(nome(p.codigo))}</b>${barra(p.horas, maxH)}<em>${esc(horas1(p.horas))}</em><u>${p.visitas} visita${p.visitas > 1 ? "s" : ""}</u></div>`).join("") || "<p>Sem visitas no período.</p>"}
+  ${(c.semVisita || []).length ? `<p class="nota" style="color:#b45309;margin-top:8px"><b>Sem visita no período:</b> ${c.semVisita.map((x) => esc(rotuloDestino(memoria, x))).join(", ")}.</p>` : ""}
   </div>
   <div class="col"><h2>Despesas por tipo</h2>
   <p class="nota">Classificadas pela descrição de cada lançamento; pedágio sempre separado dos demais gastos.</p>
@@ -170,7 +176,7 @@ export function htmlConsolidado(c, memoria, consultor) {
   </div></div>
   <h2>Agenda do período</h2>
   <table><thead><tr><th>Dia</th><th>Projeto</th><th>Tipo</th><th class="n">Horário</th><th class="n">Km</th><th class="n">Despesas</th><th>O que foi tratado</th></tr></thead><tbody>
-  ${c.agenda.map((a) => `<tr><td class="c">${esc(diaSemana(a.data))}</td><td>${esc(nome(a.destino))}</td><td class="c">${esc(a.tipo)}</td><td class="n">${hhmm(a.inicio)}–${hhmm(a.fim)}</td><td class="n">${a.km != null ? esc(kmFmt(a.km)) : "—"}</td><td class="n">${a.despesas ? esc(brl(a.despesas)) : "—"}</td><td>${esc(a.texto || "—").replace(/⚠ Em aberto:/g, '<span class="ab">⚠ Em aberto:</span>')}</td></tr>`).join("")}
+  ${c.agenda.map((a) => `<tr><td class="c">${esc(diaSemana(a.data))}</td><td>${esc(nome(a.destino))}</td><td class="c">${esc(a.tipo)}</td><td class="n">${hhmm(a.inicio)}–${hhmm(a.fim)}</td><td class="n">${a.km != null ? esc(kmFmt(a.km)) : "—"}</td><td class="n">${a.despesas ? esc(brl(a.despesas)) : "—"}</td><td>${esc(a.texto || "—").replace(/Em aberto:/g, '<span class="ab">Em aberto:</span>')}</td></tr>`).join("")}
   </tbody></table>
   <footer>Horas por projeto = da abertura do trecho (saída de casa ou do ponto anterior) até a saída do cliente; o retorno para casa conta nas horas registradas do período. Km = km de término − km de início (painel do veículo), conferido pelas marcações com GPS. Despesas separadas por tipo a partir da descrição de cada lançamento. Reembolso de km = km rodados × valor por km definido em Configurar. Documento gerado pelo MokLog CheckTest · MK RD.</footer>
   </body></html>`;
