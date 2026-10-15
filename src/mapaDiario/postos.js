@@ -36,10 +36,10 @@ export const POSTOS = {
     N: [lider("Líder", LIDER, { legado: ["Líder/CCO"] }), P("VSPP Apoio", APOIO, { legado: ["VSPP"] }), P("CCO", CCO)],
   },
   P606: { D: TRES_POSTOS, N: TRES_POSTOS },
-  // P607 não tem posto de líder: a hierarquia é Honda (ronda), AGP CCO, Vigilante pista e AGP portaria (só de dia).
+  // P607 não tem posto de líder: a hierarquia é Ronda, AGP CCO, Vigilante pista e AGP portaria (só de dia).
   P607: {
-    D: [lider("Vigilante Honda", ["Vigilante Ronda"]), P("AGP CCO", ["AGP CCO"]), P("Vigilante Pista", ["Vigilante Apoio"]), P("AGP Portaria", ["AGP"])],
-    N: [lider("Vigilante Honda", ["Vigilante Ronda"]), P("AGP CCO", ["AGP CCO"]), P("Vigilante Pista", ["Vigilante Apoio"])],
+    D: [lider("Vigilante Ronda", ["Vigilante Ronda"], { legado: ["Vigilante Ronda"] }), P("AGP CCO", ["AGP CCO"]), P("Vigilante Pista", ["Vigilante Apoio"]), P("AGP Portaria", ["AGP"])],
+    N: [lider("Vigilante Ronda", ["Vigilante Ronda"], { legado: ["Vigilante Ronda"] }), P("AGP CCO", ["AGP CCO"]), P("Vigilante Pista", ["Vigilante Apoio"])],
   },
   P311A: {
     D: [lider("Vigilante Líder", ["Vigilante Líder"], { legado: ["Líder"] }), P("Vigilante Apoio", ["Vigilante Apoio"], { legado: ["Apoio"] }), P("Vigilante Tático", ["Vigilante Ronda"], { legado: ["Tático"] }), P("Porteiro CCO", ["Porteiro CCO"], { legado: ["Portaria"] })],
@@ -47,11 +47,11 @@ export const POSTOS = {
   },
   // P311B: o símbolo vem na frente (L1, P1, P2), como eles escrevem no WhatsApp.
   P311B: {
-    D: [lider("L1 · Vigilante Líder", ["Vigilante Líder"], { legado: ["L1"] }), P("P1 · Vigilante CCO", ["Vig CCO"], { legado: ["P1"] }), P("P2 · Vigilante Honda", ["Vigilante Ronda", "Vigilante Apoio"], { legado: ["P2"] })],
-    N: [lider("L1 · Vigilante Líder", ["Vigilante Líder"], { legado: ["L1"] }), P("P1 · Vigilante CCO", ["Vig CCO"], { legado: ["P1"] }), P("P2 · Vigilante Honda", ["Vigilante Ronda", "Vigilante Apoio"], { legado: ["P2"] })],
+    D: [lider("L1 · Vigilante Líder", ["Vigilante Líder"], { legado: ["L1"] }), P("P1 · Vigilante CCO", ["Vig CCO"], { legado: ["P1"] }), P("P2 · Vigilante Ronda", ["Vigilante Ronda", "Vigilante Apoio"], { legado: ["P2", "P2 · Vigilante Ronda"] })],
+    N: [lider("L1 · Vigilante Líder", ["Vigilante Líder"], { legado: ["L1"] }), P("P1 · Vigilante CCO", ["Vig CCO"], { legado: ["P1"] }), P("P2 · Vigilante Ronda", ["Vigilante Ronda", "Vigilante Apoio"], { legado: ["P2", "P2 · Vigilante Ronda"] })],
   },
   P505: {
-    D: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("VSPP Ronda", APOIO, { horario: h0820, dias: [1, 2, 3, 4, 5] }), P("CDA", ["CDA"])], // Ronda (Honda): 5x2, 12h, segunda a sexta
+    D: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("VSPP Ronda", APOIO, { horario: h0820, dias: [1, 2, 3, 4, 5] }), P("CDA", ["CDA"])], // Ronda: 5x2, 12h, segunda a sexta
     N: [lider("VSPP Líder"), P("VSPP Apoio", APOIO), P("Vigilante CCO", CCO), P("CDA", ["CDA"])],
   },
   // P260A: VSPP Líder e Vigilante CCO (24h, 4x2) + dois postos VSPP 1 e 2 (12h, 5x2, segunda a sexta), só de dia.

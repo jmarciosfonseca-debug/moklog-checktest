@@ -8,7 +8,7 @@ import { diasEntre } from "./regras";
 import { contarOcorrencias } from "./painel";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
-import { semUndefined } from "./modelo";
+import { semUndefined, corrigirRondaNosRotulos } from "./modelo";
 
 const db = () => {
   const app = getApps()[0];
@@ -36,7 +36,7 @@ export async function loadEquipamentos(pid) {
 
 export async function loadMapa(pid, chave) {
   const snap = await getDoc(doc(db(), "equipes", pid, "mapas", chave));
-  return snap.exists() ? snap.data() : null;
+  return snap.exists() ? corrigirRondaNosRotulos(snap.data()) : null;
 }
 
 // Último mapa já enviado do mesmo turno, anterior a `antesDe` (serve de base para pré-preencher).
@@ -46,7 +46,7 @@ export async function loadMapa(pid, chave) {
 export async function loadUltimoMapa(pid, turno, antesDe, { gapPar = false } = {}) {
   const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(14)));
   const lista = snap.docs.map((d) => d.data()).filter((m) => m.turno === turno && m.status === "enviado" && m.data < antesDe && (!gapPar || Math.abs(diasEntre(m.data, antesDe)) % 2 === 0));
-  return lista[0] || null;
+  return corrigirRondaNosRotulos(lista[0] || null);
 }
 
 // Consolidado (gerencial): mapas CONCLUÍDOS de vários projetos num período [de, ate] (datas ISO).
@@ -55,7 +55,7 @@ export async function loadUltimoMapa(pid, turno, antesDe, { gapPar = false } = {
 export async function loadMapasPeriodo(projetos, de, ate) {
   const por = await Promise.all(projetos.map(async (pid) => {
     const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), where("data", ">=", de), where("data", "<=", ate), orderBy("data")));
-    return snap.docs.map((d) => ({ projetoId: pid, ...d.data() })).filter((m) => m.status === "enviado");
+    return snap.docs.map((d) => corrigirRondaNosRotulos({ projetoId: pid, ...d.data() })).filter((m) => m.status === "enviado");
   }));
   return por.flat();
 }

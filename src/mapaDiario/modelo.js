@@ -323,6 +323,15 @@ export function pessoasRepetidas(mapa) {
   return rep;
 }
 
+// Correção de grafia nos mapas já gravados: o posto de RONDA entrou com "Honda" nos rótulos
+// (P607 e P311B) e saiu errado em tela, WhatsApp e PDF. Normaliza na LEITURA, então mapa antigo
+// também sai certo em todo lugar; só mexe em "Honda" como palavra do rótulo (nada de marca de moto).
+export function corrigirRondaNosRotulos(mapa) {
+  if (!mapa || !Array.isArray(mapa.postos)) return mapa;
+  if (!mapa.postos.some((p) => p && typeof p.rotulo === "string" && /\bHonda\b/.test(p.rotulo))) return mapa;
+  return { ...mapa, postos: mapa.postos.map((p) => (p && typeof p.rotulo === "string" ? { ...p, rotulo: p.rotulo.replace(/\bHonda\b/g, "Ronda") } : p)) };
+}
+
 // O Firestore recusa documento com valor `undefined` (a gravação inteira falha). Tira de qualquer profundidade antes de gravar.
 export function semUndefined(v) {
   if (Array.isArray(v)) return v.map(semUndefined);

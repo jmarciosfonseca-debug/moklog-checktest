@@ -47,11 +47,11 @@ test("líder sem equipe montada: não mexe ao abrir; ao trocar manualmente limpa
   const limpo = puxarEquipe({ postos: base, lider: colabs[7], colabs, pid: "P601", turno: "D", limparSeSemEquipe: true });
   expect(limpo.postos.filter((p) => !p.lider).every((p) => !p.pessoaNome)).toBe(true);
 });
-test("P607: sem posto de líder; a ronda (Honda) é quem encabeça", () => {
+test("P607: sem posto de líder; a Ronda é quem encabeça", () => {
   const d = postosDoProjeto("P607", "D");
-  expect(d.map((p) => p.rotulo)).toEqual(["Vigilante Honda", "AGP CCO", "Vigilante Pista", "AGP Portaria"]);
-  expect(d.filter((p) => p.lider).map((p) => p.rotulo)).toEqual(["Vigilante Honda"]);
-  expect(defDoPosto("P311B", "D", "P2").rotulo).toBe("P2 · Vigilante Honda"); // rótulo antigo ainda é reconhecido
+  expect(d.map((p) => p.rotulo)).toEqual(["Vigilante Ronda", "AGP CCO", "Vigilante Pista", "AGP Portaria"]);
+  expect(d.filter((p) => p.lider).map((p) => p.rotulo)).toEqual(["Vigilante Ronda"]);
+  expect(defDoPosto("P311B", "D", "P2").rotulo).toBe("P2 · Vigilante Ronda"); // rótulo antigo ainda é reconhecido
 });
 test("12x36: o mapa novo aproveita as pessoas do mapa base; 4x2 não repete ninguém", () => {
   const base = { data: "2026-10-10", turno: "D", postos: [{ rotulo: "Líder", pessoaId: "l1", pessoaNome: "Matheus L." }, { rotulo: "CCO", pessoaId: "c1", pessoaNome: "Monica C." }] };

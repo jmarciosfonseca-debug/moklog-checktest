@@ -54,7 +54,7 @@ test("abre pré-preenchido do último mapa, com cabeçalho pela data e supervis�
   expect(host.textContent).toContain("Domingo, 11/10/2026");
   expect(host.textContent).toContain("Diurno 06h00–18h00");
   expect(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]').value).toBe("a");
-  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c");
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Ronda"]').value).toBe("c");
   expect(host.textContent).toContain("09/10/2026 — Marcio (Diurno)");
   expect(host.textContent).toContain("anterior 1200");
   expect(q('input[type="checkbox"]').checked).toBe(true); // material sem alteração já marcado
@@ -195,7 +195,7 @@ test("12x36: escolher o líder puxa a equipe montada em Equipes, automaticamente
   expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("");
   await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
   expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("b");
-  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c");
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Ronda"]').value).toBe("c");
   expect(host.textContent).toContain("Equipe de Luiz D. puxada da montagem em Equipes (2 postos)");
 });
 test("12x36: líder sem equipe montada avisa e deixa escolher à mão", async () => {
@@ -238,15 +238,15 @@ test("se a ficha falhar, o mapa e o WhatsApp continuam liberados e o líder é a
 
 test("rascunho reaberto: não troca o que o líder já escolheu; 'Puxar de novo' preenche só o que falta depois de montar a equipe", async () => {
   const existente = { id: "P311B_2026-10-11_D", projetoId: "P311B", data: "2026-10-11", turno: "D", status: "rascunho", horario: null, material: { semAlteracao: true, obs: "", excecoes: [] }, veiculos: [], resumo: "", observacoes: "",
-    postos: [{ id: "p1", rotulo: "L1 · Vigilante Líder", lider: true, pessoaId: "a", pessoaNome: "Luiz D.", situacao: "presente", detalhe: {}, obs: "" }, { id: "p2", rotulo: "P1 · Vigilante CCO", pessoaId: "d", pessoaNome: "Joao V.", situacao: "presente", detalhe: {}, obs: "" }, { id: "p3", rotulo: "P2 · Vigilante Honda", pessoaId: "", pessoaNome: "", situacao: "presente", detalhe: {}, obs: "" }] };
+    postos: [{ id: "p1", rotulo: "L1 · Vigilante Líder", lider: true, pessoaId: "a", pessoaNome: "Luiz D.", situacao: "presente", detalhe: {}, obs: "" }, { id: "p2", rotulo: "P1 · Vigilante CCO", pessoaId: "d", pessoaNome: "Joao V.", situacao: "presente", detalhe: {}, obs: "" }, { id: "p3", rotulo: "P2 · Vigilante Ronda", pessoaId: "", pessoaNome: "", situacao: "presente", detalhe: {}, obs: "" }] };
   let lista = colabs; // ainda sem equipe montada
   await montar({ loadMapa: jest.fn(async () => existente), loadColaboradores: jest.fn(async () => lista) });
   expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("d"); // escolha manual preservada
-  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("");
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Ronda"]').value).toBe("");
   lista = colabsEq; // o líder montou a equipe em Equipe
   await clicar(botao("Puxar de novo"));
   expect(q('select[aria-label="Quem está no posto P1 · Vigilante CCO"]').value).toBe("d"); // continua o manual
-  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]').value).toBe("c"); // preencheu o vazio
+  expect(q('select[aria-label="Quem está no posto P2 · Vigilante Ronda"]').value).toBe("c"); // preencheu o vazio
 });
 
 test("resumo cita extra sem exceção marcada: avisa uma vez e só envia no segundo toque", async () => {
@@ -356,7 +356,7 @@ test("Editar mapa: depois de concluir o formulário trava; Editar libera e concl
 test("12x36: pessoa de fora da equipe → pergunta 'É FT?'; FT sozinho já escolhe quem faltou da equipe", async () => {
   await montar({ loadUltimoMapa: jest.fn(async () => null), loadColaboradores: jest.fn(async () => colabsEq) });
   await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
-  await digitar(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]'), "d"); // Joao V. não é da equipe do Luiz
+  await digitar(q('select[aria-label="Quem está no posto P2 · Vigilante Ronda"]'), "d"); // Joao V. não é da equipe do Luiz
   expect(host.textContent).toContain("Joao V. não é da equipe de Luiz D.");
   await clicar(botao("É FT"));
   expect(host.textContent).toContain("Quem faltou?");
@@ -368,13 +368,13 @@ test("12x36: pessoa de fora da equipe → pergunta 'É FT?'; FT sozinho já esco
 test("12x36: 'É da equipe' dispensa o aviso", async () => {
   await montar({ loadUltimoMapa: jest.fn(async () => null), loadColaboradores: jest.fn(async () => colabsEq) });
   await digitar(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]'), "a");
-  await digitar(q('select[aria-label="Quem está no posto P2 · Vigilante Honda"]'), "d");
+  await digitar(q('select[aria-label="Quem está no posto P2 · Vigilante Ronda"]'), "d");
   await clicar(botao("É da equipe"));
   expect(host.textContent).not.toContain("não é da equipe de Luiz D.");
 });
 test("mapa enviado que perdeu um posto fixo: abre já em edição com o posto de volta e avisa", async () => {
   const gravado = { id: "P311B_2026-10-11_D", projetoId: "P311B", data: "2026-10-11", turno: "D", status: "enviado", enviadoEm: AGORA.toISOString(), veiculos: [{ id: "moto", rotulo: "Moto", kmAnterior: 1, kmAtual: 5 }], material: { semAlteracao: true, obs: "", excecoes: [] }, resumo: "ok", visita: { houve: false },
-    postos: [{ id: "x1", rotulo: "P1 · Vigilante CCO", pessoaId: "b", pessoaNome: "Marta A.", situacao: "presente", detalhe: {}, obs: "" }, { id: "x2", rotulo: "P2 · Vigilante Honda", pessoaId: "c", pessoaNome: "Ari A.", situacao: "presente", detalhe: {}, obs: "" }] }; // sem o líder
+    postos: [{ id: "x1", rotulo: "P1 · Vigilante CCO", pessoaId: "b", pessoaNome: "Marta A.", situacao: "presente", detalhe: {}, obs: "" }, { id: "x2", rotulo: "P2 · Vigilante Ronda", pessoaId: "c", pessoaNome: "Ari A.", situacao: "presente", detalhe: {}, obs: "" }] }; // sem o líder
   await montar({ loadMapa: jest.fn(async () => gravado), __semObrig: true });
   expect(q('select[aria-label="Quem está no posto L1 · Vigilante Líder"]')).toBeTruthy();
   expect(q("fieldset").disabled).toBe(false);
@@ -420,7 +420,7 @@ test("o mapa que vai para o Firestore não leva undefined (falta/FT/atraso marca
   await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
   await abrirExc("P1 · Vigilante CCO");
   await clicar(botao("Falta"));
-  await abrirExc("P2 · Vigilante Honda");
+  await abrirExc("P2 · Vigilante Ronda");
   await clicar(botao("Atraso"));
   await digitar(q('input[aria-label="Minutos de atraso"]'), "10");
   await clicar(botao("Concluir mapa"));
