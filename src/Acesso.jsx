@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect } from "react";
@@ -441,7 +442,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
               <div>
                 <label style={S.lbl}>Data</label>
-                <input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/>
+                <CampoData value={form.data} onChange={(v,o)=>{setF("data",v);setF("retroativo",!!(o&&o.retroativo));}} style={S.inp}/>
               </div>
               <div>
                 <label style={S.lbl}>Placa do Veículo</label>

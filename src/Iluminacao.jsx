@@ -1,4 +1,5 @@
 import { Ico } from "./Icones";
+import { validarQuadrante } from "./iluminacaoValida";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 import { avisarFalhaServidor } from "./avisoSalvar";
@@ -294,14 +295,9 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
     setEdErr(null); setDelId(null);
   };
   const gravarEdicao = async () => {
-    const nome = edNome.trim();
-    const total = Number(edTotal)||0;
-    const def = Math.min(total, Number(edDef)||0);
-    if(!nome){ setEdErr("Informe o nome do quadrante (ex: A1)."); return; }
-    if(total<=0){ setEdErr("Informe quantos pontos de iluminação existem no quadrante."); return; }
-    if((data.quadrantes||[]).some(q=>q.nome.trim().toLowerCase()===nome.toLowerCase() && q.id!==editId)){
-      setEdErr(`Já existe um quadrante chamado "${nome}".`); return;
-    }
+    const v = validarQuadrante({ nome: edNome, total: edTotal, deficientes: edDef }, data.quadrantes||[], editId);
+    if(v.erro){ setEdErr(v.erro); return; }
+    const { nome, total, deficientes: def } = v;
     const agora = new Date().toISOString();
     let quadrantes;
     if(editId==="novo"){
@@ -421,12 +417,13 @@ export default function Iluminacao({ project, onBack, dark, onToggleTheme, share
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
         <button onClick={()=>stepDef(-1)} style={{...S.btnSm,fontSize:18,padding:"6px 14px"}}>−</button>
         <input value={edDef} inputMode="numeric"
-          onChange={e=>{let v=e.target.value.replace(/[^0-9]/g,"");const t=Number(edTotal)||0;if(v!==""&&Number(v)>t)v=String(t);setEdDef(v);setEdErr(null);}}
+          onChange={e=>{const v=e.target.value.replace(/[^0-9]/g,"");setEdDef(v);setEdErr(null);}}
           style={{...S.inp,textAlign:"center",fontSize:18,fontWeight:800}}/>
         <button onClick={()=>stepDef(1)} style={{...S.btnSm,fontSize:18,padding:"6px 14px"}}>＋</button>
       </div>
       {(()=>{ const t=Number(edTotal)||0; const d=Number(edDef)||0; const pct=t?Math.round(((t-d)/t)*1000)/10:0;
         return t>0 ? <div style={{marginTop:8}}><BarraPct pct={pct} dark={dark}/><div style={{fontSize:10,...S.txt2,marginTop:4,textAlign:"right",fontWeight:800,color:STATUS_CFG[statusFromPct(pct)].color}}>{pct}% operante</div></div> : null; })()}
+      {!edErr && (Number(edDef)||0)>(Number(edTotal)||0) && <div role="alert" style={{fontSize:12,color:"#ef4444",marginTop:8,textAlign:"center"}}>Deficientes não pode ser maior que os pontos ({Number(edTotal)||0}).</div>}
       {edErr && <div role="alert" style={{fontSize:12,color:"#ef4444",marginTop:8,textAlign:"center"}}>{edErr}</div>}
       <div style={{display:"flex",gap:8,marginTop:10}}>
         <button onClick={()=>setEditId(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>

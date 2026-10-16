@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico, EmIco, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -400,7 +401,7 @@ function SecSeguranca({ data, onSave, adminAuth, dark, ccoMode, supervCCO }) {
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:9}}>
               <div>
                 <label style={S.lbl}>Data</label>
-                <input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={{...S.inp,fontSize:14}}/>
+                <CampoData value={novaVisita.data} onChange={(v)=>setNovaVisita(v=>({...v,data:v}))} style={{...S.inp,fontSize:14}}/>
               </div>
             </div>
             <div style={{marginBottom:9}}>
@@ -586,7 +587,7 @@ function SecManutencao({ data, onSave, adminAuth, dark, ccoMode, manutCCO }) {
                 {!ccoMode && showAdd===emp.id && (
                   <div style={{background:dark?"#020510":"#f8fafc",borderRadius:8,padding:"10px 12px",marginBottom:10,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                      <div><label style={S.lbl}>Data</label><input type="date" value={novaVisita.data} onChange={e=>setNovaVisita(v=>({...v,data:e.target.value}))} style={S.inp}/></div>
+                      <div><label style={S.lbl}>Data</label><CampoData value={novaVisita.data} onChange={(v)=>setNovaVisita(v=>({...v,data:v}))} style={S.inp}/></div>
                       <div><label style={S.lbl}>Técnico</label><input value={novaVisita.tecnico} onChange={e=>setNovaVisita(v=>({...v,tecnico:e.target.value}))} style={S.inp}/></div>
                     </div>
                     <label style={S.lbl}>Resumo</label>

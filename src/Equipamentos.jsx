@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico } from "./Icones";
 import IconeEquip from "./IconeEquip";
 import { iconeTema } from "./temaClaro";
@@ -155,7 +156,7 @@ function StatusSelector({ value, onChange, tipos, dark }) {
           <div style={{ fontSize:11, color:"#ef4444", fontWeight:700, marginBottom:8 }}><Ico n="alerta"/> Justificativa obrigatória</div>
           <div style={{ marginBottom:8 }}>
             <label style={S.lbl}>Data da ocorrência</label>
-            <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
+            <CampoData value={data} onChange={(v)=>setData(v)} style={S.inp}/>
           </div>
           <div style={{ marginBottom:8 }}>
             <label style={S.lbl}>Justificativa</label>
