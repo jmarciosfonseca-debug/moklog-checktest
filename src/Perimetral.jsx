@@ -538,7 +538,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
     if(!form.quemFez.trim()) { alert("Informe quem realizou o teste"); return; }
     setSaving(true);
     try {
-      const novo = {...form, criadoEm:new Date().toISOString()};
+      const novo = {...form, quemFez:padronizarNome(form.quemFez), centralAcompanhou:padronizarNome(form.centralAcompanhou), criadoEm:new Date().toISOString()};
       const newList = await saveTesteMerge(project.id, novo);
       setTestes(newList);
       setScreen("list");
@@ -826,8 +826,9 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                     ))}
                     {/* Manual fallback */}
                     <input value={form.quemFezId?"":form.quemFez} onChange={e=>setForm(f=>({...f,quemFez:e.target.value,quemFezId:""}))}
-                      placeholder="Ou digitar nome manualmente..."
+                      placeholder="Ou digitar nome manualmente..." list="sug-perim"
                       style={{...S.inp,fontSize:12,marginTop:4}}/>
+                    <datalist id="sug-perim">{listaSugestoes(equipe,(testes||[]).flatMap(t=>[t.quemFez,t.centralAcompanhou])).map(n=><option key={n} value={n}/>)}</datalist>
                   </div>
                 ):(
                   <input value={form.quemFez} onChange={e=>setForm(f=>({...f,quemFez:e.target.value}))} placeholder="Nome do responsável..." style={S.inp}/>
@@ -852,7 +853,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                       </button>
                     ))}
                     <input value={form.centralId?"":form.centralAcompanhou} onChange={e=>setForm(f=>({...f,centralAcompanhou:e.target.value,centralId:""}))}
-                      placeholder="Ou digitar nome manualmente..."
+                      placeholder="Ou digitar nome manualmente..." list="sug-perim"
                       style={{...S.inp,fontSize:12,marginTop:4}}/>
                   </div>
                 ):(

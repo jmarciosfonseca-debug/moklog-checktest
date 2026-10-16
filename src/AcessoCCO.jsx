@@ -473,13 +473,15 @@ function emptyForm(tema) {
   return base;
 }
 
-function TemaForm({ tema, form, setF, S, dark, equipe }) {
+function TemaForm({ tema, form, setF, S, dark, equipe, usados }) {
+  const sugNomes = listaSugestoes(equipe, (usados||[]).map(r=>r.nome));
+  const sugSup = listaSugestoes(equipe, (usados||[]).map(r=>r.supervisor));
   const c = TEMAS.find(t=>t.key===tema).color;
   if(tema==="acesso") return (
     <>
       <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
         <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="usuario"/> Identificação</div>
-        <div><label style={S.lbl}>Nome *</label><input value={form.nome} onChange={e=>setF("nome",e.target.value)} placeholder="Nome completo..." style={S.inp}/></div>
+        <div><label style={S.lbl}>Nome *</label><input list="sug-nomes" value={form.nome} onChange={e=>setF("nome",e.target.value)} onBlur={e=>setF("nome",padronizarNome(e.target.value))} placeholder="Nome completo..." style={S.inp}/><datalist id="sug-nomes">{sugNomes.map(n=><option key={n} value={n}/>)}</datalist></div>
         <div><label style={S.lbl}>Empresa / Setor</label><input value={form.empresa} onChange={e=>setF("empresa",e.target.value)} placeholder="Empresa ou setor..." style={S.inp}/></div>
       </div>
       <div style={S.card}>
@@ -564,7 +566,7 @@ function TemaForm({ tema, form, setF, S, dark, equipe }) {
     <>
       <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
         <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="usuario"/> Supervisor</div>
-        <div><label style={S.lbl}>Nome do Supervisor *</label><input value={form.supervisor} onChange={e=>setF("supervisor",e.target.value)} placeholder="Nome completo..." style={S.inp}/></div>
+        <div><label style={S.lbl}>Nome do Supervisor *</label><input list="sug-sup" value={form.supervisor} onChange={e=>setF("supervisor",e.target.value)} onBlur={e=>setF("supervisor",padronizarNome(e.target.value))} placeholder="Nome completo..." style={S.inp}/><datalist id="sug-sup">{sugSup.map(n=><option key={n} value={n}/>)}</datalist></div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
           <div><label style={S.lbl}>Data</label><CampoData value={form.data} onChange={(v,o)=>{setF("data",v);setF("retroativo",!!(o&&o.retroativo));}} style={S.inp}/></div>
           <div><label style={S.lbl}>Chegada</label>
@@ -716,7 +718,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     setHasDraft(!!loadDraft(tema, project.id));
     setShowArquivados(false);
     // Carrega equipe (para Intervalo) e equipamentos danificados (para Supervisão)
-    if(tema==="intervalo") loadEquipe(project.id).then(setEquipe);
+    if(["intervalo","acesso","supervisao"].includes(tema)) loadEquipe(project.id).then(setEquipe);
     if(tema==="supervisao") loadEquipDanificados(project.id).then(setEquipDan);
   },[tema, project?.id, screen==="pin"]);
 
@@ -808,7 +810,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     try {
       // Se este form já existe como rascunho no Firestore (mesmo id), PROMOVE:
       // vira registro definitivo (rascunho:false) sem criar duplicata.
-      const novo = {...form, rascunho:false, arquivado:false, registradoEm: form.registradoEm || new Date().toISOString(), updatedAt:new Date().toISOString()};
+      const novo = {...form, ...(form.nome!==undefined?{nome:padronizarNome(form.nome)}:{}), ...(form.supervisor!==undefined?{supervisor:padronizarNome(form.supervisor)}:{}), rascunho:false, arquivado:false, registradoEm: form.registradoEm || new Date().toISOString(), updatedAt:new Date().toISOString()};
       const semEste = registros.filter(r=>r.id!==novo.id);
       const newList = [novo, ...semEste];
       setRegistros(newList);
@@ -891,7 +893,7 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
           </div>
         </div>
         <div style={{padding:"14px 16px",display:"flex",flexDirection:"column",gap:12}}>
-          <TemaForm tema={tema} form={form} setF={setF} S={S} dark={dark} equipe={equipe}/>
+          <TemaForm tema={tema} form={form} setF={setF} S={S} dark={dark} equipe={equipe} usados={registros}/>
           <div style={S.card}>
             <label style={S.lbl}>Observação (opcional)</label>
             <textarea value={form.obs} onChange={e=>setF("obs",e.target.value)} placeholder="Observações..." style={{...S.inp,height:50,resize:"vertical",fontSize:12}}/>
