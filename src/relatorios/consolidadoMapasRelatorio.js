@@ -4,7 +4,7 @@
 import { documentoMoked, escHTML, dataBR, horaBR, milhar } from "./padraoMoked";
 import { descreverFiltros } from "../mapaDiario/consolidado";
 import { rotuloTurno } from "../mapaDiario/texto";
-import { ROTULO_SITUACAO, kmRodado } from "../mapaDiario/modelo";
+import { ROTULO_SITUACAO, kmRodado, rotuloSaida } from "../mapaDiario/modelo";
 import { fotoDaPessoa, iniciais } from "../mapaDiario/fotos";
 
 const e = escHTML;
@@ -56,7 +56,7 @@ function tabelaOcorrencias(ocorrencias, av) {
 }
 
 function blocoMapa(m, nomeProj, av) {
-  const postos = (m.postos || []).map((p) => `<tr><td>${e(p.rotulo || "")}</td><td class="mk-dv">${av.html(m.projetoId, p.pessoaId, p.pessoaNome, true)}${e((p.pessoaNome || "").trim() || "—")}</td><td>${p.situacao && p.situacao !== "presente" ? badge(p.situacao) : '<span class="mk-sim">Presente</span>'}</td></tr>`).join("");
+  const postos = (m.postos || []).map((p) => `<tr><td>${e(p.rotulo || "")}</td><td class="mk-dv">${av.html(m.projetoId, p.pessoaId, p.pessoaNome, true)}${e((p.pessoaNome || "").trim() || "—")}</td><td>${p.situacao && p.situacao !== "presente" ? badge(p.situacao) : '<span class="mk-sim">Presente</span>'}${p.saida ? `<div style="font-size:9px;color:#b45309">${e(rotuloSaida(p))}</div>` : ""}</td></tr>`).join("");
   const mat = m.material || { semAlteracao: true };
   const exc = mat.excecoes || [];
   const material = mat.semAlteracao && !exc.length ? "Sem alteração" : `Com alteração — ${exc.map((x) => `${x.nome} (${x.situacao === "indisponivel" ? "indisponível" : "anomalia"}${x.obs ? `: ${x.obs}` : ""})`).join("; ") || (mat.obs || "")}`;

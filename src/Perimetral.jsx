@@ -831,7 +831,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                     <datalist id="sug-perim">{listaSugestoes(equipe,(testes||[]).flatMap(t=>[t.quemFez,t.centralAcompanhou])).map(n=><option key={n} value={n}/>)}</datalist>
                   </div>
                 ):(
-                  <input value={form.quemFez} onChange={e=>setForm(f=>({...f,quemFez:e.target.value}))} placeholder="Nome do responsável..." style={S.inp}/>
+                  <><input list="sug-perim" value={form.quemFez} onChange={e=>setForm(f=>({...f,quemFez:e.target.value}))} placeholder="Nome do responsável..." style={S.inp}/><datalist id="sug-perim">{listaSugestoes(equipe,(testes||[]).flatMap(t=>[t.quemFez,t.centralAcompanhou])).map(n=><option key={n} value={n}/>)}</datalist></>
                 )}
               </div>
               {/* Central */}
@@ -857,7 +857,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                       style={{...S.inp,fontSize:12,marginTop:4}}/>
                   </div>
                 ):(
-                  <input value={form.centralAcompanhou} onChange={e=>setForm(f=>({...f,centralAcompanhou:e.target.value}))} placeholder="Nome da operadora..." style={S.inp}/>
+                  <input list="sug-perim" value={form.centralAcompanhou} onChange={e=>setForm(f=>({...f,centralAcompanhou:e.target.value}))} placeholder="Nome da operadora..." style={S.inp}/>
                 )}
               </div>
             </div>
