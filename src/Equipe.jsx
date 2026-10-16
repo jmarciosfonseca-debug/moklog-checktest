@@ -61,6 +61,7 @@ import {criarSolicitacoes, quantidadeSolicitada, anexarSolicitacoes, marcarWhats
 import {SeloWhats, FolhaWhats, BotaoAprovarTodas, PainelAprovacoesLider} from "./EquipeWhats";
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
+import CampanhaExtras from './CampanhaExtras';
 
 
 // Sem limite para desligados — ficam todos para consulta
@@ -2999,7 +3000,12 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 {adminAuth && filtroRapido==="cesta" && (
                   <CampanhaEquipeControle key={`${project.id}_${chave}_${config.valorCentavos}`} tipo={tipo} ano={anoFiltro} config={config} quantidade={linhas.length} carregando={carregando}
                     onSalvar={patch => save({...equipeData, campanhasSazonais:{...equipeData.campanhasSazonais,[chave]:{...config,...patch}}})}
-                    onPDF={()=>gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos:config.valorCentavos})}/>
+                    onPDF={()=>gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos:config.valorCentavos,extras:config.extras||[],fotos:fotosMapa})}/>
+                )}
+                {adminAuth && filtroRapido==="cesta" && !carregando && (
+                  <CampanhaExtras key={`${project.id}_${chave}_extras`} extras={config.extras||[]} fotos={fotosMapa} idFoto={`campanha-${tipo}-${anoFiltro}`}
+                    onSalvar={patch => save({...equipeData, campanhasSazonais:{...equipeData.campanhasSazonais,[chave]:{...config,...patch}}})}
+                    onEnviarFoto={async (id,url)=>{ const ref = await enviarFoto(project.id,id,url); definirFoto(ref,url); return ref; }}/>
                 )}
                 {adminAuth && filtroRapido==="aprovado" && (
                   <button onClick={()=>gerarPDFAprovados(project, equipeData.colaboradores, anoFiltro)}
