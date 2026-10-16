@@ -104,6 +104,8 @@ function fichaHTML(i, hoje, refs = new Map()) {
     const corpo = ref ? `${esc(resumoTexto(texto))} <span class="eq-ref">[${ref.ref}]</span>` : esc(texto);
     return `<li>${h.data && /^\d{4}-\d{2}-\d{2}$/.test(h.data) ? `<b>${dataBR(h.data)}</b> — ` : ''}${corpo}${tag ? ` <span class="eq-tag">${tag}</span>` : ''}</li>`;
   };
+  const promos = (Array.isArray(c.historico) ? c.historico : []).filter(h => h && h.tipo === 'Promoção' && /^\d{4}-\d{2}-\d{2}$/.test(h.data || '')).sort((a, b) => b.data.localeCompare(a.data));
+  const promoHTML = promos.length ? `<div class="eq-cursos"><b>▲ Promoções (${promos.length})</b><ul>${promos.map(h => `<li><b>${dataBR(h.data)}</b> — ${esc(h.cargoAnterior || '—')} → ${esc(h.cargoNovo || '—')}${h.detalhe && !h.cargoNovo ? ` ${esc(h.detalhe)}` : ''}${h.obs ? ` <span class="eq-tag">${esc(h.obs)}</span>` : ''}</li>`).join('')}</ul></div>` : '';
   const tempo = tempoCasaTxt(c.dataContratacao, hoje);
   const aviso = i.afastado ? '<span class="eq-tag eq-tag-wa">afastado · fora da média</span>' : '';
   return `<article class="eq-card">
@@ -112,6 +114,7 @@ function fichaHTML(i, hoje, refs = new Map()) {
       <div class="mk-mu eq-meta">${esc(reciclagemTxt(i.reciclagem))}${i.ferias[0] ? ` · Férias ${dataBR(i.ferias[0].dataInicio)}` : ''}</div>${aviso}</div>
       <div class="eq-ind">${miniGauge(i.indice)}<div class="eq-classe">${esc(i.classe)}</div></div></div>
     ${barrasEixos(i.eixos)}
+    ${promoHTML}
     ${cursos.length ? `<div class="eq-cursos"><b>Treinamentos registrados (${cursos.length})</b><ul>${cursos.map(linhaCurso).join('')}</ul></div>` : ''}
   </article>`;
 }

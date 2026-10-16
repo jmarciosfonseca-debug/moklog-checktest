@@ -62,6 +62,7 @@ import {SeloWhats, FolhaWhats, BotaoAprovarTodas, PainelAprovacoesLider} from ".
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
 import CampanhaExtras from './CampanhaExtras';
+import { afastamentoVigente, promocaoRecente } from "./equipeEventos";
 
 
 // Sem limite para desligados — ficam todos para consulta
@@ -90,7 +91,7 @@ function getTurnos(projectId) {
   if(TURNOS_SEM_FOLGUISTA.includes(projectId)) return ["Diurno","Noturno","Ferista"];
   return ["Diurno","Noturno","Folguista","Ferista"];
 }
-const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento","Atraso"];
+const HIST_TIPOS = ["Falta","FT","Medida Disciplinar","Férias","Treinamento","Atraso","Promoção"];
 // ── Cobertura temporária de liderança: quando um Apoio/outro cargo assume
 // a função de líder por um período (ex: férias do titular). Não substitui
 // o cargo cadastrado — só "promove" durante a janela de datas.
@@ -109,6 +110,7 @@ const HIST_COLORS = {
   "Medida Disciplinar":{ color:"#a855f7", bg:"#120a2e", badge:"#f3e8ff" },
   "Férias":            { color:"#0ea5e9", bg:"#001a2e", badge:"#e0f2fe" },
   "Treinamento":       { color:"#22c55e", bg:"#021a0d", badge:"#dcfce7" },
+  "Promoção":          { color:"#10b981", bg:"#02150f", badge:"#d1fae5" },
 };
 const ESCALAS = ["12x36","4x2","5x2","6x1"];
 
@@ -779,7 +781,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
   const hist    = [...(colab.historico||[])].reverse();
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
@@ -1046,8 +1048,11 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           </div>
 
           {/* Desligar — admin only */}
-          {adminAuth && colab.status==="ativo" && (
-            <DesligarModal colab={colab} onDesligar={onDesligar} S={S} dark={dark}/>
+          {adminAuth && colab.status==="ativo" && onPromover && (
+            <PromoverModal colab={colab} cargos={cargosFicha} onPromover={onPromover} S={S}/>
+          )}
+          {(adminAuth || liderAuth) && colab.status==="ativo" && (
+            <DesligarModal colab={colab} onDesligar={onDesligar} S={S} dark={dark} lideres={lideresFicha} exigeLider={!adminAuth}/>
           )}
         </div>
       </div>
@@ -1533,11 +1538,45 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
 
 
 // ── Modal desligamento com motivo, tipo e data
-function DesligarModal({ colab, onDesligar, S, dark }) {
+function PromoverModal({ colab, cargos, onPromover, S }) {
+  const [open, setOpen] = useState(false);
+  const [cargoNovo, setCargoNovo] = useState("");
+  const [data, setData] = useState(todayStr());
+  const [obs, setObs] = useState("");
+  const [busy, setBusy] = useState(false);
+  const opcoes = (cargos||[]).filter(c=>c!==colab.cargo);
+  if(!open) return (
+    <button onClick={()=>setOpen(true)} style={{ ...S.btnSec, color:"#10b981", borderColor:"#10b98144", fontSize:13 }}>▲ Promover colaborador</button>
+  );
+  return (
+    <div style={{ background:"#02150f", border:"1px solid #10b98155", borderRadius:12, padding:16 }}>
+      <div style={{ fontSize:13, fontWeight:700, color:"#10b981", marginBottom:10 }}>▲ Promover — {colab.nome}</div>
+      <div style={S.lbl}>Função atual</div>
+      <div style={{ fontSize:13, color:"#e2e8f0", marginBottom:10 }}>{colab.cargo||"—"}</div>
+      <div style={S.lbl}>Nova função *</div>
+      <select aria-label="Nova função" value={cargoNovo} onChange={e=>setCargoNovo(e.target.value)} style={{ ...S.inp, marginBottom:10 }}>
+        <option value="">Escolher…</option>
+        {opcoes.map(c=><option key={c} value={c}>{c}</option>)}
+      </select>
+      <div style={S.lbl}>Data da promoção</div>
+      <input type="date" value={data} onChange={e=>setData(e.target.value)} style={{ ...S.inp, marginBottom:10 }}/>
+      <div style={S.lbl}>Observação (opcional)</div>
+      <input value={obs} onChange={e=>setObs(e.target.value)} placeholder="Ex.: assume a liderança do turno" maxLength={200} style={{ ...S.inp, marginBottom:12 }}/>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={()=>setOpen(false)} style={{ ...S.btnSec, flex:1, fontSize:13 }}>Cancelar</button>
+        <button disabled={busy||!cargoNovo||!data} onClick={async()=>{ setBusy(true); try{ await onPromover(colab, cargoNovo, data, obs.trim()); setOpen(false); } finally { setBusy(false); } }}
+          style={{ flex:1, background:"linear-gradient(135deg,#059669,#047857)", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontSize:13, fontWeight:700, cursor:"pointer", opacity:(busy||!cargoNovo||!data)?0.5:1 }}>Confirmar promoção</button>
+      </div>
+    </div>
+  );
+}
+
+function DesligarModal({ colab, onDesligar, S, dark, lideres = [], exigeLider = false }) {
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState("Demissão");
   const [motivo, setMotivo] = useState("");
   const [data, setData] = useState(todayStr());
+  const [liderNome, setLiderNome] = useState(lideres.length===1 ? lideres[0] : "");
 
   if(!open) return (
     <button onClick={()=>setOpen(true)}
@@ -1569,10 +1608,19 @@ function DesligarModal({ colab, onDesligar, S, dark }) {
         <input value={motivo} onChange={e=>setMotivo(e.target.value)}
           placeholder="Descreva o motivo..." style={S.inp}/>
       </div>
+      {exigeLider && (
+        <div style={{ marginBottom:12 }}>
+          <div style={S.lbl}>Líder que está apontando *</div>
+          <select aria-label="Líder que está apontando o desligamento" value={liderNome} onChange={e=>setLiderNome(e.target.value)} style={S.inp}>
+            <option value="">Escolher o líder…</option>
+            {lideres.map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+      )}
       <div style={{ display:"flex", gap:8 }}>
         <button onClick={()=>setOpen(false)}
           style={{ ...S.btnSec, flex:1, fontSize:13 }}>Cancelar</button>
-        <button onClick={()=>{ onDesligar(colab, motivo, tipo, data); }}
+        <button onClick={()=>{ if(exigeLider && !liderNome){ alert("Escolha o líder que está apontando o desligamento."); return; } onDesligar(colab, motivo, tipo, data, liderNome); }}
           style={{ flex:1, background:"linear-gradient(135deg,#b91c1c,#991b1b)", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
           <Ico n="check"/> Confirmar
         </button>
@@ -2499,11 +2547,14 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     setScreen("view");
   };
 
-  const desligarColab = async (colab, motivo, tipoDeslig, dataDeslig) => {
-    if(!adminAuth) return;
+  const desligarColab = async (colab, motivo, tipoDeslig, dataDeslig, liderNome) => {
+    if(!adminAuth && !liderAuth) return;
+    if(!adminAuth && !liderNome) { alert("Escolha o líder que está apontando o desligamento."); return; }
     const desligado = {
       ...colab,
       status:"desligado",
+      desligadoPor: adminAuth ? "Gerencial" : `Líder ${liderNome}`,
+      desligadoRegistroEm: new Date().toISOString(),
       desligadoEm: dataDeslig || todayStr(),
       motivoDesligamento: motivo || "",
       tipoDesligamento: tipoDeslig || "Demissão"
@@ -2514,6 +2565,14 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     const newDesligados = [desligado, ...desligadosLimpos];
     await save({...equipeData, colaboradores:newColabs, desligados:newDesligados});
     setScreen("list"); setSelColab(null);
+  };
+
+  const promoverColab = async (colab, cargoNovo, data, obs) => {
+    if(!adminAuth || !cargoNovo || !data) return;
+    const item = { id:`promo_${Date.now()}`, tipo:"Promoção", data, cargoAnterior:colab.cargo||"", cargoNovo, obs:obs||"", detalhe:`${colab.cargo||"—"} → ${cargoNovo}${obs?` — ${obs}`:""}`, registradoEm:new Date().toISOString() };
+    const newColabs = equipeData.colaboradores.map(c=>c.id!==colab.id ? c : { ...c, cargo:cargoNovo, historico:[item, ...(c.historico||[])] });
+    await save({...equipeData, colaboradores:newColabs});
+    setSelColab(newColabs.find(c=>c.id===colab.id));
   };
 
   const reativarColab = async (colab) => {
@@ -2626,6 +2685,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
         onAddHist={()=>setScreen("addHist")}
         onEditHist={(colabId, item)=>{setEditHistItem(item);setScreen("editHist");}}
         onDesligar={desligarColab}
+        onPromover={promoverColab}
+        cargosFicha={cargos}
+        lideresFicha={(equipeData.colaboradores||[]).filter(c=>c.status==="ativo"&&ehLider(c,equipeData.colaboradores)).map(c=>c.nome)}
         onRemoveHist={removeHist}
         onEncerrarAfast={(entry)=>setEncerrarModal({entry})}/>
       {encerrarModal && (
@@ -3127,7 +3189,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                           <Avatar colab={c} size={46} border={tc.badge+"44"}/>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.nome}</div>
-                            <div style={{ fontSize:11, ...S.txtSecondary, marginTop:1 }}>{c.cargo}</div>
+                            <div style={{ fontSize:11, ...S.txtSecondary, marginTop:1 }}>{c.cargo}{promocaoRecente(c.historico,todayStr()) && <span title={`Promovido em ${fmtDate(promocaoRecente(c.historico,todayStr()).data)}`} style={{ color:"#10b981", fontWeight:800, marginLeft:6 }}>▲ promovido</span>}</div>
+                            {afastamentoVigente(c.historico,todayStr()) && <div style={{ fontSize:9, fontWeight:800, color:"#ef4444", marginTop:2 }}>{afastamentoVigente(c.historico,todayStr()).rotulo}</div>}
                             {coberturaAtiva(c) && <div style={{fontSize:9,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"1px 7px",borderRadius:5,display:"inline-block",marginTop:3}}><Ico n="atualizar"/> Cobrindo Líder até {fmtDate(c.coberturaFim)}</div>}
                             <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
                               {c.escala && <span style={{ fontSize:9, color:"#0ea5e9", background:"#001a2e", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.escala}</span>}

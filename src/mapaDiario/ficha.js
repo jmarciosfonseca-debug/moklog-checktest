@@ -8,9 +8,11 @@
 // Nome digitado (sem cadastro) e campo vazio também não geram nada. A observação do posto não vai
 // para a ficha (pode ter dado sensível).
 
+import { plantoesAfastamento } from "../equipeEventos";
 const dataBR = (iso) => iso.split("-").reverse().join("/");
 const idDe = (mapaId, colabId, tipo) => `mapa:${mapaId}:${colabId}:${tipo}`;
 const TIPOS = { falta: "Falta", ft: "FT", atraso: "Atraso" };
+const comAfastamento = (item, n) => { const k = plantoesAfastamento(n); return k ? { ...item, afastamentoPlantoes: k, detalhe: `${item.detalhe} — AFASTAMENTO: ${k} plantões` } : item; };
 
 export function lancamentosDoMapa(mapa) {
   const turno = mapa.turno === "N" ? "noturno" : "diurno";
@@ -30,7 +32,7 @@ export function lancamentosDoMapa(mapa) {
       const quem = (p.pessoaNome || "").trim();
       const por = quem ? ` (coberta ${dc.base ? "pela Base: " : "por "}${quem})` : "";
       const falta = { id: idDe(mapa.id, dc.deQuemId, "Falta"), colabId: dc.deQuemId, tipo: "Falta", data: mapa.data, detalhe: `Falta no posto ${p.rotulo}${por} — ${origem}`, origem: "mapa", mapaId: mapa.id, diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) };
-      if (!out.some((x) => x.id === falta.id)) out.push(falta);
+      if (!out.some((x) => x.id === falta.id)) out.push(comAfastamento(falta, dc.afastamentoPlantoes));
       return;
     }
     const tipo = TIPOS[p.situacao];
@@ -46,13 +48,13 @@ export function lancamentosDoMapa(mapa) {
     }
     const item = { id: idDe(mapa.id, p.pessoaId, tipo), colabId: p.pessoaId, tipo, data: mapa.data, detalhe, origem: "mapa", mapaId: mapa.id };
     if (tipo === "Falta") Object.assign(item, { diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) });
-    if (!out.some((x) => x.id === item.id)) out.push(item);
+    if (!out.some((x) => x.id === item.id)) out.push(tipo === "Falta" ? comAfastamento(item, (p.detalhe || {}).afastamentoPlantoes) : item);
     // FT: quem faltou (escolhido do cadastro) recebe a falta na própria ficha, coberta por esta FT.
     const d = p.detalhe || {};
     if (tipo === "FT" && d.quemFaltouId && d.quemFaltouId !== p.pessoaId) {
       const nomeFt = (p.pessoaNome || "").trim();
       const falta = { id: idDe(mapa.id, d.quemFaltouId, "Falta"), colabId: d.quemFaltouId, tipo: "Falta", data: mapa.data, detalhe: `Falta no posto ${p.rotulo}${nomeFt ? ` (coberta por FT de ${nomeFt})` : ""} — ${origem}`, origem: "mapa", mapaId: mapa.id, diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) };
-      if (!out.some((x) => x.id === falta.id)) out.push(falta);
+      if (!out.some((x) => x.id === falta.id)) out.push(comAfastamento(falta, d.afastamentoPlantoes));
     }
   });
   return out;

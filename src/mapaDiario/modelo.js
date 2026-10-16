@@ -1,3 +1,4 @@
+import { plantoesAfastamento, MAX_PLANTOES_AFASTAMENTO } from "../equipeEventos";
 // Mapa de Equipe diário — modelo do documento e regras de preenchimento (puro).
 // Documento: equipes/{pid}/mapas/{projeto_AAAA-MM-DD_D|N}
 //
@@ -195,6 +196,8 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
       if (!d.quemFaltouId && !d.quemFaltou && !d.semFalta && !d.postoVago) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
       if (d.quemFaltouId && d.quemFaltouId === p.pessoaId) erros.push(`${nome}: quem faltou não pode ser a própria pessoa da FT`);
     }
+    const ausenteComAfastamento = p.situacao === "falta" || (p.situacao === "cobertura" && d.deQuem && !d.semFalta) || (p.situacao === "ft" && d.quemFaltou);
+    if (ausenteComAfastamento && d.afastamentoSim && !plantoesAfastamento(d.afastamentoPlantoes)) erros.push(`${nome}: informe quantos plantões de afastamento (de 2 a ${MAX_PLANTOES_AFASTAMENTO})`);
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
   });
   // Obrigatórios: km da moto, resumo da passagem e se houve visita da supervisão neste turno.

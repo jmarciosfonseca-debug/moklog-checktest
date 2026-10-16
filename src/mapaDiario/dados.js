@@ -10,6 +10,7 @@ import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
 import { semUndefined, corrigirRondaNosRotulos, ehMoto, kmInteiro } from "./modelo";
 import { gravarSecaoEquipamentos } from "../equipamentosStore";
+import { afastamentoVigente, desligamentosRecentes } from "../equipeEventos";
 
 const db = () => {
   const app = getApps()[0];
@@ -25,8 +26,15 @@ export async function loadColaboradores(pid, hojeISO) {
     .map((f) => f.colabId));
   return (d.colaboradores || [])
     .filter((c) => c.status === "ativo")
-    .map((c) => ({ id: c.id, nome: c.nome || "", cargo: c.cargo || "", turno: c.turno || "", emFerias: ferias.has(c.id), equipeLiderId: c.equipeLiderId || null, equipeLideresExtra: Array.isArray(c.equipeLideresExtra) ? c.equipeLideresExtra : [] }))
+    .map((c) => ({ id: c.id, nome: c.nome || "", cargo: c.cargo || "", turno: c.turno || "", emFerias: ferias.has(c.id), equipeLiderId: c.equipeLiderId || null, equipeLideresExtra: Array.isArray(c.equipeLideresExtra) ? c.equipeLideresExtra : [], afastamento: afastamentoVigente(c.historico, hojeISO) }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+// Desligamentos registrados nas últimas 24h (aviso no mapa).
+export async function loadDesligamentosRecentes(pid, agora = new Date()) {
+  const snap = await getDoc(doc(db(), "equipes", pid));
+  const d = snap.exists() ? snap.data() : {};
+  return desligamentosRecentes(d.desligados, agora, 24);
 }
 
 // Cadastro de Equipamentos do projeto (somente leitura) para conferir o material no mapa.

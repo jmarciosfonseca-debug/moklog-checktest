@@ -9,6 +9,7 @@ import { horarioDoTurno } from "./horarios";
 import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
+import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
 import { isDemo } from "../session";
 import * as dados from "./dados";
 
@@ -26,6 +27,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [data, setData] = useState(inicial.data);
   const [turno, setTurno] = useState(inicial.turno);
   const [colabs, setColabs] = useState([]);
+  const [deslig, setDeslig] = useState([]);   // desligamentos das últimas 24h (aviso)
   const [mapa, setMapa] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -68,6 +70,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     (async () => {
       try {
         const [cs, existente] = await Promise.all([io.loadColaboradores(pid, data), io.loadMapa(pid, chaveMapa(pid, data, turno))]);
+        if (io.loadDesligamentosRecentes) { const dl = await io.loadDesligamentosRecentes(pid, agoraFn()).catch(() => []); if (vivo) setDeslig(dl); }
         let m = existente;
         if (!m) {
           const base = await io.loadUltimoMapa(pid, turno, data, { gapPar: projetoPuxaEquipe(pid) }).catch(() => null);
@@ -212,7 +215,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   };
 
   const editarMapa = () => { setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(completarPostosFixos(m, colabs))); };
-  const texto = mapa ? montarTextoWhatsApp(mapa, { nomeProjeto: project?.name || "" }) : "";
+  const texto = mapa ? montarTextoWhatsApp(mapa, { nomeProjeto: project?.name || "", desligamentos: deslig }) : "";
   const copiar = async () => { try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch (e) { setAvisos(["Não consegui copiar; use o botão do WhatsApp."]); } };
   const enviado = mapa && mapa.status === "enviado";
   const prazo = horario ? estadoDoMapa({ inicio: inicioDoTurno(data, horario.inicio), agora: agoraFn(), enviadoEm: enviado ? new Date(mapa.enviadoEm) : null }) : null;
@@ -388,6 +391,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         {mapa && !carregando && (<>
           <fieldset disabled={!!enviado && !editando} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
           {avisoReaberto && <div role="status" style={{ ...S.card, borderColor: cor.ac, fontSize: 13, color: cor.txt, fontWeight: 600 }}>⚠ {avisoReaberto}</div>}
+          {deslig.length > 0 && <div role="status" style={{ ...S.card, borderColor: "#dc2626" }}><div style={{ ...S.h, color: "#dc2626" }}>🚪 Funcionário desligado (últimas 24h)</div>{deslig.map((d) => <div key={d.id + d.em} style={{ fontSize: 13, color: cor.txt }}>• {linhaDesligamento(d)}</div>)}</div>}
           <div style={S.card}>
             <div style={S.h}>Equipe do turno</div>
             {!projetoPuxaEquipe(pid) && <div style={{ fontSize: 12, color: cor.txt2, marginBottom: 8 }}>Projeto 4x2/5x2: a equipe muda a cada plantão e não é puxada sozinha. Escolha quem está em cada posto.</div>}
@@ -426,6 +430,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     </div>
                   );
                 })()}
+                {(() => { const c = colabs.find((x) => x.id === p.pessoaId); return c && c.afastamento && p.situacao !== "falta" ? <div role="status" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>⚠ {c.afastamento.rotulo}. Confirme se já retornou.</div> : null; })()}
                 {(p.situacao !== "presente" || abertos[p.id]) && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                   {SITUACOES.map((s) => (
                     <button key={s.id} aria-pressed={p.situacao === s.id} onClick={() => marcarSituacao(p, s.id)} style={S.chip(p.situacao === s.id, s.id === "presente" ? "#16a34a" : s.id === "falta" ? "#dc2626" : cor.ac)}>{s.rotulo}</button>
@@ -489,6 +494,22 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     {seletorPessoa("Troca no lugar de quem", p.detalhe?.noLugarDe, (n) => setDetalhe(p.id, { noLugarDe: n }))}
                   </div>
                 )}
+                {(() => {
+                  const quem = p.situacao === "falta" ? p.pessoaNome : p.situacao === "cobertura" && !p.detalhe?.semFalta ? p.detalhe?.deQuem : p.situacao === "ft" ? p.detalhe?.quemFaltou : "";
+                  if (!quem) return null;
+                  const sim = !!p.detalhe?.afastamentoSim;
+                  return (
+                    <div style={{ marginTop: 8, padding: 8, border: `1px solid ${cor.line}`, borderRadius: 8 }}>
+                      <div style={S.lab}>{quem}: afastamento por mais de um plantão (ex.: atestado)?</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                        <button aria-pressed={!sim} onClick={() => setDetalhe(p.id, { afastamentoSim: false, afastamentoPlantoes: undefined })} style={S.chip(!sim, cor.ac)}>Não, só esta falta</button>
+                        <button aria-pressed={sim} onClick={() => setDetalhe(p.id, { afastamentoSim: true })} style={S.chip(sim, "#dc2626")}>Sim, afastado</button>
+                        {sim && <input type="text" inputMode="numeric" aria-label={`Quantos plantões de afastamento de ${quem}`} placeholder="Qtd. de plantões" value={p.detalhe?.afastamentoPlantoes ?? ""} onChange={(e) => setDetalhe(p.id, { afastamentoPlantoes: e.target.value.replace(/\D/g, "").slice(0, 2) })} style={{ ...S.in, width: 130 }} />}
+                      </div>
+                      {sim && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>{`Informe de 2 a ${MAX_PLANTOES_AFASTAMENTO} plantões. Fica na ficha, no texto do WhatsApp e serve de prévia do retorno.`}</div>}
+                    </div>
+                  );
+                })()}
                 {p.situacao !== "presente" && (
                   <input aria-label={`Observação do posto ${p.rotulo}`} placeholder="Observação (opcional, sem motivo de saúde)" value={p.obs || ""} onChange={(e) => setPosto(p.id, { obs: e.target.value })} style={{ ...S.in, marginTop: 8 }} />
                 )}
