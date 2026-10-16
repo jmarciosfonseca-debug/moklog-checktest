@@ -41,6 +41,12 @@ function calcDuracao(entrada, saida) {
   } catch { return null; }
 }
 
+// Duração do registro: usa data+hora dos marcos quando existem (registros novos); antigos seguem como antes.
+function duracaoDe(r) {
+  if (r && r.marcos && r.marcos.entradaPatio && r.marcos.saidaPatio) return textoDuracao(minutosEntre(r.marcos.entradaPatio, r.marcos.saidaPatio));
+  return calcDuracao(r && r.entradaPatio, r && r.saidaPatio);
+}
+
 async function loadRegistros(projectId) {
   try {
     const snap = await getDoc(doc(db,"acesso",projectId));
@@ -60,7 +66,7 @@ async function saveRegistros(projectId, registros) {
 
 // ── Gerar PDF de um único registro
 function gerarPDFRegistro(r, projectId) {
-  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const dur = duracaoDe(r);
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -121,7 +127,7 @@ function gerarPDFRegistro(r, projectId) {
 function gerarPDFConsolidado(lista, projectId) {
   const sorted = [...lista].sort((a,b)=>a.data.localeCompare(b.data));
   const rows = sorted.map((r,i) => {
-    const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+    const dur = duracaoDe(r);
     return `<tr style="background:${i%2===0?"#f8fafc":"#ffffff"}">
       <td>${fmtDate(r.data)}</td>
       <td>${r.transportadora||"--"}</td>
@@ -188,7 +194,7 @@ function gerarPDFConsolidado(lista, projectId) {
 
 // ── WhatsApp do registro
 function enviarWhatsApp(r, projectId) {
-  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const dur = duracaoDe(r);
   const msg = encodeURIComponent(
     `*🚛 Registro de Acesso — ${projectId}*\n` +
     `📅 Data: ${fmtDate(r.data)}\n` +
@@ -209,7 +215,7 @@ function enviarWhatsApp(r, projectId) {
 
 // ── Tela VER registro individual
 function ViewRegistro({ r, onBack, onExcluir, dark, S }) {
-  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const dur = duracaoDe(r);
   const noPatioAgora = r.entradaPatio && !r.saidaPatio;
 
   return (
@@ -335,8 +341,11 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
       alert("Informe pelo menos Transportadora, Placa ou Motorista");
       return;
     }
+    const am = analisarMarcos(form.data, form);
+    if (am.invalidos.length) { alert("Horário inválido. Confira os campos de horário."); return; }
+    if (am.viradas.length && !window.confirm(perguntaVirada(am.viradas))) return;   // líder corrige o horário
     setSaving(true);
-    const novoRegistro = { ...form, registradoEm: new Date().toISOString() };
+    const novoRegistro = { ...form, marcos: am.marcos, viradaDeDia: am.viradas.length > 0, registradoEm: new Date().toISOString() };
     const newList = [novoRegistro, ...registros];
     setRegistros(newList);
     await saveRegistros(projectId, newList);
@@ -479,7 +488,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
             {form.entradaPatio && form.saidaPatio && (
               <div style={{ marginTop:10, background:"#001a2e", border:"1px solid #0ea5e922", borderRadius:8, padding:"8px 12px" }}>
                 <span style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}>
-                  <Ico n="ampulheta"/> Duração: {calcDuracao(form.entradaPatio, form.saidaPatio)||"--"}
+                  <Ico n="ampulheta"/> Duração: {duracaoDe({ ...form, marcos: analisarMarcos(form.data, form).marcos })||"--"}
                 </span>
               </div>
             )}
@@ -570,7 +579,7 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
 
 function RegistroCard({ r, selIds, toggleSel, onVer, dark }) {
   const isSelected = selIds.includes(r.id);
-  const dur = calcDuracao(r.entradaPatio, r.saidaPatio);
+  const dur = duracaoDe(r);
   const noPatioAgora = r.entradaPatio && !r.saidaPatio;
 
   return (
