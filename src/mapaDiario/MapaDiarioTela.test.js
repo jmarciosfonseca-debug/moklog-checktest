@@ -41,6 +41,7 @@ const obrigatorios = async () => {
   const nao = [...host.querySelectorAll("button")].find((b) => b.textContent.trim() === "Não houve");
   if (nao) await act(async () => nao.click());
 };
+beforeEach(() => { window.confirm = jest.fn(() => true); });
 beforeEach(() => { jest.useFakeTimers("modern"); jest.setSystemTime(AGORA); host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host); });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); jest.useRealTimers(); });
 const q = (sel) => host.querySelector(sel);
@@ -341,17 +342,34 @@ test("com nome escolhido o botão do posto mostra 'Presente' (verde); falta muda
   await clicar(botao("Falta"));
   expect(q('button[aria-label="Exceção do posto L1 · Vigilante Líder"]').textContent).toContain("Falta");
 });
-test("Editar mapa: depois de concluir o formulário trava; Editar libera e conclui de novo", async () => {
-  await montar();
+test("mapa enviado: formulário trava; 'Saída antecipada / substituição' grava Falta com motivo e cobertura, sem liberar km/material", async () => {
+  await montar({ lancarNaFicha: jest.fn(async () => ({ removidos: 0 })) });
   await clicar(botao("Concluir mapa"));
   expect(io.saveMapa).toHaveBeenCalledTimes(1);
   expect(q("fieldset").disabled).toBe(true);
-  expect(botao("Concluir mapa")).toBeUndefined();
-  await clicar(botao("Editar mapa"));
-  expect(q("fieldset").disabled).toBe(false);
-  await clicar(botao("Concluir mapa"));
+  expect(botao("Editar mapa")).toBeUndefined();
+  await clicar(botao("Saída antecipada / substituição"));
+  expect(q("fieldset").disabled).toBe(true);                       // km, material, resumo seguem travados
+  await clicar(botao("Confirmar saída"));
+  expect(q('[data-testid="saida-antecipada"] [role="alert"]').textContent).toContain("Escolha o colaborador que saiu");
+  const quem = q('select[aria-label="Quem saiu"]');
+  await digitar(quem, quem.options[2].value);
+  await digitar(q('select[aria-label="Motivo da saída"]'), "Mal súbito");
+  await digitar(q('input[aria-label="Horário da saída"]'), "14:30");
+  await clicar(botao("+ Quem cobre"));
+  await digitar(q('select[aria-label="Tipo de cobertura 1"]'), "ft");
+  const cob = q('select[aria-label="Quem cobre 1"]');
+  await digitar(cob, cob.options[1].value);
+  await clicar(botao("Confirmar saída"));
   expect(io.saveMapa).toHaveBeenCalledTimes(2);
-  expect(q("fieldset").disabled).toBe(true);
+  const gravado = salvos[1];
+  const saiu = gravado.postos.find((p) => p.saida);
+  expect(saiu.saida).toMatchObject({ motivo: "Mal súbito", hora: "14:30" });
+  expect(saiu.saida.coberturas[0]).toMatchObject({ tipo: "ft", de: "14:30" });
+  expect(gravado.alteracoes).toHaveLength(1);
+  expect(gravado.km).toBeUndefined();
+  expect(host.textContent).toContain("SAÍDA ANTECIPADA");        // no texto do WhatsApp
+  expect(io.lancarNaFicha).toHaveBeenCalledTimes(2);
 });
 test("12x36: pessoa de fora da equipe → pergunta 'É FT?'; FT sozinho já escolhe quem faltou da equipe", async () => {
   await montar({ loadUltimoMapa: jest.fn(async () => null), loadColaboradores: jest.fn(async () => colabsEq) });
@@ -381,7 +399,7 @@ test("mapa enviado que perdeu um posto fixo: abre já em edição com o posto de
   expect(host.textContent).toContain("enviado sem o posto fixo (L1 · Vigilante Líder)");
   expect(io.saveMapa).not.toHaveBeenCalled(); // nada gravado até concluir
 });
-test("mapa enviado completo continua travado até 'Editar mapa'", async () => {
+test("mapa enviado completo continua travado (só a saída antecipada abre)", async () => {
   await montar();
   await clicar(botao("Concluir mapa"));
   expect(q("fieldset").disabled).toBe(true);
@@ -427,17 +445,26 @@ test("o mapa que vai para o Firestore não leva undefined (falta/FT/atraso marca
   expect(io.saveMapa).toHaveBeenCalledTimes(1);
   expect(achaUndefT(salvos[0])).toEqual([]);
 });
-test("editando um mapa enviado: o WhatsApp some até concluir; se não gravar, continua escondido e o erro aparece", async () => {
+test("saída antecipada: se o servidor não confirmar, o aviso aparece e o reenvio é possível", async () => {
   await montar();
   await clicar(botao("Concluir mapa"));
-  expect(host.textContent).toContain("Abrir WhatsApp");
-  await clicar(botao("Editar mapa"));
-  expect(host.textContent).not.toContain("Abrir WhatsApp");
-  expect(q('pre[aria-label="Texto do mapa"]')).toBeNull();
+  await clicar(botao("Saída antecipada / substituição"));
+  const quem = q('select[aria-label="Quem saiu"]');
+  await digitar(quem, quem.options[1].value);
+  await digitar(q('select[aria-label="Motivo da saída"]'), "Necessidade de saída antecipada");
   io.saveMapa.mockImplementationOnce(async () => { throw new Error("falhou"); });
-  await clicar(botao("Concluir mapa"));
+  await clicar(botao("Confirmar saída"));
   expect(q('[role="alert"]').textContent).toContain("SEM CONFIRMAÇÃO DO SERVIDOR: falhou");
-  expect(host.textContent).not.toContain("Abrir WhatsApp");
-  await clicar(botao("Concluir mapa"));
-  expect(host.textContent).toContain("Abrir WhatsApp"); // gravou: libera
+});
+test("líder corrige a quantidade de um equipamento dentro do mapa e o cadastro é gravado", async () => {
+  const corrigir = jest.fn(async () => ({ armamento: [{ id: "a1", identificacao: "Arma 01", calibre: ".38", nSerie: "123", status: "ok" }], municao: [{ id: "m1", identificacao: "Munição .38", qtd: 30, status: "ok" }] }));
+  await montar({ corrigirItemEquipamento: corrigir });
+  await clicar(q('button[aria-label="Conferir material"]'));
+  await clicar(q('button[aria-label="Corrigir cadastro: Munição .38"]'));
+  await digitar(q('input[aria-label="Quantidade no cadastro: Munição .38"]'), "30.5");   // só dígitos: vira 305
+  await digitar(q('input[aria-label="Quantidade no cadastro: Munição .38"]'), "30");
+  await clicar(botao("Salvar no cadastro"));
+  expect(corrigir).toHaveBeenCalledWith("P311B", "municao:m1", { identificacao: "Munição .38", qtd: 30 });
+  expect(host.textContent).toContain("Cadastro de Equipamentos atualizado");
+  expect(host.textContent).toContain("30 un.");
 });

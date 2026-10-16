@@ -8,7 +8,8 @@ import { diasEntre } from "./regras";
 import { contarOcorrencias } from "./painel";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
-import { semUndefined, corrigirRondaNosRotulos } from "./modelo";
+import { semUndefined, corrigirRondaNosRotulos, ehMoto, kmInteiro } from "./modelo";
+import { gravarSecaoEquipamentos } from "../equipamentosStore";
 
 const db = () => {
   const app = getApps()[0];
@@ -47,6 +48,16 @@ export async function loadUltimoMapa(pid, turno, antesDe, { gapPar = false } = {
   const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(14)));
   const lista = snap.docs.map((d) => d.data()).filter((m) => m.turno === turno && m.status === "enviado" && m.data < antesDe && (!gapPar || Math.abs(diasEntre(m.data, antesDe)) % 2 === 0));
   return corrigirRondaNosRotulos(lista[0] || null);
+}
+
+// Último plantão ENVIADO do projeto, de qualquer turno/equipe, anterior a este (data + turno; D antes de N).
+// Serve só para o km anterior dos veículos — a moto é a mesma para todo mundo.
+export async function loadUltimoPlantao(pid, data, turno) {
+  const snap = await getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(14)));
+  const ord = (m) => `${m.data}${m.turno === "N" ? "1" : "0"}`;
+  const alvo = `${data}${turno === "N" ? "1" : "0"}`;
+  const lista = snap.docs.map((d) => d.data()).filter((m) => m.status === "enviado" && ord(m) < alvo).sort((a, b) => ord(b).localeCompare(ord(a)));
+  return lista[0] || null;
 }
 
 // Consolidado (gerencial): mapas CONCLUÍDOS de vários projetos num período [de, ate] (datas ISO).
@@ -147,4 +158,43 @@ export async function lancarNaFicha(mapa) {
   const faltando = lancamentosDoMapa(mapa).filter((l) => colabs.some((c) => c.id === l.colabId) && !((colabs.find((c) => c.id === l.colabId) || {}).historico || []).some((h) => h && h.id === l.id));
   if (faltando.length) throw new Error("a gravação não conferiu na ficha");
   return { ...r, conferido: true };
+}
+
+// ── Equipamentos pelo mapa ───────────────────────────────────────────────────
+// Sempre do servidor: a base da gravação (before) tem que ser o cadastro de verdade.
+export async function loadEquipamentosFresco(pid) {
+  const ref = doc(db(), "equipamentos", pid);
+  let snap;
+  try { snap = await getDocFromServer(ref); } catch (e) { snap = await getDoc(ref); }
+  return snap.exists() ? snap.data() : null;
+}
+
+// O líder corrige no mapa o cadastro de um item (identificação e/ou quantidade). id = "categoria:idDoItem".
+export async function corrigirItemEquipamento(pid, itemId, { identificacao, qtd }) {
+  const [cat, ...resto] = String(itemId).split(":");
+  const idItem = resto.join(":");
+  const eq = (await loadEquipamentosFresco(pid)) || {};
+  const lista = Array.isArray(eq[cat]) ? eq[cat] : [];
+  const alvo = lista.find((x, i) => String(x && x.id != null ? x.id : i) === idItem);
+  if (!alvo) throw new Error("Este item não está mais no cadastro. Feche e abra o mapa de novo.");
+  const novo = { ...alvo };
+  if (identificacao != null) novo.identificacao = String(identificacao).trim();
+  if (qtd != null) novo.qtd = Number(qtd);
+  const depois = lista.map((x) => (x === alvo ? novo : x));
+  await gravarSecaoEquipamentos(pid, cat, eq, depois);
+  return loadEquipamentosFresco(pid);
+}
+
+// Ao enviar o mapa: o km da Moto no cadastro acompanha o odômetro (só se for maior).
+export async function atualizarKmMotoNoCadastro(pid, mapa) {
+  const v = (mapa.veiculos || []).find(ehMoto);
+  const km = v ? kmInteiro(v.kmAtual) : null;
+  if (km == null) return { atualizado: false };
+  const eq = (await loadEquipamentosFresco(pid)) || {};
+  const moto = eq.moto;
+  if (!moto || typeof moto !== "object") return { atualizado: false };
+  const atual = kmInteiro(moto.km);
+  if (atual != null && km <= atual) return { atualizado: false };
+  await gravarSecaoEquipamentos(pid, "moto", eq, { ...moto, km });
+  return { atualizado: true, km };
 }
