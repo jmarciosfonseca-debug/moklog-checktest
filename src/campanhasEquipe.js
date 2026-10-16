@@ -25,3 +25,29 @@ export function totalCampanha(qtd, centavos) {
   const total = qtd * centavos;
   return Number.isSafeInteger(total) ? total / 100 : null;
 }
+
+// ── Itens extras (gerencial): além dos colaboradores marcados pela equipe, o gerencial pode acrescentar
+// itens avulsos (ex.: "modelo XY para a administração") com quantidade, valor unitário, observação e foto de catálogo.
+export const MAX_EXTRAS = 30;
+export const novoIdExtra = () => `x${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+export function extraValido(x) {
+  return !!x && typeof x === 'object' && typeof x.id === 'string' && /^[-\w]{1,40}$/.test(x.id)
+    && typeof x.descricao === 'string' && x.descricao.trim().length >= 1 && x.descricao.length <= 120
+    && Number.isSafeInteger(x.qtd) && x.qtd >= 1 && x.qtd <= 10000
+    && Number.isSafeInteger(x.valorCentavos) && x.valorCentavos >= 0 && x.valorCentavos <= 100000000
+    && (x.obs == null || (typeof x.obs === 'string' && x.obs.length <= 300))
+    && (x.fotoRef == null || (typeof x.fotoRef === 'string' && /^[-\w]{1,100}$/.test(x.fotoRef)));
+}
+export const totalExtra = x => totalCampanha(x?.qtd, x?.valorCentavos);
+export function totaisExtras(extras = []) {
+  const lista = Array.isArray(extras) ? extras : [];
+  const qtd = lista.reduce((s, x) => s + (Number.isSafeInteger(x?.qtd) ? x.qtd : 0), 0);
+  const valor = lista.reduce((s, x) => s + (totalExtra(x) ?? 0), 0);
+  return { qtd, valor: Math.round(valor * 100) / 100 };
+}
+// Resultado do lote: colaboradores (qtd × valor unitário da campanha) + extras.
+export function totalGeralCampanha(qtdColabs, centavosUnit, extras = []) {
+  const base = centavosUnit == null ? 0 : (totalCampanha(qtdColabs, centavosUnit) ?? 0);
+  const ex = totaisExtras(extras);
+  return { qtd: qtdColabs + ex.qtd, valor: Math.round((base + ex.valor) * 100) / 100, baseCalculada: centavosUnit != null };
+}
