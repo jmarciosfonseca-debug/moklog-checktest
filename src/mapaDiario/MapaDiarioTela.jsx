@@ -5,7 +5,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { isDemo } from "../session";
@@ -485,7 +485,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
             {mapa.veiculos.map((v, i) => (
               <div key={v.id || i} style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
                 <div style={{ flex: 1 }}><div style={S.lab}>{v.rotulo || "Veículo"} · anterior {v.kmAnterior ?? "—"}{ehMoto(v) && projetoComMoto(pid) ? " · obrigatório" : ""}</div>
-                  <input type="number" inputMode="decimal" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual" value={v.kmAtual ?? ""} onChange={(e) => alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: e.target.value } : x)) }))} style={S.in} /></div>
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual (só números)" value={v.kmAtual ?? ""} onChange={(e) => { const dig = soDigitos(e.target.value); alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: dig } : x)) })); }} style={{ ...S.in, ...(kmRodado(v) != null && kmRodado(v) < 0 ? { borderColor: "#dc2626" } : {}) }} />
+                  {kmRodado(v) != null && kmRodado(v) < 0 && <div role="alert" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>Menor que o anterior ({v.kmAnterior}). Confira o odômetro e digite só números — o mapa não conclui assim.</div>}</div>
                 <div style={{ fontSize: 12, color: cor.txt2, minWidth: 70 }}>{kmRodado(v) != null ? `rodou ${kmRodado(v)} km` : ""}</div>
               </div>
             ))}

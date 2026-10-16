@@ -1,4 +1,4 @@
-import { ehMoto, garantirMoto, semUndefined, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo , corrigirRondaNosRotulos } from "./modelo";
+import { ehMoto, garantirMoto, semUndefined, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo , corrigirRondaNosRotulos, soDigitos } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 import { postoVazio as postoVazioT } from "./modelo";
@@ -402,4 +402,14 @@ test("corrigirRondaNosRotulos: mapa antigo gravado com 'Honda' sai como 'Ronda' 
   // sem "Honda" no rótulo, devolve o MESMO objeto (nada de regravação à toa)
   expect(corrigirRondaNosRotulos(ok)).toBe(ok);
   expect(corrigirRondaNosRotulos(null)).toBeNull();
+});
+
+test("odômetro: ponto de milhar vale milhar (71.330 = 71330) e só dígitos são aceitos", () => {
+  expect(kmRodado({ kmAnterior: 71285, kmAtual: "71.330" })).toBe(45);
+  expect(soDigitos("71.330 km")).toBe("71330");
+  expect(soDigitos("71,3")).toBe("713");
+  const m = { ...preencher(mapa(), ["A", "B", "C"]), veiculos: [{ rotulo: "Moto", kmAnterior: 71500, kmAtual: "71200" }, { rotulo: "Veículo 2", kmAnterior: 900, kmAtual: "800" }] };
+  const erros = validarParaConcluir(m);
+  expect(erros).toContain("Moto: km atual menor que o anterior");
+  expect(erros).toContain("Veículo 2: km atual menor que o anterior");
 });
