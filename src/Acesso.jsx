@@ -6,6 +6,7 @@ import { avisarFalhaServidor } from "./avisoSalvar";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
+import { analisarMarcos, minutosEntre, textoDuracao, perguntaVirada } from "./acessoHorarios";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",

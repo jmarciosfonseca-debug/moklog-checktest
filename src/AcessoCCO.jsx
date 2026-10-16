@@ -25,6 +25,7 @@ const fbApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
 import { getAccess, grantSession } from "./session";
+import { padronizarNome, listaSugestoes } from "./nomes";
 
 
 
