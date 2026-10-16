@@ -15,7 +15,8 @@ export function campanhaDisponivel(agora, configs = {}) {
   return { ...c, disponivel: !!c.tipo && configs[chaveCampanha(c.tipo, c.ano)]?.oculta !== true };
 }
 export function valorCampanhaCentavos(texto) {
-  const s = String(texto ?? '').trim();
+  let s = String(texto ?? '').trim();
+  if (/^\d+\.\d{2}$/.test(s)) s = s.replace('.', ',');   // teclado numérico: 159.90 = 159,90
   if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(s)) return null;
   const n = Math.round(Number(s.replace(/\./g, '').replace(',', '.')) * 100);
   return Number.isSafeInteger(n) && n >= 0 && n <= 100000000 ? n : null;
@@ -50,4 +51,20 @@ export function totalGeralCampanha(qtdColabs, centavosUnit, extras = []) {
   const base = centavosUnit == null ? 0 : (totalCampanha(qtdColabs, centavosUnit) ?? 0);
   const ex = totaisExtras(extras);
   return { qtd: qtdColabs + ex.qtd, valor: Math.round((base + ex.valor) * 100) / 100, baseCalculada: centavosUnit != null };
+}
+
+// Resumo por valor unitário: itens com o MESMO valor somam numa linha; valores diferentes viram cálculos separados.
+export function resumoPorValor(qtdColabs, centavosUnit, extras = []) {
+  const mapa = new Map();
+  const add = (c, q) => { if (c == null || !q) return; mapa.set(c, (mapa.get(c) || 0) + q); };
+  add(centavosUnit, qtdColabs);
+  (Array.isArray(extras) ? extras : []).forEach(x => add(x.valorCentavos, x.qtd));
+  return [...mapa.entries()].sort((a, b) => b[0] - a[0]).map(([centavos, qtd]) => ({ centavos, qtd, total: totalCampanha(qtd, centavos) }));
+}
+export function principalValido(p) {
+  return p == null || (typeof p === 'object' && !Array.isArray(p)
+    && Object.keys(p).every(k => ['descricao', 'obs', 'fotoRef'].includes(k))
+    && (p.descricao == null || (typeof p.descricao === 'string' && p.descricao.length <= 120))
+    && (p.obs == null || (typeof p.obs === 'string' && p.obs.length <= 300))
+    && (p.fotoRef == null || (typeof p.fotoRef === 'string' && /^[-\w]{1,100}$/.test(p.fotoRef))));
 }

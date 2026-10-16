@@ -15,7 +15,7 @@
 import { getTheme } from "./generatePDF";
 import { solicitacoesPorAprovacao, situacaoSolicitacao } from "./equipeAprovacao";
 import { fmtBRL } from './equipeAprovacao';
-import { CAMPANHAS, totalCampanha, totaisExtras, totalGeralCampanha, totalExtra } from './campanhasEquipe';
+import { CAMPANHAS, totalCampanha, totaisExtras, totalGeralCampanha, totalExtra, resumoPorValor } from './campanhasEquipe';
 import { LOGO_MOKED_30 } from './fvLogo';
 
 const SLA_ALERTA = 5; // dias em aberto para alertar (espelha Equipe.jsx)
@@ -364,6 +364,11 @@ export function gerarPDFCestaNatal(project, lista, ano, opcoes = {}) {
   const fotos = opcoes.fotos || {};
   const totExtras = totaisExtras(extras);
   const geral = totalGeralCampanha(ordenada.length, centavos, extras);
+  const principal = opcoes.principal || {};
+  const fotoOk = r => r && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(fotos[r] || '');
+  const blocoPrincipal = (principal.descricao || principal.obs || fotoOk(principal.fotoRef)) ? `<div style="break-inside:avoid;margin:8px 0;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;"><b>Modelo (equipe):</b> ${esc(principal.descricao || '—')}${principal.obs ? `<br><small>${esc(principal.obs)}</small>` : ''}${fotoOk(principal.fotoRef) ? `<br><img src="${fotos[principal.fotoRef]}" style="max-width:150px;max-height:110px;margin-top:4px;border-radius:4px;">` : ''}</div>` : '';
+  const resumo = resumoPorValor(ordenada.length, centavos, extras);
+  const blocoResumo = extras.length ? `<div style="break-inside:avoid;margin-top:8px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;"><b>Resumo por valor</b><br>${resumo.map(l => `${l.qtd} unidade(s) × ${fmtBRL(l.centavos / 100)} = <b>${fmtBRL(l.total)}</b>`).join('<br>')}</div>` : '';
   const tabelaExtras = extras.length ? `
   <div style="margin-top:14px;break-inside:avoid;"><b>Itens adicionais (gerencial)</b>
     <table class="tbl"><thead><tr><th>Item</th><th>Qtd.</th><th>Valor unit.</th><th>Total</th></tr></thead><tbody>${extras.map(x => `<tr>
@@ -372,11 +377,12 @@ export function gerarPDFCestaNatal(project, lista, ano, opcoes = {}) {
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${fmtBRL(x.valorCentavos / 100)}</td>
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;">${fmtBRL(totalExtra(x))}</td></tr>`).join('')}</tbody></table>
     <div style="margin-top:4px;"><b>Subtotal adicionais:</b> ${totExtras.qtd} unidade(s) · ${fmtBRL(totExtras.valor)}</div></div>
+  ${blocoResumo}
   <div style="break-inside:avoid;margin-top:8px;padding:10px 12px;border:2px solid #334155;border-radius:6px;font-size:13px;"><b>TOTAL GERAL:</b> ${geral.qtd} unidade(s) · ${geral.baseCalculada || !ordenada.length ? fmtBRL(geral.valor) : 'Não calculado (informe o valor unitário)'}</div>` : '';
 
   const corpo = (ordenada.length || extras.length) ? `
   <style>@page{size:A4;} .campanha-lista tr{break-inside:avoid;} .campanha-lista thead{display:table-header-group;} .campanha-lista td{overflow-wrap:anywhere;} .campanha-lista td:nth-child(4),.campanha-lista th{white-space:nowrap;}</style>
-  ${ordenada.length ? `<div class="campanha-lista">
+  ${ordenada.length ? `${blocoPrincipal}<div class="campanha-lista">
     <table class="tbl">
       <thead><tr><th>#</th><th>Colaborador</th><th>Cargo</th><th>Turno</th><th>Unidade</th><th>Qtd.</th></tr></thead>
       <tbody>${linhas}</tbody>

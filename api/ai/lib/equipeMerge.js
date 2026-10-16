@@ -87,6 +87,12 @@ function extrasOk(a){
   &&(x.obs==null||(typeof x.obs==='string'&&x.obs.length<=300))
   &&(x.fotoRef==null||(typeof x.fotoRef==='string'&&/^[-\w]{1,100}$/.test(x.fotoRef))));
 }
+function principalOk(p){
+ return object(p)&&Object.keys(p).every(k=>['descricao','obs','fotoRef'].includes(k))
+  &&(p.descricao==null||(typeof p.descricao==='string'&&p.descricao.length<=120))
+  &&(p.obs==null||(typeof p.obs==='string'&&p.obs.length<=300))
+  &&(p.fotoRef==null||(typeof p.fotoRef==='string'&&/^[-\w]{1,100}$/.test(p.fotoRef)));
+}
 function validateLeader(before,after){
  for(const field of ['fv','campanhasSazonais','historicoDesde','treinamentosEsperados'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}
  const old=[...(before.colaboradores||[]),...(before.desligados||[])].flatMap(c=>(c.uniforme?.solicitacoes||[]).map(s=>({c:c.id,s})));
@@ -132,7 +138,7 @@ async function save(db,pid,before,after,identity){
   const result=merge(before,after,current);
   if(!equal(current.campanhasSazonais,result.campanhasSazonais)){
    const configs=result.campanhasSazonais;
-   if(!object(configs)||Object.entries(configs).some(([k,v])=>! /^(natal|pascoa)_20\d{2}$/.test(k)||!object(v)||Object.keys(v).some(f=>!['oculta','valorCentavos','extras'].includes(f))||(v.extras!==undefined&&!extrasOk(v.extras))||(v.oculta!==undefined&&typeof v.oculta!=='boolean')||(v.valorCentavos!==undefined&&(!Number.isSafeInteger(v.valorCentavos)||v.valorCentavos<0||v.valorCentavos>100000000))))throw Object.assign(Error('Configuração de campanha inválida.'),{status:400});
+   if(!object(configs)||Object.entries(configs).some(([k,v])=>! /^(natal|pascoa)_20\d{2}$/.test(k)||!object(v)||Object.keys(v).some(f=>!['oculta','valorCentavos','extras','principal'].includes(f))||(v.extras!==undefined&&!extrasOk(v.extras))||(v.principal!==undefined&&!principalOk(v.principal))||(v.oculta!==undefined&&typeof v.oculta!=='boolean')||(v.valorCentavos!==undefined&&(!Number.isSafeInteger(v.valorCentavos)||v.valorCentavos<0||v.valorCentavos>100000000))))throw Object.assign(Error('Configuração de campanha inválida.'),{status:400});
   }
   protegerChecagem(current,result,identity);
   validateQuantities(current,result);
