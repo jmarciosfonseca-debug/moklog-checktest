@@ -413,3 +413,37 @@ test("odômetro: ponto de milhar vale milhar (71.330 = 71330) e só dígitos sã
   expect(erros).toContain("Moto: km atual menor que o anterior");
   expect(erros).toContain("Veículo 2: km atual menor que o anterior");
 });
+
+// ---- A1: km anterior vem do ÚLTIMO plantão do projeto, qualquer turno/equipe ----
+import { herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, kmInteiro, registrarSaidaAntecipada, rotuloSaida } from "./modelo";
+test("sequência 14/10 D → 14/10 N → 15/10 D → 15/10 N: cada plantão herda o km do anterior, qualquer turno", () => {
+  const base = (d, t) => ({ projetoId: "P311A", data: d, turno: t, veiculos: [{ id: t === "N" ? "vmv4fuzjw" : "moto", rotulo: "Moto", kmAnterior: null, kmAtual: null }] });
+  const passos = [["2026-10-14", "D", "71133", "71171"], ["2026-10-14", "N", "71171", "71241"], ["2026-10-15", "D", "71241", "71285"], ["2026-10-15", "N", "71285", "71330"]];
+  let ultimo = { veiculos: [{ id: "moto", rotulo: "Moto", kmAtual: 71133 }] };
+  passos.forEach(([d, t, ant, atual]) => {
+    let m = herdarKmDoUltimoPlantao(base(d, t), ultimo);
+    if (ant === "71133") m = herdarKmDoUltimoPlantao(base(d, t), { veiculos: [{ id: "moto", rotulo: "Moto", kmAtual: 71133 }] });
+    expect(m.veiculos).toHaveLength(1);
+    expect(m.veiculos[0]).toMatchObject({ id: "moto", kmAnterior: Number(ant) });
+    ultimo = veiculosInteiros({ ...m, veiculos: [{ ...m.veiculos[0], kmAtual: atual }] });
+  });
+  expect(ultimo.veiculos[0]).toMatchObject({ id: "moto", kmAnterior: 71285, kmAtual: 71330 });
+});
+test("km sai como inteiro; veículo 2 do plantão anterior entra pelo rótulo; limite de 300 km só avisa", () => {
+  expect(kmInteiro("71.330")).toBe(71330);
+  expect(kmInteiro("")).toBeNull();
+  const m = herdarKmDoUltimoPlantao({ projetoId: "P311A", veiculos: [{ id: "x", rotulo: "Moto", kmAnterior: null, kmAtual: "71400" }] }, { veiculos: [{ id: "moto", rotulo: "moto", kmAtual: "71.000" }, { id: "v2", rotulo: "Carro", kmAtual: 500 }] });
+  expect(m.veiculos.map((v) => [v.id, v.rotulo, v.kmAnterior])).toEqual([["moto", "Moto", 71000], ["v2", "Carro", 500]]);
+  expect(rodadoAlto(m).map((v) => v.rotulo)).toEqual(["Moto"]);  // 400 km; carro sem atual não conta
+  expect(rodadoAlto({ veiculos: [{ rotulo: "Moto", kmAnterior: 71000, kmAtual: 71400 }] })).toHaveLength(1);
+  expect(veiculosInteiros(m).veiculos[0]).toMatchObject({ kmAnterior: 71000, kmAtual: 71400 });
+});
+test("saída antecipada: valida, guarda histórico da alteração e descreve a cobertura", () => {
+  const mp = { id: "P1_2026-10-15_D", projetoId: "P311A", data: "2026-10-15", turno: "D", postos: [{ id: "p1", rotulo: "Vigilante Tático", pessoaId: "c1", pessoaNome: "Ana", situacao: "presente", detalhe: {} }] };
+  expect(registrarSaidaAntecipada(mp, { postoId: "", motivo: "", hora: "" }).erros.length).toBeGreaterThan(2);
+  const r = registrarSaidaAntecipada(mp, { postoId: "p1", motivo: "Outro", outro: "Consulta urgente", hora: "14:30", coberturas: [{ tipo: "adiantando", pessoaId: "c2", pessoaNome: "Beto", de: "14:30", ate: "18:00" }], agora: new Date("2026-10-15T17:40:00Z"), por: "Líder" });
+  expect(r.erros).toEqual([]);
+  expect(r.mapa.alteracoes[0]).toMatchObject({ tipo: "saida-antecipada", postoId: "p1", estadoAnterior: { pessoaNome: "Ana", situacao: "presente" } });
+  expect(rotuloSaida(r.mapa.postos[0])).toBe("Saída antecipada às 14:30 — Consulta urgente — cobertura: Beto das 14:30 às 18:00");
+  expect(registrarSaidaAntecipada(mp, { postoId: "p1", motivo: "Mal súbito", hora: "14:30", coberturas: [{ tipo: "ft", pessoaNome: "Beto" }] }).erros.join()).toContain("horário de entrada");
+});

@@ -2,7 +2,7 @@
 // Títulos em negrito e emoji por assunto (início, efetivo, destaque de falta/FT e informações adicionais abaixo). P260B e P260C saem com cabeçalho "P260-B"/"P260-C"
 // (o P260B envia ao grupo do P260A).
 import { rotuloDia } from "./regras";
-import { ROTULO_SITUACAO, kmRodado } from "./modelo";
+import { ROTULO_SITUACAO, kmRodado, rotuloSaida } from "./modelo";
 
 export const cabecalhoProjeto = (pid) => (/^P260[BC]$/.test(pid) ? `P260-${pid.slice(-1)}` : pid);
 
@@ -63,10 +63,10 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
     `📅 *Data:* ${rotuloDia(mapa.data)}, ${dataBR(mapa.data)}`,
   ]);
   const eq = ["👥 *EFETIVO*"];
-  (mapa.postos || []).forEach((p) => { eq.push(linhaPosto(p)); if (p.obs && p.obs.trim()) eq.push(`      ↳ ${p.obs.trim()}`); });
+  (mapa.postos || []).forEach((p) => { eq.push(linhaPosto(p)); if (p.saida) eq.push(`      ↳ 🚪 ${rotuloSaida(p)}`); if (p.obs && p.obs.trim()) eq.push(`      ↳ ${p.obs.trim()}`); });
   blocos.push(eq);
-  const exc = (mapa.postos || []).filter((p) => p.situacao !== "presente" && linhaOcorrencia(p, mapa.postos));
-  blocos.push(["🚨 *FALTAS / ATRASOS / FT / TROCAS*", ...(exc.length ? exc.map((p) => linhaOcorrencia(p, mapa.postos)) : ["✅ Sem ocorrências"])]);
+  const exc = (mapa.postos || []).filter((p) => (p.situacao !== "presente" && linhaOcorrencia(p, mapa.postos)) || p.saida);
+  blocos.push(["🚨 *FALTAS / ATRASOS / FT / TROCAS*", ...(exc.length ? exc.flatMap((p) => [linhaOcorrencia(p, mapa.postos), p.saida ? `🚪 *SAÍDA ANTECIPADA* — ${nomeDe(p)} (${p.rotulo}${horarioDe(p)}): ${rotuloSaida(p)}` : ""].filter(Boolean)) : ["✅ Sem ocorrências"])]);
   const mat = mapa.material || { semAlteracao: true };
   const mexc = (mat.excecoes || []);
   const m = ["🧰 *MATERIAL (armamento, munição, rádios)*"];

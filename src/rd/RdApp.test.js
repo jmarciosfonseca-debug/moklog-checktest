@@ -1,6 +1,12 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import RdApp from "./RdApp";
+
+// O RD usa "hoje": fixa o relógio em 15/10/2026 para o teste não depender do dia em que roda.
+const RealDate = Date;
+const AGORA_FIXA = "2026-10-15T20:00:00-03:00";
+beforeAll(() => { global.Date = class extends RealDate { constructor(...a) { if (a.length) super(...a); else super(AGORA_FIXA); } static now() { return new RealDate(AGORA_FIXA).getTime(); } }; });
+afterAll(() => { global.Date = RealDate; });
 import { htmlRd } from "./rdPdf";
 
 jest.mock("./rdStore", () => ({ criarRdStore: () => mockStore }));

@@ -126,7 +126,7 @@ export function itensDeEquipamento(data, projetoId = null, turno = null) {
         if (!it || typeof it !== "object") return;
         const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
         const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
-        cad.push({ id: `${cat}:${it.id || i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok" });
+        cad.push({ id: `${cat}:${it.id != null ? it.id : i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok", identificacao: it.identificacao || "", qtd: it.qtd ?? null });
       });
     });
   }
@@ -377,4 +377,71 @@ export function completarIdsCobertura(mapa, colabs = []) {
     return { ...x, detalhe: { ...d, deQuemId: achados[0].id } };
   });
   return mudou ? { ...mapa, postos } : mapa;
+}
+
+// ── Quilometragem (A1) ───────────────────────────────────────────────────────
+// Inteiro ou null. "71.330", "71330", 71330 → 71330; vazio/inválido → null.
+export const kmInteiro = (v) => { const n = num(v); return n == null || Number.isNaN(n) ? null : Math.round(n); };
+
+// O km anterior vem do ÚLTIMO plantão enviado do projeto (qualquer turno/equipe) e não do último do mesmo turno.
+// O veículo casa por id, depois por rótulo (Moto sempre vira id "moto"). Veículo que existia no plantão
+// anterior e não está neste mapa entra com o km anterior dele. kmAtual do mapa em edição nunca é tocado.
+export function herdarKmDoUltimoPlantao(mapa, ultimo) {
+  const lista = (ultimo && Array.isArray(ultimo.veiculos) ? ultimo.veiculos : []).filter(Boolean);
+  const norm = (r) => String(r || "").trim().toLowerCase();
+  const idEstavel = (v) => (ehMoto(v) ? "moto" : v.id);
+  let veiculos = (mapa.veiculos || []).map((v) => ({ ...v, id: idEstavel(v) }));
+  lista.forEach((u) => {
+    const km = kmInteiro(u.kmAtual ?? u.kmAnterior);
+    const uid = idEstavel(u);
+    let alvo = veiculos.findIndex((v) => v.id === uid || (norm(v.rotulo) && norm(v.rotulo) === norm(u.rotulo)));
+    if (alvo < 0) { veiculos = [...veiculos, { id: uid, rotulo: u.rotulo, kmAnterior: null, kmAtual: null }]; alvo = veiculos.length - 1; }
+    if (km != null) veiculos = veiculos.map((v, i) => (i === alvo ? { ...v, kmAnterior: km } : v));
+  });
+  return { ...mapa, veiculos };
+}
+
+// Na hora de enviar: km como número inteiro e id estável do veículo.
+export function veiculosInteiros(mapa) {
+  return { ...mapa, veiculos: (mapa.veiculos || []).map((v) => ({ ...v, id: ehMoto(v) ? "moto" : v.id, kmAnterior: kmInteiro(v.kmAnterior), kmAtual: kmInteiro(v.kmAtual) })) };
+}
+
+export const LIMITE_KM_PLANTAO = 300;
+// Veículos que rodaram mais que o limite num único plantão (só para confirmar, nunca bloqueia).
+export const rodadoAlto = (mapa, limite = LIMITE_KM_PLANTAO) => (mapa.veiculos || []).filter((v) => { const r = kmRodado(v); return r != null && r > limite; });
+
+// ── Saída antecipada / substituição (A2) ─────────────────────────────────────
+// Mapa já enviado: material, km, supervisão e resumo ficam travados; só dá para apontar que alguém saiu
+// no meio do plantão e quem entrou no lugar. Quem saiu vira Falta na ficha; quem cobre NÃO recebe FT.
+export const MOTIVOS_SAIDA = ["Mal súbito", "Necessidade de saída antecipada", "Outro"];
+export const TIPOS_COBERTURA = [["base", "Colaborador da base"], ["ft", "Colega em FT"], ["adiantando", "Colega adiantando o plantão"]];
+const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function rotuloSaida(p) {
+  const sd = p && p.saida;
+  if (!sd) return "";
+  const motivo = sd.motivo === "Outro" ? (sd.outro || "Outro") : sd.motivo;
+  const cob = (sd.coberturas || []).map((c) => `${c.pessoaNome}${c.tipo === "base" ? " (Base)" : c.tipo === "ft" ? " (FT)" : ""} das ${c.de}${c.ate ? ` às ${c.ate}` : ""}`);
+  return `Saída antecipada às ${sd.hora} — ${motivo}${cob.length ? ` — cobertura: ${cob.join("; ")}` : " — sem cobertura informada"}`;
+}
+
+export function registrarSaidaAntecipada(mapa, { postoId, motivo, outro = "", hora, coberturas = [], agora = new Date(), por = "" }) {
+  const erros = [];
+  const posto = (mapa.postos || []).find((x) => x.id === postoId);
+  if (!posto || !posto.pessoaId) erros.push("Escolha o colaborador que saiu (precisa estar no cadastro da Equipe).");
+  if (!MOTIVOS_SAIDA.includes(motivo)) erros.push("Escolha o motivo da saída.");
+  if (motivo === "Outro" && !String(outro).trim()) erros.push('Descreva o motivo em "Outro".');
+  if (!HORA.test(String(hora || ""))) erros.push("Informe o horário da saída (HH:MM).");
+  const cobs = (coberturas || []).filter((c) => c && (c.pessoaId || String(c.pessoaNome || "").trim()));
+  cobs.forEach((c) => {
+    if (!TIPOS_COBERTURA.some(([k]) => k === c.tipo)) erros.push("Informe se quem cobre é da base, FT ou adiantando o plantão.");
+    if (!HORA.test(String(c.de || ""))) erros.push(`Informe o horário de entrada de ${c.pessoaNome || "quem cobre"}.`);
+    if (c.ate && !HORA.test(String(c.ate))) erros.push(`Horário final de ${c.pessoaNome || "quem cobre"} inválido.`);
+  });
+  if (erros.length) return { mapa, erros: [...new Set(erros)] };
+  const anterior = { rotulo: posto.rotulo, pessoaId: posto.pessoaId, pessoaNome: posto.pessoaNome, situacao: posto.situacao, saida: posto.saida || null };
+  const saida = { motivo, outro: motivo === "Outro" ? String(outro).trim() : "", hora, coberturas: cobs.map((c) => ({ tipo: c.tipo, pessoaId: c.pessoaId || "", pessoaNome: String(c.pessoaNome || "").trim(), de: c.de, ate: c.ate || "" })), registradoEm: agora.toISOString() };
+  const postos = mapa.postos.map((x) => (x.id === postoId ? { ...x, saida } : x));
+  const alteracoes = [...(mapa.alteracoes || []), { em: agora.toISOString(), por, tipo: "saida-antecipada", postoId, estadoAnterior: anterior }];
+  return { mapa: { ...mapa, postos, alteracoes }, erros: [] };
 }

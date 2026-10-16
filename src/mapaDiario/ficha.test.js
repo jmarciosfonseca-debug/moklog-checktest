@@ -81,3 +81,15 @@ test("descricaoLancamentos: diz quem recebe o quê (FT e a falta de quem foi cob
   m.postos[0].pessoaNome = "Marta";
   expect(descricaoLancamentos(m).sort()).toEqual(["FT de Joao", "Falta de Marta"]);
 });
+
+test("saída antecipada: quem saiu recebe Falta com a observação; quem cobriu NÃO recebe FT; concluir de novo não duplica", () => {
+  const mapa = { id: "P311A_2026-10-15_D", projetoId: "P311A", data: "2026-10-15", turno: "D", postos: [{ id: "p1", rotulo: "Vigilante Tático", pessoaId: "c1", pessoaNome: "Ana", situacao: "presente", saida: { motivo: "Mal súbito", hora: "14:30", coberturas: [{ tipo: "ft", pessoaId: "c2", pessoaNome: "Beto", de: "14:30" }] } }, { id: "p2", rotulo: "Apoio", pessoaId: "c2", pessoaNome: "Beto", situacao: "presente" }] };
+  const l = lancamentosDoMapa(mapa);
+  expect(l).toHaveLength(1);
+  expect(l[0]).toMatchObject({ colabId: "c1", tipo: "Falta", id: "mapa:P311A_2026-10-15_D:c1:Falta" });
+  expect(l[0].detalhe).toContain("Saída antecipada — Mal súbito — saiu às 14:30 — posto Vigilante Tático");
+  const doc = { colaboradores: [{ id: "c1", historico: [] }, { id: "c2", historico: [] }] };
+  const um = aplicarNaFicha(doc, mapa);
+  const dois = aplicarNaFicha(um.after, mapa);
+  expect(dois.mudou).toBe(false);
+});

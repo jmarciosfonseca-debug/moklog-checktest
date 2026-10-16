@@ -5,7 +5,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { isDemo } from "../session";
@@ -46,6 +46,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [reenvioPendente, setReenvioPendente] = useState(0); // nº de tentativas automáticas já feitas
   const carregadoRef = useRef(false);
   const timer = useRef(null);
+  const [eqEdit, setEqEdit] = useState(null);       // correção de cadastro de equipamento pelo líder
+  const [saidaForm, setSaidaForm] = useState(null);   // saída antecipada / substituição (mapa já enviado)
+  const [saidaErros, setSaidaErros] = useState([]);
   const reenvio = useRef(null);                      // { timer, mapa } do reenvio automático
 
   const horario = horarioDoTurno(pid, turno);
@@ -70,6 +73,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           m = novoMapa({ projetoId: pid, data, turno, horario: horario ? { inicio: horario.inicio, fim: horario.fim } : null, base, agora: agoraFn() });
         }
         if (m.status !== "enviado") {
+          // Km anterior: do ÚLTIMO plantão do projeto (qualquer turno/equipe), não do último do mesmo turno.
+          if (io.loadUltimoPlantao) { const ult = await io.loadUltimoPlantao(pid, data, turno).catch(() => null); if (ult) m = herdarKmDoUltimoPlantao(m, ult); }
           const vis = await io.loadUltimaVisita(pid).catch(() => null);
           m = { ...m, supervisao: vis };
         }
@@ -153,7 +158,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     const aviso = avisoResumoSemExcecao(mapaC);
     if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
-    const final = { ...mapaC, material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
+    const altos = rodadoAlto(mapaC);
+    if (altos.length && !window.confirm(`${altos.map((v) => `${v.rotulo || "Veículo"}: ${kmRodado(v)} km`).join(" · ")} num único plantão. Confira o odômetro.\n\nEstá correto? (OK para concluir, Cancelar para corrigir)`)) return;
+    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
     await enviarComConfirmacao(final);
   }
   // Envio OFICIAL: grava e CONFIRMA no servidor antes de liberar o WhatsApp. Sem confirmação,
@@ -167,6 +174,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
       setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
       setFichaMsg(null);
       await lancarFicha(final);                       // Falta/FT/atraso → ficha (sem duplicar)
+      if (io.atualizarKmMotoNoCadastro && !isDemo()) io.atualizarKmMotoNoCadastro(pid, final).catch(() => {}); // km da moto no cadastro acompanha o mapa (só se maior)
     } catch (e) {
       setAvisos([`SEM CONFIRMAÇÃO DO SERVIDOR: ${(e && e.message) || "erro"}. O mapa ficou neste aparelho e o WhatsApp NÃO foi liberado. Mantenha esta tela aberta: vou tentar de novo sozinho a cada 20 segundos — ou toque em Concluir mapa quando o sinal voltar.`]);
       agendarReenvio(final);
@@ -217,6 +225,96 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     chip: (on, c = cor.ac) => ({ background: on ? c : "transparent", color: on ? "#111" : cor.txt2, border: `1px solid ${on ? c : cor.line}`, borderRadius: 999, padding: "6px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer", minHeight: 32 }),
     lab: { fontSize: 11, color: cor.txt2, margin: "8px 0 3px", fontWeight: 700 },
   };
+
+  // Líder corrige o cadastro do equipamento (identificação/quantidade) sem sair do mapa. Função de render, não componente.
+  const salvarCadastroItem = async () => {
+    const q = soDigitos(eqEdit.qtd);
+    const minimo = eqEdit.categoria === "municao" ? 0 : 1;
+    if (eqEdit.identificacao.trim() === "") return setEqEdit((e) => ({ ...e, erro: "Informe a identificação do item." }));
+    if (q === "" || Number(q) < minimo || Number(q) > 100000) return setEqEdit((e) => ({ ...e, erro: `Quantidade inválida (mínimo ${minimo}, só números).` }));
+    setEqEdit((e) => ({ ...e, salvando: true, erro: "" }));
+    try {
+      const eq = await io.corrigirItemEquipamento(pid, eqEdit.id, { identificacao: eqEdit.identificacao, qtd: Number(q) });
+      setItensMat(itensDeEquipamento(eq, pid, turno));
+      setEqEdit({ ...eqEdit, salvando: false, ok: true });
+      setTimeout(() => setEqEdit(null), 1500);
+    } catch (e) { setEqEdit((x) => ({ ...x, salvando: false, erro: `Não salvou: ${(e && e.message) || "erro"}. Tente de novo.` })); }
+  };
+  const renderCorrigirCadastro = (it) => {
+    if (!eqEdit || eqEdit.id !== it.id) return <button onClick={() => setEqEdit({ id: it.id, categoria: it.categoria, identificacao: it.identificacao || it.nome, qtd: it.qtd == null ? "" : String(it.qtd), erro: "" })} style={{ ...S.btn, marginTop: 6, fontSize: 11, padding: "4px 10px" }} aria-label={`Corrigir cadastro: ${it.nome}`}>✎ Corrigir cadastro</button>;
+    return (
+      <div style={{ marginTop: 6, padding: 8, border: `1px dashed ${cor.line}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <input aria-label={`Identificação: ${it.nome}`} value={eqEdit.identificacao} onChange={(e) => setEqEdit((x) => ({ ...x, identificacao: e.target.value }))} style={S.in} />
+        <input aria-label={`Quantidade no cadastro: ${it.nome}`} type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Quantidade (só números)" value={eqEdit.qtd} onChange={(e) => setEqEdit((x) => ({ ...x, qtd: soDigitos(e.target.value) }))} style={S.in} />
+        {eqEdit.erro && <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{eqEdit.erro}</div>}
+        {eqEdit.ok && <div role="status" style={{ color: "#16a34a", fontSize: 12, fontWeight: 700 }}>Cadastro de Equipamentos atualizado.</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={salvarCadastroItem} disabled={eqEdit.salvando} style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none" }}>{eqEdit.salvando ? "Salvando…" : "Salvar no cadastro"}</button>
+          <button onClick={() => setEqEdit(null)} style={S.btn}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
+
+  // Saída antecipada / substituição: função de render (não componente) para o teclado não cair a cada letra.
+  const horaAgora = () => new Date(agoraFn().getTime() - 3 * 3600000).toISOString().slice(11, 16);
+  const abrirSaida = () => { setSaidaErros([]); setSaidaForm({ postoId: "", motivo: "", outro: "", hora: horaAgora(), coberturas: [] }); };
+  const alterarSaida = (patch) => setSaidaForm((f) => ({ ...f, ...patch }));
+  const confirmarSaida = async () => {
+    const r = registrarSaidaAntecipada(mapa, { ...saidaForm, agora: agoraFn() });
+    setSaidaErros(r.erros);
+    if (r.erros.length) return;
+    setSaidaForm(null);
+    await enviarComConfirmacao({ ...r.mapa, revisoes: [...(r.mapa.revisoes || []), { em: agoraFn().toISOString(), saidaAntecipada: true }] });
+  };
+  const renderSaida = () => {
+    if (!saidaForm) return <button onClick={abrirSaida} style={{ ...S.btn, marginTop: 8 }}>Saída antecipada / substituição</button>;
+    const comPessoa = (mapa.postos || []).filter((p) => p.pessoaId);
+    const quem = comPessoa.find((p) => p.id === saidaForm.postoId);
+    return (
+      <div style={{ marginTop: 10, padding: 10, border: `1px solid ${cor.line}`, borderRadius: 10, display: "flex", flexDirection: "column", gap: 8 }} data-testid="saida-antecipada">
+        <div style={{ fontSize: 13, fontWeight: 800, color: cor.txt }}>Saída antecipada / substituição</div>
+        <label style={S.lab}>1. Quem saiu
+          <select aria-label="Quem saiu" value={saidaForm.postoId} onChange={(e) => alterarSaida({ postoId: e.target.value })} style={S.in}>
+            <option value="">Escolha…</option>
+            {comPessoa.map((p) => <option key={p.id} value={p.id}>{p.pessoaNome} — {p.rotulo}</option>)}
+          </select></label>
+        <label style={S.lab}>2. Motivo
+          <select aria-label="Motivo da saída" value={saidaForm.motivo} onChange={(e) => alterarSaida({ motivo: e.target.value })} style={S.in}>
+            <option value="">Escolha…</option>
+            {MOTIVOS_SAIDA.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select></label>
+        {saidaForm.motivo === "Outro" && <input aria-label="Descreva o motivo" placeholder="Descreva o motivo" value={saidaForm.outro} onChange={(e) => alterarSaida({ outro: e.target.value })} style={S.in} />}
+        <label style={S.lab}>3. Horário da saída
+          <input aria-label="Horário da saída" type="time" value={saidaForm.hora} onChange={(e) => alterarSaida({ hora: e.target.value })} style={S.in} /></label>
+        <div style={S.lab}>4. Quem vai cobrir? (pode ser mais de uma pessoa, em partes do período)</div>
+        {saidaForm.coberturas.map((c, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 8, border: `1px dashed ${cor.line}`, borderRadius: 8 }}>
+            <select aria-label={`Tipo de cobertura ${i + 1}`} value={c.tipo} onChange={(e) => alterarSaida({ coberturas: saidaForm.coberturas.map((x, k) => (k === i ? { ...x, tipo: e.target.value } : x)) })} style={S.in}>
+              <option value="">Tipo…</option>
+              {TIPOS_COBERTURA.map(([k, r]) => <option key={k} value={k}>{r}</option>)}
+            </select>
+            <select aria-label={`Quem cobre ${i + 1}`} value={c.pessoaId} onChange={(e) => { const col = colabs.find((x) => x.id === e.target.value); alterarSaida({ coberturas: saidaForm.coberturas.map((x, k) => (k === i ? { ...x, pessoaId: e.target.value, pessoaNome: col ? col.nome : "" } : x)) }); }} style={S.in}>
+              <option value="">Quem cobre…</option>
+              {colabs.filter((x) => !quem || x.id !== quem.pessoaId).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+            </select>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input aria-label={`Entrada ${i + 1}`} type="time" value={c.de} onChange={(e) => alterarSaida({ coberturas: saidaForm.coberturas.map((x, k) => (k === i ? { ...x, de: e.target.value } : x)) })} style={S.in} />
+              <input aria-label={`Até ${i + 1}`} type="time" value={c.ate} onChange={(e) => alterarSaida({ coberturas: saidaForm.coberturas.map((x, k) => (k === i ? { ...x, ate: e.target.value } : x)) })} style={S.in} />
+              <button onClick={() => alterarSaida({ coberturas: saidaForm.coberturas.filter((_, k) => k !== i) })} style={S.btn} aria-label={`Remover cobertura ${i + 1}`}>×</button>
+            </div>
+          </div>
+        ))}
+        <button onClick={() => alterarSaida({ coberturas: [...saidaForm.coberturas, { tipo: "", pessoaId: "", pessoaNome: "", de: saidaForm.hora, ate: "" }] })} style={S.btn}>+ Quem cobre</button>
+        {saidaErros.length > 0 && <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{saidaErros.map((e) => <div key={e}>{e}</div>)}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={confirmarSaida} disabled={enviando} style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none" }}>{enviando ? "Gravando e confirmando…" : "Confirmar saída"}</button>
+          <button onClick={() => { setSaidaForm(null); setSaidaErros([]); }} style={S.btn}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
+
   const opcoesPessoa = () => (
     <>
       <option value="">Escolher…</option>
@@ -448,6 +546,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                             <div key={it.id} style={{ borderTop: `1px solid ${cor.line}`, padding: "8px 0" }}>
                               <div style={{ fontSize: 13, color: cor.txt, fontWeight: 700 }}>{it.nome}{it.detalhe ? <span style={{ color: cor.txt2, fontWeight: 500 }}> · {it.detalhe}</span> : null}</div>
                               {it.cadastro && it.cadastro !== "ok" && <div style={{ fontSize: 11, color: "#f59e0b" }}>No cadastro de Equipamentos: {it.cadastro}</div>}
+                              {it.cadastro != null && io.corrigirItemEquipamento && renderCorrigirCadastro(it)}
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                                 {SITUACOES_MATERIAL.map((o) => (
                                   <button key={o.id} aria-pressed={sit === o.id} aria-label={`${it.nome}: ${o.rotulo}`} onClick={() => setMat((m) => definirSituacaoMaterial(m, it, o.id))} style={S.chip(sit === o.id, o.id === "ok" ? "#16a34a" : o.id === "anomalia" ? "#f59e0b" : "#dc2626")}>{o.rotulo}</button>
@@ -531,8 +630,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
               </div>
               </>}
               {!editando && <>
-                <div style={{ fontSize: 11, color: cor.txt2, marginTop: 8 }}>Mapa arquivado neste dia. Se algo mudou (alguém saiu, outra pessoa entrou), toque em Editar mapa, corrija e conclua de novo; a correção fica registrada.</div>
-                <button onClick={editarMapa} style={{ ...S.btn, marginTop: 8 }}>Editar mapa</button>
+                <div style={{ fontSize: 11, color: cor.txt2, marginTop: 8 }}>Mapa arquivado: material, km, supervisão e resumo ficam travados. Se alguém precisou sair no meio do plantão, aponte aqui e diga quem cobriu; fica registrado.</div>
+                {renderSaida()}
               </>}
               {editando && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>Editando o mapa enviado. O WhatsApp só volta depois que você tocar em Concluir mapa e o app confirmar que gravou.</div>}
             </div>

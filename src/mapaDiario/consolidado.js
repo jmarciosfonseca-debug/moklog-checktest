@@ -1,7 +1,7 @@
 // Mapa de Equipe diário — consolidado (puro, sem Firestore nem relógio): filtra os mapas concluídos
 // por período, projeto, plantão (turno), líder, colaborador e tipo de ocorrência (falta / FT) e soma os números.
 // Só mapas "enviado" (concluídos) entram: rascunho não é fato consumado.
-import { kmRodado } from "./modelo";
+import { kmRodado, rotuloSaida } from "./modelo";
 
 export const OCORRENCIAS = [
   { id: "todos", rotulo: "Todos os mapas", tipos: null },
@@ -61,6 +61,10 @@ export function ocorrenciasDoMapa(mapa) {
   const ctx = { data: mapa.data, projetoId: mapa.projetoId, turno: mapa.turno, lider };
   const linhas = [];
   for (const p of postos) {
+    if (p.saida && p.pessoaId && (!p.situacao || p.situacao === "presente")) { // saída antecipada (mapa já enviado) = Falta na ficha
+      linhas.push({ ...ctx, tipo: "falta", posto: p.rotulo || "", pessoa: nomeDe(p), pessoaId: p.pessoaId || "", detalhe: rotuloSaida(p), envolvidos: [nomeDe(p), ...(p.saida.coberturas || []).map((c) => c.pessoaNome)].filter(Boolean) });
+      continue;
+    }
     if (!p.situacao || p.situacao === "presente" || !TIPOS_LINHA.includes(p.situacao)) continue;
     const { detalhe, envolvidos } = detalheDoPosto(p, postos);
     linhas.push({ ...ctx, tipo: p.situacao, posto: p.rotulo || "", pessoa: nomeDe(p), pessoaId: p.pessoaId || "", detalhe, envolvidos });

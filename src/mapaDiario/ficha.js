@@ -17,6 +17,13 @@ export function lancamentosDoMapa(mapa) {
   const origem = `mapa de ${dataBR(mapa.data)} (${turno})`;
   const out = [];
   (mapa.postos || []).forEach((p) => {
+    // Saída antecipada (mapa já enviado): quem saiu recebe Falta; quem cobriu NÃO recebe FT (decisão do gerencial).
+    if (p.saida && p.pessoaId) {
+      const sd = p.saida;
+      const motivo = sd.motivo === "Outro" ? (sd.outro || "Outro") : sd.motivo;
+      const item = { id: idDe(mapa.id, p.pessoaId, "Falta"), colabId: p.pessoaId, tipo: "Falta", data: mapa.data, detalhe: `Saída antecipada — ${motivo} — saiu às ${sd.hora} — posto ${p.rotulo} — ${origem}`, origem: "mapa", mapaId: mapa.id, diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) };
+      if (!out.some((x) => x.id === item.id)) out.push(item);
+    }
     const dc = p.detalhe || {};
     // Cobertura: a falta é de quem foi coberto, não de quem cobre.
     if (p.situacao === "cobertura" && dc.deQuemId && !dc.semFalta && dc.deQuemId !== p.pessoaId) {
