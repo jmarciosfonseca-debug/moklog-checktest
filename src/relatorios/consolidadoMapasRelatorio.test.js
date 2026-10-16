@@ -78,3 +78,9 @@ test("falta derivada da FT aparece no PDF mesmo sem posto de falta", () => {
   expect(h).toContain("coberta por FT de Rosemeire");
   expect(h).toMatch(/<div class="mk-kv mk-da">1<\/div><div class="mk-kl">Faltas/);
 });
+
+test("posto com saída antecipada mostra a saída e a cobertura no PDF", () => {
+  const { rotuloSaida } = require("../mapaDiario/modelo");
+  const p = { rotulo: "Tático", pessoaNome: "Ana", saida: { motivo: "Mal súbito", hora: "14:30", coberturas: [{ tipo: "base", pessoaNome: "Beto", de: "14:30" }] } };
+  expect(rotuloSaida(p)).toContain("cobertura: Beto (Base) das 14:30");
+});

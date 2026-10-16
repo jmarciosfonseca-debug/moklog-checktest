@@ -7,6 +7,8 @@ import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer } from "firebase/firestore";
 import { gravarSecaoEquipamentos } from "./equipamentosStore";
+import { validarKmMoto, kmMotoDoMapa, soDigitosKm } from "./kmMoto";
+import { loadUltimoPlantao } from "./mapaDiario/dados";
 
 
 const firebaseConfig = {
@@ -622,7 +624,14 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
   const [novaManut, setNovaManut] = useState({ data:todayStr(), km:"", desc:"" });
   const [form, setForm] = useState(moto || { placa:"", km:"", proximaRevisao:"", status:"ok", historico:[] });
 
-  const save = async (updated) => { if(await onUpdate(updated)!==false)setEditing(false); };
+  const save = async (updated) => {
+    let ultimo = null;
+    try { ultimo = kmMotoDoMapa(await loadUltimoPlantao(project.id, "9999-12-31", "N")); } catch(e) { /* sem leitura: não trava */ }
+    const v = validarKmMoto(updated, ultimo);
+    if(!v.ok){ alert(v.erro); return; }
+    const final = {...updated, km:v.km==null?"":v.km, kmManutencao:v.kmManutencao==null?"":v.kmManutencao};
+    if(await onUpdate(final)!==false){ setForm(final); setEditing(false); }
+  };
 
   const addManut = async () => {
     if(!novaManut.desc.trim()) { alert("Informe a descrição"); return; }
@@ -652,9 +661,9 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
               <div><label style={S.lbl}>Placa</label><input value={form.placa} onChange={e=>setForm(f=>({...f,placa:e.target.value}))} placeholder="ABC-1234" style={S.inp}/></div>
               <div><label style={S.lbl}>Modelo</label><input value={form.modelo||""} onChange={e=>setForm(f=>({...f,modelo:e.target.value}))} placeholder="Ex: Honda CG 160..." style={S.inp}/></div>
               <div><label style={S.lbl}>Ano</label><input type="number" value={form.ano||""} onChange={e=>setForm(f=>({...f,ano:e.target.value}))} placeholder="Ex: 2022" style={S.inp}/></div>
-              <div><label style={S.lbl}>KM Atual</label><input type="number" value={form.km} onChange={e=>setForm(f=>({...f,km:e.target.value}))} placeholder="0" style={S.inp}/></div>
+              <div><label style={S.lbl}>KM Atual</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM Atual" value={form.km} onChange={e=>setForm(f=>({...f,km:soDigitosKm(e.target.value)}))} placeholder="Só números" style={S.inp}/></div>
             </div>
-            <div><label style={S.lbl}>KM para próxima manutenção</label><input type="number" value={form.kmManutencao||""} onChange={e=>setForm(f=>({...f,kmManutencao:e.target.value}))} placeholder="Ex: 5000" style={S.inp}/></div>
+            <div><label style={S.lbl}>KM para próxima manutenção</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM para próxima manutenção" value={form.kmManutencao||""} onChange={e=>setForm(f=>({...f,kmManutencao:soDigitosKm(e.target.value)}))} placeholder="Ex: 5000" style={S.inp}/></div>
             <div><label style={S.lbl}>Próxima Revisão (Data)</label><input type="date" value={form.proximaRevisao||""} onChange={e=>setForm(f=>({...f,proximaRevisao:e.target.value}))} style={S.inp}/></div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditing(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
