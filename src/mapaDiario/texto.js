@@ -17,6 +17,9 @@ const SEPARADOR = "━━━━━━━━━━━━━━";
 const nomeDe = (p) => (p.pessoaNome || "").trim();
 const horarioDe = (p) => (p.horario ? ` (${hh(p.horario.inicio)}–${hh(p.horario.fim)})` : "");
 
+import { plantoesAfastamento, linhaDesligamento } from "../equipeEventos";
+const afast = (n) => { const k = plantoesAfastamento(n); return k ? ` — *AFASTADO por ${k} plantões*` : ""; };
+
 // Linha do efetivo: posto em negrito; a exceção ganha emoji e a palavra em negrito.
 function linhaPosto(p) {
   const nome = nomeDe(p);
@@ -24,10 +27,10 @@ function linhaPosto(p) {
   const rot = `*${p.rotulo}${horarioDe(p)}:*`;
   switch (p.situacao) {
     case "vago": return `⚪ ${rot} sem ninguém no posto`;
-    case "falta": return `❌ ${rot} ${nome} — *FALTA*`;
+    case "falta": return `❌ ${rot} ${nome} — *FALTA*${afast(d.afastamentoPlantoes)}`;
     case "atraso": return `⏰ ${rot} ${nome} — *ATRASO*${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
-    case "ft": return `🔄 ${rot} ${nome} — *FT* (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
-    case "cobertura": return `🤝 ${rot} ${nome}${d.base ? " (Base)" : ""} — *COBERTURA* de ${d.deQuem}${d.semFalta ? " (não foi falta)" : ""}`;
+    case "ft": return `🔄 ${rot} ${nome} — *FT* (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}${afast(d.afastamentoPlantoes)}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
+    case "cobertura": return `🤝 ${rot} ${nome}${d.base ? " (Base)" : ""} — *COBERTURA* de ${d.deQuem}${d.semFalta ? " (não foi falta)" : afast(d.afastamentoPlantoes)}`;
     case "troca": return `🔁 ${rot} ${nome} — *TROCA DE PLANTÃO*, no lugar de ${d.noLugarDe}`;
     default: return `✅ ${rot} ${nome}`;
   }
@@ -42,18 +45,18 @@ function linhaOcorrencia(p, postos) {
     case "vago": return `⚪ *SEM NINGUÉM* — ${onde}`;
     case "falta": {
       const ft = (postos || []).find((x) => x.id && x.id === d.porFtDe);
-      return `❌ *FALTA* — ${nome} (${onde})${ft && nomeDe(ft) ? ` — coberta por FT de ${nomeDe(ft)}` : ""}`;
+      return `❌ *FALTA* — ${nome} (${onde})${ft && nomeDe(ft) ? ` — coberta por FT de ${nomeDe(ft)}` : ""}${afast(d.afastamentoPlantoes)}`;
     }
     case "atraso": return `⏰ *ATRASO* — ${nome} (${onde})${d.hora ? `, chegou às ${hh(d.hora)}` : ""}${d.minutos ? ` (${d.minutos} min)` : ""}`;
-    case "ft": return `🔄 *FT* — ${nome} (${onde})${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
-    case "cobertura": return `🤝 *COBERTURA* — ${nome}${d.base ? " (Base)" : ""} (${onde}), cobrindo ${d.deQuem}${d.semFalta ? " (não foi falta)" : ""}`;
+    case "ft": return `🔄 *FT* — ${nome} (${onde})${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}${afast(d.afastamentoPlantoes)}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
+    case "cobertura": return `🤝 *COBERTURA* — ${nome}${d.base ? " (Base)" : ""} (${onde}), cobrindo ${d.deQuem}${d.semFalta ? " (não foi falta)" : afast(d.afastamentoPlantoes)}`;
     case "troca": return `🔁 *TROCA DE PLANTÃO* — ${nome} (${onde}), no lugar de ${d.noLugarDe}`;
     default: return "";
   }
 }
 
 // Cada assunto é um bloco com título em negrito e o conteúdo logo abaixo; blocos separados por linha em branco.
-export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
+export function montarTextoWhatsApp(mapa, { nomeProjeto = "", desligamentos = [] } = {}) {
   const blocos = [];
   blocos.push([
     "📋 *MAPA DE EQUIPE*",
@@ -95,6 +98,7 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "" } = {}) {
   const vis = mapa.visita;
   blocos.push(["🔎 *ÚLTIMA VISITA DA SUPERVISÃO*", s && s.ultimaData ? `${dataBR(s.ultimaData)}${s.supervisor ? ` — ${s.supervisor}` : ""}${s.turno ? ` (${s.turno})` : ""}` : "—",
     ...(vis && typeof vis.houve === "boolean" ? [vis.houve ? `Neste turno: visita de ${(vis.supervisor || "").trim()}` : "Neste turno: sem visita"] : [])]);
+  if (desligamentos.length) blocos.push(["🚪 *FUNCIONÁRIO DESLIGADO (últimas 24h)*", ...desligamentos.map((d) => `• ${linhaDesligamento(d)}`)]);
   if (mapa.resumo && mapa.resumo.trim()) blocos.push(["📝 *RESUMO DA PASSAGEM*", mapa.resumo.trim()]);
   if (mapa.observacoes && mapa.observacoes.trim()) blocos.push(["💬 *OBSERVAÇÕES*", mapa.observacoes.trim()]);
   return blocos.map((b) => b.join("\n")).join("\n\n");

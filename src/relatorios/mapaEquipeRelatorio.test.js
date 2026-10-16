@@ -88,3 +88,9 @@ test('texto longo repetido: ficha mostra resumo + [T1]; texto integral aparece u
   const curto = gerar({ colaboradores: [{ ...colaborador, historico: [{ tipo: 'Treinamento', detalhe: 'DDS fictício', data: '2026-09-01' }] }] });
   expect(curto).not.toContain('Treinamentos — descrições completas');
 });
+
+test('PDF da equipe mostra a promoção no histórico da ficha', () => {
+  const c = { ...colaborador, cargo: 'Líder', historico: [{ tipo: 'Promoção', data: '2026-09-01', cargoAnterior: 'Vigilante', cargoNovo: 'Líder', obs: 'assume o turno' }] };
+  const html = gerar({ colaboradores: [c] });
+  expect(html).toContain('Promoções (1)'); expect(html).toContain('Vigilante'); expect(html).toContain('01/09/2026'); expect(html).toContain('assume o turno');
+});
