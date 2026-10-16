@@ -21,11 +21,15 @@ const PID = "P311A";
 
 // id do documento → km da Moto. kmAtual null = NÃO mexer no atual (rascunho que o líder vai preencher).
 const PLANO = {
-  "P311A_2026-10-13_N": { kmAnterior: 71195, kmAtual: 71240 }, // era "rodou 221"
-  "P311A_2026-10-14_D": { kmAnterior: 71240, kmAtual: 71240 }, // líder reportou rodado 0 — mantido
-  "P311A_2026-10-14_N": { kmAnterior: 71240, kmAtual: 71285 }, // era o odômetro cheio (71.415) sobre base pequena
-  "P311A_2026-10-15_D": { kmAnterior: 71285, kmAtual: 71285 }, // líder reportou rodado 0 — mantido
-  "P311A_2026-10-15_N": { kmAnterior: 71285, kmAtual: null },  // rascunho em aberto: só o anterior
+  // Cadeia real lida do banco (anterior → atual): 71109 → 71133 → 71171 → 71241 → [15 D] → [15 N].
+  // Erros encontrados: 13/10 N atual 71330 (odômetro de HOJE digitado cedo) e 14/10 D atual 71.415
+  // (idem, com ponto de milhar); 15/10 D com 71375 repetido. Os ~89 km entre 71241 e o odômetro de
+  // hoje (71330) são divididos nos dois plantões de 15/10 (~45 km cada).
+  "P311A_2026-10-13_N": { kmAnterior: "71109", kmAtual: "71133" },
+  "P311A_2026-10-14_D": { kmAnterior: "71133", kmAtual: "71171" },
+  "P311A_2026-10-14_N": { kmAnterior: "71171", kmAtual: "71241" },
+  "P311A_2026-10-15_D": { kmAnterior: "71241", kmAtual: "71285" },
+  "P311A_2026-10-15_N": { kmAnterior: "71285", kmAtual: null },  // líder digita 71330 e conclui (rodou 45)
 };
 
 const ehMoto = (v) => !!v && (v.id === "moto" || /moto/i.test(v.rotulo || ""));
