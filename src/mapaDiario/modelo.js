@@ -161,7 +161,15 @@ export function definirSituacaoMaterial(material, item, situacao, obs) {
   return { ...base, excecoes, semAlteracao: excecoes.length ? false : !(base.obs || "").trim() };
 }
 
-const num = (v) => (v === "" || v == null ? null : Number(String(v).replace(",", ".")));
+// "71.330" (ponto de milhar, como o pessoal digita) vale 71330 — nunca 71,33.
+const num = (v) => {
+  if (v === "" || v == null) return null;
+  const t = String(v).trim();
+  if (/^\d{1,3}(\.\d{3})+$/.test(t)) return Number(t.replace(/\./g, ""));
+  return Number(t.replace(",", "."));
+};
+// Odômetro: só dígitos (sem ponto, vírgula ou símbolo).
+export const soDigitos = (v) => String(v ?? "").replace(/\D/g, "");
 
 export function kmRodado(v) {
   const a = num(v.kmAnterior), b = num(v.kmAtual);
