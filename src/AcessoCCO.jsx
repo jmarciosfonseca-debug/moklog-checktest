@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -484,7 +485,7 @@ function TemaForm({ tema, form, setF, S, dark, equipe }) {
       <div style={S.card}>
         <div style={{fontSize:11,color:"#f59e0b",fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:12}}><Ico n="cronometro"/> Data e Hora</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Data</label><CampoData value={form.data} onChange={(v,o)=>{setF("data",v);setF("retroativo",!!(o&&o.retroativo));}} style={S.inp}/></div>
           <div><label style={S.lbl}>Hora de Entrada</label>
             <div style={{display:"flex",gap:5}}>
               <input type="time" value={form.horaEntrada} onChange={e=>setF("horaEntrada",e.target.value)} style={{...S.inp,flex:1}}/>
@@ -500,7 +501,7 @@ function TemaForm({ tema, form, setF, S, dark, equipe }) {
       <div style={S.card}>
         <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginBottom:10}}><Ico n="calendario"/> Plantão</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
-          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Data</label><CampoData value={form.data} onChange={(v,o)=>{setF("data",v);setF("retroativo",!!(o&&o.retroativo));}} style={S.inp}/></div>
         </div>
         <label style={S.lbl}>Turno</label>
         <PillGroup options={TURNOS} value={form.turno} onChange={v=>setF("turno",v)} dark={dark}/>
@@ -565,7 +566,7 @@ function TemaForm({ tema, form, setF, S, dark, equipe }) {
         <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="usuario"/> Supervisor</div>
         <div><label style={S.lbl}>Nome do Supervisor *</label><input value={form.supervisor} onChange={e=>setF("supervisor",e.target.value)} placeholder="Nome completo..." style={S.inp}/></div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Data</label><CampoData value={form.data} onChange={(v,o)=>{setF("data",v);setF("retroativo",!!(o&&o.retroativo));}} style={S.inp}/></div>
           <div><label style={S.lbl}>Chegada</label>
             <div style={{display:"flex",gap:4}}>
               <input type="time" value={form.chegada} onChange={e=>setF("chegada",e.target.value)} style={{...S.inp,flex:1,padding:"8px 6px"}}/>
@@ -621,7 +622,7 @@ function TemaForm({ tema, form, setF, S, dark, equipe }) {
       <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
         <div style={{fontSize:11,color:c,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="predio"/> Dados da Visita</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div><label style={S.lbl}>Data</label><input type="date" value={form.data} onChange={e=>setF("data",e.target.value)} style={S.inp}/></div>
+          <div><label style={S.lbl}>Data</label><CampoData value={form.data} onChange={(v,o)=>{setF("data",v);setF("retroativo",!!(o&&o.retroativo));}} style={S.inp}/></div>
           <div><label style={S.lbl}>Empresa *</label><input value={form.empresa} onChange={e=>setF("empresa",e.target.value)} placeholder="Empresa..." style={S.inp}/></div>
         </div>
         <div><label style={S.lbl}>Técnico(s)</label><input value={form.tecnico} onChange={e=>setF("tecnico",e.target.value)} placeholder="Nome do(s) técnico(s)..." style={S.inp}/></div>

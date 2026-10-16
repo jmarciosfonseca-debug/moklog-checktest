@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect, useRef } from "react";
@@ -375,7 +376,7 @@ export default function Ambulancia({ project, onBack, dark, onToggleTheme, share
           {/* Data + Turno */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             <Campo S={S} label="Data" obrigatorio>
-              <input type="date" value={form.data} onChange={e=>setF({ data:e.target.value })} style={S.input}/>
+              <CampoData value={form.data} onChange={(v)=>setF({ data:v })} style={S.input}/>
             </Campo>
             <Campo S={S} label="Turno" obrigatorio>
               <div style={{ display:"flex", gap:8 }}>

@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -766,7 +767,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               <button onClick={()=>{setScreen("list");setForm(null);}} style={S.backBtn}>← Cancelar</button>
               <div style={{flex:1}}>
                 <div style={{fontSize:15,fontWeight:800,...S.txt}}><Ico n="cadeado"/> Novo Teste Perimetral</div>
-                <div style={{fontSize:11,...S.txt2}}>P505 · Klog Guarulhos</div>
+                <div style={{fontSize:11,...S.txt2}}>{project.id} · {pcfg.clienteNome||project.name}</div>
               </div>
               <button onClick={onToggleTheme} style={{background:"transparent",border:`1px solid ${dark?"#1e293b":"#cbd5e1"}`,borderRadius:8,padding:"5px 10px",cursor:"pointer",fontSize:14,...S.txt2}}>{iconeTema()}</button>
             </div>
@@ -778,7 +779,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <div>
                   <label style={S.lbl}>Data</label>
-                  <input type="date" value={form.data} onChange={e=>setForm(f=>({...f,data:e.target.value}))} style={S.inp}/>
+                  <CampoData value={form.data} onChange={(v,o)=>setForm(f=>({...f,data:v,retroativo:!!(o&&o.retroativo)}))} style={S.inp}/>
                 </div>
                 <div>
                   <label style={S.lbl}>Hora</label>

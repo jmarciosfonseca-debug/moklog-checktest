@@ -1,3 +1,4 @@
+import CampoData from "./CampoData";
 import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -499,7 +500,7 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             <div>
               <label style={S.lbl}>Data</label>
-              <input type="date" value={data} onChange={e=>setData(e.target.value)} style={S.inp}/>
+              <CampoData value={data} onChange={(v)=>setData(v)} style={S.inp}/>
             </div>
             <div>
               <label style={S.lbl}>Hora de Início</label>

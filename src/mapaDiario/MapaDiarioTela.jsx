@@ -1,5 +1,6 @@
 // Tela "Mapa de Equipe diário" do projeto: o líder preenche as exceções e conclui; sai o texto do WhatsApp.
 // O mapa abre pré-preenchido (último mapa enviado do mesmo turno). Autosalva o rascunho.
+import CampoData from "../CampoData";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
@@ -357,7 +358,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
         <div style={S.card}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <input type="date" aria-label="Data do mapa" value={data} onChange={(e) => e.target.value && setData(e.target.value)} style={{ ...S.in, width: "auto" }} />
+            <CampoData aria-label="Data do mapa" value={data} onChange={(v)=> v && setData(v)} style={{ ...S.in, width: "auto" }} />
             {["D", "N"].map((t) => <button key={t} onClick={() => setTurno(t)} aria-pressed={turno === t} style={S.chip(turno === t)}>{t === "D" ? "Diurno" : "Noturno"}</button>)}
           </div>
           <div style={{ fontSize: 12, color: cor.txt2, marginTop: 8 }}>
