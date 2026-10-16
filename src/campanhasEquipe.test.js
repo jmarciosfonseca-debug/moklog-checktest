@@ -23,6 +23,7 @@ test('ocultar é por tipo e ano; não afeta ciclo seguinte nem apaga registros',
 test('preço BR e cálculo em centavos, sem confundir vazio e zero',()=>{
  expect(valorCampanhaCentavos('1.250,50')).toBe(125050);
  expect(valorCampanhaCentavos('0')).toBe(0);
+ expect(valorCampanhaCentavos('159.90')).toBe(15990); expect(valorCampanhaCentavos('1.250')).toBe(125000);
  for(const s of ['','-1','1,234','abc','1.2','1000001'])expect(valorCampanhaCentavos(s)).toBeNull();
  expect(totalCampanha(3,1001)).toBe(30.03); expect(totalCampanha(3,null)).toBeNull();
 });

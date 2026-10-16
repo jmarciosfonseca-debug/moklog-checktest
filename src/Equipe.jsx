@@ -2998,9 +2998,10 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   </div>
                 ))}
                 {adminAuth && filtroRapido==="cesta" && (
-                  <CampanhaEquipeControle key={`${project.id}_${chave}_${config.valorCentavos}`} tipo={tipo} ano={anoFiltro} config={config} quantidade={linhas.length} carregando={carregando}
+                  <CampanhaEquipeControle key={`${project.id}_${chave}_${config.valorCentavos}_${config.principal?.fotoRef||''}`} tipo={tipo} ano={anoFiltro} config={config} quantidade={linhas.length} carregando={carregando}
                     onSalvar={patch => save({...equipeData, campanhasSazonais:{...equipeData.campanhasSazonais,[chave]:{...config,...patch}}})}
-                    onPDF={()=>gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos:config.valorCentavos,extras:config.extras||[],fotos:fotosMapa})}/>
+                    fotos={fotosMapa} idFoto={`campanha-${tipo}-${anoFiltro}`} onEnviarFoto={async (id,url)=>{ const ref = await enviarFoto(project.id,id,url); definirFoto(ref,url); return ref; }}
+                    onPDF={({valorCentavos,principal})=>gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos,principal,extras:config.extras||[],fotos:fotosMapa})}/>
                 )}
                 {adminAuth && filtroRapido==="cesta" && !carregando && (
                   <CampanhaExtras key={`${project.id}_${chave}_extras`} extras={config.extras||[]} fotos={fotosMapa} idFoto={`campanha-${tipo}-${anoFiltro}`}

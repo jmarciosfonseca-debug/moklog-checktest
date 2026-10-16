@@ -74,3 +74,32 @@ test('tela: valida campos e confirma antes de remover', async () => {
   conf.mockRestore();
   await act(async () => root.unmount());
 });
+
+test('mesmo valor soma na mesma linha; valor diferente separa', () => {
+  const { resumoPorValor } = require('./campanhasEquipe');
+  expect(resumoPorValor(9, 15990, [{ qtd: 1, valorCentavos: 15990 }])).toEqual([{ centavos: 15990, qtd: 10, total: 1599 }]);
+  const r = resumoPorValor(9, 15990, [{ qtd: 2, valorCentavos: 20000 }]);
+  expect(r.map(x => [x.centavos, x.qtd])).toEqual([[20000, 2], [15990, 9]]);
+});
+
+test('API aceita modelo principal e rejeita lixo', async () => {
+  const ok = { ...base, campanhasSazonais: { natal_2026: { valorCentavos: 15990, principal: { descricao: 'Munique', fotoRef: 'campanha-natal-2026-ab' } } } };
+  expect(await save(banco(), 'P601', base, ok, { nivel: 'admin' })).toEqual(ok);
+  await expect(save(banco(), 'P601', base, { ...base, campanhasSazonais: { natal_2026: { principal: { x: 1 } } } }, { nivel: 'admin' })).rejects.toMatchObject({ status: 400 });
+});
+
+test('controle: valor com ponto calcula, soma extras e habilita o PDF', async () => {
+  const Controle = require('./CampanhaEquipeControle').default;
+  global.IS_REACT_ACT_ENVIRONMENT = true; const host = document.createElement('div'); const root = createRoot(host);
+  const onPDF = jest.fn(), onSalvar = jest.fn(async () => {});
+  await act(async () => root.render(<Controle tipo="natal" ano={2026} quantidade={9} config={{ extras: [{ id: 'a', descricao: 'Ferista', qtd: 1, valorCentavos: 15990 }] }} onSalvar={onSalvar} onPDF={onPDF} onEnviarFoto={async () => 'r'} />));
+  const inp = host.querySelector('[aria-label="Valor unitário da campanha"]');
+  await act(async () => { digitar(inp, '159.90'); });
+  expect(host.textContent).toContain('10 unidade(s)');
+  const pdf = [...host.querySelectorAll('button')].find(b => b.textContent.startsWith('Gerar PDF'));
+  expect(pdf.disabled).toBe(false);
+  await act(async () => { pdf.click(); });
+  expect(onSalvar).toHaveBeenCalledWith({ valorCentavos: 15990 });
+  expect(onPDF).toHaveBeenCalledWith(expect.objectContaining({ valorCentavos: 15990 }));
+  await act(async () => root.unmount());
+});
