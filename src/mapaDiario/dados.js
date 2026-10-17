@@ -83,25 +83,48 @@ export async function loadMapasPeriodo(projetos, de, ate) {
 // ficar esperando para sempre — o líder fica no escuro e o mapa "some" (bug de campo 15/10).
 const comTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => { setTimeout(() => rej(new Error(msg)), ms); })]);
 
+// Gravações do MESMO mapa são serializadas (uma fila por documento): o rascunho do autosave nunca ultrapassa o envio oficial.
+// Causa do bug de campo (17/10, P260B/P604): o autosave de 1,5 s disparava DEPOIS do Concluir, regravava o mapa como
+// rascunho (apagando status "enviado") e a confirmação do servidor não batia — painel Pendente e "falha" na tela.
+const filas = new Map();
+const enfileirar = (id, tarefa) => {
+  const anterior = filas.get(id) || Promise.resolve();
+  const atual = anterior.catch(() => {}).then(tarefa);
+  filas.set(id, atual.catch(() => {}));
+  return atual;
+};
+const enviadosNaSessao = new Set();   // ids de mapas já enviados neste aparelho: rascunho nunca rebaixa um mapa enviado
+export const _limparEnviadosParaTeste = () => { enviadosNaSessao.clear(); filas.clear(); };
+
 export async function saveMapa(mapa) {
-  const agora = new Date().toISOString();
-  const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
-  await comTimeout(setDoc(doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id), doc_), 8000, "Sem resposta do servidor — confira a conexão.");
-  return doc_;
+  return enfileirar(mapa.id, async () => {
+    const agora = new Date().toISOString();
+    const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
+    if (mapa.status !== "enviado" && enviadosNaSessao.has(mapa.id)) return doc_;   // rascunho atrasado: descartado
+    await comTimeout(setDoc(doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id), doc_), 8000, "Sem resposta do servidor — confira a conexão.");
+    return doc_;
+  });
 }
 
 // ENVIO OFICIAL do mapa (Concluir): grava e CONFIRMA lendo de volta DO SERVIDOR.
 // Só com a confirmação o WhatsApp é liberado — acaba o "enviei mas o painel ficou Pendente":
 // ou o mapa está comprovadamente no servidor, ou o líder é avisado na hora de que não chegou.
+// Se a leitura mostrar outra gravação por cima (rascunho atrasado de outro aparelho/aba), regrava uma vez.
 export async function enviarMapa(mapa, { timeoutMs = 12000 } = {}) {
-  const agora = new Date().toISOString();
-  const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
-  const ref = doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id);
-  await comTimeout(setDoc(ref, doc_), timeoutMs, "o mapa NÃO chegou ao servidor (sem conexão)");
-  if (isDemo()) return doc_;                                  // demonstração: nada vai ao banco mesmo
-  const conf = await comTimeout(getDocFromServer(ref), timeoutMs, "gravou, mas não deu para CONFIRMAR no servidor");
-  if (!conf.exists() || conf.data().atualizadoEm !== agora) throw new Error("a confirmação no servidor não bateu");
-  return doc_;
+  return enfileirar(mapa.id, async () => {
+    const ref = doc(db(), "equipes", mapa.projetoId, "mapas", mapa.id);
+    if (mapa.status === "enviado" && !isDemo()) enviadosNaSessao.add(mapa.id);   // a partir daqui rascunho nenhum rebaixa este mapa
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      const agora = new Date().toISOString();
+      const doc_ = semUndefined({ ...mapa, atualizadoEm: agora });
+      await comTimeout(setDoc(ref, doc_), timeoutMs, "o mapa NÃO chegou ao servidor (sem conexão)");
+      if (isDemo()) return doc_;                                  // demonstração: nada vai ao banco mesmo
+      const conf = await comTimeout(getDocFromServer(ref), timeoutMs, "gravou, mas não deu para CONFIRMAR no servidor");
+      const d = conf.exists() ? conf.data() : null;
+      if (d && (d.atualizadoEm === agora || (mapa.status === "enviado" && d.status === "enviado" && d.enviadoEm === doc_.enviadoEm))) return doc_;
+    }
+    throw new Error("a confirmação no servidor não bateu");
+  });
 }
 
 // Última visita da supervisão — fonte única: CCO (cco_supervisao/{pid}.registros[]);

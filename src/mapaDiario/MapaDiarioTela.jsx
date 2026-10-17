@@ -48,6 +48,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [enviando, setEnviando] = useState(false);   // Concluir em andamento (gravando + confirmando no servidor)
   const [reenvioPendente, setReenvioPendente] = useState(0); // nº de tentativas automáticas já feitas
   const carregadoRef = useRef(false);
+  const enviandoRef = useRef(false);   // true de Concluir até a resposta do servidor
   const timer = useRef(null);
   const [eqEdit, setEqEdit] = useState(null);       // correção de cadastro de equipamento pelo líder
   const [saidaForm, setSaidaForm] = useState(null);   // saída antecipada / substituição (mapa já enviado)
@@ -113,6 +114,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
       clearTimeout(timer.current);
       setSalvo("");
       timer.current = setTimeout(async () => {
+        if (enviandoRef.current) return;   // Concluir em andamento/concluído: rascunho atrasado não regrava o mapa
         try { await io.saveMapa(novo); setSalvo("Salvo"); } catch (e) { setSalvo("Não salvou — confira a conexão"); }
       }, 1500);
       return novo;
@@ -171,6 +173,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   // o líder vê na hora que NÃO chegou — e a tela tenta de novo sozinha a cada 20 s.
   const enviarComConfirmacao = async (final) => {
     setEnviando(true);
+    clearTimeout(timer.current); enviandoRef.current = true;   // cancela o autosave pendente: nada pode ultrapassar o envio
     const enviar = io.enviarMapa || io.saveMapa;      // fallback p/ ambientes antigos
     try {
       const gravado = await enviar(final);
@@ -182,7 +185,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     } catch (e) {
       setAvisos([`SEM CONFIRMAÇÃO DO SERVIDOR: ${(e && e.message) || "erro"}. O mapa ficou neste aparelho e o WhatsApp NÃO foi liberado. Mantenha esta tela aberta: vou tentar de novo sozinho a cada 20 segundos — ou toque em Concluir mapa quando o sinal voltar.`]);
       agendarReenvio(final);
-    } finally { setEnviando(false); }
+    } finally { setEnviando(false); enviandoRef.current = false; }
   };
   const pararReenvio = () => { if (reenvio.current) { clearInterval(reenvio.current.timer); reenvio.current = null; } setReenvioPendente(0); };
   const agendarReenvio = (final) => {
