@@ -40,3 +40,13 @@ export function linhaDesligamento(d) {
   const quando = new Date(d.em).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   return `${d.nome}${d.cargo ? ` (${d.cargo})` : ''}${d.tipo ? ` — ${d.tipo}` : ''} — apontado por ${d.por || 'não informado'} em ${quando}`;
 }
+
+// Histórico da ficha em ORDEM CRONOLÓGICA pela data do fato (aplicação/realização), não pela data do lançamento no sistema.
+// Mais antigo primeiro, mais recente no fim; empate pela hora do lançamento. Só ordena a exibição: nada é alterado ou apagado.
+export function ordenarHistorico(historico) {
+  const chave = h => (/^\d{4}-\d{2}-\d{2}/.test(h && h.data) ? h.data.slice(0, 10) : String(h && h.registradoEm || '').slice(0, 10)) || '0000-00-00';
+  return (Array.isArray(historico) ? historico : [])
+    .map((h, i) => ({ h, i }))
+    .sort((a, b) => chave(a.h).localeCompare(chave(b.h)) || String(a.h.registradoEm || '').localeCompare(String(b.h.registradoEm || '')) || a.i - b.i)
+    .map(x => x.h);
+}

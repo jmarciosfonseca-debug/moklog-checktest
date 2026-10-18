@@ -57,3 +57,18 @@ test('texto do mapa traz o desligamento recente com o líder', () => {
   const t = montarTextoWhatsApp(m, { desligamentos: [{ id: 'a', nome: 'Fulano', cargo: 'Vigilante', tipo: 'Demissão', por: 'Líder Beltrano', em: '2026-10-16T12:00:00Z' }] });
   expect(t).toMatch(/FUNCIONÁRIO DESLIGADO/); expect(t).toMatch(/Líder Beltrano/);
 });
+
+test('histórico em ordem cronológica pela data do fato, não pelo lançamento', () => {
+  const { ordenarHistorico } = require('./equipeEventos');
+  const h = [
+    { id: 'novo-lancado-hoje-fato-2023', tipo: 'Treinamento', data: '2023-05-10', registradoEm: '2026-10-18T10:00:00Z' },
+    { id: 'falta-2026', tipo: 'Falta', data: '2026-10-01', registradoEm: '2026-10-01T08:00:00Z' },
+    { id: 'ft-2025', tipo: 'FT', data: '2025-03-02', registradoEm: '2025-03-02T08:00:00Z' },
+    { id: 'sem-data', tipo: 'Atraso', registradoEm: '2026-01-05T08:00:00Z' },
+    { id: 'mesmo-dia-b', tipo: 'Falta', data: '2026-10-01', registradoEm: '2026-10-01T12:00:00Z' },
+  ];
+  const copia = JSON.stringify(h);
+  expect(ordenarHistorico(h).map(x => x.id)).toEqual(['novo-lancado-hoje-fato-2023', 'ft-2025', 'sem-data', 'falta-2026', 'mesmo-dia-b']);
+  expect(JSON.stringify(h)).toBe(copia);          // não altera os dados
+  expect(ordenarHistorico(undefined)).toEqual([]);
+});

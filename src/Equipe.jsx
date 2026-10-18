@@ -62,7 +62,7 @@ import {SeloWhats, FolhaWhats, BotaoAprovarTodas, PainelAprovacoesLider} from ".
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
 import CampanhaExtras from './CampanhaExtras';
-import { afastamentoVigente, promocaoRecente } from "./equipeEventos";
+import { afastamentoVigente, promocaoRecente, ordenarHistorico } from "./equipeEventos";
 
 
 // Sem limite para desligados — ficam todos para consulta
@@ -791,7 +791,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
 
 function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
-  const hist    = [...(colab.historico||[])].reverse();
+  const hist    = ordenarHistorico(colab.historico);   // cronológico pela data do fato (aplicação), não pelo lançamento
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
   const fts     = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
   const mds     = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
