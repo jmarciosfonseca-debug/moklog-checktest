@@ -24,6 +24,7 @@ import { setDoc as fgSetDoc } from "./fireGuard";
 import { TOLERANCIA_MIN, temGradeEspecial, buildSlots, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot } from "./rondaVirtualGrade";
 import { montarRelatorioTurno, montarConsolidadoRonda, chaveColaboradora, periodoUltimosDias, rotulosColaboradoras } from "./relatorios/rondaVirtualRelatorio";
 import { baixarHtml } from "./relatorios/padraoMoked";
+import PlantaoDoMapa, { usePlantaoDoMapa } from "./mapaDiario/PlantaoDoMapa";
 
 
 // ── Definição das grades (turnos)
@@ -159,6 +160,8 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [tick, setTick] = useState(0); // força recálculo do relógio
   const [novoTipo, setNovoTipo] = useState("noturno");
   const [novoPlant, setNovoPlant] = useState("");
+  // Quem está de plantão agora pelo Mapa de Equipe (só cadastrados: o plantonista precisa estar na Equipe).
+  const plantaoMapa = usePlantaoDoMapa(project.id);
   // Folguista selecionado? (libera diurno em qualquer dia nos projetos elegíveis)
   const colabSel = equipe.find(c=>String(c.id)===String(novoPlant));
   const selEhFolguista = !!colabSel && (
@@ -527,6 +530,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
                   : "06h→17h a cada 1 hora")}
           </div>
           <label style={S.lbl}>Plantonista *</label>
+          <PlantaoDoMapa plantao={plantaoMapa} dark={dark} selecionado={(equipe.find(c=>String(c.id)===String(novoPlant))||{}).nome||""} filtro={x=>!!x.pessoaId&&equipe.some(c=>String(c.id)===String(x.pessoaId))} onEscolher={x=>setNovoPlant(String(x.pessoaId))}/>
           <select value={novoPlant} onChange={e=>setNovoPlant(e.target.value)} style={{...S.inp,marginBottom:10}}>
             <option value="">Selecione o plantonista...</option>
             {equipe.map(c=>(<option key={c.id} value={c.id}>{c.nome}{c.cargo?` — ${c.cargo}`:""}{c.turno?` · ${c.turno}`:""}</option>))}

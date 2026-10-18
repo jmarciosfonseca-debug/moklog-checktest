@@ -29,6 +29,8 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
 import { getAccess, grantSession } from "./session";
+import PlantaoDoMapa, { usePlantaoDoMapa } from "./mapaDiario/PlantaoDoMapa";
+import { liderDePlantao } from "./mapaDiario/plantao";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -530,6 +532,9 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const turno = turnoAtual();
   const dataP = dataPlantaoAtual();
   const tui = TURNO_UI[turno];
+  // Quem está realmente de plantão (Mapa de Equipe do turno): cobertura/FT/Base no lugar do titular que faltou.
+  const plantaoMapa = usePlantaoDoMapa(project.id, dataP, turno);
+  const liderMapa = liderDePlantao(plantaoMapa && plantaoMapa.pessoas);
 
   const saveTimer = useRef(null);
   const pendRef = useRef(null); // {full, idx} pendente de gravação
@@ -799,7 +804,8 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
                 onChange={e=>editRonda(r.id,"executante",e.target.value,true)}
                 style={{...S.inp,fontSize:14,padding:"11px 12px",opacity:travado?.7:1}}>
                 <option value="">— selecionar —</option>
-                {r.executante && !colabs.some(c=>c.nome===r.executante) && <option value={r.executante}>{r.executante}</option>}
+                {r.executante && !colabs.some(c=>c.nome===r.executante) && !((plantaoMapa&&plantaoMapa.pessoas)||[]).some(x=>x.pessoaNome===r.executante) && <option value={r.executante}>{r.executante}</option>}
+                {((plantaoMapa&&plantaoMapa.pessoas)||[]).filter(x=>!colabs.some(c=>c.nome===x.pessoaNome)).map(x=><option key={`mapa:${x.pessoaNome}`} value={x.pessoaNome}>{x.pessoaNome} · {x.base?"Base (Mapa de Equipe)":"Mapa de Equipe"}</option>)}
                 {colabs.map(c=><option key={c.nome} value={c.nome}>{c.nome}{c.cargo?` · ${c.cargo}`:""}</option>)}
               </select>
             </div>
@@ -998,12 +1004,21 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
           <div style={{marginTop:10}}>
             <label style={S.lbl}>Responsável pelo registro</label>
             {atualFull?.lider ? (
+              <>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{flex:1,fontSize:16,fontWeight:800,...S.txt}}>{atualFull.lider}</div>
                 {!travado && <button onClick={()=>{setLider("");setLiderDropOpen(false);}} style={S.btnSm}>trocar</button>}
               </div>
+              {!travado && liderMapa && norm(liderMapa.pessoaNome)!==norm(atualFull.lider) && (
+                <div role="status" style={{marginTop:8,fontSize:12,color:"#f59e0b",fontWeight:700}}>
+                  No Mapa de Equipe, quem está no posto de líder neste plantão é {liderMapa.pessoaNome}.{" "}
+                  <button onClick={()=>setLider(liderMapa.pessoaNome)} style={{...S.btnSm,marginLeft:4}}>Usar {liderMapa.pessoaNome}</button>
+                </div>
+              )}
+              </>
             ) : (
               <div>
+                {!travado && <PlantaoDoMapa plantao={plantaoMapa} dark={dark} titulo="Quem está de plantão (Mapa de Equipe)" onEscolher={x=>{setLider(x.pessoaNome);setLiderDropOpen(false);}}/>}
                 <button onClick={()=>setLiderDropOpen(o=>!o)}
                   style={{...S.inp,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontSize:14,fontWeight:600,color:dark?"#94a3b8":"#64748b"}}>
                   <span>Toque para selecionar…</span>

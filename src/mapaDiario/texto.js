@@ -2,7 +2,7 @@
 // Títulos em negrito e emoji por assunto (início, efetivo, destaque de falta/FT e informações adicionais abaixo). P260B e P260C saem com cabeçalho "P260-B"/"P260-C"
 // (o P260B envia ao grupo do P260A).
 import { rotuloDia } from "./regras";
-import { ROTULO_SITUACAO, kmRodado, rotuloSaida } from "./modelo";
+import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloCorrecaoKm, rotuloBaixa } from "./modelo";
 
 export const cabecalhoProjeto = (pid) => (/^P260[BC]$/.test(pid) ? `P260-${pid.slice(-1)}` : pid);
 
@@ -82,16 +82,18 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "", desligamentos = []
   }
   const qs = Object.values(mat.quantidades || {}).filter((q) => q && String(q.qtd).trim());
   if (qs.length) m.push(`📦 Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
+  (mat.baixas || []).forEach((b) => m.push(`🔻 ${rotuloBaixa(b)}`));
   blocos.push(m);
   // Veículo sem nenhuma leitura não vira linha (antes saía "Veículo 2: —").
   const veic = [];
   (mapa.veiculos || []).forEach((v) => {
     const r = kmRodado(v);
     const partes = [];
-    if (v.kmAnterior != null && v.kmAnterior !== "") partes.push(`anterior ${v.kmAnterior}`);
-    if (v.kmAtual != null && v.kmAtual !== "") partes.push(`atual ${v.kmAtual}`);
+    if (v.kmAnterior != null && v.kmAnterior !== "") partes.push(`anterior ${v.kmAnterior}${v.correcaoKm ? ` (${rotuloCorrecaoKm(v)})` : ""}`);
+    if (v.kmAtual != null && v.kmAtual !== "") partes.push(`atual ${v.kmAtual}${v.kmAtualCorrigido != null && v.kmAtualCorrigido !== "" ? ` (corrigido depois para ${v.kmAtualCorrigido})` : ""}`);
     if (r != null) partes.push(`rodado ${r} km`);
-    if (partes.length) veic.push(`• *${v.rotulo || "Veículo"}:* ${partes.join(" · ")}`);
+    if (partes.length) veic.push(`• *${v.rotulo || "Veículo"}${v.placa ? ` ${v.placa}` : ""}:* ${partes.join(" · ")}`);
+    if (v.trocaMoto) veic.push(`   ↳ Moto substituída${v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}`);
   });
   if (veic.length) blocos.push(["🚗 *VEÍCULOS*", ...veic]);
   const s = mapa.supervisao;

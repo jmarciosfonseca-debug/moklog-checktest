@@ -31,6 +31,7 @@ export const CATEGORIAS = {
   ft: { rotulo: "FT", gerencial: true, ordem: 2 },
   mapa: { rotulo: "Mapa de Equipe", gerencial: true, ordem: 1 },
   material: { rotulo: "Material no mapa", gerencial: true, ordem: 2 },
+  veiculo: { rotulo: "Moto / km", gerencial: true, ordem: 3 },
   supervisao: { rotulo: "Supervisão", gerencial: true, ordem: 5 },
   keyaccess: { rotulo: "KeyAccess", gerencial: false, ordem: 2 },
   ctmk: { rotulo: "CTMK", gerencial: false, ordem: 2 },

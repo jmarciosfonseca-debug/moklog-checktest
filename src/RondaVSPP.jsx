@@ -6,6 +6,7 @@ import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { setDoc } from "./fireGuard";
 import { montarConsolidadoVSPP } from "./relatorios/rondaVsppConsolidado";
 import { abrirParaImpressao } from "./relatorios/padraoMoked";
+import PlantaoDoMapa, { usePlantaoDoMapa } from "./mapaDiario/PlantaoDoMapa";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLMwBqccgWDk7VFQdLYKuLNXWtkNn5WGA",
@@ -196,6 +197,8 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
   const [consolDe,setConsolDe]=useState("");
   const [consolAte,setConsolAte]=useState("");
   const adminAuth=sharedAuth==="admin";
+  // Quem está de plantão pelo Mapa de Equipe do dia (ronda VSPP é diurna): cobertura/FT/Base no lugar de quem faltou.
+  const plantaoMapa=usePlantaoDoMapa(project.id, screen==="dia"&&diaAtual?diaAtual.data:null, screen==="dia"&&diaAtual?"D":null);
 
   useEffect(()=>{
     Promise.all([loadRondas(project.id),loadEquipe(project.id)]).then(([r,e])=>{
@@ -271,9 +274,11 @@ export default function RondaVSPP({ project, onBack, dark, sharedAuth, onAuthGra
             {/* Executor */}
             <div style={S.card}>
               <label style={S.lbl}>Executor da Ronda *</label>
+              <PlantaoDoMapa plantao={plantaoMapa} dark={dark} selecionado={diaAtual.executor} onEscolher={x=>{const n={...diaAtual,executor:x.pessoaNome};setDiaAtual(n);salvarDia(n);}}/>
               {colabs.length>0?(
                 <select value={diaAtual.executor} onChange={e=>{const n={...diaAtual,executor:e.target.value};setDiaAtual(n);salvarDia(n);}} style={{...S.inp}}>
                   <option value="">— Selecione quem está em campo —</option>
+                  {diaAtual.executor&&diaAtual.executor!=="__outro"&&!colabs.some(c=>c.nome===diaAtual.executor)&&<option value={diaAtual.executor}>{diaAtual.executor}</option>}
                   {colabs.map(c=><option key={c.id||c.nome} value={c.nome}>{c.nome} · {c.cargo}</option>)}
                   <option value="__outro">Outro (digitar abaixo)</option>
                 </select>

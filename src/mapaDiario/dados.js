@@ -4,12 +4,13 @@
 import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer, collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { setDoc } from "../fireGuard";
-import { diasEntre } from "./regras";
+import { diasEntre, chaveMapa } from "./regras";
+import { quemEstaDePlantao, turnoDoMapa } from "./plantao";
 import { contarOcorrencias } from "./painel";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
 import { semUndefined, corrigirRondaNosRotulos, ehMoto, kmInteiro } from "./modelo";
-import { gravarSecaoEquipamentos } from "../equipamentosStore";
+import { gravarSecaoEquipamentos, darBaixaEquipamento } from "../equipamentosStore";
 import { afastamentoVigente, desligamentosRecentes } from "../equipeEventos";
 
 const db = () => {
@@ -46,6 +47,12 @@ export async function loadEquipamentos(pid) {
 export async function loadMapa(pid, chave) {
   const snap = await getDoc(doc(db(), "equipes", pid, "mapas", chave));
   return snap.exists() ? corrigirRondaNosRotulos(snap.data()) : null;
+}
+
+// Quem está de plantão no turno (pelo Mapa de Equipe, rascunho ou enviado). Sem mapa → null (o módulo segue como sempre).
+export async function loadPlantaoDoMapa(pid, data, turno) {
+  const m = await loadMapa(pid, chaveMapa(pid, data, turnoDoMapa(turno)));
+  return m ? { mapa: m, pessoas: quemEstaDePlantao(m) } : null;
 }
 
 // Último mapa já enviado do mesmo turno, anterior a `antesDe` (serve de base para pré-preencher).
@@ -216,7 +223,30 @@ export async function corrigirItemEquipamento(pid, itemId, { identificacao, qtd 
   return loadEquipamentosFresco(pid);
 }
 
+// O líder dá baixa no mapa num item do cadastro (substituído, extraviado...). id = "categoria:idDoItem".
+// O item sai da lista ativa (some do mapa, do PDF e das contagens) e fica no histórico `baixados` do projeto.
+export async function darBaixaItemEquipamento(pid, itemId, { motivo, obs = "", por = "" }) {
+  const [cat, ...resto] = String(itemId).split(":");
+  const idItem = resto.join(":");
+  const eq = (await loadEquipamentosFresco(pid)) || {};
+  const alvo = (Array.isArray(eq[cat]) ? eq[cat] : []).find((x) => x && x.id != null && String(x.id) === idItem);
+  if (!alvo) throw new Error("Este item não está mais no cadastro (ou é antigo, sem identificador). Feche e abra o mapa de novo; se continuar, dê baixa em Equipamentos.");
+  return darBaixaEquipamento(pid, { categoria: cat, id: alvo.id, motivo, obs, por }, eq);
+}
+
+// O líder cadastra pelo mapa o item que entrou no lugar do baixado (ex.: lanterna tática no lugar da XRT-6000A).
+export async function adicionarItemEquipamento(pid, categoria, { identificacao, qtd = 1 }) {
+  const eq = (await loadEquipamentosFresco(pid)) || {};
+  const lista = Array.isArray(eq[categoria]) ? eq[categoria] : [];
+  const novo = { id: Date.now().toString() + Math.random().toString(36).substring(2, 5), status: "ok", justificativa: "", dataProblem: "", historico: [], identificacao: String(identificacao || "").trim(), qtd: Number(qtd) };
+  await gravarSecaoEquipamentos(pid, categoria, eq, [...lista, novo]);
+  return loadEquipamentosFresco(pid);
+}
+
 // Ao enviar o mapa: o km da Moto no cadastro acompanha o odômetro (só se for maior).
+// Exceção: o líder corrigiu o km anterior neste mapa (erro de digitação) — o cadastro recebe o km deste mapa
+// mesmo que seja menor, porque o valor maior que estava lá era o erro.
+// Mapa de outra moto (placa diferente da do cadastro) nunca mexe no cadastro.
 export async function atualizarKmMotoNoCadastro(pid, mapa) {
   const v = (mapa.veiculos || []).find(ehMoto);
   const km = v ? kmInteiro(v.kmAtual) : null;
@@ -224,8 +254,32 @@ export async function atualizarKmMotoNoCadastro(pid, mapa) {
   const eq = (await loadEquipamentosFresco(pid)) || {};
   const moto = eq.moto;
   if (!moto || typeof moto !== "object") return { atualizado: false };
+  const np = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (v.placa && moto.placa && np(v.placa) !== np(moto.placa)) return { atualizado: false };
   const atual = kmInteiro(moto.km);
-  if (atual != null && km <= atual) return { atualizado: false };
+  if (atual === km) return { atualizado: false };
+  if (atual != null && km < atual && !v.correcaoKm) return { atualizado: false };
   await gravarSecaoEquipamentos(pid, "moto", eq, { ...moto, km });
   return { atualizado: true, km };
+}
+
+// Correção de km: o mapa ANTERIOR (onde houve o erro de digitação) recebe `kmAtualCorrigido` no veículo.
+// O `kmAtual` digitado lá fica intacto (histórico). Leitura do servidor + gravação do documento inteiro (sem transação).
+export async function corrigirKmNoMapaAnterior(pid, mapaId, veiculoId, km, info = {}) {
+  if (!pid || !mapaId || km == null) return { atualizado: false };
+  return enfileirar(mapaId, async () => {
+    const ref = doc(db(), "equipes", pid, "mapas", mapaId);
+    let snap;
+    try { snap = await getDocFromServer(ref); } catch (e) { snap = await getDoc(ref); }
+    if (!snap.exists()) return { atualizado: false };
+    const m = snap.data();
+    const alvo = (m.veiculos || []).findIndex((x) => x && (x.id === veiculoId || (veiculoId === "moto" && ehMoto(x))));
+    if (alvo < 0) return { atualizado: false };
+    const v = m.veiculos[alvo];
+    if (kmInteiro(v.kmAtualCorrigido) === km) return { atualizado: false };   // já aplicado
+    const veiculos = m.veiculos.map((x, i) => (i === alvo ? { ...x, kmAtualCorrigido: km, kmCorrecao: { para: km, motivo: info.motivo || "", porMapa: info.porMapa || "", em: info.em || new Date().toISOString() } } : x));
+    const doc_ = semUndefined({ ...m, veiculos, atualizadoEm: new Date().toISOString() });
+    if (!isDemo()) await comTimeout(setDoc(ref, doc_), 8000, "Sem resposta do servidor — confira a conexão.");
+    return { atualizado: true };
+  });
 }
