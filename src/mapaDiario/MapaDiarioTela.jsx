@@ -6,7 +6,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
@@ -14,6 +14,7 @@ import { isDemo } from "../session";
 import * as dados from "./dados";
 
 const dataBR = (iso) => iso.split("-").reverse().join("/");
+const kmInteiroTela = (v) => { const n = Number(String(v ?? "").replace(/\D/g, "")); return String(v ?? "").replace(/\D/g, "") === "" ? null : n; };
 const nomeCurto = (c) => c.nome;
 
 export default function MapaDiarioTela({ project, dark, onBack, io = dados, agoraFn = () => new Date() }) {
@@ -53,6 +54,10 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [eqEdit, setEqEdit] = useState(null);       // correção de cadastro de equipamento pelo líder
   const [saidaForm, setSaidaForm] = useState(null);   // saída antecipada / substituição (mapa já enviado)
   const [saidaErros, setSaidaErros] = useState([]);
+  const [kmForm, setKmForm] = useState(null);        // correção do km anterior { veiculoId, km, motivo, erros }
+  const [baixaForm, setBaixaForm] = useState(null);  // baixa de equipamento pelo líder { id, motivo, obs, erro, salvando }
+  const [baixaMsg, setBaixaMsg] = useState("");
+  const [cadastroFalhou, setCadastroFalhou] = useState(false); // não leu Equipamentos: troca de moto não pôde ser conferida
   const reenvio = useRef(null);                      // { timer, mapa } do reenvio automático
 
   const horario = horarioDoTurno(pid, turno);
@@ -77,13 +82,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           const base = await io.loadUltimoMapa(pid, turno, data, { gapPar: projetoPuxaEquipe(pid) }).catch(() => null);
           m = novoMapa({ projetoId: pid, data, turno, horario: horario ? { inicio: horario.inicio, fim: horario.fim } : null, base, agora: agoraFn() });
         }
+        let falhouCadastro = false;
+        const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => { falhouCadastro = true; return null; }) : Promise.resolve(null));
+        if (vivo) setCadastroFalhou(falhouCadastro);
         if (m.status !== "enviado") {
           // Km anterior: do ÚLTIMO plantão do projeto (qualquer turno/equipe), não do último do mesmo turno.
-          if (io.loadUltimoPlantao) { const ult = await io.loadUltimoPlantao(pid, data, turno).catch(() => null); if (ult) m = herdarKmDoUltimoPlantao(m, ult); }
+          // A moto do cadastro entra junto: placa atual e troca de moto (moto nova começa do km inicial dela).
+          if (io.loadUltimoPlantao) {
+            const FALHOU = {};
+            const ult = await io.loadUltimoPlantao(pid, data, turno).catch(() => FALHOU);
+            if (ult !== FALHOU) m = herdarKmDoUltimoPlantao(m, ult, eq && eq.moto);
+          }
           const vis = await io.loadUltimaVisita(pid).catch(() => null);
           m = { ...m, supervisao: vis };
         }
-        const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
         if (!vivo) return;
         let aviso = "";
         if (m.status !== "enviado" && projetoPuxaEquipe(pid)) {
@@ -101,6 +113,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         } else setAvisoReaberto("");
         setAvisoEquipe(aviso);
         setColabs(cs); setMapa(m.status === "enviado" ? (reabrir ? garantirMoto(completo) : m) : garantirMoto(completarPostosFixos(m, cs))); setItensMat(itensDeEquipamento(eq, pid, turno));
+        if (m.status === "enviado") aplicarCorrecoesKm(m, 1);   // reabriu um mapa enviado: garante que a correção de km chegou ao plantão anterior
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -181,11 +194,30 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
       setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
       setFichaMsg(null);
       await lancarFicha(final);                       // Falta/FT/atraso → ficha (sem duplicar)
-      if (io.atualizarKmMotoNoCadastro && !isDemo()) io.atualizarKmMotoNoCadastro(pid, final).catch(() => {}); // km da moto no cadastro acompanha o mapa (só se maior)
+      if (io.atualizarKmMotoNoCadastro && !isDemo()) io.atualizarKmMotoNoCadastro(pid, final).catch(() => {}); // km da moto no cadastro acompanha o mapa (só se maior, ou corrigido)
+      aplicarCorrecoesKm(final);
     } catch (e) {
       setAvisos([`SEM CONFIRMAÇÃO DO SERVIDOR: ${(e && e.message) || "erro"}. O mapa ficou neste aparelho e o WhatsApp NÃO foi liberado. Mantenha esta tela aberta: vou tentar de novo sozinho a cada 20 segundos — ou toque em Concluir mapa quando o sinal voltar.`]);
       agendarReenvio(final);
     } finally { setEnviando(false); enviandoRef.current = false; }
+  };
+  // Km anterior corrigido neste mapa: o plantão do erro recebe o km certo (kmAtualCorrigido), para o consolidado não somar km irreal.
+  // Idempotente; tenta de novo se o sinal cair (e de novo sempre que o mapa for reaberto). Correção desfeita numa revisão volta o plantão anterior ao digitado.
+  const aplicarCorrecoesKm = (final, tentativas = 3) => {
+    if (!io.corrigirKmNoMapaAnterior || isDemo() || !final) return;
+    const veics = final.veiculos || [];
+    const desfeitos = (final.revisoes || []).length && io.desfazerKmNoMapaAnterior ? veics.filter((v) => !v.correcaoKm && v.kmAnteriorDe) : [];
+    const corrigidos = veics.filter((v) => v.correcaoKm);
+    if (!corrigidos.length && !desfeitos.length) return;
+    const executar = async (resta) => {
+      try {
+        let anteriorId = null;
+        if (corrigidos.some((v) => !v.kmAnteriorDe) && io.loadUltimoPlantao) { const u = await io.loadUltimoPlantao(pid, final.data, final.turno); anteriorId = u && u.id; }
+        for (const v of corrigidos) { const alvo = v.kmAnteriorDe || anteriorId; if (alvo) await io.corrigirKmNoMapaAnterior(pid, alvo, v.id, kmInteiroTela(v.kmAnterior), { motivo: v.correcaoKm.motivo, porMapa: final.id, em: v.correcaoKm.em, rotulo: v.rotulo || "" }); }
+        for (const v of desfeitos) await io.desfazerKmNoMapaAnterior(pid, v.kmAnteriorDe, v.id, final.id, v.rotulo || "");
+      } catch (e) { if (resta > 1) setTimeout(() => executar(resta - 1), 15000); }
+    };
+    executar(tentativas);
   };
   const pararReenvio = () => { if (reenvio.current) { clearInterval(reenvio.current.timer); reenvio.current = null; } setReenvioPendente(0); };
   const agendarReenvio = (final) => {
@@ -199,6 +231,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         setMapa(gravado); setSalvo("Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
         setFichaMsg(null);
         await lancarFicha(gravado);
+        if (io.atualizarKmMotoNoCadastro && !isDemo()) io.atualizarKmMotoNoCadastro(pid, gravado).catch(() => {});
+        aplicarCorrecoesKm(gravado);
       } catch (e) { /* segue tentando enquanto a tela estiver aberta */ }
     }, 20000) };
   };
@@ -258,6 +292,77 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={salvarCadastroItem} disabled={eqEdit.salvando} style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none" }}>{eqEdit.salvando ? "Salvando…" : "Salvar no cadastro"}</button>
           <button onClick={() => setEqEdit(null)} style={S.btn}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
+
+  // Baixa do item no cadastro (trocado, extraviado, danificado, devolvido). "Substituído" já cadastra o item que entrou.
+  const salvarBaixa = async (it) => {
+    const erro = validarBaixa(baixaForm);
+    if (erro) return setBaixaForm((f) => ({ ...f, erro }));
+    const subst = baixaForm.motivo === "Substituído" ? String(baixaForm.substituto || "").trim() : "";
+    const qtdSub = soDigitos(baixaForm.qtd) === "" ? 1 : Number(soDigitos(baixaForm.qtd));
+    if (subst && (qtdSub < (it.categoria === "municao" ? 0 : 1) || qtdSub > 100000)) return setBaixaForm((f) => ({ ...f, erro: "Quantidade do item novo inválida." }));
+    setBaixaForm((f) => ({ ...f, salvando: true, erro: "" }));
+    try {
+      let eq = await io.darBaixaItemEquipamento(pid, it.id, { motivo: baixaForm.motivo, obs: baixaForm.obs, por: quemPreenche() });
+      let aviso = "";
+      if (subst && io.adicionarItemEquipamento) {
+        try { eq = await io.adicionarItemEquipamento(pid, it.categoria, { identificacao: subst, qtd: qtdSub }); }
+        catch (e) { aviso = ` A baixa foi feita, mas o item novo NÃO foi cadastrado (${(e && e.message) || "erro"}): cadastre em Equipamentos.`; }
+      }
+      setItensMat(itensDeEquipamento(eq, pid, turno));
+      alterar((m) => registrarBaixaNoMapa(m, it, { motivo: baixaForm.motivo, obs: baixaForm.obs, substituto: aviso ? "" : subst }, agoraFn()));
+      setBaixaForm(null);
+      setBaixaMsg(`${it.nome}: baixa registrada (${baixaForm.motivo}).${subst && !aviso ? ` ${subst} cadastrado no lugar.` : ""}${aviso}`);
+    } catch (e) { setBaixaForm((f) => ({ ...f, salvando: false, erro: `Não deu baixa: ${(e && e.message) || "erro"}. Tente de novo.` })); }
+  };
+  const renderBaixa = (it) => {
+    if (!baixaForm || baixaForm.id !== it.id) return <button onClick={() => { setEqEdit(null); setBaixaMsg(""); setBaixaForm({ id: it.id, motivo: "", obs: "", substituto: "", qtd: "1", erro: "" }); }} style={{ ...S.btn, marginTop: 6, marginLeft: 6, fontSize: 11, padding: "4px 10px" }} aria-label={`Dar baixa: ${it.nome}`}>⊘ Dar baixa (trocado, extraviado…)</button>;
+    return (
+      <div data-testid="baixa-item" style={{ marginTop: 6, padding: 8, border: `1px dashed #dc262688`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 12, color: cor.txt2 }}>O item sai do cadastro e da lista do mapa (fica no histórico de baixas do projeto, com o motivo).</div>
+        <select aria-label={`Motivo da baixa: ${it.nome}`} value={baixaForm.motivo} onChange={(e) => setBaixaForm((f) => ({ ...f, motivo: e.target.value, erro: "" }))} style={S.in}>
+          <option value="">Motivo…</option>
+          {MOTIVOS_BAIXA.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <input aria-label={`Observação da baixa: ${it.nome}`} placeholder={baixaForm.motivo === "Outro" ? "Descreva o motivo (obrigatório)" : "Observação (opcional)"} value={baixaForm.obs} onChange={(e) => setBaixaForm((f) => ({ ...f, obs: e.target.value }))} style={S.in} />
+        {baixaForm.motivo === "Substituído" && <>
+          <input aria-label={`Item que entrou no lugar de ${it.nome}`} placeholder={`Item que entrou no lugar (ex.: ${it.rotuloCategoria || "item"} tática 01)`} value={baixaForm.substituto} onChange={(e) => setBaixaForm((f) => ({ ...f, substituto: e.target.value }))} style={S.in} />
+          {String(baixaForm.substituto || "").trim() && <input aria-label="Quantidade do item novo" type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Quantidade" value={baixaForm.qtd} onChange={(e) => setBaixaForm((f) => ({ ...f, qtd: soDigitos(e.target.value) }))} style={S.in} />}
+        </>}
+        {baixaForm.erro && <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{baixaForm.erro}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => salvarBaixa(it)} disabled={baixaForm.salvando} style={{ ...S.btn, background: "#dc2626", color: "#fff", border: "none" }}>{baixaForm.salvando ? "Gravando…" : "Confirmar baixa"}</button>
+          <button onClick={() => setBaixaForm(null)} style={S.btn}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
+
+  // Quem está preenchendo (para o histórico das correções): o líder do posto de líder no mapa.
+  const quemPreenche = () => ((mapa && mapa.postos) || []).find((p) => p.lider && (p.pessoaNome || "").trim())?.pessoaNome || "Líder do plantão";
+
+  // Correção do km anterior (erro de digitação no plantão passado). Função de render, não componente.
+  const renderCorrigirKm = (v) => {
+    if (!kmForm || kmForm.veiculoId !== v.id) return <button onClick={() => setKmForm({ veiculoId: v.id, km: "", motivo: "", erros: [] })} style={{ ...S.btn, marginTop: 6, fontSize: 11, padding: "4px 10px" }} aria-label={`Corrigir km anterior ${v.rotulo || "Veículo"}`}>✎ Corrigir km anterior</button>;
+    const salvar = () => {
+      const r = corrigirKmAnterior(mapa, v.id, { km: kmForm.km, motivo: kmForm.motivo, por: quemPreenche(), agora: agoraFn() });
+      if (r.erros.length) return setKmForm((f) => ({ ...f, erros: r.erros }));
+      alterar(() => r.mapa);
+      setKmForm(null);
+    };
+    return (
+      <div data-testid="corrigir-km" style={{ marginTop: 6, padding: 8, border: `1px dashed ${cor.line}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 12, color: cor.txt2 }}>Use só quando o km do plantão anterior foi lançado errado. Fica registrado quem corrigiu e o motivo; o plantão anterior recebe o km certo ao concluir.</div>
+        {cadastroFalhou && ehMoto(v) && <div role="alert" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700 }}>Não consegui ler o cadastro de Equipamentos agora. Se a MOTO FOI TROCADA, não corrija aqui: feche e abra o mapa de novo (a moto nova começa do km inicial dela).</div>}
+        <input aria-label={`Km anterior correto ${v.rotulo || "Veículo"}`} type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Km anterior correto (só números)" value={kmForm.km} onChange={(e) => setKmForm((f) => ({ ...f, km: soDigitos(e.target.value) }))} style={S.in} />
+        <input aria-label="Motivo da correção do km" placeholder="Motivo (ex.: erro de digitação no plantão anterior)" value={kmForm.motivo} onChange={(e) => setKmForm((f) => ({ ...f, motivo: e.target.value }))} style={S.in} />
+        {kmForm.erros.length > 0 && <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{kmForm.erros.map((e) => <div key={e}>{e}</div>)}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={salvar} style={{ ...S.btn, background: "#16a34a", color: "#fff", border: "none" }}>Salvar correção</button>
+          <button onClick={() => setKmForm(null)} style={S.btn}>Cancelar</button>
         </div>
       </div>
     );
@@ -561,6 +666,8 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                 {!mat.semAlteracao && exc.length === 0 && !matAberto && <textarea aria-label="O que mudou no material" rows={2} placeholder="O que mudou no material" value={mat.obs || ""} onChange={(e) => setMat((m) => ({ ...m, obs: e.target.value }))} style={{ ...S.in, marginTop: 8 }} />}
                 {matAberto && (
                   <div style={{ marginTop: 10 }}>
+                    {baixaMsg && <div role="status" style={{ fontSize: 12, color: "#16a34a", fontWeight: 700, marginBottom: 8 }}>{baixaMsg}</div>}
+                    {(mat.baixas || []).map((b) => <div key={b.id} style={{ fontSize: 12, color: cor.txt2, marginBottom: 4 }}>🔻 {rotuloBaixa(b)}</div>)}
                     {itensMat.length === 0 && <div style={{ fontSize: 12, color: cor.txt2 }}>Sem equipamentos cadastrados neste projeto. Use "+ Outro item" para registrar uma anomalia.</div>}
                     {Object.entries(grupos).map(([nomeGrupo, itens]) => (
                       <div key={nomeGrupo} style={{ marginBottom: 10 }}>
@@ -572,6 +679,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                               <div style={{ fontSize: 13, color: cor.txt, fontWeight: 700 }}>{it.nome}{it.detalhe ? <span style={{ color: cor.txt2, fontWeight: 500 }}> · {it.detalhe}</span> : null}</div>
                               {it.cadastro && it.cadastro !== "ok" && <div style={{ fontSize: 11, color: "#f59e0b" }}>No cadastro de Equipamentos: {it.cadastro}</div>}
                               {it.cadastro != null && io.corrigirItemEquipamento && renderCorrigirCadastro(it)}
+                              {it.origem !== "base" && io.darBaixaItemEquipamento && renderBaixa(it)}
                               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                                 {SITUACOES_MATERIAL.map((o) => (
                                   <button key={o.id} aria-pressed={sit === o.id} aria-label={`${it.nome}: ${o.rotulo}`} onClick={() => setMat((m) => definirSituacaoMaterial(m, it, o.id))} style={S.chip(sit === o.id, o.id === "ok" ? "#16a34a" : o.id === "anomalia" ? "#f59e0b" : "#dc2626")}>{o.rotulo}</button>
@@ -607,11 +715,17 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           <div style={S.card}>
             <div style={S.h}>Veículos (odômetro)</div>
             {mapa.veiculos.map((v, i) => (
-              <div key={v.id || i} style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
-                <div style={{ flex: 1 }}><div style={S.lab}>{v.rotulo || "Veículo"} · anterior {v.kmAnterior ?? "—"}{ehMoto(v) && projetoComMoto(pid) ? " · obrigatório" : ""}</div>
-                  <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual (só números)" value={v.kmAtual ?? ""} onChange={(e) => { const dig = soDigitos(e.target.value); alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: dig } : x)) })); }} style={{ ...S.in, ...(kmRodado(v) != null && kmRodado(v) < 0 ? { borderColor: "#dc2626" } : {}) }} />
-                  {kmRodado(v) != null && kmRodado(v) < 0 && <div role="alert" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>Menor que o anterior ({v.kmAnterior}). Confira o odômetro e digite só números — o mapa não conclui assim.</div>}</div>
-                <div style={{ fontSize: 12, color: cor.txt2, minWidth: 70 }}>{kmRodado(v) != null ? `rodou ${kmRodado(v)} km` : ""}</div>
+              <div key={v.id || i} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                  <div style={{ flex: 1 }}><div style={S.lab}>{v.rotulo || "Veículo"}{v.placa ? ` ${v.placa}` : ""} · anterior {v.kmAnterior ?? "—"}{v.correcaoKm ? " (corrigido)" : ""}{ehMoto(v) && projetoComMoto(pid) ? " · obrigatório" : ""}</div>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual (só números)" value={v.kmAtual ?? ""} onChange={(e) => { const dig = soDigitos(e.target.value); alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: dig } : x)) })); }} style={{ ...S.in, ...(kmRodado(v) != null && kmRodado(v) < 0 ? { borderColor: "#dc2626" } : {}) }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: cor.txt2, minWidth: 70 }}>{kmRodado(v) != null ? `rodou ${kmRodado(v)} km` : ""}</div>
+                </div>
+                {v.trocaMoto && <div role="status" style={{ fontSize: 12, color: cor.ac, fontWeight: 700, marginTop: 4 }}>Moto substituída{v.trocaMoto.em ? ` em ${dataBR(String(v.trocaMoto.em).slice(0, 10))}` : ""}{v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}: o km anterior é o km inicial da moto nova.</div>}
+                {kmRodado(v) != null && kmRodado(v) < 0 && <div role="alert" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>Menor que o anterior ({v.kmAnterior}). Confira o odômetro. Se o km anterior foi digitado errado no plantão passado, toque em "Corrigir km anterior".</div>}
+                {v.correcaoKm && <div role="status" style={{ fontSize: 12, color: cor.txt2, marginTop: 4 }}>Km anterior {rotuloCorrecaoKm(v)}. <button onClick={() => alterar((m) => desfazerCorrecaoKm(m, v.id))} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Desfazer correção</button></div>}
+                {renderCorrigirKm(v)}
               </div>
             ))}
             <button onClick={() => alterar((m) => ({ ...m, veiculos: [...m.veiculos, { id: `v${Date.now().toString(36)}`, rotulo: m.veiculos.length ? `Veículo ${m.veiculos.length + 1}` : "Moto", kmAnterior: null, kmAtual: null }] }))} style={S.btn}>+ Veículo</button>

@@ -20,7 +20,37 @@ function validate(section,before,after,identity){
   if(section==='checagemSemanal'&&(!/^\d{4}-\d{2}-\d{2}$/.test(after.alvo||'')||typeof after.ultimoResultado?.por!=='string'||after.ultimoResultado.por.trim().length<3))fail(400,'Assinatura da checagem inválida.');
  }
 }
+// Baixa de equipamento (líder ou gerencial): o item sai da lista ativa e vai, inteiro, para `baixados` com o motivo.
+// Uma única gravação (nada se perde no meio); as listas ativas continuam limpas para todas as telas e relatórios.
+const MOTIVOS_BAIXA=['Substituído','Extraviado','Danificado / inservível','Devolvido','Outro'];
+async function baixa(db,pid,pedido,identity){
+ const p=pedido&&typeof pedido==='object'?pedido:{};
+ if(!CATS.includes(p.categoria))fail(400,'Categoria inválida.');
+ const semId=p.id==null;   // item antigo sem identificador: localizado por posição + identificação
+ if(semId?!(Number.isSafeInteger(p.indice)&&p.indice>=0&&typeof p.identificacao==='string'):!['string','number'].includes(typeof p.id)||!String(p.id))fail(400,'Item inválido.');
+ if(!MOTIVOS_BAIXA.includes(p.motivo))fail(400,'Escolha o motivo da baixa.');
+ const obs=typeof p.obs==='string'?p.obs.trim().slice(0,500):'';
+ if(p.motivo==='Outro'&&obs.length<3)fail(400,'Descreva o motivo da baixa.');
+ const por=typeof p.por==='string'?p.por.trim().slice(0,120):'';
+ const ref=db.collection('equipamentos').doc(pid);
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref),current=snap.exists?snap.data():{};
+  const lista=Array.isArray(current[p.categoria])?current[p.categoria]:[];
+  const alvo=semId?(lista[p.indice]&&lista[p.indice].id==null&&String(lista[p.indice].identificacao||'')===p.identificacao?lista[p.indice]:null):lista.find(x=>x&&String(x.id)===String(p.id));
+  const baixados=Array.isArray(current.baixados)?current.baixados:[];
+  if(!alvo){
+   if(!semId&&baixados.some(x=>x&&x.categoria===p.categoria&&String(x.id)===String(p.id)))return current;   // reenvio: já baixado
+   fail(404,'Este item não está mais no cadastro. Reabra a tela.');
+  }
+  const em=new Date().toISOString();
+  const registro={...alvo,categoria:p.categoria,baixa:{motivo:p.motivo,obs,por,nivel:identity&&identity.nivel||'',em}};
+  const patch={[p.categoria]:lista.filter(x=>x!==alvo),baixados:[...baixados,registro],updatedAt:em};
+  if(snap.exists)tx.update(ref,patch);else tx.set(ref,patch);
+  return {...current,...patch};
+ });
+}
 async function save(db,pid,section,before,after,identity){
+ if(section==='baixa')return baixa(db,pid,after,identity);
  if(![...CATS,'moto','checagemSemanal'].includes(section))fail(400,'Seção inválida.');
  const ref=db.collection('equipamentos').doc(pid);
  return db.runTransaction(async tx=>{
@@ -33,4 +63,4 @@ async function save(db,pid,section,before,after,identity){
   return {...current,...patch};
  });
 }
-module.exports={save,validate};
+module.exports={save,validate,MOTIVOS_BAIXA};

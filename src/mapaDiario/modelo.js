@@ -132,7 +132,8 @@ export function itensDeEquipamento(data, projetoId = null, turno = null) {
     });
   }
   // Base do Codex (o que o projeto declara nos mapas) + cadastro: o cadastro vence por categoria.
-  const comCadastro = new Set(cad.map((i) => i.categoria));
+  // Categoria que já teve cadastro (mesmo que tudo tenha sido baixado) não volta para a linha genérica da base.
+  const comCadastro = new Set([...cad.map((i) => i.categoria), ...((data && Array.isArray(data.baixados) ? data.baixados : []).map((b) => b && b.categoria).filter(Boolean))]);
   const base = itensDaBase(projetoId, turno, rotulos).filter((i) => !comCadastro.has(i.categoria));
   const ordem = CATEGORIAS_MATERIAL.map(([c]) => c);
   return [...cad, ...base].sort((a, b) => ordem.indexOf(a.categoria) - ordem.indexOf(b.categoria));
@@ -144,6 +145,23 @@ export function resumoItens(itens) {
   (itens || []).forEach((i) => cont.set(i.rotuloCategoria, (cont.get(i.rotuloCategoria) || 0) + 1));
   return [...cont.entries()].map(([k, n]) => `${k} ${n}`).join(" · ");
 }
+
+// ── Baixa de equipamento pelo líder (troca, extravio, dano, devolução) ───────
+// Mesma lista do servidor (api/ai/lib/equipamentosSave.js). O cadastro é atualizado pelo servidor; o mapa só guarda o registro.
+export const MOTIVOS_BAIXA = ["Substituído", "Extraviado", "Danificado / inservível", "Devolvido", "Outro"];
+export function validarBaixa({ motivo, obs }) {
+  if (!MOTIVOS_BAIXA.includes(motivo)) return "Escolha o motivo da baixa.";
+  if (motivo === "Outro" && String(obs || "").trim().length < 3) return "Descreva o motivo da baixa.";
+  return "";
+}
+// O item baixado sai das exceções do material deste mapa e fica anotado em material.baixas (vai no WhatsApp e no histórico).
+export function registrarBaixaNoMapa(mapa, item, { motivo, obs = "", substituto = "" }, agora = new Date()) {
+  const mat = { ...materialNovo(), ...(mapa.material || {}) };
+  const excecoes = (mat.excecoes || []).filter((e) => e.id !== item.id);
+  const baixas = [...(mat.baixas || []).filter((b) => b.id !== item.id), { id: item.id, categoria: item.categoria || "outros", nome: item.nome, motivo, obs: String(obs || "").trim(), substituto: String(substituto || "").trim(), em: agora.toISOString() }];
+  return { ...mapa, material: { ...mat, excecoes, baixas, semAlteracao: excecoes.length ? false : !(mat.obs || "").trim() } };
+}
+export const rotuloBaixa = (b) => `${b.nome} — baixa: ${b.motivo}${b.obs ? ` (${b.obs})` : ""}${b.substituto ? ` · entrou: ${b.substituto}` : ""}`;
 
 // Itens que o líder precisa contar e informar (quantidade desconhecida na base).
 export const itensContaveis = (itens) => (itens || []).filter((i) => i.contar);
@@ -172,8 +190,11 @@ const num = (v) => {
 // Odômetro: só dígitos (sem ponto, vírgula ou símbolo).
 export const soDigitos = (v) => String(v ?? "").replace(/\D/g, "");
 
+// Km final de um veículo no plantão: o corrigido depois (erro de digitação apontado pelo plantão seguinte) vence o digitado.
+export const kmFinalDoVeiculo = (v) => (v ? (v.kmAtualCorrigido != null && v.kmAtualCorrigido !== "" ? v.kmAtualCorrigido : v.kmAtual) : null);
+
 export function kmRodado(v) {
-  const a = num(v.kmAnterior), b = num(v.kmAtual);
+  const a = num(v.kmAnterior), b = num(kmFinalDoVeiculo(v));
   if (a == null || b == null || Number.isNaN(a) || Number.isNaN(b)) return null;
   return b - a;
 }
@@ -389,19 +410,103 @@ export const kmInteiro = (v) => { const n = num(v); return n == null || Number.i
 // O km anterior vem do ÚLTIMO plantão enviado do projeto (qualquer turno/equipe) e não do último do mesmo turno.
 // O veículo casa por id, depois por rótulo (Moto sempre vira id "moto"). Veículo que existia no plantão
 // anterior e não está neste mapa entra com o km anterior dele. kmAtual do mapa em edição nunca é tocado.
-export function herdarKmDoUltimoPlantao(mapa, ultimo) {
+// Km anterior corrigido à mão pelo líder (correcaoKm) nunca é sobrescrito pela herança.
+// motoCadastro (opcional) = equipamentos/{pid}.moto: identifica a moto atual (placa) e a troca de moto.
+export function herdarKmDoUltimoPlantao(mapa, ultimo, motoCadastro = null) {
   const lista = (ultimo && Array.isArray(ultimo.veiculos) ? ultimo.veiculos : []).filter(Boolean);
   const norm = (r) => String(r || "").trim().toLowerCase();
   const idEstavel = (v) => (ehMoto(v) ? "moto" : v.id);
   let veiculos = (mapa.veiculos || []).map((v) => ({ ...v, id: idEstavel(v) }));
+  const trocada = motoTrocadaDesde(motoCadastro, ultimo);
   lista.forEach((u) => {
-    const km = kmInteiro(u.kmAtual ?? u.kmAnterior);
+    const km = kmInteiro(kmFinalDoVeiculo(u) ?? u.kmAnterior);
     const uid = idEstavel(u);
     let alvo = veiculos.findIndex((v) => v.id === uid || (norm(v.rotulo) && norm(v.rotulo) === norm(u.rotulo)));
     if (alvo < 0) { veiculos = [...veiculos, { id: uid, rotulo: u.rotulo, kmAnterior: null, kmAtual: null }]; alvo = veiculos.length - 1; }
-    if (km != null) veiculos = veiculos.map((v, i) => (i === alvo ? { ...v, kmAnterior: km } : v));
+    if (uid === "moto" && trocada) return;                    // moto nova: o km da antiga não serve de anterior
+    if (km != null) veiculos = veiculos.map((v, i) => (i === alvo && !v.correcaoKm ? { ...v, kmAnterior: km, kmAnteriorDe: ultimo.id || null } : v));
   });
+  const cad = motoCadastro && typeof motoCadastro === "object" ? motoCadastro : null;
+  // Rascunho reaberto quando a troca já não vale (ex.: o plantão anterior já é da moto nova): tira o aviso antigo.
+  if (cad && !trocada) veiculos = veiculos.map((v) => { if (!ehMoto(v) || !v.trocaMoto) return v; const { trocaMoto, ...resto } = v; return resto; });
+  if (cad && (cad.placa || trocada)) {
+    const iMoto = veiculos.findIndex(ehMoto);
+    if (iMoto >= 0) veiculos = veiculos.map((v, i) => {
+      if (i !== iMoto) return v;
+      const comPlaca = cad.placa ? { ...v, placa: String(cad.placa).trim() } : v;
+      if (!trocada || v.correcaoKm) return comPlaca;
+      const um = lista.find(ehMoto);
+      const placaAnterior = (um && um.placa) || ((cad.anteriores || []).slice(-1)[0] || {}).placa || "";
+      return { ...comPlaca, kmAnterior: kmInteiro(cad.kmInicial ?? cad.km), kmAnteriorDe: null, trocaMoto: { placaAnterior, placaNova: cad.placa || "", em: cad.trocadaEm || null } };
+    });
+  }
   return { ...mapa, veiculos };
+}
+
+// ── Troca de moto ────────────────────────────────────────────────────────────
+const normPlaca = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+// A moto do cadastro é outra que a do último plantão? Pela placa (quando os dois têm) ou pela data da troca.
+export function motoTrocadaDesde(motoCadastro, ultimo) {
+  const cad = motoCadastro && typeof motoCadastro === "object" ? motoCadastro : null;
+  if (!cad || !cad.trocadaEm) return false;                 // nunca houve troca registrada: segue como sempre
+  const um = ((ultimo && ultimo.veiculos) || []).find(ehMoto);
+  if (um && um.placa && cad.placa) return normPlaca(um.placa) !== normPlaca(cad.placa);
+  if (!ultimo) return true;
+  const quando = ultimo.enviadoEm || `${ultimo.data || ""}T23:59:59.999Z`;
+  return String(quando) < String(cad.trocadaEm);
+}
+
+// Substitui a moto no cadastro: a antiga vai para o histórico (anteriores) com a baixa; a nova começa limpa.
+export function substituirMoto(motoAtual, { placa, modelo = "", ano = "", kmInicial, motivo, por = "", agora = new Date() }) {
+  const erros = [];
+  const p = String(placa || "").trim().toUpperCase();
+  const k = String(kmInicial ?? "").replace(/\D/g, "");
+  if (normPlaca(p).length < 7) erros.push("Informe a placa da moto nova (ex.: ABC1D23).");
+  if (k === "") erros.push("Informe o km inicial da moto nova (só números).");
+  if (String(motivo || "").trim().length < 3) erros.push("Informe o motivo da troca.");
+  const atual = motoAtual && typeof motoAtual === "object" ? motoAtual : null;
+  if (atual && atual.placa && normPlaca(atual.placa) === normPlaca(p)) erros.push("A placa nova é igual à da moto atual.");
+  if (erros.length) return { erros };
+  const em = agora.toISOString();
+  const { anteriores = [], ...semHist } = atual || {};
+  const baixada = atual && (atual.placa || atual.km) ? [{ ...semHist, baixa: { em, por, motivo: String(motivo).trim(), kmFinal: kmInteiro(atual.km) } }] : [];
+  const nova = { placa: p, modelo: String(modelo || "").trim(), ano: String(ano || "").trim(), km: Number(k), kmInicial: Number(k), kmManutencao: "", proximaRevisao: "", status: "ok", historico: [], trocadaEm: em, trocadaPor: por, anteriores: [...(Array.isArray(anteriores) ? anteriores : []), ...baixada] };
+  return { erros: [], moto: nova };
+}
+
+// ── Correção do km anterior (erro de digitação no plantão anterior) ─────────
+// Só o km ANTERIOR deste mapa muda; o original fica guardado e a correção vai para o histórico do mapa.
+// Ao concluir, o mapa anterior recebe `kmAtualCorrigido` (o `kmAtual` digitado lá nunca é apagado).
+export function corrigirKmAnterior(mapa, veiculoId, { km, motivo, por = "", agora = new Date() }) {
+  const erros = [];
+  const k = String(km ?? "").replace(/\D/g, "");
+  if (k === "") erros.push("Informe o km correto (só números).");
+  if (String(motivo || "").trim().length < 3) erros.push("Informe o motivo da correção (ex.: erro de digitação no plantão anterior).");
+  const v = (mapa.veiculos || []).find((x) => x.id === veiculoId);
+  if (!v) erros.push("Veículo não encontrado no mapa.");
+  if (erros.length) return { mapa, erros };
+  const para = Number(k);
+  const original = v.correcaoKm ? (v.kmAnteriorOriginal ?? null) : kmInteiro(v.kmAnterior);
+  if (original === para && !v.correcaoKm) return { mapa, erros: ["O km informado é igual ao anterior: nada a corrigir."] };
+  const em = agora.toISOString();
+  const correcaoKm = { de: original, para, motivo: String(motivo).trim(), por, em };
+  const veiculos = mapa.veiculos.map((x) => (x.id === veiculoId ? { ...x, kmAnteriorOriginal: original, kmAnterior: para, correcaoKm } : x));
+  const alteracoes = [...(mapa.alteracoes || []), { em, por, tipo: "correcao-km", veiculoId, de: original, para, motivo: correcaoKm.motivo }];
+  return { mapa: { ...mapa, veiculos, alteracoes }, erros: [] };
+}
+// Desfaz a correção (volta ao km herdado do plantão anterior).
+export function desfazerCorrecaoKm(mapa, veiculoId) {
+  return { ...mapa, veiculos: (mapa.veiculos || []).map((x) => {
+    if (x.id !== veiculoId || !x.correcaoKm) return x;
+    const { correcaoKm, kmAnteriorOriginal, ...resto } = x;
+    return { ...resto, kmAnterior: kmAnteriorOriginal ?? null };
+  }) };
+}
+// "anterior 71330 (corrigido; era 713300 — erro de digitação)"
+export function rotuloCorrecaoKm(v) {
+  const c = v && v.correcaoKm;
+  if (!c) return "";
+  return `corrigido; era ${c.de ?? "—"} — ${c.motivo}`;
 }
 
 // Na hora de enviar: km como número inteiro e id estável do veículo.

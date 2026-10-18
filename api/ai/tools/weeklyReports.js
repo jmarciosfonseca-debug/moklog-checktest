@@ -48,6 +48,7 @@ async function get_weekly_report_items(args = {}) {
     // Varre genericamente arrays de itens + o objeto "moto" (caso especial).
     const buckets = [];
     for (const [key, val] of Object.entries(data)) {
+      if (key === "baixados") continue;              // histórico de itens baixados: não estão mais em uso
       if (Array.isArray(val)) buckets.push([key, val]);
     }
     if (data.moto && typeof data.moto === "object") buckets.push(["moto", [data.moto]]);

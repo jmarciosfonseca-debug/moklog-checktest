@@ -6,9 +6,10 @@ import { checkPin } from "./session";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer } from "firebase/firestore";
-import { gravarSecaoEquipamentos } from "./equipamentosStore";
+import { gravarSecaoEquipamentos, darBaixaEquipamento, MOTIVOS_BAIXA } from "./equipamentosStore";
 import { validarKmMoto, kmMotoDoMapa, soDigitosKm } from "./kmMoto";
 import { loadUltimoPlantao } from "./mapaDiario/dados";
+import { substituirMoto, motoTrocadaDesde } from "./mapaDiario/modelo";
 
 
 const firebaseConfig = {
@@ -178,9 +179,17 @@ function StatusSelector({ value, onChange, tipos, dark }) {
 }
 
 // ── Item Card genérico
-function ItemCard({ item, icon, title, children, onRemove, adminAuth, dark, problema }) {
+function ItemCard({ item, icon, title, children, onRemove, onBaixa, adminAuth, dark, problema }) {
   const S = getStyles(dark);
   const [open, setOpen] = useState(false);
+  const [baixa, setBaixa] = useState(null); // { motivo, obs, erro, salvando }
+  const confirmarBaixa = async () => {
+    if (!MOTIVOS_BAIXA.includes(baixa.motivo)) return setBaixa(b=>({...b,erro:"Escolha o motivo da baixa."}));
+    if (baixa.motivo==="Outro" && String(baixa.obs||"").trim().length<3) return setBaixa(b=>({...b,erro:"Descreva o motivo da baixa."}));
+    setBaixa(b=>({...b,salvando:true,erro:""}));
+    const ok = await onBaixa({ motivo:baixa.motivo, obs:String(baixa.obs||"").trim() });
+    if (ok) setBaixa(null); else setBaixa(b=>b&&({...b,salvando:false,erro:"Não deu baixa. Veja o aviso no topo e tente de novo."}));
+  };
   const hasProblema = item.status && item.status !== "ok";
 
   return (
@@ -205,8 +214,30 @@ function ItemCard({ item, icon, title, children, onRemove, adminAuth, dark, prob
               <div style={{ fontSize:11, ...S.txt }}>{item.justificativa}</div>
             </div>
           )}
+          {onBaixa && !baixa && (
+            <button aria-label={`Dar baixa: ${title}`} onClick={()=>setBaixa({motivo:"",obs:"",erro:""})}
+              style={{ ...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:11, marginTop:8, marginRight:8 }}>
+              ⊘ Dar baixa (trocado, extraviado…)
+            </button>
+          )}
+          {onBaixa && baixa && (
+            <div data-testid="baixa-equip" style={{ marginTop:8, padding:10, border:"1px dashed #ef444466", borderRadius:8, display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ fontSize:11, ...S.txt2 }}>O item sai da lista ativa (e do Mapa de Equipe) e fica no histórico de baixas, com o motivo.</div>
+              <select aria-label={`Motivo da baixa: ${title}`} value={baixa.motivo} onChange={e=>setBaixa(b=>({...b,motivo:e.target.value,erro:""}))} style={S.inp}>
+                <option value="">Motivo…</option>
+                {MOTIVOS_BAIXA.map(m=><option key={m} value={m}>{m}</option>)}
+              </select>
+              <input aria-label={`Observação da baixa: ${title}`} value={baixa.obs} onChange={e=>setBaixa(b=>({...b,obs:e.target.value}))} placeholder={baixa.motivo==="Outro"?"Descreva o motivo (obrigatório)":"Observação (opcional)"} style={S.inp}/>
+              {baixa.motivo==="Substituído" && <div style={{ fontSize:11, ...S.txt2 }}>Depois de confirmar, o formulário abre para cadastrar o item que entrou no lugar.</div>}
+              {baixa.erro && <div role="alert" style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}>{baixa.erro}</div>}
+              <div style={{ display:"flex", gap:8 }}>
+                <button onClick={()=>setBaixa(null)} style={{ ...S.btnSec, flex:1, fontSize:12 }}>Cancelar</button>
+                <button onClick={confirmarBaixa} disabled={baixa.salvando} style={{ ...S.btn, flex:1, fontSize:12, background:"#dc2626" }}>{baixa.salvando?"Gravando…":"Confirmar baixa"}</button>
+              </div>
+            </div>
+          )}
           {adminAuth && onRemove && (
-            <button onClick={()=>{ if(window.confirm("Excluir este item?")) onRemove(); }}
+            <button onClick={()=>{ if(window.confirm("Excluir este item DEFINITIVAMENTE (sem histórico)? Para troca, extravio ou dano, use Dar baixa.")) onRemove(); }}
               style={{ ...S.btnSm, color:"#ef4444", border:"1px solid #ef444433", fontSize:10, marginTop:8 }}>
               <Ico n="lixeira"/> Excluir Item
             </button>
@@ -472,7 +503,7 @@ export function NovoItemForm({ tipo, project, onSave, onCancel, dark, initial })
 }
 
 // ── Seção genérica de itens
-export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, adminAuth, dark, extraStatusTipos }) {
+export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, onBaixa, adminAuth, dark, extraStatusTipos }) {
   const S = getStyles(dark);
   const [showForm, setShowForm] = useState(false);
   const [editItem,setEditItem]=useState(null);
@@ -525,7 +556,9 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, admin
 
       <fieldset disabled={showForm||!!editItem} style={{border:0,padding:0,margin:0,minWidth:0}}>{items.map(item => (
         <ItemCard key={item.id} item={item} icon={icon} title={item.identificacao||(item.tipo||tipo)}
-          onRemove={adminAuth?()=>removeItem(item.id):null} adminAuth={adminAuth} dark={dark}>
+          onRemove={adminAuth?()=>removeItem(item.id):null}
+          onBaixa={canEdit&&onBaixa?async(info)=>{ const ok=await onBaixa(item,info); if(ok&&info.motivo==="Substituído"){ setAberto(true); setEditItem(null); setShowForm(true); } return ok; }:null}
+          adminAuth={adminAuth} dark={dark}>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {canEdit&&<button onClick={()=>setEditItem(item)} style={S.btnSm}>Editar equipamento</button>}
             {!["municao","radiosHT"].includes(tipo)&&<span style={{fontSize:11,...S.txt2}}>Qtd: {item.qtd??1}</span>}
@@ -616,6 +649,35 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, admin
   );
 }
 
+// ── Histórico de baixas (itens trocados, extraviados, danificados, devolvidos) e motos substituídas — só leitura
+const ROTULO_CAT_BAIXA = { smartphones:"Smartphone", radiosHT:"Rádio HT", armamento:"Armamento", municao:"Munição", placas:"Placa balística", lanternas:"Lanterna", ztrax:"ZTRAX", bodycam:"Bodycam", outros:"Outro" };
+function HistoricoBaixas({ baixados, motos, dark }) {
+  const S = getStyles(dark);
+  const [aberto, setAberto] = useState(false);
+  const total = baixados.length + motos.length;
+  if (!total) return null;
+  const linhas = [
+    ...baixados.map(b=>({ em:(b.baixa&&b.baixa.em)||"", txt:`${ROTULO_CAT_BAIXA[b.categoria]||"Item"}: ${b.identificacao||b.modelo||"—"}`, det:[b.baixa&&b.baixa.motivo, b.baixa&&b.baixa.obs, b.baixa&&b.baixa.por].filter(Boolean).join(" · ") })),
+    ...motos.map(m=>({ em:(m.baixa&&m.baixa.em)||"", txt:`Moto ${m.placa||"—"}${m.modelo?` (${m.modelo})`:""}`, det:[m.baixa&&m.baixa.motivo, m.baixa&&m.baixa.kmFinal!=null?`km final ${m.baixa.kmFinal}`:"", m.baixa&&m.baixa.por].filter(Boolean).join(" · ") })),
+  ].sort((a,b)=>String(b.em).localeCompare(String(a.em)));
+  return (
+    <div style={{background:dark?"#060c18":"#fff",border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`,borderRadius:14,overflow:"hidden"}}>
+      <button aria-expanded={aberto} onClick={()=>setAberto(a=>!a)} style={{display:"flex",width:"100%",justifyContent:"space-between",alignItems:"center",padding:"14px",background:"transparent",border:"none",cursor:"pointer"}}>
+        <span style={{fontSize:14,fontWeight:800,...S.txt}}>Itens baixados ({total})</span>
+        <span style={{...S.txt2,fontSize:14}}>{aberto?"▾":"▸"}</span>
+      </button>
+      {aberto && <div style={{padding:"0 14px 12px",display:"flex",flexDirection:"column",gap:6}}>
+        {linhas.map((l,i)=>(
+          <div key={i} style={{fontSize:12,borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,paddingTop:6}}>
+            <div style={{fontWeight:700,...S.txt}}>{l.txt}</div>
+            <div style={{...S.txt2,fontSize:11}}>{l.em?fmtDate(String(l.em).slice(0,10)):""}{l.det?` · ${l.det}`:""}</div>
+          </div>
+        ))}
+      </div>}
+    </div>
+  );
+}
+
 // ── Motocicleta (1 por projeto)
 function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
   const S = getStyles(dark);
@@ -624,9 +686,11 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
   const [novaManut, setNovaManut] = useState({ data:todayStr(), km:"", desc:"" });
   const [form, setForm] = useState(moto || { placa:"", km:"", proximaRevisao:"", status:"ok", historico:[] });
 
+  const [troca, setTroca] = useState(null);   // substituição da moto { placa, modelo, ano, kmInicial, itens, motivo, erros, salvando }
   const save = async (updated) => {
     let ultimo = null;
-    try { ultimo = kmMotoDoMapa(await loadUltimoPlantao(project.id, "9999-12-31", "N")); } catch(e) { /* sem leitura: não trava */ }
+    // Moto trocada depois do último mapa: o km do mapa é da moto antiga e não trava a nova.
+    try { const um = await loadUltimoPlantao(project.id, "9999-12-31", "N"); ultimo = motoTrocadaDesde(updated, um) ? null : kmMotoDoMapa(um); } catch(e) { /* sem leitura: não trava */ }
     const v = validarKmMoto(updated, ultimo);
     if(!v.ok){ alert(v.erro); return; }
     const final = {...updated, km:v.km==null?"":v.km, kmManutencao:v.kmManutencao==null?"":v.kmManutencao};
@@ -641,6 +705,15 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
     setShowHist(false);
   };
 
+  const confirmarTroca = async () => {
+    const r = substituirMoto(form, { ...troca, por: adminAuth ? "Gerencial" : "Líder (PIN do projeto)" });
+    if (r.erros.length) return setTroca(t=>({...t,erros:r.erros}));
+    const nova = troca.itens && troca.itens.trim() ? { ...r.moto, itens: troca.itens.trim() } : r.moto;
+    setTroca(t=>({...t,salvando:true,erros:[]}));
+    if(await onUpdate(nova)!==false){ setForm(nova); setTroca(null); setEditing(false); }
+    else setTroca(t=>t&&({...t,salvando:false,erros:["Não salvou. Veja o aviso no topo e tente de novo."]}));
+  };
+
   const hasProblema = form.status && form.status!=="ok";
 
   return (
@@ -651,14 +724,37 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
           <span style={{fontSize:13,fontWeight:700,...S.txt}}>Motocicleta</span>
           {hasProblema && <DiasAberto dataProblem={form.dataProblem}/>}
         </div>
-        {liderAuth && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}><Ico n="editar"/> Editar</button>}
+        <div style={{display:"flex",gap:6}}>
+          {liderAuth && form.placa && !troca && <button aria-label="Substituir moto" onClick={()=>{setEditing(false);setTroca({placa:"",modelo:"",ano:"",kmInicial:"",itens:"",motivo:"",erros:[]});}} style={{...S.btnSm,color:"#0ea5e9",border:"1px solid #0ea5e944",fontSize:10}}>⇄ Substituir moto</button>}
+          {liderAuth && !troca && <button onClick={()=>setEditing(true)} style={{...S.btnSm,color:"#f59e0b",border:"1px solid #f59e0b44",fontSize:10}}><Ico n="editar"/> Editar</button>}
+        </div>
       </div>
+
+      {troca && (
+        <div data-testid="troca-moto" style={{...S.card,border:"1px solid #0ea5e966",display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{fontSize:13,fontWeight:800,...S.txt}}>Substituir moto {form.placa ? `(sai ${form.placa})` : ""}</div>
+          <div style={{fontSize:11,...S.txt2}}>A moto atual vai para o histórico (com km final e motivo). A nova começa limpa, do km inicial informado, e o Mapa de Equipe passa a seguir a nova.</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            <div><label style={S.lbl}>Placa da nova *</label><input aria-label="Placa da moto nova" value={troca.placa} onChange={e=>setTroca(t=>({...t,placa:e.target.value.toUpperCase()}))} placeholder="ABC1D23" style={S.inp}/></div>
+            <div><label style={S.lbl}>KM inicial *</label><input aria-label="KM inicial da moto nova" type="text" inputMode="numeric" pattern="[0-9]*" value={troca.kmInicial} onChange={e=>setTroca(t=>({...t,kmInicial:soDigitosKm(e.target.value)}))} placeholder="Só números" style={S.inp}/></div>
+            <div><label style={S.lbl}>Modelo</label><input aria-label="Modelo da moto nova" value={troca.modelo} onChange={e=>setTroca(t=>({...t,modelo:e.target.value}))} placeholder="Ex: Honda CG 160" style={S.inp}/></div>
+            <div><label style={S.lbl}>Ano</label><input aria-label="Ano da moto nova" type="text" inputMode="numeric" value={troca.ano} onChange={e=>setTroca(t=>({...t,ano:soDigitosKm(e.target.value).slice(0,4)}))} placeholder="Ex: 2024" style={S.inp}/></div>
+          </div>
+          <div><label style={S.lbl}>Itens que acompanham a moto (opcional)</label><input aria-label="Itens que acompanham a moto nova" value={troca.itens} onChange={e=>setTroca(t=>({...t,itens:e.target.value}))} placeholder="Ex: baú, 2 capacetes, sinalizador" style={S.inp}/></div>
+          <div><label style={S.lbl}>Motivo da troca *</label><input aria-label="Motivo da troca da moto" value={troca.motivo} onChange={e=>setTroca(t=>({...t,motivo:e.target.value}))} placeholder="Ex: moto antiga devolvida para manutenção" style={S.inp}/></div>
+          {troca.erros.length>0 && <div role="alert" style={{fontSize:12,color:"#ef4444",fontWeight:700}}>{troca.erros.map(e=><div key={e}>{e}</div>)}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>setTroca(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
+            <button onClick={confirmarTroca} disabled={troca.salvando} style={{...S.btn,flex:1,fontSize:13}}>{troca.salvando?"Gravando…":"Confirmar troca"}</button>
+          </div>
+        </div>
+      )}
 
       <div style={{...S.card,border:`2px solid ${hasProblema?(STATUS_CONFIG[form.status]?.border||"#ef444433"):dark?"#0f172a":"#e2e8f0"}`}}>
         {editing ? (
           <div style={{display:"flex",flexDirection:"column",gap:10}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <div><label style={S.lbl}>Placa</label><input value={form.placa} onChange={e=>setForm(f=>({...f,placa:e.target.value}))} placeholder="ABC-1234" style={S.inp}/></div>
+              <div><label style={S.lbl}>Placa</label><input aria-label="Placa" value={form.placa} readOnly={!!(moto&&moto.placa)&&!adminAuth} onChange={e=>setForm(f=>({...f,placa:e.target.value}))} placeholder="ABC-1234" style={S.inp}/>{!!(moto&&moto.placa)&&!adminAuth&&<div style={{fontSize:10,...S.txt2,marginTop:3}}>Outra moto? Use "Substituir moto".</div>}</div>
               <div><label style={S.lbl}>Modelo</label><input value={form.modelo||""} onChange={e=>setForm(f=>({...f,modelo:e.target.value}))} placeholder="Ex: Honda CG 160..." style={S.inp}/></div>
               <div><label style={S.lbl}>Ano</label><input type="number" value={form.ano||""} onChange={e=>setForm(f=>({...f,ano:e.target.value}))} placeholder="Ex: 2022" style={S.inp}/></div>
               <div><label style={S.lbl}>KM Atual</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM Atual" value={form.km} onChange={e=>setForm(f=>({...f,km:soDigitosKm(e.target.value)}))} placeholder="Só números" style={S.inp}/></div>
@@ -684,6 +780,8 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                     ["KM Atual",   form.km?`${form.km} km`:"--"],
                     ["KM Manutenção", form.kmManutencao?`${form.kmManutencao} km`:"--"],
                     ["Próx. Revisão", form.proximaRevisao?fmtDate(form.proximaRevisao):"--"],
+                    ...(form.itens?[["Itens da moto", form.itens]]:[]),
+                    ...(form.trocadaEm?[["Em uso desde", `${fmtDate(String(form.trocadaEm).slice(0,10))}${form.kmInicial!=null?` · km inicial ${form.kmInicial}`:""}`]]:[]),
                   ].map(([label,val])=>(
                     <div key={label}><div style={S.lbl}>{label}</div><div style={{fontSize:12,fontWeight:600,...S.txt}}>{val}</div></div>
                   ))}
@@ -877,6 +975,22 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
     }finally{gravando.current=false;setSaving(false);}
   };
 
+  // Baixa de item (líder com PIN ou gerencial): o servidor tira da lista ativa e guarda em `baixados` numa gravação só.
+  const baixarItem = async (categoria, item, { motivo, obs }) => {
+    if(gravando.current||!liderAuth)return false;
+    gravando.current=true;setSaving(true);setSaveError("");
+    const before=confirmado.current;
+    try{
+      const resp=await darBaixaEquipamento(project.id,{categoria,id:item.id,motivo,obs,por:adminAuth?"Gerencial":"Líder (PIN do projeto)"},before);
+      const saved={...before,[categoria]:resp[categoria]||[],baixados:resp.baixados||[],...(resp.updatedAt?{updatedAt:resp.updatedAt}:{})};
+      confirmado.current=saved;setData(saved);
+      try{localStorage.setItem(`equipamentos_${project.id}`,JSON.stringify(saved));}catch{}
+      return true;
+    }catch(e){ setSaveError(e.message||"Não foi possível dar baixa."); return false; }
+    finally{gravando.current=false;setSaving(false);}
+  };
+  const baixaDe = (categoria) => (item, info) => baixarItem(categoria, item, info);
+
   // Conclui a checagem semanal: registra assinatura/resultado e crava o próximo
   // domingo. Aditivo — só grava o campo checagemSemanal, sem tocar no inventário.
   const concluirChecagem = async ({corrigidos,emAberto,assinatura}) => {
@@ -997,46 +1111,48 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
           {/* Seções */}
           <SecaoItens titulo="Outros equipamentos" icon="+" tipo="outros"
             items={data.outros||[]} project={project}
-            onUpdate={v=>saveSection("outros",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("outros",v)} onBaixa={baixaDe("outros")} adminAuth={adminAuth} dark={dark}/>
           <SecaoItens titulo="Smartphones" icon="📱" tipo="smartphones"
             items={data.smartphones||[]} project={project}
-            onUpdate={v=>saveSection("smartphones",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("smartphones",v)} onBaixa={baixaDe("smartphones")} adminAuth={adminAuth} dark={dark}/>
 
           <SecaoItens titulo="Rádios HT" icon="📻" tipo="radiosHT"
             items={data.radiosHT||[]} project={project}
-            onUpdate={v=>saveSection("radiosHT",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("radiosHT",v)} onBaixa={baixaDe("radiosHT")} adminAuth={adminAuth} dark={dark}/>
 
           <SecaoItens titulo="Armamento" icon="🔫" tipo="armamento"
             items={data.armamento||[]} project={project}
-            onUpdate={v=>saveSection("armamento",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("armamento",v)} onBaixa={baixaDe("armamento")} adminAuth={adminAuth} dark={dark}/>
 
           <SecaoItens titulo="Munição" icon="💊" tipo="municao"
             items={data.municao||[]} project={project}
-            onUpdate={v=>saveSection("municao",v)} adminAuth={adminAuth} dark={dark}
+            onUpdate={v=>saveSection("municao",v)} onBaixa={baixaDe("municao")} adminAuth={adminAuth} dark={dark}
             extraStatusTipos={["ok","baixo","critico"]}/>
 
           <SecaoItens titulo="Placas Balísticas" icon="🦺" tipo="placas"
             items={data.placas||[]} project={project}
-            onUpdate={v=>saveSection("placas",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("placas",v)} onBaixa={baixaDe("placas")} adminAuth={adminAuth} dark={dark}/>
 
           <SecaoItens titulo="Lanternas" icon="🔦" tipo="lanternas"
             items={data.lanternas||[]} project={project}
-            onUpdate={v=>saveSection("lanternas",v)} adminAuth={adminAuth} dark={dark}/>
+            onUpdate={v=>saveSection("lanternas",v)} onBaixa={baixaDe("lanternas")} adminAuth={adminAuth} dark={dark}/>
 
           {TEM_ZTRAX.includes(project.id) && (
             <SecaoItens titulo="Pânico ZTRAX" icon="🚨" tipo="ztrax"
               items={data.ztrax||[]} project={project}
-              onUpdate={v=>saveSection("ztrax",v)} adminAuth={adminAuth} dark={dark}/>
+              onUpdate={v=>saveSection("ztrax",v)} onBaixa={baixaDe("ztrax")} adminAuth={adminAuth} dark={dark}/>
           )}
 
           {TEM_BODYCAM.includes(project.id) && (
             <SecaoItens titulo="Bodycam" icon="📹" tipo="bodycam"
               items={data.bodycam||[]} project={project}
-              onUpdate={v=>saveSection("bodycam",v)} adminAuth={adminAuth} dark={dark}/>
+              onUpdate={v=>saveSection("bodycam",v)} onBaixa={baixaDe("bodycam")} adminAuth={adminAuth} dark={dark}/>
           )}
 
           <SecMoto moto={data.moto} project={project}
             onUpdate={v=>saveSection("moto",v)} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}/>
+
+          <HistoricoBaixas baixados={data.baixados||[]} motos={(data.moto&&data.moto.anteriores)||[]} dark={dark}/>
         </fieldset>
       </div>
 

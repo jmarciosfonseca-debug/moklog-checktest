@@ -23,6 +23,8 @@ const db = getFirestore(fbApp);
 
 import { getAccess, grantSession } from "./session";
 import { padronizarNome, listaSugestoes } from "./nomes";
+import PlantaoDoMapa, { usePlantaoDoMapa } from "./mapaDiario/PlantaoDoMapa";
+import { somarDias } from "./mapaDiario/regras";
 
 
 
@@ -498,6 +500,10 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
     .filter(c=>{ const cg=normP(c.cargo); if(cg.includes("folg")) return true; return !["porteiro","cda","cco","central"].some(x=>cg.includes(x)); })
     .sort((a,b)=>normP(a.nome).localeCompare(normP(b.nome)));
 
+  // Quem está de plantão pelo Mapa de Equipe (para "Realizou o Teste"): noturno de madrugada é o mapa da véspera.
+  const dataMapaForm = form ? ((/^n/i.test(form.turno||"") && String(form.hora||"") < "06:00") ? somarDias(form.data, -1) : form.data) : null;
+  const plantaoMapa = usePlantaoDoMapa(project.id, dataMapaForm, form ? form.turno : null);
+
   const persistViewTeste = (novo, imediato=false) => {
     setViewTeste(novo);
     setTestes(ts=>ts.some(t=>t.id===novo.id)?ts.map(t=>t.id===novo.id?novo:t):ts); // atualização otimista
@@ -810,6 +816,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               {/* Quem fez o teste */}
               <div>
                 <label style={S.lbl}>Realizou o Teste *</label>
+                <PlantaoDoMapa plantao={plantaoMapa} dark={dark!==false} selecionado={form.quemFez} onEscolher={x=>{ const c=equipe.find(e=>x.pessoaId&&String(e.id)===String(x.pessoaId)); setForm(f=>({...f,quemFez:x.pessoaNome,quemFezId:c?c.id:""})); }}/>
                 {colabs.length>0?(
                   <div style={{display:"flex",flexDirection:"column",gap:5}}>
                     {colabs.map(c=>(

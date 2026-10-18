@@ -350,6 +350,11 @@ export function gerarPDFCestaNatal(project, lista, ano, opcoes = {}) {
   const projectId = project?.id || project;
   const theme = getTheme(projectId);
   const nomeProj = NOMES_PROJETO[projectId] || projectId;
+  // Cada geração é uma versão nova: data/hora no documento e no nome do arquivo (o celular nunca reabre um arquivo antigo de mesmo nome).
+  const geradoEm = opcoes.geradoEm instanceof Date && !Number.isNaN(opcoes.geradoEm.getTime()) ? opcoes.geradoEm : new Date();
+  const p2 = n => String(n).padStart(2, '0');
+  const geradoTxt = `${p2(geradoEm.getDate())}/${p2(geradoEm.getMonth() + 1)}/${geradoEm.getFullYear()} ${p2(geradoEm.getHours())}:${p2(geradoEm.getMinutes())}`;
+  const carimbo = `${geradoEm.getFullYear()}-${p2(geradoEm.getMonth() + 1)}-${p2(geradoEm.getDate())}_${p2(geradoEm.getHours())}h${p2(geradoEm.getMinutes())}`;
   const ordenada = [...(lista || [])].sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
   const linhas = ordenada.map((c, i) => `<tr>
       <td style="padding:7px 9px;border-bottom:1px solid #e5e7eb;text-align:center;width:36px;">${i + 1}</td>
@@ -400,9 +405,9 @@ export function gerarPDFCestaNatal(project, lista, ano, opcoes = {}) {
     titulo: `${nome} ${ano}`,
     campanha: true,
     subtitulo: "Solicitação à empresa - relação de colaboradores e cálculo do lote",
-    metaTxt: `${geral.qtd} unidade(s)`,
-    corpo, totalItens: geral.qtd,
+    metaTxt: `${geral.qtd} unidade(s) · versão de ${geradoTxt}`,
+    corpo: `<div style="font-size:11px;color:#475569;margin:0 0 6px;">Versão gerada em <b>${geradoTxt}</b> com os valores e o modelo salvos neste momento.</div>${corpo}`, totalItens: geral.qtd,
   });
-  abrir(html, `solicitacao_${tipo}_${projectId}_${ano}.html`);
+  abrir(html, `solicitacao_${tipo}_${projectId}_${ano}_${carimbo}.html`);
   return geral.qtd;
 }

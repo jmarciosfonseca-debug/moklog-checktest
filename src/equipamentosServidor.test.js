@@ -48,3 +48,34 @@ test('documento novo e primeira checagem usam gravação parcial',async()=>{
 test('reenvio idêntico após perda da resposta é idempotente',async()=>{
  const db=banco({armamento:[item]});await expect(save(db,'P505','armamento',[],[item],lider)).resolves.toEqual({armamento:[item]});expect(db.set).not.toHaveBeenCalled();
 });
+// Baixa pelo líder (campo 18/10, P604): o item sai da lista ativa e vai inteiro para `baixados`, numa gravação só.
+test('baixa: líder tira o item da lista com motivo; histórico guarda o item inteiro; reenvio é idempotente',async()=>{
+ const xrt={id:'l1',identificacao:'XRT-6000A',qtd:1,status:'ok',historico:[{id:'h'}]},outra={id:'l2',identificacao:'Lanterna 02',qtd:1,status:'ok'};
+ const db=banco({lanternas:[xrt,outra],armamento:[item]});
+ const r=await save(db,'P505','baixa',null,{categoria:'lanternas',id:'l1',motivo:'Substituído',obs:'Trocada por tática',por:'Luiz'},lider);
+ expect(r.lanternas).toEqual([outra]);expect(r.armamento).toEqual([item]);
+ expect(r.baixados).toEqual([expect.objectContaining({...xrt,categoria:'lanternas',baixa:expect.objectContaining({motivo:'Substituído',obs:'Trocada por tática',por:'Luiz',nivel:'lider'})})]);
+ const patch=db.set.mock.calls[0][1];expect(Object.keys(patch).sort()).toEqual(['baixados','lanternas','updatedAt']);
+ const depois=banco(r);await expect(save(depois,'P505','baixa',null,{categoria:'lanternas',id:'l1',motivo:'Substituído'},lider)).resolves.toBe(r);expect(depois.set).not.toHaveBeenCalled();
+});
+test('baixa: motivo obrigatório, "Outro" exige descrição, item inexistente e categoria estranha recusados',async()=>{
+ const db=banco({lanternas:[{id:'l1',identificacao:'X',qtd:1}]});
+ await expect(save(db,'P505','baixa',null,{categoria:'lanternas',id:'l1',motivo:''},lider)).rejects.toMatchObject({status:400});
+ await expect(save(db,'P505','baixa',null,{categoria:'lanternas',id:'l1',motivo:'Outro',obs:' '},lider)).rejects.toMatchObject({status:400});
+ await expect(save(db,'P505','baixa',null,{categoria:'lanternas',id:'zz',motivo:'Extraviado'},lider)).rejects.toMatchObject({status:404});
+ await expect(save(db,'P505','baixa',null,{categoria:'moto',id:'l1',motivo:'Extraviado'},lider)).rejects.toMatchObject({status:400});
+ expect(db.set).not.toHaveBeenCalled();
+});
+test('API: líder de outro projeto não dá baixa',async()=>{
+ auth.verify.mockReturnValue({nivel:'lider',pid:'P601'});const r=res();
+ await handler({method:'POST',headers:{},body:{pid:'P505',section:'baixa',before:null,after:{categoria:'lanternas',id:'l1',motivo:'Extraviado'}}},r);
+ expect(r.status).toHaveBeenCalledWith(403);expect(getDb).not.toHaveBeenCalled();
+});
+test('baixa de item antigo sem id: confere posição e identificação; divergência recusa',async()=>{
+ const velho={identificacao:'XRT-6000A',qtd:1,status:'ok'},outro={id:'l2',identificacao:'Lanterna 02',qtd:1};
+ const db=banco({lanternas:[velho,outro]});
+ const r=await save(db,'P505','baixa',null,{categoria:'lanternas',id:null,indice:0,identificacao:'XRT-6000A',motivo:'Substituído'},lider);
+ expect(r.lanternas).toEqual([outro]);expect(r.baixados[0]).toMatchObject({identificacao:'XRT-6000A',categoria:'lanternas'});
+ await expect(save(banco({lanternas:[velho]}),'P505','baixa',null,{categoria:'lanternas',id:null,indice:0,identificacao:'Outra',motivo:'Extraviado'},lider)).rejects.toMatchObject({status:404});
+ await expect(save(banco({lanternas:[outro]}),'P505','baixa',null,{categoria:'lanternas',id:null,indice:0,identificacao:'Lanterna 02',motivo:'Extraviado'},lider)).rejects.toMatchObject({status:404});
+});

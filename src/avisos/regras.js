@@ -88,6 +88,13 @@ function avisosDoMapa(pid, p, mapa) {
     const indisp = e.situacao === "indisponivel";
     out.push(A({ id: `material:${base}:${norm(e.nome)}`, tipo: "material", sev: indisp ? "atencao" : "info", projetoId: pid, titulo: `${e.nome}: ${indisp ? "indisponível" : "com anomalia"}`, detalhe: [quando, (e.obs || "").trim()].filter(Boolean).join(" · "), desde: p.inicio }));
   }
+  // Km anterior corrigido à mão pelo líder (erro de digitação no plantão anterior) e troca de moto: só informativo.
+  for (const v of mapa.veiculos || []) {
+    if (!v) continue;
+    const rot = `${v.rotulo || "Veículo"}${v.placa ? ` ${v.placa}` : ""}`;
+    if (v.correcaoKm) out.push(A({ id: `km:${base}:${norm(v.id || v.rotulo)}`, tipo: "veiculo", sev: "info", projetoId: pid, titulo: `${rot}: km anterior corrigido`, detalhe: [quando, `${v.correcaoKm.de ?? "—"} → ${v.correcaoKm.para}`, v.correcaoKm.motivo, v.correcaoKm.por ? `por ${v.correcaoKm.por}` : ""].filter(Boolean).join(" · "), desde: p.inicio }));
+    if (v.trocaMoto) out.push(A({ id: `moto:${base}:${norm(v.placa || v.id)}`, tipo: "veiculo", sev: "info", projetoId: pid, titulo: `Moto substituída${v.placa ? `: ${v.placa}` : ""}`, detalhe: [quando, v.trocaMoto.placaAnterior ? `antes ${v.trocaMoto.placaAnterior}` : "", v.kmAnterior != null ? `km inicial ${v.kmAnterior}` : ""].filter(Boolean).join(" · "), desde: p.inicio }));
+  }
   return out;
 }
 
