@@ -30,16 +30,17 @@ export default function CampanhaEquipeControle({ tipo, ano, config = {}, quantid
     if (!url) { setErro('Não foi possível usar esta imagem. Escolha outra foto (JPG/PNG).'); return; }
     setFotoNova(url); setSemFoto(false);
   };
-  const patchPrincipal = async () => {
+  const patchPrincipal = async (fotosNovas) => {
     let fotoRef = semFoto ? undefined : pr.fotoRef;
-    if (fotoNova) fotoRef = await onEnviarFoto(idFoto, fotoNova);
+    if (fotoNova) { fotoRef = await onEnviarFoto(idFoto, fotoNova); if (fotoRef) fotosNovas[fotoRef] = fotoNova; }
     const principal = { ...(desc.trim() ? { descricao: desc.trim() } : {}), ...(obs.trim() ? { obs: obs.trim() } : {}), ...(fotoRef ? { fotoRef } : {}) };
     return { principal };
   };
-  const salvarTudo = async () => {
+  // Devolve o que foi gravado e as fotos novas (o PDF usa a foto que acabou de subir, não a do cache).
+  const salvarTudo = async (fotosNovas = {}) => {
     const patch = {};
     if (alterado && cents != null) patch.valorCentavos = cents;
-    if (principalAlterado) Object.assign(patch, await patchPrincipal());
+    if (principalAlterado) Object.assign(patch, await patchPrincipal(fotosNovas));
     if (Object.keys(patch).length) await onSalvar(patch);
     setFotoNova(''); setSemFoto(false);
     return patch;
@@ -50,9 +51,10 @@ export default function CampanhaEquipeControle({ tipo, ano, config = {}, quantid
     finally { setBusy(false); }
   };
   const gerarPDF = () => executar(async () => {
-    const patch = await salvarTudo();
+    const fotosNovas = {};
+    const patch = await salvarTudo(fotosNovas);
     const principal = patch.principal || config.principal || {};
-    onPDF({ valorCentavos: cents, principal });
+    await onPDF({ valorCentavos: cents, principal, fotosNovas });
   });
   const pendente = alterado || principalAlterado;
   const semValor = quantidade > 0 && cents == null;
@@ -80,6 +82,7 @@ export default function CampanhaEquipeControle({ tipo, ano, config = {}, quantid
     <small>{config.oculta ? 'Oculta manualmente neste tipo e ano. O próximo ciclo anual não é afetado.' : 'Natal: 01/10 a 30/11. Páscoa: 01/02 a 31/03. Histórico sempre disponível ao gerencial.'}</small>
     <button disabled={busy || carregando || unidades === 0 || semValor || (alterado && cents == null)} onClick={gerarPDF}>Gerar PDF da solicitação ({unidades})</button>
     {semValor && <small>Informe o valor unitário para gerar o PDF.</small>}
+    {!semValor && <small>Cada PDF sai como versão nova (data e hora no documento e no nome do arquivo), sempre com o que está salvo agora.</small>}
     {pendente && !semValor && <small>O PDF salva o valor e o modelo automaticamente.</small>}
     {erro && <div role="alert">{erro}</div>}
   </section>;

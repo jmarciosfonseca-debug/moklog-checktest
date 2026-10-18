@@ -48,7 +48,7 @@ import { pertenceA, lideresDe, semEquipeAlguma, alternarVinculo, removerVinculo,
 import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
-import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes } from "./fotosEquipe";
+import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes, carregarFotos } from "./fotosEquipe";
 import MaturidadeResumo, { IndiceIndividual } from './equipe/MaturidadeResumo';
 import { calcularMapaEquipe } from './equipe/maturidade';
 import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
@@ -213,6 +213,14 @@ async function loadEquipe(projectId) {
     if(local) return JSON.parse(local);
   } catch(e){}
   return { colaboradores:[], desligados:[] };
+}
+
+// Configuração da campanha (valor, modelo, extras) lida DO SERVIDOR na hora do PDF: nunca sai versão antiga da memória.
+async function campanhaDoServidor(projectId, chave) {
+  try {
+    const snap = await getDocFromServer(doc(db,"equipes",projectId));
+    return snap.exists() ? ((snap.data().campanhasSazonais || {})[chave] || null) : null;
+  } catch(e) { return null; }
 }
 
 async function saveEquipe(projectId, data, before) {
@@ -3063,7 +3071,17 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   <CampanhaEquipeControle key={`${project.id}_${chave}_${config.valorCentavos}_${config.principal?.fotoRef||''}`} tipo={tipo} ano={anoFiltro} config={config} quantidade={linhas.length} carregando={carregando}
                     onSalvar={patch => save({...equipeData, campanhasSazonais:{...equipeData.campanhasSazonais,[chave]:{...config,...patch}}})}
                     fotos={fotosMapa} idFoto={`campanha-${tipo}-${anoFiltro}`} onEnviarFoto={async (id,url)=>{ const ref = await enviarFoto(project.id,id,url); definirFoto(ref,url); return ref; }}
-                    onPDF={({valorCentavos,principal})=>gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos,principal,extras:config.extras||[],fotos:fotosMapa})}/>
+                    onPDF={async ({valorCentavos,principal,fotosNovas})=>{
+                      // PDF sempre com a ÚLTIMA versão gravada (servidor): valor, modelo, foto e itens adicionais.
+                      const srv = isDemo() ? null : await campanhaDoServidor(project.id, chave);
+                      const cfg = srv || config;
+                      const principalFinal = srv ? (srv.principal || {}) : principal;
+                      const valorFinal = srv && srv.valorCentavos != null ? srv.valorCentavos : valorCentavos;
+                      let fotosPdf = { ...fotosMapa, ...(fotosNovas || {}) };
+                      const refs = [principalFinal.fotoRef, ...(cfg.extras || []).map(x=>x.fotoRef)].filter(Boolean);
+                      if (refs.some(r=>!fotosPdf[r])) { try { fotosPdf = { ...(await carregarFotos(db, project.id)), ...fotosPdf }; } catch(e) { /* sem foto: o PDF sai sem a imagem */ } }
+                      gerarPDFCestaNatal(project, linhas, anoFiltro, {tipo,valorCentavos:valorFinal,principal:principalFinal,extras:cfg.extras||[],fotos:fotosPdf});
+                    }}/>
                 )}
                 {adminAuth && filtroRapido==="cesta" && !carregando && (
                   <CampanhaExtras key={`${project.id}_${chave}_extras`} extras={config.extras||[]} fotos={fotosMapa} idFoto={`campanha-${tipo}-${anoFiltro}`}

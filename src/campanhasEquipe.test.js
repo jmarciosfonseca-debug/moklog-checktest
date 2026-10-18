@@ -59,6 +59,6 @@ test.each(['P601','P602','P604','P605','P606','P607','P505','P311A','P311B','P26
   gerarPDFCestaNatal({id:pid},[{nome:`TESTE exclusivo ${pid}`}],2026,{tipo:'natal',valorCentavos:12550});
   expect(html).toContain(LOGO_MOKED_30);expect(html).toContain(`<b>${pid}</b>`);
   expect(html).toContain(`TESTE exclusivo ${pid}`);expect(html).toContain('1 unidade(s)');expect(html).toContain('125,50');
-  expect(arquivo).toBe(`solicitacao_natal_${pid}_2026.html`);
+  expect(arquivo).toMatch(new RegExp(`^solicitacao_natal_${pid}_2026_\\d{4}-\\d{2}-\\d{2}_\\d{2}h\\d{2}\\.html$`));
  }finally{global.Blob=OldBlob;click.mockRestore();}
 });
