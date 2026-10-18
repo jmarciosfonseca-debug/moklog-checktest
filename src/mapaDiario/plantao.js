@@ -20,11 +20,13 @@ export function quemEstaDePlantao(mapa) {
     vistos.add(chave);
     out.push({ ...p, pessoaNome: nome });
   };
+  // FT que cobre a falta de quem estava no posto de líder assume o papel de líder do plantão.
+  const postosLider = new Set(mapa.postos.filter((p) => p && p.lider).map((p) => p.id));
   mapa.postos.forEach((p) => {
     if (!p) return;
     const d = p.detalhe || {};
     const base = !!(d.base || (d.livre && !p.pessoaId));
-    const lider = !!p.lider;
+    const lider = !!p.lider || (p.situacao === "ft" && !!d.faltaPostoId && postosLider.has(d.faltaPostoId));
     if (!p.saida && SITUACOES_NO_POSTO.has(p.situacao)) add({ postoId: p.id, posto: p.rotulo || "", pessoaId: p.pessoaId || "", pessoaNome: p.pessoaNome, situacao: p.situacao, base, lider });
     if (p.saida) (p.saida.coberturas || []).forEach((c) => add({ postoId: p.id, posto: p.rotulo || "", pessoaId: c.pessoaId || "", pessoaNome: c.pessoaNome, situacao: "cobertura", base: c.tipo === "base", lider, desde: c.de || "" }));
   });

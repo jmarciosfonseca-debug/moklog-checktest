@@ -132,7 +132,8 @@ export function itensDeEquipamento(data, projetoId = null, turno = null) {
     });
   }
   // Base do Codex (o que o projeto declara nos mapas) + cadastro: o cadastro vence por categoria.
-  const comCadastro = new Set(cad.map((i) => i.categoria));
+  // Categoria que já teve cadastro (mesmo que tudo tenha sido baixado) não volta para a linha genérica da base.
+  const comCadastro = new Set([...cad.map((i) => i.categoria), ...((data && Array.isArray(data.baixados) ? data.baixados : []).map((b) => b && b.categoria).filter(Boolean))]);
   const base = itensDaBase(projetoId, turno, rotulos).filter((i) => !comCadastro.has(i.categoria));
   const ordem = CATEGORIAS_MATERIAL.map(([c]) => c);
   return [...cad, ...base].sort((a, b) => ordem.indexOf(a.categoria) - ordem.indexOf(b.categoria));
@@ -426,6 +427,8 @@ export function herdarKmDoUltimoPlantao(mapa, ultimo, motoCadastro = null) {
     if (km != null) veiculos = veiculos.map((v, i) => (i === alvo && !v.correcaoKm ? { ...v, kmAnterior: km, kmAnteriorDe: ultimo.id || null } : v));
   });
   const cad = motoCadastro && typeof motoCadastro === "object" ? motoCadastro : null;
+  // Rascunho reaberto quando a troca já não vale (ex.: o plantão anterior já é da moto nova): tira o aviso antigo.
+  if (cad && !trocada) veiculos = veiculos.map((v) => { if (!ehMoto(v) || !v.trocaMoto) return v; const { trocaMoto, ...resto } = v; return resto; });
   if (cad && (cad.placa || trocada)) {
     const iMoto = veiculos.findIndex(ehMoto);
     if (iMoto >= 0) veiculos = veiculos.map((v, i) => {

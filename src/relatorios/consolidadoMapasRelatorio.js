@@ -4,7 +4,7 @@
 import { documentoMoked, escHTML, dataBR, horaBR, milhar } from "./padraoMoked";
 import { descreverFiltros } from "../mapaDiario/consolidado";
 import { rotuloTurno } from "../mapaDiario/texto";
-import { ROTULO_SITUACAO, kmRodado, rotuloSaida } from "../mapaDiario/modelo";
+import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloBaixa, rotuloCorrecaoKm } from "../mapaDiario/modelo";
 import { fotoDaPessoa, iniciais } from "../mapaDiario/fotos";
 
 const e = escHTML;
@@ -59,8 +59,9 @@ function blocoMapa(m, nomeProj, av) {
   const postos = (m.postos || []).map((p) => `<tr><td>${e(p.rotulo || "")}</td><td class="mk-dv">${av.html(m.projetoId, p.pessoaId, p.pessoaNome, true)}${e((p.pessoaNome || "").trim() || "—")}</td><td>${p.situacao && p.situacao !== "presente" ? badge(p.situacao) : '<span class="mk-sim">Presente</span>'}${p.saida ? `<div style="font-size:9px;color:#b45309">${e(rotuloSaida(p))}</div>` : ""}</td></tr>`).join("");
   const mat = m.material || { semAlteracao: true };
   const exc = mat.excecoes || [];
-  const material = mat.semAlteracao && !exc.length ? "Sem alteração" : `Com alteração — ${exc.map((x) => `${x.nome} (${x.situacao === "indisponivel" ? "indisponível" : "anomalia"}${x.obs ? `: ${x.obs}` : ""})`).join("; ") || (mat.obs || "")}`;
-  const km = (m.veiculos || []).map((v) => { const r = kmRodado(v); return r != null ? `${v.rotulo || "Veículo"} ${milhar(r)} km` : ""; }).filter(Boolean).join(" · ");
+  const baixas = (mat.baixas || []).map((b) => rotuloBaixa(b));
+  const material = (mat.semAlteracao && !exc.length ? (baixas.length ? "Sem alteração no restante" : "Sem alteração") : `Com alteração — ${exc.map((x) => `${x.nome} (${x.situacao === "indisponivel" ? "indisponível" : "anomalia"}${x.obs ? `: ${x.obs}` : ""})`).join("; ") || (mat.obs || "")}`) + (baixas.length ? ` · Baixa: ${baixas.join("; ")}` : "");
+  const km = (m.veiculos || []).map((v) => { const r = kmRodado(v); return r != null ? `${v.rotulo || "Veículo"}${v.placa ? ` ${v.placa}` : ""} ${milhar(r)} km${v.correcaoKm ? ` (km anterior ${rotuloCorrecaoKm(v)})` : ""}${v.kmAtualCorrigido != null ? ` (km corrigido depois: era ${v.kmAtual})` : ""}${v.trocaMoto ? " (moto substituída)" : ""}` : ""; }).filter(Boolean).join(" · ");
   const vis = m.visita && typeof m.visita.houve === "boolean" ? (m.visita.houve ? `visita de ${m.visita.supervisor || "supervisão"} neste turno` : "sem visita neste turno") : "";
   const ult = m.supervisao && m.supervisao.ultimaData ? `última visita ${dataBR(m.supervisao.ultimaData)}${m.supervisao.supervisor ? ` (${m.supervisao.supervisor})` : ""}` : "";
   const env = m.enviadoEm ? ` · concluído ${dataBR(m.enviadoEm)} ${horaBR(m.enviadoEm)}` : "";

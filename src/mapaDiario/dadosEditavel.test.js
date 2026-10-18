@@ -25,7 +25,7 @@ test("baixa pelo mapa: id do mapa (categoria:id) vira pedido ao servidor; item s
   const eq = await dados.darBaixaItemEquipamento("P604", "lanternas:l1", { motivo: "Substituído", obs: "tática", por: "Luiz D." });
   expect(mockBaixa[0]).toEqual({ pid: "P604", pedido: { categoria: "lanternas", id: "l1", motivo: "Substituído", obs: "tática", por: "Luiz D." } });
   expect(eq.lanternas.map((x) => x.identificacao)).toEqual(["Sem id"]);
-  await expect(dados.darBaixaItemEquipamento("P604", "lanternas:1", { motivo: "Extraviado" })).rejects.toThrow(/sem identificador/);
+  await expect(dados.darBaixaItemEquipamento("P604", "lanternas:9", { motivo: "Extraviado" })).rejects.toThrow(/não está mais no cadastro/);
 });
 
 test("item novo cadastrado pelo mapa entra no fim da lista com id, status ok e quantidade", async () => {
@@ -59,4 +59,24 @@ test("plantão pelo mapa: lê o mapa do turno pedido (diurno/noturno) e devolve 
   const r = await dados.loadPlantaoDoMapa("P604", "2026-10-18", "noturno");
   expect(r.pessoas.map((x) => x.pessoaNome)).toEqual(["Folguista"]);
   expect(await dados.loadPlantaoDoMapa("P604", "2026-10-18", "diurno")).toBeNull();
+});
+
+test("revisão: reenvio de baixa que já entrou é sucesso; item antigo sem id vai por posição + identificação", async () => {
+  mockEquip = { lanternas: [{ id: "l2", identificacao: "Lanterna 02" }], baixados: [{ id: "l1", categoria: "lanternas" }] };
+  expect(await dados.darBaixaItemEquipamento("P604", "lanternas:l1", { motivo: "Substituído" })).toBe(mockEquip);
+  expect(mockBaixa).toHaveLength(0);
+  mockEquip = { lanternas: [{ identificacao: "XRT-6000A" }] };
+  await dados.darBaixaItemEquipamento("P604", "lanternas:0", { motivo: "Substituído", obs: "", por: "Luiz" });
+  expect(mockBaixa[0].pedido).toEqual({ categoria: "lanternas", id: null, indice: 0, identificacao: "XRT-6000A", motivo: "Substituído", obs: "", por: "Luiz" });
+});
+
+test("revisão: correção casa veículo pelo rótulo; desfazer só remove a correção feita por aquele mapa", async () => {
+  const K = "equipes/P604/mapas/P604_2026-10-17_N";
+  mockBanco[K] = { id: "P604_2026-10-17_N", projetoId: "P604", status: "enviado", veiculos: [{ id: "vA", rotulo: "Veículo 2", kmAtual: 5000 }] };
+  expect(await dados.corrigirKmNoMapaAnterior("P604", "P604_2026-10-17_N", "vB", 500, { rotulo: "Veículo 2", porMapa: "M1" })).toEqual({ atualizado: true });
+  expect(mockBanco[K].veiculos[0]).toMatchObject({ kmAtual: 5000, kmAtualCorrigido: 500 });
+  expect(await dados.desfazerKmNoMapaAnterior("P604", "P604_2026-10-17_N", "vB", "OUTRO", "Veículo 2")).toEqual({ atualizado: false });
+  expect(await dados.desfazerKmNoMapaAnterior("P604", "P604_2026-10-17_N", "vB", "M1", "Veículo 2")).toEqual({ atualizado: true });
+  expect(mockBanco[K].veiculos[0].kmAtualCorrigido).toBeUndefined();
+  expect(mockBanco[K].veiculos[0].kmAtual).toBe(5000);
 });

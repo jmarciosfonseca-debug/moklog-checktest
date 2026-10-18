@@ -26,7 +26,8 @@ const MOTIVOS_BAIXA=['Substituído','Extraviado','Danificado / inservível','Dev
 async function baixa(db,pid,pedido,identity){
  const p=pedido&&typeof pedido==='object'?pedido:{};
  if(!CATS.includes(p.categoria))fail(400,'Categoria inválida.');
- if(!['string','number'].includes(typeof p.id)||!String(p.id))fail(400,'Item inválido.');
+ const semId=p.id==null;   // item antigo sem identificador: localizado por posição + identificação
+ if(semId?!(Number.isSafeInteger(p.indice)&&p.indice>=0&&typeof p.identificacao==='string'):!['string','number'].includes(typeof p.id)||!String(p.id))fail(400,'Item inválido.');
  if(!MOTIVOS_BAIXA.includes(p.motivo))fail(400,'Escolha o motivo da baixa.');
  const obs=typeof p.obs==='string'?p.obs.trim().slice(0,500):'';
  if(p.motivo==='Outro'&&obs.length<3)fail(400,'Descreva o motivo da baixa.');
@@ -35,10 +36,10 @@ async function baixa(db,pid,pedido,identity){
  return db.runTransaction(async tx=>{
   const snap=await tx.get(ref),current=snap.exists?snap.data():{};
   const lista=Array.isArray(current[p.categoria])?current[p.categoria]:[];
-  const alvo=lista.find(x=>x&&String(x.id)===String(p.id));
+  const alvo=semId?(lista[p.indice]&&lista[p.indice].id==null&&String(lista[p.indice].identificacao||'')===p.identificacao?lista[p.indice]:null):lista.find(x=>x&&String(x.id)===String(p.id));
   const baixados=Array.isArray(current.baixados)?current.baixados:[];
   if(!alvo){
-   if(baixados.some(x=>x&&x.categoria===p.categoria&&String(x.id)===String(p.id)))return current;   // reenvio: já baixado
+   if(!semId&&baixados.some(x=>x&&x.categoria===p.categoria&&String(x.id)===String(p.id)))return current;   // reenvio: já baixado
    fail(404,'Este item não está mais no cadastro. Reabra a tela.');
   }
   const em=new Date().toISOString();

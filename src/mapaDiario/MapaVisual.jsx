@@ -1,7 +1,7 @@
 // Mapa de Equipe diário — visão de leitura (gerencial): o mapa já preenchido, direto e visual.
 // Só mostra; não edita nem grava. Ocorrências (falta, FT, atraso…) em destaque no topo; falta de quem a FT cobriu sempre aparece.
 import { ocorrenciasDoMapa, detalheDoPosto, liderDoMapa } from "./consolidado";
-import { kmRodado } from "./modelo";
+import { kmRodado, rotuloBaixa, rotuloCorrecaoKm } from "./modelo";
 import { fotoDaPessoa, iniciais } from "./fotos";
 
 export const ESTILO = {
@@ -85,7 +85,9 @@ export default function MapaVisual({ mapa, dark, fotos = null }) {
       </div>
 
       <div style={{ display: "grid", gap: 3, fontSize: 12.5, color: txt }}>
-        <div><b>Material:</b> {mat.semAlteracao && !exc.length ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Sem alteração</span> : <span style={{ color: "#d97706", fontWeight: 700 }}>⚠ Com alteração — {exc.map((x) => `${x.nome} (${x.situacao === "indisponivel" ? "indisponível" : "anomalia"}${x.obs ? `: ${x.obs}` : ""})`).join("; ") || (mat.obs || "")}</span>}</div>
+        <div><b>Material:</b> {mat.semAlteracao && !exc.length ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Sem alteração{(mat.baixas || []).length ? " no restante" : ""}</span> : <span style={{ color: "#d97706", fontWeight: 700 }}>⚠ Com alteração — {exc.map((x) => `${x.nome} (${x.situacao === "indisponivel" ? "indisponível" : "anomalia"}${x.obs ? `: ${x.obs}` : ""})`).join("; ") || (mat.obs || "")}</span>}</div>
+        {(mat.baixas || []).map((b) => <div key={b.id} style={{ color: "#d97706", fontWeight: 700 }}>🔻 {rotuloBaixa(b)}</div>)}
+        {(mapa.veiculos || []).filter((v) => v && (v.correcaoKm || v.kmAtualCorrigido != null || v.trocaMoto)).map((v) => <div key={`kmc:${v.id}`} style={{ color: txt2 }}>{v.rotulo || "Veículo"}{v.placa ? ` ${v.placa}` : ""}: {[v.correcaoKm ? `km anterior ${rotuloCorrecaoKm(v)}` : "", v.kmAtualCorrigido != null ? `km atual corrigido depois para ${v.kmAtualCorrigido} (era ${v.kmAtual})` : "", v.trocaMoto ? `moto substituída${v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}` : ""].filter(Boolean).join(" · ")}</div>)}
         {veic.length > 0 && <div><b>Km rodado:</b> {veic.map((v) => `${v.rotulo} ${v.r} km`).join(" · ")}</div>}
         {(vis || ult) && <div><b>Supervisão:</b> {[vis, ult].filter(Boolean).join(" · ")}</div>}
         {(mapa.resumo || "").trim() && <div><b>Resumo da passagem:</b> <span style={{ color: txt2 }}>{mapa.resumo.trim()}</span></div>}

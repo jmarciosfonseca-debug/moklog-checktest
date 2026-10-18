@@ -20,11 +20,11 @@ const mapa = {
   ],
 };
 
-test("falta e posto vago ficam fora; cobertura (Base), FT e presentes entram", () => {
+test("falta e posto vago ficam fora; cobertura (Base), FT e presentes entram; a FT da falta do líder vira o líder", () => {
   const l = quemEstaDePlantao(mapa);
-  expect(l.map((x) => x.pessoaNome)).toEqual(["Marta A.", "José da Base", "João FT"]);
+  expect(l.map((x) => x.pessoaNome)).toEqual(["João FT", "Marta A.", "José da Base"]);
   expect(l.find((x) => x.pessoaNome === "José da Base")).toMatchObject({ base: true, situacao: "cobertura", pessoaId: "" });
-  expect(liderDePlantao(l)).toBeNull();                       // o líder titular faltou: ninguém no posto de líder
+  expect(liderDePlantao(l).pessoaNome).toBe("João FT");      // o titular faltou: quem fez a FT no lugar dele é o líder do plantão
 });
 
 test("quem cobre o posto de líder vira o líder do plantão (e vem primeiro)", () => {
@@ -75,4 +75,9 @@ describe("componente", () => {
     await act(async () => root.render(<Teste io={io} data={null} turno={null} />));
     expect(io.loadPlantaoDoMapa).not.toHaveBeenCalled();
   });
+});
+
+test("revisão: FT que cobre a falta de quem NÃO é líder não vira líder", () => {
+  const m = { postos: mapa.postos.map((p) => (p.id === "p4" ? { ...p, detalhe: { quemFaltouId: "b", faltaPostoId: "p2" } } : p.id === "p2" ? { ...p, situacao: "falta" } : p)) };
+  expect(liderDePlantao(quemEstaDePlantao(m))).toBeNull();
 });

@@ -14,6 +14,7 @@ import { isDemo } from "../session";
 import * as dados from "./dados";
 
 const dataBR = (iso) => iso.split("-").reverse().join("/");
+const kmInteiroTela = (v) => { const n = Number(String(v ?? "").replace(/\D/g, "")); return String(v ?? "").replace(/\D/g, "") === "" ? null : n; };
 const nomeCurto = (c) => c.nome;
 
 export default function MapaDiarioTela({ project, dark, onBack, io = dados, agoraFn = () => new Date() }) {
@@ -56,6 +57,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [kmForm, setKmForm] = useState(null);        // correção do km anterior { veiculoId, km, motivo, erros }
   const [baixaForm, setBaixaForm] = useState(null);  // baixa de equipamento pelo líder { id, motivo, obs, erro, salvando }
   const [baixaMsg, setBaixaMsg] = useState("");
+  const [cadastroFalhou, setCadastroFalhou] = useState(false); // não leu Equipamentos: troca de moto não pôde ser conferida
   const reenvio = useRef(null);                      // { timer, mapa } do reenvio automático
 
   const horario = horarioDoTurno(pid, turno);
@@ -80,7 +82,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           const base = await io.loadUltimoMapa(pid, turno, data, { gapPar: projetoPuxaEquipe(pid) }).catch(() => null);
           m = novoMapa({ projetoId: pid, data, turno, horario: horario ? { inicio: horario.inicio, fim: horario.fim } : null, base, agora: agoraFn() });
         }
-        const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => null) : Promise.resolve(null));
+        let falhouCadastro = false;
+        const eq = await (io.loadEquipamentos ? io.loadEquipamentos(pid).catch(() => { falhouCadastro = true; return null; }) : Promise.resolve(null));
+        if (vivo) setCadastroFalhou(falhouCadastro);
         if (m.status !== "enviado") {
           // Km anterior: do ÚLTIMO plantão do projeto (qualquer turno/equipe), não do último do mesmo turno.
           // A moto do cadastro entra junto: placa atual e troca de moto (moto nova começa do km inicial dela).
@@ -109,6 +113,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         } else setAvisoReaberto("");
         setAvisoEquipe(aviso);
         setColabs(cs); setMapa(m.status === "enviado" ? (reabrir ? garantirMoto(completo) : m) : garantirMoto(completarPostosFixos(m, cs))); setItensMat(itensDeEquipamento(eq, pid, turno));
+        if (m.status === "enviado") aplicarCorrecoesKm(m, 1);   // reabriu um mapa enviado: garante que a correção de km chegou ao plantão anterior
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
     })();
@@ -197,11 +202,22 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     } finally { setEnviando(false); enviandoRef.current = false; }
   };
   // Km anterior corrigido neste mapa: o plantão do erro recebe o km certo (kmAtualCorrigido), para o consolidado não somar km irreal.
-  const aplicarCorrecoesKm = (final) => {
-    if (!io.corrigirKmNoMapaAnterior || isDemo()) return;
-    (final.veiculos || []).filter((v) => v.correcaoKm && v.kmAnteriorDe).forEach((v) => {
-      io.corrigirKmNoMapaAnterior(pid, v.kmAnteriorDe, v.id, v.kmAnterior, { motivo: v.correcaoKm.motivo, porMapa: final.id, em: v.correcaoKm.em }).catch(() => {});
-    });
+  // Idempotente; tenta de novo se o sinal cair (e de novo sempre que o mapa for reaberto). Correção desfeita numa revisão volta o plantão anterior ao digitado.
+  const aplicarCorrecoesKm = (final, tentativas = 3) => {
+    if (!io.corrigirKmNoMapaAnterior || isDemo() || !final) return;
+    const veics = final.veiculos || [];
+    const desfeitos = (final.revisoes || []).length && io.desfazerKmNoMapaAnterior ? veics.filter((v) => !v.correcaoKm && v.kmAnteriorDe) : [];
+    const corrigidos = veics.filter((v) => v.correcaoKm);
+    if (!corrigidos.length && !desfeitos.length) return;
+    const executar = async (resta) => {
+      try {
+        let anteriorId = null;
+        if (corrigidos.some((v) => !v.kmAnteriorDe) && io.loadUltimoPlantao) { const u = await io.loadUltimoPlantao(pid, final.data, final.turno); anteriorId = u && u.id; }
+        for (const v of corrigidos) { const alvo = v.kmAnteriorDe || anteriorId; if (alvo) await io.corrigirKmNoMapaAnterior(pid, alvo, v.id, kmInteiroTela(v.kmAnterior), { motivo: v.correcaoKm.motivo, porMapa: final.id, em: v.correcaoKm.em, rotulo: v.rotulo || "" }); }
+        for (const v of desfeitos) await io.desfazerKmNoMapaAnterior(pid, v.kmAnteriorDe, v.id, final.id, v.rotulo || "");
+      } catch (e) { if (resta > 1) setTimeout(() => executar(resta - 1), 15000); }
+    };
+    executar(tentativas);
   };
   const pararReenvio = () => { if (reenvio.current) { clearInterval(reenvio.current.timer); reenvio.current = null; } setReenvioPendente(0); };
   const agendarReenvio = (final) => {
@@ -340,6 +356,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     return (
       <div data-testid="corrigir-km" style={{ marginTop: 6, padding: 8, border: `1px dashed ${cor.line}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 12, color: cor.txt2 }}>Use só quando o km do plantão anterior foi lançado errado. Fica registrado quem corrigiu e o motivo; o plantão anterior recebe o km certo ao concluir.</div>
+        {cadastroFalhou && ehMoto(v) && <div role="alert" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700 }}>Não consegui ler o cadastro de Equipamentos agora. Se a MOTO FOI TROCADA, não corrija aqui: feche e abra o mapa de novo (a moto nova começa do km inicial dela).</div>}
         <input aria-label={`Km anterior correto ${v.rotulo || "Veículo"}`} type="text" inputMode="numeric" pattern="[0-9]*" placeholder="Km anterior correto (só números)" value={kmForm.km} onChange={(e) => setKmForm((f) => ({ ...f, km: soDigitos(e.target.value) }))} style={S.in} />
         <input aria-label="Motivo da correção do km" placeholder="Motivo (ex.: erro de digitação no plantão anterior)" value={kmForm.motivo} onChange={(e) => setKmForm((f) => ({ ...f, motivo: e.target.value }))} style={S.in} />
         {kmForm.erros.length > 0 && <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{kmForm.erros.map((e) => <div key={e}>{e}</div>)}</div>}

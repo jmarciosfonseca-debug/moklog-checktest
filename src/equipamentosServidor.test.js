@@ -71,3 +71,11 @@ test('API: líder de outro projeto não dá baixa',async()=>{
  await handler({method:'POST',headers:{},body:{pid:'P505',section:'baixa',before:null,after:{categoria:'lanternas',id:'l1',motivo:'Extraviado'}}},r);
  expect(r.status).toHaveBeenCalledWith(403);expect(getDb).not.toHaveBeenCalled();
 });
+test('baixa de item antigo sem id: confere posição e identificação; divergência recusa',async()=>{
+ const velho={identificacao:'XRT-6000A',qtd:1,status:'ok'},outro={id:'l2',identificacao:'Lanterna 02',qtd:1};
+ const db=banco({lanternas:[velho,outro]});
+ const r=await save(db,'P505','baixa',null,{categoria:'lanternas',id:null,indice:0,identificacao:'XRT-6000A',motivo:'Substituído'},lider);
+ expect(r.lanternas).toEqual([outro]);expect(r.baixados[0]).toMatchObject({identificacao:'XRT-6000A',categoria:'lanternas'});
+ await expect(save(banco({lanternas:[velho]}),'P505','baixa',null,{categoria:'lanternas',id:null,indice:0,identificacao:'Outra',motivo:'Extraviado'},lider)).rejects.toMatchObject({status:404});
+ await expect(save(banco({lanternas:[outro]}),'P505','baixa',null,{categoria:'lanternas',id:null,indice:0,identificacao:'Lanterna 02',motivo:'Extraviado'},lider)).rejects.toMatchObject({status:404});
+});

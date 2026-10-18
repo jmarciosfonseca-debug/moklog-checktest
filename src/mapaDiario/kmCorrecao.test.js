@@ -117,3 +117,17 @@ describe("Troca de moto", () => {
     expect(motoTrocadaDesde(nova, { enviadoEm: "2026-10-18T09:30:00.000Z", veiculos: [{ id: "moto", kmAtual: 1300 }] })).toBe(false);
   });
 });
+
+import { itensDeEquipamento } from "./modelo";
+test("revisão: categoria toda baixada não volta para a linha genérica da base (sem contagem obrigatória)", () => {
+  expect(itensDeEquipamento({ radiosHT: [] }, "P604", "D").some((i) => i.categoria === "radiosHT")).toBe(true);   // nunca teve cadastro: base vale
+  expect(itensDeEquipamento({ radiosHT: [], baixados: [{ id: "r1", categoria: "radiosHT" }] }, "P604", "D").some((i) => i.categoria === "radiosHT")).toBe(false);
+});
+test("revisão: aviso de troca de moto some ao reabrir quando a troca já não vale", () => {
+  const nova = { placa: "XYZ9K88", km: 1250, kmInicial: 1250, trocadaEm: "2026-10-18T08:00:00.000Z" };
+  const rascunho = mapaBase([{ id: "moto", rotulo: "Moto", placa: "XYZ9K88", kmAnterior: 1250, kmAtual: null, trocaMoto: { placaAnterior: "ABC1D23" } }]);
+  const ultimo = { id: "x", enviadoEm: "2026-10-18T09:30:00.000Z", veiculos: [{ id: "moto", rotulo: "Moto", placa: "XYZ9K88", kmAtual: 1300 }] };
+  const m = herdarKmDoUltimoPlantao(rascunho, ultimo, nova);
+  expect(m.veiculos[0].trocaMoto).toBeUndefined();
+  expect(m.veiculos[0].kmAnterior).toBe(1300);
+});
