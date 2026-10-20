@@ -46,6 +46,7 @@ import {situacaoSolicitacao, podeEnviarAoGrupo, envioPendente, enviadoAposAprova
 import { gravarComRecuperacao } from "./equipeConflito";
 import { pertenceA, lideresDe, semEquipeAlguma, alternarVinculo, removerVinculo, cargoCompartilhado } from "./equipe/vinculos";
 import EquipesMontadas from "./equipe/EquipesMontadas";
+import { reduzirFoto, lerArquivo } from "./fotoCampanha";
 import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
@@ -793,6 +794,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
 function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
   const hist    = ordenarHistorico(colab.historico);   // cronológico pela data do fato (aplicação), não pelo lançamento
+  const fotosFicha = useContext(FotosCtx) || {};        // fotos de treinamento (fotoRef no item do histórico)
   const [histAberto, setHistAberto] = useState({});     // cascata: grupos do histórico expandidos
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
   const fts     = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
@@ -1030,6 +1032,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
                       <div style={{ fontSize:12, color:"#f1f5f9", fontWeight:600 }}>{fmtDate(h.data)}</div>
                       {h.label && <div style={{ fontSize:10, color:"#94a3b8" }}>{h.label}</div>}
                       {h.detalhe && <div style={{ fontSize:10, color:"#64748b" }}>{h.detalhe}</div>}
+                      {h.fotoRef && fotosFicha[h.fotoRef] && <img src={fotosFicha[h.fotoRef]} alt="Foto do treinamento" style={{ marginTop:5, width:96, height:72, objectFit:"cover", borderRadius:6, border:"1px solid #1e293b" }}/>}
                       {h.origem==="mapa" && (
                         <div style={{ fontSize:9, color:"#38bdf8", marginTop:2, fontWeight:700 }}>
                           ● Lançado automaticamente pelo Mapa de Equipe{h.registradoEm?` · ${fmtDate(h.registradoEm.slice(0,10))} ${new Date(h.registradoEm).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:""}
@@ -1545,6 +1548,9 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
               <div style={{ marginTop:10 }}>
                 <label style={S.lbl}>Descrição do Treinamento</label>
                 <input value={histForm.detalhe||""} onChange={e=>setHistForm(h=>({...h,detalhe:e.target.value}))} placeholder="Ex: Treinamento de segurança, NR35..." style={S.inp}/>
+                <label style={{ ...S.lbl, marginTop:8 }}>Foto do treinamento (opcional — evidência para o cliente)</label>
+                <input type="file" accept="image/*" aria-label="Foto do treinamento" onChange={async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; const url=await reduzirFoto(await lerArquivo(f)); setHistForm(h=>({...h,fotoNova:url})); }} style={{ fontSize:12, color:"#94a3b8" }}/>
+                {histForm.fotoNova && <div style={{ marginTop:6, display:"flex", gap:8, alignItems:"center" }}><img src={histForm.fotoNova} alt="" style={{ width:72, height:72, objectFit:"cover", borderRadius:8, border:"1px solid #1e293b" }}/><button onClick={()=>setHistForm(h=>({...h,fotoNova:""}))} style={{ ...S.btnSm, fontSize:10 }}>Remover foto</button></div>}
               </div>
             )}
           </div>
@@ -2375,7 +2381,10 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
         extra = { diasFalta:1, subtipo:"1 dia", label:fmtDate(histForm.data) };
       }
     }
-    const item = { ...histForm, ...extra, id:Date.now().toString(), registradoEm:new Date().toISOString() };
+    const { fotoNova, ...formSemFoto } = histForm;
+    const item = { ...formSemFoto, ...extra, id:Date.now().toString(), registradoEm:new Date().toISOString() };
+    // Foto de treinamento: documento imutável em equipes/{pid}/fotos (mesmo caminho das fotos de colaborador); na ficha fica só a referência.
+    if(histForm.tipo==="Treinamento" && fotoNova){ try { const ref = await enviarFoto(project.id, `treino-${item.id}`, fotoNova); if(ref){ item.fotoRef = ref; definirFoto(ref, fotoNova); } } catch(e){ alert("A foto não foi enviada; o registro segue sem foto. "+(e?.message||"")); } }
     const newColabs = equipeData.colaboradores.map(c=>{
       if(c.id!==selColab.id) return c;
       const newHist = [item, ...(c.historico||[])];

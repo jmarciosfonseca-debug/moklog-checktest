@@ -127,6 +127,17 @@ function TelaProjeto({ p, onBack, onAbrir }) {
         <span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ fontSize: 12 }}><b>{l.length} {r.toLowerCase()}</b><div style={C.micro}>{l.map((x) => `${(x.nome || "").split(" ").slice(0, 2).join(" ")}${r === "Voltando em 7 dias" ? ` (volta ${fmtD(x.retorno)})` : r === "Saindo em 7 dias" ? ` (sai ${fmtD(x.inicio)})` : x.retorno ? ` (até ${fmtD(x.retorno)})` : ""}`).join(" · ")}</div></div>
       </div> : null)}
     </button>
+    {/* fotos — evidências de treinamento */}
+    <div style={C.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Fotos · treinamentos</div>{p.equipe.evidencias.length > 3 && <button style={{ ...C.back, padding: "3px 8px", fontSize: 11, color: "#0ea5e9" }} onClick={() => onAbrir("fotos")}>Visualizar todas ›</button>}</div>
+      {p.equipe.evidencias.length === 0 && <div style={C.micro}>Sem fotos ainda. O líder anexa a foto ao registrar o treinamento na ficha.</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+        {p.equipe.evidencias.slice(0, 6).map((t, i) => <button key={t.id || i} onClick={() => onAbrir("fotos")} aria-label={`Foto: ${t.detalhe || "treinamento"}`} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
+          <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, border: "1px solid #0f172a" }} />
+          <div style={{ position: "absolute", left: 6, right: 6, bottom: 6, fontSize: 9, fontWeight: 700, color: "#f1f5f9", textShadow: "0 1px 3px #000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>{t.detalhe || "Treinamento"}</div>
+        </button>)}
+      </div>
+    </div>
     {/* relógios menores */}
     <div style={C.card}>
       <div style={C.titulo}>Progressos</div>
@@ -148,7 +159,7 @@ function Abas({ abas, atual, onMudar }) {
 function Detalhe({ p, tipo, onBack, abrirPDF }) {
   const s = p.sistemas;
   const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false);
-  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias" }[tipo];
+  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias", fotos: "Fotos · treinamentos" }[tipo];
   const vig = turnoVigente(p.pid, new Date());
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><button style={C.back} onClick={onBack}>← {p.nome}</button><div style={{ ...C.titulo, marginBottom: 0 }}>{titulo}</div></div>
@@ -228,6 +239,14 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       {!sel && <div style={{ borderTop: "1px solid #0f172a", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
     </div>}
 
+    {tipo === "fotos" && <div style={C.card}>
+      {p.equipe.evidencias.length === 0 && <div style={C.micro}>Sem fotos de treinamento.</div>}
+      {p.equipe.evidencias.map((t, i) => <div key={t.id || i} style={{ marginBottom: 12 }}>
+        <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", borderRadius: 10, border: "1px solid #0f172a" }} />
+        <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4 }}>{t.detalhe || t.label || "Treinamento"}</div>
+        <div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div>
+      </div>)}
+    </div>}
     {tipo === "ferias" && <div style={C.card}>
       {[["Em férias hoje", p.ferias.emFerias, "#38bdf8"], ["Saindo nos próximos 7 dias", p.ferias.saindo, AMARELO], ["Voltando nos próximos 7 dias", p.ferias.voltando, VERDE]].map(([r, l, c]) => <div key={r} style={{ marginBottom: 12 }}>
         <div style={{ ...C.titulo, color: c }}>{r} ({l.length})</div>
@@ -248,30 +267,40 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
   </>;
 }
 
-// ── Macro (proprietário) ──────────────────────────────────────────────────────
+// ── Macro (proprietário): resumo do grupo + um card por parque, no padrão do app ─────────────
 function TelaMacro({ escopo, dados, onAbrir }) {
   const g = consolidarGrupo(dados);
   const label = GRUPOS_CLIENTE[escopo]?.label || escopo;
+  const parques = Object.values(dados);
+  const riscoPior = Math.max(0, ...parques.map((p) => p.risco?.nivel || 0));
+  const feriasHoje = parques.reduce((a, p) => a + (p.ferias?.emFerias.length || 0), 0);
+  const Luzinha = ({ c, t }) => <span title={t} style={{ width: 10, height: 10, borderRadius: "50%", background: c, boxShadow: `0 0 6px ${c}`, display: "inline-block" }} />;
   return <>
-    <div style={{ ...C.titulo, marginBottom: 10 }}>{label} · {g.projetos} parques</div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}><div style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>{label}</div><span style={C.micro}>{g.projetos} parques · {g.equipeAtivos} colaboradores</span></div>
     <div style={C.grid2}>
-      <div style={C.card}><Mostrador valor={g.turnover} max={50} invertido rotulo="Turnover" tam={180} cor={corTurnover(g.turnover)} sub={`${g.equipeAtivos} colaboradores`} /></div>
-      <div style={C.card}><Mostrador valor={g.testePct} rotulo="Sistemas" tam={180} sub={g.testesAtrasados ? `${g.testesAtrasados} teste${g.testesAtrasados === 1 ? "" : "s"} atrasado${g.testesAtrasados === 1 ? "" : "s"}` : "testes em dia"} /></div>
+      <div style={C.card}><Mostrador valor={g.testePct} rotulo="Saúde dos parques" tam={180} zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={g.testesAtrasados ? `${g.testesAtrasados} teste${g.testesAtrasados === 1 ? "" : "s"} atrasado${g.testesAtrasados === 1 ? "" : "s"}` : "testes em dia"} /></div>
+      <div style={C.card}><Mostrador valor={g.turnover} max={50} invertido rotulo="Turnover 12 m" tam={180} cor={corTurnover(g.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="média dos parques" /></div>
     </div>
-    <div style={C.card}><div style={C.grid2}>
-      <Anel valor={g.faltasHoje} unidade="" rotulo="Faltas hoje" cor={g.faltasHoje ? VERMELHO2 : VERDE} sub={`${g.mapasHoje} de ${g.projetos} mapas enviados`} />
-      <Anel valor={g.equipPct} rotulo="Equipamentos" sub={`${g.equipInop} inoperantes no grupo`} />
-    </div></div>
-    <div style={C.titulo}>Parques</div>
-    {Object.values(dados).map((p) => <button key={p.pid} style={C.cardBtn} onClick={() => onAbrir(p.pid)} aria-label={`Abrir ${p.nome}`}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div><div style={{ fontSize: 13, fontWeight: 800 }}>{p.nome}</div><div style={C.micro}>{p.equipe.ativos} colaboradores · teste {p.teste.data ? fmtD(p.teste.data) : "—"}{p.equipe.turnover !== null ? ` · turnover ${p.equipe.turnover}%` : ""}</div></div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {[[p.teste.atrasado ? AMARELO : corDe(p.teste.pct), "Teste semanal"], [!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE, "Mapa do dia"], [corDe(p.equip.pct), "Equipamentos"], [p.sistemas.ctmkOff ? VERMELHO2 : VERDE, "CTMK"], [COR_RISCO[p.risco?.nivel] || CINZA, "Risco"]].map(([c, t]) => <span key={t} title={t} style={{ width: 12, height: 12, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}` }} />)}
-        </div>
+    <div style={C.card}>
+      <div style={C.titulo}>Hoje no grupo</div>
+      {[[g.faltasHoje ? VERMELHO2 : VERDE, `${g.faltasHoje} falta${g.faltasHoje === 1 ? "" : "s"} nos mapas de hoje`, `${g.mapasHoje} de ${g.projetos} mapas enviados`],
+        [riscoPior ? COR_RISCO[riscoPior] : CINZA, `Risco mais alto: ${riscoPior ? NIVEL_LABEL[riscoPior] : "sem avaliação"}`, parques.filter((p) => p.risco?.nivel === riscoPior && riscoPior).map((p) => p.nome).join(" · ")],
+        ["#38bdf8", `${feriasHoje} em férias hoje`, parques.filter((p) => p.ferias?.emFerias.length).map((p) => `${p.nome} (${p.ferias.emFerias.length})`).join(" · ") || "ninguém"],
+        [g.equipInop ? AMARELO : VERDE, `${g.equipInop} equipamento${g.equipInop === 1 ? "" : "s"} inoperante${g.equipInop === 1 ? "" : "s"}`, `${g.equipPct === null ? "—" : g.equipPct + "%"} operantes no grupo`],
+        [parques.some((p) => p.sistemas?.ctmkOff) ? VERMELHO2 : VERDE, `CTMK: ${parques.filter((p) => p.sistemas?.ctmkOff).length} off-line`, parques.filter((p) => p.sistemas?.ctmkOff).map((p) => p.nome).join(" · ") || "todas on-line"],
+      ].map(([c, t, d], i) => <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: i ? "1px solid #0f172a" : "none" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t}</div><div style={C.micro}>{d}</div></div></div>)}
+    </div>
+    <div style={C.titulo}>Parques — toque para abrir o painel</div>
+    {parques.map((p) => <button key={p.pid} style={C.cardBtn} onClick={() => onAbrir(p.pid)} aria-label={`Abrir ${p.nome}`}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#f1f5f9" }}>{p.nome}</div>
+        <div style={{ display: "flex", gap: 6 }}><Luzinha c={p.teste.atrasado ? AMARELO : corDe(p.teste.pct)} t="Teste semanal" /><Luzinha c={COR_RISCO[p.risco?.nivel] || CINZA} t="Risco" /><Luzinha c={!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE} t="Mapa do dia" /><Luzinha c={corDe(p.equip.pct)} t="Equipamentos" /><Luzinha c={p.sistemas.ctmkOff ? VERMELHO2 : VERDE} t="CTMK" /></div>
       </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
+        {[["Saúde", p.teste.pct === null ? "—" : `${p.teste.pct}%`, p.teste.atrasado ? AMARELO : corDe(p.teste.pct)], ["Risco", p.risco?.nivel ? NIVEL_LABEL[p.risco.nivel] : "—", COR_RISCO[p.risco?.nivel] || CINZA], ["Plantão", p.mapa.temMapa ? `${p.mapa.presentes}/${p.mapa.postos}` : "—", p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE], ["Turnover", p.equipe.turnover === null ? "—" : `${p.equipe.turnover}%`, corTurnover(p.equipe.turnover)]].map(([r, v, c]) => <div key={r} style={{ background: "#0a1120", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}><div style={{ fontSize: 13, fontWeight: 900, color: c }}>{v}</div><div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: .5 }}>{r}</div></div>)}
+      </div>
+      <div style={{ ...C.micro, marginTop: 6 }}>{p.equipe.ativos} colaboradores · teste {p.teste.data ? fmtD(p.teste.data) : "—"}{p.ferias?.emFerias.length ? ` · ${p.ferias.emFerias.length} em férias` : ""}{p.mapa.faltas ? ` · ${p.mapa.faltas} falta${p.mapa.faltas === 1 ? "" : "s"} hoje` : ""}</div>
     </button>)}
-    <div style={C.micro}>Luzes: teste semanal · mapa do dia · equipamentos · CTMK · risco</div>
   </>;
 }
 

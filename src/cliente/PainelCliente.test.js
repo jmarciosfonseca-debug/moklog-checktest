@@ -36,9 +36,9 @@ test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com no
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "1234"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await clicar(botao(host, "ENTRAR")); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect(mockCheckPin).toHaveBeenCalledWith("1234", { cliente: true });
-    expect(host.textContent).toContain("Golgi · 2 parques");
+    expect(host.textContent).toContain("2 parques · 4 colaboradores");
     expect(host.textContent).toContain("Proprietário · visão macro");
-    expect(host.textContent).toContain("2Faltas hoje");                      // consolidado do dia (mock: mesmo mapa nos 2 parques)
+    expect(host.textContent).toContain("2 faltas nos mapas de hoje");                    // consolidado do dia (mock: mesmo mapa nos 2 parques)
     await clicar(botao(host, "Abrir Golgi Cajamar"));
     expect(host.textContent).toContain("SAÚDE DO PARQUE"); expect(host.textContent).toContain("50%");
     expect(host.textContent).toContain("ANÁLISE DE RISCO"); expect(host.textContent).toContain("ELEVADO");
@@ -68,7 +68,7 @@ test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com no
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir sistemas"));
     expect(host.textContent).toContain("OFF-LINE"); expect(host.textContent).toContain("1 falha em aberto");
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "← Meus parques"));
-    expect(host.textContent).toContain("Golgi · 2 parques");
+    expect(host.textContent).toContain("2 parques · 4 colaboradores");
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 test("PIN de gestor do parque: entra direto no parque, sem botão de macro; PIN errado avisa", async () => {
