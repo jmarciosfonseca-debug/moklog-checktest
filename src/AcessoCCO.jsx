@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import ListaCascata from "./ListaCascata";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -1012,17 +1013,17 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
 
               {hoje.length>0 && (<>
                 <div style={{fontSize:11,color:temaInfo.color,fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}>Hoje</div>
-                {hoje.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark!==false} S={S} adminAuth={adminAuth}
+                <ListaCascata itens={hoje} campos={["registradoEm","criadoEm","data"]} dark={dark!==false} rotulo="de hoje" render={r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark!==false} S={S} adminAuth={adminAuth}
                   onContinuar={()=>continuarRegistro(r)}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
-                  onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
+                  onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>}/>
               </>)}
               {anteriores.length>0 && (<>
                 <div style={{fontSize:11,...S.txt2,fontWeight:700,textTransform:"uppercase",letterSpacing:.8,marginTop:4}}>Anteriores</div>
-                {anteriores.map(r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark!==false} S={S} adminAuth={adminAuth}
+                <ListaCascata itens={anteriores} campos={["data","registradoEm","criadoEm"]} dark={dark!==false} render={r=><RegistroCard key={r.id} tema={tema} r={r} dark={dark!==false} S={S} adminAuth={adminAuth}
                   onContinuar={()=>continuarRegistro(r)}
                   onArquivar={()=>arquivar(r.id)} onDesarquivar={()=>desarquivar(r.id)}
-                  onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>)}
+                  onExcluir={()=>{if(window.confirm("Excluir definitivamente?")) excluir(r.id);}}/>}/>
               </>)}
             </>
           )}

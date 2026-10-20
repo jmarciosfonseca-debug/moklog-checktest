@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import ListaCascata from "./ListaCascata";
 import { Ico } from "./Icones";
 import IconeEquip from "./IconeEquip";
 import { iconeTema } from "./temaClaro";
@@ -846,7 +847,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                       </div>
                     </div>
                   )}
-                  {(form.historico||[]).map(h=>(
+                  <ListaCascata itens={form.historico||[]} campos={["data"]} dark={dark} render={h=>(
                     <div key={h.id} style={{background:dark?"#020510":"#f8fafc",borderRadius:7,padding:"8px 10px",marginBottom:5,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
                       <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:3}}>
                         <span style={{fontSize:10,color:"#f59e0b",fontWeight:700}}>{fmtDate(h.data)}</span>
@@ -854,7 +855,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                       </div>
                       <div style={{fontSize:11,...S.txt}}>{h.desc}</div>
                     </div>
-                  ))}
+                  )}/>
                 </div>
               </>
             )}
