@@ -11,11 +11,14 @@ import { ROTULO_SITUACAO } from "../mapaDiario/modelo";
 import VerMapasProjeto from "../mapaDiario/VerMapasProjeto";
 import { turnoVigente } from "../mapaDiario/painel";
 import QuadroEfetivo from "../equipe/QuadroEfetivo";
+import MaturidadeResumo from "../equipe/MaturidadeResumo";
+import EquipesMontadas, { montarEquipesDisponivel } from "../equipe/EquipesMontadas";
 import { EQUIP_CATS } from "../equipData";
 import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
 const LARANJA = "#f97316";
+const B = "#0f172a"; // borda padrão do app
 const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
 const EQUIP_LABEL = { smartphones: "Smartphones", radiosHT: "Rádios HT", armamento: "Armamento", municao: "Munição", placas: "Placas balísticas", lanternas: "Lanternas", ztrax: "Ztrax", bodycam: "Bodycam", outros: "Outros" };
 
@@ -51,8 +54,13 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     equip: equipamentosResumo(equip),
     sistemas: sistemasResumo({ ctmk: ctmkData?.[pid], keyaccess, iluminacao: ilum, energia, perimetralZonasRuins, score360: s360 }),
     colabs, pendencias,
-    risco: risc, equipeDoc: eq, equipDoc: equip,
+    risco: risc, equipeDoc: eq, equipDoc: equip, fotos,
     historico: h.map((r, i) => ({ idx: i, data: r.meta?.date || null, pct: (() => { try { return computeHealth(PROJECTS[pid], r.state).pct; } catch { return null; } })(), report: r })).reverse().slice(0, 12),
+    ferias: (() => { const f = (eq.ferias || []).filter((x) => x && x.colabId && x.dataInicio); const em7 = (d) => { const n = (new Date(d + "T12:00:00Z") - new Date(hoje + "T12:00:00Z")) / 86400000; return n >= 0 && n <= 7; };
+      const nomeDe = (id) => { const c = (eq.colaboradores || []).find((x) => x && x.id === id); return c ? { nome: c.nome, cargo: c.cargo, foto: fotoDe(c, fotos) } : { nome: id, cargo: "", foto: "" }; };
+      return { emFerias: f.filter((x) => x.dataInicio <= hoje && (!x.dataRetorno || hoje <= x.dataRetorno)).map((x) => ({ ...nomeDe(x.colabId), inicio: x.dataInicio, retorno: x.dataRetorno || null, cobertura: x.cobertura || "" })),
+        saindo: f.filter((x) => x.dataInicio > hoje && em7(x.dataInicio)).map((x) => ({ ...nomeDe(x.colabId), inicio: x.dataInicio, retorno: x.dataRetorno || null })),
+        voltando: f.filter((x) => x.dataRetorno && x.dataRetorno >= hoje && em7(x.dataRetorno) && x.dataInicio <= hoje).map((x) => ({ ...nomeDe(x.colabId), inicio: x.dataInicio, retorno: x.dataRetorno })) }; })(),
     desligados: (eq.desligados || []).filter((c) => c && typeof c === "object").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, saida: c.desligadoEm || null, motivo: c.motivoDesligamento || c.tipoDesligamento || "", foto: fotoDe(c, fotos) })).sort((a, b) => String(b.saida || "").localeCompare(String(a.saida || ""))),
   };
   p.luzes = luzes(p);
@@ -61,12 +69,12 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
 
 function Avatar({ foto, nome, tam = 36 }) {
   const ini = (nome || "?").split(/\s+/).slice(0, 2).map((x) => x[0] || "").join("").toUpperCase();
-  const borda = { width: tam, height: tam, clipPath: "polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%)" };
+  const borda = { width: tam, height: tam, borderRadius: tam / 4, border: "2px solid #1e293b" };
   return foto ? <img src={foto} alt={nome} style={{ ...borda, objectFit: "cover" }} />
-    : <div style={{ ...borda, background: "#1b1b20", color: "#9ca3af", fontSize: tam / 2.8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{ini}</div>;
+    : <div style={{ ...borda, background: "#0f172a", color: "#64748b", fontSize: tam / 2.8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{ini}</div>;
 }
-const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: primeiro ? "none" : "1px solid #1f2127" }}>{children}</div>;
-const Luzes = ({ p }) => <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 4px", borderTop: "1px solid #2a2a31", marginTop: 4 }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div>;
+const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: primeiro ? "none" : "1px solid #0f172a" }}>{children}</div>;
+const Luzes = ({ p }) => <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 4px", borderTop: "1px solid #0f172a", marginTop: 4 }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div>;
 
 // ── Parque ────────────────────────────────────────────────────────────────────
 function MostradorRisco({ risco, tam = 180 }) {
@@ -99,7 +107,7 @@ function TelaProjeto({ p, onBack, onAbrir }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Equipe de plantão</div><span style={C.micro}>{m.temMapa ? `${fmtD(m.data)} · ${m.turno === "N" ? "noturno" : "diurno"}${m.hoje ? "" : " (último)"}` : "sem mapa"}</span></div>
       {m.temMapa ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {plantao.map((x, i) => <div key={i} style={{ textAlign: "center", width: 54 }}>
-          <div style={{ position: "relative", display: "inline-block" }}><Avatar foto={x.foto} nome={x.nome || x.posto} tam={44} /><span title={ROTULO_SITUACAO[x.situacao] || x.situacao} style={{ position: "absolute", right: -2, bottom: -2, width: 12, height: 12, borderRadius: "50%", background: corSit(x.situacao), border: "2px solid #0a0a0d", boxShadow: `0 0 6px ${corSit(x.situacao)}` }} /></div>
+          <div style={{ position: "relative", display: "inline-block" }}><Avatar foto={x.foto} nome={x.nome || x.posto} tam={44} /><span title={ROTULO_SITUACAO[x.situacao] || x.situacao} style={{ position: "absolute", right: -2, bottom: -2, width: 12, height: 12, borderRadius: "50%", background: corSit(x.situacao), border: "2px solid #060c18", boxShadow: `0 0 6px ${corSit(x.situacao)}` }} /></div>
           <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(x.nome || "—").split(" ")[0]}</div>
           <div style={{ fontSize: 8, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.posto}</div>
         </div>)}
@@ -110,6 +118,14 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
       <Mostrador valor={p.equipe.turnover} max={50} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
       <div style={{ textAlign: "right", ...C.micro }}>quantos temos × quantos saíram ›</div>
+    </button>
+    {/* férias */}
+    <button style={C.cardBtn} onClick={() => onAbrir("ferias")} aria-label="Abrir férias">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Férias</div><span style={C.micro}>{p.ferias.emFerias.length} em férias hoje</span></div>
+      {p.ferias.emFerias.length === 0 && p.ferias.saindo.length === 0 && p.ferias.voltando.length === 0 && <div style={C.micro}>Ninguém de férias, saindo ou voltando nos próximos 7 dias.</div>}
+      {[["Em férias", p.ferias.emFerias, "#38bdf8"], ["Saindo em 7 dias", p.ferias.saindo, AMARELO], ["Voltando em 7 dias", p.ferias.voltando, VERDE]].map(([r, l, c]) => l.length ? <div key={r} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ fontSize: 12 }}><b>{l.length} {r.toLowerCase()}</b><div style={C.micro}>{l.map((x) => `${(x.nome || "").split(" ").slice(0, 2).join(" ")}${r === "Voltando em 7 dias" ? ` (volta ${fmtD(x.retorno)})` : r === "Saindo em 7 dias" ? ` (sai ${fmtD(x.inicio)})` : x.retorno ? ` (até ${fmtD(x.retorno)})` : ""}`).join(" · ")}</div></div>
+      </div> : null)}
     </button>
     {/* relógios menores */}
     <div style={C.card}>
@@ -126,13 +142,13 @@ function TelaProjeto({ p, onBack, onAbrir }) {
 
 // ── Detalhes ──────────────────────────────────────────────────────────────────
 function Abas({ abas, atual, onMudar }) {
-  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? VERMELHO2 : "#3a3a42", color: atual === k ? "#fecaca" : "#d1d5db", boxShadow: atual === k ? `0 0 10px ${VERMELHO2}55` : "none" }}>{r}</button>)}</div>;
+  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? "#0ea5e9" : "#0f172a", color: atual === k ? "#0ea5e9" : "#94a3b8", background: atual === k ? "#0d1f2e" : "transparent" }}>{r}</button>)}</div>;
 }
 
 function Detalhe({ p, tipo, onBack, abrirPDF }) {
   const s = p.sistemas;
   const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false);
-  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas" }[tipo];
+  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias" }[tipo];
   const vig = turnoVigente(p.pid, new Date());
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><button style={C.back} onClick={onBack}>← {p.nome}</button><div style={{ ...C.titulo, marginBottom: 0 }}>{titulo}</div></div>
@@ -142,7 +158,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       <div style={{ ...C.micro, marginBottom: 6 }}>Toque num teste para abrir o relatório (PDF).</div>
       {p.historico.length === 0 && <div style={C.micro}>Nenhum teste registrado.</div>}
       {p.historico.map((r, i) => <button key={r.idx} aria-label={`Abrir teste de ${fmtD(r.data)}`} onClick={() => abrirPDF && abrirPDF(p.pid, r.report)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: corDe(r.pct), boxShadow: `0 0 8px ${corDe(r.pct)}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>Teste de {fmtD(r.data)}</div><div style={C.micro}>{r.pct === null ? "—" : `${r.pct}% dos sistemas operantes`}</div></div><span style={C.chip(VERMELHO2)}>PDF ›</span>
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: corDe(r.pct), boxShadow: `0 0 8px ${corDe(r.pct)}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>Teste de {fmtD(r.data)}</div><div style={C.micro}>{r.pct === null ? "—" : `${r.pct}% dos sistemas operantes`}</div></div><span style={C.chip("#0ea5e9")}>PDF ›</span>
       </Linha></button>)}
     </div>}
 
@@ -157,10 +173,11 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
     </div>}
 
     {tipo === "plantao" && <>
-      <Abas abas={[["mapa", "Mapa de equipe hoje"], ["equipe", "Equipe completa"]]} atual={aba} onMudar={setAba} />
+      <Abas abas={[["mapa", "Mapa de hoje"], ["equipe", "Equipe montada"], ["maturidade", "Maturidade"]]} atual={aba} onMudar={setAba} />
       {aba === "mapa" && <div style={C.card}>{vig ? <VerMapasProjeto projetoId={p.pid} data={vig.data} turno={vig.turno} dark /> : <div style={C.micro}>Sem turno configurado.</div>}</div>}
-      {aba === "equipe" && <div style={C.card}>
-        <QuadroEfetivo projectId={p.pid} equipe={p.equipeDoc} hoje={hojeISO()} dark />
+      {aba === "maturidade" && <div style={C.card}><QuadroEfetivo projectId={p.pid} equipe={p.equipeDoc} hoje={hojeISO()} dark /><div style={{ height: 10 }} /><MaturidadeResumo equipe={p.equipeDoc} hoje={hojeISO()} dark /></div>}
+      {aba === "equipe" && montarEquipesDisponivel(p.pid, p.equipeDoc.colaboradores) && <div style={C.card}><EquipesMontadas colaboradores={p.equipeDoc.colaboradores} fotos={p.fotos} dark /></div>}
+      {aba === "equipe" && !montarEquipesDisponivel(p.pid, p.equipeDoc.colaboradores) && <div style={C.card}>
         {["Diurno", "Noturno", "Outros"].map((t) => { const lista = p.colabs.filter((c) => (t === "Outros" ? !["Diurno", "Noturno"].includes(c.turno) : c.turno === t)); if (!lista.length) return null; return <div key={t} style={{ marginTop: 12 }}>
           <div style={C.titulo}>{t} <span style={{ color: "#6b7280", letterSpacing: 0 }}>({lista.length})</span></div>
           {lista.map((c, i) => <Linha key={c.id} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={42} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div><span style={C.chip(c.treinos ? VERDE : CINZA)}>{c.treinos} trein.</span></Linha>)}
@@ -198,19 +215,26 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       <div style={{ ...C.micro, marginBottom: 8 }}>{p.equipe.treinadosPct === null ? "" : `${p.equipe.treinadosPct}% da equipe com treinamento registrado · `}{p.equipe.ultimosTreinos.length ? `último em ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"}. Toque num colaborador para ver os treinamentos dele.</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         {p.colabs.map((c) => <button key={c.id} aria-pressed={sel === c.id} aria-label={`Treinamentos de ${c.nome}`} onClick={() => setSel(sel === c.id ? null : c.id)} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "center", width: 54, opacity: sel && sel !== c.id ? .45 : 1 }}>
-          <div style={{ display: "inline-block", outline: sel === c.id ? `2px solid ${VERMELHO2}` : "none", outlineOffset: 2 }}><Avatar foto={c.foto} nome={c.nome} tam={44} /></div>
+          <div style={{ display: "inline-block", outline: sel === c.id ? "2px solid #0ea5e9" : "none", outlineOffset: 2 }}><Avatar foto={c.foto} nome={c.nome} tam={44} /></div>
           <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(c.nome || "").split(" ")[0]}</div>
           <div style={{ fontSize: 8, color: c.treinos ? VERDE : "#6b7280" }}>{c.treinos} trein.</div>
         </button>)}
       </div>
       {(() => { const c = p.colabs.find((x) => x.id === sel); if (!c) return null; const ts = (p.equipeDoc.colaboradores || []).find((x) => x.id === sel)?.historico?.filter((h) => h && h.tipo === "Treinamento").sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))) || [];
-        return <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}><Avatar foto={c.foto} nome={c.nome} tam={48} /><div><div style={{ fontSize: 13, fontWeight: 800 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div></div>
+        return <div style={{ borderTop: "1px solid #0f172a", paddingTop: 8 }}><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}><Avatar foto={c.foto} nome={c.nome} tam={48} /><div><div style={{ fontSize: 13, fontWeight: 800 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div></div>
           {ts.length === 0 && <div style={C.micro}>Sem treinamento registrado.</div>}
           {ts.map((t, i) => <Linha key={t.id || i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: VERDE, boxShadow: `0 0 8px ${VERDE}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)}</div></div></Linha>)}
         </div>; })()}
-      {!sel && <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
+      {!sel && <div style={{ borderTop: "1px solid #0f172a", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
     </div>}
 
+    {tipo === "ferias" && <div style={C.card}>
+      {[["Em férias hoje", p.ferias.emFerias, "#38bdf8"], ["Saindo nos próximos 7 dias", p.ferias.saindo, AMARELO], ["Voltando nos próximos 7 dias", p.ferias.voltando, VERDE]].map(([r, l, c]) => <div key={r} style={{ marginBottom: 12 }}>
+        <div style={{ ...C.titulo, color: c }}>{r} ({l.length})</div>
+        {l.length === 0 && <div style={C.micro}>Ninguém.</div>}
+        {l.map((x, i) => <Linha key={i} primeiro={i === 0}><Avatar foto={x.foto} nome={x.nome} tam={38} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{x.nome}</div><div style={C.micro}>{x.cargo}{x.inicio ? ` · sai ${fmtD(x.inicio)}` : ""}{x.retorno ? ` · volta ${fmtD(x.retorno)}` : ""}{x.cobertura ? ` · cobertura: ${x.cobertura}` : ""}</div></div></Linha>)}
+      </div>)}
+    </div>}
     {tipo === "sistemas" && <div style={C.card}>
       {s.score360 !== null && <Mostrador valor={s.score360} rotulo="Visão 360" sub="nota do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} />}
       {[["CTMK (central)", s.ctmkOff ? `OFF-LINE há ${s.ctmkDias} dia${s.ctmkDias === 1 ? "" : "s"}` : "on-line", s.ctmkOff ? VERMELHO2 : VERDE],
@@ -278,9 +302,9 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
     <div style={{ ...C.card, marginTop: 30, textAlign: "center" }}>
       <div style={C.titulo}>Acesso de leitura</div>
       <div style={{ ...C.micro, marginBottom: 16 }}>Gestor do parque ou proprietário</div>
-      <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #3a3a42", background: "#0a0a0d", color: "#f3f4f6", fontSize: 20, textAlign: "center", letterSpacing: 8, borderRadius: 6 }} />
+      <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #1e293b", background: "#020510", color: "#f1f5f9", fontSize: 20, textAlign: "center", letterSpacing: 8, borderRadius: 6 }} />
       {erro && <div role="alert" style={{ color: VERMELHO2, fontSize: 12, marginTop: 8 }}>{erro}</div>}
-      <div><button onClick={entrar} style={{ marginTop: 14, background: `linear-gradient(180deg, ${VERMELHO2}, #9f0710)`, color: "#fff", border: "none", padding: "10px 32px", fontWeight: 900, letterSpacing: 2, cursor: "pointer", clipPath: "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)", boxShadow: `0 0 16px ${VERMELHO2}55` }}>ENTRAR</button></div>
+      <div><button onClick={entrar} style={{ marginTop: 14, background: "linear-gradient(135deg,#1d4ed8,#1e40af)", color: "#fff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 700, cursor: "pointer" }}>ENTRAR</button></div>
     </div>
   </main>;
 
