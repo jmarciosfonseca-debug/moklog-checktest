@@ -44,7 +44,9 @@ export function Mostrador({ valor, max = 100, rotulo, sub, tam = 220, cor, unida
     {v !== null && v > 0 && arco(0, v, c, 4, .9)}
     {ticks}
     <text x={cx} y={cy - r * 0.38} textAnchor="middle" fontSize={tam / 17} fontWeight="900" letterSpacing="1.5" fill="#94a3b8">{rotulo.toUpperCase()}</text>
-    {v !== null && <g filter="url(#mkGlow)"><line x1={bx} y1={by} x2={nx} y2={ny} stroke="#f8fafc" strokeWidth={3.5} strokeLinecap="round" /></g>}
+    {v !== null && (() => { // ponteiro em seta: base larga no eixo, ponta fina na graduação, com brilho da cor da zona
+      const [px, py] = pt(na + Math.PI / 2, 5), [qx, qy] = pt(na - Math.PI / 2, 5);
+      return <g filter="url(#mkGlow)"><polygon points={`${px} ${py} ${nx} ${ny} ${qx} ${qy} ${bx} ${by}`} fill="#f8fafc" stroke={c} strokeWidth={1.2} strokeLinejoin="round" /></g>; })()}
     <circle cx={cx} cy={cy} r={10} fill="#04080f" stroke="#0ea5e9" strokeWidth={3} />
     <text x={cx} y={cy + r * 0.55} textAnchor="middle" fontSize={tam / 7} fontWeight="900" fill={v === null ? CINZA : c} style={{ filter: "drop-shadow(0 0 8px rgba(14,165,233,.35))" }}>{valorTexto !== undefined ? valorTexto : v === null ? "—" : `${v}${unidade}`}</text>
     {sub && <text x={cx} y={cy + r * 0.55 + tam / 14} textAnchor="middle" fontSize={tam / 20} fill="#9ca3af">{sub}</text>}
