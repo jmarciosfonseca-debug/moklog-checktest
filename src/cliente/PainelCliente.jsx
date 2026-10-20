@@ -94,11 +94,11 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     {/* saúde do parque + análise de risco */}
     <div style={C.grid2}>
       <button style={C.cardBtn} onClick={() => onAbrir("teste")} aria-label="Abrir teste semanal">
-        <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" tam={180} cor={p.teste.atrasado && p.teste.pct !== null ? AMARELO : undefined} zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `teste ${fmtD(p.teste.data)}${p.teste.atrasado ? " · atrasado" : ""}` : "sem teste"} />
+        <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" tam={160} cor={p.teste.atrasado && p.teste.pct !== null ? AMARELO : undefined} zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `teste ${fmtD(p.teste.data)}${p.teste.atrasado ? " · atrasado" : ""}` : "sem teste"} />
         <div><span style={C.chip(p.teste.inop ? VERMELHO2 : VERDE)}>{p.teste.inop} inop</span><span style={C.chip(p.teste.parcial ? AMARELO : CINZA)}>{p.teste.parcial} parcial</span></div>
       </button>
       <button style={C.cardBtn} onClick={() => onAbrir("risco")} aria-label="Abrir análise de risco">
-        <MostradorRisco risco={p.risco} />
+        <MostradorRisco risco={p.risco} tam={160} />
         <div>{p.risco?.determinante ? <span style={C.chip(COR_RISCO[p.risco.nivel] || CINZA)}>{p.risco.determinante}</span> : <span style={C.micro}>&nbsp;</span>}</div>
       </button>
     </div>
@@ -116,7 +116,7 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     </button>
     {/* turnover */}
     <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
-      <Mostrador valor={p.equipe.turnover} max={50} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
+      <Mostrador valor={p.equipe.turnover} max={50} tam={190} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
       <div style={{ textAlign: "right", ...C.micro }}>quantos temos × quantos saíram ›</div>
     </button>
     {/* férias */}
