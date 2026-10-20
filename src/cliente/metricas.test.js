@@ -40,3 +40,12 @@ test("equipamentos e consolidado do grupo", () => {
   expect(g).toMatchObject({ projetos: 2, testePct: 80, testesAtrasados: 1, equipeAtivos: 15, turnover: 10, equipPct: 90, equipInop: 2, faltasHoje: 1, mapasHoje: 1 });
   expect(corDe(95)).toBe("#22c55e"); expect(corDe(75)).toBe("#f59e0b"); expect(corDe(10)).toBe("#ef4444"); expect(corDe(null)).toBe("#64748b");
 });
+
+test("sistemas (insumos da Visão 360) e luzes de aviso", () => {
+  const { sistemasResumo, luzes } = require("./metricas");
+  const agora = Date.parse("2026-10-20T12:00:00Z");
+  const s = sistemasResumo({ ctmk: { status: "offline", offlineSince: "2026-10-17T12:00:00Z" }, keyaccess: { registros: [{ horaFim: null }, { horaFim: "10:00" }] }, iluminacao: { quadrantes: [{ total: 10, deficientes: 2 }] }, energia: { eventos: [{ inicioQueda: "2026-10-18T01:00:00Z", concluido: false }, { inicioQueda: "2026-09-01T01:00:00Z", concluido: true }] }, perimetralZonasRuins: 1, score360: { score: 81.4, vulnerabilidades: ["CTMK off-line"] } }, agora);
+  expect(s).toMatchObject({ ctmkOff: true, ctmkDias: 3, keyAbertas: 1, ilumPct: 80, quedas7d: 1, energiaAberta: true, perimetralZonasRuins: 1, score360: 81 });
+  const l = luzes({ teste: { atrasado: true, inop: 0 }, mapa: { hoje: true, faltas: 1 }, equip: { inop: 0 }, sistemas: s });
+  expect(l.filter((x) => x.on).map((x) => x.id)).toEqual(["teste", "falta", "ctmk", "energia", "key"]);
+});
