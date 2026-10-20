@@ -2301,3 +2301,11 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
     </div>
   );
 }
+
+// Área do Cliente: nível de risco do parque (mesmo motor do PDF, sem abrir janelas). Fontes obrigatórias apenas.
+export async function calcularRiscoProjeto(project, stored) {
+  const marcadas = {}; FONTES_DEF.forEach((f) => (marcadas[f.key] = !f.opcional));
+  const { dados, faltantes } = await coletarFontes(project, stored, marcadas);
+  const a = montarAnalise(project, "", dados, {});
+  return { nivel: a.geral?.nivel ?? null, label: a.geral?.label || "", cor: a.geral?.cor || null, motivo: a.geral?.motivoMatriz || "", determinante: a.geral?.determinante?.label || "", faltantes: (faltantes || []).map((f) => f.label), vetores: (a.vetores || []).filter((v) => v.incluirCliente !== false).slice(0, 6).map((v) => ({ label: v.label, nivel: v.nivel })) };
+}

@@ -8,8 +8,16 @@ import { carregarFotos, fotoDe } from "../fotosEquipe";
 import { testeSemanal, equipeResumo, mapaResumo, equipamentosResumo, consolidarGrupo, sistemasResumo, luzes, GRUPOS_CLIENTE } from "./metricas";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "../v360Perimetral";
 import { ROTULO_SITUACAO } from "../mapaDiario/modelo";
+import VerMapasProjeto from "../mapaDiario/VerMapasProjeto";
+import { turnoVigente } from "../mapaDiario/painel";
+import QuadroEfetivo from "../equipe/QuadroEfetivo";
+import { EQUIP_CATS } from "../equipData";
+import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
+const LARANJA = "#f97316";
+const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
+const EQUIP_LABEL = { smartphones: "Smartphones", radiosHT: "Rádios HT", armamento: "Armamento", municao: "Munição", placas: "Placas balísticas", lanternas: "Lanternas", ztrax: "Ztrax", bodycam: "Bodycam", outros: "Outros" };
 
 const db = () => getFirestore(getApps()[0]);
 const hojeISO = () => new Date().toLocaleDateString("sv-SE");
@@ -19,9 +27,9 @@ const corTurnover = (t) => (t === null ? CINZA : t <= 10 ? VERDE : t <= 25 ? AMA
 const ler = (col, pid) => getDoc(doc(db(), col, pid)).then((s) => (s.exists() ? s.data() : null)).catch(() => null);
 
 // ── Carregamento por projeto: tudo que a gestão vê hoje, em leitura ──────────
-async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, score360) {
+async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, score360, risco) {
   const hoje = hojeISO();
-  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360] = await Promise.all([
+  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc] = await Promise.all([
     ler("equipes", pid).then((d) => d || {}),
     ler("equipamentos", pid),
     getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(6))).then((s) => s.docs.map((d) => d.data())).catch(() => []),
@@ -29,6 +37,7 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     ler("keyaccess_falhas", pid), ler("iluminacao", pid), ler("energia_ocorrencias", pid), ler("perimetral", pid),
     PERIMETRAL_VIA_RONDAS.includes(pid) ? ler("rondas", pid) : Promise.resolve(null),
     score360 ? score360(pid).catch(() => null) : Promise.resolve(null),
+    risco ? risco(pid).catch(() => null) : Promise.resolve(null),
   ]);
   const colabs = (eq.colaboradores || []).filter((c) => c && (c.status || "ativo") === "ativo").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, turno: c.turno, desde: c.dataContratacao, foto: fotoDe(c, fotos), treinos: (c.historico || []).filter((h) => h && h.tipo === "Treinamento").length }));
   const h = stored?.[pid]?.history || []; const last = h[h.length - 1];
@@ -42,6 +51,9 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     equip: equipamentosResumo(equip),
     sistemas: sistemasResumo({ ctmk: ctmkData?.[pid], keyaccess, iluminacao: ilum, energia, perimetralZonasRuins, score360: s360 }),
     colabs, pendencias,
+    risco: risc, equipeDoc: eq, equipDoc: equip,
+    historico: h.map((r, i) => ({ idx: i, data: r.meta?.date || null, pct: (() => { try { return computeHealth(PROJECTS[pid], r.state).pct; } catch { return null; } })(), report: r })).reverse().slice(0, 12),
+    desligados: (eq.desligados || []).filter((c) => c && typeof c === "object").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, saida: c.desligadoEm || null, motivo: c.motivoDesligamento || c.tipoDesligamento || "", foto: fotoDe(c, fotos) })).sort((a, b) => String(b.saida || "").localeCompare(String(a.saida || ""))),
   };
   p.luzes = luzes(p);
   return p;
@@ -57,90 +69,150 @@ const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10
 const Luzes = ({ p }) => <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 4px", borderTop: "1px solid #2a2a31", marginTop: 4 }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div>;
 
 // ── Parque ────────────────────────────────────────────────────────────────────
+function MostradorRisco({ risco, tam = 180 }) {
+  // 4 zonas: baixo (verde) · moderado (amarelo) · elevado (laranja) · crítico (vermelho); ponteiro no nível.
+  const n = risco?.nivel ?? null; const v = n === null || n === 0 ? null : (n - 0.5) * 25;
+  return <Mostrador valor={v} max={100} unidade="" rotulo="Análise de risco" tam={tam} cor={COR_RISCO[n] || CINZA} zonaCritica={[75, 100]} sub={n ? (risco.label || NIVEL_LABEL[n]) : "sem avaliação"} valorTexto={n ? (NIVEL_LABEL[n] || "") : "—"} zonas={[[0, 25, VERDE], [25, 50, AMARELO], [50, 75, LARANJA], [75, 100, VERMELHO2]]} />;
+}
+
 function TelaProjeto({ p, onBack, onAbrir }) {
   const m = p.mapa, s = p.sistemas;
-  const presencaPct = m.temMapa && m.postos ? Math.round((m.presentes / m.postos) * 100) : null;
+  const plantao = m.lista.map((x) => ({ ...x, foto: p.colabs.find((k) => k.id === x.pessoaId)?.foto }));
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
       {onBack ? <button style={C.back} onClick={onBack}>← Meus parques</button> : <span />}
       <div style={{ ...C.titulo, marginBottom: 0 }}>{p.nome}</div>
     </div>
-    {/* conta-giros: turnover */}
-    <button style={C.cardBtn} onClick={() => onAbrir("equipe")} aria-label="Abrir equipe">
-      <Mostrador valor={p.equipe.turnover} max={50} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.saidas12m} saída${p.equipe.saidas12m === 1 ? "" : "s"} · ${p.equipe.entradas12m} entrada${p.equipe.entradas12m === 1 ? "" : "s"}`} />
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}><span style={C.micro}>{p.equipe.ativos} ativos{p.equipe.tempoMedioMeses !== null ? ` · ${p.equipe.tempoMedioMeses} meses de casa (média)` : ""}</span><span style={C.micro}>toque para ver a equipe ›</span></div>
-    </button>
-    {/* velocímetro: equipe hoje + saúde dos sistemas */}
+    {/* saúde do parque + análise de risco */}
     <div style={C.grid2}>
-      <button style={C.cardBtn} onClick={() => onAbrir("mapa")} aria-label="Abrir mapa do dia">
-        <Mostrador valor={presencaPct} rotulo="Equipe hoje" tam={180} sub={m.temMapa ? `${m.presentes}/${m.postos} postos · ${fmtD(m.data)}${m.hoje ? "" : " (último)"}` : "sem mapa"} />
-        <div>{m.faltas > 0 && <span style={C.chip(VERMELHO2)}>{m.faltas} falta{m.faltas === 1 ? "" : "s"}</span>}{m.ft > 0 && <span style={C.chip("#a855f7")}>{m.ft} FT</span>}{m.vagos > 0 && <span style={C.chip(VERMELHO2)}>{m.vagos} vago{m.vagos === 1 ? "" : "s"}</span>}{m.temMapa && !m.faltas && !m.vagos && <span style={C.chip(VERDE)}>completa</span>}</div>
-      </button>
       <button style={C.cardBtn} onClick={() => onAbrir("teste")} aria-label="Abrir teste semanal">
-        <Mostrador valor={p.teste.pct} rotulo="Sistemas" tam={180} cor={p.teste.atrasado && p.teste.pct !== null ? AMARELO : undefined} sub={p.teste.data ? `teste ${fmtD(p.teste.data)}${p.teste.atrasado ? " · atrasado" : ""}` : "sem teste"} />
-        <div><span style={C.chip(p.teste.inop ? VERMELHO2 : VERDE)}>{p.teste.inop} inop</span><span style={C.chip(p.teste.parcial ? AMARELO : CINZA)}>{p.teste.parcial} parcial</span>{s.score360 !== null && <span style={C.chip(corDe(s.score360))}>360: {s.score360}</span>}</div>
+        <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" tam={180} cor={p.teste.atrasado && p.teste.pct !== null ? AMARELO : undefined} zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `teste ${fmtD(p.teste.data)}${p.teste.atrasado ? " · atrasado" : ""}` : "sem teste"} />
+        <div><span style={C.chip(p.teste.inop ? VERMELHO2 : VERDE)}>{p.teste.inop} inop</span><span style={C.chip(p.teste.parcial ? AMARELO : CINZA)}>{p.teste.parcial} parcial</span></div>
+      </button>
+      <button style={C.cardBtn} onClick={() => onAbrir("risco")} aria-label="Abrir análise de risco">
+        <MostradorRisco risco={p.risco} />
+        <div>{p.risco?.determinante ? <span style={C.chip(COR_RISCO[p.risco.nivel] || CINZA)}>{p.risco.determinante}</span> : <span style={C.micro}>&nbsp;</span>}</div>
       </button>
     </div>
+    {/* equipe de plantão */}
+    <button style={C.cardBtn} onClick={() => onAbrir("plantao")} aria-label="Abrir equipe de plantão">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Equipe de plantão</div><span style={C.micro}>{m.temMapa ? `${fmtD(m.data)} · ${m.turno === "N" ? "noturno" : "diurno"}${m.hoje ? "" : " (último)"}` : "sem mapa"}</span></div>
+      {m.temMapa ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {plantao.map((x, i) => <div key={i} style={{ textAlign: "center", width: 54 }}>
+          <div style={{ position: "relative", display: "inline-block" }}><Avatar foto={x.foto} nome={x.nome || x.posto} tam={44} /><span title={ROTULO_SITUACAO[x.situacao] || x.situacao} style={{ position: "absolute", right: -2, bottom: -2, width: 12, height: 12, borderRadius: "50%", background: corSit(x.situacao), border: "2px solid #0a0a0d", boxShadow: `0 0 6px ${corSit(x.situacao)}` }} /></div>
+          <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(x.nome || "—").split(" ")[0]}</div>
+          <div style={{ fontSize: 8, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.posto}</div>
+        </div>)}
+      </div> : <div style={C.micro}>Nenhum mapa enviado ainda.</div>}
+      <div style={{ marginTop: 4 }}>{m.faltas > 0 && <span style={C.chip(VERMELHO2)}>{m.faltas} falta{m.faltas === 1 ? "" : "s"}</span>}{m.atrasos > 0 && <span style={C.chip(AMARELO)}>{m.atrasos} atraso{m.atrasos === 1 ? "" : "s"}</span>}{m.ft > 0 && <span style={C.chip("#a855f7")}>{m.ft} FT</span>}{m.vagos > 0 && <span style={C.chip(VERMELHO2)}>{m.vagos} vago{m.vagos === 1 ? "" : "s"}</span>}<span style={{ ...C.micro, float: "right" }}>mapa de hoje · equipe completa ›</span></div>
+    </button>
+    {/* turnover */}
+    <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
+      <Mostrador valor={p.equipe.turnover} max={50} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
+      <div style={{ textAlign: "right", ...C.micro }}>quantos temos × quantos saíram ›</div>
+    </button>
     {/* relógios menores */}
     <div style={C.card}>
       <div style={C.titulo}>Progressos</div>
       <div style={C.grid2}>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("treino")} aria-label="Abrir treinamentos"><Anel valor={p.equipe.treinadosPct} rotulo="Formação" sub={`${p.equipe.ultimosTreinos.length ? "último " + fmtD(p.equipe.ultimosTreinos[0].data) : "sem registro"}`} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("equip")} aria-label="Abrir equipamentos"><Anel valor={p.equip.pct} rotulo="Equipamentos" sub={`${p.equip.total} itens · ${p.equip.inop} inop`} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("sistemas")} aria-label="Abrir sistemas"><Anel valor={s.ilumPct} rotulo="Iluminação" sub={s.ilumTotal ? `${s.ilumDef} deficientes de ${s.ilumTotal}` : "sem dados"} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("pend")} aria-label="Abrir pendências"><Anel valor={p.pendencias.length} unidade="" rotulo="Pendências" cor={p.pendencias.length ? AMARELO : VERDE} sub="itens do teste em aberto" /></button>
+        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("treino")} aria-label="Abrir treinamentos"><Anel valor={p.equipe.treinadosPct} rotulo="Treinamentos" sub={p.equipe.ultimosTreinos.length ? `último ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"} /></button>
+        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("equip")} aria-label="Abrir equipamentos"><Anel valor={p.equip.pct} rotulo="Equip. de plantão" sub={`${p.equip.total} itens · ${p.equip.inop} inop`} /></button>
+        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, gridColumn: "1 / -1" }} onClick={() => onAbrir("sistemas")} aria-label="Abrir sistemas"><Anel valor={s.score360} rotulo="Sistemas · 360" sub={`CTMK ${s.ctmkOff ? "off-line" : "on-line"} · iluminação ${s.ilumPct === null ? "—" : s.ilumPct + "%"} · energia ${s.quedas7d} queda${s.quedas7d === 1 ? "" : "s"}/7d`} /></button>
       </div>
       <Luzes p={p} />
-    </div>
-    {/* evidências */}
-    <div style={C.card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Equipe · evidências</div><button style={{ ...C.back, padding: "3px 8px", fontSize: 11 }} onClick={() => onAbrir("equipe")}>Visualizar todas ›</button></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-        {p.colabs.filter((c) => c.foto).slice(0, 6).map((c) => <div key={c.id} style={{ position: "relative" }}><img src={c.foto} alt={c.nome} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", clipPath: "polygon(12% 0, 100% 0, 100% 88%, 88% 100%, 0 100%, 0 12%)", border: "1px solid #2a2a31" }} /><div style={{ position: "absolute", left: 6, bottom: 6, fontSize: 9, fontWeight: 800, color: "#f3f4f6", textShadow: "0 1px 3px #000" }}>{(c.nome || "").split(" ")[0]}</div></div>)}
-        {p.colabs.filter((c) => c.foto).length === 0 && <div style={{ ...C.micro, gridColumn: "1 / -1" }}>Sem fotos cadastradas. Fotos de treinamento/campo entram na próxima fase.</div>}
-      </div>
-      {p.equipe.ultimosTreinos.slice(0, 2).map((t, i) => <Linha key={i} primeiro={false}><div><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}
     </div>
   </>;
 }
 
 // ── Detalhes ──────────────────────────────────────────────────────────────────
-function Detalhe({ p, tipo, onBack }) {
+function Abas({ abas, atual, onMudar }) {
+  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? VERMELHO2 : "#3a3a42", color: atual === k ? "#fecaca" : "#d1d5db", boxShadow: atual === k ? `0 0 10px ${VERMELHO2}55` : "none" }}>{r}</button>)}</div>;
+}
+
+function Detalhe({ p, tipo, onBack, abrirPDF }) {
   const s = p.sistemas;
-  const titulo = { teste: "Teste semanal", equipe: "Equipe", mapa: "Mapa de equipe", equip: "Equipamentos", treino: "Formação", pend: "Pendências", sistemas: "Sistemas" }[tipo];
+  const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false);
+  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas" }[tipo];
+  const vig = turnoVigente(p.pid, new Date());
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><button style={C.back} onClick={onBack}>← {p.nome}</button><div style={{ ...C.titulo, marginBottom: 0 }}>{titulo}</div></div>
+
     {tipo === "teste" && <div style={C.card}>
-      <Mostrador valor={p.teste.pct} rotulo="Sistemas" sub={p.teste.data ? `teste de ${fmtD(p.teste.data)}` : "sem teste"} />
-      <div style={C.titulo}>Últimas semanas</div>
-      <div style={{ display: "flex", gap: 6, alignItems: "flex-end", height: 70 }}>{p.teste.serie.map((x, i) => <div key={i} title={`${fmtD(x.data)} · ${x.pct}%`} style={{ flex: 1, textAlign: "center" }}><div style={{ height: Math.max(4, (x.pct || 0) * 0.6), background: corDe(x.pct), borderRadius: 2, boxShadow: `0 0 6px ${corDe(x.pct)}66` }} /><div style={{ fontSize: 9, color: "#6b7280" }}>{x.data ? x.data.slice(8, 10) + "/" + x.data.slice(5, 7) : ""}</div></div>)}</div>
-      <div style={{ ...C.micro, marginTop: 8 }}>{p.teste.total} itens testados · {p.teste.inop} inoperantes · {p.teste.parcial} parciais{p.teste.atrasado ? " · ⚠️ teste da semana ainda não registrado" : ""}</div>
+      <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `teste de ${fmtD(p.teste.data)}` : "sem teste"} />
+      <div style={{ ...C.micro, marginBottom: 6 }}>Toque num teste para abrir o relatório (PDF).</div>
+      {p.historico.length === 0 && <div style={C.micro}>Nenhum teste registrado.</div>}
+      {p.historico.map((r, i) => <button key={r.idx} aria-label={`Abrir teste de ${fmtD(r.data)}`} onClick={() => abrirPDF && abrirPDF(p.pid, r.report)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}>
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: corDe(r.pct), boxShadow: `0 0 8px ${corDe(r.pct)}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>Teste de {fmtD(r.data)}</div><div style={C.micro}>{r.pct === null ? "—" : `${r.pct}% dos sistemas operantes`}</div></div><span style={C.chip(VERMELHO2)}>PDF ›</span>
+      </Linha></button>)}
     </div>}
-    {tipo === "equipe" && <div style={C.card}>
-      <div style={{ marginBottom: 8 }}>{Object.entries(p.equipe.porCargo).map(([c, n]) => <span key={c} style={C.chip("#38bdf8")}>{n} {c}</span>)}</div>
-      <div style={{ ...C.micro, marginBottom: 8 }}>Turnover 12 m: {p.equipe.turnover === null ? `não aferido (${p.equipe.turnoverMotivo})` : `${p.equipe.turnover}%`} · {p.equipe.saidas12m} saídas · {p.equipe.entradas12m} entradas</div>
-      {p.colabs.map((c, i) => <Linha key={c.id} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={42} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.turno ? ` · ${c.turno}` : ""}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div><span style={C.chip(c.treinos ? VERDE : CINZA)}>{c.treinos} trein.</span></Linha>)}
+
+    {tipo === "risco" && <div style={C.card}>
+      <MostradorRisco risco={p.risco} tam={220} />
+      {!p.risco && <div style={C.micro}>Análise de risco indisponível para este parque.</div>}
+      {p.risco && <>
+        <div style={{ fontSize: 12, marginBottom: 6 }}>{p.risco.motivo}</div>
+        {p.risco.vetores.map((v, i) => <Linha key={i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: COR_RISCO[v.nivel] || CINZA, boxShadow: `0 0 8px ${COR_RISCO[v.nivel] || CINZA}` }} /><div style={{ flex: 1, fontSize: 12 }}>{v.label}</div><span style={C.chip(COR_RISCO[v.nivel] || CINZA)}>{NIVEL_LABEL[v.nivel] || ""}</span></Linha>)}
+        {p.risco.faltantes.length > 0 && <div style={{ ...C.micro, marginTop: 8 }}>Sem dados de: {p.risco.faltantes.join(", ")}</div>}
+      </>}
     </div>}
-    {tipo === "mapa" && <div style={C.card}>
-      {!p.mapa.temMapa && <div style={C.micro}>Sem mapa enviado.</div>}
-      {p.mapa.temMapa && <div style={{ ...C.micro, marginBottom: 6 }}>{fmtD(p.mapa.data)} · turno {p.mapa.turno === "N" ? "noturno" : "diurno"} · {p.mapa.presentes} de {p.mapa.postos} postos cobertos</div>}
-      {p.mapa.lista.map((x, i) => { const c = p.colabs.find((k) => k.id === x.pessoaId); return <Linha key={i} primeiro={i === 0}><Avatar foto={c?.foto} nome={x.nome || x.posto} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{x.nome || "—"}</div><div style={C.micro}>{x.posto}</div></div><span style={C.chip(corSit(x.situacao))}>{ROTULO_SITUACAO[x.situacao] || x.situacao}</span></Linha>; })}
+
+    {tipo === "plantao" && <>
+      <Abas abas={[["mapa", "Mapa de equipe hoje"], ["equipe", "Equipe completa"]]} atual={aba} onMudar={setAba} />
+      {aba === "mapa" && <div style={C.card}>{vig ? <VerMapasProjeto projetoId={p.pid} data={vig.data} turno={vig.turno} dark /> : <div style={C.micro}>Sem turno configurado.</div>}</div>}
+      {aba === "equipe" && <div style={C.card}>
+        <QuadroEfetivo projectId={p.pid} equipe={p.equipeDoc} hoje={hojeISO()} dark />
+        {["Diurno", "Noturno", "Outros"].map((t) => { const lista = p.colabs.filter((c) => (t === "Outros" ? !["Diurno", "Noturno"].includes(c.turno) : c.turno === t)); if (!lista.length) return null; return <div key={t} style={{ marginTop: 12 }}>
+          <div style={C.titulo}>{t} <span style={{ color: "#6b7280", letterSpacing: 0 }}>({lista.length})</span></div>
+          {lista.map((c, i) => <Linha key={c.id} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={42} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div><span style={C.chip(c.treinos ? VERDE : CINZA)}>{c.treinos} trein.</span></Linha>)}
+        </div>; })}
+      </div>}
+    </>}
+
+    {tipo === "turnover" && <div style={C.card}>
+      <Mostrador valor={p.equipe.turnover} max={50} invertido rotulo="Turnover 12 m" cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="saídas ÷ efetivo médio · 12 meses" />
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <tbody>
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Quantos temos hoje</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #1f2127" }}>{p.equipe.ativos}</td></tr>
+          {Object.entries(p.equipe.porCargo).map(([c, n]) => <tr key={c}><td style={{ padding: "3px 0 3px 12px", color: "#9ca3af" }}>{c}</td><td style={{ textAlign: "right", color: "#9ca3af" }}>{n}</td></tr>)}
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Entraram (12 m)</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #1f2127", color: VERDE }}>{p.equipe.entradas12m}</td></tr>
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Saíram (12 m)</td><td style={{ textAlign: "right", borderTop: "1px solid #1f2127" }}><button aria-label="Ver quem saiu" onClick={() => setVerSaidas((v) => !v)} style={{ ...C.back, color: VERMELHO2, fontWeight: 900 }}>{p.equipe.saidas12m} {verSaidas ? "▴" : "▾ ver quem"}</button></td></tr>
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Total de desligamentos registrados</td><td style={{ textAlign: "right", borderTop: "1px solid #1f2127", color: "#9ca3af" }}>{p.desligados.length}</td></tr>
+        </tbody>
+      </table>
+      {verSaidas && <div style={{ marginTop: 8 }}>
+        {p.desligados.length === 0 && <div style={C.micro}>Nenhum desligamento registrado.</div>}
+        {p.desligados.map((c, i) => <Linha key={c.id || i} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={38} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.saida ? ` · saiu em ${fmtD(c.saida)}` : ""}{c.motivo ? ` · ${c.motivo}` : ""}</div></div></Linha>)}
+      </div>}
     </div>}
+
     {tipo === "equip" && <div style={C.card}>
-      <Mostrador valor={p.equip.pct} rotulo="Equipamentos" sub={`${p.equip.total} itens`} />
-      <div style={C.micro}>{p.equip.ok} ok · {p.equip.parcial} parciais · {p.equip.inop} inoperantes. Detalhe por item fica com a gestão Moked.</div>
+      <div style={{ ...C.micro, marginBottom: 6 }}>{p.equip.total} itens · {p.equip.ok} ok · {p.equip.parcial} parciais · {p.equip.inop} inoperantes</div>
+      {EQUIP_CATS.map((k) => { const itens = (p.equipDoc?.[k] || []).filter((it) => it && typeof it === "object"); if (!itens.length) return null; return <div key={k} style={{ marginTop: 10 }}>
+        <div style={C.titulo}>{EQUIP_LABEL[k] || k} <span style={{ color: "#6b7280", letterSpacing: 0 }}>({itens.length})</span></div>
+        {itens.map((it, i) => { const st = it.status === "inop" || it.status === "critico" ? VERMELHO2 : it.status === "parcial" || it.status === "baixo" ? AMARELO : VERDE; return <Linha key={it.id || i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: st, boxShadow: `0 0 8px ${st}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{it.identificacao || it.nome || it.modelo || "Item"}</div><div style={C.micro}>{[it.modelo, it.nSerie ? `série ${it.nSerie}` : "", it.qtd ? `qtd ${it.qtd}` : ""].filter(Boolean).join(" · ")}</div></div><span style={C.chip(st)}>{it.status || "ok"}</span></Linha>; })}
+      </div>; })}
+      {p.equipDoc?.moto?.placa && <div style={{ marginTop: 10 }}><div style={C.titulo}>Motocicleta</div><Linha primeiro><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{p.equipDoc.moto.placa}{p.equipDoc.moto.modelo ? ` · ${p.equipDoc.moto.modelo}` : ""}</div><div style={C.micro}>{p.equipDoc.moto.km ? `${p.equipDoc.moto.km} km` : ""}{p.equipDoc.moto.ultimaManutencao ? ` · últ. manutenção ${fmtD(p.equipDoc.moto.ultimaManutencao)}` : ""}</div></div></Linha></div>}
     </div>}
+
     {tipo === "treino" && <div style={C.card}>
-      <div style={{ ...C.micro, marginBottom: 8 }}>{p.equipe.treinadosPct === null ? "" : `${p.equipe.treinadosPct}% da equipe com treinamento registrado.`} Evidências (fotos dos treinamentos) entram na próxima fase.</div>
-      {p.equipe.ultimosTreinos.length === 0 && <div style={C.micro}>Nenhum treinamento registrado.</div>}
-      {p.equipe.ultimosTreinos.map((t, i) => { const c = p.colabs.find((x) => x.id === t.colabId); return <Linha key={i} primeiro={i === 0}><Avatar foto={c?.foto} nome={t.colabNome} /><div><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>; })}
+      <div style={{ ...C.micro, marginBottom: 8 }}>{p.equipe.treinadosPct === null ? "" : `${p.equipe.treinadosPct}% da equipe com treinamento registrado · `}{p.equipe.ultimosTreinos.length ? `último em ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"}. Toque num colaborador para ver os treinamentos dele.</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        {p.colabs.map((c) => <button key={c.id} aria-pressed={sel === c.id} aria-label={`Treinamentos de ${c.nome}`} onClick={() => setSel(sel === c.id ? null : c.id)} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "center", width: 54, opacity: sel && sel !== c.id ? .45 : 1 }}>
+          <div style={{ display: "inline-block", outline: sel === c.id ? `2px solid ${VERMELHO2}` : "none", outlineOffset: 2 }}><Avatar foto={c.foto} nome={c.nome} tam={44} /></div>
+          <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(c.nome || "").split(" ")[0]}</div>
+          <div style={{ fontSize: 8, color: c.treinos ? VERDE : "#6b7280" }}>{c.treinos} trein.</div>
+        </button>)}
+      </div>
+      {(() => { const c = p.colabs.find((x) => x.id === sel); if (!c) return null; const ts = (p.equipeDoc.colaboradores || []).find((x) => x.id === sel)?.historico?.filter((h) => h && h.tipo === "Treinamento").sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))) || [];
+        return <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}><Avatar foto={c.foto} nome={c.nome} tam={48} /><div><div style={{ fontSize: 13, fontWeight: 800 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div></div>
+          {ts.length === 0 && <div style={C.micro}>Sem treinamento registrado.</div>}
+          {ts.map((t, i) => <Linha key={t.id || i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: VERDE, boxShadow: `0 0 8px ${VERDE}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)}</div></div></Linha>)}
+        </div>; })()}
+      {!sel && <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
     </div>}
-    {tipo === "pend" && <div style={C.card}>
-      {p.pendencias.length === 0 && <div style={C.micro}>Nenhuma pendência no último teste semanal.</div>}
-      {p.pendencias.map((x, i) => <div key={i} style={{ padding: "7px 0", borderTop: i ? "1px solid #1f2127" : "none" }}><span style={C.chip(x.status === "inop" ? VERMELHO2 : AMARELO)}>{x.status === "inop" ? "Inoperante" : "Parcial"}</span><div style={{ fontSize: 12, fontWeight: 700 }}>{x.cat}{x.item ? ` — ${x.item}` : ""}</div><div style={C.micro}>{x.since ? `desde ${fmtD(x.since)}` : ""}{x.note ? ` · ${x.note}` : ""}</div></div>)}
-    </div>}
+
     {tipo === "sistemas" && <div style={C.card}>
-      {s.score360 !== null && <Mostrador valor={s.score360} rotulo="Visão 360" sub="nota do parque" />}
+      {s.score360 !== null && <Mostrador valor={s.score360} rotulo="Visão 360" sub="nota do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} />}
       {[["CTMK (central)", s.ctmkOff ? `OFF-LINE há ${s.ctmkDias} dia${s.ctmkDias === 1 ? "" : "s"}` : "on-line", s.ctmkOff ? VERMELHO2 : VERDE],
         ["KeyAccess", s.keyAbertas ? `${s.keyAbertas} falha${s.keyAbertas === 1 ? "" : "s"} em aberto` : "sem falhas abertas", s.keyAbertas ? VERMELHO2 : VERDE],
         ["Iluminação", s.ilumTotal ? `${s.ilumDef} deficientes de ${s.ilumTotal} (${s.ilumPct}% ok)` : "sem dados", s.ilumTotal ? corDe(s.ilumPct) : CINZA],
@@ -171,16 +243,16 @@ function TelaMacro({ escopo, dados, onAbrir }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div><div style={{ fontSize: 13, fontWeight: 800 }}>{p.nome}</div><div style={C.micro}>{p.equipe.ativos} colaboradores · teste {p.teste.data ? fmtD(p.teste.data) : "—"}{p.equipe.turnover !== null ? ` · turnover ${p.equipe.turnover}%` : ""}</div></div>
         <div style={{ display: "flex", gap: 6 }}>
-          {[[p.teste.atrasado ? AMARELO : corDe(p.teste.pct), "Teste semanal"], [!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE, "Mapa do dia"], [corDe(p.equip.pct), "Equipamentos"], [p.sistemas.ctmkOff ? VERMELHO2 : VERDE, "CTMK"]].map(([c, t]) => <span key={t} title={t} style={{ width: 12, height: 12, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}` }} />)}
+          {[[p.teste.atrasado ? AMARELO : corDe(p.teste.pct), "Teste semanal"], [!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE, "Mapa do dia"], [corDe(p.equip.pct), "Equipamentos"], [p.sistemas.ctmkOff ? VERMELHO2 : VERDE, "CTMK"], [COR_RISCO[p.risco?.nivel] || CINZA, "Risco"]].map(([c, t]) => <span key={t} title={t} style={{ width: 12, height: 12, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}` }} />)}
         </div>
       </div>
     </button>)}
-    <div style={C.micro}>Luzes: teste semanal · mapa do dia · equipamentos · CTMK</div>
+    <div style={C.micro}>Luzes: teste semanal · mapa do dia · equipamentos · CTMK · risco</div>
   </>;
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkData, score360, onBack }) {
+export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkData, score360, risco, abrirPDF, onBack }) {
   const [escopo, setEscopo] = useState(() => getClienteScope());
   const [pin, setPin] = useState(""), [erro, setErro] = useState("");
   const [dados, setDados] = useState(null), [carregando, setCarregando] = useState(false);
@@ -190,12 +262,12 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   useEffect(() => {
     if (!escopo) return;
     let vivo = true; setCarregando(true);
-    Promise.all(pids.map((p) => carregarProjeto(p, PROJECTS, stored, computeHealth, ctmkData, score360).catch(() => null))).then((xs) => {
+    Promise.all(pids.map((p) => carregarProjeto(p, PROJECTS, stored, computeHealth, ctmkData, score360, risco).catch(() => null))).then((xs) => {
       if (!vivo) return; const m = {}; xs.forEach((x) => { if (x) m[x.pid] = x; }); setDados(m); setCarregando(false);
       if (pids.length === 1) setPid(pids[0]);
     });
     return () => { vivo = false; };
-  }, [escopo, pids, PROJECTS, stored, computeHealth, ctmkData, score360]);
+  }, [escopo, pids, PROJECTS, stored, computeHealth, ctmkData, score360, risco]);
 
   const entrar = async () => { setErro(""); const n = await checkPin(pin, { cliente: true }); if (!n) { setErro("PIN inválido para a Área do Cliente."); return; } setPin(""); setEscopo(getClienteScope()); };
   const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); setDetalhe(null); onBack && onBack(); };
@@ -218,7 +290,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
     {carregando && <p role="status" style={C.micro}>Lendo os dados dos parques…</p>}
     {!carregando && dados && (
       pid && dados[pid]
-        ? (detalhe ? <Detalhe p={dados[pid]} tipo={detalhe} onBack={() => setDetalhe(null)} />
+        ? (detalhe ? <Detalhe key={detalhe} p={dados[pid]} tipo={detalhe} onBack={() => setDetalhe(null)} abrirPDF={abrirPDF} />
           : <TelaProjeto p={dados[pid]} onBack={pids.length > 1 ? () => setPid(null) : null} onAbrir={setDetalhe} />)
         : <TelaMacro escopo={escopo.escopo} dados={dados} onAbrir={setPid} />
     )}

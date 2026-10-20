@@ -19,7 +19,7 @@ export const C = {
 export const corDe = (p) => (p === null || p === undefined ? CINZA : p >= 90 ? VERDE : p >= 70 ? AMARELO : VERMELHO2);
 
 // Mostrador grande (conta-giros): arco graduado 0..max, zona crítica em vermelho, agulha iluminada, valor central.
-export function Mostrador({ valor, max = 100, rotulo, sub, tam = 220, cor, unidade = "%", invertido = false, zonaCritica }) {
+export function Mostrador({ valor, max = 100, rotulo, sub, tam = 220, cor, unidade = "%", invertido = false, zonaCritica, zonas, valorTexto }) {
   const cx = tam / 2, cy = tam / 2 + 10, r = tam / 2 - 18;
   const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25; // 270°
   const ang = (v) => a0 + (a1 - a0) * Math.max(0, Math.min(1, v / max));
@@ -31,7 +31,7 @@ export function Mostrador({ valor, max = 100, rotulo, sub, tam = 220, cor, unida
   const ticks = []; const n = 10;
   for (let i = 0; i <= n * 5; i++) { const a = a0 + (a1 - a0) * (i / (n * 5)); const maior = i % 5 === 0; const [x1, y1] = pt(a, r - (maior ? 14 : 8)), [x2, y2] = pt(a, r - 2); ticks.push(<line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={maior ? "#e5e7eb" : "#6b7280"} strokeWidth={maior ? 2 : 1} />); if (maior) { const [tx, ty] = pt(a, r - 26); ticks.push(<text key={"t" + i} x={tx} y={ty + 3} textAnchor="middle" fontSize={tam / 22} fontWeight="700" fill="#cbd5e1">{Math.round((max * i) / (n * 5))}</text>); } }
   const na = v === null ? a0 : ang(v); const [nx, ny] = pt(na, r - 20); const [bx, by] = pt(na + Math.PI, 14);
-  return <svg width="100%" viewBox={`0 0 ${tam} ${tam * 0.92}`} role="img" aria-label={`${rotulo}: ${v === null ? "sem dado" : v + unidade}`} style={{ display: "block", maxWidth: tam, margin: "0 auto" }}>
+  return <svg width="100%" viewBox={`0 0 ${tam} ${tam * 0.92}`} role="img" aria-label={`${rotulo}: ${valorTexto !== undefined ? valorTexto : v === null ? "sem dado" : v + unidade}`} style={{ display: "block", maxWidth: tam, margin: "0 auto" }}>
     <defs>
       <radialGradient id="mkFace" cx="50%" cy="45%" r="60%"><stop offset="0%" stopColor="#16161b" /><stop offset="100%" stopColor="#050507" /></radialGradient>
       <linearGradient id="mkBezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8b8f99" /><stop offset="50%" stopColor="#2b2e36" /><stop offset="100%" stopColor="#9aa0ab" /></linearGradient>
@@ -40,13 +40,13 @@ export function Mostrador({ valor, max = 100, rotulo, sub, tam = 220, cor, unida
     <circle cx={cx} cy={cy} r={r + 10} fill="url(#mkBezel)" />
     <circle cx={cx} cy={cy} r={r + 5} fill="url(#mkFace)" stroke="#1f2127" />
     {arco(0, max, "#1f2127", 8)}
-    {arco(crit[0], crit[1], VERMELHO, 8, .85)}
+    {zonas ? zonas.map(([x, y, zc], i) => <g key={i}>{arco(x, y, zc, 8, .8)}</g>) : arco(crit[0], crit[1], VERMELHO, 8, .85)}
     {v !== null && v > 0 && arco(0, v, c, 4, .9)}
     {ticks}
     <text x={cx} y={cy - r * 0.38} textAnchor="middle" fontSize={tam / 17} fontWeight="900" letterSpacing="2" fill="#d1d5db">{rotulo.toUpperCase()}</text>
     {v !== null && <g filter="url(#mkGlow)"><line x1={bx} y1={by} x2={nx} y2={ny} stroke={VERMELHO2} strokeWidth={4} strokeLinecap="round" /></g>}
     <circle cx={cx} cy={cy} r={11} fill="#0b0b0e" stroke="#9aa0ab" strokeWidth={3} />
-    <text x={cx} y={cy + r * 0.55} textAnchor="middle" fontSize={tam / 7} fontWeight="900" fill={v === null ? CINZA : c} style={{ filter: "drop-shadow(0 0 8px rgba(229,9,20,.5))" }}>{v === null ? "—" : `${v}${unidade}`}</text>
+    <text x={cx} y={cy + r * 0.55} textAnchor="middle" fontSize={tam / 7} fontWeight="900" fill={v === null ? CINZA : c} style={{ filter: "drop-shadow(0 0 8px rgba(229,9,20,.5))" }}>{valorTexto !== undefined ? valorTexto : v === null ? "—" : `${v}${unidade}`}</text>
     {sub && <text x={cx} y={cy + r * 0.55 + tam / 14} textAnchor="middle" fontSize={tam / 20} fill="#9ca3af">{sub}</text>}
   </svg>;
 }
