@@ -28,3 +28,19 @@ test('erro de rede/configuração não concede acesso; gate aguarda resposta ass
  fetch.mockRejectedValue(Error('network'));expect(await checkPin('synthetic-pin')).toBeNull();expect(getSession()).toBeNull();
  let resolve;fetch.mockImplementation(()=>new Promise(r=>resolve=r));const promise=checkPin('synthetic-pin');expect(getSession()).toBeNull();resolve(reply('admin'));expect(await promise).toBe('admin');
 });
+
+test('cliente: só entra pelo Painel do Cliente e carrega o escopo; gerencial no painel vê tudo',async()=>{
+ const {getClienteScope}=require('./session');
+ clearSession();
+ fetch.mockResolvedValue({ok:true,status:200,json:async()=>({ok:true,nivel:'cliente',escopo:'GOLGI',pids:['P601','P602'],token:'t',exp:Date.now()+8*3600000})});
+ expect(await checkPin('synthetic-pin')).toBeNull();                       // tela de PIN comum recusa cliente
+ expect(await checkPin('synthetic-pin',{projectId:'P601'})).toBeNull();
+ expect(await checkPin('synthetic-pin',{cliente:true})).toBe('cliente');
+ expect(getClienteScope()).toEqual({escopo:'GOLGI',pids:['P601','P602']});
+ expect(getAccess('P601')).toBeNull();                                     // cliente nunca vira líder/admin
+ clearSession();
+ fetch.mockResolvedValue(reply('admin'));expect(await checkPin('synthetic-pin',{cliente:true})).toBe('admin');
+ expect(getClienteScope()).toEqual({escopo:'MOKED',pids:null});
+ clearSession();
+ fetch.mockResolvedValue(reply('lider','P601'));expect(await checkPin('synthetic-pin',{cliente:true})).toBeNull();
+});
