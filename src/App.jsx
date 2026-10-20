@@ -34,6 +34,7 @@ import { montarHTMLExecutivo } from "./relatorios/executivoRelatorio";
 import { itensDoEstado, falhasPorSistema } from "./relatorios/metricas";
 import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
 import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
+import PainelCliente from "./cliente/PainelCliente";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 const RdApp=React.lazy(()=>import("./rd/RdApp"));
@@ -4279,6 +4280,7 @@ export default function App(){
       />
     </ErrorBoundary>
   );
+  if(screen==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
@@ -4739,12 +4741,13 @@ export default function App(){
             <div style={{fontSize:11,color:T.sub,marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:10}}>
           <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[239,68,68]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
           <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[204,34,34]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
             {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
           </TopoBtn>
           <TopoBtn arq="painel" fb="grafico" label="Painel" cor={[56,189,248]} aria="Abrir painel gerencial" onClick={()=>setScreen("dashboard")}/>
+          <TopoBtn arq="cliente" fb="usuario" label="Cliente" cor={[34,197,94]} aria="Abrir painel do cliente" onClick={()=>setScreen("cliente")}/>
           <button onClick={()=>setDark(!dark)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 4px 6px",borderRadius:14,cursor:"pointer",color:"#e2e8f0",fontSize:11,fontWeight:700,background:"radial-gradient(120% 130% at 50% 0%, rgba(165,180,252,.2), rgba(165,180,252,.03) 70%), #0a1322",border:"1px solid rgba(165,180,252,.38)",boxShadow:"0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)"}} aria-label="Alternar tema claro/escuro"><span style={{display:"flex",width:34,height:34,alignItems:"center",justifyContent:"center"}}>{React.cloneElement(iconeTema(),{width:34,height:34})}</span><span>Tema</span></button>
         </div>
 
