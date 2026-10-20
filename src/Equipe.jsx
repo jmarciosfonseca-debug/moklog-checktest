@@ -45,6 +45,7 @@ import { fvNoEscopo } from "./fvConfig";
 import {situacaoSolicitacao, podeEnviarAoGrupo, envioPendente, enviadoAposAprovacao} from "./equipeAprovacao";
 import { gravarComRecuperacao } from "./equipeConflito";
 import { pertenceA, lideresDe, semEquipeAlguma, alternarVinculo, removerVinculo, cargoCompartilhado } from "./equipe/vinculos";
+import EquipesMontadas from "./equipe/EquipesMontadas";
 import { criarFila } from "./filaGravacao";
 import { janelaChecagemAberta, useAtualizarAoVoltar } from "./janelaChecagem";
 import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "./checagemEquipeRegras";
@@ -3108,69 +3109,11 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             );
           })()}
 
-          {/* VISÃO POR EQUIPE MONTADA */}
-          {!filtroRapido && visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (()=>{
-            const lideres = ativos.filter(c=>ehLider(c, equipeData.colaboradores)).sort((a,b)=>(a.turno||"").localeCompare(b.turno||""));
-            const semEquipe = ativos.filter(c=>!ehLider(c, equipeData.colaboradores) && semEquipeAlguma(c));
-            const turnos = [...new Set(lideres.map(l=>l.turno))];
-            return (
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                {turnos.map(turno=>{
-                  const tc = TURNO_CONFIG[turno] || TURNO_CONFIG["Diurno"];
-                  const lideresTurno = lideres.filter(l=>l.turno===turno);
-                  return (
-                    <div key={turno}>
-                      <div style={{ fontSize:12, fontWeight:700, color:tc.badge, marginBottom:8, letterSpacing:.5, display:"flex", alignItems:"center", gap:8 }}><TurnoIcone turno={turno} tc={tc} size={26}/> {turno.toUpperCase()}</div>
-                      {lideresTurno.map(lider=>{
-                        const membros = ativos.filter(c=>pertenceA(c,lider.id));
-                        return (
-                          <div key={lider.id} style={{ border:`1px solid ${dark?"#232b4a":"#e2e8f0"}`, borderRadius:12, padding:10, marginBottom:10, background:dark?"#0a1120":"#fff" }}>
-                            <div style={{ display:"flex", alignItems:"center", gap:9, padding:8, background:dark?"#0d1f2e":"#f0f9ff", borderRadius:8, border:"1px solid #0ea5e933" }}>
-                              <Avatar colab={lider} size={34} border="#0ea5e9"/>
-                              <div style={{ flex:1, minWidth:0 }}>
-                                <div style={{ fontSize:13.5, fontWeight:700, ...S.txtPrimary }}>{lider.nome}</div>
-                                <div style={{ fontSize:10, color:"#0ea5e9" }}>{lider.cargo}</div>
-                              </div>
-                              {liderAuth && (
-                                <button onClick={()=>setMontarLiderId(lider.id)}
-                                  style={{ ...S.btnSm, fontSize:10, color:"#0ea5e9", border:"1px solid #0ea5e944", padding:"5px 10px" }}>
-                                  {membros.length?<><Ico n="editar"/>{" Editar"}</>:<><Ico n="mais"/>{" Montar"}</>}
-                                </button>
-                              )}
-                            </div>
-                            {membros.length===0 ? (
-                              <div style={{ fontSize:11, color:"#64748b", padding:"8px 0 2px 20px" }}>Sem membros vinculados</div>
-                            ) : membros.map(m=>(
-                              <div key={m.id} onClick={()=>{setSelColab(m);setScreen("view");}}
-                                style={{ display:"flex", alignItems:"center", gap:9, padding:"7px 8px 7px 20px", marginTop:4, position:"relative", cursor:"pointer" }}>
-                                <div style={{ position:"absolute", left:8, top:0, bottom:"50%", width:2, background:dark?"#232b4a":"#cbd5e1" }}/>
-                                <div style={{ position:"absolute", left:8, top:"50%", width:9, height:2, background:dark?"#232b4a":"#cbd5e1" }}/>
-                                <Avatar colab={m} size={28} border={dark?"#232b4a":"#e2e8f0"}/>
-                                <div style={{ flex:1, minWidth:0 }}>
-                                  <div style={{ fontSize:12.5, fontWeight:600, ...S.txtPrimary }}>{m.nome}</div>
-                                  <div style={{ fontSize:9.5, color:"#94a3b8" }}>{m.cargo}</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-                {semEquipe.length>0 && (
-                  <div style={{ opacity:.75, fontSize:11, color:"#94a3b8", padding:10, border:`1px dashed ${dark?"#232b4a":"#cbd5e1"}`, borderRadius:8 }}>
-                    <Ico n="usuarios"/> Sem equipe ({semEquipe.length}): {semEquipe.map(c=>c.nome).join(", ")}
-                  </div>
-                )}
-                {lideres.length===0 && (
-                  <div style={{ fontSize:12, color:"#64748b", textAlign:"center", padding:16 }}>
-                    Nenhum líder cadastrado. Cadastre colaboradores com cargo de líder para montar as equipes.
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          {/* VISÃO POR EQUIPE MONTADA (componente compartilhado com a Área do Cliente) */}
+          {!filtroRapido && visaoEquipes && montarEquipesDisponivel(project.id, equipeData.colaboradores) && (
+            <EquipesMontadas colaboradores={equipeData.colaboradores} fotos={fotosMapa} dark={dark}
+              onSelecionar={(m)=>{setSelColab(m);setScreen("view");}} onMontar={liderAuth ? (id)=>setMontarLiderId(id) : null}/>
+          )}
 
           {/* Cards por turno (visão padrão) */}
           {!filtroRapido && !visaoEquipes && getTurnos(project.id).map(turno=>{

@@ -9,6 +9,7 @@ jest.mock("../v360Perimetral", () => ({ PERIMETRAL_VIA_RONDAS: [], zonasRuinsPro
 jest.mock("../mapaDiario/VerMapasProjeto", () => () => <div data-testid="ver-mapas-mock">MAPA DO LÍDER</div>);
 jest.mock("../mapaDiario/painel", () => ({ turnoVigente: () => ({ data: "2026-10-20", turno: "D" }) }));
 jest.mock("../equipe/QuadroEfetivo", () => () => <div>QUADRO</div>);
+jest.mock("../equipe/MaturidadeResumo", () => () => <div>MATURIDADE</div>);
 const mockCheckPin = jest.fn(), mockPDF = jest.fn(); global.__escopo = null;
 jest.mock("../session", () => ({ checkPin: (...a) => mockCheckPin(...a), clearSession: () => { global.__escopo = null; }, getClienteScope: () => global.__escopo }));
 const PainelCliente = require("./PainelCliente").default;
@@ -16,7 +17,7 @@ const PROJECTS = { P601: { id: "P601", name: "Golgi Cajamar", categories: [{ id:
 const health = (p, state) => { const arr = state.c1 || []; const inop = arr.filter((x) => x.status === "inop").length; return { total: arr.length, ok: arr.length - inop, partial: 0, inop, pct: Math.round(((arr.length - inop) / arr.length) * 100) }; };
 const hoje = new Date().toLocaleDateString("sv-SE");
 const stored = { P601: { history: [{ meta: { date: hoje }, state: { c1: [{ status: "ok" }, { status: "inop", note: "sem imagem" }] } }] }, P602: { history: [] } };
-const equipe = { colaboradores: [{ id: "a", nome: "Ana Lima", cargo: "Vigilante", turno: "Diurno", status: "ativo", dataContratacao: "2024-01-10", historico: [{ tipo: "Treinamento", data: "2026-09-24", detalhe: "Brigada" }] }, { id: "b", nome: "Bia Souza", cargo: "Líder", turno: "Noturno", status: "ativo", historico: [] }], desligados: [{ id: "z", nome: "Zé Saiu", cargo: "Vigilante", desligadoEm: "2026-06-01", motivoDesligamento: "Pediu demissão" }] };
+const equipe = { colaboradores: [{ id: "a", nome: "Ana Lima", cargo: "Vigilante", turno: "Diurno", status: "ativo", dataContratacao: "2024-01-10", historico: [{ tipo: "Treinamento", data: "2026-09-24", detalhe: "Brigada" }] }, { id: "b", nome: "Bia Souza", cargo: "VSPP Líder", turno: "Noturno", status: "ativo", historico: [] }], ferias: [{ colabId: "a", dataInicio: "2026-01-01", dataRetorno: "2099-01-01" }], desligados: [{ id: "z", nome: "Zé Saiu", cargo: "Vigilante", desligadoEm: "2026-06-01", motivoDesligamento: "Pediu demissão" }] };
 const mapas = [{ data: hoje, turno: "D", status: "enviado", postos: [{ rotulo: "P1", pessoaId: "a", pessoaNome: "Ana Lima", situacao: "presente" }, { rotulo: "P2", pessoaId: "b", pessoaNome: "Bia Souza", situacao: "falta" }] }];
 beforeAll(() => { global.IS_REACT_ACT_ENVIRONMENT = true; });
 beforeEach(() => { global.__escopo = null; mockCheckPin.mockReset();
@@ -45,8 +46,11 @@ test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com no
     // equipe de plantão: abas mapa (modelo do líder) / equipe completa por turno
     await clicar(botao(host, "Abrir equipe de plantão"));
     expect(host.querySelector('[data-testid="ver-mapas-mock"]')).not.toBeNull();
-    await clicar(botao(host, "Equipe completa"));
-    expect(host.textContent).toContain("QUADRO"); expect(host.textContent).toContain("Diurno"); expect(host.textContent).toContain("Noturno"); expect(host.textContent).toContain("Bia Souza");
+    await clicar(botao(host, "Equipe montada"));
+    expect(host.querySelector('[data-testid="equipes-montadas"]')).not.toBeNull(); expect(host.textContent).toContain("NOTURNO"); expect(host.textContent).toContain("Bia Souza");
+    await clicar(botao(host, "Maturidade")); expect(host.textContent).toContain("QUADRO"); expect(host.textContent).toContain("MATURIDADE");
+    await clicar(botao(host, "← Golgi Cajamar")); expect(host.textContent).toContain("1 em férias hoje");
+    await clicar(botao(host, "Abrir férias")); expect(host.textContent).toContain("Ana Lima");
     // turnover: tabela + quem saiu
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir turnover"));
     expect(host.textContent).toContain("Quantos temos hoje"); expect(host.textContent).not.toContain("Zé Saiu");
