@@ -18,7 +18,7 @@ import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
 const LARANJA = "#f97316";
-const B = "#0f172a"; // borda padrão do app
+const B = "#2a2a31"; // borda padrão do app
 const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
 const EQUIP_LABEL = { smartphones: "Smartphones", radiosHT: "Rádios HT", armamento: "Armamento", municao: "Munição", placas: "Placas balísticas", lanternas: "Lanternas", ztrax: "Ztrax", bodycam: "Bodycam", outros: "Outros" };
 
@@ -69,12 +69,12 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
 
 function Avatar({ foto, nome, tam = 36 }) {
   const ini = (nome || "?").split(/\s+/).slice(0, 2).map((x) => x[0] || "").join("").toUpperCase();
-  const borda = { width: tam, height: tam, borderRadius: tam / 4, border: "2px solid #1e293b" };
+  const borda = { width: tam, height: tam, clipPath: "polygon(20% 0, 100% 0, 100% 80%, 80% 100%, 0 100%, 0 20%)" };
   return foto ? <img src={foto} alt={nome} style={{ ...borda, objectFit: "cover" }} />
-    : <div style={{ ...borda, background: "#0f172a", color: "#64748b", fontSize: tam / 2.8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{ini}</div>;
+    : <div style={{ ...borda, background: "#2a2a31", color: "#64748b", fontSize: tam / 2.8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{ini}</div>;
 }
-const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: primeiro ? "none" : "1px solid #0f172a" }}>{children}</div>;
-const Luzes = ({ p }) => <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 4px", borderTop: "1px solid #0f172a", marginTop: 4 }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div>;
+const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: primeiro ? "none" : "1px solid #2a2a31" }}>{children}</div>;
+const Luzes = ({ p }) => <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 4px", borderTop: "1px solid #2a2a31", marginTop: 4 }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div>;
 
 // ── Parque ────────────────────────────────────────────────────────────────────
 function MostradorRisco({ risco, tam = 180 }) {
@@ -91,6 +91,11 @@ function TelaProjeto({ p, onBack, onAbrir }) {
       {onBack ? <button style={C.back} onClick={onBack}>← Meus parques</button> : <span />}
       <div style={{ ...C.titulo, marginBottom: 0 }}>{p.nome}</div>
     </div>
+    {/* turnover */}
+    <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
+      <Mostrador valor={p.equipe.turnover} max={50} tam={250} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
+      <div style={{ textAlign: "right", ...C.micro }}>quantos temos × quantos saíram ›</div>
+    </button>
     {/* saúde do parque + análise de risco */}
     <div style={C.grid2}>
       <button style={C.cardBtn} onClick={() => onAbrir("teste")} aria-label="Abrir teste semanal">
@@ -107,17 +112,12 @@ function TelaProjeto({ p, onBack, onAbrir }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Equipe de plantão</div><span style={C.micro}>{m.temMapa ? `${fmtD(m.data)} · ${m.turno === "N" ? "noturno" : "diurno"}${m.hoje ? "" : " (último)"}` : "sem mapa"}</span></div>
       {m.temMapa ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {plantao.map((x, i) => <div key={i} style={{ textAlign: "center", width: 54 }}>
-          <div style={{ position: "relative", display: "inline-block" }}><Avatar foto={x.foto} nome={x.nome || x.posto} tam={44} /><span title={ROTULO_SITUACAO[x.situacao] || x.situacao} style={{ position: "absolute", right: -2, bottom: -2, width: 12, height: 12, borderRadius: "50%", background: corSit(x.situacao), border: "2px solid #060c18", boxShadow: `0 0 6px ${corSit(x.situacao)}` }} /></div>
+          <div style={{ position: "relative", display: "inline-block" }}><Avatar foto={x.foto} nome={x.nome || x.posto} tam={44} /><span title={ROTULO_SITUACAO[x.situacao] || x.situacao} style={{ position: "absolute", right: -2, bottom: -2, width: 12, height: 12, borderRadius: "50%", background: corSit(x.situacao), border: "2px solid #0b0b0e", boxShadow: `0 0 6px ${corSit(x.situacao)}` }} /></div>
           <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(x.nome || "—").split(" ")[0]}</div>
           <div style={{ fontSize: 8, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.posto}</div>
         </div>)}
       </div> : <div style={C.micro}>Nenhum mapa enviado ainda.</div>}
       <div style={{ marginTop: 4 }}>{m.faltas > 0 && <span style={C.chip(VERMELHO2)}>{m.faltas} falta{m.faltas === 1 ? "" : "s"}</span>}{m.atrasos > 0 && <span style={C.chip(AMARELO)}>{m.atrasos} atraso{m.atrasos === 1 ? "" : "s"}</span>}{m.ft > 0 && <span style={C.chip("#a855f7")}>{m.ft} FT</span>}{m.vagos > 0 && <span style={C.chip(VERMELHO2)}>{m.vagos} vago{m.vagos === 1 ? "" : "s"}</span>}<span style={{ ...C.micro, float: "right" }}>mapa de hoje · equipe completa ›</span></div>
-    </button>
-    {/* turnover */}
-    <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
-      <Mostrador valor={p.equipe.turnover} max={50} tam={190} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
-      <div style={{ textAlign: "right", ...C.micro }}>quantos temos × quantos saíram ›</div>
     </button>
     {/* férias */}
     <button style={C.cardBtn} onClick={() => onAbrir("ferias")} aria-label="Abrir férias">
@@ -129,11 +129,11 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     </button>
     {/* fotos — evidências de treinamento */}
     <div style={C.card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Fotos · treinamentos</div>{p.equipe.evidencias.length > 3 && <button style={{ ...C.back, padding: "3px 8px", fontSize: 11, color: "#0ea5e9" }} onClick={() => onAbrir("fotos")}>Visualizar todas ›</button>}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Fotos · treinamentos</div>{p.equipe.evidencias.length > 3 && <button style={{ ...C.back, padding: "3px 8px", fontSize: 11, color: "#FF1E27", textDecoration: "underline" }} onClick={() => onAbrir("fotos")}>Visualizar todas ›</button>}</div>
       {p.equipe.evidencias.length === 0 && <div style={C.micro}>Sem fotos ainda. O líder anexa a foto ao registrar o treinamento na ficha.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
         {p.equipe.evidencias.slice(0, 6).map((t, i) => <button key={t.id || i} onClick={() => onAbrir("fotos")} aria-label={`Foto: ${t.detalhe || "treinamento"}`} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
-          <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, border: "1px solid #0f172a" }} />
+          <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", clipPath: "polygon(12% 0, 100% 0, 100% 88%, 88% 100%, 0 100%, 0 12%)", border: "1px solid #3a3a42", outline: "1px solid #FF1E2744" }} />
           <div style={{ position: "absolute", left: 6, right: 6, bottom: 6, fontSize: 9, fontWeight: 700, color: "#f1f5f9", textShadow: "0 1px 3px #000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>{t.detalhe || "Treinamento"}</div>
         </button>)}
       </div>
@@ -153,7 +153,7 @@ function TelaProjeto({ p, onBack, onAbrir }) {
 
 // ── Detalhes ──────────────────────────────────────────────────────────────────
 function Abas({ abas, atual, onMudar }) {
-  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? "#0ea5e9" : "#0f172a", color: atual === k ? "#0ea5e9" : "#94a3b8", background: atual === k ? "#0d1f2e" : "transparent" }}>{r}</button>)}</div>;
+  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? "#FF1E27" : "#3a3a42", color: atual === k ? "#fecaca" : "#d1d5db", background: atual === k ? "#2a0b0e" : undefined, boxShadow: atual === k ? "0 0 10px #FF1E2755" : "none" }}>{r}</button>)}</div>;
 }
 
 function Detalhe({ p, tipo, onBack, abrirPDF }) {
@@ -169,7 +169,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       <div style={{ ...C.micro, marginBottom: 6 }}>Toque num teste para abrir o relatório (PDF).</div>
       {p.historico.length === 0 && <div style={C.micro}>Nenhum teste registrado.</div>}
       {p.historico.map((r, i) => <button key={r.idx} aria-label={`Abrir teste de ${fmtD(r.data)}`} onClick={() => abrirPDF && abrirPDF(p.pid, r.report)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: corDe(r.pct), boxShadow: `0 0 8px ${corDe(r.pct)}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>Teste de {fmtD(r.data)}</div><div style={C.micro}>{r.pct === null ? "—" : `${r.pct}% dos sistemas operantes`}</div></div><span style={C.chip("#0ea5e9")}>PDF ›</span>
+        <span style={{ width: 10, height: 10, borderRadius: "50%", background: corDe(r.pct), boxShadow: `0 0 8px ${corDe(r.pct)}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>Teste de {fmtD(r.data)}</div><div style={C.micro}>{r.pct === null ? "—" : `${r.pct}% dos sistemas operantes`}</div></div><span style={C.chip(VERMELHO2)}>PDF ›</span>
       </Linha></button>)}
     </div>}
 
@@ -226,23 +226,23 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       <div style={{ ...C.micro, marginBottom: 8 }}>{p.equipe.treinadosPct === null ? "" : `${p.equipe.treinadosPct}% da equipe com treinamento registrado · `}{p.equipe.ultimosTreinos.length ? `último em ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"}. Toque num colaborador para ver os treinamentos dele.</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         {p.colabs.map((c) => <button key={c.id} aria-pressed={sel === c.id} aria-label={`Treinamentos de ${c.nome}`} onClick={() => setSel(sel === c.id ? null : c.id)} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "center", width: 54, opacity: sel && sel !== c.id ? .45 : 1 }}>
-          <div style={{ display: "inline-block", outline: sel === c.id ? "2px solid #0ea5e9" : "none", outlineOffset: 2 }}><Avatar foto={c.foto} nome={c.nome} tam={44} /></div>
+          <div style={{ display: "inline-block", outline: sel === c.id ? "2px solid #FF1E27" : "none", outlineOffset: 2 }}><Avatar foto={c.foto} nome={c.nome} tam={44} /></div>
           <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(c.nome || "").split(" ")[0]}</div>
           <div style={{ fontSize: 8, color: c.treinos ? VERDE : "#6b7280" }}>{c.treinos} trein.</div>
         </button>)}
       </div>
       {(() => { const c = p.colabs.find((x) => x.id === sel); if (!c) return null; const ts = (p.equipeDoc.colaboradores || []).find((x) => x.id === sel)?.historico?.filter((h) => h && h.tipo === "Treinamento").sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))) || [];
-        return <div style={{ borderTop: "1px solid #0f172a", paddingTop: 8 }}><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}><Avatar foto={c.foto} nome={c.nome} tam={48} /><div><div style={{ fontSize: 13, fontWeight: 800 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div></div>
+        return <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}><Avatar foto={c.foto} nome={c.nome} tam={48} /><div><div style={{ fontSize: 13, fontWeight: 800 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div></div>
           {ts.length === 0 && <div style={C.micro}>Sem treinamento registrado.</div>}
           {ts.map((t, i) => <Linha key={t.id || i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: VERDE, boxShadow: `0 0 8px ${VERDE}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)}</div></div></Linha>)}
         </div>; })()}
-      {!sel && <div style={{ borderTop: "1px solid #0f172a", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
+      {!sel && <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
     </div>}
 
     {tipo === "fotos" && <div style={C.card}>
       {p.equipe.evidencias.length === 0 && <div style={C.micro}>Sem fotos de treinamento.</div>}
       {p.equipe.evidencias.map((t, i) => <div key={t.id || i} style={{ marginBottom: 12 }}>
-        <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", borderRadius: 10, border: "1px solid #0f172a" }} />
+        <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", clipPath: "polygon(6% 0, 100% 0, 100% 94%, 94% 100%, 0 100%, 0 6%)", border: "1px solid #3a3a42" }} />
         <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4 }}>{t.detalhe || t.label || "Treinamento"}</div>
         <div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div>
       </div>)}
@@ -288,7 +288,7 @@ function TelaMacro({ escopo, dados, onAbrir }) {
         ["#38bdf8", `${feriasHoje} em férias hoje`, parques.filter((p) => p.ferias?.emFerias.length).map((p) => `${p.nome} (${p.ferias.emFerias.length})`).join(" · ") || "ninguém"],
         [g.equipInop ? AMARELO : VERDE, `${g.equipInop} equipamento${g.equipInop === 1 ? "" : "s"} inoperante${g.equipInop === 1 ? "" : "s"}`, `${g.equipPct === null ? "—" : g.equipPct + "%"} operantes no grupo`],
         [parques.some((p) => p.sistemas?.ctmkOff) ? VERMELHO2 : VERDE, `CTMK: ${parques.filter((p) => p.sistemas?.ctmkOff).length} off-line`, parques.filter((p) => p.sistemas?.ctmkOff).map((p) => p.nome).join(" · ") || "todas on-line"],
-      ].map(([c, t, d], i) => <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: i ? "1px solid #0f172a" : "none" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t}</div><div style={C.micro}>{d}</div></div></div>)}
+      ].map(([c, t, d], i) => <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: i ? "1px solid #2a2a31" : "none" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t}</div><div style={C.micro}>{d}</div></div></div>)}
     </div>
     <div style={C.titulo}>Parques — toque para abrir o painel</div>
     {parques.map((p) => <button key={p.pid} style={C.cardBtn} onClick={() => onAbrir(p.pid)} aria-label={`Abrir ${p.nome}`}>
@@ -297,7 +297,7 @@ function TelaMacro({ escopo, dados, onAbrir }) {
         <div style={{ display: "flex", gap: 6 }}><Luzinha c={p.teste.atrasado ? AMARELO : corDe(p.teste.pct)} t="Teste semanal" /><Luzinha c={COR_RISCO[p.risco?.nivel] || CINZA} t="Risco" /><Luzinha c={!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE} t="Mapa do dia" /><Luzinha c={corDe(p.equip.pct)} t="Equipamentos" /><Luzinha c={p.sistemas.ctmkOff ? VERMELHO2 : VERDE} t="CTMK" /></div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-        {[["Saúde", p.teste.pct === null ? "—" : `${p.teste.pct}%`, p.teste.atrasado ? AMARELO : corDe(p.teste.pct)], ["Risco", p.risco?.nivel ? NIVEL_LABEL[p.risco.nivel] : "—", COR_RISCO[p.risco?.nivel] || CINZA], ["Plantão", p.mapa.temMapa ? `${p.mapa.presentes}/${p.mapa.postos}` : "—", p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE], ["Turnover", p.equipe.turnover === null ? "—" : `${p.equipe.turnover}%`, corTurnover(p.equipe.turnover)]].map(([r, v, c]) => <div key={r} style={{ background: "#0a1120", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}><div style={{ fontSize: 13, fontWeight: 900, color: c }}>{v}</div><div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: .5 }}>{r}</div></div>)}
+        {[["Saúde", p.teste.pct === null ? "—" : `${p.teste.pct}%`, p.teste.atrasado ? AMARELO : corDe(p.teste.pct)], ["Risco", p.risco?.nivel ? NIVEL_LABEL[p.risco.nivel] : "—", COR_RISCO[p.risco?.nivel] || CINZA], ["Plantão", p.mapa.temMapa ? `${p.mapa.presentes}/${p.mapa.postos}` : "—", p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE], ["Turnover", p.equipe.turnover === null ? "—" : `${p.equipe.turnover}%`, corTurnover(p.equipe.turnover)]].map(([r, v, c]) => <div key={r} style={{ background: "#15151a", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}><div style={{ fontSize: 13, fontWeight: 900, color: c }}>{v}</div><div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: .5 }}>{r}</div></div>)}
       </div>
       <div style={{ ...C.micro, marginTop: 6 }}>{p.equipe.ativos} colaboradores · teste {p.teste.data ? fmtD(p.teste.data) : "—"}{p.ferias?.emFerias.length ? ` · ${p.ferias.emFerias.length} em férias` : ""}{p.mapa.faltas ? ` · ${p.mapa.faltas} falta${p.mapa.faltas === 1 ? "" : "s"} hoje` : ""}</div>
     </button>)}
@@ -331,9 +331,9 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
     <div style={{ ...C.card, marginTop: 30, textAlign: "center" }}>
       <div style={C.titulo}>Acesso de leitura</div>
       <div style={{ ...C.micro, marginBottom: 16 }}>Gestor do parque ou proprietário</div>
-      <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #1e293b", background: "#020510", color: "#f1f5f9", fontSize: 20, textAlign: "center", letterSpacing: 8, borderRadius: 6 }} />
+      <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #3a3a42", background: "#08080a", color: "#f1f5f9", fontSize: 20, textAlign: "center", letterSpacing: 8, borderRadius: 6 }} />
       {erro && <div role="alert" style={{ color: VERMELHO2, fontSize: 12, marginTop: 8 }}>{erro}</div>}
-      <div><button onClick={entrar} style={{ marginTop: 14, background: "linear-gradient(135deg,#1d4ed8,#1e40af)", color: "#fff", border: "none", borderRadius: 10, padding: "12px 32px", fontWeight: 700, cursor: "pointer" }}>ENTRAR</button></div>
+      <div><button onClick={entrar} style={{ marginTop: 14, background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "11px 32px", fontWeight: 900, letterSpacing: 2, cursor: "pointer", clipPath: "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)", boxShadow: "0 0 16px #FF1E2755" }}>ENTRAR</button></div>
     </div>
   </main>;
 
