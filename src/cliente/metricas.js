@@ -37,13 +37,15 @@ export function equipeResumo(equipe, hojeISO, catalogo = []) {
   const porCargo = {}; ativos.forEach((c) => { const k = c.cargo || "Sem cargo"; porCargo[k] = (porCargo[k] || 0) + 1; });
   const comTreino = ativos.filter((c) => (c.historico || []).some((x) => x && x.tipo === "Treinamento")).length;
   let treinoPct = null; try { const v = ativos.map((c) => calcularTreinamento(c, catalogo, hojeISO)).filter((x) => typeof x === "number"); treinoPct = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; } catch { treinoPct = null; }
-  const ultimosTreinos = ordenarHistorico(ativos.flatMap((c) => (c.historico || []).filter((x) => x && x.tipo === "Treinamento").map((x) => ({ ...x, colabNome: c.nome, colabId: c.id })))).reverse().slice(0, 12);
+  const todosTreinos = ordenarHistorico(ativos.flatMap((c) => (c.historico || []).filter((x) => x && x.tipo === "Treinamento").map((x) => ({ ...x, colabNome: c.nome, colabId: c.id })))).reverse();
+  const ultimosTreinos = todosTreinos.slice(0, 12);
+  const evidencias = todosTreinos.filter((x) => x.fotoRef).slice(0, 30); // galeria: só treinamentos com foto
   return {
     ativos: ativos.length, porCargo, tempoMedioMeses,
     turnover: est && est.turnover !== null ? Math.round(est.turnover * 10) / 10 : null,
     turnoverMotivo: est ? est.motivoNaoAferido : "sem dados",
     entradas12m: est ? est.entradas12m : 0, saidas12m: est ? est.desligados12m : 0,
-    treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, ultimosTreinos,
+    treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, ultimosTreinos, evidencias,
   };
 }
 
