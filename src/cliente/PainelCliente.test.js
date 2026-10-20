@@ -17,7 +17,7 @@ const PROJECTS = { P601: { id: "P601", name: "Golgi Cajamar", categories: [{ id:
 const health = (p, state) => { const arr = state.c1 || []; const inop = arr.filter((x) => x.status === "inop").length; return { total: arr.length, ok: arr.length - inop, partial: 0, inop, pct: Math.round(((arr.length - inop) / arr.length) * 100) }; };
 const hoje = new Date().toLocaleDateString("sv-SE");
 const stored = { P601: { history: [{ meta: { date: hoje }, state: { c1: [{ status: "ok" }, { status: "inop", note: "sem imagem" }] } }] }, P602: { history: [] } };
-const equipe = { colaboradores: [{ id: "a", nome: "Ana Lima", cargo: "Vigilante", turno: "Diurno", status: "ativo", dataContratacao: "2024-01-10", historico: [{ tipo: "Treinamento", data: "2026-09-24", detalhe: "Brigada" }] }, { id: "b", nome: "Bia Souza", cargo: "VSPP Líder", turno: "Noturno", status: "ativo", historico: [] }], ferias: [{ colabId: "a", dataInicio: "2026-01-01", dataRetorno: "2099-01-01" }], desligados: [{ id: "z", nome: "Zé Saiu", cargo: "Vigilante", desligadoEm: "2026-06-01", motivoDesligamento: "Pediu demissão" }] };
+const equipe = { colaboradores: [{ id: "a", nome: "Ana Lima", cargo: "Vigilante", turno: "Diurno", status: "ativo", dataContratacao: "2024-01-10", historico: [{ tipo: "Treinamento", data: "2026-09-24", detalhe: "Brigada" }] }, { id: "b", nome: "Bia Souza", cargo: "VSPP Líder", turno: "Noturno", status: "ativo", dataContratacao: "2026-08-01", historico: [{ tipo: "Treinamento", data: "2026-07-16", detalhe: "Brigada — não aplicado" }] }], ferias: [{ colabId: "a", dataInicio: "2026-01-01", dataRetorno: "2099-01-01" }], desligados: [{ id: "z", nome: "Zé Saiu", cargo: "Vigilante", desligadoEm: "2026-06-01", motivoDesligamento: "Pediu demissão" }] };
 const mapas = [{ data: hoje, turno: "D", status: "enviado", postos: [{ rotulo: "P1", pessoaId: "a", pessoaNome: "Ana Lima", situacao: "presente" }, { rotulo: "P2", pessoaId: "b", pessoaNome: "Bia Souza", situacao: "falta" }] }];
 beforeAll(() => { global.IS_REACT_ACT_ENVIRONMENT = true; });
 beforeEach(() => { global.__escopo = null; mockCheckPin.mockReset();
@@ -25,7 +25,7 @@ beforeEach(() => { global.__escopo = null; mockCheckPin.mockReset();
   mockGetDocs.mockImplementation(async () => ({ docs: mapas.map((m) => ({ data: () => m })) })); });
 const clicar = async (el) => { expect(el).toBeTruthy(); await act(async () => el.dispatchEvent(new MouseEvent("click", { bubbles: true }))); };
 const botao = (host, t) => [...host.querySelectorAll("button")].find((b) => b.textContent.includes(t) || b.getAttribute("aria-label") === t);
-const montar = async (host, root) => { await act(async () => root.render(<PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={health} ctmkData={{ P601: { status: "offline", offlineSince: "2026-10-18T10:00:00Z" } }} score360={async () => ({ score: 77.7, vulnerabilidades: ["CTMK off-line"] })} risco={async () => ({ nivel: 3, label: "ELEVADO", motivo: "1 via transponível", determinante: "Cancela P1", faltantes: [], vetores: [{ label: "Cancela P1", nivel: 3 }] })} abrirPDF={mockPDF} onBack={() => {}} />)); await act(async () => { await new Promise((r) => setTimeout(r, 20)); }); };
+const montar = async (host, root) => { await act(async () => root.render(<PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={health} ctmkData={{ P601: { status: "offline", offlineSince: "2026-10-18T10:00:00Z" } }} score360={async () => ({ score: 77.7, vulnerabilidades: ["CTMK off-line"] })} risco={async () => ({ nivel: 3, label: "ELEVADO", motivo: "1 via transponível", determinante: "Cancela P1", faltantes: [], vetores: [{ label: "Cancela P1", nivel: 3, inop: 2, total: 5, piorDias: 12, detalhe: "Cancela inoperante há 12 dias", note: "" }] })} abrirPDF={mockPDF} onBack={() => {}} />)); await act(async () => { await new Promise((r) => setTimeout(r, 20)); }); };
 
 test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com nome e situação", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
@@ -43,6 +43,10 @@ test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com no
     expect(host.textContent).toContain("SAÚDE DO PARQUE"); expect(host.textContent).toContain("50%");
     expect(host.textContent).toContain("ANÁLISE DE RISCO"); expect(host.textContent).toContain("ELEVADO");
     expect(host.textContent).toContain("Equipe de plantão"); expect(host.textContent).toContain("Ana"); expect(host.textContent).toContain("1 falta");
+    // análise de risco: item expande com quantidade e tempo
+    await clicar(botao(host, "Abrir análise de risco")); expect(host.textContent).not.toContain("há 12 dias");
+    await clicar(botao(host, "Detalhe: Cancela P1")); expect(host.textContent).toContain("2 de 5 inoperantes · há 12 dias");
+    await clicar(botao(host, "← Golgi Cajamar"));
     // equipe de plantão: abas mapa (modelo do líder) / equipe completa por turno
     await clicar(botao(host, "Abrir equipe de plantão"));
     expect(host.querySelector('[data-testid="ver-mapas-mock"]')).not.toBeNull();
@@ -55,18 +59,24 @@ test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com no
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir turnover"));
     expect(host.textContent).toContain("Quantos temos hoje"); expect(host.textContent).not.toContain("Zé Saiu");
     await clicar(botao(host, "Ver quem saiu")); expect(host.textContent).toContain("Zé Saiu"); expect(host.textContent).toContain("Pediu demissão");
+    expect(host.textContent).toContain("Entraram nos últimos 12 meses");
+    await clicar(botao(host, "Ver quem entrou")); expect(host.textContent).toContain("Bia Souza (VSPP Líder, desde 01/08/2026)");
     // teste semanal: toque abre o PDF
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir teste semanal"));
+    expect(host.textContent).toContain("O que está puxando a nota para baixo"); expect(host.textContent).toContain("sem imagem");
     await clicar(botao(host, `Abrir teste de ${hoje.slice(8, 10)}/${hoje.slice(5, 7)}/${hoje.slice(0, 4)}`));
     expect(mockPDF).toHaveBeenCalledWith("P601", stored.P601.history[0]);
     // treinamentos por colaborador
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir treinamentos"));
+    expect(host.textContent).toContain('1 registro "não aplicado" (não contam)');
     await clicar(botao(host, "Treinamentos de Ana Lima")); expect(host.textContent).toContain("Brigada");
+    await clicar(botao(host, "Treinamentos de Bia Souza")); expect(host.textContent).toContain("NÃO APLICADO");
     // equipamentos item a item
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir equipamentos"));
     expect(host.textContent).toContain("Smartphones");
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir sistemas"));
     expect(host.textContent).toContain("OFF-LINE"); expect(host.textContent).toContain("1 falha em aberto");
+    await clicar(botao(host, "Detalhe: CTMK (central)")); expect(host.textContent).toContain("Sem comunicação com a central");
     await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "← Meus parques"));
     expect(host.textContent).toContain("2 parques · 4 colaboradores");
   } finally { await act(async () => root.unmount()); host.remove(); }
