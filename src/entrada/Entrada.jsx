@@ -1,5 +1,5 @@
 // Porta de entrada da plataforma Moked (decisão do Marcio, 20/10): logo centralizado → "Entrar" → vídeo curto de
-// introdução (public/moked/intro.mp4; se não existir ou falhar, pula) → "Escolha a sua área" (divisões) com a
+// introdução (public/moked/intro.mp4, ~14 s; se não existir ou falhar, pula) → "Escolha a sua área" (divisões) com a
 // Área do Cliente no topo. MokLog abre o app atual; as demais divisões ficam "em breve" até existirem.
 import { useEffect, useRef, useState } from "react";
 
@@ -9,24 +9,27 @@ export const DIVISOES = [
   { id: "mokvip", nome: "MokVip", sub: "Executivos e eventos", ativo: false, cor: "#a855f7" },
   { id: "mokres", nome: "MokRes", sub: "Residencial", ativo: false, cor: "#22c55e" },
   { id: "mokimp", nome: "MokImp", sub: "Implantação", ativo: false, cor: "#38bdf8" },
+  { id: "moktec", nome: "MokTec", sub: "Tecnologia", ativo: false, cor: "#e11d48" },
 ];
+export const logoDivisao = (id) => `/moked/divisoes/${id}.jpg`;
 export const LOGO_MOKED_URL = "/moked/logo-moked.png";
 export const VIDEO_INTRO_URL = "/moked/intro.mp4";
 const CHAVE_VISTO = "moked_intro_visto_v1"; // vídeo uma vez por sessão do navegador
 
-const fundo = { minHeight: "100vh", background: "radial-gradient(140% 70% at 50% -10%, #2a0609 0%, #0a0a0d 45%, #050507 100%)", color: "#e5e7eb", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 };
+// Fundo = a mesma cor do PNG do logo (#0b0f19), para o logo não aparecer como um retângulo.
+const fundo = { minHeight: "100vh", background: "radial-gradient(140% 70% at 50% -10%, #1a0507 0%, #0b0f19 40%, #0b0f19 100%)", color: "#e5e7eb", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 };
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
 const botaoVermelho = { background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "13px 38px", fontWeight: 900, letterSpacing: 2.5, fontSize: 14, cursor: "pointer", clipPath: chanfro, boxShadow: "0 0 18px #FF1E2766", textTransform: "uppercase" };
 
-export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = false }) {
-  const [etapa, setEtapa] = useState("splash"); // splash | video | areas
+export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = false, etapaInicial = "splash" }) {
+  const [etapa, setEtapa] = useState(etapaInicial); // splash | video | areas
   const vid = useRef(null);
   const jaViu = () => { try { return sessionStorage.getItem(CHAVE_VISTO) === "1"; } catch { return false; } };
   const marcar = () => { try { sessionStorage.setItem(CHAVE_VISTO, "1"); } catch { /* sem storage */ } };
   const entrar = () => { if (pularVideo || jaViu()) setEtapa("areas"); else setEtapa("video"); };
   const fimVideo = () => { marcar(); setEtapa("areas"); };
 
-  useEffect(() => { if (etapa !== "video") return undefined; const t = setTimeout(fimVideo, 15000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
+  useEffect(() => { if (etapa !== "video") return undefined; const t = setTimeout(fimVideo, 20000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
 
   if (etapa === "splash") return <main style={fundo} data-testid="entrada-splash">
     <img src={logo} alt="Moked Security Consulting" style={{ width: "min(70vw, 320px)", filter: "drop-shadow(0 0 24px rgba(229,9,20,.35))" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -46,9 +49,9 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", marginBottom: 12 }}>Escolha a sua área</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {DIVISOES.map((d) => <button key={d.id} aria-label={d.nome} disabled={!d.ativo} onClick={() => d.ativo && onEscolher(d.id)}
-          style={{ background: "linear-gradient(160deg, #15151a 0%, #0b0b0e 60%)", border: `1px solid ${d.ativo ? d.cor + "aa" : "#2a2a31"}`, color: d.ativo ? "#f3f4f6" : "#6b7280", padding: "18px 12px", textAlign: "left", cursor: d.ativo ? "pointer" : "default", clipPath: chanfro, boxShadow: d.ativo ? `0 0 14px ${d.cor}33, inset 0 1px 0 rgba(255,255,255,.06)` : "inset 0 1px 0 rgba(255,255,255,.04)", gridColumn: d.id === "moklog" ? "1 / -1" : "auto" }}>
-          <div style={{ fontSize: d.id === "moklog" ? 20 : 15, fontWeight: 900, letterSpacing: 1 }}><span style={{ color: d.ativo ? d.cor : "#4b5563" }}>Mok</span>{d.nome.slice(3)}</div>
-          <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 3 }}>{d.sub}{d.ativo ? "" : " · em breve"}</div>
+          style={{ background: "#fff", border: `2px solid ${d.ativo ? d.cor : "#2a2a31"}`, padding: 0, cursor: d.ativo ? "pointer" : "default", clipPath: chanfro, boxShadow: d.ativo ? `0 0 18px ${d.cor}55` : "none", opacity: d.ativo ? 1 : .45, gridColumn: d.id === "moklog" ? "1 / -1" : "auto", position: "relative", overflow: "hidden" }}>
+          <img src={logoDivisao(d.id)} alt={d.nome} style={{ display: "block", width: "100%", height: d.id === "moklog" ? 110 : 76, objectFit: "contain", background: "#fff", padding: "8px 14px", boxSizing: "border-box" }} />
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: d.ativo ? d.cor : "#2a2a31", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "3px 8px", textAlign: "center" }}>{d.ativo ? d.sub : "Em breve"}</div>
         </button>)}
       </div>
       <div style={{ marginTop: 18, fontSize: 10, color: "#4b5563", textAlign: "center" }}>Moked Security Consulting</div>
