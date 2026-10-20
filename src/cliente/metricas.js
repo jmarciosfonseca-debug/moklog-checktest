@@ -85,3 +85,32 @@ export function consolidarGrupo(porProjeto) {
     treinadosPct: med((x) => x.equipe?.treinadosPct),
   };
 }
+
+// ── Sistemas (os mesmos insumos da Visão 360): CTMK, KeyAccess, iluminação, energia, perimetral ──
+export function sistemasResumo({ ctmk, keyaccess, iluminacao, energia, perimetralZonasRuins, score360 }, agoraMs = Date.now()) {
+  const keyAbertas = (keyaccess?.registros || []).filter((r) => r && !r.horaFim).length;
+  const quads = iluminacao?.quadrantes || [];
+  const ilumTotal = quads.reduce((a, q) => a + (Number(q.total) || 0), 0), ilumDef = quads.reduce((a, q) => a + (Number(q.deficientes) || 0), 0);
+  const eventos = energia?.eventos || []; const corte = agoraMs - 7 * 86400000;
+  const quedas7d = eventos.filter((e) => e && e.inicioQueda && new Date(e.inicioQueda).getTime() >= corte).length;
+  const energiaAberta = eventos.some((e) => e && !e.concluido);
+  const ctmkOff = ctmk?.status === "offline";
+  const ctmkDias = ctmkOff && ctmk.offlineSince ? Math.max(0, Math.floor((agoraMs - new Date(ctmk.offlineSince).getTime()) / 86400000)) : 0;
+  return {
+    ctmkOff, ctmkDias, keyAbertas, ilumTotal, ilumDef, ilumPct: ilumTotal ? Math.round(((ilumTotal - ilumDef) / ilumTotal) * 100) : null,
+    quedas7d, energiaAberta, perimetralZonasRuins: perimetralZonasRuins || 0,
+    score360: typeof score360?.score === "number" ? Math.round(score360.score) : null, vulnerabilidades: score360?.vulnerabilidades || [],
+  };
+}
+
+// Luzes de aviso do cluster (acendem quando há problema).
+export function luzes(p) {
+  return [
+    { id: "teste", rotulo: "Teste atrasado", on: !!p.teste?.atrasado },
+    { id: "falta", rotulo: "Falta hoje", on: !!(p.mapa?.hoje && (p.mapa.faltas || p.mapa.vagos)) },
+    { id: "inop", rotulo: "Inoperante", on: (p.teste?.inop || 0) + (p.equip?.inop || 0) > 0 },
+    { id: "ctmk", rotulo: "CTMK off", on: !!p.sistemas?.ctmkOff },
+    { id: "energia", rotulo: "Energia", on: !!p.sistemas?.energiaAberta },
+    { id: "key", rotulo: "KeyAccess", on: (p.sistemas?.keyAbertas || 0) > 0 },
+  ];
+}
