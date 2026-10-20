@@ -248,7 +248,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       <h3>Visita · {rotuloDestino(mem, t.destino)}</h3>
       {pend.length > 0 && <div className="rd-pend"><strong>Pendente da última visita:</strong>
         {pend.map((p, i) => <p key={i}>{p.texto} <em>(desde {dataBR(p.desde)})</em>
-          <button className="rd-link" onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: p.texto, status: "finalizado", desde: p.desde }] }); setNotice("Concluído: sai da lista de pendências quando o dia for arquivado."); }}>✓ Concluir</button></p>)}
+          <button className="rd-link" onClick={() => { mudarTrecho(t.id, { atividades: [...(t.atividades || []), { texto: p.texto, status: "finalizado", desde: p.desde }] }); setNotice("Concluído: fica registrado no RD de hoje e sai dos lembretes quando o dia for arquivado. Justificativa é opcional — use as observações da visita se quiser."); }}>✓ Concluir</button></p>)}
         <p className="rd-micro">O que não for concluído continua pendente e reaparece na próxima visita.</p>
       </div>}
       {TRATATIVAS_PADRAO.map(([tag, rotulo]) => {
@@ -393,7 +393,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       </section>
       <section className="rd-card rd-pastas">
         <h2>Pastas mensais</h2>
-        <p className="rd-micro">Cada mês vai do dia {diaFechamento() + 1} ao dia {diaFechamento()} seguinte (ajustado a dia útil) e leva o nome do mês em que fecha. O RD arquivado entra sozinho na pasta do mês.</p>
+        <p className="rd-micro">Cada mês vai do dia {diaFechamento() + 1} ao dia {diaFechamento()} seguinte (sábado, domingo e feriado nacional pulam para o dia útil) e leva o nome do mês em que fecha. O RD arquivado entra sozinho na pasta do mês.</p>
         {ANOS_PASTA.map((ano) => <div key={ano} className="rd-pasta-ano">
           <button className="rd-arq-item" aria-expanded={anoAberto === ano} onClick={() => setAnoAberto(anoAberto === ano ? null : ano)}><div><strong>📁 {ano}</strong><span>{dias.filter((d) => cicloDaData(d.data, diaFechamento()).ano === ano).length} RD{dias.filter((d) => cicloDaData(d.data, diaFechamento()).ano === ano).length === 1 ? "" : "s"}</span></div><em>{anoAberto === ano ? "▾" : "▸"}</em></button>
           {anoAberto === ano && <div className="rd-dias rd-pasta-meses">
@@ -469,7 +469,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   // ── Tela 0: dia de hoje já arquivado → painel pronto para a próxima visita ──
   if (dia.estado === "fechado") return <main className={tema}>
     <header><button onClick={onBack}>← Início</button>
-      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={abrirPasta}>🗂</button></h1>
+      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={abrirPasta}>🗂</button><button className="rd-arquivo-btn rd-mes-btn" aria-label="Relatório do mês atual" title="Relatório do mês atual" onClick={() => { const c = cicloDaData(hojeISO(), diaFechamento()); setPasta({ ano: c.ano, mes: c.mes }); setAnoAberto(c.ano); setPer({ de: c.de, ate: c.ate }); abrirPasta(); }}>📅</button></h1>
       <p>{dataBR(data)} · pronto para a próxima visita</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}
@@ -484,7 +484,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   // ── Tela do dia (trabalho): os trechos em LINHA ──────────────────────────────
   return <main className={tema}>
     <header><button onClick={onBack}>← Início</button>
-      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={abrirPasta}>🗂</button></h1>
+      <h1>MK RD · Relatório Diário <button className="rd-engrenagem" aria-label="Configurar" onClick={() => setConfig(true)}>⚙</button><button className="rd-arquivo-btn" aria-label="RDs arquivados" onClick={abrirPasta}>🗂</button><button className="rd-arquivo-btn rd-mes-btn" aria-label="Relatório do mês atual" title="Relatório do mês atual" onClick={() => { const c = cicloDaData(hojeISO(), diaFechamento()); setPasta({ ano: c.ano, mes: c.mes }); setAnoAberto(c.ano); setPer({ de: c.de, ate: c.ate }); abrirPasta(); }}>📅</button></h1>
       <p>{dataBR(data)} · {aberto ? `em deslocamento para ${rotuloDestino(mem, aberto.destino)}` : `você está em ${rotuloDestino(mem, estou)}`}</p></header>
     {error && <div role="alert" className="rd-erro">{error}</div>}
     {notice && <p role="status" className="rd-aviso">{notice}</p>}

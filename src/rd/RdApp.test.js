@@ -327,3 +327,23 @@ test("pastas mensais: 2026 abre em outubro (20/09–19/10, atual); 20/10 cai em 
     expect([...host.querySelectorAll(".rd-pasta-meses button")].length).toBe(12);
   } finally { URL.createObjectURL = realCreate; clickAnchor.mockRestore(); await act(async () => root.unmount()); host.remove(); }
 });
+
+test("lembrete atravessa o mês: pendência antiga reaparece na visita e Concluir registra o fim sem justificativa; 📅 abre o mês atual", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  mockStore.ler.mockResolvedValue({ dia: null, memoria: { rotas: {}, pendencias: { MK602: [{ texto: "Conversar com a supervisão sobre o portão", desde: "2026-09-08" }] }, revisao: 3 } });
+  try {
+    await montar(host, root);
+    await clicar(host, "📅");
+    expect(host.textContent).toContain("📂 outubro de 26");
+    await clicar(host, "← Voltar ao dia");
+    await clicar(host, "MK602");
+    expect(host.textContent).toContain("Conversar com a supervisão sobre o portão");
+    expect(host.textContent).toContain("desde 08/09/2026");
+    await clicar(host, "✓ Concluir");
+    expect(host.textContent).toContain("Justificativa é opcional");
+    const draft = JSON.parse(localStorage.getItem("rd:v1:u:2026-10-15"));
+    const at = draft.dia.trechos.at(-1).atividades.find((a) => a.status === "finalizado");
+    expect(at).toMatchObject({ texto: "Conversar com a supervisão sobre o portão", desde: "2026-09-08" });
+    expect(htmlRd(draft.dia, draft.mem || {}, "m@moked")).toContain("lembrete aberto desde 08/09/2026");
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});

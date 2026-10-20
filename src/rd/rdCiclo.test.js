@@ -1,4 +1,4 @@
-import { ciclo, cicloDaData, ehUltimoDiaDoCiclo, mesesDoAno, csvDoCiclo } from "./rdCiclo";
+import { feriadosDoAno, ehDiaUtil, ciclo, cicloDaData, ehUltimoDiaDoCiclo, mesesDoAno, csvDoCiclo } from "./rdCiclo";
 
 test("outubro/26 = 20/09 (domingo → segunda 21/09) a 19/10 (segunda)", () => {
   expect(ciclo(2026, 10)).toMatchObject({ de: "2026-09-21", ate: "2026-10-19", nome: "outubro de 26", chave: "2026-10" });
@@ -26,3 +26,16 @@ test("pastas: 2026 só out–dez; 2027 os 12", () => {
 });
 test("dia de fechamento configurável", () => { expect(ciclo(2026, 10, 18)).toMatchObject({ de: "2026-09-21", ate: "2026-10-16" }); });
 test("csv", () => { expect(csvDoCiclo([{ data: "2026-10-19", trechos: 2, km: 184.5, projetos: "MK505" }])).toContain('2026-10-19;2;184,5;"MK505"'); });
+
+test("feriados nacionais: fixos e móveis (2026: Carnaval 16–17/02, Sexta Santa 03/04, Corpus Christi 04/06)", () => {
+  const f = feriadosDoAno(2026);
+  for (const d of ["2026-02-16", "2026-02-17", "2026-04-03", "2026-06-04", "2026-11-20", "2026-12-25", "2026-09-07"]) expect(f.has(d)).toBe(true);
+  expect(ehDiaUtil(new Date("2026-11-20T12:00Z"))).toBe(false);
+  expect(ehDiaUtil(new Date("2026-11-19T12:00Z"))).toBe(true);
+});
+test("feriado no dia de abrir/fechar: 20/11/2026 (Consciência Negra, sexta) → dezembro abre segunda 23/11", () => {
+  expect(ciclo(2026, 12).de).toBe("2026-11-23");
+});
+test("fechamento em feriado: dia 19 configurado como 21 → abril/27: 21/04 (Tiradentes, quarta) fecha terça 20/04", () => {
+  expect(ciclo(2027, 4, 21).ate).toBe("2027-04-20");
+});
