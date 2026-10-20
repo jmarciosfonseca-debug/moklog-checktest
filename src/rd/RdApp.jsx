@@ -10,6 +10,7 @@ import { criarRdStore } from "./rdStore";
 import { criarMarco, linkMapa } from "./rdGeo";
 import { imprimirRd } from "./rdPdf";
 import { imprimirConsolidado, consolidarPeriodo } from "./rdConsolidado";
+import { ciclo, cicloDaData, ehUltimoDiaDoCiclo, mesesDoAno, nomeMes, ANOS_PASTA, csvDoCiclo } from "./rdCiclo";
 import { comprimirFoto, novoIdFoto } from "./rdFoto";
 import {
   listarDestinos, rotuloDestino, normalizarCodigoNovo, novoIdTrecho, hojeISO, dataBR,
@@ -64,6 +65,8 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
   const [consulta, setConsulta] = useState(false);    // RD aberto pela pasta (modo leitura)
   const [per, setPer] = useState(null);               // período da pasta {de, ate}
   const [perDias, setPerDias] = useState(null);       // dias completos do período (para resumo e consolidado)
+  const [pasta, setPasta] = useState(null);           // pasta mensal aberta {ano, mes} (ciclo 20→19)
+  const [anoAberto, setAnoAberto] = useState(null);   // ano expandido na lista de pastas
   const cfgTimer = useRef(null);                      // a configuração salva sozinha (debounce)
   const tema = "rd" + (dark ? "" : " rd-claro");      // acompanha o tema do app
 
@@ -145,8 +148,9 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     setNotice(`Chegada em ${rotuloDestino(mem, t.destino)} cravada às ${horaDe(marco)}.`);
   }
 
-  const diaFechamento = () => { const d = parseInt(mem?.config?.fechamentoDia, 10); return d >= 1 && d <= 28 ? d : 18; };
-  const periodoAtual = (ate) => { const f = diaFechamento(); const fim = new Date(ate + "T12:00:00Z"); const ini = new Date(fim); if (fim.getUTCDate() <= f) ini.setUTCMonth(ini.getUTCMonth() - 1); ini.setUTCDate(f + 1); return { de: ini.toISOString().slice(0, 10), ate }; };
+  const diaFechamento = () => { const d = parseInt(mem?.config?.fechamentoDia, 10); return d >= 1 && d <= 28 ? d : 19; };
+  // Período = ciclo mensal (abre no dia seguinte ao fechamento, fecha no dia de fechamento, ajustado a dia útil).
+  const periodoAtual = (ate) => { const c = cicloDaData(ate, diaFechamento()); return { de: c.de, ate: c.ate }; };
   async function imprimirComFotos(d, m) {
     const ids = (d.trechos || []).flatMap((t) => [...(t.pedagios || []), ...(t.gastos || [])]).map((x) => x.fotoId).filter(Boolean);
     let fotos = {};
@@ -154,7 +158,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     imprimirRd(d, m, auth?.currentUser?.email || "", fotos);
   }
   async function fecharDia() {
-    const ultimoDoCiclo = Number(data.slice(8, 10)) === diaFechamento();
+    const ultimoDoCiclo = ehUltimoDiaDoCiclo(data, diaFechamento());
     // Confirmação do km final do dia antes de arquivar: "quilometragem final está correta?"
     const ultimoT = dia.trechos[dia.trechos.length - 1];
     const perguntaKm = ultimoT?.kmFinal != null && ultimoT.kmFinal !== "" ? `Km final do dia: ${ultimoT.kmFinal} — confere com o painel?\n\n` : "";
@@ -177,12 +181,19 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
     try { const r = await store.periodo(p.de, p.ate); setPerDias(r.dias || []); } catch { setPerDias([]); }
   };
   function abrirPasta() {
-    const p = per || periodoAtual(hojeISO());
+    const c = cicloDaData(hojeISO(), diaFechamento());
+    const p = per || { de: c.de, ate: c.ate };
+    if (!pasta) { setPasta({ ano: c.ano, mes: c.mes }); setAnoAberto(c.ano); }
     setPer(p); setArquivo(true); setConsulta(false);
     store.dias().then((d) => setDias(d.dias || [])).catch(() => {});
     carregarPeriodo(p);
   }
   const mudarPeriodo = (p) => { setPer(p); carregarPeriodo(p); };
+  const abrirMes = (ano, mes) => { const c = ciclo(ano, mes, diaFechamento()); setPasta({ ano, mes }); mudarPeriodo({ de: c.de, ate: c.ate }); };
+  const baixarCsv = (nome, linhas) => {
+    const blob = new Blob([csvDoCiclo(linhas)], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
   const atalhos = () => {
     const h = hojeISO();
     const d7 = new Date(h + "T12:00:00Z"); d7.setUTCDate(d7.getUTCDate() - 6);
@@ -380,9 +391,24 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
         {perDias === null && <p className="rd-micro">Calculando o período…</p>}
         <button className="rd-principal" disabled={busy || !perDias || !perDias.length} onClick={() => run(async () => { imprimirConsolidado(perDias, mem, auth?.currentUser?.email || ""); })}>Gerar consolidado do período (PDF)</button>
       </section>
+      <section className="rd-card rd-pastas">
+        <h2>Pastas mensais</h2>
+        <p className="rd-micro">Cada mês vai do dia {diaFechamento() + 1} ao dia {diaFechamento()} seguinte (ajustado a dia útil) e leva o nome do mês em que fecha. O RD arquivado entra sozinho na pasta do mês.</p>
+        {ANOS_PASTA.map((ano) => <div key={ano} className="rd-pasta-ano">
+          <button className="rd-arq-item" aria-expanded={anoAberto === ano} onClick={() => setAnoAberto(anoAberto === ano ? null : ano)}><div><strong>📁 {ano}</strong><span>{dias.filter((d) => cicloDaData(d.data, diaFechamento()).ano === ano).length} RD{dias.filter((d) => cicloDaData(d.data, diaFechamento()).ano === ano).length === 1 ? "" : "s"}</span></div><em>{anoAberto === ano ? "▾" : "▸"}</em></button>
+          {anoAberto === ano && <div className="rd-dias rd-pasta-meses">
+            {mesesDoAno(ano).map((mes) => { const c = ciclo(ano, mes, diaFechamento()); const n = dias.filter((d) => cicloDaData(d.data, diaFechamento()).chave === c.chave).length; const atual = cicloDaData(hojeISO(), diaFechamento()).chave === c.chave;
+              return <button key={mes} aria-pressed={pasta?.ano === ano && pasta?.mes === mes} onClick={() => abrirMes(ano, mes)}>{nomeMes(mes)}{n ? ` (${n})` : ""}{atual ? " · atual" : ""}</button>; })}
+          </div>}
+        </div>)}
+      </section>
       <section className="rd-card">
+        {pasta && (() => { const c = ciclo(pasta.ano, pasta.mes, diaFechamento()); const lista = dias.filter((d) => cicloDaData(d.data, diaFechamento()).chave === c.chave);
+          return <div className="rd-pasta-cab"><div><strong>📂 {c.nome}</strong><span>{dataBR(c.de)} a {dataBR(c.ate)} · {lista.length} RD{lista.length === 1 ? "" : "s"}</span></div>
+            <button className="rd-link" disabled={!lista.length} onClick={() => baixarCsv(`RD_${c.chave}.csv`, lista.map((d) => ({ data: d.data, trechos: d.trechos, km: infoDia[d.data]?.km ?? "", projetos: infoDia[d.data]?.projetos || "" })))}>⬇ Exportar (CSV)</button></div>; })()}
         {dias.length === 0 && <p className="rd-micro">Nenhum RD ainda. Feche um dia com "Salvar e arquivar" e ele aparece aqui.</p>}
-        {dias.map((d) => <div key={d.data} className="rd-arq-linha">
+        {pasta && dias.length > 0 && !dias.some((d) => cicloDaData(d.data, diaFechamento()).chave === ciclo(pasta.ano, pasta.mes, diaFechamento()).chave) && <p className="rd-micro">Nenhum RD nesta pasta.</p>}
+        {dias.filter((d) => !pasta || cicloDaData(d.data, diaFechamento()).chave === ciclo(pasta.ano, pasta.mes, diaFechamento()).chave).map((d) => <div key={d.data} className="rd-arq-linha">
           <button className="rd-arq-item" onClick={() => { setData(d.data); setConsulta(true); setArquivo(false); setEditTrecho(null); }}>
             <div><strong>{dataBR(d.data)}</strong><span>{d.trechos} trecho{d.trechos === 1 ? "" : "s"}{infoDia[d.data] ? ` · ${kmFmt(infoDia[d.data].km)}${infoDia[d.data].projetos ? ` · ${infoDia[d.data].projetos}` : ""}` : ""}</span></div>
             <em className={d.estado === "fechado" ? "ok" : "andamento"}>{d.estado === "fechado" ? "✓ Arquivado" : "Em aberto"}</em>
@@ -413,7 +439,7 @@ export default function RdApp({ auth, onBack, dark = true, criarMarcoFn = criarM
       </div>
       <div className="rd-linha">
         <label>Diária (R$)<input inputMode="decimal" value={mem?.config?.valorDiaria ?? ""} onChange={(e) => mudarConfig({ valorDiaria: e.target.value })} /></label>
-        <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 18} onChange={(e) => mudarConfig({ fechamentoDia: e.target.value })} /></label>
+        <label>Dia do fechamento<input inputMode="numeric" value={mem?.config?.fechamentoDia ?? 19} onChange={(e) => mudarConfig({ fechamentoDia: e.target.value })} /></label>
       </div>
       <p className="rd-micro">Os valores salvam sozinhos ao digitar. Nesta fase de teste a configuração é sua; na evolução, só a gerência Moked edita.</p>
     </section>
