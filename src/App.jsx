@@ -27,7 +27,7 @@ import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp } from "./Il
 import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
 import RondaDiaria from "./RondaDiaria";
-import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE } from "./AnaliseRisco";
+import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE, calcularRiscoProjeto } from "./AnaliseRisco";
 import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
 import { montarHTMLExecutivo } from "./relatorios/executivoRelatorio";
@@ -4280,7 +4280,10 @@ export default function App(){
       />
     </ErrorBoundary>
   );
-  if(screen==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} onBack={()=>setScreen("home")}/>;
+  if(screen==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
+    abrirPDF={async (pid,rep)=>{ const proj=PROJECTS[pid]; const c=ctmkData[pid]; const idade=c?.status==="offline"?ctmkOfflineIdade(c.offlineSince):null; const ctmkInfo=c?{status:c.status,days:idade?idade.dias:null,offlineLabel:idade?idade.label:null}:undefined;
+      const [i,e,f]=await Promise.all([loadInquilinosParaPDF(pid),loadEnergiaResumoParaPDF(pid),loadFollowups(db,pid).catch(()=>({}))]); await generatePDF(proj,rep.state,rep.meta,[],ctmkInfo,i,e,f); }}
+    onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
