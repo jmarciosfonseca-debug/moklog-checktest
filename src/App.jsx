@@ -35,6 +35,7 @@ import { itensDoEstado, falhasPorSistema } from "./relatorios/metricas";
 import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
 import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
 import PainelCliente from "./cliente/PainelCliente";
+import Entrada from "./entrada/Entrada";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 const RdApp=React.lazy(()=>import("./rd/RdApp"));
@@ -3521,6 +3522,8 @@ function DemoBanner(){
 
 export default function App(){
   const [screen,setScreen]=useState("home");
+  // Porta de entrada Moked: "entrada" (logo → vídeo → áreas) | "moklog" (app atual) | "cliente" (Área do Cliente)
+  const [portal,setPortal]=useState("entrada");
   const [,setSessionRevision]=useState(0);
   // ── Auth anônimo: acompanha se o crachá já chegou. NÃO bloqueia a UI
   // (failsafe): se demorar/falhar, o app segue — a regra ainda é `if true`.
@@ -4149,6 +4152,11 @@ export default function App(){
     </>
   );
 
+  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog") setPortal("moklog"); }}/>;
+  if(portal==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
+    abrirPDF={async (pid,rep)=>{ const proj=PROJECTS[pid]; const c=ctmkData[pid]; const idade=c?.status==="offline"?ctmkOfflineIdade(c.offlineSince):null; const ctmkInfo=c?{status:c.status,days:idade?idade.dias:null,offlineLabel:idade?idade.label:null}:undefined;
+      const [i,e,f]=await Promise.all([loadInquilinosParaPDF(pid),loadEnergiaResumoParaPDF(pid),loadFollowups(db,pid).catch(()=>({}))]); await generatePDF(proj,rep.state,rep.meta,[],ctmkInfo,i,e,f); }}
+    onBack={()=>setPortal("entrada")}/>;
   if(showAcesso) return <ErrorBoundary moduleName="Acesso Transportadoras"><AcessoApp initialScreen={acessoScreen} dark={dark} onToggleTheme={()=>setDark(!dark)} onBack={()=>{setShowAcesso(false);setAcessoScreen("menu");}}/></ErrorBoundary>;
   if(showRd) return <ErrorBoundary moduleName="MK RD"><React.Suspense fallback={<p style={{color:"#94a3b8",padding:20}}>Abrindo o MK RD…</p>}><RdApp auth={auth} dark={dark} onBack={()=>setShowRd(false)}/></React.Suspense></ErrorBoundary>;
   if(showDiagnostico) return <ErrorBoundary moduleName="Diagnóstico Situacional"><DiagnosticoSituacional auth={auth} db={db} dark={dark} onToggleTheme={()=>setDark(!dark)} projects={PROJECTS} projectGroups={{golgi:["P601","P602","P604","P605","P606","P607"],mega:["P311A","P311B"],klog:["P505"]}} onBack={()=>setShowDiagnostico(false)}/></ErrorBoundary>;
@@ -4280,10 +4288,6 @@ export default function App(){
       />
     </ErrorBoundary>
   );
-  if(screen==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
-    abrirPDF={async (pid,rep)=>{ const proj=PROJECTS[pid]; const c=ctmkData[pid]; const idade=c?.status==="offline"?ctmkOfflineIdade(c.offlineSince):null; const ctmkInfo=c?{status:c.status,days:idade?idade.dias:null,offlineLabel:idade?idade.label:null}:undefined;
-      const [i,e,f]=await Promise.all([loadInquilinosParaPDF(pid),loadEnergiaResumoParaPDF(pid),loadFollowups(db,pid).catch(()=>({}))]); await generatePDF(proj,rep.state,rep.meta,[],ctmkInfo,i,e,f); }}
-    onBack={()=>setScreen("home")}/>;
   if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
@@ -4744,13 +4748,12 @@ export default function App(){
             <div style={{fontSize:11,color:T.sub,marginTop:1}}>Sistema de Teste Semanal de Seguranca</div>
           </div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:8,marginBottom:10}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
           <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[239,68,68]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
           <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[204,34,34]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
             {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
           </TopoBtn>
           <TopoBtn arq="painel" fb="grafico" label="Painel" cor={[56,189,248]} aria="Abrir painel gerencial" onClick={()=>setScreen("dashboard")}/>
-          <TopoBtn arq="cliente" fb="usuario" label="Cliente" cor={[34,197,94]} aria="Abrir painel do cliente" onClick={()=>setScreen("cliente")}/>
           <button onClick={()=>setDark(!dark)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 4px 6px",borderRadius:14,cursor:"pointer",color:"#e2e8f0",fontSize:11,fontWeight:700,background:"radial-gradient(120% 130% at 50% 0%, rgba(165,180,252,.2), rgba(165,180,252,.03) 70%), #0a1322",border:"1px solid rgba(165,180,252,.38)",boxShadow:"0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)"}} aria-label="Alternar tema claro/escuro"><span style={{display:"flex",width:34,height:34,alignItems:"center",justifyContent:"center"}}>{React.cloneElement(iconeTema(),{width:34,height:34})}</span><span>Tema</span></button>
         </div>
 
