@@ -74,7 +74,7 @@ function Avatar({ foto, nome, tam = 36 }) {
     : <div style={{ ...borda, background: "#2a2a31", color: "#64748b", fontSize: tam / 2.8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{ini}</div>;
 }
 const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: primeiro ? "none" : "1px solid #2a2a31" }}>{children}</div>;
-const Luzes = ({ p }) => <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 4px", borderTop: "1px solid #2a2a31", marginTop: 4 }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div>;
+const Luzes = ({ p }) => <div style={{ borderTop: "1px solid #2a2a31", marginTop: 4 }}><div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 2px" }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div><div style={{ ...C.micro, textAlign: "center", fontSize: 9 }}>Luzes de aviso: acesa = atenção · apagada = normal</div></div>;
 
 // ── Parque ────────────────────────────────────────────────────────────────────
 function MostradorRisco({ risco, tam = 180 }) {
@@ -142,9 +142,9 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     <div style={C.card}>
       <div style={C.titulo}>Progressos</div>
       <div style={C.grid2}>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("treino")} aria-label="Abrir treinamentos"><Anel valor={p.equipe.treinadosPct} rotulo="Treinamentos" sub={p.equipe.ultimosTreinos.length ? `último ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("equip")} aria-label="Abrir equipamentos"><Anel valor={p.equip.pct} rotulo="Equip. de plantão" sub={`${p.equip.total} itens · ${p.equip.inop} inop`} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, gridColumn: "1 / -1" }} onClick={() => onAbrir("sistemas")} aria-label="Abrir sistemas"><Anel valor={s.score360} rotulo="Sistemas · 360" sub={`CTMK ${s.ctmkOff ? "off-line" : "on-line"} · iluminação ${s.ilumPct === null ? "—" : s.ilumPct + "%"} · energia ${s.quedas7d} queda${s.quedas7d === 1 ? "" : "s"}/7d`} /></button>
+        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("treino")} aria-label="Abrir treinamentos"><Anel valor={p.equipe.treinoIndicePct !== null ? p.equipe.treinoIndicePct : p.equipe.treinadosPct} rotulo="Treinamentos" sub={p.equipe.treinoIndicePct !== null ? `obrigatórios concluídos · ${p.equipe.treinadosPct ?? 0}% com registro` : (p.equipe.ultimosTreinos.length ? `último ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro")} /></button>
+        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("equip")} aria-label="Abrir equipamentos"><Anel valor={p.equip.pct} rotulo="Equipamentos" sub={`${p.equip.total} itens · ${p.equip.inop} inop`} /></button>
+        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, gridColumn: "1 / -1" }} onClick={() => onAbrir("sistemas")} aria-label="Abrir sistemas"><Anel valor={s.score360} rotulo="Sistemas · 360" sub={`CTMK ${s.ctmkOff ? `off-line há ${s.ctmkDias}d` : s.ctmkOnlineDias !== null ? `on-line há ${s.ctmkOnlineDias}d` : "on-line"} · iluminação ${s.ilumPct === null ? "—" : s.ilumPct + "%"} · energia ${s.quedas7d} queda${s.quedas7d === 1 ? "" : "s"}/7d`} /></button>
       </div>
       <Luzes p={p} />
     </div>
@@ -158,19 +158,27 @@ function Abas({ abas, atual, onMudar }) {
 
 function Detalhe({ p, tipo, onBack, abrirPDF }) {
   const s = p.sistemas;
-  const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false);
+  const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false), [verEntradas, setVerEntradas] = useState(false), [aberto, setAberto] = useState({}), [maisTestes, setMaisTestes] = useState(false);
+  const alternar = (k) => setAberto((a) => ({ ...a, [k]: !a[k] }));
+  const Seta = ({ on }) => <span style={{ color: "#9ca3af", fontSize: 11 }}>{on ? "▴" : "▾"}</span>;
   const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias", fotos: "Fotos · treinamentos" }[tipo];
   const vig = turnoVigente(p.pid, new Date());
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><button style={C.back} onClick={onBack}>← {p.nome}</button><div style={{ ...C.titulo, marginBottom: 0 }}>{titulo}</div></div>
 
     {tipo === "teste" && <div style={C.card}>
-      <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `teste de ${fmtD(p.teste.data)}` : "sem teste"} />
-      <div style={{ ...C.micro, marginBottom: 6 }}>Toque num teste para abrir o relatório (PDF).</div>
-      {p.historico.length === 0 && <div style={C.micro}>Nenhum teste registrado.</div>}
-      {p.historico.map((r, i) => <button key={r.idx} aria-label={`Abrir teste de ${fmtD(r.data)}`} onClick={() => abrirPDF && abrirPDF(p.pid, r.report)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}>
+      <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `último teste · ${fmtD(p.teste.data)}` : "sem teste"} />
+      {p.historico[0] && <button aria-label={`Abrir teste de ${fmtD(p.historico[0].data)}`} onClick={() => abrirPDF && abrirPDF(p.pid, p.historico[0].report)} style={{ width: "100%", background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "10px 12px", fontWeight: 900, letterSpacing: 1, cursor: "pointer", clipPath: "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)", marginBottom: 10 }}>ABRIR RELATÓRIO DO ÚLTIMO TESTE (PDF)</button>}
+      <div style={C.titulo}>O que está puxando a nota para baixo</div>
+      {p.pendencias.length === 0 && <div style={C.micro}>Nada: todos os sistemas operantes no último teste.</div>}
+      {p.pendencias.slice(0, aberto.pend ? 100 : 5).map((x, i) => <Linha key={i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: x.status === "inop" ? VERMELHO2 : AMARELO, boxShadow: `0 0 8px ${x.status === "inop" ? VERMELHO2 : AMARELO}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{x.cat}{x.item ? ` — ${x.item}` : ""}</div><div style={C.micro}>{x.status === "inop" ? "Inoperante" : "Parcial"}{x.since ? ` · desde ${fmtD(x.since)}` : ""}{x.note ? ` · ${x.note}` : ""}</div></div></Linha>)}
+      {p.pendencias.length > 5 && <button style={{ ...C.back, marginTop: 6 }} onClick={() => alternar("pend")}>{aberto.pend ? "▴ Mostrar só os 5 primeiros" : `▾ Ver mais ${p.pendencias.length - 5}`}</button>}
+      <div style={{ ...C.titulo, marginTop: 14 }}>Testes anteriores</div>
+      {p.historico.length <= 1 && <div style={C.micro}>Nenhum teste anterior.</div>}
+      {p.historico.slice(1, maisTestes ? 100 : 4).map((r, i) => <button key={r.idx} aria-label={`Abrir teste de ${fmtD(r.data)}`} onClick={() => abrirPDF && abrirPDF(p.pid, r.report)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: corDe(r.pct), boxShadow: `0 0 8px ${corDe(r.pct)}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>Teste de {fmtD(r.data)}</div><div style={C.micro}>{r.pct === null ? "—" : `${r.pct}% dos sistemas operantes`}</div></div><span style={C.chip(VERMELHO2)}>PDF ›</span>
       </Linha></button>)}
+      {p.historico.length > 4 && <button style={{ ...C.back, marginTop: 6 }} onClick={() => setMaisTestes((v) => !v)}>{maisTestes ? "▴ Mostrar só os 3 últimos" : `▾ Ver mais ${p.historico.length - 4} testes`}</button>}
     </div>}
 
     {tipo === "risco" && <div style={C.card}>
@@ -178,7 +186,16 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       {!p.risco && <div style={C.micro}>Análise de risco indisponível para este parque.</div>}
       {p.risco && <>
         <div style={{ fontSize: 12, marginBottom: 6 }}>{p.risco.motivo}</div>
-        {p.risco.vetores.map((v, i) => <Linha key={i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: COR_RISCO[v.nivel] || CINZA, boxShadow: `0 0 8px ${COR_RISCO[v.nivel] || CINZA}` }} /><div style={{ flex: 1, fontSize: 12 }}>{v.label}</div><span style={C.chip(COR_RISCO[v.nivel] || CINZA)}>{NIVEL_LABEL[v.nivel] || ""}</span></Linha>)}
+        <div style={{ ...C.micro, marginBottom: 4 }}>Toque num item para ver o detalhe.</div>
+        {p.risco.vetores.map((v, i) => <div key={i}>
+          <button aria-label={`Detalhe: ${v.label}`} onClick={() => alternar("v" + i)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: COR_RISCO[v.nivel] || CINZA, boxShadow: `0 0 8px ${COR_RISCO[v.nivel] || CINZA}` }} /><div style={{ flex: 1, fontSize: 12, fontWeight: 700 }}>{v.label}</div><span style={C.chip(COR_RISCO[v.nivel] || CINZA)}>{NIVEL_LABEL[v.nivel] || ""}</span><Seta on={aberto["v" + i]} /></Linha></button>
+          {aberto["v" + i] && <div style={{ margin: "0 0 8px 20px", padding: "8px 10px", background: "#15151a", borderLeft: `2px solid ${COR_RISCO[v.nivel] || CINZA}`, fontSize: 11.5, color: "#d1d5db" }}>
+            {(v.inop !== null && v.inop !== undefined) && <div><b>{v.inop}</b>{v.total ? ` de ${v.total}` : ""} inoperante{v.inop === 1 ? "" : "s"}{v.piorDias !== null && v.piorDias !== undefined ? ` · há ${v.piorDias} dia${v.piorDias === 1 ? "" : "s"}` : ""}</div>}
+            {v.detalhe && <div style={{ marginTop: 3, color: "#9ca3af" }}>{v.detalhe}</div>}
+            {v.note && <div style={{ marginTop: 3, color: "#9ca3af" }}>Obs.: {v.note}</div>}
+            {!v.detalhe && (v.inop === null || v.inop === undefined) && <div style={{ color: "#9ca3af" }}>Sem detalhe adicional registrado.</div>}
+          </div>}
+        </div>)}
         {p.risco.faltantes.length > 0 && <div style={{ ...C.micro, marginTop: 8 }}>Sem dados de: {p.risco.faltantes.join(", ")}</div>}
       </>}
     </div>}
@@ -197,14 +214,15 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
     </>}
 
     {tipo === "turnover" && <div style={C.card}>
-      <Mostrador valor={p.equipe.turnover} max={50} invertido rotulo="Turnover 12 m" cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="saídas ÷ efetivo médio · 12 meses" />
+      <Mostrador valor={p.equipe.turnover} max={50} invertido rotulo="Turnover 12 m" cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="saídas ÷ efetivo médio · últimos 12 meses" />
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
         <tbody>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Quantos temos hoje</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #1f2127" }}>{p.equipe.ativos}</td></tr>
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Quantos temos hoje</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #2a2a31" }}>{p.equipe.ativos}</td></tr>
           {Object.entries(p.equipe.porCargo).map(([c, n]) => <tr key={c}><td style={{ padding: "3px 0 3px 12px", color: "#9ca3af" }}>{c}</td><td style={{ textAlign: "right", color: "#9ca3af" }}>{n}</td></tr>)}
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Entraram (12 m)</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #1f2127", color: VERDE }}>{p.equipe.entradas12m}</td></tr>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Saíram (12 m)</td><td style={{ textAlign: "right", borderTop: "1px solid #1f2127" }}><button aria-label="Ver quem saiu" onClick={() => setVerSaidas((v) => !v)} style={{ ...C.back, color: VERMELHO2, fontWeight: 900 }}>{p.equipe.saidas12m} {verSaidas ? "▴" : "▾ ver quem"}</button></td></tr>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #1f2127" }}>Total de desligamentos registrados</td><td style={{ textAlign: "right", borderTop: "1px solid #1f2127", color: "#9ca3af" }}>{p.desligados.length}</td></tr>
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Entraram nos últimos 12 meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem entrou" onClick={() => setVerEntradas((v) => !v)} style={{ ...C.back, color: VERDE, fontWeight: 900 }}>{p.equipe.entradas12m} {verEntradas ? "▴" : "▾ ver quem"}</button></td></tr>
+          {verEntradas && <tr><td colSpan={2} style={{ padding: "4px 0 8px 12px", color: "#9ca3af", fontSize: 11.5 }}>{p.equipe.entradas12mLista.length ? p.equipe.entradas12mLista.map((c) => `${c.nome} (${c.cargo || "—"}, desde ${fmtD(c.desde)})`).join(" · ") : "Ninguém admitido no período."}</td></tr>}
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Saíram nos últimos 12 meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem saiu" onClick={() => setVerSaidas((v) => !v)} style={{ ...C.back, color: VERMELHO2, fontWeight: 900 }}>{p.equipe.saidas12m} {verSaidas ? "▴" : "▾ ver quem"}</button></td></tr>
+          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Total de desligamentos registrados</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31", color: "#9ca3af" }}>{p.desligados.length}</td></tr>
         </tbody>
       </table>
       {verSaidas && <div style={{ marginTop: 8 }}>
@@ -223,7 +241,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
     </div>}
 
     {tipo === "treino" && <div style={C.card}>
-      <div style={{ ...C.micro, marginBottom: 8 }}>{p.equipe.treinadosPct === null ? "" : `${p.equipe.treinadosPct}% da equipe com treinamento registrado · `}{p.equipe.ultimosTreinos.length ? `último em ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"}. Toque num colaborador para ver os treinamentos dele.</div>
+      <div style={{ ...C.micro, marginBottom: 8 }}>{p.equipe.treinoIndicePct !== null ? `Obrigatórios concluídos: ${p.equipe.treinoIndicePct}% · ` : ""}{p.equipe.treinadosPct === null ? "" : `${p.equipe.treinadosPct}% da equipe com treinamento aplicado · `}{p.equipe.ultimosTreinos.length ? `último em ${fmtD(p.equipe.ultimosTreinos[0].data)}` : "sem registro"}{p.equipe.naoAplicados ? ` · ${p.equipe.naoAplicados} registro${p.equipe.naoAplicados === 1 ? "" : "s"} "não aplicado" (não contam)` : ""}. Toque num colaborador para ver os treinamentos dele.</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         {p.colabs.map((c) => <button key={c.id} aria-pressed={sel === c.id} aria-label={`Treinamentos de ${c.nome}`} onClick={() => setSel(sel === c.id ? null : c.id)} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", textAlign: "center", width: 54, opacity: sel && sel !== c.id ? .45 : 1 }}>
           <div style={{ display: "inline-block", outline: sel === c.id ? "2px solid #FF1E27" : "none", outlineOffset: 2 }}><Avatar foto={c.foto} nome={c.nome} tam={44} /></div>
@@ -234,7 +252,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       {(() => { const c = p.colabs.find((x) => x.id === sel); if (!c) return null; const ts = (p.equipeDoc.colaboradores || []).find((x) => x.id === sel)?.historico?.filter((h) => h && h.tipo === "Treinamento").sort((a, b) => String(b.data || "").localeCompare(String(a.data || ""))) || [];
         return <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}><Avatar foto={c.foto} nome={c.nome} tam={48} /><div><div style={{ fontSize: 13, fontWeight: 800 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.desde ? ` · desde ${fmtD(c.desde)}` : ""}</div></div></div>
           {ts.length === 0 && <div style={C.micro}>Sem treinamento registrado.</div>}
-          {ts.map((t, i) => <Linha key={t.id || i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: VERDE, boxShadow: `0 0 8px ${VERDE}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)}</div></div></Linha>)}
+          {ts.map((t, i) => { const na = /n[ãa]o\s+(aplicad|realizad|conclu)/i.test(`${t.detalhe || ""} ${t.label || ""}`); return <Linha key={t.id || i} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: na ? VERMELHO2 : VERDE, boxShadow: `0 0 8px ${na ? VERMELHO2 : VERDE}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)}{na ? " · NÃO APLICADO — não conta como treinado" : ""}</div></div></Linha>; })}
         </div>; })()}
       {!sel && <div style={{ borderTop: "1px solid #2a2a31", paddingTop: 8 }}><div style={C.titulo}>Últimos treinamentos</div>{p.equipe.ultimosTreinos.slice(0, 5).map((t, i) => <Linha key={i} primeiro={i === 0}><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t.detalhe || t.label || "Treinamento"}</div><div style={C.micro}>{fmtD(t.data)} · {t.colabNome}</div></div></Linha>)}</div>}
     </div>}
@@ -256,12 +274,20 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
     </div>}
     {tipo === "sistemas" && <div style={C.card}>
       {s.score360 !== null && <Mostrador valor={s.score360} rotulo="Visão 360" sub="nota do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} />}
-      {[["CTMK (central)", s.ctmkOff ? `OFF-LINE há ${s.ctmkDias} dia${s.ctmkDias === 1 ? "" : "s"}` : "on-line", s.ctmkOff ? VERMELHO2 : VERDE],
-        ["KeyAccess", s.keyAbertas ? `${s.keyAbertas} falha${s.keyAbertas === 1 ? "" : "s"} em aberto` : "sem falhas abertas", s.keyAbertas ? VERMELHO2 : VERDE],
-        ["Iluminação", s.ilumTotal ? `${s.ilumDef} deficientes de ${s.ilumTotal} (${s.ilumPct}% ok)` : "sem dados", s.ilumTotal ? corDe(s.ilumPct) : CINZA],
-        ["Energia", `${s.quedas7d} queda${s.quedas7d === 1 ? "" : "s"} em 7 dias${s.energiaAberta ? " · ocorrência em aberto" : ""}`, s.energiaAberta ? VERMELHO2 : s.quedas7d ? AMARELO : VERDE],
-        ["Perimetral", s.perimetralZonasRuins ? `${s.perimetralZonasRuins} zona${s.perimetralZonasRuins === 1 ? "" : "s"} com problema` : "zonas ok", s.perimetralZonasRuins ? VERMELHO2 : VERDE],
-      ].map(([r, v, c], i) => <Linha key={r} primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{r}</div><div style={C.micro}>{v}</div></div></Linha>)}
+      <div style={{ ...C.micro, marginBottom: 4 }}>Toque numa linha para ver o detalhe.</div>
+      {[["ctmk", "CTMK (central)", s.ctmkOff ? `OFF-LINE há ${s.ctmkDias} dia${s.ctmkDias === 1 ? "" : "s"}` : s.ctmkOnlineDias !== null ? `on-line há ${s.ctmkOnlineDias} dia${s.ctmkOnlineDias === 1 ? "" : "s"}` : "on-line", s.ctmkOff ? VERMELHO2 : VERDE,
+          s.ctmkOff ? `Sem comunicação com a central desde ${s.ctmkDias} dia${s.ctmkDias === 1 ? "" : "s"}.` : s.ctmkOnlineDesde ? `Restabelecida em ${fmtD(String(s.ctmkOnlineDesde).slice(0, 10))}.` : "Sem registro de queda."],
+        ["key", "KeyAccess", s.keyAbertas ? `${s.keyAbertas} falha${s.keyAbertas === 1 ? "" : "s"} em aberto` : "sem falhas abertas", s.keyAbertas ? VERMELHO2 : VERDE,
+          s.keyFalhas.length ? s.keyFalhas.map((f) => `${f.data ? fmtD(f.data) : ""}${f.hora ? ` ${f.hora}` : ""}${f.local ? ` · ${f.local}` : ""}`).join("\n") : "Nenhuma falha em aberto."],
+        ["ilum", "Iluminação", s.ilumTotal ? `${s.ilumDef} deficientes de ${s.ilumTotal} (${s.ilumPct}% ok)` : "sem dados", s.ilumTotal ? corDe(s.ilumPct) : CINZA,
+          s.quadrantes.length ? s.quadrantes.map((q) => `${q.nome || "Quadrante"}: ${q.total - q.deficientes}/${q.total} ok${q.deficientes ? ` · ${q.deficientes} deficiente${q.deficientes === 1 ? "" : "s"}` : ""}`).join("\n") : "Sem registro de iluminação."],
+        ["energia", "Energia", `${s.quedas7d} queda${s.quedas7d === 1 ? "" : "s"} em 7 dias${s.energiaAberta ? " · ocorrência em aberto" : ""}`, s.energiaAberta ? VERMELHO2 : s.quedas7d ? AMARELO : VERDE,
+          s.eventosEnergia.length ? s.eventosEnergia.map((e) => `${fmtD(String(e.inicio).slice(0, 10))} ${String(e.inicio).slice(11, 16)}${e.fim ? ` → ${String(e.fim).slice(11, 16)}` : ""} · ${e.concluido ? "concluída" : "EM ABERTO"}${e.obs ? ` · ${e.obs}` : ""}`).join("\n") : "Sem ocorrências registradas."],
+        ["peri", "Perimetral", s.perimetralZonasRuins ? `${s.perimetralZonasRuins} zona${s.perimetralZonasRuins === 1 ? "" : "s"} com problema` : "zonas ok", s.perimetralZonasRuins ? VERMELHO2 : VERDE, "Zonas do teste perimetral com falha no último teste. O detalhe por zona está no relatório perimetral."],
+      ].map(([k, r, v, c, det], i) => <div key={k}>
+        <button aria-label={`Detalhe: ${r}`} onClick={() => alternar(k)} style={{ width: "100%", background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}><Linha primeiro={i === 0}><span style={{ width: 10, height: 10, borderRadius: "50%", background: c, boxShadow: `0 0 8px ${c}` }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{r}</div><div style={C.micro}>{v}</div></div><Seta on={aberto[k]} /></Linha></button>
+        {aberto[k] && <div style={{ margin: "0 0 8px 20px", padding: "8px 10px", background: "#15151a", borderLeft: `2px solid ${c}`, fontSize: 11.5, color: "#d1d5db", whiteSpace: "pre-line" }}>{det}</div>}
+      </div>)}
       {s.vulnerabilidades.length > 0 && <div style={{ ...C.micro, marginTop: 8 }}>Vulnerabilidades: {s.vulnerabilidades.join(" · ")}</div>}
     </div>}
   </>;

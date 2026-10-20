@@ -35,17 +35,21 @@ export function equipeResumo(equipe, hojeISO, catalogo = []) {
   const tempos = ativos.map((c) => (c.dataContratacao && /^\d{4}-\d{2}-\d{2}$/.test(c.dataContratacao) ? diasEntre(c.dataContratacao, hojeISO) : null)).filter((d) => d !== null && d >= 0);
   const tempoMedioMeses = tempos.length ? Math.round(tempos.reduce((a, b) => a + b, 0) / tempos.length / 30.4) : null;
   const porCargo = {}; ativos.forEach((c) => { const k = c.cargo || "Sem cargo"; porCargo[k] = (porCargo[k] || 0) + 1; });
-  const comTreino = ativos.filter((c) => (c.historico || []).some((x) => x && x.tipo === "Treinamento")).length;
+  // "Não aplicado" / "não realizado" lançado como Treinamento é registro de ausência: não conta como treinado.
+  const aplicado = (x) => x && x.tipo === "Treinamento" && !/n[ãa]o\s+(aplicad|realizad|concluíd|conclu[ií]d)/i.test(`${x.detalhe || ""} ${x.label || ""}`);
+  const comTreino = ativos.filter((c) => (c.historico || []).some(aplicado)).length;
   let treinoPct = null; try { const v = ativos.map((c) => calcularTreinamento(c, catalogo, hojeISO)).filter((x) => typeof x === "number"); treinoPct = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; } catch { treinoPct = null; }
-  const todosTreinos = ordenarHistorico(ativos.flatMap((c) => (c.historico || []).filter((x) => x && x.tipo === "Treinamento").map((x) => ({ ...x, colabNome: c.nome, colabId: c.id })))).reverse();
-  const ultimosTreinos = todosTreinos.slice(0, 12);
+  const todosTreinos = ordenarHistorico(ativos.flatMap((c) => (c.historico || []).filter((x) => x && x.tipo === "Treinamento").map((x) => ({ ...x, colabNome: c.nome, colabId: c.id, aplicado: aplicado(x) })))).reverse();
+  const ultimosTreinos = todosTreinos.filter((x) => x.aplicado).slice(0, 12);
+  const naoAplicados = todosTreinos.filter((x) => !x.aplicado).length;
+  const entradas12m = (() => { const ini = new Date(hojeISO + "T12:00:00Z"); ini.setUTCFullYear(ini.getUTCFullYear() - 1); const i = ini.toISOString().slice(0, 10); return ativos.filter((c) => c.dataContratacao && c.dataContratacao >= i && c.dataContratacao <= hojeISO).map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, desde: c.dataContratacao })); })();
   const evidencias = todosTreinos.filter((x) => x.fotoRef).slice(0, 30); // galeria: só treinamentos com foto
   return {
     ativos: ativos.length, porCargo, tempoMedioMeses,
     turnover: est && est.turnover !== null ? Math.round(est.turnover * 10) / 10 : null,
     turnoverMotivo: est ? est.motivoNaoAferido : "sem dados",
     entradas12m: est ? est.entradas12m : 0, saidas12m: est ? est.desligados12m : 0,
-    treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, ultimosTreinos, evidencias,
+    treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, ultimosTreinos, evidencias, naoAplicados, entradas12mLista: entradas12m,
   };
 }
 
@@ -98,8 +102,13 @@ export function sistemasResumo({ ctmk, keyaccess, iluminacao, energia, perimetra
   const energiaAberta = eventos.some((e) => e && !e.concluido);
   const ctmkOff = ctmk?.status === "offline";
   const ctmkDias = ctmkOff && ctmk.offlineSince ? Math.max(0, Math.floor((agoraMs - new Date(ctmk.offlineSince).getTime()) / 86400000)) : 0;
+  const ctmkOnlineDesde = !ctmkOff && ctmk?.lastOfflinePeriod?.to ? ctmk.lastOfflinePeriod.to : null;
+  const ctmkOnlineDias = ctmkOnlineDesde ? Math.max(0, Math.floor((agoraMs - new Date(ctmkOnlineDesde).getTime()) / 86400000)) : null;
+  const quadrantes = quads.map((q) => ({ nome: q.nome || q.id || "", total: Number(q.total) || 0, deficientes: Number(q.deficientes) || 0 }));
+  const eventosEnergia = eventos.filter((e) => e && e.inicioQueda).sort((a, b) => String(b.inicioQueda).localeCompare(String(a.inicioQueda))).slice(0, 5).map((e) => ({ inicio: e.inicioQueda, fim: e.fimQueda || e.retorno || null, concluido: !!e.concluido, obs: e.descricao || e.obs || "" }));
+  const keyFalhas = (keyaccess?.registros || []).filter((r) => r && !r.horaFim).slice(0, 8).map((r) => ({ data: r.data || "", hora: r.horaInicio || r.hora || "", local: r.local || r.portao || r.descricao || "" }));
   return {
-    ctmkOff, ctmkDias, keyAbertas, ilumTotal, ilumDef, ilumPct: ilumTotal ? Math.round(((ilumTotal - ilumDef) / ilumTotal) * 100) : null,
+    ctmkOff, ctmkDias, ctmkOnlineDias, ctmkOnlineDesde, keyAbertas, keyFalhas, quadrantes, eventosEnergia, ilumTotal, ilumDef, ilumPct: ilumTotal ? Math.round(((ilumTotal - ilumDef) / ilumTotal) * 100) : null,
     quedas7d, energiaAberta, perimetralZonasRuins: perimetralZonasRuins || 0,
     score360: typeof score360?.score === "number" ? Math.round(score360.score) : null, vulnerabilidades: score360?.vulnerabilidades || [],
   };
