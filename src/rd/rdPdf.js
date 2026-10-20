@@ -34,7 +34,7 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
    <section class="vis"><h3>${esc(rotuloDestino(memoria, t.destino))}</h3>
    ${(t.atividades || []).filter((a) => a.status !== "aberto").map((a) => {
     const [titulo, resto] = a.texto.includes(" — ") ? [a.texto.slice(0, a.texto.indexOf(" — ")), a.texto.slice(a.texto.indexOf(" — ") + 3)] : [null, a.texto];
-    return `<p class="at st-${a.status || "neutro"}">${a.status === "finalizado" ? "Concluído: " : ""}${titulo ? `<b>${esc(titulo)}</b> — ` : ""}${esc(resto)}</p>`;
+    return `<p class="at st-${a.status || "neutro"}">${a.status === "finalizado" ? "Concluído: " : ""}${titulo ? `<b>${esc(titulo)}</b> — ` : ""}${esc(resto)}${a.status === "finalizado" && a.desde ? ` <i>(lembrete aberto desde ${esc(dataBR(a.desde))})</i>` : ""}</p>`;
    }).join("")}
    ${t.obs ? `<p class="obs">${esc(t.obs)}</p>` : ""}</section>`).join("");
   const kmValor = memoria?.config?.valorKm;

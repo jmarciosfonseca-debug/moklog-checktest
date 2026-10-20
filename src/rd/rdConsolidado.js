@@ -86,7 +86,7 @@ export function consolidarPeriodo(dias, memoria) {
 }
 
 function resumoTrecho(t) {
-  const partes = (t.atividades || []).map((a) => (a.status === "aberto" ? "Em aberto: " : (a.status === "finalizado" ? "Concluído: " : "")) + a.texto);
+  const partes = (t.atividades || []).map((a) => (a.status === "aberto" ? "Em aberto: " : (a.status === "finalizado" ? "Concluído: " : "")) + a.texto + (a.status === "finalizado" && a.desde ? ` (aberto desde ${a.desde.slice(8, 10)}/${a.desde.slice(5, 7)})` : ""));
   if (t.obs) partes.push(t.obs);
   return partes.join(" · ");
 }

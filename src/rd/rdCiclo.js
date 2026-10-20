@@ -2,7 +2,7 @@
 // fechamento (dia 20) e fecha no dia de fechamento do mês seguinte (dia 19). O ciclo leva o nome do
 // mês em que FECHA: outubro/26 = 20/09 a 19/10. Se o dia de abrir cair em sábado/domingo, o ciclo
 // abre na segunda; se o dia de fechar cair em sábado/domingo, fecha na sexta anterior.
-// (Só fim de semana é considerado "não útil"; feriados não entram nesta fase.)
+// Dia não útil = sábado, domingo ou feriado nacional (fixos + móveis calculados pela Páscoa).
 export const FECHAMENTO_PADRAO = 19;
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 export const nomeMes = (m) => MESES[m - 1] || "";
@@ -11,6 +11,20 @@ const iso = (d) => d.toISOString().slice(0, 10);
 const utc = (a, m, dia) => new Date(Date.UTC(a, m - 1, dia, 12));
 const dow = (d) => d.getUTCDay(); // 0 dom … 6 sáb
 
+// Feriados nacionais do Brasil (ano a ano). Fixos + Carnaval (seg/ter), Sexta-feira Santa e Corpus Christi.
+const FIXOS = ["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"];
+function pascoa(ano) { // algoritmo de Meeus/Jones/Butcher
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1; return utc(ano, mes, dia);
+}
+const mais = (d, n) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x; };
+export function feriadosDoAno(ano) {
+  const p = pascoa(ano);
+  return new Set([...FIXOS.map((md) => `${ano}-${md}`), ...[-48, -47, -2, 60].map((n) => iso(mais(p, n)))]);
+}
+export const ehFeriado = (dataISO) => feriadosDoAno(+dataISO.slice(0, 4)).has(dataISO);
+export const ehDiaUtil = (d) => !(dow(d) === 0 || dow(d) === 6 || ehFeriado(iso(d)));
+
 export function diaFechamentoValido(v) { const d = parseInt(v, 10); return d >= 1 && d <= 28 ? d : FECHAMENTO_PADRAO; }
 
 // Ciclo que FECHA em (ano, mes). `f` = dia de fechamento.
@@ -18,9 +32,9 @@ export function ciclo(ano, mes, f = FECHAMENTO_PADRAO) {
   f = diaFechamentoValido(f);
   const pa = mes === 1 ? ano - 1 : ano, pm = mes === 1 ? 12 : mes - 1; // mês anterior
   const ini = utc(pa, pm, f + 1);
-  while (dow(ini) === 0 || dow(ini) === 6) ini.setUTCDate(ini.getUTCDate() + 1);
+  while (!ehDiaUtil(ini)) ini.setUTCDate(ini.getUTCDate() + 1);
   const fim = utc(ano, mes, f);
-  while (dow(fim) === 0 || dow(fim) === 6) fim.setUTCDate(fim.getUTCDate() - 1);
+  while (!ehDiaUtil(fim)) fim.setUTCDate(fim.getUTCDate() - 1);
   return { ano, mes, chave: `${ano}-${String(mes).padStart(2, "0")}`, nome: `${nomeMes(mes)} de ${String(ano).slice(2)}`, de: iso(ini), ate: iso(fim) };
 }
 
