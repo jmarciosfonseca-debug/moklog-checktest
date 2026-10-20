@@ -290,3 +290,40 @@ test("atividades em casa: voltou para MK Home e registra o que fez; home office 
     expect(fechado.dia.trechos[0].chegada.em).toBe("2026-10-16T17:30:00.000-03:00");
   } finally { await act(async () => root2.unmount()); host2.remove(); }
 });
+
+test("pastas mensais: 2026 abre em outubro (20/09–19/10, atual); 20/10 cai em novembro; exportar CSV", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  mockStore.ler.mockResolvedValue({ dia: { ...DIA_RODADO, estado: "fechado" }, memoria: { revisao: 3 } });
+  mockStore.dias.mockResolvedValue({ dias: [{ data: "2026-10-15", estado: "fechado", trechos: 2 }, { data: "2026-10-20", estado: "fechado", trechos: 1 }, { data: "2026-09-21", estado: "fechado", trechos: 3 }] });
+  const urls = []; const realCreate = URL.createObjectURL; URL.createObjectURL = (b) => { urls.push(b); return "blob:x"; }; URL.revokeObjectURL = () => {};
+  const clickAnchor = jest.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  try {
+    await montar(host, root);
+    await clicar(host, "🗂");
+    expect(host.textContent).toContain("Pastas mensais");
+    expect(host.textContent).toContain("📁 2026");
+    expect(host.textContent).toContain("📁 2027");
+    expect(host.textContent).toContain("outubro (2) · atual");
+    expect(host.textContent).toContain("novembro (1)");
+    expect(host.textContent).toContain("📂 outubro de 26");
+    expect(host.textContent).toContain("21/09/2026 a 19/10/2026");
+    expect(host.textContent).toContain("15/10/2026");
+    expect(host.textContent).toContain("21/09/2026");
+    expect(host.textContent).not.toContain("20/10/2026 ");
+    expect(porLabel(host, "De").value).toBe("2026-09-21");
+    expect(porLabel(host, "Até").value).toBe("2026-10-19");
+    await clicar(host, "novembro (1)");
+    expect(host.textContent).toContain("📂 novembro de 26");
+    expect(host.textContent).toContain("20/10/2026 a 19/11/2026");
+    expect(host.querySelector('[aria-label="Apagar o RD de 15/10/2026"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Apagar o RD de 20/10/2026"]')).not.toBeNull();
+    await clicar(host, "Exportar (CSV)");
+    expect(urls.length).toBe(1);
+    const texto = await new Promise((ok) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsText(urls[0]); });
+    expect(texto).toContain("2026-10-20;1;");
+    // 2027 lista os 12 meses
+    await clicar(host, "📁 2027");
+    expect(host.textContent).toContain("dezembro");
+    expect([...host.querySelectorAll(".rd-pasta-meses button")].length).toBe(12);
+  } finally { URL.createObjectURL = realCreate; clickAnchor.mockRestore(); await act(async () => root.unmount()); host.remove(); }
+});
