@@ -153,7 +153,10 @@ describe("servidor (merge) com fotoRef",()=>{
 });
 test("código: Avatar usa o resolvedor único, não há consulta direta ao mapa e o documento principal não recebe mais a foto",()=>{
   const fs=require("fs"),eq=fs.readFileSync("src/Equipe.jsx","utf8"),app=fs.readFileSync("src/App.jsx","utf8");
-  expect((eq.match(/<Avatar colab=\{\w+\}/g)||[]).length).toBe(7);expect(eq).not.toMatch(/<Avatar foto=/);
+  expect((eq.match(/<Avatar colab=\{\w+\}/g)||[]).length).toBe(5);expect(eq).not.toMatch(/<Avatar foto=/);
+  // equipe montada (líder → membros) vive em EquipesMontadas.jsx e também resolve a foto só por fotoDe()
+  const em=fs.readFileSync("src/equipe/EquipesMontadas.jsx","utf8");
+  expect((em.match(/<AvatarEquipe colab=\{\w+\}/g)||[]).length).toBe(2);expect(em).toContain("fotoDe(colab, fotos)");expect(em).not.toMatch(/fotos\[colab|colab\.foto\b/);
   expect(eq).not.toMatch(/mapaFotos\[|mapa\[id\]|mapa\[colab/);
   expect(eq).toContain("enviarFoto(project.id, form.id, fotoFinal)");expect(eq).toContain("prepararColaborador({ form");
   expect(eq).not.toContain("const formFinal = { ...form, foto: fotoFinal };");
