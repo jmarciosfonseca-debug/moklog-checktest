@@ -96,3 +96,27 @@ test('líder não troca a placa pelo Editar (é outra moto: usa Substituir); km 
  expect(window.alert.mock.calls[0][0]).toContain('Corrigir km anterior');
  expect(mockGravar).not.toHaveBeenCalled();
 });
+
+test('registrar manutenção atualiza KM Atual e Últ. manutenção sem Editar; próximo km opcional mantém o alerta',async()=>{
+ await montar({moto:{placa:'ABC1D23',modelo:'CG 160',km:72100,kmManutencao:72000,proximaRevisao:'2026-12-01',status:'ok',historico:[]}});
+ expect(host.textContent).toContain('KM de manutenção atingido');                 // 72100 ≥ 72000
+ let salvo;mockGravar.mockImplementation(async(pid,sec,before,after)=>{salvo={sec,after};return {...before,[sec]:after};});
+ await clicar(botao('+ Registrar'));
+ await preencher(host.querySelector('input[aria-label="KM da manutenção"]'),'72.450');
+ const ta=host.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(ta,'Revisão geral');ta.dispatchEvent(new Event('input',{bubbles:true}));});
+ await clicar(botao('Registrar manutenção'));
+ expect(salvo.sec).toBe('moto');
+ expect(salvo.after).toMatchObject({km:72450,kmManutencao:'',historico:[expect.objectContaining({km:72450,desc:'Revisão geral'})]});
+ expect(salvo.after.ultimaManutencao).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+ expect(host.textContent).toContain('72450 km');
+ expect(host.textContent).toContain('Últ. Manutenção');
+ expect(host.textContent).not.toContain('Próx. Revisão');
+ expect(host.textContent).not.toContain('KM de manutenção atingido');             // km previsto limpo → sem alerta
+ // segunda manutenção informando o próximo km abaixo do atual → recusa
+ await clicar(botao('+ Registrar'));
+ await preencher(host.querySelector('input[aria-label="KM da manutenção"]'),'73000');
+ await preencher(host.querySelector('input[aria-label="KM para próxima manutenção (registro)"]'),'72000');
+ const ta2=host.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(ta2,'Pneu');ta2.dispatchEvent(new Event('input',{bubbles:true}));});
+ await clicar(botao('Registrar manutenção'));
+ expect(window.alert).toHaveBeenCalledWith(expect.stringContaining('maior que o km atual'));
+});

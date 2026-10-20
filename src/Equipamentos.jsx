@@ -8,6 +8,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer } from "firebase/firestore";
 import { gravarSecaoEquipamentos, darBaixaEquipamento, MOTIVOS_BAIXA } from "./equipamentosStore";
 import { validarKmMoto, kmMotoDoMapa, soDigitosKm } from "./kmMoto";
+import { registrarManutencao, ultimaManutencao } from "./motoManutencao";
 import { loadUltimoPlantao } from "./mapaDiario/dados";
 import { substituirMoto, motoTrocadaDesde } from "./mapaDiario/modelo";
 
@@ -311,7 +312,7 @@ function gerarPDFEquipamentos(project, data, segLogos) {
   const motoSection = moto && moto.placa ? `<div class="card">
     <h2>🏍️ Motocicleta</h2>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">
-      ${[["Placa",moto.placa],["Modelo",moto.modelo||"--"],["Ano",moto.ano||"--"],["KM Atual",moto.km?`${moto.km} km`:"--"],["KM Manutenção",moto.kmManutencao?`${moto.kmManutencao} km`:"--"],["Próx. Revisão",moto.proximaRevisao?fmtD(moto.proximaRevisao):"--"]].map(([l,v])=>`
+      ${[["Placa",moto.placa],["Modelo",moto.modelo||"--"],["Ano",moto.ano||"--"],["KM Atual",moto.km?`${moto.km} km`:"--"],["KM Manutenção",moto.kmManutencao?`${moto.kmManutencao} km`:"--"],["Últ. Manutenção",(moto.ultimaManutencao||(moto.historico||[])[0]?.data)?fmtD(moto.ultimaManutencao||(moto.historico||[])[0].data):"--"]].map(([l,v])=>`
         <div><div style="font-size:10px;color:#94a3b8;font-weight:700">${l}</div><div style="font-weight:700;color:${l==="KM Atual"&&moto.kmManutencao&&Number(moto.km)>=Number(moto.kmManutencao)?"#dc2626":"#0f172a"}">${v}</div></div>`).join("")}
     </div>
     ${moto.km&&moto.kmManutencao&&Number(moto.km)>=Number(moto.kmManutencao)?'<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:8px 12px;color:#dc2626;font-size:12px;font-weight:700">🔴 KM de manutenção atingido!</div>':""}
@@ -683,7 +684,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
   const S = getStyles(dark);
   const [editing, setEditing] = useState(false);
   const [showHist, setShowHist] = useState(false);
-  const [novaManut, setNovaManut] = useState({ data:todayStr(), km:"", desc:"" });
+  const [novaManut, setNovaManut] = useState({ data:todayStr(), km:"", desc:"", proximoKm:"" });
   const [form, setForm] = useState(moto || { placa:"", km:"", proximaRevisao:"", status:"ok", historico:[] });
 
   const [troca, setTroca] = useState(null);   // substituição da moto { placa, modelo, ano, kmInicial, itens, motivo, erros, salvando }
@@ -697,11 +698,14 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
     if(await onUpdate(final)!==false){ setForm(final); setEditing(false); }
   };
 
+  // Registrar manutenção atualiza o cadastro sozinho (KM Atual, Últ. manutenção) — sem "Editar".
   const addManut = async () => {
-    if(!novaManut.desc.trim()) { alert("Informe a descrição"); return; }
-    const updated = {...form, historico:[{id:Date.now().toString(),...novaManut},...(form.historico||[])]};
-    if(await onUpdate(updated)===false)return;setForm(updated);
-    setNovaManut({data:todayStr(),km:"",desc:""});
+    let ultimo = null;
+    try { const um = await loadUltimoPlantao(project.id, "9999-12-31", "N"); ultimo = motoTrocadaDesde(form, um) ? null : kmMotoDoMapa(um); } catch(e) { /* sem leitura: não trava */ }
+    const r = registrarManutencao(form, novaManut, ultimo);
+    if(!r.ok){ alert(r.erro); return; }
+    if(await onUpdate(r.moto)===false)return;setForm(r.moto);
+    setNovaManut({data:todayStr(),km:"",desc:"",proximoKm:""});
     setShowHist(false);
   };
 
@@ -760,7 +764,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
               <div><label style={S.lbl}>KM Atual</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM Atual" value={form.km} onChange={e=>setForm(f=>({...f,km:soDigitosKm(e.target.value)}))} placeholder="Só números" style={S.inp}/></div>
             </div>
             <div><label style={S.lbl}>KM para próxima manutenção</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM para próxima manutenção" value={form.kmManutencao||""} onChange={e=>setForm(f=>({...f,kmManutencao:soDigitosKm(e.target.value)}))} placeholder="Ex: 5000" style={S.inp}/></div>
-            <div><label style={S.lbl}>Próxima Revisão (Data)</label><input type="date" value={form.proximaRevisao||""} onChange={e=>setForm(f=>({...f,proximaRevisao:e.target.value}))} style={S.inp}/></div>
+            <div style={{fontSize:10,...S.txt2}}>A data da última manutenção e o km do dia entram pelo "+ Registrar" do histórico — este Editar é só para correções.</div>
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setEditing(false)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
               <button onClick={()=>save(form)} style={{...S.btn,flex:1,fontSize:13}}><Ico n="check"/> Salvar</button>
@@ -779,7 +783,7 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                     ["Ano",        form.ano||"--"],
                     ["KM Atual",   form.km?`${form.km} km`:"--"],
                     ["KM Manutenção", form.kmManutencao?`${form.kmManutencao} km`:"--"],
-                    ["Próx. Revisão", form.proximaRevisao?fmtDate(form.proximaRevisao):"--"],
+                    ["Últ. Manutenção", (form.ultimaManutencao||ultimaManutencao(form)?.data)?fmtDate(form.ultimaManutencao||ultimaManutencao(form).data):"--"],
                     ...(form.itens?[["Itens da moto", form.itens]]:[]),
                     ...(form.trocadaEm?[["Em uso desde", `${fmtDate(String(form.trocadaEm).slice(0,10))}${form.kmInicial!=null?` · km inicial ${form.kmInicial}`:""}`]]:[]),
                   ].map(([label,val])=>(
@@ -831,12 +835,14 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                     <div style={{background:dark?"#020510":"#f8fafc",borderRadius:8,padding:"10px",marginBottom:8,border:`1px solid ${dark?"#0f172a":"#e2e8f0"}`}}>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                         <div><label style={S.lbl}>Data</label><input type="date" value={novaManut.data} onChange={e=>setNovaManut(m=>({...m,data:e.target.value}))} style={S.inp}/></div>
-                        <div><label style={S.lbl}>KM</label><input type="number" value={novaManut.km} onChange={e=>setNovaManut(m=>({...m,km:e.target.value}))} placeholder="KM..." style={S.inp}/></div>
+                        <div><label style={S.lbl}>KM da moto no dia *</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM da manutenção" value={novaManut.km} onChange={e=>setNovaManut(m=>({...m,km:soDigitosKm(e.target.value)}))} placeholder="Só números" style={S.inp}/></div>
                       </div>
+                      <div style={{marginBottom:8}}><label style={S.lbl}>KM para próxima manutenção (opcional)</label><input type="text" inputMode="numeric" pattern="[0-9]*" aria-label="KM para próxima manutenção (registro)" value={novaManut.proximoKm} onChange={e=>setNovaManut(m=>({...m,proximoKm:soDigitosKm(e.target.value)}))} placeholder="Deixe vazio se não souber" style={S.inp}/>
+                        <div style={{fontSize:10,...S.txt2,marginTop:3}}>Ao registrar, o KM Atual e a Últ. manutenção do cadastro atualizam sozinhos. Se informar o próximo km, o alerta "KM atingido" continua valendo.</div></div>
                       <div style={{marginBottom:8}}><label style={S.lbl}>Descrição</label><textarea value={novaManut.desc} onChange={e=>setNovaManut(m=>({...m,desc:e.target.value}))} placeholder="O que foi feito..." style={{...S.inp,height:50,resize:"vertical",fontSize:12}}/></div>
                       <div style={{display:"flex",gap:8}}>
                         <button onClick={()=>setShowHist(false)} style={{...S.btnSec,flex:1,fontSize:12}}>Cancelar</button>
-                        <button onClick={addManut} style={{...S.btn,flex:1,fontSize:12}}><Ico n="check"/> Adicionar</button>
+                        <button onClick={addManut} style={{...S.btn,flex:1,fontSize:12}}><Ico n="check"/> Registrar manutenção</button>
                       </div>
                     </div>
                   )}
