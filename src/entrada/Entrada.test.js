@@ -16,7 +16,9 @@ test("logo → Entrar → vídeo (pulável) → escolha de área; MokLog e Área
     await clicar(botao(host, "Pular"));
     expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
     expect(host.textContent).toContain("Escolha a sua área"); expect(host.textContent).toContain("Área do Cliente");
-    expect(botao(host, "MokPat").disabled).toBe(true); expect(host.textContent).toContain("Em breve");
+    expect(host.textContent).toContain("Em breve");
+    await clicar(botao(host, "MokPat")); expect(host.querySelector('[data-testid="entrada-construcao"]')).not.toBeNull(); expect(host.textContent).toContain("Em construção"); expect(esc).not.toHaveBeenCalled();
+    await clicar(botao(host, "Voltar")); expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
     await clicar(botao(host, "MokLog")); expect(esc).toHaveBeenLastCalledWith("moklog");
     await clicar(botao(host, "Área do Cliente")); expect(esc).toHaveBeenLastCalledWith("cliente");
     expect(sessionStorage.getItem("moked_intro_visto_v1")).toBe("1");
