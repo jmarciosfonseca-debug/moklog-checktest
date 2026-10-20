@@ -62,7 +62,7 @@ import {SeloWhats, FolhaWhats, BotaoAprovarTodas, PainelAprovacoesLider} from ".
 import { CAMPANHAS, calendarioCampanha, campanhaDisponivel, chaveCampanha } from './campanhasEquipe';
 import CampanhaEquipeControle from './CampanhaEquipeControle';
 import CampanhaExtras from './CampanhaExtras';
-import { afastamentoVigente, promocaoRecente, ordenarHistorico } from "./equipeEventos";
+import { afastamentoVigente, promocaoRecente, ordenarHistorico, agruparHistorico, HIST_VISIVEIS } from "./equipeEventos";
 
 
 // Sem limite para desligados — ficam todos para consulta
@@ -792,6 +792,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
 function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
   const hist    = ordenarHistorico(colab.historico);   // cronológico pela data do fato (aplicação), não pelo lançamento
+  const [histAberto, setHistAberto] = useState({});     // cascata: grupos do histórico expandidos
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
   const fts     = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
   const mds     = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
@@ -1010,8 +1011,12 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             {hist.length === 0 && (
               <div style={{ textAlign:"center", padding:"20px 0", color:"#334155", fontSize:12 }}>Nenhum registro ainda</div>
             )}
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {hist.map(h => {
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {agruparHistorico(hist).map(g => { const hcG = HIST_COLORS[g.tipo] || HIST_COLORS["Medida Disciplinar"]; const aberto = !!histAberto[g.tipo]; const itens = aberto ? g.itens : g.itens.slice(0, HIST_VISIVEIS); const resto = g.itens.length - itens.length;
+              return <div key={g.tipo} data-testid={"hist-grupo-"+g.tipo}>
+              <div style={{ fontSize:10, fontWeight:700, color:hcG.color, textTransform:"uppercase", letterSpacing:.5, margin:"2px 0 5px" }}>{g.tipo} <span style={{ color:"#64748b", fontWeight:600 }}>({g.itens.length})</span> <span style={{ color:"#475569", fontWeight:500, textTransform:"none", letterSpacing:0 }}>· mais recente primeiro</span></div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {itens.map(h => {
                 const hc = HIST_COLORS[h.tipo] || HIST_COLORS["Medida Disciplinar"];
                 const hColor = hc.color;
                 const hBg    = hc.bg;
@@ -1052,6 +1057,13 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
                   </div>
                 );
               })}
+              </div>
+              {(resto > 0 || aberto) && g.itens.length > HIST_VISIVEIS && (
+                <button onClick={()=>setHistAberto(a=>({ ...a, [g.tipo]: !aberto }))} style={{ marginTop:5, background:"transparent", border:"1px solid #33415566", color:"#94a3b8", fontSize:10, cursor:"pointer", padding:"4px 10px", borderRadius:6 }}>
+                  {aberto ? "▴ Mostrar só as últimas " + HIST_VISIVEIS : `▾ Ver mais ${resto} (anteriores)`}
+                </button>
+              )}
+              </div>; })}
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import ListaCascata from "./ListaCascata";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { useState, useEffect } from "react";
@@ -554,20 +555,20 @@ export default function AcessoApp({ onBack, initialScreen, dark: darkProp, onTog
             {regHoje.length>0 && (
               <>
                 <div style={{ fontSize:10, color:"#f59e0b", fontWeight:700, textTransform:"uppercase", letterSpacing:.8 }}>Hoje</div>
-                {regHoje.map(r=>(
+                <ListaCascata itens={regHoje} campos={["registradoEm","data"]} dark={dark} rotulo="de hoje" render={r=>(
                   <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel} dark={dark}
                     onVer={()=>{ setViewReg(r); setScreen("view"); }}/>
-                ))}
+                )}/>
               </>
             )}
 
             {regAnt.length>0 && (
               <>
                 <div style={{ fontSize:10, color:"#475569", fontWeight:700, textTransform:"uppercase", letterSpacing:.8, marginTop:4 }}>Anteriores</div>
-                {regAnt.map(r=>(
+                <ListaCascata itens={regAnt} campos={["data","registradoEm"]} dark={dark} render={r=>(
                   <RegistroCard key={r.id} r={r} selIds={selIds} toggleSel={toggleSel} dark={dark}
                     onVer={()=>{ setViewReg(r); setScreen("view"); }}/>
-                ))}
+                )}/>
               </>
             )}
           </div>

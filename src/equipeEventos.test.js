@@ -1,4 +1,4 @@
-import { plantoesAfastamento, afastamentoVigente, promocaoRecente, desligamentosRecentes, linhaDesligamento } from './equipeEventos';
+import { plantoesAfastamento, afastamentoVigente, promocaoRecente, desligamentosRecentes, linhaDesligamento, agruparHistorico } from './equipeEventos';
 import { lancamentosDoMapa } from './mapaDiario/ficha';
 import { montarTextoWhatsApp } from './mapaDiario/texto';
 import { validarParaConcluir } from './mapaDiario/modelo';
@@ -59,7 +59,7 @@ test('texto do mapa traz o desligamento recente com o líder', () => {
 });
 
 test('histórico em ordem cronológica pela data do fato, não pelo lançamento', () => {
-  const { ordenarHistorico } = require('./equipeEventos');
+  const { ordenarHistorico, agruparHistorico } = require('./equipeEventos');
   const h = [
     { id: 'novo-lancado-hoje-fato-2023', tipo: 'Treinamento', data: '2023-05-10', registradoEm: '2026-10-18T10:00:00Z' },
     { id: 'falta-2026', tipo: 'Falta', data: '2026-10-01', registradoEm: '2026-10-01T08:00:00Z' },
@@ -71,4 +71,16 @@ test('histórico em ordem cronológica pela data do fato, não pelo lançamento'
   expect(ordenarHistorico(h).map(x => x.id)).toEqual(['novo-lancado-hoje-fato-2023', 'ft-2025', 'sem-data', 'falta-2026', 'mesmo-dia-b']);
   expect(JSON.stringify(h)).toBe(copia);          // não altera os dados
   expect(ordenarHistorico(undefined)).toEqual([]);
+});
+
+test('agruparHistorico: por categoria, último primeiro dentro do grupo, ordem fixa dos grupos', () => {
+  const h = [
+    { id: 1, tipo: 'Treinamento', data: '2026-04-09' }, { id: 2, tipo: 'Falta', data: '2026-08-03' }, { id: 3, tipo: 'Falta', data: '2026-09-12' },
+    { id: 4, tipo: 'Treinamento', data: '2026-10-11' }, { id: 5, tipo: 'FT', data: '2026-05-01' }, { id: 6, tipo: 'Falta', data: '2026-10-10' },
+  ];
+  const g = agruparHistorico(h);
+  expect(g.map(x => x.tipo)).toEqual(['Falta', 'FT', 'Treinamento']);
+  expect(g[0].itens.map(x => x.data)).toEqual(['2026-10-10', '2026-09-12', '2026-08-03']);
+  expect(g[2].itens.map(x => x.id)).toEqual([4, 1]);
+  expect(agruparHistorico(null)).toEqual([]);
 });

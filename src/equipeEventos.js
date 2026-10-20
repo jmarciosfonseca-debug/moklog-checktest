@@ -50,3 +50,15 @@ export function ordenarHistorico(historico) {
     .sort((a, b) => chave(a.h).localeCompare(chave(b.h)) || String(a.h.registradoEm || '').localeCompare(String(b.h.registradoEm || '')) || a.i - b.i)
     .map(x => x.h);
 }
+
+// Tela da ficha: histórico AGRUPADO por categoria (Falta, FT, Treinamento, Férias, Atraso, …), cada grupo do mais
+// recente para o mais antigo (último primeiro). Em cascata: só as 3 últimas datas visíveis; "ver mais" abre o resto.
+export const HIST_VISIVEIS = 3;
+export const HIST_ORDEM_GRUPOS = ['Falta', 'FT', 'Atraso', 'Medida Disciplinar', 'Férias', 'Treinamento', 'Promoção'];
+export function agruparHistorico(historico) {
+  const desc = ordenarHistorico(historico).reverse();
+  const grupos = new Map();
+  for (const h of desc) { const t = (h && h.tipo) || 'Outros'; if (!grupos.has(t)) grupos.set(t, []); grupos.get(t).push(h); }
+  const pos = t => { const i = HIST_ORDEM_GRUPOS.indexOf(t); return i < 0 ? 99 : i; };
+  return [...grupos.entries()].sort((a, b) => pos(a[0]) - pos(b[0]) || a[0].localeCompare(b[0])).map(([tipo, itens]) => ({ tipo, itens }));
+}
