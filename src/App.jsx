@@ -1617,6 +1617,8 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   };
   const [pin,setPin]=useState(""); const [auth,setAuth]=useState(()=>hasGerencial()); const [err,setErr]=useState(false);
   const [selProject,setSelProject]=useState(null); const [viewReport,setViewReport]=useState(null);
+  const [mesRel,setMesRel]=useState(null);           // "AAAA-MM" do mês escolhido na lista de relatórios (null = mais recente)
+  const [verMaisRel,setVerMaisRel]=useState(false);  // cascata: 4 do mês à vista, "ver mais" abre o resto
   const [pendScreen,setPendScreen]=useState(false);
   const [confirmDel,setConfirmDel]=useState(null); const [selReports,setSelReports]=useState({});
   const GOLGI_IDS=["P601","P602","P604","P605","P606","P607"], MEGA_IDS=["P311A","P311B"];
@@ -1944,6 +1946,14 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   );
   if(selProject){
     const p=selProject; const hist=stored[p.id]?.history??[]; const sel=selReports[p.id]??[];
+    // Organização por mês (ajuste 20/10): os testes são semanais → chips de mês; mês escolhido mostra até 4 (mais recente primeiro) e "ver mais".
+    const MESES_PT=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+    const mesDe=(r)=>String(r.meta?.date||"").slice(0,7);
+    const mesesDisp=[...new Set(hist.map(mesDe).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+    const mesAtivo=mesRel&&mesesDisp.includes(mesRel)?mesRel:(mesesDisp[0]||null);
+    const rotuloMes=(m)=>m?`${MESES_PT[+m.slice(5,7)-1]}/${m.slice(2,4)}`:"";
+    const listaMes=hist.map((r,i)=>({r,realIdx:i})).filter(x=>!mesAtivo||mesDe(x.r)===mesAtivo).reverse();
+    const listaVisivel=verMaisRel?listaMes:listaMes.slice(0,4);
     const toggleSel=(idx)=>{const cur=selReports[p.id]??[];const next=cur.includes(idx)?cur.filter(i=>i!==idx):(cur.length<6?[...cur,idx]:cur);setSelReports(prev=>({...prev,[p.id]:next}));};
     const viewToken=viewLinks[p.id];
     const viewUrl=viewToken?`${window.location.origin}${window.location.pathname}?view=${p.id}_${viewToken}`:"";
@@ -1986,9 +1996,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             style={{...S.sm,width:"100%",marginBottom:8,fontSize:12}}>
             <Ico n="busca"/> Versão interna (com conferência de divergências)</button></>}
           {sel.length===0&&hist.length>0&&<div style={{background:"#0f172a",borderRadius:8,padding:"8px",textAlign:"center",fontSize:12,color:"#94a3b8",marginBottom:8}}><Ico n="quadradoCheck"/> Selecione 2 a 6 relatorios para consolidado</div>}
+          {mesesDisp.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+            {mesesDisp.map(m=>{const n=hist.filter(r=>mesDe(r)===m).length;return <button key={m} aria-pressed={m===mesAtivo} onClick={()=>{setMesRel(m);setVerMaisRel(false);}} style={{background:m===mesAtivo?"#1d4ed8":"#060c18",border:`1px solid ${m===mesAtivo?"#1d4ed8":"#0f172a"}`,color:m===mesAtivo?"#fff":"#94a3b8",borderRadius:9,padding:"6px 10px",fontSize:11.5,fontWeight:700,cursor:"pointer"}}>{rotuloMes(m)} <span style={{opacity:.7,fontWeight:500}}>({n})</span></button>;})}
+          </div>}
+          {mesAtivo&&<div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{rotuloMes(mesAtivo)} · {listaMes.length} relatório(s) · mais recente primeiro</div>}
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {hist.slice().reverse().map((r,revIdx)=>{
-              const realIdx=hist.length-1-revIdx;
+            {listaVisivel.map(({r,realIdx})=>{
               const h=computeHealth(p,r.state);
               const color=h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444";
               const isSelected=sel.includes(realIdx);
@@ -2019,6 +2032,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
               );
             })}
           </div>
+          {listaMes.length>4&&<button onClick={()=>setVerMaisRel(v=>!v)} style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px",marginTop:10}}>{verMaisRel?"▴ Mostrar só os 4 últimos":`▾ Ver mais ${listaMes.length-4} relatório(s) de ${rotuloMes(mesAtivo)}`}</button>}
         </div>
         {confirmDel&&(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>

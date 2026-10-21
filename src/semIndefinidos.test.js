@@ -28,3 +28,11 @@ test("histórico de relatórios semanais: cascata com 3 últimos, mais recente p
   expect(fn).toContain("Ver mais ${filtrados.length-3}");            // cascata
   expect(fn).toContain('aria-expanded={aberto}');                    // bloco expansível
 });
+
+test("painel gerencial: relatórios do projeto organizados por mês (chips), 4 à vista, cascata", () => {
+  const app = require("fs").readFileSync("src/App.jsx", "utf8");
+  expect(app).toContain("const mesesDisp=[...new Set(hist.map(mesDe)");
+  expect(app).toContain("listaMes.slice(0,4)");
+  expect(app).toContain("Ver mais ${listaMes.length-4} relatório(s) de ${rotuloMes(mesAtivo)}");
+  expect(app).toContain("aria-pressed={m===mesAtivo}");
+});
