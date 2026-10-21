@@ -18,3 +18,13 @@ test("porta de entrada Moked: App abre em Entrada e a Área do Cliente saiu da H
   expect(app).not.toMatch(/arq="cliente"/);
   expect(app).not.toMatch(/screen==="cliente"/);
 });
+
+test("histórico de relatórios semanais: cascata com 3 últimos, mais recente primeiro, filtro por data", () => {
+  const app = require("fs").readFileSync("src/App.jsx", "utf8");
+  const fn = app.slice(app.indexOf("function HistoryScreen("), app.indexOf("function ReportScreen("));
+  expect(fn).toContain(".slice().reverse();");                       // mais recente no topo
+  expect(fn).toContain("filtrados.slice(0,3)");                      // 3 últimos
+  expect(fn).toContain('aria-label="Buscar relatório por data"');    // filtro por data
+  expect(fn).toContain("Ver mais ${filtrados.length-3}");            // cascata
+  expect(fn).toContain('aria-expanded={aberto}');                    // bloco expansível
+});
