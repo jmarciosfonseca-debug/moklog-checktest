@@ -21,15 +21,16 @@ test("logo → Entrar → vídeo (pulável) → escolha de área; MokLog e Área
     await clicar(botao(host, "Voltar")); expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
     await clicar(botao(host, "MokLog")); expect(esc).toHaveBeenLastCalledWith("moklog");
     await clicar(botao(host, "Área do Cliente")); expect(esc).toHaveBeenLastCalledWith("cliente");
-    expect(sessionStorage.getItem("moked_intro_visto_v1")).toBe("1");
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
-test("vídeo só uma vez por sessão: na segunda entrada vai direto às áreas", async () => {
-  sessionStorage.setItem("moked_intro_visto_v1", "1");
+test("vídeo toca a cada entrada; se o navegador bloquear o autoplay, aparece o botão Tocar", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  const play = jest.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.reject(new Error("NotAllowed")));
   try {
     await act(async () => root.render(<Entrada onEscolher={() => {}} />));
     await clicar(botao(host, "Entrar"));
-    expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
-  } finally { await act(async () => root.unmount()); host.remove(); }
+    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    expect(host.querySelector('[data-testid="entrada-video"]')).not.toBeNull();
+    expect(botao(host, "Tocar vídeo")).toBeTruthy();
+  } finally { play.mockRestore(); await act(async () => root.unmount()); host.remove(); }
 });
