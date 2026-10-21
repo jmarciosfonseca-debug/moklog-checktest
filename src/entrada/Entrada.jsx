@@ -14,7 +14,7 @@ export const DIVISOES = [
 export const logoDivisao = (id) => `/moked/divisoes/${id}.jpg`;
 export const LOGO_MOKED_URL = "/moked/logo-moked.png";
 export const VIDEO_INTRO_URL = "/moked/intro.mp4";
-const CHAVE_VISTO = "moked_intro_visto_v1"; // vídeo uma vez por sessão do navegador
+// O vídeo toca a cada entrada (decisão do Marcio); "Pular" fica sempre visível.
 
 // Fundo = a mesma cor do PNG do logo (#0b0f19), para o logo não aparecer como um retângulo.
 const fundo = { minHeight: "100vh", background: "radial-gradient(140% 70% at 50% -10%, #1a0507 0%, #0b0f19 40%, #0b0f19 100%)", color: "#e5e7eb", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 };
@@ -25,12 +25,12 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   const [etapa, setEtapa] = useState(etapaInicial); // splash | video | areas | construcao
   const [emConstrucao, setEmConstrucao] = useState(null);
   const vid = useRef(null);
-  const jaViu = () => { try { return sessionStorage.getItem(CHAVE_VISTO) === "1"; } catch { return false; } };
-  const marcar = () => { try { sessionStorage.setItem(CHAVE_VISTO, "1"); } catch { /* sem storage */ } };
-  const entrar = () => { if (pularVideo || jaViu()) setEtapa("areas"); else setEtapa("video"); };
-  const fimVideo = () => { marcar(); setEtapa("areas"); };
+  const [bloqueado, setBloqueado] = useState(false); // navegador recusou o autoplay → mostra "Tocar"
+  const entrar = () => { if (pularVideo) setEtapa("areas"); else setEtapa("video"); };
+  const fimVideo = () => setEtapa("areas");
+  const tocar = () => { const v = vid.current; if (!v) return; const r = v.play(); if (r && r.catch) r.then(() => setBloqueado(false)).catch(() => setBloqueado(true)); };
 
-  useEffect(() => { if (etapa !== "video") return undefined; const t = setTimeout(fimVideo, 20000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
+  useEffect(() => { if (etapa !== "video") return undefined; tocar(); const t = setTimeout(fimVideo, 25000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
 
   if (etapa === "splash") return <main style={fundo} data-testid="entrada-splash">
     <img src={logo} alt="Moked Security Consulting" style={{ width: "min(70vw, 320px)", borderRadius: "48% / 40%", padding: "14px 22px", background: "#0b0f19", boxShadow: "0 0 0 1px #2a2a31, 0 0 40px rgba(229,9,20,.25)" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -39,7 +39,8 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   </main>;
 
   if (etapa === "video") return <main style={{ ...fundo, padding: 0, background: "#000" }} data-testid="entrada-video">
-    <video ref={vid} src={video} autoPlay muted playsInline onEnded={fimVideo} onError={fimVideo} style={{ width: "100%", maxWidth: 560, maxHeight: "80vh", background: "#000" }} />
+    <video ref={vid} src={video} autoPlay muted playsInline preload="auto" onEnded={fimVideo} onError={fimVideo} onPlaying={() => setBloqueado(false)} style={{ width: "100%", maxWidth: 560, maxHeight: "80vh", background: "#000" }} />
+    {bloqueado && <button onClick={tocar} style={{ ...botaoVermelho, position: "fixed", left: "50%", top: "50%", transform: "translate(-50%,-50%)" }}>▶ Tocar vídeo</button>}
     <button onClick={fimVideo} style={{ ...botaoVermelho, position: "fixed", right: 16, bottom: 20, padding: "8px 16px", fontSize: 11, letterSpacing: 1.5 }}>Pular</button>
   </main>;
 
