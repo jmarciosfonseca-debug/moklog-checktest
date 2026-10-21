@@ -2311,7 +2311,15 @@ function PendenciesScreen({stored, onBack}) {
 
 function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
   const [viewReport, setViewReport] = useState(null);
-  const hist=(stored[project.id]?.history??[]).slice().reverse();
+  const hist=(stored[project.id]?.history??[]).slice().reverse();   // mais recente primeiro
+  // Cascata (ajuste 20/10): 3 últimos à vista, "ver mais" abre o resto; filtro por data (dd/mm, mm/aaaa ou aaaa-mm-dd).
+  const [filtroData,setFiltroData]=useState("");
+  const [verTodos,setVerTodos]=useState(false);
+  const [abertos,setAbertos]=useState({});
+  const normData=(iso)=>{ if(!iso) return ""; const [a,m,d]=String(iso).slice(0,10).split("-"); return `${d}/${m}/${a} ${m}/${a} ${a}-${m}-${d} ${d}/${m}`; };
+  const q=filtroData.trim().toLowerCase();
+  const filtrados=q?hist.filter(r=>normData(r.meta?.date).includes(q)):hist;
+  const visiveis=(q||verTodos)?filtrados:filtrados.slice(0,3);
 
   if(viewReport) return((()=>{
     const rep = viewReport.report || viewReport;
@@ -2418,13 +2426,19 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
           <div><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Historico — {project.id}</div><div style={{fontSize:11,color:"#94a3b8"}}>{project.name} · {hist.length} relatório(s)</div></div>
         </div>
         {!hist.length&&<div style={{textAlign:"center",padding:"40px 0",color:"#94a3b8",fontSize:14}}><div style={{fontSize:28,marginBottom:8}}><Ico n="pasta"/></div>Nenhum relatorio salvo ainda.</div>}
+        {hist.length>0&&<div style={{display:"flex",gap:8,alignItems:"center",margin:"8px 0 10px"}}>
+          <input aria-label="Buscar relatório por data" value={filtroData} onChange={e=>setFiltroData(e.target.value)} placeholder="Buscar por data (ex.: 18/10, 10/2026)" style={{flex:1,background:"#020510",border:"1px solid #1e293b",borderRadius:9,color:"#f1f5f9",padding:"9px 12px",fontSize:13}}/>
+          {filtroData&&<button onClick={()=>setFiltroData("")} style={{...S.secBtn,fontSize:12,padding:"8px 12px"}}>Limpar</button>}
+        </div>}
+        {q&&!filtrados.length&&<div style={{textAlign:"center",padding:"16px 0",color:"#94a3b8",fontSize:13}}>Nenhum relatório com essa data.</div>}
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {hist.map((r,i)=>{
+          {visiveis.map((r,i)=>{
             const h=computeHealth(project,r.state);
             const color=h.pct>=90?"#22c55e":h.pct>=70?"#f59e0b":"#ef4444";
+            const chave=r.meta?.date||String(i); const aberto=!!abertos[chave];
             return(
-              <div key={i} style={{background:"#060c18",border:`1px solid ${color}22`,borderRadius:12,padding:"12px 14px"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div key={chave+i} style={{background:"#060c18",border:`1px solid ${color}22`,borderRadius:12,padding:"12px 14px"}}>
+                <div role="button" aria-expanded={aberto} aria-label={`Relatório de ${fmtDate(r.meta?.date)}`} onClick={()=>setAbertos(a=>({...a,[chave]:!aberto}))} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}>
                   <HealthRing pct={h.pct} size={46}/>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontSize:14,fontWeight:800,color:"#f1f5f9"}}>{getWeekLabel(r.meta?.date)} <span style={{fontSize:11,color:"#94a3b8",fontWeight:400}}>{fmtDate(r.meta?.date)}</span></div>
@@ -2432,20 +2446,23 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
                     {r.meta?.signature&&<div style={{fontSize:11,color:"#94a3b8"}}><Ico n="editar"/> {r.meta.signature}</div>}
                     <div style={{fontSize:11,color:h.inop>0?"#ef4444":"#22c55e",fontWeight:600}}>{h.inop>0?`${h.inop} inoperante(s)`:<><Ico n="check"/>{" Tudo OK"}</>}</div>
                   </div>
+                  <span style={{color:"#64748b",fontSize:12}}>{aberto?"▴":"▾"}</span>
                 </div>
                 <div style={{marginTop:8,height:3,background:"#0f172a",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",width:`${h.pct}%`,background:color,borderRadius:2}}/>
                 </div>
-                <div style={{marginTop:10}}>
-                  <button onClick={()=>setViewReport({project,report:r,idx:hist.length-1-i})}
+                {aberto&&<div style={{marginTop:10}}>
+                  <div style={{fontSize:11,color:"#94a3b8",marginBottom:8}}>{h.total} itens testados · {h.ok} ok · {h.partial} parcial(is) · {h.inop} inoperante(s){r.meta?.obs?` · Obs.: ${r.meta.obs}`:""}</div>
+                  <button onClick={()=>setViewReport({project,report:r,idx:hist.indexOf(r)>=0?hist.length-1-hist.indexOf(r):0})}
                     style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px"}}>
                     <Ico n="olho"/> Ver Relatório Completo
                   </button>
-                </div>
+                </div>}
               </div>
             );
           })}
         </div>
+        {!q&&filtrados.length>3&&<button onClick={()=>setVerTodos(v=>!v)} style={{...S.secBtn,width:"100%",fontSize:13,padding:"10px",marginTop:10}}>{verTodos?"▴ Mostrar só os 3 últimos":`▾ Ver mais ${filtrados.length-3} relatório(s) anteriores`}</button>}
       </div>
     </div>
   );
