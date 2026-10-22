@@ -4749,7 +4749,7 @@ export default function App(){
   const totalInopHome=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);
   // ── HOME — Main cards
   return(
-    <div style={{...S.page, background:dark?"radial-gradient(ellipse at 50% -5%, #0a1628 0%, #04080f 55%)":"#f1f5f9", minHeight:"100vh"}}>
+    <div style={{...S.page, background:dark?"radial-gradient(140% 70% at 50% -10%, #2a0609 0%, #0b0b0e 45%, #050507 100%)":"#f1f5f9", minHeight:"100vh"}}>
       <style>{`
         @keyframes mkPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5)}70%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
         @keyframes mkGlow{0%,100%{opacity:.5}50%{opacity:1}}
@@ -4780,11 +4780,11 @@ export default function App(){
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
-          <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[239,68,68]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
-          <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[204,34,34]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
+          <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[229,9,20]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
+          <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[229,9,20]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
             {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
           </TopoBtn>
-          <TopoBtn arq="painel" fb="grafico" label="Painel" cor={[56,189,248]} aria="Abrir painel gerencial" onClick={()=>setScreen("dashboard")}/>
+          <TopoBtn arq="painel" fb="grafico" label="Painel" cor={[229,9,20]} aria="Abrir painel gerencial" onClick={()=>setScreen("dashboard")}/>
           <button onClick={()=>setDark(!dark)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 4px 6px",borderRadius:14,cursor:"pointer",color:"#e2e8f0",fontSize:11,fontWeight:700,background:"radial-gradient(120% 130% at 50% 0%, rgba(165,180,252,.2), rgba(165,180,252,.03) 70%), #0a1322",border:"1px solid rgba(165,180,252,.38)",boxShadow:"0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)"}} aria-label="Alternar tema claro/escuro"><span style={{display:"flex",width:34,height:34,alignItems:"center",justifyContent:"center"}}>{React.cloneElement(iconeTema(),{width:34,height:34})}</span><span>Tema</span></button>
         </div>
 
@@ -4808,7 +4808,7 @@ export default function App(){
           </div>
           <button onClick={()=>setShowDiagnostico(true)}
             style={{marginBottom:10,width:"100%",background:T.diagBg,border:`1.5px solid ${T.diagBorder}`,borderRadius:18,padding:"16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:T.diagShadow}}>
-            <IconeModulo n="bussola" cor="#0ea5e9" arq="diagnostico" bg="#38bdf814" txt="#38bdf8"/>
+            <IconeModulo n="bussola" cor={dark?"#FF1E27":"#0ea5e9"} arq="diagnostico" bg={dark?"#E5091418":"#38bdf814"} txt={dark?"#FF1E27":"#38bdf8"}/>
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:T.diagTxt}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:T.diagSub,marginTop:3}}>Catálogo publicado · rascunho local</div></div>
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
@@ -4826,7 +4826,7 @@ export default function App(){
               const totalInop = healths.reduce((a,h)=>a+h.inop,0);
               return(
                 <button key={grp.key} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
-                  style={{background:T.card,border:`1.5px solid ${hasProblems?grp.color+"99":grp.color+"44"}`,borderRadius:20,padding:"20px 14px 18px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",boxShadow:T.cardShadow(grp.color)}}>
+                  style={{background:dark?"linear-gradient(160deg,#2a0b0e 0%,#140608 38%,#0b0b0e 100%)":T.card,border:`1.5px solid ${dark?(hasProblems?"#FF1E27aa":"#3a3a42"):(hasProblems?grp.color+"99":grp.color+"44")}`,borderRadius:20,padding:"20px 14px 18px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",boxShadow:dark?"0 12px 30px rgba(0,0,0,.6), 0 0 18px #E5091422, inset 0 1px 0 rgba(255,255,255,.06)":T.cardShadow(grp.color)}}>
                   {hasProblems&&<div style={{position:"absolute",top:10,right:10,width:8,height:8,borderRadius:"50%",background:"#ef4444",boxShadow:"0 0 8px #ef4444aa",animation:"mkGlow 1.6s infinite"}}/>}
                   <IconeCliente arq={grp.key} cor={grp.color} fallback={<svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 18L26 4L48 18V42H4V18Z" stroke={grp.color} strokeWidth="2.5" strokeLinejoin="round" fill={grp.color+"11"}/>
@@ -4844,8 +4844,8 @@ export default function App(){
                     </div>
                   ):(
                     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-                      <StatusRing empty size={46} color="#7c3aed"/>
-                      <span style={{fontSize:12,color:"#a78bfa"}}>Sem dados</span>
+                      <StatusRing empty size={46} color="#6b7280"/>
+                      <span style={{fontSize:12,color:"#9ca3af"}}>Sem dados</span>
                     </div>
                   )}
                 </button>
@@ -4887,19 +4887,20 @@ export default function App(){
 
 // ─── TEMA CLARO/ESCURO ────────────────────────────────────────────────────────
 const themeTokens=(dark)=>dark?{
-  title:"#f8fafc",sub:"#94a3b8",hdrBg:"rgba(148,163,184,.06)",hdrBorder:"#263248",hdrTxt:"#a8b6c8",
-  divLine:"#1e293b",divTxt:"#64748b",
-  diagBg:"linear-gradient(135deg,#123458 0%,#0b1d33 58%,#12243d 100%)",diagBorder:"#38bdf866",
-  diagShadow:"0 10px 26px rgba(0,0,0,.48), 0 0 20px #38bdf812, inset 0 1px 0 rgba(255,255,255,.06)",
-  diagTxt:"#e0f2fe",diagSub:"#7dd3fc",diagArrow:"#38bdf8",
-  card:"linear-gradient(165deg,#0c1526 0%,#060c18 65%)",cardTxt:"#f1f5f9",cardSub:"#64748b",cardBorderNeutral:"#263248",
-  cardShadow:(c)=>`0 12px 30px rgba(0,0,0,.55), 0 0 20px ${c}12, inset 0 1px 0 rgba(255,255,255,.05)`,
-  track:"#0f172a",saudeBg:"linear-gradient(165deg,#0a1a12 0%,#060c18 70%)",saudeLabel:"#a8b6c8",
-  saudeShadow:"0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)",
-  draftBg:"linear-gradient(120deg,#131a2b 0%,#0f172a 55%,#1a1610 100%)",draftShadow:"0 6px 18px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)",
-  mod:(c)=>`linear-gradient(165deg,${c}11,${c}06)`,modShadow:"0 4px 14px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04)",modChev:(c)=>c+"44",modIconBg:(c)=>c+"15",
-  ttl:(c)=>c,
-  chev:"#94a3b8",listBg:"#060c18",listBgActive:"#060f20",listBorder:"#0f172a",listName:"#94a3b8",listHdr:"#0f172a",
+  // Paleta Moked (21/10): preto profundo, metal escovado, vermelho sangue #E50914. Cor viva só com significado (estado).
+  title:"#f8fafc",sub:"#9ca3af",hdrBg:"rgba(255,255,255,.04)",hdrBorder:"#2a2a31",hdrTxt:"#c7cad1",
+  divLine:"#2a2a31",divTxt:"#6b7280",
+  diagBg:"linear-gradient(135deg,#2a0b0e 0%,#140608 55%,#0b0b0e 100%)",diagBorder:"#E5091488",
+  diagShadow:"0 10px 26px rgba(0,0,0,.55), 0 0 20px #E5091418, inset 0 1px 0 rgba(255,255,255,.06)",
+  diagTxt:"#fee2e2",diagSub:"#fca5a5",diagArrow:"#FF1E27",
+  card:"linear-gradient(160deg,#15151a 0%,#0b0b0e 60%,#08080a 100%)",cardTxt:"#f3f4f6",cardSub:"#9ca3af",cardBorderNeutral:"#2a2a31",
+  cardShadow:()=>"0 12px 30px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06)",
+  track:"#1f1f25",saudeBg:"linear-gradient(165deg,#15151a 0%,#0b0b0e 70%)",saudeLabel:"#c7cad1",
+  saudeShadow:"0 8px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05)",
+  draftBg:"linear-gradient(120deg,#1a1610 0%,#15151a 55%,#0b0b0e 100%)",draftShadow:"0 6px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05)",
+  mod:(c)=>`linear-gradient(160deg,#15151a 0%,#0b0b0e 70%)`,modShadow:"0 4px 14px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05)",modChev:()=>"#6b7280",modIconBg:()=>"#1f1f25",
+  ttl:()=>"#f3f4f6",
+  chev:"#9ca3af",listBg:"#0b0b0e",listBgActive:"#15151a",listBorder:"#2a2a31",listName:"#9ca3af",listHdr:"#15151a",
 }:{
   title:"#0f172a",sub:"#475569",hdrBg:"#ffffff",hdrBorder:"#cbd5e1",hdrTxt:"#334155",
   divLine:"#cbd5e1",divTxt:"#64748b",
