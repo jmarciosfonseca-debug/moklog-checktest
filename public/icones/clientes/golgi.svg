@@ -3,27 +3,11 @@
     <filter id="golgi3-shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="-8" dy="16" stdDeviation="15" flood-color="#02141A" flood-opacity="0.9"/>
     </filter>
-    <filter id="golgi3-glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#559BA4" flood-opacity="0.75"/>
-      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#84CC16" flood-opacity="0.5"/>
-    </filter>
+    <filter id="golgi3-glow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#E50914" flood-opacity="0.35"/></filter>
 
-    <linearGradient id="golgi3-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#081E24" stop-opacity="0.96"/>
-      <stop offset="45%" stop-color="#041419" stop-opacity="0.94"/>
-      <stop offset="100%" stop-color="#010A0C" stop-opacity="0.98"/>
-    </linearGradient>
-    <radialGradient id="golgi3-glass-glow" cx="22%" cy="18%" r="75%">
-      <stop offset="0%" stop-color="#559BA4" stop-opacity="0.28"/>
-      <stop offset="40%" stop-color="#65A30D" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#081E24" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="golgi3-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
-      <stop offset="0%" stop-color="#E6FFFA" stop-opacity="0.95"/>
-      <stop offset="25%" stop-color="#559BA4" stop-opacity="0.85"/>
-      <stop offset="60%" stop-color="#15803D" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#064E3B" stop-opacity="0.15"/>
-    </linearGradient>
+    <linearGradient id="golgi3-glass-base" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#180A0C" stop-opacity="0.96"/><stop offset="45%" stop-color="#100507" stop-opacity="0.94"/><stop offset="100%" stop-color="#080102" stop-opacity="0.98"/></linearGradient>
+    <radialGradient id="golgi3-glass-glow" cx="22%" cy="18%" r="75%"><stop offset="0%" stop-color="#E50914" stop-opacity="0.22"/><stop offset="40%" stop-color="#B91C1C" stop-opacity="0.08"/><stop offset="100%" stop-color="#180A0C" stop-opacity="0"/></radialGradient>
+    <linearGradient id="golgi3-rim-border" x1="15%" y1="10%" x2="85%" y2="90%"><stop offset="0%" stop-color="#FEE2E2" stop-opacity="0.9"/><stop offset="25%" stop-color="#E50914" stop-opacity="0.8"/><stop offset="60%" stop-color="#B91C1C" stop-opacity="0.4"/><stop offset="100%" stop-color="#450A0A" stop-opacity="0.15"/></linearGradient>
     <linearGradient id="golgi3-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25"/>
       <stop offset="35%" stop-color="#99F6E4" stop-opacity="0.06"/>
