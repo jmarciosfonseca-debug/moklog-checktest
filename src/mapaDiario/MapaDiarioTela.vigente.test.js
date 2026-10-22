@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import MapaDiarioTela from "./MapaDiarioTela";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
+// O campo de data limita o retroativo pela data REAL (hojeISO): fixa o relógio em 14/10/2026 para o teste não envelhecer.
+beforeAll(() => { jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate", "setTimeout", "setInterval", "clearTimeout", "clearInterval", "queueMicrotask"] }); jest.setSystemTime(new Date("2026-10-14T22:56:00.000Z")); });
+afterAll(() => jest.useRealTimers());
 // Aba aberta da véspera: a seleção ficou no noturno de 13/10, mas agora é quarta 14/10 às 19:56.
 const AGORA = () => new Date("2026-10-14T22:56:00.000Z");
 const io = {
@@ -11,6 +14,8 @@ const io = {
   loadUltimoMapa: async () => null,
   saveMapa: jest.fn(async (m) => ({ ...m, status: "enviado", enviadoEm: AGORA().toISOString() })),
   loadMaterialBase: async () => null,
+  loadUltimaVisita: async () => null,
+  loadDesligamentosRecentes: async () => [],
 };
 
 test("mapa fora do plantão em vigor: banner com atalho e Concluir só com confirmação explícita", async () => {

@@ -49,7 +49,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
       <span style={{ display: "flex", fontSize: 16, color: COR[a.sev], marginTop: 1, flexShrink: 0 }}><Ico n={ICONE[a.tipo] || "alerta"} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, color: txt2, background: dark ? "#0f172a" : "#e2e8f0", borderRadius: 5, padding: "1px 6px" }}>{a.projetoId}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 800, color: txt2, background: dark ? "#1f1f25" : "#e2e8f0", borderRadius: 5, padding: "1px 6px" }}>{a.projetoId}</span>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: txt }}>{a.titulo}</span>
           {a.novo && <span style={{ fontSize: 9.5, fontWeight: 900, color: "#fff", background: "#2563eb", borderRadius: 5, padding: "1px 6px", letterSpacing: .4 }}>NOVO</span>}
         </div>
@@ -59,7 +59,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
     </button>
   );
   return (
-    <div data-testid="painel-avisos" style={{ marginTop: 10, background: dark ? "linear-gradient(165deg,#0c1526 0%,#060c18 70%)" : "linear-gradient(165deg,#ffffff 0%,#f8fafc 100%)", border: `1px solid ${corBorda}55`, borderRadius: 14, padding: "10px 14px", boxShadow: dark ? "0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)" : "0 4px 14px rgba(15,23,42,.08)" }}
+    <div data-testid="painel-avisos" style={{ marginTop: 10, background: dark ? "linear-gradient(160deg,#15151a 0%,#0b0b0e 70%)" : "linear-gradient(165deg,#ffffff 0%,#f8fafc 100%)", border: `1px solid ${corBorda}55`, borderRadius: 14, padding: "10px 14px", boxShadow: dark ? "0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)" : "0 4px 14px rgba(15,23,42,.08)" }}
       onMouseEnter={() => setPausa(true)} onMouseLeave={() => setPausa(false)}>
       <style>{`@keyframes mkAvisoPulso{0%,100%{opacity:1}50%{opacity:.45}}@keyframes mkAvisoEntra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div onClick={total ? onToggle : undefined} role={total ? "button" : undefined} aria-expanded={total ? !!aberto : undefined} style={{ display: "flex", alignItems: "center", gap: 8, cursor: total ? "pointer" : "default" }}>
