@@ -195,7 +195,7 @@ function IconeCliente({ arq, cor, fallback }) {
   const [falhou, setFalhou] = useState(false);
   if (falhou) return fallback;
   return <img src={`/icones/clientes/${arq}.svg`} alt="" width={92} height={92} draggable={false} onError={()=>setFalhou(true)}
-    style={{ display:"block", margin:"-4px 0 -2px", filter:`drop-shadow(0 6px 14px ${cor}55)` }}/>;
+    style={{ display:"block", margin:"-4px 0 -2px", filter:"drop-shadow(0 6px 14px rgba(0,0,0,.55))" }}/>;
 }
 
 // Ícone 3D pequeno para botões cheios (Painel Gerencial); cai no ícone de linha se a arte não carregar
