@@ -16,26 +16,13 @@
     </filter>
 
     <!-- Base de vidro fosco escuro com matiz âmbar/grafite -->
-    <linearGradient id="mapa-glass-base" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1F1306" stop-opacity="0.96"/>
-      <stop offset="45%" stop-color="#140B03" stop-opacity="0.94"/>
-      <stop offset="100%" stop-color="#080401" stop-opacity="0.98"/>
-    </linearGradient>
+    <linearGradient id="mapa-glass-base" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#180A0C" stop-opacity="0.96"/><stop offset="45%" stop-color="#100507" stop-opacity="0.94"/><stop offset="100%" stop-color="#080102" stop-opacity="0.98"/></linearGradient>
 
     <!-- Brilho volumétrico interno âmbar/ouro -->
-    <radialGradient id="mapa-glass-glow" cx="22%" cy="18%" r="75%">
-      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.30"/>
-      <stop offset="45%" stop-color="#D97706" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#1F1306" stop-opacity="0"/>
-    </radialGradient>
+    <radialGradient id="mapa-glass-glow" cx="22%" cy="18%" r="75%"><stop offset="0%" stop-color="#E50914" stop-opacity="0.22"/><stop offset="40%" stop-color="#B91C1C" stop-opacity="0.08"/><stop offset="100%" stop-color="#180A0C" stop-opacity="0"/></radialGradient>
 
     <!-- Rim light chanfrado da borda externa -->
-    <linearGradient id="mapa-rim-border" x1="15%" y1="10%" x2="85%" y2="90%">
-      <stop offset="0%" stop-color="#FEF3C7" stop-opacity="0.95"/>
-      <stop offset="25%" stop-color="#F59E0B" stop-opacity="0.85"/>
-      <stop offset="60%" stop-color="#B45309" stop-opacity="0.45"/>
-      <stop offset="100%" stop-color="#451A03" stop-opacity="0.15"/>
-    </linearGradient>
+    <linearGradient id="mapa-rim-border" x1="15%" y1="10%" x2="85%" y2="90%"><stop offset="0%" stop-color="#FEE2E2" stop-opacity="0.9"/><stop offset="25%" stop-color="#E50914" stop-opacity="0.8"/><stop offset="60%" stop-color="#B91C1C" stop-opacity="0.4"/><stop offset="100%" stop-color="#450A0A" stop-opacity="0.15"/></linearGradient>
 
     <!-- Reflexo especular diagonal superior do vidro -->
     <linearGradient id="mapa-specular-top" x1="0%" y1="0%" x2="0%" y2="100%">
