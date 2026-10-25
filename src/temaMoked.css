@@ -24,7 +24,15 @@
   animation: none !important;
 }
 .mk-navigation .mk-caption { color: var(--mk-muted) !important; }
+.mk-navigation [data-pendente] {
+  color: #fff !important;
+  background: #92400e;
+  font-size: 11px !important;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
 .mk-navigation:hover { border-color: var(--mk-muted) !important; }
+#root main[data-testid^="entrada"] { --mk-focus: #f8fafc; }
 #root :is(button, a, input, select, textarea):focus-visible {
   outline: 2px solid var(--mk-focus) !important;
   outline-offset: 3px;

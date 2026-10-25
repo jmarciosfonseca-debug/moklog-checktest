@@ -893,7 +893,7 @@ export function ContadorEquipamentos({ projectId }){
   const dias = Math.floor(diff/86400000);
   const horas = Math.floor((diff%86400000)/3600000);
   const minutos = Math.floor((diff%3600000)/60000);
-  return <div style={{fontSize:10,color:"#f43f5e",marginTop:3,fontWeight:700}}><Ico n="ampulheta"/> {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)}</div>;
+  return <div className="mk-caption" style={{fontSize:11,color:"var(--mk-muted)",marginTop:3,fontWeight:700}}><Ico n="ampulheta"/> {dias}d {horas}h {minutos}min · dom {fmtDate(alvo)}</div>;
 }
 
 // Modal de conclusão da checagem semanal de equipamentos.
