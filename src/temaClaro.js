@@ -60,6 +60,7 @@ const SOL = [
 export function aplicarTema(tema) {
   _atual = tema;
   if (typeof document === "undefined") return;
+  document.documentElement.dataset.mokedTema = tema;
   try { localStorage.setItem(CHAVE, tema); } catch {}
   let el = document.getElementById(ID);
   if (tema === "lua") { if (el) el.remove(); return; }
