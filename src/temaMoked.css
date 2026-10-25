@@ -1,0 +1,38 @@
+:root {
+  --mk-surface: #1f2937;
+  --mk-page: #111827;
+  --mk-text: #f3f4f6;
+  --mk-muted: #cbd5e1;
+  --mk-border: #475569;
+  --mk-brand: #b91c1c;
+  --mk-focus: #f8fafc;
+}
+:root[data-moked-tema="nuvem"], :root[data-moked-tema="sol"] {
+  --mk-surface: #fff;
+  --mk-page: #f5f6f8;
+  --mk-text: #111827;
+  --mk-muted: #475569;
+  --mk-border: #cbd5e1;
+  --mk-focus: #111827;
+}
+:root[data-moked-tema="sol"] { --mk-surface: #fffbf0; --mk-page: #fbf4e2; }
+.mk-navigation {
+  background: var(--mk-surface) !important;
+  border: 1px solid var(--mk-border) !important;
+  color: var(--mk-text) !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+.mk-navigation .mk-caption { color: var(--mk-muted) !important; }
+.mk-navigation:hover { border-color: var(--mk-muted) !important; }
+#root :is(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--mk-focus) !important;
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  #root *, #root *::before, #root *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './temaMoked.css';
 
 // Link público de follow-up (manutenção/administração): página própria, sem o app nem login.
 const PaginaExterna = lazy(() => import('./followupLink/PaginaExterna'));

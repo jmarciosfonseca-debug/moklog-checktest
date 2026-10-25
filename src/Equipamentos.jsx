@@ -1,5 +1,5 @@
 import CampoData from "./CampoData";
-import ListaCascata from "./ListaCascata";
+import ListaCascata from "./ListaCascata.jsx";
 import { Ico } from "./Icones";
 import IconeEquip from "./IconeEquip";
 import { iconeTema } from "./temaClaro";
