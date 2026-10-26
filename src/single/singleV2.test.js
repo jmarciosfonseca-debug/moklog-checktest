@@ -7,11 +7,11 @@ const {inventario}=require("./catalogoCobertura.cjs");
 const {calcularFamilia,calcularInspecao}=require("./singleCalc");
 const {executar}=require("./singleServer");
 
-test("catálogo v3: itens separados, ids únicos e cobertura total dos 137 rótulos reais",()=>{
+test("catálogo v3: itens separados, ids únicos e cobertura total dos 138 rótulos reais",()=>{
  expect(new Set(familias.map(f=>f.id)).size).toBe(familias.length);
  expect(familias.length).toBeGreaterThanOrEqual(50);
  const all=inventario().map(x=>({...x,v2:classificar(x.nome,x.tipo)}));
- expect(all).toHaveLength(137);
+ expect(all).toHaveLength(138);
  expect(all.filter(x=>x.v2==="revisar")).toEqual([]);
  const ids=new Set(familias.map(f=>f.id));
  expect(all.every(x=>x.v2==="fora_v1"||ids.has(x.v2))).toBe(true);

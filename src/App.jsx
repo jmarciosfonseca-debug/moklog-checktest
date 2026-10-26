@@ -629,6 +629,8 @@ const PROJECTS = {
       {id:"torniquetes",label:"22 - TORNIQUETES (ESTRUTURA MECÂNICA)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
       {id:"facial_torniquetes",label:"23 - LEITORES FACIAIS DOS TORNIQUETES",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04","Unidade 05","Unidade 06","Unidade 07","Unidade 08"]},
       {id:"totens",label:"24 - TOTENS VISITANTES/MOTORISTAS",type:"items",itemLabels:["Totem Visitantes","Totem Motoristas"]},
+      // Bolsão/subsolo (Marcio, 26/10/2026): conjunto novo no teste semanal; entra operante.
+      {id:"bolsao_subsolo",label:"24B - BOLSÃO / SUBSOLO — CANCELAS, LEITORES FACIAIS E INTERCOMUNICADORES",type:"items",itemLabels:["Cancela 01 — Entrada","Cancela 02 — Saída","Leitor Facial 01 — Entrada","Leitor Facial 02 — Saída","Intercomunicador 01 — Entrada","Intercomunicador 02 — Saída"]},
       {id:"intercomunicadores",label:"LEGADO (HISTÓRICO) — INTERCOMUNICADORES",type:"items",itemLabels:["Portaria","CCO","Torniquetes","Cancelas"]},
       {id:"facial",label:"LEGADO (HISTÓRICO) — LEITORES FACIAIS ECLUSAS/CANCELAS",type:"items",itemLabels:["Eclusa Entrada 01","Eclusa Entrada 02","Eclusa Saída 03 Reversiva","Eclusa Saída 04"]},
       {id:"portoes",label:"LEGADO (HISTÓRICO) — PORTÕES / ANTI-ESMAGAMENTO",type:"items",itemLabels:["Eclusa 01 Externa","Eclusa 01 Interna","Eclusa 02 Externa","Eclusa 02 Interna","Eclusa 03 Externa","Eclusa 03 Interna","Eclusa 04 Externa","Eclusa 04 Interna"]},

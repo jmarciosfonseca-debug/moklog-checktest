@@ -13,7 +13,7 @@ test("prioridade evita classificar monitor CFTV como câmera e leitor como cance
 });
 test("todo rótulo real recebe família, fora v1 ou revisar explícito",()=>{
  const all=inventario(),known=new Set([...familias.map(x=>x.id),"fora_v1","revisar"]);
- expect(all.length).toBe(137);
+ expect(all.length).toBe(138);
  expect(all.filter(x=>x.destino==="revisar")).toEqual([]);
  expect(all.every(x=>known.has(x.destino))).toBe(true);
 });
