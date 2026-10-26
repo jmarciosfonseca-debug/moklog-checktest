@@ -36,3 +36,14 @@ test("painel gerencial: relatórios do projeto organizados por mês (chips), 4 �
   expect(app).toContain("Ver mais ${listaMes.length-4} relatório(s) de ${rotuloMes(mesAtivo)}");
   expect(app).toContain("aria-pressed={m===mesAtivo}");
 });
+
+// Porta do MokLog (Marcio, 26/10/2026): PIN antes da Home; líder cai só no próprio projeto; gerencial vê a Home completa.
+test("porta do MokLog: PIN antes da Home e escopo do líder", () => {
+  const fs = require("fs"), path = require("path");
+  const app = fs.readFileSync(path.join(__dirname, "App.jsx"), "utf8");
+  expect(app).toMatch(/portal==="moklog_pin"/);
+  expect(app).toMatch(/setPortal\(hasGerencial\(\)\|\|getScopedProjectId\(\)\?"moklog":"moklog_pin"\)/);
+  expect(app).toMatch(/entrarNoProjetoDoLider\(pid\)/);
+  expect(app).toMatch(/groupProjects = \[_escopoLider\]/);
+  expect(fs.existsSync(path.join(__dirname, "entrada", "PinMoklog.jsx"))).toBe(true);
+});
