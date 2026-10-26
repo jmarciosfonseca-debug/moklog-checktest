@@ -5,12 +5,12 @@ import { kmRodado, rotuloSaida } from "./modelo";
 
 export const OCORRENCIAS = [
   { id: "todos", rotulo: "Todos os mapas", tipos: null },
-  { id: "qualquer", rotulo: "Só mapas com ocorrência (falta, FT, atraso, troca, cobertura)", tipos: ["falta", "ft", "atraso", "cobertura", "troca", "vago"] },
+  { id: "qualquer", rotulo: "Só mapas com ocorrência (falta, FT, atraso, troca, cobertura)", tipos: ["falta", "ft", "atraso", "cobertura", "troca", "vago", "antecipacao"] },
   { id: "falta_ft", rotulo: "Falta ou FT", tipos: ["falta", "ft"] },
   { id: "falta", rotulo: "Só falta", tipos: ["falta"] },
   { id: "ft", rotulo: "Só FT", tipos: ["ft"] },
 ];
-const TIPOS_LINHA = ["falta", "ft", "atraso", "cobertura", "troca", "vago"]; // tudo que sai do "presente"
+const TIPOS_LINHA = ["falta", "ft", "atraso", "cobertura", "troca", "vago", "antecipacao"]; // tudo que sai do "presente"
 export const MAX_DIAS_PERIODO = 92;
 
 const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -47,6 +47,9 @@ export function detalheDoPosto(p, postos = []) {
     detalhe = [d.hora ? `chegou às ${hh(d.hora)}` : "", d.minutos ? `${d.minutos} min` : ""].filter(Boolean).join(" · ");
   } else if (p.situacao === "vago") {
     detalhe = "posto sem ninguém";
+  } else if (p.situacao === "antecipacao") {
+    if (d.motivoAnt === "falta" && d.quemFaltou) { detalhe = `antecipou cobrindo a falta de ${d.quemFaltou}`; envolvidos.push(d.quemFaltou); }
+    else detalhe = `antecipou o plantão${d.motivoTexto ? ` — ${d.motivoTexto}` : ""}`;
   }
   if ((p.obs || "").trim()) detalhe = detalhe ? `${detalhe} — ${p.obs.trim()}` : p.obs.trim();
   return { detalhe, envolvidos: envolvidos.filter(Boolean) };
@@ -70,7 +73,7 @@ export function ocorrenciasDoMapa(mapa) {
     linhas.push({ ...ctx, tipo: p.situacao, posto: p.rotulo || "", pessoa: nomeDe(p), pessoaId: p.pessoaId || "", detalhe, envolvidos });
   }
   for (const p of postos) {
-    if (p.situacao !== "ft") continue;
+    if (p.situacao !== "ft" && !(p.situacao === "antecipacao" && (p.detalhe || {}).motivoAnt === "falta")) continue;
     const d = p.detalhe || {};
     const quem = String(d.quemFaltou || "").trim();
     if (d.semFalta || !quem) continue;

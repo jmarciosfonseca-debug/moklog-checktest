@@ -27,7 +27,7 @@ export function turnoVigente(projetoId, agora) {
 }
 
 // Ocorrências que pintam a bolinha de amarelo no painel: FT, falta, atraso e troca.
-export const SITUACOES_OCORRENCIA = ["falta", "ft", "atraso", "troca"];
+export const SITUACOES_OCORRENCIA = ["falta", "ft", "atraso", "troca", "antecipacao"];
 export function contarOcorrencias(mapa) {
   return (mapa?.postos || []).filter((x) => SITUACOES_OCORRENCIA.includes(x?.situacao)).length;
 }

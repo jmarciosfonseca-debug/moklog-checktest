@@ -21,6 +21,7 @@ export const SITUACOES = [
   { id: "ft", rotulo: "FT" },
   { id: "cobertura", rotulo: "Cobertura" },
   { id: "troca", rotulo: "Troca" },
+  { id: "antecipacao", rotulo: "Antecipação de plantão" },
   { id: "vago", rotulo: "Sem ninguém" },
 ];
 export const ROTULO_SITUACAO = Object.fromEntries(SITUACOES.map((s) => [s.id, s.rotulo]));
@@ -217,9 +218,16 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
       if (!d.quemFaltouId && !d.quemFaltou && !d.semFalta && !d.postoVago) erros.push(`${nome}: FT cobrindo falta de quem? Escolha quem faltou`);
       if (d.quemFaltouId && d.quemFaltouId === p.pessoaId) erros.push(`${nome}: quem faltou não pode ser a própria pessoa da FT`);
     }
-    const ausenteComAfastamento = p.situacao === "falta" || (p.situacao === "cobertura" && d.deQuem && !d.semFalta) || (p.situacao === "ft" && d.quemFaltou);
+    const ausenteComAfastamento = p.situacao === "falta" || (p.situacao === "cobertura" && d.deQuem && !d.semFalta) || (p.situacao === "ft" && d.quemFaltou) || (p.situacao === "antecipacao" && d.motivoAnt === "falta" && d.quemFaltou);
     if (ausenteComAfastamento && d.afastamentoSim && !plantoesAfastamento(d.afastamentoPlantoes)) erros.push(`${nome}: informe quantos plantões de afastamento (de 2 a ${MAX_PLANTOES_AFASTAMENTO})`);
     if (p.situacao === "troca" && !d.noLugarDe) erros.push(`${nome}: troca no lugar de quem?`);
+    // Antecipação de plantão (Marcio, 26/10): quem antecipou precisa dizer o motivo — falta de alguém (vai para a ficha) ou outro (VSPP, reciclagem…).
+    if (p.situacao === "antecipacao") {
+      if (!d.motivoAnt) erros.push(`${nome}: antecipação por quê? Marque "Falta de alguém" ou "Outro motivo"`);
+      else if (d.motivoAnt === "falta" && !d.quemFaltouId && !d.quemFaltou && !d.semFalta && !d.postoVago) erros.push(`${nome}: antecipação cobrindo a falta de quem? Escolha quem faltou`);
+      else if (d.motivoAnt === "outro" && String(d.motivoTexto || "").trim().length < 3) erros.push(`${nome}: descreva o motivo da antecipação (ex.: VSPP, reciclagem)`);
+      if (d.quemFaltouId && d.quemFaltouId === p.pessoaId) erros.push(`${nome}: quem faltou não pode ser a própria pessoa que antecipou`);
+    }
   });
   // Obrigatórios: km da moto, resumo da passagem e se houve visita da supervisão neste turno.
   if (projetoComMoto(mapa.projetoId)) {
@@ -326,10 +334,20 @@ export function mudarSituacao(mapa, id, nova) {
   const p = (mapa.postos || []).find((x) => x.id === id);
   if (!p || p.situacao === nova) return mapa;
   let m = mapa;
-  if (p.situacao === "ft") m = desfazerVinculoFalta(m, id);
+  if (p.situacao === "ft" || p.situacao === "antecipacao") m = desfazerVinculoFalta(m, id);
   const porFt = p.situacao === "falta" && p.detalhe && p.detalhe.porFtDe;
   if (porFt) m = { ...m, postos: m.postos.map((x) => (x.id === porFt ? { ...x, detalhe: semVinculo(x.detalhe) } : x)) };
   return { ...m, postos: m.postos.map((x) => (x.id === id ? { ...x, situacao: nova, detalhe: x.detalhe && x.detalhe.livre ? { livre: true } : {} } : x)) }; // nunca undefined: o Firestore recusa o mapa inteiro
+}
+
+// Antecipação: "falta" mantém o vínculo com quem faltou; "outro" limpa o vínculo e guarda o texto.
+export function definirMotivoAntecipacao(mapa, postoId, motivo, texto) {
+  let m = motivo === "outro" ? desfazerVinculoFalta(mapa, postoId) : mapa;
+  return { ...m, postos: (m.postos || []).map((x) => {
+    if (x.id !== postoId) return x;
+    const { motivoAnt, motivoTexto, ...resto } = x.detalhe || {};
+    return { ...x, detalhe: { ...resto, motivoAnt: motivo, ...(motivo === "outro" ? { motivoTexto: String(texto ?? motivoTexto ?? "") } : {}) } };
+  }) };
 }
 
 export function removerPosto(mapa, id) {

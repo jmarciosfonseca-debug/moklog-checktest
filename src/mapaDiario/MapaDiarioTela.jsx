@@ -6,7 +6,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
@@ -572,7 +572,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                     </label>
                   </div>
                 )}
-                {p.situacao === "ft" && (() => {
+                {p.situacao === "antecipacao" && (() => {
+                  const d = p.detalhe || {};
+                  return (
+                    <div data-testid="antecipacao-motivo">
+                      <div style={S.lab}>Antecipou o plantão por quê?</div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button aria-pressed={d.motivoAnt === "falta"} onClick={() => alterar((m) => definirMotivoAntecipacao(m, p.id, "falta"))} style={S.chip(d.motivoAnt === "falta", "#dc2626")}>Falta de alguém</button>
+                        <button aria-pressed={d.motivoAnt === "outro"} onClick={() => alterar((m) => definirMotivoAntecipacao(m, p.id, "outro"))} style={S.chip(d.motivoAnt === "outro", cor.ac)}>Outro motivo</button>
+                      </div>
+                      {d.motivoAnt === "outro" && <input aria-label="Motivo da antecipação" placeholder="Ex.: VSPP, reciclagem, treinamento…" value={d.motivoTexto || ""} onChange={(e) => alterar((m) => definirMotivoAntecipacao(m, p.id, "outro", e.target.value))} style={{ ...S.in, marginTop: 6 }} />}
+                    </div>
+                  );
+                })()}
+                {(p.situacao === "ft" || (p.situacao === "antecipacao" && p.detalhe?.motivoAnt === "falta")) && (() => {
                   const cand = candidatosAFalta(mapa, p.id);
                   const idsNoMapa = new Set(cand.map((x) => x.pessoaId).filter(Boolean));
                   const aus = ausentesDaEquipe(mapa, colabs).filter((c) => c.id !== p.pessoaId);
@@ -582,7 +595,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                   return (
                     <div>
                       <div style={S.lab}>Quem faltou?</div>
-                      <select aria-label="Quem faltou (FT)" value={valor} onChange={(e) => alterar((m) => vincularFalta(m, p.id, e.target.value, colabs))} style={S.in}>
+                      <select aria-label={p.situacao === "ft" ? "Quem faltou (FT)" : "Quem faltou (antecipação)"} value={valor} onChange={(e) => alterar((m) => vincularFalta(m, p.id, e.target.value, colabs))} style={S.in}>
                         <option value="">Escolher quem faltou…</option>
                         <option value="__ninguem">Ninguém faltou (não teve falta)</option>
                         <option value="__vago">POSTO VAGO (sem titular, não é falta)</option>
@@ -592,7 +605,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                         </optgroup>
                         {outros.length > 0 && <optgroup label="Outros do projeto">{outros.map((c) => <option key={c.id} value={`c:${c.id}`}>{nomeCurto(c)}</option>)}</optgroup>}
                       </select>
-                      {p.detalhe?.quemFaltou && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>{p.detalhe.faltaPostoId ? "O posto dele passa a Falta. " : ""}A falta vai para a ficha de {p.detalhe.quemFaltou} e a FT para a ficha de {p.pessoaNome || "quem está no posto extra"}.</div>}
+                      {p.detalhe?.quemFaltou && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>{p.detalhe.faltaPostoId ? "O posto dele passa a Falta. " : ""}A falta vai para a ficha de {p.detalhe.quemFaltou}{p.situacao === "ft" ? ` e a FT para a ficha de ${p.pessoaNome || "quem está no posto extra"}` : " (quem antecipou não recebe FT)"}.</div>}
                     </div>
                   );
                 })()}
@@ -603,7 +616,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                   </div>
                 )}
                 {(() => {
-                  const quem = p.situacao === "falta" ? p.pessoaNome : p.situacao === "cobertura" && !p.detalhe?.semFalta ? p.detalhe?.deQuem : p.situacao === "ft" ? p.detalhe?.quemFaltou : "";
+                  const quem = p.situacao === "falta" ? p.pessoaNome : p.situacao === "cobertura" && !p.detalhe?.semFalta ? p.detalhe?.deQuem : p.situacao === "ft" || (p.situacao === "antecipacao" && p.detalhe?.motivoAnt === "falta") ? p.detalhe?.quemFaltou : "";
                   if (!quem) return null;
                   const sim = !!p.detalhe?.afastamentoSim;
                   return (
