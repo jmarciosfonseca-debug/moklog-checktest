@@ -1,8 +1,16 @@
-// Server-issued token, held only in this page's memory. Never persist PINs or tokens.
+// Token emitido pelo servidor. O PIN nunca é guardado; o token fica na memória e, por decisão do Marcio (26/10/2026),
+// também no aparelho por uma janela curta de inatividade — gerencial/cliente 30 min, líder 15 min — para não pedir PIN
+// a cada troca de tela ou ao fechar e reabrir. A janela renova a cada toque; o teto é a validade do token no servidor.
 let current=null,pending=null;
-export const SESSION_TIMEOUTS={gerencial:8*3600000,equipe:8*3600000,demo:8*3600000,ronda:8*3600000,cliente:8*3600000};
+export const SESSION_TIMEOUTS={gerencial:30*60000,equipe:15*60000,demo:30*60000,ronda:15*60000,cliente:30*60000};
+const CHAVE='moklog_session_v2';
 const announce=()=>{if(typeof window!=='undefined')window.dispatchEvent(new Event('moklog-auth-changed'));};
 try{localStorage.removeItem('moklog_session_v1');}catch{}
+let ultimaGravacao=0;
+function persistir(force){try{if(!current){localStorage.removeItem(CHAVE);return;}const t=Date.now();if(!force&&t-ultimaGravacao<10000)return;ultimaGravacao=t;localStorage.setItem(CHAVE,JSON.stringify(current));}catch{}}
+function restaurar(){try{const raw=localStorage.getItem(CHAVE);if(!raw)return;const s=JSON.parse(raw);if(!s||typeof s.token!=='string'||!SESSION_TIMEOUTS[s.nivel]||!Number.isFinite(s.exp)||!Number.isFinite(s.srvExp)||s.exp<=Date.now()||s.srvExp<=Date.now()){localStorage.removeItem(CHAVE);return;}current=s;}catch{}}
+restaurar();
+const janela=(nivel,srvExp)=>Math.min(srvExp,Date.now()+SESSION_TIMEOUTS[nivel]);
 export function getSession(){if(current&&Date.now()>=current.exp)clearSession();return current;}
 export function getAccess(pid){const s=getSession();if(!s)return null;if(['gerencial','demo'].includes(s.nivel))return 'admin';return s.nivel==='equipe'&&s.projectId===pid?'lider':null;}
 export function isDemo(){return getSession()?.nivel==='demo';}
@@ -10,8 +18,8 @@ export function hasGerencial(){return ['gerencial','demo'].includes(getSession()
 export function getScopedProjectId(){const s=getSession();return s?.nivel==='equipe'?s.projectId:null;}
 // Painel do Cliente: {escopo:'GOLGI'|'P601', pids:[...]} ou null. Gerencial/demo veem todos (escopo 'MOKED').
 export function getClienteScope(){const s=getSession();if(!s)return null;if(s.nivel==='cliente')return {escopo:s.escopo,pids:s.pids||[]};if(['gerencial','demo'].includes(s.nivel))return {escopo:'MOKED',pids:null};return null;}
-export function clearSession(){current=null;announce();}
-export function touchSession(){getSession();}
+export function clearSession(){current=null;persistir(true);announce();}
+export function touchSession(){const s=getSession();if(!s)return;s.exp=janela(s.nivel,s.srvExp);persistir(false);}
 export function grantSession(){return getSession();} // Legacy callbacks cannot manufacture access.
 export async function checkPin(value,opts={}){
  const pin=String(value||'').trim();if(!pin||pending)return null;
@@ -24,7 +32,8 @@ export async function checkPin(value,opts={}){
  if(data.nivel==='cliente'&&!opts.cliente)return null; // PIN de cliente só entra pelo Painel do Cliente
  if(opts.cliente&&!['cliente','admin','demo'].includes(data.nivel))return null;
  if((opts.adminOnly||(!opts.projectId&&!opts.anyProject&&!opts.cliente))&&!['admin','demo'].includes(data.nivel))return null;
- current={token:data.token,nivel:{admin:'gerencial',lider:'equipe',demo:'demo',ronda:'ronda',cliente:'cliente'}[data.nivel],projectId:data.pid||null,exp:data.exp,...(data.nivel==='cliente'?{escopo:data.escopo,pids:Array.isArray(data.pids)?data.pids:[]}:{})};announce();return data.nivel;
+ const nivel={admin:'gerencial',lider:'equipe',demo:'demo',ronda:'ronda',cliente:'cliente'}[data.nivel];
+ current={token:data.token,nivel,projectId:data.pid||null,srvExp:data.exp,exp:janela(nivel,data.exp),...(data.nivel==='cliente'?{escopo:data.escopo,pids:Array.isArray(data.pids)?data.pids:[]}:{})};persistir(true);announce();return data.nivel;
  })();
  try{return await pending;}catch{window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:'Sem conexão com o servidor de acesso.'}));return null;}finally{pending=null;}
 }
