@@ -355,3 +355,20 @@ test("semáforo com 1000 dias fica em Automação e apoio; cancela AS parcial fi
   expect(bloco(iManut, iRonda)).not.toMatch(/Ronda Virtual/);
   expect(bloco(iRonda, iRonda + 600)).toMatch(/1974\/2160 rondas executadas.*não altera a classe de risco/);
 });
+
+test("base operacional: Cancelas AS entram como contenção (sem rótulo apoio/prateleira); cancela ADM é prateleira", () => {
+  const dados = contexto([]);
+  dados.project = { id: "P601", name: "Golgi Cajamar", categories: [
+    { id: "cas", label: "06 - CANCELAS AS (ALTA SEGURANÇA)", type: "items", itemLabels: ["Acesso 01", "Acesso 03"] },
+    { id: "cadm", label: "05 - CANCELAS ADM (ADMINISTRATIVAS)", type: "items", itemLabels: ["ADM 01"] },
+    { id: "sem", label: "22 - SEMÁFOROS", type: "items", itemLabels: ["S1"] },
+  ] };
+  dados.ts = { ...(dados.ts || {}), data: "25/10/2026", estado: { cas: [{ status: "partial" }, { status: "ok" }], cadm: [{ status: "inop" }], sem: [{ status: "inop" }] }, pend: [] };
+  const html = gerarHTMLAnaliseRisco(dados);
+  const i = html.indexOf("Onde estão as falhas");
+  const bloco = html.slice(i, i + 1500);
+  expect(bloco).toMatch(/Cancelas AS[^<]*<\/span>[\s\S]{0,300}?1<small class="ar-mu"> de 2<\/small><\/b>/);
+  expect(bloco).not.toMatch(/Cancelas AS[\s\S]{0,400}?prateleira/);
+  expect(bloco).toMatch(/Cancelas ADM[\s\S]{0,400}?prateleira/);
+  expect(bloco).toMatch(/Semáforos[\s\S]{0,400}?apoio/);
+});

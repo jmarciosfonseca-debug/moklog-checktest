@@ -1574,7 +1574,9 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   if (ts?.estado && project?.categories) {
     const itensBase = itensDoEstado(project, ts.estado), rb = resumo(itensBase);
     const totalCat = {}; itensBase.forEach((it) => { totalCat[it.cat] = (totalCat[it.cat] || 0) + 1; });
-    const camadaCat = (cat) => { try { const rc = classificarVetor({ labelItem: "", labelCategoria: cat, escopo: "moked" }); return rc.observacaoManutencao || rc.classe === "Periférico" ? 3 : (rc.classe === "Automação" || rc.classe === "Iluminação") ? 2 : 1; } catch { return 1; } };
+    // Cancela de alta segurança é contenção (motor v2 trata por haste), nunca prateleira — o nome "CANCELAS AS" não casa a regra "cancela alta seg" do riscoConfig.
+    const ehContencaoNominal = (cat) => /cancela[s]?\s+as\b|alta\s+seg|bollard|bolard|pino|dilacerador|garra|perimetral|per[ií]metro|p[âa]nico|ctmk|cftv|inc[êe]ndio|sdai|eclusa/i.test(String(cat || ""));
+    const camadaCat = (cat) => { if (ehContencaoNominal(cat)) return 1; try { const rc = classificarVetor({ labelItem: "", labelCategoria: cat, escopo: "moked" }); return rc.observacaoManutencao || rc.classe === "Periférico" ? 3 : (rc.classe === "Automação" || rc.classe === "Iluminação") ? 2 : 1; } catch { return 1; } };
     const fsb = falhasPorSistema(itensBase).map((f) => ({ ...f, camada: camadaCat(f.cat), total: totalCat[f.cat] || 0 })).sort((a, b) => a.camada - b.camada || (b.inop + b.parcial) - (a.inop + a.parcial)).slice(0, 9);
     const C = 2 * Math.PI * 56, sg = (q) => rb.total ? q / rb.total * C : 0, mx = Math.max(1, ...fsb.map((f) => f.inop + f.parcial));
     const rosca = `<svg viewBox="0 0 160 160" width="124" height="124" role="img" aria-label="${rb.total} ativos: ${rb.ok} operacionais, ${rb.parcial} parciais, ${rb.inop} inoperantes"><g transform="rotate(-90 80 80)" fill="none" stroke-width="18"><circle cx="80" cy="80" r="56" stroke="#E5E7EB"/>
