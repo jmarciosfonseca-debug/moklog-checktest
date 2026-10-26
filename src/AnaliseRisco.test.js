@@ -233,7 +233,7 @@ test("os nove projetos compartilham capa e a mesma estrutura institucional", () 
     expect(html).toContain("Moked Consulting Security");
     expect(html).toContain("Análise de Risco de Segurança");
     expect(html).toContain("Classificação do ativo");
-    expect(html).toContain("Vetores que definem o risco");
+    expect(html).toContain("O que define o risco — contenção e detecção");
     expect(html).toContain("Como se chega à classificação — memória de cálculo");
     expect(html).toContain("Matriz de Impacto Operacional e Exposição ao Risco");
     expect(html).toContain("Diagnóstico territorial — por que a falha importa aqui");
@@ -328,4 +328,30 @@ test("identificador técnico de zona órfã não aparece no relatório", () => {
 
   expect(html).not.toContain("Área/zona: perimetro-sem-cadastro");
   expect(html).toContain("Área/zona: Perímetro sem identificação nominal");
+});
+
+// Camadas de apresentação (Marcio, 26/10/2026): automação/periférico nunca aparecem na tabela "define o risco",
+// por mais dias que tenham; ronda virtual sai do bloco de manutenção e ganha bloco próprio.
+test("semáforo com 1000 dias fica em Automação e apoio; cancela AS parcial fica no que define o risco; ronda virtual em bloco próprio", () => {
+  const vet = (x) => ({ chave: x.chave || x.label, label: x.label, nivel: x.nivel, piorDias: x.dias ?? null, inop: 1, total: 4, descricao: "", qtd: 1, ...x });
+  const dados = contexto([
+    vet({ label: "09 - SEMÁFOROS / PICTOGRAMAS", nivel: 2, dias: 1000, classeV2: "Automação" }),
+    vet({ label: "05 - CANCELAS AS (ALTA SEGURANÇA)", nivel: 2, dias: 12, classeV2: "Bloqueador" }),
+    vet({ chave: "ronda-virtual", label: "Ronda Virtual (CFTV)", nivel: 1, classeV2: "Periférico", observacaoManutencao: true, inop: 186, total: 2160, descricao: "1974/2160 rondas executadas (91%). 186 não executada(s) e 0 ocorrência(s) sem justificativa." }),
+    vet({ label: "17 - JOYSTICK CFTV", nivel: 1, dias: 400, classeV2: "Periférico", observacaoManutencao: true }),
+  ]);
+  dados.geral = { ...dados.geral, label: "MODERADO", nivel: 2 };
+  const html = gerarHTMLAnaliseRisco(dados);
+  const iDefine = html.indexOf("O que define o risco — contenção e detecção");
+  const iApoio = html.indexOf("Automação e apoio — registrados, não alteram a classe de risco");
+  const iManut = html.indexOf("Itens em manutenção — registrados, sem impacto direto na classificação");
+  const iRonda = html.indexOf("Rotina de monitoramento — Ronda Virtual (CFTV)");
+  expect(iDefine).toBeGreaterThan(-1); expect(iApoio).toBeGreaterThan(iDefine); expect(iManut).toBeGreaterThan(iApoio); expect(iRonda).toBeGreaterThan(iManut);
+  const bloco = (a, b) => html.slice(a, b);
+  expect(bloco(iDefine, iApoio)).toMatch(/CANCELAS AS/i);
+  expect(bloco(iDefine, iApoio)).not.toMatch(/SEM[ÁA]FOROS/i);
+  expect(bloco(iApoio, iManut)).toMatch(/SEM[ÁA]FOROS/i);
+  expect(bloco(iManut, iRonda)).toMatch(/JOYSTICK/i);
+  expect(bloco(iManut, iRonda)).not.toMatch(/Ronda Virtual/);
+  expect(bloco(iRonda, iRonda + 600)).toMatch(/1974\/2160 rondas executadas.*não altera a classe de risco/);
 });

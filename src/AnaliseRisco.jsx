@@ -1513,20 +1513,36 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   const emCards = new Set(cardsAcao.map((c) => c.v));
   const demais = vetores.filter((v) => !emCards.has(v) && !v.bloqueadorCaido && !(v.nivel >= NIVEIS.ELEVADO) && !v.observacaoManutencao)
     .sort((a, b) => b.nivel - a.nivel || (b.piorDias || 0) - (a.piorDias || 0));
-  const linhasVet = [...cardsAcao.map((c) => c.v), ...demais].map(linhaDe);
+  // Camadas de apresentação (Marcio, 26/10/2026): só apresentação — a nota, a fórmula e os tetos não mudam.
+  //   1 = define o risco (Bloqueador, Tático, perímetro, CTMK, CFTV, incêndio)  2 = automação e apoio (teto Moderado)
+  //   3 = prateleira/manutenção (Periférico)  rotina = Ronda Virtual (execução, não equipamento)
+  // Dias em aberto NUNCA promovem item de camada 2/3 para a 1.
+  const camadaDe = (v) => v.chave === "ronda-virtual" ? "rotina"
+    : (v.observacaoManutencao || v.classeV2 === "Periférico") ? 3
+    : (v.classeV2 === "Automação" || v.classeV2 === "Iluminação") ? 2 : 1;
+  const linhasTodas = [...cardsAcao.map((c) => c.v), ...demais].map(linhaDe);
+  const linhasVet = linhasTodas.filter((l) => camadaDe(l.v) === 1);
+  const linhasApoio = linhasTodas.filter((l) => camadaDe(l.v) === 2);
   // v2: nenhum item marcado como Bloqueador pode cair em "sem impacto".
-  const linhasMan = vetores.filter((v) => v.observacaoManutencao && !emCards.has(v) && v.classeV2 !== "Bloqueador" && !v.bloqueadorCaido).map(linhaDe);
+  const linhasMan = vetores.filter((v) => v.observacaoManutencao && !emCards.has(v) && v.classeV2 !== "Bloqueador" && !v.bloqueadorCaido && camadaDe(v) === 3).map(linhaDe);
+  const vRonda = vetores.find((v) => v.chave === "ronda-virtual") || null;
   const tratHTML = (t) => !t ? '<span class="ar-mu">—</span>'
     : t.estado === "sem" ? '<span class="ar-tr-sem">Sem tratativa</span>'
     : `<span class="${t.estado === "vencido" ? "ar-tr-venc" : "ar-tr-ok"}">${esc(({ aguardando: "Aguardando retorno", proposta: "Proposta enviada", aprovado: "Aprovado", execucao: "Em execução" })[t.status] || "Em acompanhamento")}</span>${t.quando ? `<div class="ar-mu">${esc(new Date(t.quando).toLocaleDateString("pt-BR").slice(0, 5))} · ${t.estado === "vencido" ? "follow-up vencido" : "em dia"}</div>` : ""}`;
   const corDias = (d) => d == null ? "" : d > 180 ? "ar-d-alta" : d >= 30 ? "ar-d-media" : "ar-d-baixa";
-  const tabelaVetHTML = linhasVet.length ? `<table class="ar-tb"><colgroup><col style="width:30%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:19%"><col style="width:13%"></colgroup>
+  const tabelaDe = (linhas, vazio) => linhas.length ? `<table class="ar-tb"><colgroup><col style="width:30%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:19%"><col style="width:13%"></colgroup>
     <thead><tr><th>Vetor</th><th>Classe</th><th>Nível</th><th class="ar-num">Em aberto</th><th>Tratativa</th><th>Correção</th></tr></thead><tbody>
-    ${linhasVet.slice(0, limiteApontamentos).map((l) => `<tr class="vt-linha"><td><div class="ar-dv">${esc(l.nome)}${l.extras ? ` <span class="ar-mu">e mais ${l.extras}</span>` : ""}</div><div class="ar-mu">${esc(l.sistema)}${l.status ? ` · ${l.status}` : ""}${l.v.travaTipo ? " · trava do site" : ""}${l.v.zonaCanonica ? ` · Área/zona: ${esc(zonaParaRelatorio(l.v))}` : ""}</div></td>
+    ${linhas.slice(0, limiteApontamentos).map((l) => `<tr class="vt-linha"><td><div class="ar-dv">${esc(l.nome)}${l.extras ? ` <span class="ar-mu">e mais ${l.extras}</span>` : ""}</div><div class="ar-mu">${esc(l.sistema)}${l.status ? ` · ${l.status}` : ""}${l.v.travaTipo ? " · trava do site" : ""}${l.v.zonaCanonica ? ` · Área/zona: ${esc(zonaParaRelatorio(l.v))}` : ""}</div></td>
       <td>${esc(l.v.classeV2 || (l.v.bloqueadorCaido ? "Bloqueador" : "—"))}</td><td><span class="ar-b ${NIVEL_CLS[l.v.nivel] || "ar-b-mo"}">${NIVEL_TXT[l.v.nivel] || ""}</span></td>
       <td class="ar-num">${l.dias != null ? `<span class="${corDias(l.dias)}">${l.dias} d</span>` : "—"}${l.desde ? `<div class="ar-mu">desde ${esc(l.desde)}</div>` : ""}</td><td>${tratHTML(l.trat)}</td><td><b>${esc(l.prazo)}</b></td></tr>`).join("")}
-    </tbody></table>` : `<div class="ar-ok">Nenhum vetor de risco apurado no período.</div>`;
+    </tbody></table>` : `<div class="ar-ok">${vazio}</div>`;
+  const tabelaVetHTML = tabelaDe(linhasVet, "Nenhum item de contenção ou detecção (perímetro, pânico, bollards, cancelas de alta segurança, CTMK, CFTV, incêndio) inoperante no período.");
   const restantesVet = Math.max(0, linhasVet.length - limiteApontamentos);
+  const apoioHTML = linhasApoio.length ? `<div class="bloco"><div class="eyebrow">Automação e apoio — registrados, não alteram a classe de risco</div>
+    <div class="nota">Semáforos, faróis, botoeiras, totens, QR, sensores anti-esmagamento e portões comuns têm teto Moderado por doutrina: entram no plano de manutenção, mas o tempo em aberto não os promove a fator de risco.</div>
+    ${tabelaDe(linhasApoio, "")}</div>` : "";
+  const rondaHTML = vRonda ? `<div class="bloco"><div class="eyebrow">Rotina de monitoramento — Ronda Virtual (CFTV)</div>
+    <p class="ar-pq">${esc(vRonda.descricao || "")} É execução de rotina do CCO, não equipamento: não há tratativa de manutenção associada e não altera a classe de risco.</p></div>` : "";
   const manutHTML = linhasMan.length ? `<div class="bloco"><div class="eyebrow">Itens em manutenção — registrados, sem impacto direto na classificação</div>
     <table class="ar-tb"><thead><tr><th>Item</th><th class="ar-num">Afetados</th><th class="ar-num">Em aberto</th><th>Tratativa</th></tr></thead><tbody>
     ${linhasMan.map((l) => `<tr><td><b>${esc(l.nome)}</b>${l.extras ? ` e mais ${l.extras}` : ""}<span class="ar-mu"> · ${esc(l.sistema)}</span></td><td class="ar-num">${l.v.inop != null && l.v.total ? `${l.v.inop} de ${l.v.total}` : "—"}</td><td class="ar-num">${l.dias != null ? `${l.dias} d` : "—"}</td><td>${tratHTML(l.trat)}</td></tr>`).join("")}
@@ -1556,13 +1572,16 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   // base operacional: a mesma do laudo semanal (mesma fórmula e mesmos números)
   let baseHTML = "";
   if (ts?.estado && project?.categories) {
-    const itensBase = itensDoEstado(project, ts.estado), rb = resumo(itensBase), fsb = falhasPorSistema(itensBase).slice(0, 9);
+    const itensBase = itensDoEstado(project, ts.estado), rb = resumo(itensBase);
+    const totalCat = {}; itensBase.forEach((it) => { totalCat[it.cat] = (totalCat[it.cat] || 0) + 1; });
+    const camadaCat = (cat) => { try { const rc = classificarVetor({ labelItem: "", labelCategoria: cat, escopo: "moked" }); return rc.observacaoManutencao || rc.classe === "Periférico" ? 3 : (rc.classe === "Automação" || rc.classe === "Iluminação") ? 2 : 1; } catch { return 1; } };
+    const fsb = falhasPorSistema(itensBase).map((f) => ({ ...f, camada: camadaCat(f.cat), total: totalCat[f.cat] || 0 })).sort((a, b) => a.camada - b.camada || (b.inop + b.parcial) - (a.inop + a.parcial)).slice(0, 9);
     const C = 2 * Math.PI * 56, sg = (q) => rb.total ? q / rb.total * C : 0, mx = Math.max(1, ...fsb.map((f) => f.inop + f.parcial));
     const rosca = `<svg viewBox="0 0 160 160" width="124" height="124" role="img" aria-label="${rb.total} ativos: ${rb.ok} operacionais, ${rb.parcial} parciais, ${rb.inop} inoperantes"><g transform="rotate(-90 80 80)" fill="none" stroke-width="18"><circle cx="80" cy="80" r="56" stroke="#E5E7EB"/>
       <circle cx="80" cy="80" r="56" stroke="#9CA3AF" stroke-dasharray="${sg(rb.ok).toFixed(1)} ${C.toFixed(1)}"/><circle cx="80" cy="80" r="56" stroke="#F59E0B" stroke-dasharray="${sg(rb.parcial).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-sg(rb.ok)).toFixed(1)}"/>
       <circle cx="80" cy="80" r="56" stroke="#DC2626" stroke-dasharray="${sg(rb.inop).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-(sg(rb.ok) + sg(rb.parcial))).toFixed(1)}"/></g>
       <text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">${rb.total}</text><text x="80" y="97" text-anchor="middle" font-size="11" fill="#6B7280">ativos</text></svg>`;
-    const barras = fsb.length ? fsb.map((f) => `<div class="ar-vb"><span>${esc(rotuloSistema(f.cat))}</span><span class="ar-vt">${f.inop ? `<i style="background:#DC2626;width:${(f.inop / mx * 100).toFixed(0)}%"></i>` : ""}${f.parcial ? `<i style="background:#F59E0B;width:${(f.parcial / mx * 100).toFixed(0)}%"></i>` : ""}</span><b>${f.inop + f.parcial}</b></div>`).join("") : '<div class="ar-ok">Nenhuma falha no último laudo.</div>';
+    const barras = fsb.length ? fsb.map((f) => `<div class="ar-vb"><span>${esc(rotuloSistema(f.cat))}</span><span class="ar-vt">${f.inop ? `<i style="background:#DC2626;width:${(f.inop / mx * 100).toFixed(0)}%"></i>` : ""}${f.parcial ? `<i style="background:#F59E0B;width:${(f.parcial / mx * 100).toFixed(0)}%"></i>` : ""}</span><b>${f.inop + f.parcial}${f.total ? `<small class="ar-mu"> de ${f.total}</small>` : ""}${f.camada > 1 ? `<small class="ar-mu"> · ${f.camada === 2 ? "apoio" : "prateleira"}</small>` : ""}</b></div>`).join("") : '<div class="ar-ok">Nenhuma falha no último laudo.</div>';
     baseHTML = `<section class="ar-base"><div><div class="ar-lb">Base operacional · mesmo laudo de ${esc(ts.data || "")}</div><div class="ar-rw">${rosca}<div class="ar-lgd">
       <div><i style="background:#9CA3AF"></i>Operacional <b>${rb.ok}</b></div><div><i style="background:#F59E0B"></i>Parcial <b>${rb.parcial}</b></div><div><i style="background:#DC2626"></i>Inoperante <b>${rb.inop}</b></div>
       <div class="ar-sd">Saúde <b>${Math.round(rb.saude)}%</b> <span class="ar-mu">(igual ao laudo)</span></div></div></div></div>
@@ -1593,7 +1612,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .ar-pq{margin:5px 0}.ar-pql{margin:4px 0 0;padding-left:18px}.ar-pql li{margin:3px 0}
   .ar-base{display:grid;grid-template-columns:46% 1fr;gap:16px;border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin-bottom:6px}
   .ar-rw{display:flex;align-items:center;gap:12px;margin-top:4px}.ar-lgd{font-size:12px;display:grid;gap:4px}.ar-lgd i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}.ar-sd{margin-top:4px;font-size:13px}
-  .ar-vb{display:grid;grid-template-columns:44% 1fr 20px;gap:8px;align-items:center;font-size:11.5px;margin:4px 0}.ar-vt{display:flex;gap:2px;height:9px}.ar-vt i{display:block;height:9px;border-radius:2px}.ar-vb b{text-align:right}
+  .ar-vb{display:grid;grid-template-columns:40% 1fr 92px;gap:8px;align-items:center;font-size:11.5px;margin:4px 0}.ar-vt{display:flex;gap:2px;height:9px}.ar-vt i{display:block;height:9px;border-radius:2px}.ar-vb b{text-align:right;white-space:nowrap}.ar-vb b small{font-weight:400;font-size:9.5px}
   table.ar-tb{width:100%;border-collapse:collapse}.ar-tb th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;text-align:left;font-weight:700;border-bottom:1.5px solid #111827;padding:6px}
   .ar-tb td{border-bottom:1px solid #EEF0F3;padding:6px;vertical-align:top;font-size:12.5px}.ar-tb tr{page-break-inside:avoid}
   .ar-num{text-align:right;white-space:nowrap}.ar-dv{font-weight:700;color:#111827}.ar-mu{color:#6B7280;font-size:11.5px}
@@ -1798,11 +1817,13 @@ ${novoCSS}</style></head><body>
     ${topoHTML}
     ${baseHTML}
     <div class="bloco">
-      <div class="eyebrow">Vetores que definem o risco</div>
+      <div class="eyebrow">O que define o risco — contenção e detecção</div>
       ${tabelaVetHTML}
       ${restantesVet ? `<div class="mais-anexo">Mais ${restantesVet} apontamento(s) permanecem disponíveis no Anexo Técnico, sem alongar o documento executivo.</div>` : ""}
     </div>
+    ${apoioHTML}
     ${manutHTML}
+    ${rondaHTML}
 
     <div class="bloco">
       <div class="eyebrow">Como se chega à classificação — memória de cálculo</div>
