@@ -18,7 +18,7 @@ import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Ambulancia from "./Ambulancia";
-import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject } from "./session";
+import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession } from "./session";
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
 
@@ -37,6 +37,7 @@ import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
 import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
 import PainelCliente from "./cliente/PainelCliente";
 import Entrada from "./entrada/Entrada";
+import PinMoklog from "./entrada/PinMoklog";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 const RdApp=React.lazy(()=>import("./rd/RdApp"));
@@ -3903,6 +3904,13 @@ export default function App(){
   const pendenteAposPin=useRef(null);
   const [pinAlvo,setPinAlvo]=useState(null); // projeto do PIN quando ele não está em PROJECTS (Jatinox B/C): não troca o projeto aberto
   const comPin=(pid,abrir)=>{ if(checkAuth(pid)){abrir();return;} pendenteAposPin.current=abrir; if(PROJECTS[pid]){ setPinAlvo(null); setProject(PROJECTS[pid]); } else setPinAlvo({id:pid,name:(JATINOX_SUBS[pid]||{}).name||pid}); setScreen("pin_gate"); };
+  // Líder entra direto no painel do projeto dele (sem a Home com todos os grupos).
+  const GRUPO_DO_PROJETO={P601:"golgi",P602:"golgi",P604:"golgi",P605:"golgi",P606:"golgi",P607:"golgi",P311A:"mega",P311B:"mega",P505:"klog",P260A:"jatinox",P260B:"jatinox",P260C:"jatinox"};
+  const entrarNoProjetoDoLider=(pid)=>{
+    if(PROJECTS[pid]) setProject(PROJECTS[pid]);
+    if(pid==="P260A"){ setHomeGroup(null); setScreen("p260a_home"); return; }
+    setHomeGroup(GRUPO_DO_PROJETO[pid]||null); setScreen("home");
+  };
   const grantAuth=(pid,mode="lider")=>{grantSession(mode,pid);setProjectAuth(prev=>({...prev,[pid]:{mode,ts:Date.now()}}));};
   // modo já liberado para o projeto (null se sessão expirada/inexistente) — usado pelos módulos CCO/Equipe/Equipamentos/Empresas
   const getProjectAuthMode=(pid)=>getAccess(pid);
@@ -4172,7 +4180,13 @@ export default function App(){
     </>
   );
 
-  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog") setPortal("moklog"); }}/>;
+  // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
+  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog") setPortal(hasGerencial()||getScopedProjectId()?"moklog":"moklog_pin"); }}/>;
+  if(portal==="moklog_pin") return <PinMoklog onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
+    if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }
+    else { setHomeGroup(null); setScreen("home"); }
+    setPortal("moklog");
+  }}/>;
   if(portal==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
     abrirPDF={async (pid,rep)=>{ const proj=PROJECTS[pid]; const c=ctmkData[pid]; const idade=c?.status==="offline"?ctmkOfflineIdade(c.offlineSince):null; const ctmkInfo=c?{status:c.status,days:idade?idade.dias:null,offlineLabel:idade?idade.label:null}:undefined;
       const [i,e,f]=await Promise.all([loadInquilinosParaPDF(pid),loadEnergiaResumoParaPDF(pid),loadFollowups(db,pid).catch(()=>({}))]); await generatePDF(proj,rep.state,rep.meta,[],ctmkInfo,i,e,f); }}
@@ -4496,19 +4510,22 @@ export default function App(){
   );
 
   // ── HOME — Jatinox subscreen
-  if(homeGroup==="jatinox") return(
+  // Líder (sessão de projeto) nunca vê a Home com todos os grupos: cai no grupo do próprio projeto.
+  const _pidLiderHome = !hasGerencial() ? getScopedProjectId() : null;
+  const homeGroupEf = homeGroup || (_pidLiderHome && _pidLiderHome!=="P260A" && screen==="home" ? GRUPO_DO_PROJETO[_pidLiderHome] : null);
+  if(homeGroupEf==="jatinox") return(
     <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
       <SyncBadge/><DemoBanner/>
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:"1px solid #0f172a"}}>
-          <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
+          <button onClick={()=>{ if(_pidLiderHome){ clearSession(); setHomeGroup(null); setPortal("entrada"); } else setHomeGroup(null); }} style={S.backBtn} aria-label="Voltar">← Voltar</button>
           <div style={{flex:1}}>
             <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}><Ico n="predio"/> Jatinox</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>P260A · P260B · P260C</div>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {Object.values(JATINOX_SUBS).map(jp=>{
+          {Object.values(JATINOX_SUBS).filter(jp=>!_pidLiderHome||jp.id===_pidLiderHome).map(jp=>{
             const isSel=jatinoxSel===jp.id;
             return(
               <div key={jp.id} style={{background:"#060c18",border:`2px solid ${isSel?"#7c3aed66":"#0f172a"}`,borderRadius:14,overflow:"hidden"}}>
@@ -4584,23 +4601,25 @@ export default function App(){
   );
 
   // ── HOME — Group subscreen (Golgi, Mega, Klog)
-  if(homeGroup) {
-    const groupProjects = {
+  if(homeGroupEf) {
+    let groupProjects = {
       golgi: ["P601","P602","P604","P605","P606","P607"],
       mega:  ["P311A","P311B"],
       klog:  ["P505"],
-    }[homeGroup] || [];
+    }[homeGroupEf] || [];
+    const _escopoLider = !hasGerencial() ? getScopedProjectId() : null;
+    if(_escopoLider && groupProjects.includes(_escopoLider)) groupProjects = [_escopoLider];
     const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog"};
     const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a"};
-    const color = groupColors[homeGroup];
+    const color = groupColors[homeGroupEf];
     return (
       <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
         <SyncBadge/><DemoBanner/>
         <div style={S.homeWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:`1px solid ${T.listHdr}`}}>
-            <button onClick={()=>setHomeGroup(null)} style={S.backBtn} aria-label="Voltar">← Voltar</button>
+            <button onClick={()=>{ if(_escopoLider){ clearSession(); setHomeGroup(null); setPortal("entrada"); } else setHomeGroup(null); }} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
-              <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{groupNames[homeGroup]}</div>
+              <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{_escopoLider?`${_escopoLider} — ${PROJECTS[_escopoLider]?.name||""}`:groupNames[homeGroupEf]}</div>
               <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.join(" · ")}</div>
             </div>
             {(()=>{if(RS_TRANCADO&&!hasGerencial())return null;const tp=groupProjects.reduce((a,pid)=>a+((rsCounts[pid]&&rsCounts[pid].naoVistas)||0),0);return tp>0?(
