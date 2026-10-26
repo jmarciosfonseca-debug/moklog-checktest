@@ -92,10 +92,15 @@ describe("laudo semanal", () => {
     expect(html).toContain('class="mk-regua"'); expect(html).toContain("Nº MK-P605-RS-1004"); expect(html).toContain("José Fonseca");
     expect(html).not.toMatch(EMOJI);
   });
-  test("rosca com o total de ativos e 'Onde estão as falhas' (sistemas com falha primeiro)", () => {
+  test("rosca com o total de ativos e 'Onde estão as falhas'; sistemas em ordem alfabética renumerados 1..N (Marcio, 26/10/2026)", () => {
     expect(html).toContain("Visão geral dos ativos"); expect(html).toContain("Onde estão as falhas");
     expect(html).toMatch(/aria-label="61 ativos: 56 operacionais, 2 parciais, 3 inoperantes"/);
-    expect(html.indexOf("<b>06 - CFTV</b>")).toBeLessThan(html.indexOf("<b>01 - ALARME PERIMETRAL</b>"));
+    const rotulos = [...html.matchAll(/<tr><td><b>(\d{2} - [^<]+)<\/b><\/td><td class="mk-num">/g)].map((m) => m[1]);
+    expect(rotulos[0]).toBe("01 - ALARME PERIMETRAL");
+    expect(rotulos.map((r) => r.slice(0, 2))).toEqual(rotulos.map((_, i) => String(i + 1).padStart(2, "0")));
+    const nomes = rotulos.map((r) => r.slice(5));
+    expect(nomes).toEqual([...nomes].sort((x, y) => x.localeCompare(y, "pt-BR", { sensitivity: "base" })));
+    expect(html).not.toContain("<b>06 - CFTV</b>"); // o número do cadastro não vai para o documento
   });
   test("saúde do laudo = saúde da mesma semana no consolidado (mesma base e fórmula)", () => {
     const saudeCons = Math.round(montarConsolidado(PROJ, SEMANAS, { hoje: HOJE }).series[2]);
@@ -103,7 +108,7 @@ describe("laudo semanal", () => {
     expect(Math.round(Number(`${m[1]}.${m[2]}`))).toBe(saudeCons); expect(saudeCons).toBe(93);     // antes: 95%, com as câmeras paradas ignoradas
   });
   test("Pânico fixo parcial aparece como 50%, não 0%", () => {
-    expect(html).toMatch(/<b>20 - PÂNICO FIXO<\/b><\/td><td class="mk-num">0\/1<\/td>[\s\S]{0,900}?mk-b-da">50,0%/);
+    expect(html).toMatch(/<b>\d{2} - PÂNICO FIXO<\/b><\/td><td class="mk-num">0\/1<\/td>[\s\S]{0,900}?mk-b-da">50,0%/);
   });
   test("pendências por tempo em aberto, com 'desde' e status", () => {
     expect(html.indexOf("<b>CF 05</b>")).toBeLessThan(html.indexOf("<b>CCO Emergencial</b>"));
