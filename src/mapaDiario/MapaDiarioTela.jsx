@@ -44,6 +44,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [confirmouResumo, setConfirmouResumo] = useState(false);
   const [matAberto, setMatAberto] = useState(false);
   const [editando, setEditando] = useState(false); // mapa já enviado reaberto para correção
+  const edicaoLiderRef = useRef(false); // true quando a reabertura veio do botão "Editar mapa (1x)" — ao concluir, carimba o mapa
   const [, setTicue] = useState(0); // re-render periódico: plantão em vigor e banner ficam atuais mesmo com a aba aberta da véspera
   const [ignorados, setIgnorados] = useState({}); // avisos "não é da equipe" dispensados (posto:pessoa)
   const [enviando, setEnviando] = useState(false);   // Concluir em andamento (gravando + confirmando no servidor)
@@ -179,7 +180,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     const agora = agoraFn().toISOString();
     const altos = rodadoAlto(mapaC);
     if (altos.length && !window.confirm(`${altos.map((v) => `${v.rotulo || "Veículo"}: ${kmRodado(v)} km`).join(" · ")} num único plantão. Confira o odômetro.\n\nEstá correto? (OK para concluir, Cancelar para corrigir)`)) return;
-    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
+    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
     await enviarComConfirmacao(final);
   }
   // Envio OFICIAL: grava e CONFIRMA no servidor antes de liberar o WhatsApp. Sem confirmação,
@@ -191,7 +192,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     try {
       const gravado = await enviar(final);
       pararReenvio();
-      setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
+      setMapa(gravado); setSalvo(isDemo() ? "Demonstração — NÃO gravado" : "Enviado e CONFIRMADO no servidor"); setEditando(false); edicaoLiderRef.current = false; setAvisos([]);
       setFichaMsg(null);
       await lancarFicha(final);                       // Falta/FT/atraso → ficha (sem duplicar)
       if (io.atualizarKmMotoNoCadastro && !isDemo()) io.atualizarKmMotoNoCadastro(pid, final).catch(() => {}); // km da moto no cadastro acompanha o mapa (só se maior, ou corrigido)
@@ -228,7 +229,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
       try {
         const gravado = await enviar(reenvio.current.mapa);
         pararReenvio();
-        setMapa(gravado); setSalvo("Enviado e CONFIRMADO no servidor"); setEditando(false); setAvisos([]);
+        setMapa(gravado); setSalvo("Enviado e CONFIRMADO no servidor"); setEditando(false); edicaoLiderRef.current = false; setAvisos([]);
         setFichaMsg(null);
         await lancarFicha(gravado);
         if (io.atualizarKmMotoNoCadastro && !isDemo()) io.atualizarKmMotoNoCadastro(pid, gravado).catch(() => {});
@@ -251,7 +252,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     } finally { setFichaBusy(false); }
   };
 
-  const editarMapa = () => { setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(completarPostosFixos(m, colabs))); };
+  const editarMapa = () => { edicaoLiderRef.current = true; setEditando(true); setConfirmouResumo(false); setAvisos([]); setMapa((m) => garantirMoto(completarPostosFixos(m, colabs))); };
   const texto = mapa ? montarTextoWhatsApp(mapa, { nomeProjeto: project?.name || "", desligamentos: deslig }) : "";
   const copiar = async () => { try { await navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch (e) { setAvisos(["Não consegui copiar; use o botão do WhatsApp."]); } };
   const enviado = mapa && mapa.status === "enviado";
@@ -784,6 +785,11 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
               {!editando && <>
                 <div style={{ fontSize: 11, color: cor.txt2, marginTop: 8 }}>Mapa arquivado: material, km, supervisão e resumo ficam travados. Se alguém precisou sair no meio do plantão, aponte aqui e diga quem cobriu; fica registrado.</div>
                 {renderSaida()}
+                {!mapa.edicaoLiderEm && <div style={{ marginTop: 10 }}>
+                  <button onClick={editarMapa} style={{ ...S.btn, borderColor: cor.ac, color: cor.ac }}>✎ Editar mapa (1x)</button>
+                  <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>Esqueceu ou lançou algo errado? Dá para corrigir uma única vez. Depois de concluir de novo, o mapa fica fechado (só saída antecipada / substituição).</div>
+                </div>}
+                {mapa.edicaoLiderEm && <div style={{ fontSize: 11, color: cor.txt2, marginTop: 10 }}>Mapa já corrigido uma vez pelo líder{String(mapa.edicaoLiderEm).length >= 10 ? ` em ${dataBR(String(mapa.edicaoLiderEm).slice(0, 10))}` : ""}.</div>}
               </>}
               {editando && <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 8 }}>Editando o mapa enviado. O WhatsApp só volta depois que você tocar em Concluir mapa e o app confirmar que gravou.</div>}
             </div>

@@ -468,3 +468,12 @@ test("líder corrige a quantidade de um equipamento dentro do mapa e o cadastro 
   expect(host.textContent).toContain("Cadastro de Equipamentos atualizado");
   expect(host.textContent).toContain("30 un.");
 });
+
+// Editar mapa (1x) — Marcio, 26/10/2026: depois de concluído, o líder pode reabrir uma única vez; após concluir de novo, o botão some.
+test("mapa enviado mostra Editar mapa (1x); mapa já editado pelo líder não mostra", () => {
+  const { MapaDiarioTela: _ignored } = {};
+  const fs = require("fs");
+  const src = fs.readFileSync(require("path").join(__dirname, "MapaDiarioTela.jsx"), "utf8");
+  expect(src).toMatch(/!mapa\.edicaoLiderEm && [\s\S]{0,200}Editar mapa \(1x\)/);
+  expect(src).toMatch(/edicaoLiderRef\.current && !mapaC\.edicaoLiderEm \? \{ edicaoLiderEm: agora \}/);
+});
