@@ -78,7 +78,7 @@ test("vetor do teste semanal diz 'parcial desde' quando o item é parcial", () =
 
 test("seções aprovadas continuam: memória de cálculo, matriz, território e pontos fortes", () => {
   const html = gerarHTMLAnaliseRisco(ctx());
-  const ordem = ["Vetores que definem o risco", "Como se chega à classificação — memória de cálculo", "Matriz de Impacto Operacional e Exposição ao Risco", "Diagnóstico territorial — por que a falha importa aqui", "Ações priorizadas", "O que sustenta a operação — pontos fortes", "Palavra do consultor"];
+  const ordem = ["O que define o risco — contenção e detecção", "Como se chega à classificação — memória de cálculo", "Matriz de Impacto Operacional e Exposição ao Risco", "Diagnóstico territorial — por que a falha importa aqui", "Ações priorizadas", "O que sustenta a operação — pontos fortes", "Palavra do consultor"];
   const pos = ordem.map((t) => html.indexOf(t));
   pos.forEach((p) => expect(p).toBeGreaterThan(-1));
   expect([...pos].sort((a, b) => a - b)).toEqual(pos);
