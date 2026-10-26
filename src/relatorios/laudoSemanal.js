@@ -46,14 +46,20 @@ export function pendenciasDoLaudo(project, itens, followupsInfo, hoje = new Date
   }).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
 }
 
+// "06 - CANCELAS AS (ALTA SEGURANÇA)" → "CANCELAS AS (ALTA SEGURANÇA)": o número do cadastro não vai para o documento.
+export const nomeSistema = (lbl) => String(lbl || "").replace(/^\s*\d+[A-Za-z]?\s*[-–.]\s*/, "").trim();
+
 export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, energiaInfo = null, followupsInfo = null, linkFollowup = null, hoje = new Date() } = {}) {
   const itens = itensDoEstado(project, state);
   const r = resumo(itens);
   const saude = Math.round(r.saude * 10) / 10;
   const fx = faixa(saude);
-  // Sistemas com falha primeiro (mais falhas no topo), depois os 100% na ordem do projeto — mesma leitura do
-  // "Onde estão as falhas" aprovado em 04/10/2026.
-  const cats = porCategoria(itens).map((c, i) => ({ ...c, _i: i, _f: c.inop + c.parcial })).sort((a, b) => b._f - a._f || b.inop - a.inop || a._i - b._i);
+  // Marcio, 26/10/2026: sistemas em ORDEM ALFABÉTICA pelo nome (sem o número do cadastro) e renumerados 1..N
+  // no documento, para a numeração sempre começar em 1 e acompanhar a lista. As falhas continuam destacadas na linha.
+  const cats = porCategoria(itens).map((c) => ({ ...c, _f: c.inop + c.parcial, nome: nomeSistema(c.cat) }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }))
+    .map((c, i) => ({ ...c, rotulo: `${String(i + 1).padStart(2, "0")} - ${c.nome}` }));
+  const rotuloCat = new Map(cats.map((c) => [c.cat, c.rotulo]));
   const fs = falhasPorSistema(itens);
   const pend = pendenciasDoLaudo(project, itens, followupsInfo, hoje);
   const maiorAging = pend.reduce((m, p) => Math.max(m, p.dias ?? 0), 0);
@@ -89,12 +95,12 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
   const linhasCat = cats.map((c) => {
     const s = Math.round(c.saude * 10) / 10, f = faixa(s);
     const falhas = fs.find((x) => x.cat === c.cat);
-    return `<tr><td><b>${escHTML(c.cat)}</b></td><td class="mk-num">${c.ok}/${c.total}</td>
+    return `<tr><td><b>${escHTML(c.rotulo)}</b></td><td class="mk-num">${c.ok}/${c.total}</td>
       <td>${falhas ? `<div class="ls-fb"><span class="ls-ft">${falhas.inop ? `<span style="background:#B91C1C;width:${((falhas.inop / mx) * 100).toFixed(1)}%"></span>` : ""}${falhas.parcial ? `<span style="background:#D97706;width:${((falhas.parcial / mx) * 100).toFixed(1)}%"></span>` : ""}</span><span class="mk-sm">${falhas.inop ? `<b class="mk-da">${falhas.inop}</b> inop.` : ""}${falhas.inop && falhas.parcial ? " · " : ""}${falhas.parcial ? `<b class="mk-wa">${falhas.parcial}</b> parc.` : ""}</span></div>` : '<span class="mk-nao">—</span>'}</td>
       <td><div style="display:flex;align-items:center;gap:6px"><span style="flex:1;height:7px;background:#EEF0F3;border-radius:4px;overflow:hidden"><span style="display:block;height:100%;width:${s}%;background:${COR[f]}"></span></span><span class="mk-b mk-b-${f}">${num1(s)}%</span></div></td></tr>`;
   }).join("");
   const disponibilidade = cats.length
-    ? `<section><div class="mk-h2">Disponibilidade por sistema <span class="mk-mu">· ${cats.length} sistemas · ${fs.length ? `falhas em ${fs.length}, listados primeiro` : "nenhuma falha"}</span></div>
+    ? `<section><div class="mk-h2">Disponibilidade por sistema <span class="mk-mu">· ${cats.length} sistemas · ${fs.length ? `falhas em ${fs.length}` : "nenhuma falha"}</span></div>
       <table class="mk-tb"><colgroup><col style="width:34%"><col style="width:12%"><col style="width:26%"><col style="width:28%"></colgroup>
       <thead><tr><th>Sistema</th><th class="mk-num">Operac./total</th><th>Onde estão as falhas</th><th>Saúde</th></tr></thead><tbody>${linhasCat}</tbody></table></section>`
     : `<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-kl">sistemas cadastrados</div></div>`;
@@ -103,7 +109,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
   const pill = (st) => (st === "partial" ? '<span class="mk-b mk-b-wa">Parcial</span>' : '<span class="mk-b mk-b-da">Inoperante</span>');
   const linhasPend = pend.map((p) => {
     const nome = p.unico ? p.cat : p.item;
-    const linha = `<tr><td><b>${escHTML(nome)}</b>${p.unico ? "" : `<div class="mk-mu">${escHTML(p.cat)}</div>`}</td>
+    const linha = `<tr><td><b>${escHTML(nome)}</b>${p.unico ? "" : `<div class="mk-mu">${escHTML(rotuloCat.get(p.cat) || p.cat)}</div>`}</td>
       <td>${p.note && p.note !== "--" ? escHTML(p.note) : '<span class="mk-nao">Sem descrição registrada</span>'}</td>
       <td class="mk-num">${p.dias != null ? `<b class="${p.dias > 180 ? "mk-da" : p.dias >= 30 ? "mk-wa" : ""}">${p.dias} d</b>` : '<span class="mk-nao">—</span>'}${p.since ? `<div class="mk-mu">desde ${dataBR(p.since)}</div>` : ""}</td>
       <td>${pill(p.status)}</td>
