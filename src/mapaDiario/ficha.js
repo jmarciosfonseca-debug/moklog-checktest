@@ -35,6 +35,15 @@ export function lancamentosDoMapa(mapa) {
       if (!out.some((x) => x.id === falta.id)) out.push(comAfastamento(falta, dc.afastamentoPlantoes));
       return;
     }
+    // Antecipação de plantão cobrindo falta: só quem faltou recebe a Falta (quem antecipou não recebe FT).
+    if (p.situacao === "antecipacao") {
+      const d = p.detalhe || {};
+      if (d.motivoAnt !== "falta" || !d.quemFaltouId || d.quemFaltouId === p.pessoaId) return;
+      const nomeAnt = (p.pessoaNome || "").trim();
+      const falta = { id: idDe(mapa.id, d.quemFaltouId, "Falta"), colabId: d.quemFaltouId, tipo: "Falta", data: mapa.data, detalhe: `Falta no posto ${p.rotulo}${nomeAnt ? ` (coberta por antecipação de plantão de ${nomeAnt})` : ""} — ${origem}`, origem: "mapa", mapaId: mapa.id, diasFalta: 1, subtipo: "1 dia", label: dataBR(mapa.data) };
+      if (!out.some((x) => x.id === falta.id)) out.push(comAfastamento(falta, d.afastamentoPlantoes));
+      return;
+    }
     const tipo = TIPOS[p.situacao];
     if (!tipo || !p.pessoaId) return;
     let detalhe;

@@ -62,7 +62,7 @@ export function mapaResumo(mapas, hojeISO) {
   const cont = (s) => postos.filter((p) => p.situacao === s).length;
   return {
     temMapa: true, data: m.data, turno: m.turno, hoje: m.data === hojeISO, postos: postos.length,
-    presentes: postos.filter((p) => ["presente", "atraso", "cobertura", "troca", "ft"].includes(p.situacao || "presente")).length,
+    presentes: postos.filter((p) => ["presente", "atraso", "cobertura", "troca", "ft", "antecipacao"].includes(p.situacao || "presente")).length,
     faltas: cont("falta"), ft: cont("ft"), atrasos: cont("atraso"), vagos: cont("vago"),
     lista: postos.map((p) => ({ posto: p.rotulo, nome: p.pessoaNome || "", situacao: p.situacao || "presente", pessoaId: p.pessoaId || "" })),
   };

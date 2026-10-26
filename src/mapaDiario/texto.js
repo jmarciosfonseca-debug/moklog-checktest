@@ -32,9 +32,13 @@ function linhaPosto(p) {
     case "ft": return `🔄 ${rot} ${nome} — *FT* (folga trabalhada)${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}${afast(d.afastamentoPlantoes)}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
     case "cobertura": return `🤝 ${rot} ${nome}${d.base ? " (Base)" : ""} — *COBERTURA* de ${d.deQuem}${d.semFalta ? " (não foi falta)" : afast(d.afastamentoPlantoes)}`;
     case "troca": return `🔁 ${rot} ${nome} — *TROCA DE PLANTÃO*, no lugar de ${d.noLugarDe}`;
+    case "antecipacao": return `⏩ ${rot} ${nome} — *ANTECIPAÇÃO DE PLANTÃO*${motivoAnt(d)}`;
     default: return `✅ ${rot} ${nome}`;
   }
 }
+
+// Motivo da antecipação: falta de alguém (com afastamento, se houver) ou texto livre (VSPP, reciclagem…).
+export const motivoAnt = (d) => (d.motivoAnt === "falta" ? (d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}${afast(d.afastamentoPlantoes)}` : d.postoVago ? ", cobrindo posto vago" : ", sem falta") : d.motivoTexto ? `, motivo: ${d.motivoTexto}` : "");
 
 // Bloco de destaque: só o que saiu do normal, com o detalhe (quem faltou, quem cobriu).
 function linhaOcorrencia(p, postos) {
@@ -51,6 +55,7 @@ function linhaOcorrencia(p, postos) {
     case "ft": return `🔄 *FT* — ${nome} (${onde})${d.quemFaltou ? `, cobrindo a falta de ${d.quemFaltou}${afast(d.afastamentoPlantoes)}` : d.postoVago ? ", cobrindo posto vago" : ""}`;
     case "cobertura": return `🤝 *COBERTURA* — ${nome}${d.base ? " (Base)" : ""} (${onde}), cobrindo ${d.deQuem}${d.semFalta ? " (não foi falta)" : afast(d.afastamentoPlantoes)}`;
     case "troca": return `🔁 *TROCA DE PLANTÃO* — ${nome} (${onde}), no lugar de ${d.noLugarDe}`;
+    case "antecipacao": return `⏩ *ANTECIPAÇÃO DE PLANTÃO* — ${nome} (${onde})${motivoAnt(d)}`;
     default: return "";
   }
 }

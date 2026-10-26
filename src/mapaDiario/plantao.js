@@ -6,7 +6,7 @@
 //  - Falta e "Sem ninguém" (vago) ficam fora;
 //  - Presente, Atraso, FT, Cobertura e Troca entram com o nome que está no posto (cadastro ou Base digitada);
 //  - Saída antecipada: quem saiu fica fora e quem cobriu entra no mesmo posto (herda "líder" se o posto é de líder).
-const SITUACOES_NO_POSTO = new Set(["presente", "atraso", "ft", "cobertura", "troca"]);
+const SITUACOES_NO_POSTO = new Set(["presente", "atraso", "ft", "cobertura", "troca", "antecipacao"]);
 
 export function quemEstaDePlantao(mapa) {
   if (!mapa || !Array.isArray(mapa.postos)) return [];
@@ -41,6 +41,6 @@ export const liderDePlantao = (lista) => (lista || []).find((x) => x.lider) || n
 export const turnoDoMapa = (t) => (/^n/i.test(String(t || "")) ? "N" : "D");
 
 export function rotuloNoPlantao(x) {
-  const extra = x.lider ? "líder" : x.situacao === "ft" ? "FT" : x.situacao === "cobertura" ? (x.base ? "cobertura Base" : "cobertura") : x.situacao === "troca" ? "troca" : "";
+  const extra = x.lider ? "líder" : x.situacao === "ft" ? "FT" : x.situacao === "cobertura" ? (x.base ? "cobertura Base" : "cobertura") : x.situacao === "troca" ? "troca" : x.situacao === "antecipacao" ? "antecipação" : "";
   return `${x.pessoaNome}${x.posto ? ` · ${x.posto}` : ""}${extra && !x.lider ? ` (${extra})` : ""}`;
 }
