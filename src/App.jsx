@@ -612,7 +612,8 @@ const PROJECTS = {
       {id:"cftv",label:"06 - CFTV FIXAS",type:"count",total:65},
       {id:"speed_dome",label:"06B - CFTV SPEED DOME",type:"count",total:8},
       {id:"eclusas",label:"07 - ECLUSA CCO (PORTAS/ABERTURA)",type:"items",itemLabels:["Porta 01 — Local","Porta 01 — Remota","Porta 02 — Local","Porta 02 — Remota"]},
-      {id:"eletroima",label:"08 - ELETROÍMÃS DA ECLUSA CCO",type:"items",itemLabels:["Portaria","CCO","Eclusa"]},
+      // Marcio, 26/10/2026: as duas eclusas (Portaria e CCO) têm duas portas com eletroímã cada. IDs preservam o histórico (Portaria = -1, CCO = -2).
+      {id:"eletroima",label:"08 - ELETROÍMÃS DAS ECLUSAS CCO E PORTARIA",type:"items",itemLabels:["Portaria — Porta 01","Portaria — Porta 02","CCO — Porta 01","CCO — Porta 02"],itemIds:["eletroima-1","eletroima-4","eletroima-2","eletroima-5"]},
       {id:"farois",label:"09 - FARÓIS/LED DAS CANCELAS",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04","Cancela 05","Cancela 06","Cancela 07","Cancela 08"]},
       {id:"garra",label:"10 - GARRA DE TIGRE (DILACERADORES)",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
       {id:"giroflex",label:"11 - GIROFLEX DAS ECLUSAS",type:"items",itemLabels:["Unidade 01","Unidade 02","Unidade 03","Unidade 04"]},
