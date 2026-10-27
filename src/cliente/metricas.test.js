@@ -49,3 +49,16 @@ test("sistemas (insumos da Visão 360) e luzes de aviso", () => {
   const l = luzes({ teste: { atrasado: true, inop: 0 }, mapa: { hoje: true, faltas: 1 }, equip: { inop: 0 }, sistemas: s });
   expect(l.filter((x) => x.on).map((x) => x.id)).toEqual(["teste", "falta", "ctmk", "energia", "key"]);
 });
+
+// Marcio, 26/10/2026: "treinado" conta treinamento aplicado na ficha OU reciclagem em dia; contagens separadas.
+test("equipe: reciclagem em dia conta como treinado; contagens de ficha e reciclagem", () => {
+  const hoje = "2026-10-26";
+  const eq = { colaboradores: [
+    { id: "a", nome: "A", status: "ativo", historico: [{ tipo: "Treinamento", data: "2026-05-01", detalhe: "NR-35 altura" }] },
+    { id: "b", nome: "B", status: "ativo", ultimaReciclagem: "2025-12-01" },
+    { id: "c", nome: "C", status: "ativo", ultimaReciclagem: "2023-01-01" },
+    { id: "d", nome: "D", status: "ativo" },
+  ] };
+  const r = equipeResumo(eq, hoje, []);
+  expect(r.comTreinoFicha).toBe(1); expect(r.comReciclagem).toBe(1); expect(r.treinadosPct).toBe(50);
+});

@@ -4,6 +4,7 @@
 import { calcularEstabilidade, calcularTreinamento } from "../equipe/maturidade";
 import { contarEquip } from "../equipData";
 import { ordenarHistorico } from "../equipeEventos";
+import { statusReciclagem } from "../pendencias";
 
 export const GRUPOS_CLIENTE = {
   GOLGI: { label: "Golgi", pids: ["P601", "P602", "P604", "P605", "P606", "P607"] },
@@ -37,7 +38,10 @@ export function equipeResumo(equipe, hojeISO, catalogo = []) {
   const porCargo = {}; ativos.forEach((c) => { const k = c.cargo || "Sem cargo"; porCargo[k] = (porCargo[k] || 0) + 1; });
   // "Não aplicado" / "não realizado" lançado como Treinamento é registro de ausência: não conta como treinado.
   const aplicado = (x) => x && x.tipo === "Treinamento" && !/n[ãa]o\s+(aplicad|realizad|concluíd|conclu[ií]d)/i.test(`${x.detalhe || ""} ${x.label || ""}`);
-  const comTreino = ativos.filter((c) => (c.historico || []).some(aplicado)).length;
+  // Treinado = tem treinamento aplicado na ficha OU reciclagem em dia (a reciclagem é treinamento obrigatório por lei).
+  const comTreinoFicha = ativos.filter((c) => (c.historico || []).some(aplicado)).length;
+  const comReciclagem = ativos.filter((c) => { try { const r = statusReciclagem(c.ultimaReciclagem); return r.temData && r.estado !== "vencido"; } catch { return false; } }).length;
+  const comTreino = ativos.filter((c) => (c.historico || []).some(aplicado) || (() => { try { const r = statusReciclagem(c.ultimaReciclagem); return r.temData && r.estado !== "vencido"; } catch { return false; } })()).length;
   let treinoPct = null; try { const v = ativos.map((c) => calcularTreinamento(c, catalogo, hojeISO)).filter((x) => typeof x === "number"); treinoPct = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; } catch { treinoPct = null; }
   const todosTreinos = ordenarHistorico(ativos.flatMap((c) => (c.historico || []).filter((x) => x && x.tipo === "Treinamento").map((x) => ({ ...x, colabNome: c.nome, colabId: c.id, aplicado: aplicado(x) })))).reverse();
   const ultimosTreinos = todosTreinos.filter((x) => x.aplicado).slice(0, 12);
@@ -49,7 +53,7 @@ export function equipeResumo(equipe, hojeISO, catalogo = []) {
     turnover: est && est.turnover !== null ? Math.round(est.turnover * 10) / 10 : null,
     turnoverMotivo: est ? est.motivoNaoAferido : "sem dados",
     entradas12m: est ? est.entradas12m : 0, saidas12m: est ? est.desligados12m : 0,
-    treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, ultimosTreinos, evidencias, naoAplicados, entradas12mLista: entradas12m,
+    treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, comTreinoFicha, comReciclagem, ultimosTreinos, evidencias, naoAplicados, entradas12mLista: entradas12m,
   };
 }
 

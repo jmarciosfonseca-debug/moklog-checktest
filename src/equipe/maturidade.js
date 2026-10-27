@@ -57,6 +57,10 @@ export function agregarEixos(eixos, pesos = CONFIG_MATURIDADE.pesos) {
 }
 
 const normalizar = valor => String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+// "NR35" no catálogo casa com "Treinamento NR-35 altura" na ficha: compara sem acentos, pontuação e espaços,
+// e aceita o nome do catálogo contido na descrição (Marcio, 26/10/2026: a ficha é escrita à mão pelo líder).
+const compacto = v => normalizar(v).replace(/[^a-z0-9]/g, '');
+export const casaTreinamento = (detalheFicha, nomeCatalogo) => { const a = compacto(detalheFicha), b = compacto(nomeCatalogo); return !!b && (a === b || a.includes(b)); };
 export function calcularTreinamento(colaborador, catalogo, hoje) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
@@ -65,7 +69,7 @@ export function calcularTreinamento(colaborador, catalogo, hoje) {
   const registros = (colaborador.historico || []).filter(h => h.tipo === 'Treinamento');
   const validos = obrigatorios.filter(t => registros.some(h => {
     const realizado = data(h.data);
-    if (realizado === null || realizado > fim || normalizar(h.detalhe) !== normalizar(t.nome)) return false;
+    if (realizado === null || realizado > fim || !casaTreinamento(h.detalhe, t.nome)) return false;
     if (t.validadeMeses === undefined || t.validadeMeses === null) return true;
     if (!Number.isInteger(t.validadeMeses) || t.validadeMeses <= 0) return false;
     const vence = new Date(realizado); vence.setUTCMonth(vence.getUTCMonth() + t.validadeMeses);
