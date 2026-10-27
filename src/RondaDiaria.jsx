@@ -691,23 +691,22 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
     if(concluindoAnt) return;
     setConcluindoAnt(true);
     try {
-      let alvo = plantaoAnt;
-      if(!alvo){
-        alvo = { id:newId(), projectId:project.id, dataPlantao:ant.dataPlantao, turno:ant.turno,
-                 lider:"", rondas:[], criadoEm:new Date().toISOString() };
+      // Bug (26/10/2026, P260A): o índice guarda só a ENTRADA LEVE do plantão (sem as rondas). Gravar essa
+      // entrada como se fosse o plantão completo apagava as rondas/fotos/perimetral do turno anterior e deixava
+      // o índice inconsistente. Agora carrega o plantão completo antes de marcar como enviado.
+      let alvo = plantaoAnt ? await loadPlantaoFull(plantaoAnt) : null;
+      if(!alvo || !alvo.id){
+        alvo = { id:plantaoAnt?.id||newId(), projectId:project.id, dataPlantao:ant.dataPlantao, turno:ant.turno,
+                 lider:plantaoAnt?.lider||"", rondas:[], criadoEm:new Date().toISOString() };
       }
-      const concluido = { ...alvo, enviado:true, enviadoEm:new Date().toISOString(),
+      const concluido = { ...alvo, projectId:alvo.projectId||project.id, rondas:alvo.rondas||[], enviado:true, enviadoEm:new Date().toISOString(),
                           concluidoPorTerceiro:true };
-      await savePlantaoFull(concluido);
-      const entrada = {
-        id:concluido.id, dataPlantao:concluido.dataPlantao, turno:concluido.turno,
-        lider:concluido.lider||"", nRondas:(concluido.rondas||[]).length,
-        enviado:true, enviadoEm:concluido.enviadoEm,
-      };
-      await saveIndexEntry(project.id, entrada, null);
-      const outros = (idx.plantoes||[]).filter(x=>x.id!==entrada.id);
-      setIdx({ ...idx, plantoes:[...outros, entrada] });
-    } catch(e){ console.error("concluirAnterior:", e); }
+      const okFull = await savePlantaoFull(concluido);
+      const { novoIdx, remotoOk } = await saveIndexEntry(project.id, entradaLeve(concluido), null);
+      setIdx(novoIdx); // índice fresco do servidor, não a cópia antiga desta tela
+      if(!(okFull && remotoOk)) setEnvioErr("O plantão anterior foi concluído só neste aparelho (sem sinal). Ele será reenviado quando a conexão voltar.");
+      else setEnvioErr(null);
+    } catch(e){ console.error("concluirAnterior:", e); setEnvioErr(`Não consegui concluir o plantão anterior: ${(e&&e.message)||"erro"}. Tente de novo.`); }
     finally { setConcluindoAnt(false); }
   };
   const reabrirView = async () => {
