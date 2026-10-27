@@ -10,6 +10,9 @@ export const DIVISOES = [
   { id: "mokres", nome: "MokRes", sub: "Residencial", ativo: false, cor: "#22c55e" },
   { id: "mokimp", nome: "MokImp", sub: "Implantação", ativo: false, cor: "#38bdf8" },
   { id: "moktec", nome: "MokTec", sub: "Tecnologia", ativo: false, cor: "#e11d48" },
+  // Central Moked (Marcio, 26/10/2026): o cliente vê tudo que a Moked oferece; logado, acessa as próprias câmeras.
+  { id: "central", nome: "Central Moked", sub: "Monitoramento 24h", ativo: false, cor: "#E50914", largo: true, semLogo: true,
+    oferece: ["Monitoramento 24 horas dos parques pela Central Moked", "Acesso do cliente às câmeras do próprio parque, após login", "Ronda virtual por CFTV e histórico de eventos", "Alertas de perímetro, energia e acesso em tempo real", "Integração com o MokLog CheckTest: teste semanal, mapa de equipe e análise de risco"] },
 ];
 export const logoDivisao = (id) => `/moked/divisoes/${id}.jpg`;
 export const LOGO_MOKED_URL = "/moked/logo-moked.png";
@@ -45,9 +48,15 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   </main>;
 
   if (emConstrucao) return <main style={fundo} data-testid="entrada-construcao">
-    <img src={logoDivisao(emConstrucao.id)} alt={emConstrucao.nome} style={{ width: "min(70vw, 300px)", background: "#fff", padding: "10px 16px", clipPath: chanfro }} />
+    {emConstrucao.semLogo
+      ? <div style={{ width: "min(70vw, 300px)", background: "#fff", padding: "18px 16px", clipPath: chanfro, textAlign: "center", fontWeight: 900, letterSpacing: 3, fontSize: 20, color: "#0b0b0e" }}>CENTRAL <span style={{ color: "#E50914" }}>MOKED</span></div>
+      : <img src={logoDivisao(emConstrucao.id)} alt={emConstrucao.nome} style={{ width: "min(70vw, 300px)", background: "#fff", padding: "10px 16px", clipPath: chanfro }} />}
     <div style={{ marginTop: 22, fontSize: 18, fontWeight: 900, letterSpacing: 2, textTransform: "uppercase" }}>Em construção</div>
     <div style={{ marginTop: 6, fontSize: 12, color: "#9ca3af", textAlign: "center", maxWidth: 320 }}>A área {emConstrucao.nome} ({emConstrucao.sub}) ainda está sendo construída na plataforma Moked.</div>
+    {emConstrucao.oferece && <div style={{ marginTop: 18, width: "100%", maxWidth: 360, background: "linear-gradient(160deg,#121216,#0b0b0e)", border: "1px solid #2a2a31", padding: "14px 16px", clipPath: chanfro }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 2, color: "#9ca3af", textTransform: "uppercase", marginBottom: 8 }}>O que vai oferecer</div>
+      {emConstrucao.oferece.map((t) => <div key={t} style={{ display: "flex", gap: 8, fontSize: 12.5, color: "#e5e7eb", lineHeight: 1.45, marginBottom: 6 }}><span style={{ color: "#E50914", fontWeight: 900 }}>›</span><span>{t}</span></div>)}
+    </div>}
     <div style={{ marginTop: 26 }}><button onClick={() => setEmConstrucao(null)} style={botaoVermelho}>Voltar</button></div>
   </main>;
 
@@ -58,8 +67,10 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", marginBottom: 12 }}>Escolha a sua área</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {DIVISOES.map((d) => <button key={d.id} aria-label={d.nome} onClick={() => (d.ativo ? onEscolher(d.id) : setEmConstrucao(d))}
-          style={{ background: "#fff", border: `2px solid ${d.ativo ? d.cor : "#2a2a31"}`, padding: 0, cursor: "pointer", clipPath: chanfro, boxShadow: "none", opacity: d.ativo ? 1 : .6, position: "relative", overflow: "hidden" }}>
-          <img src={logoDivisao(d.id)} alt={d.nome} style={{ display: "block", width: "100%", height: 76, objectFit: "contain", background: "#fff", padding: "8px 14px", boxSizing: "border-box" }} />
+          style={{ background: "#fff", border: `2px solid ${d.ativo ? d.cor : "#2a2a31"}`, padding: 0, cursor: "pointer", clipPath: chanfro, boxShadow: "none", opacity: d.ativo ? 1 : .6, position: "relative", overflow: "hidden", gridColumn: d.largo ? "1 / -1" : "auto" }}>
+          {d.semLogo
+            ? <div style={{ height: 76, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, letterSpacing: 3, fontSize: 18, color: "#0b0b0e", paddingBottom: 14 }}>CENTRAL <span style={{ color: "#E50914", marginLeft: 6 }}>MOKED</span></div>
+            : <img src={logoDivisao(d.id)} alt={d.nome} style={{ display: "block", width: "100%", height: 76, objectFit: "contain", background: "#fff", padding: "8px 14px", boxSizing: "border-box" }} />}
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: d.ativo ? d.cor : "#2a2a31", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "3px 8px", textAlign: "center" }}>{d.ativo ? d.sub : "Em breve"}</div>
         </button>)}
       </div>
