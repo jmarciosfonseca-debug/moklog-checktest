@@ -47,3 +47,15 @@ test("porta do MokLog: PIN antes da Home e escopo do líder", () => {
   expect(app).toMatch(/groupProjects = \[_escopoLider\]/);
   expect(fs.existsSync(path.join(__dirname, "entrada", "PinMoklog.jsx"))).toBe(true);
 });
+
+// Ronda Perimetral (26/10/2026, P260A): concluir o plantão anterior carrega o plantão COMPLETO antes de gravar;
+// nunca grava a entrada leve do índice por cima das rondas do turno anterior.
+test("ronda diária: concluir plantão anterior usa o plantão completo e mostra erro na tela", () => {
+  const fs = require("fs"), path = require("path");
+  const src = fs.readFileSync(path.join(__dirname, "RondaDiaria.jsx"), "utf8");
+  const i = src.indexOf("const concluirAnterior = async () => {");
+  const bloco = src.slice(i, i + 2200);
+  expect(bloco).toMatch(/await loadPlantaoFull\(plantaoAnt\)/);
+  expect(bloco).toMatch(/saveIndexEntry\(project\.id, entradaLeve\(concluido\)/);
+  expect(bloco).toMatch(/setEnvioErr\(`Não consegui concluir o plantão anterior/);
+});
