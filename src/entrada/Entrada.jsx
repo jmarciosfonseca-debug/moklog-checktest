@@ -10,9 +10,6 @@ export const DIVISOES = [
   { id: "mokres", nome: "MokRes", sub: "Residencial", ativo: false, cor: "#22c55e" },
   { id: "mokimp", nome: "MokImp", sub: "Implantação", ativo: false, cor: "#38bdf8" },
   { id: "moktec", nome: "MokTec", sub: "Tecnologia", ativo: false, cor: "#e11d48" },
-  // Central Moked (Marcio, 26/10/2026): o cliente vê tudo que a Moked oferece; logado, acessa as próprias câmeras.
-  { id: "central", nome: "Central Moked", sub: "Monitoramento 24h", ativo: false, cor: "#E50914", largo: true, semLogo: true,
-    oferece: ["Monitoramento 24 horas dos parques pela Central Moked", "Acesso do cliente às câmeras do próprio parque, após login", "Ronda virtual por CFTV e histórico de eventos", "Alertas de perímetro, energia e acesso em tempo real", "Integração com o MokLog CheckTest: teste semanal, mapa de equipe e análise de risco"] },
 ];
 export const logoDivisao = (id) => `/moked/divisoes/${id}.jpg`;
 export const LOGO_MOKED_URL = "/moked/logo-moked.png";
