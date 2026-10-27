@@ -42,7 +42,8 @@ const STATUS_CONFIG = {
   critico: { label:"Crítico",    color:"#ef4444", bg:"#1a0202", border:"#ef444433" },
 };
 
-function todayStr() { return new Date().toISOString().split("T")[0]; }
+// Data local de Brasília (26/10/2026): toISOString é UTC e, depois das 21h, virava o dia seguinte na checagem/manutenção.
+function todayStr() { return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }); }
 function fmtDate(d) {
   if(!d) return "--";
   try { return new Date(d+"T12:00:00").toLocaleDateString("pt-BR"); } catch { return d; }
@@ -370,7 +371,7 @@ ${motoSection}
   const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href=url; a.download=`equipamentos_${project.id}_${new Date().toISOString().split("T")[0]}.html`;
+  a.href=url; a.download=`equipamentos_${project.id}_${todayStr()}.html`;
   a.click(); URL.revokeObjectURL(url);
 }
 

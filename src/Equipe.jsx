@@ -1694,7 +1694,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
     try {
       const d = new Date(inicio+"T12:00:00");
       d.setDate(d.getDate()+(dias===20?20:30));
-      return d.toISOString().split("T")[0];
+      return d.toLocaleDateString("sv-SE"); // meio-dia local: sem virar o dia por fuso
     } catch { return ""; }
   }
 
