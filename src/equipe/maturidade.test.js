@@ -74,3 +74,10 @@ test('equipe renormaliza estabilidade ausente e exclui afastado', () => {
   expect(agregarEquipe([{ indice: 80 }, { indice: 0, afastado: true }], null).indice).toBe(80);
   expect(agregarEquipe([], 100).indice).toBeNull();
 });
+
+test("obrigatórios: nome do catálogo contido na descrição da ficha conta (NR35 ⇄ 'Treinamento NR-35 altura')", () => {
+  const hoje = '2026-10-26';
+  const c = { historico: [{ tipo: 'Treinamento', data: '2026-05-01', detalhe: 'Treinamento NR-35 altura' }] };
+  expect(calcularTreinamento(c, [{ nome: 'NR35', obrigatorio: true }], hoje)).toBe(100);
+  expect(calcularTreinamento(c, [{ nome: 'Brigada', obrigatorio: true }], hoje)).toBe(0);
+});
