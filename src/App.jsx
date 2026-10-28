@@ -4181,8 +4181,8 @@ export default function App(){
   );
 
   // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
-  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog") setPortal(hasGerencial()||getScopedProjectId()?"moklog":"moklog_pin"); }}/>;
-  if(portal==="moklog_pin") return <PinMoklog onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
+  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog") setPortal(hasGerencial()?"moklog":"moklog_pin"); }}/>;
+  if(portal==="moklog_pin") return <PinMoklog sessaoLider={getScopedProjectId()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
     if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }
     else { setHomeGroup(null); setScreen("home"); }
     setPortal("moklog");

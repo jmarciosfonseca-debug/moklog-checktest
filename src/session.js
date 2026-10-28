@@ -24,7 +24,10 @@ export function grantSession(){return getSession();} // Legacy callbacks cannot 
 export async function checkPin(value,opts={}){
  const pin=String(value||'').trim();if(!pin||pending)return null;
  pending=(async()=>{
- const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{})})});
+ // Sem resposta em 12 s o pedido é abortado: antes, um fetch pendurado deixava `pending` preso e todo PIN seguinte
+ // voltava "inválido" até recarregar a página (relato do Marcio no computador, 28/10/2026).
+ const ctrl=typeof AbortController!=='undefined'?new AbortController():null;const tmr=ctrl?setTimeout(()=>ctrl.abort(),12000):null;
+ let r;try{r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{})}),...(ctrl?{signal:ctrl.signal}:{})});}finally{if(tmr)clearTimeout(tmr);}
  const data=await r.json().catch(()=>({}));
  if(!r.ok||!data.ok){window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:data.erro||'Servidor de acesso indisponível.'}));return null;}
  if(!['admin','lider','demo','ronda','cliente'].includes(data.nivel)||typeof data.token!=='string'||!Number.isFinite(data.exp)||data.exp<=Date.now()||(data.nivel==='lider'&&opts.projectId&&data.pid!==opts.projectId))return null;
