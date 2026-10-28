@@ -42,7 +42,7 @@ test("porta do MokLog: PIN antes da Home e escopo do líder", () => {
   const fs = require("fs"), path = require("path");
   const app = fs.readFileSync(path.join(__dirname, "App.jsx"), "utf8");
   expect(app).toMatch(/portal==="moklog_pin"/);
-  expect(app).toMatch(/setPortal\(hasGerencial\(\)\|\|getScopedProjectId\(\)\?"moklog":"moklog_pin"\)/);
+  expect(app).toMatch(/setPortal\(hasGerencial\(\)\?"moklog":"moklog_pin"\)/);
   expect(app).toMatch(/entrarNoProjetoDoLider\(pid\)/);
   expect(app).toMatch(/groupProjects = \[_escopoLider\]/);
   expect(fs.existsSync(path.join(__dirname, "entrada", "PinMoklog.jsx"))).toBe(true);
