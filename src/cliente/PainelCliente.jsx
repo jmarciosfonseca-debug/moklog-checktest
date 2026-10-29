@@ -1,6 +1,6 @@
 // Área do Cliente — cluster automotivo Moked, só leitura. Proprietário (PIN de grupo) vê o macro e entra em
 // cada parque; gestor do parque (PIN de projeto) vê só o seu. Gerencial vê tudo. Nada aqui grava.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { checkPin, clearSession, getClienteScope } from "../session";
@@ -336,17 +336,28 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const [pin, setPin] = useState(""), [erro, setErro] = useState("");
   const [dados, setDados] = useState(null), [carregando, setCarregando] = useState(false);
   const [pid, setPid] = useState(null), [detalhe, setDetalhe] = useState(null);
+  const [falhas, setFalhas] = useState({}), [atualizadoEm, setAtualizadoEm] = useState(null), [versao, setVersao] = useState(0);
   const pids = useMemo(() => (escopo ? (escopo.pids || Object.keys(PROJECTS)) : []), [escopo, PROJECTS]);
+  // Carga estável (28/10/2026): as funções e dados vindos do App mudam a cada render dele; antes isso reiniciava a
+  // leitura a cada atualização e cancelava a leitura em andamento (painel em branco/zerado). Agora a leitura roda
+  // uma vez por escopo (ou ao tocar em Atualizar) e usa sempre a versão mais recente dos dados do App.
+  const ult = useRef({ PROJECTS, stored, computeHealth, ctmkData, score360, risco });
+  ult.current = { PROJECTS, stored, computeHealth, ctmkData, score360, risco };
+  const storedPronto = !!(stored && Object.keys(stored).length);
 
   useEffect(() => {
-    if (!escopo) return;
+    if (!escopo || !pids.length) return;
     let vivo = true; setCarregando(true);
-    Promise.all(pids.map((p) => carregarProjeto(p, PROJECTS, stored, computeHealth, ctmkData, score360, risco).catch(() => null))).then((xs) => {
-      if (!vivo) return; const m = {}; xs.forEach((x) => { if (x) m[x.pid] = x; }); setDados(m); setCarregando(false);
+    const { PROJECTS: P, stored: st, computeHealth: ch, ctmkData: ck, score360: s3, risco: rk } = ult.current;
+    Promise.all(pids.map((p) => carregarProjeto(p, P, st, ch, ck, s3, rk).then((x) => ({ ok: true, x })).catch((e) => ({ ok: false, pid: p, erro: (e && e.message) || "erro de leitura" })))).then((xs) => {
+      if (!vivo) return;
+      const m = {}, f = {};
+      xs.forEach((r) => { if (r.ok && r.x) m[r.x.pid] = r.x; else if (!r.ok) f[r.pid] = r.erro; });
+      setDados(m); setFalhas(f); setAtualizadoEm(new Date()); setCarregando(false);
       if (pids.length === 1) setPid(pids[0]);
     });
     return () => { vivo = false; };
-  }, [escopo, pids, PROJECTS, stored, computeHealth, ctmkData, score360, risco]);
+  }, [escopo, pids, versao, storedPronto]); // eslint-disable-line
 
   const entrar = async () => { setErro(""); const n = await checkPin(pin, { cliente: true }); if (!n) { setErro("PIN inválido para a Área do Cliente."); return; } setPin(""); setEscopo(getClienteScope()); };
   const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); setDetalhe(null); onBack && onBack(); };
@@ -365,8 +376,16 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
 
   return <main style={C.main}>
     <Cabecalho logo={MOKED_LOGO} badge="Área do Cliente" direita={<button style={C.back} onClick={sair} aria-label="Sair">Sair</button>} />
-    <div style={{ ...C.micro, marginBottom: 8 }}>{perfil} · somente leitura</div>
+    <div style={{ ...C.micro, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+      <span>{perfil} · somente leitura{atualizadoEm ? ` · atualizado às ${atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+      <button onClick={() => setVersao((v) => v + 1)} disabled={carregando} style={{ ...C.back, minHeight: 28, padding: "3px 10px", fontSize: 11 }} aria-label="Atualizar">{carregando ? "Lendo…" : "Atualizar"}</button>
+    </div>
     {carregando && <p role="status" style={C.micro}>Lendo os dados dos parques…</p>}
+    {!carregando && Object.keys(falhas).length > 0 && <div role="alert" style={{ ...C.card, borderColor: VERMELHO2 }}>
+      <div style={{ ...C.titulo, color: VERMELHO2 }}>Não consegui ler {Object.keys(falhas).length === 1 ? "um parque" : `${Object.keys(falhas).length} parques`}</div>
+      {Object.entries(falhas).map(([k, v]) => <div key={k} style={C.micro}>{k}: {v}</div>)}
+      <div style={{ ...C.micro, marginTop: 6 }}>Toque em Atualizar para tentar de novo.</div>
+    </div>}
     {!carregando && dados && (
       pid && dados[pid]
         ? (detalhe ? <Detalhe key={detalhe} p={dados[pid]} tipo={detalhe} onBack={() => setDetalhe(null)} abrirPDF={abrirPDF} />
