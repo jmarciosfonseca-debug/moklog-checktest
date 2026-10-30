@@ -359,7 +359,17 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
     return () => { vivo = false; };
   }, [escopo, pids, versao, storedPronto]); // eslint-disable-line
 
-  const entrar = async () => { setErro(""); const n = await checkPin(pin, { cliente: true }); if (!n) { setErro("PIN inválido para a Área do Cliente."); return; } setPin(""); setEscopo(getClienteScope()); };
+  // Mostra o motivo real do servidor (PIN inválido, limite de tentativas, servidor indisponível) em vez de um texto genérico.
+  const entrar = async () => {
+    setErro(""); let motivo = "";
+    const ouvir = (e) => { motivo = (e && e.detail) || ""; };
+    window.addEventListener("moklog-auth-error", ouvir);
+    try {
+      const n = await checkPin(pin, { cliente: true });
+      if (!n) { setErro(motivo || "PIN inválido para a Área do Cliente."); return; }
+      setPin(""); setEscopo(getClienteScope());
+    } finally { window.removeEventListener("moklog-auth-error", ouvir); }
+  };
   const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); setDetalhe(null); onBack && onBack(); };
   const perfil = !escopo ? "" : escopo.escopo === "MOKED" ? "Visão Moked (gerencial)" : escopo.pids.length > 1 ? "Proprietário · visão macro" : "Gestor do parque";
 
