@@ -107,11 +107,15 @@ function daysSince(d) {
   try { return Math.floor((Date.now()-new Date(d+"T12:00:00").getTime())/86400000); } catch { return null; }
 }
 
+// Leitura com prazo (30/10/2026, CCO P605): com sinal fraco o getDoc do Firestore pode ficar esperando sem fim,
+// e a tela parava em "Carregando…". Após 8 s cai para a cópia local do aparelho.
+const getDocPrazo = (ref, ms = 8000) => Promise.race([getDoc(ref), new Promise((_, rej) => setTimeout(() => rej(new Error("tempo esgotado")), ms))]);
+
 // ── Firebase load/save por tema (registros guardados em array `registros`)
 async function loadTema(tema, projectId) {
   const col = COLLECTIONS[tema];
   try {
-    const snap = await getDoc(doc(db,col,projectId));
+    const snap = await getDocPrazo(doc(db,col,projectId));
     if(snap.exists()) {
       const data = snap.data();
       try { localStorage.setItem(`${col}_${projectId}`, JSON.stringify(data.registros||[])); } catch(e){}
@@ -135,7 +139,7 @@ async function saveTema(tema, projectId, registros) {
 // Carrega colaboradores ativos da equipe do projeto (equipes/{pid})
 async function loadEquipe(projectId) {
   try {
-    const snap = await getDoc(doc(db,"equipes",projectId));
+    const snap = await getDocPrazo(doc(db,"equipes",projectId));
     if(snap.exists()) {
       const data = snap.data();
       try { localStorage.setItem(`equipe_${projectId}`, JSON.stringify(data)); } catch(e){}
@@ -153,7 +157,7 @@ async function loadEquipe(projectId) {
 async function loadEquipDanificados(projectId) {
   let data = null;
   try {
-    const snap = await getDoc(doc(db,"equipamentos",projectId));
+    const snap = await getDocPrazo(doc(db,"equipamentos",projectId));
     if(snap.exists()) data = snap.data();
   } catch(e){}
   if(!data){ try { const local=localStorage.getItem(`equipamentos_${projectId}`); if(local) data=JSON.parse(local); } catch(e){} }
@@ -200,14 +204,14 @@ async function loadActivityDots(projectId){
     }),
     (async()=>{
       try{
-        const snap = await getDoc(doc(db,"cco_ronda",projectId));
+        const snap = await getDocPrazo(doc(db,"cco_ronda",projectId));
         if(snap.exists() && (snap.data().turnos||[]).some(t=>t.dataInicio===hoje))
           out.ronda = {color:"#22c55e", pulse:true}; // turno registrado hoje
       }catch(e){}
     })(),
     (async()=>{
       try{
-        const snap = await getDoc(doc(db,"cftv_gravacao",projectId));
+        const snap = await getDocPrazo(doc(db,"cftv_gravacao",projectId));
         if(snap.exists()){
           const cams = snap.data().cameras||[];
           const has = f => cams.some(c=>c.diasGravacao!==null&&c.diasGravacao!==undefined&&f(c.diasGravacao));
@@ -292,7 +296,7 @@ function gerarPDFTema(tema, project, registros, opts = {}) {
 
 // Leitura só para a conferência cruzada: falha de leitura = null ("não verificado"), nunca lista vazia.
 async function carregarParaConferencia(tema, projectId) {
-  try { const snap = await getDoc(doc(db, COLLECTIONS[tema], projectId)); return snap.exists() ? (snap.data().registros || []) : null; }
+  try { const snap = await getDocPrazo(doc(db, COLLECTIONS[tema], projectId)); return snap.exists() ? (snap.data().registros || []) : null; }
   catch (e) { return null; }
 }
 
@@ -713,15 +717,17 @@ export default function AcessoCCO({ project, onBack, dark, onToggleTheme, shared
     if(!project?.id || screen==="pin") return;
     if(isRonda||isCftv||isBodycam){ setLoadingTema(false); setShowArquivados(false); return; } // ◀ ronda/cftv/bodycam gerenciam o próprio load
     setLoadingTema(true);
+    let vivo = true; // ignora resposta atrasada de uma aba anterior
     loadTema(tema, project.id).then(r=>{
+      if(!vivo) return;
       setDados(prev=>({...prev,[tema]:r||[]}));
-      setLoadingTema(false);
-    });
+    }).catch(()=>{}).finally(()=>{ if(vivo) setLoadingTema(false); });
     setHasDraft(!!loadDraft(tema, project.id));
     setShowArquivados(false);
     // Carrega equipe (para Intervalo) e equipamentos danificados (para Supervisão)
     if(["intervalo","acesso","supervisao"].includes(tema)) loadEquipe(project.id).then(setEquipe);
     if(tema==="supervisao") loadEquipDanificados(project.id).then(setEquipDan);
+    return ()=>{ vivo = false; };
   },[tema, project?.id, screen==="pin"]);
 
   // ── AUTOSAVE automático do rascunho (compartilhado, no Firestore) ──
