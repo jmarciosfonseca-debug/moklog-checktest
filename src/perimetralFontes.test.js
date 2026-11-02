@@ -85,3 +85,12 @@ test("turno do teste perimetral vem da hora: 18h–5h59 Noturno, 6h–17h59 Diur
   expect(turnoPorHora(em(18))).toBe("Noturno");
   expect(turnoPorHora(em(23))).toBe("Noturno");
 });
+
+test("turnoPorHora aceita HH:MM e o formulário não tem mais botão de escolher turno", () => {
+  const { turnoPorHora } = require("./Perimetral");
+  expect(turnoPorHora("18:20")).toBe("Noturno"); expect(turnoPorHora("05:59")).toBe("Noturno"); expect(turnoPorHora("06:00")).toBe("Diurno"); expect(turnoPorHora("17:59")).toBe("Diurno");
+  const src = require("fs").readFileSync(require("path").join(__dirname, "Perimetral.jsx"), "utf8");
+  expect(src).not.toMatch(/\["Diurno","Noturno"\]\.map\(t=>\(\s*<button/);
+  expect(src).toMatch(/Editar teste \(data, hora, zonas\)/);
+  expect(src).toMatch(/turno:turnoPorHora\(form\.hora\|\|nowTime\(\)\)/);
+});
