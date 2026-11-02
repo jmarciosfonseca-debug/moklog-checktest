@@ -94,3 +94,10 @@ test("turnoPorHora aceita HH:MM e o formulário não tem mais botão de escolher
   expect(src).toMatch(/Editar teste \(data, hora, zonas\)/);
   expect(src).toMatch(/turno:turnoPorHora\(form\.hora\|\|nowTime\(\)\)/);
 });
+
+test("gerencial pode registrar Teste do consultor (Moked) no perimetral", () => {
+  const src = require("fs").readFileSync(require("path").join(__dirname, "Perimetral.jsx"), "utf8");
+  expect(src).toMatch(/Teste do consultor \(Moked\)/);
+  expect(src).toMatch(/\["Marcio Fonseca","Christian Lopes"\]/);
+  expect(src).toMatch(/teste\.consultor\?" · <b>Consultor Moked<\/b>":""/);
+});

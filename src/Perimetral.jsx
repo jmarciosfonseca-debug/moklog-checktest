@@ -342,7 +342,7 @@ ${incluirPerim?`<div class="kpis">
 <div class="section">
   <div class="section-title">Equipe</div>
   <div class="info-grid">
-    <div class="info-item"><label>Realizou o Teste</label><span>${teste.quemFez||"—"}</span></div>
+    <div class="info-item"><label>Realizou o Teste</label><span>${teste.quemFez||"—"}${teste.consultor?" · <b>Consultor Moked</b>":""}</span></div>
     <div class="info-item"><label>Acompanhou (Central)</label><span>${teste.centralAcompanhou||"—"}</span></div>
     <div class="info-item"><label>Turno / Horário</label><span>${teste.turno} · ${teste.hora||"--"}</span></div>
   </div>
@@ -683,7 +683,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               <button onClick={()=>{setViewTeste(null);setScreen("list");}} style={S.backBtn}>← Voltar</button>
               <div style={{flex:1}}>
                 <div style={{fontSize:15,fontWeight:800,...S.txt}}>{viewTeste.turno==="Diurno"?<><Ico n="sol"/></>:<><Ico n="lua"/></>} {viewTeste.turno} · {fmtDate(viewTeste.data)}</div>
-                <div style={{fontSize:11,...S.txt2}}>{viewTeste.quemFez||"—"} · {viewTeste.hora}</div>
+                <div style={{fontSize:11,...S.txt2}}>{viewTeste.quemFez||"—"}{viewTeste.consultor?" · Consultor Moked":""} · {viewTeste.hora}</div>
               </div>
               {adminAuth && (
                 <button onClick={()=>setPdfSel({modo:"teste",teste:viewTeste,perim:true,rondas:(viewTeste.rondas||[]).length>0})}
@@ -816,8 +816,19 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
             {/* Equipe — seleção automática */}
             <div style={{...S.card,display:"flex",flexDirection:"column",gap:10}}>
               <div style={{fontSize:11,color:"#0ea5e9",fontWeight:700,textTransform:"uppercase",letterSpacing:.8}}><Ico n="usuario"/> Equipe</div>
+              {/* Teste do consultor (gerencial, 02/11/2026): Marcio/Christian fazem o teste e assinam, sem passar pela equipe */}
+              {adminAuth && <div style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${form.consultor?"#E50914":"#2a2a31"}`,background:form.consultor?"#1a0507":"transparent"}}>
+                <label style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:13,fontWeight:800,color:form.consultor?"#fecaca":"#9ca3af"}}>
+                  <input type="checkbox" checked={!!form.consultor} onChange={e=>setForm(f=>({...f,consultor:e.target.checked,quemFez:e.target.checked?(f.consultorNome||""):"",quemFezId:""}))}/>
+                  Teste do consultor (Moked)
+                </label>
+                {form.consultor && <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {["Marcio Fonseca","Christian Lopes"].map(n=><button key={n} onClick={()=>setForm(f=>({...f,consultorNome:n,quemFez:n,quemFezId:""}))} style={{...S.btnSm,fontSize:12,background:form.quemFez===n?"#E50914":"transparent",color:form.quemFez===n?"#fff":undefined,borderColor:"#E5091488"}}>{n}</button>)}
+                  <input value={form.quemFez} onChange={e=>setForm(f=>({...f,consultorNome:e.target.value,quemFez:e.target.value,quemFezId:""}))} placeholder="Nome do consultor" style={{...S.inp,flex:1,minWidth:160}}/>
+                </div>}
+              </div>}
               {/* Quem fez o teste */}
-              <div>
+              {!form.consultor && <div>
                 <label style={S.lbl}>Realizou o Teste *</label>
                 <PlantaoDoMapa plantao={plantaoMapa} dark={dark!==false} selecionado={form.quemFez} onEscolher={x=>{ const c=equipe.find(e=>x.pessoaId&&String(e.id)===String(x.pessoaId)); setForm(f=>({...f,quemFez:x.pessoaNome,quemFezId:c?c.id:""})); }}/>
                 {colabs.length>0?(
@@ -844,7 +855,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 ):(
                   <><input list="sug-perim" value={form.quemFez} onChange={e=>setForm(f=>({...f,quemFez:e.target.value}))} placeholder="Nome do responsável..." style={S.inp}/><datalist id="sug-perim">{listaSugestoes(equipe,(testes||[]).flatMap(t=>[t.quemFez,t.centralAcompanhou])).map(n=><option key={n} value={n}/>)}</datalist></>
                 )}
-              </div>
+              </div>}
               {/* Central */}
               <div>
                 <label style={S.lbl}>Acompanhou na Central</label>
@@ -1062,7 +1073,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                               }
                             }}>
                               <div style={{fontSize:12,fontWeight:700,...S.txt}}>{t.turno} · {t.hora}</div>
-                              <div style={{fontSize:10,...S.txt2}}>{t.quemFez||"—"}</div>
+                              <div style={{fontSize:10,...S.txt2}}>{t.quemFez||"—"}{t.consultor?" · Consultor":""}</div>
                             </div>
                             {probs>0
                               ?<span style={{fontSize:10,color:"#ef4444",fontWeight:700,background:"#1a0202",padding:"2px 8px",borderRadius:5}}>{probs} prob.</span>
