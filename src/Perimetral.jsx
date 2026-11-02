@@ -422,7 +422,7 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false
 // Turno automático (Marcio, 02/11/2026): 06h–17h59 = Diurno, 18h–05h59 = Noturno (hora de Brasília).
 // A equipe não precisa escolher; o botão continua disponível para exceção.
 export function turnoPorHora(d = new Date()) {
-  const h = Number(d.toLocaleString("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).slice(0, 2));
+  const h = typeof d === "string" ? Number(d.slice(0, 2)) : Number(d.toLocaleString("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).slice(0, 2));
   return h >= 6 && h < 18 ? "Diurno" : "Noturno";
 }
 function emptyTeste(turnoDefault, pcfg) {
@@ -551,7 +551,8 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
     if(!form.quemFez.trim()) { alert("Informe quem realizou o teste"); return; }
     setSaving(true);
     try {
-      const novo = {...form, quemFez:padronizarNome(form.quemFez), centralAcompanhou:padronizarNome(form.centralAcompanhou), criadoEm:new Date().toISOString()};
+      const editando = !!form.criadoEm;
+      const novo = {...form, turno:turnoPorHora(form.hora||nowTime()), quemFez:padronizarNome(form.quemFez), centralAcompanhou:padronizarNome(form.centralAcompanhou), criadoEm:form.criadoEm||new Date().toISOString(), ...(editando?{editadoEm:new Date().toISOString()}:{})};
       const newList = await saveTesteMerge(project.id, novo);
       setTestes(newList);
       setScreen("list");
@@ -758,6 +759,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               ))}
               <button onClick={addRondaCont} style={{...S.btnGreen,fontSize:13,marginTop:(viewTeste.rondas||[]).length>0?2:10}}><Ico n="mais"/> Registrar ronda (agora)</button>
             </div>
+            {adminAuth&&<button onClick={()=>{setForm({...viewTeste, turno:turnoPorHora(viewTeste.hora||"12:00")});setViewTeste(null);setScreen("form");}} style={{...S.btnSec,fontSize:13}}><Ico n="editar"/> Editar teste (data, hora, zonas)</button>}
             {adminAuth&&<button onClick={()=>excluir(viewTeste.id)} style={{...S.btnSec,color:"#ef4444",borderColor:"#ef444433",fontSize:13}}><Ico n="lixeira"/> Excluir</button>}
           </div>
         </div>
@@ -797,21 +799,16 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
                 <div>
                   <label style={S.lbl}>Hora</label>
                   <div style={{display:"flex",gap:5}}>
-                    <input type="time" value={form.hora} onChange={e=>setForm(f=>({...f,hora:e.target.value}))} style={{...S.inp,flex:1}}/>
-                    <button onClick={()=>setForm(f=>({...f,hora:nowTime()}))} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}><Ico n="cronometro"/></button>
+                    <input type="time" value={form.hora} onChange={e=>setForm(f=>({...f,hora:e.target.value,turno:turnoPorHora(e.target.value)}))} style={{...S.inp,flex:1}}/>
+                    <button onClick={()=>setForm(f=>({...f,hora:nowTime(),turno:turnoPorHora(nowTime())}))} style={{...S.btnSm,padding:"8px 10px",fontSize:14,flexShrink:0}}><Ico n="cronometro"/></button>
                   </div>
                 </div>
               </div>
-              {/* Turno */}
+              {/* Turno: só leitura, definido pela hora (02/11/2026) */}
               <div>
-                <label style={S.lbl}>Turno <span style={{fontWeight:400,opacity:.7}}>· definido pela hora (18h–6h = Noturno)</span></label>
-                <div style={{display:"flex",gap:8}}>
-                  {["Diurno","Noturno"].map(t=>(
-                    <button key={t} onClick={()=>setForm(f=>({...f,turno:t,quemFez:"",quemFezId:""}))}
-                      style={{flex:1,background:form.turno===t?t==="Diurno"?"#1a2e1a":"#0a0a2e":"transparent",border:`2px solid ${form.turno===t?t==="Diurno"?"#22c55e":"#818cf8":"#0f172a"}`,color:form.turno===t?t==="Diurno"?"#22c55e":"#818cf8":dark?"#475569":"#94a3b8",borderRadius:8,padding:"10px",fontSize:13,cursor:"pointer",fontWeight:form.turno===t?700:400}}>
-                      {t==="Diurno"?<><Ico n="sol"/>{" Diurno"}</>:<><Ico n="lua"/>{" Noturno"}</>}
-                    </button>
-                  ))}
+                <label style={S.lbl}>Turno <span style={{fontWeight:400,opacity:.7}}>· automático pela hora (06h–17h59 Diurno · 18h–05h59 Noturno)</span></label>
+                <div aria-label="Turno do teste" style={{padding:"10px 12px",borderRadius:10,fontWeight:800,fontSize:14,background:form.turno==="Diurno"?"#1a2e1a":"#0a0a2e",border:`2px solid ${form.turno==="Diurno"?"#22c55e":"#818cf8"}`,color:form.turno==="Diurno"?"#22c55e":"#818cf8"}}>
+                  {form.turno==="Diurno"?<><Ico n="sol"/>{" Diurno"}</>:<><Ico n="lua"/>{" Noturno"}</>}
                 </div>
               </div>
             </div>
