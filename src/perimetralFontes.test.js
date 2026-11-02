@@ -74,3 +74,14 @@ test("vetores: cada zona ruim da coleção vira um vetor com chave própria (P31
   expect(v.map((x) => x.chave)).toEqual(["perimetral:Z-02", "perimetral:Z-03"]);
   expect(new Set(v.map((x) => x.zonaCanonica)).size).toBe(2);
 });
+
+// Turno automático do Teste Perimetral (Marcio, 02/11/2026)
+test("turno do teste perimetral vem da hora: 18h–5h59 Noturno, 6h–17h59 Diurno", () => {
+  const { turnoPorHora } = require("./Perimetral");
+  const em = (h) => new Date(Date.UTC(2026, 10, 2, h + 3, 0)); // UTC-3
+  expect(turnoPorHora(em(5))).toBe("Noturno");
+  expect(turnoPorHora(em(6))).toBe("Diurno");
+  expect(turnoPorHora(em(17))).toBe("Diurno");
+  expect(turnoPorHora(em(18))).toBe("Noturno");
+  expect(turnoPorHora(em(23))).toBe("Noturno");
+});
