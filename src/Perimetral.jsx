@@ -419,12 +419,18 @@ function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false
   baixarHtml(html, `consolidado_perimetral_${project.id}_${new Date().toLocaleDateString("pt-BR").replace(/\//g,"-")}.html`);
 }
 
+// Turno automático (Marcio, 02/11/2026): 06h–17h59 = Diurno, 18h–05h59 = Noturno (hora de Brasília).
+// A equipe não precisa escolher; o botão continua disponível para exceção.
+export function turnoPorHora(d = new Date()) {
+  const h = Number(d.toLocaleString("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).slice(0, 2));
+  return h >= 6 && h < 18 ? "Diurno" : "Noturno";
+}
 function emptyTeste(turnoDefault, pcfg) {
   return {
     id: (typeof crypto!=="undefined"&&crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,10)}-${Math.random().toString(36).slice(2,10)}`,
     data: todayStr(),
     hora: nowTime(),
-    turno: turnoDefault||"Diurno",
+    turno: turnoDefault||turnoPorHora(),
     quemFez: "",
     quemFezId: "",
     centralAcompanhou: "",
@@ -798,7 +804,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
               </div>
               {/* Turno */}
               <div>
-                <label style={S.lbl}>Turno</label>
+                <label style={S.lbl}>Turno <span style={{fontWeight:400,opacity:.7}}>· definido pela hora (18h–6h = Noturno)</span></label>
                 <div style={{display:"flex",gap:8}}>
                   {["Diurno","Noturno"].map(t=>(
                     <button key={t} onClick={()=>setForm(f=>({...f,turno:t,quemFez:"",quemFezId:""}))}
