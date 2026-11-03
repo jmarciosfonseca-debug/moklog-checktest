@@ -94,3 +94,13 @@ test("mesclar: sem duplicidade, só 90 dias, mais recente primeiro; resumir cont
   expect(r.mercado).toEqual({ d30: 1, d90: 1 });
   expect(r.total).toBe(3);
 });
+
+test("mesma notícia em dois portais vira um item com dois links", () => {
+  const agora = new Date("2026-11-02T12:00:00Z");
+  const a = { id: "x1", tema: "seguranca", tipo: "roubo", titulo: "Quadrilha rouba carga de eletrônicos em Cajamar", link: "https://g1/a", fonte: "G1", data: agora.toISOString() };
+  const b = { id: "x2", tema: "seguranca", tipo: "roubo", titulo: "Quadrilha rouba carga de eletrônicos em Cajamar!", link: "https://portal/b", fonte: "Portal 360", data: agora.toISOString() };
+  const m = mesclar([a], [b], agora);
+  expect(m).toHaveLength(1);
+  expect(m[0].links).toEqual([{ fonte: "G1", link: "https://g1/a" }, { fonte: "Portal 360", link: "https://portal/b" }]);
+  expect(mesclar(m, [b], agora)[0].links).toHaveLength(2); // idempotente
+});
