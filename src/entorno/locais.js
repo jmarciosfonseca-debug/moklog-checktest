@@ -16,11 +16,11 @@ const LOCAIS = {
   P606:  { nome: "Golgi Duque de Caxias", grupo: "golgi",   cidade: "Duque de Caxias", uf: "RJ", vizinhas: ["Baixada Fluminense", "Washington Luiz"], interesse: ["Washington Luiz", "Arco Metropolitano"],
            fontes: [["G1 Rio", "https://g1.globo.com/rss/g1/rj/rio-de-janeiro/"]] },
   P607:  { nome: "Golgi Brasília",        grupo: "golgi",   cidade: "Santa Maria",     uf: "DF", vizinhas: ["Gama", "Valparaíso de Goiás", "Novo Gama"], interesse: ["BR-040", "Brasília"],
-           fontes: [["G1 DF", "https://g1.globo.com/rss/g1/df/distrito-federal/"]] },
+           fontes: [["Diário de Santa Maria", "https://diariosm.com.br/feed/"], ["Adm. Regional de Santa Maria", "https://www.santamaria.df.gov.br/feed/"], ["Jornal de Brasília", "https://jornaldebrasilia.com.br/feed/"], ["Alô Valparaíso", "https://alovalparaiso.com.br/feed/"], ["Grande Brasília", "https://grandebrasilia.com/feed/"], ["Prefeitura de Valparaíso", "https://valparaisodegoias.go.gov.br/feed/"], ["G1 DF", "https://g1.globo.com/rss/g1/df/distrito-federal/"], ["G1 Goiás", "https://g1.globo.com/rss/g1/go/goias/"]] },
   P311A: { nome: "Mega Curitiba",         grupo: "mega",    cidade: "Quatro Barras",   uf: "PR", vizinhas: ["Curitiba", "Colombo", "Campina Grande do Sul", "Pinhais"], interesse: ["BR-116", "Régis Bittencourt"],
            fontes: [["G1 Paraná", "https://g1.globo.com/rss/g1/pr/parana/"]] },
   P311B: { nome: "Mega Itajaí",           grupo: "mega",    cidade: "Itajaí",          uf: "SC", vizinhas: ["Navegantes", "Balneário Camboriú", "Brusque"], interesse: ["Porto de Itajaí", "Porto de Navegantes", "BR-101"],
-           fontes: [["G1 Santa Catarina", "https://g1.globo.com/rss/g1/sc/santa-catarina/"]] },
+           fontes: [["Jornal de Navegantes", "https://www.jornaldenavegantes.com.br/feed/"], ["Diarinho", "https://diarinho.net/feed/"], ["NSC Total", "https://www.nsctotal.com.br/rss"], ["Município de Itajaí", "https://itajai.sc.gov.br/noticias/feed"], ["G1 Santa Catarina", "https://g1.globo.com/rss/g1/sc/santa-catarina/"]] },
   P505:  { nome: "Klog Guarulhos",        grupo: "klog",    cidade: "Guarulhos",       uf: "SP", vizinhas: ["Cumbica", "Bonsucesso", "Pimentas"], interesse: ["Dutra", "Aeroporto de Guarulhos", "Cumbica"],
            fontes: [["Guarulhos Todo Dia", "https://guarulhostododia.com.br/feed/"], ["Click Guarulhos", "https://www.clickguarulhos.com.br/feed/"], ["GuarulhosWeb", "https://guarulhosweb.com.br/feed/"], ["G1 São Paulo", "https://g1.globo.com/rss/g1/sp/sao-paulo/"]] },
   // Jatinox (02/11): A e B no Ipiranga (São Paulo); C em Indaiatuba. Só segurança — não recebem o mercado geral (Black Friday etc.).
