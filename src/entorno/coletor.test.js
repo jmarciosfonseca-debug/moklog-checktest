@@ -2,7 +2,7 @@
 jest.mock("../../api/ai/lib/accessAuth", () => ({ requireAdmin: (req, res) => { if (req.headers.authorization === "Bearer admin") return { nivel: "admin" }; res.status(401).json({ ok: false }); return null; } }));
 const docs = {};
 const col = (nome) => ({ doc: (id) => ({ get: async () => ({ data: () => docs[`${nome}/${id}`] }), set: async (d, o) => { docs[`${nome}/${id}`] = o && o.merge ? { ...(docs[`${nome}/${id}`] || {}), ...d } : d; } }) });
-jest.mock("../../api/ai/lib/firebaseAdmin", () => ({ getDb: () => ({ collection: col }) }));
+jest.mock("../../api/ai/lib/firebaseAdmin", () => ({ getDb: () => global.__dbMock || ({ collection: col }) }));
 const chamadasIA = [];
 jest.mock("../../api/ai/lib/openai", () => ({ callText: async (prompt) => { if (global.__iaFalha) throw new Error("tool_choice inválido"); chamadasIA.push(prompt); const ids = [...prompt.matchAll(/id=(n[a-z0-9]+)/g)].map((m) => m[1]); return JSON.stringify(ids.map((id) => ({ id, relevante: true, tipo: "roubo", cidade: "Cajamar", bairro: "", proximidade: "cidade", confianca: 80, resumo: "ok" }))); } }));
 const handler = require("../../api/entorno-coletar");
@@ -60,4 +60,24 @@ test("falha da IA não impede a gravação: o doc sai com o erro registrado", as
     expect(docs["entorno/P601"].itens).toEqual([]);
     expect(docs["entorno/P601"].ultimaColeta.erros.join()).toMatch(/IA: tool_choice/);
   } finally { global.__iaFalha = false; }
+});
+
+// GET /api/entorno — leitura pelo servidor com escopo da sessão (03/11/2026).
+jest.mock("../../api/ai/lib/accessAuth", () => ({
+  requireAdmin: (req, res) => { if (req.headers.authorization === "Bearer admin") return { nivel: "admin" }; res.status(401).json({ ok: false }); return null; },
+  verify: (t) => ({ "a.a": { nivel: "admin" }, "c.c": { nivel: "cliente", pids: ["P601", "P602"] }, "l.l": { nivel: "lider", pid: "P505" } }[t] || null),
+}));
+const lerApi = require("../../api/entorno");
+test("leitura: admin vê todos + status; cliente só o escopo + geral; líder só o seu; sem sessão 401; pid fora do escopo 403", async () => {
+  docs["entorno/P601"] = { itens: [{ id: "a" }] }; docs["entorno/P505"] = { itens: [] }; docs["entorno/_geral"] = { itens: [{ id: "g" }] }; docs["entorno/_status"] = { ultimaEm: "x" };
+  const getAll = async (...refs) => refs.map((r) => ({ id: r.id, exists: !!docs[`entorno/${r.id}`], data: () => docs[`entorno/${r.id}`] }));
+  const dbMock = { collection: () => ({ doc: (id) => ({ id }) }), getAll };
+  global.__dbMock = dbMock;
+  let res = resposta(); await lerApi({ method: "GET", headers: {}, query: {} }, res); expect(res.code).toBe(401);
+  res = resposta(); await lerApi({ method: "GET", headers: { authorization: "Bearer a.a" }, query: {} }, res);
+  expect(res.code).toBe(200); expect(Object.keys(res.body.docs)).toEqual(["P601", "P505"]); expect(res.body.status).toEqual({ ultimaEm: "x" }); expect(res.body.geral.itens).toHaveLength(1);
+  res = resposta(); await lerApi({ method: "GET", headers: { authorization: "Bearer c.c" }, query: {} }, res);
+  expect(res.body.pids).toEqual(["P601", "P602"]); expect(Object.keys(res.body.docs)).toEqual(["P601"]); expect(res.body.status).toBeNull(); expect(res.body.geral).toBeTruthy();
+  res = resposta(); await lerApi({ method: "GET", headers: { authorization: "Bearer c.c" }, query: { pid: "P505" } }, res); expect(res.code).toBe(403);
+  res = resposta(); await lerApi({ method: "GET", headers: { authorization: "Bearer l.l" }, query: {} }, res); expect(res.body.pids).toEqual(["P505"]);
 });

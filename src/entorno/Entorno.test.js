@@ -4,8 +4,7 @@ import { createRoot } from "react-dom/client";
 import EntornoLista, { filtrar } from "./EntornoLista";
 
 const docs = {};
-jest.mock("firebase/app", () => ({ getApps: () => [{}] }));
-jest.mock("firebase/firestore", () => ({ getFirestore: () => ({}), doc: (_db, col, id) => `${col}/${id}`, getDoc: async (ref) => ({ exists: () => !!docs[ref], data: () => docs[ref] }) }));
+jest.mock("./lerEntorno", () => ({ lerEntorno: async () => { const out = { docs: {}, geral: null, status: null, erro: "" }; for (const [k, v] of Object.entries(docs)) { const id = k.replace("entorno/", ""); if (id === "_status") out.status = v; else if (id === "_geral") out.geral = v; else out.docs[id] = v; } return out; } }));
 const mockAuthFetch = jest.fn();
 jest.mock("../session", () => ({ authFetch: (...a) => mockAuthFetch(...a) }));
 jest.mock("../generatePDF", () => ({ MOKED_LOGO: "" }));
