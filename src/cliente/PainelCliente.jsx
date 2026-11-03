@@ -17,7 +17,7 @@ import { EQUIP_CATS } from "../equipData";
 import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
-import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno } from "../entorno/EntornoLista";
+import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno, ehPerto as ehPertoEntorno } from "../entorno/EntornoLista";
 import { LOCAIS as LOCAIS_ENTORNO, recebeGeral } from "../entorno/locais";
 import { lerEntorno } from "../entorno/lerEntorno";
 import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
@@ -164,14 +164,15 @@ function TelaProjeto({ p, onBack, onAbrir }) {
 function CardEntorno({ p, onAbrir }) {
   const e = p.entorno, r = e?.resumo, l = LOCAIS_ENTORNO[p.pid];
   if (!l || !l.cidade) return null; // parque sem entorno cadastrado: não mostra o card
-  const ultimos = e ? filtrarEntorno(e.itens, { dias: 30 }).slice(0, 3) : [];
+  const ultimos = e ? filtrarEntorno(e.itens, { dias: 30, ordem: "proximidade" }).slice(0, 3) : []; // as mais próximas do parque primeiro
+  const nPerto = e ? (e.itens || []).filter((i) => i.tema === "seguranca" && ehPertoEntorno(i)).length : 0;
   const seg = r?.seguranca, mer = r?.mercado;
   return <div style={C.card}>
     <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, width: "100%" }} onClick={() => onAbrir("entorno")} aria-label="Abrir entorno">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><div style={C.titulo}>Entorno · {l.cidade}/{l.uf}</div><span style={C.micro}>últimos 30 dias ›</span></div>
       {!e && <div style={C.micro}>Sem notícias coletadas ainda.</div>}
       {e && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-        <div><div style={C.numero(seg?.d30 ? (seg.graves ? VERMELHO2 : AMARELO) : VERDE)}>{seg?.d30 ?? 0}</div><div style={C.micro}>ocorrências noticiadas</div></div>
+        <div><div style={C.numero(seg?.d30 ? (seg.graves ? VERMELHO2 : AMARELO) : VERDE)}>{seg?.d30 ?? 0}</div><div style={C.micro}>ocorrências noticiadas{nPerto ? ` · ${nPerto} perto do parque` : ""}</div></div>
         <div><div style={{ ...C.numero(seg?.tendencia === "alta" ? VERMELHO2 : seg?.tendencia === "queda" ? VERDE : AMARELO), fontSize: 20, marginTop: 4 }}>{seg?.tendencia === "alta" ? "▲ em alta" : seg?.tendencia === "queda" ? "▼ em queda" : "▶ estável"}</div><div style={C.micro}>vs. 30 dias anteriores</div></div>
         <div><div style={C.numero("#38bdf8")}>{mer?.d30 ?? 0}</div><div style={C.micro}>mercado logístico</div></div>
       </div>}

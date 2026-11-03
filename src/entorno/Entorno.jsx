@@ -5,7 +5,7 @@ import { authFetch } from "../session";
 import { lerEntorno } from "./lerEntorno";
 import { LOCAIS, GERAL, recebeGeral, projetosComEntorno, TIPO_ROTULO } from "./locais";
 import { mesclar, resumir } from "./core";
-import EntornoLista, { corTipo, fmtData } from "./EntornoLista";
+import EntornoLista, { corTipo, fmtData, ehPerto } from "./EntornoLista";
 import { C, Cabecalho, VERMELHO2, VERDE, AMARELO, CINZA, AZUL } from "../cliente/Cluster";
 import { MOKED_LOGO } from "../generatePDF";
 
@@ -28,7 +28,7 @@ function CardParque({ pid, d, onAbrir }) {
       <div><div style={{ ...C.numero(corTend(seg?.tendencia)), fontSize: 20, marginTop: 4 }}>{setaTend(seg?.tendencia)} {seg?.anterior30 ?? 0}→{seg?.d30 ?? 0}</div><div style={C.micro}>tendência vs. 30 anteriores</div></div>
       <div><div style={C.numero(AZUL)}>{mer?.d30 ?? 0}</div><div style={C.micro}>mercado · 30 dias</div></div>
     </div>}
-    {topo.length > 0 && <div style={{ marginTop: 6 }}>{topo.map(([t, n]) => <span key={t} style={C.chip(corTipo(t))}>{TIPO_ROTULO[t] || t} {n}</span>)}</div>}
+    {topo.length > 0 && <div style={{ marginTop: 6 }}>{(() => { const np = (d?.itens || []).filter((i) => i.tema === "seguranca" && ehPerto(i)).length; return np ? <span style={C.chip(VERMELHO2)}>⌖ {np} perto do parque</span> : null; })()}{topo.map(([t, n]) => <span key={t} style={C.chip(corTipo(t))}>{TIPO_ROTULO[t] || t} {n}</span>)}</div>}
   </button>;
 }
 

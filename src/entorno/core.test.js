@@ -1,5 +1,5 @@
 // Entorno (02/11/2026): núcleo puro — buscas por projeto, leitura de RSS, pré-filtro de tema, mescla e resumo.
-const { consultasDoProjeto, consultasGerais, parseRss, passaPreFiltro, novosParaClassificar, aplicarClassificacao, mesclar, resumir, idDe, promptClassificacao } = require("./core");
+const { distanciaKm, faixaKm, ordenarPorProximidade, consultasDoProjeto, consultasGerais, parseRss, passaPreFiltro, novosParaClassificar, aplicarClassificacao, mesclar, resumir, idDe, promptClassificacao } = require("./core");
 const { LOCAIS, projetosComEntorno, recebeGeral } = require("./locais");
 
 const RSS = `<?xml version="1.0"?><rss><channel><title>x</title>
@@ -11,7 +11,9 @@ const RSS = `<?xml version="1.0"?><rss><channel><title>x</title>
 test("cada projeto tem buscas no Google News (segurança e mercado) + portais indicados; janela de 90 dias", () => {
   const q = consultasDoProjeto("P601");
   expect(q.slice(0, 2).map((x) => x.tema)).toEqual(["seguranca", "mercado"]);
-  expect(q.slice(2).map((x) => x.fonte)).toEqual(["Portal Notícia 360", "Portal Dois Pontos", "G1 Cajamar"]);
+  expect(q.slice(2, 5).map((x) => x.fonte)).toEqual(["Portal Notícia 360", "Portal Dois Pontos", "G1 Cajamar"]);
+  expect(q.slice(5).map((x) => x.fonte)).toEqual(["Agência Brasil", "R7", "UOL Notícias", "CNN Brasil", "Metrópoles"]);
+  expect(q.slice(5).every((x) => x.amplo && x.lugares.includes("Cajamar"))).toBe(true);
   expect(q[4].amplo).toBe(true); expect(q[2].amplo).toBe(false); expect(q[2].tema).toBeNull();
   expect(q[4].lugares).toEqual(expect.arrayContaining(["Cajamar", "Franco da Rocha"]));
   expect(q[0].url).toMatch(/^https:\/\/news\.google\.com\/rss\/search\?q=/);
@@ -22,7 +24,7 @@ test("cada projeto tem buscas no Google News (segurança e mercado) + portais in
 
 test("Jatinox (Ipiranga/SP e Indaiatuba): só segurança, sem busca de mercado; mercado geral só para os demais", () => {
   const q = consultasDoProjeto("P260A");
-  expect(q.map((x) => x.tema)).toEqual(["seguranca", null, null]);
+  expect(q.slice(0, 3).map((x) => x.tema)).toEqual(["seguranca", null, null]);
   expect(decodeURIComponent(q[0].url)).toMatch(/Ipiranga/);
   expect(consultasDoProjeto("P260C")[0].url).toMatch(/Indaiatuba/);
   expect(projetosComEntorno()).toEqual(expect.arrayContaining(["P601", "P505", "P311A", "P311B", "P606", "P607", "P260A", "P260B", "P260C"]));
@@ -103,4 +105,13 @@ test("mesma notícia em dois portais vira um item com dois links", () => {
   expect(m).toHaveLength(1);
   expect(m[0].links).toEqual([{ fonte: "G1", link: "https://g1/a" }, { fonte: "Portal 360", link: "https://portal/b" }]);
   expect(mesclar(m, [b], agora)[0].links).toHaveLength(2); // idempotente
+});
+
+test("proximidade: distância em km, faixas e ordenação (perto primeiro, depois cidade/vizinha, depois data)", () => {
+  const km = distanciaKm({ lat: -23.35, lng: -46.88 }, { lat: -23.36, lng: -46.89 });
+  expect(km).toBeGreaterThan(1); expect(km).toBeLessThan(2);
+  expect(distanciaKm(null, { lat: 0, lng: 0 })).toBeNull();
+  expect([faixaKm(2), faixaKm(8), faixaKm(20), faixaKm(50), faixaKm(null)]).toEqual(["muito perto", "perto", "na região", "longe", null]);
+  const o = ordenarPorProximidade([{ id: "regiao", proximidade: "regiao", data: "2026-11-02" }, { id: "km9", km: 9, data: "2026-10-01" }, { id: "km2", km: 2, data: "2026-09-01" }, { id: "cidade", proximidade: "cidade", data: "2026-10-20" }, { id: "cidade2", proximidade: "cidade", data: "2026-10-25" }]);
+  expect(o.map((x) => x.id)).toEqual(["km2", "km9", "cidade2", "cidade", "regiao"]);
 });

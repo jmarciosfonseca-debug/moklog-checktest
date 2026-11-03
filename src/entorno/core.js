@@ -1,6 +1,6 @@
 // Núcleo puro do Entorno: monta as buscas, lê RSS, pré-filtra pelo tema, mescla com o que já está gravado e resume.
 // Sem rede e sem banco — tudo testável. CommonJS (compartilhado com api/entorno-coletar.js).
-const { LOCAIS, GERAL, TEMAS, TIPOS_GRAVES } = require("./locais");
+const { LOCAIS, GERAL, TEMAS, TIPOS_GRAVES, FONTES_GERAIS } = require("./locais");
 
 const DIAS_JANELA = 90;
 const MAX_ITENS = 150;
@@ -32,6 +32,7 @@ function consultasDoProjeto(pid) {
     out.push({ tema: "mercado", url: urlGoogleNews(mer), fonte: "Google News" });
   }
   for (const [nome, url] of l.fontes || []) out.push({ tema: null, url, fonte: nome, amplo: /g1\.globo\.com\/rss/.test(url), lugares: lugaresDe(l) });
+  for (const [nome, url] of FONTES_GERAIS) out.push({ tema: null, url, fonte: nome, amplo: true, lugares: lugaresDe(l) });
   return out;
 }
 
@@ -205,4 +206,22 @@ function resumir(itens, agora = new Date()) {
   };
 }
 
-module.exports = { DIAS_JANELA, MAX_ITENS, MAX_NOVOS_POR_RODADA, CONFIANCA_MINIMA, urlGoogleNews, consultasDoProjeto, consultasGerais, parseRss, passaPreFiltro, idDe, novosParaClassificar, promptClassificacao, extrairJson, aplicarClassificacao, mesclar, resumir, semAcento };
+// Proximidade (03/11): distância em km entre a notícia geocodificada e o parque; faixas para destaque.
+function distanciaKm(a, b) {
+  if (!a || !b || typeof a.lat !== "number" || typeof b.lat !== "number") return null;
+  const r = 6371, g = (x) => (x * Math.PI) / 180;
+  const dLat = g(b.lat - a.lat), dLng = g(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(g(a.lat)) * Math.cos(g(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * r * Math.asin(Math.sqrt(h)) * 10) / 10;
+}
+const FAIXAS = [[3, "muito perto"], [10, "perto"], [30, "na região"]];
+function faixaKm(km) { if (typeof km !== "number") return null; for (const [max, r] of FAIXAS) if (km <= max) return r; return "longe"; }
+
+// Ordenação para a tela: segurança perto do parque primeiro (km, depois proximidade por cidade), depois por data.
+const PESO_PROX = { cidade: 0, vizinha: 1, regiao: 2 };
+function ordenarPorProximidade(itens) {
+  const chave = (i) => [typeof i.km === "number" ? i.km : 999, PESO_PROX[i.proximidade] ?? 3, -(Date.parse(i.data || 0) || 0)];
+  return [...(itens || [])].sort((a, b) => { const x = chave(a), y = chave(b); for (let k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] - y[k]; return 0; });
+}
+
+module.exports = { distanciaKm, faixaKm, ordenarPorProximidade, DIAS_JANELA, MAX_ITENS, MAX_NOVOS_POR_RODADA, CONFIANCA_MINIMA, urlGoogleNews, consultasDoProjeto, consultasGerais, parseRss, passaPreFiltro, idDe, novosParaClassificar, promptClassificacao, extrairJson, aplicarClassificacao, mesclar, resumir, semAcento };
