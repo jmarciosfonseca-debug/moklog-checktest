@@ -2,9 +2,11 @@
 // Somente leitura: cada item tem o link da fonte original.
 import { useMemo, useState } from "react";
 import { TEMAS, TIPO_ROTULO, TIPOS_GRAVES } from "./locais";
-import { C, VERMELHO2, AMARELO, VERDE, CINZA, AZUL } from "../cliente/Cluster";
+import { C, VERMELHO2, AMARELO, VERDE, CINZA } from "../cliente/Cluster";
 
-export const corTipo = (tipo) => (TIPOS_GRAVES.includes(tipo) ? VERMELHO2 : ["roubo", "furto", "arrombamento", "trafico", "operacao_policial"].includes(tipo) ? AMARELO : AZUL);
+// Cores (Marcio, 02/11): criminalidade em vermelho (grave) ou amarelo; empreendimento/logística/mercado em verde.
+export const corTipo = (tipo) => (TIPOS_GRAVES.includes(tipo) ? VERMELHO2 : AMARELO);
+export const corItem = (i) => (i.tema === "mercado" ? VERDE : corTipo(i.tipo));
 export const fmtData = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" }) : "s/ data");
 const PROX = { cidade: "na cidade", vizinha: "cidade vizinha", regiao: "na região" };
 
@@ -14,8 +16,10 @@ export function filtrar(itens, { tema = "todos", tipo = "todos", dias = 90 } = {
 }
 
 export function ItemNoticia({ i, compacto = false }) {
-  const cor = i.tema === "mercado" ? VERDE : corTipo(i.tipo);
-  return <a href={i.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none", color: "inherit", padding: compacto ? "7px 0" : "10px 0", borderTop: "1px solid #1f1f25" }} aria-label={`Abrir notícia: ${i.titulo}`}>
+  const cor = corItem(i);
+  const links = (i.links && i.links.length ? i.links : [{ fonte: i.fonte, link: i.link }]).filter((l) => l.link);
+  return <div style={{ padding: compacto ? "7px 0" : "10px 0", borderTop: "1px solid #1f1f25", borderLeft: `3px solid ${cor}`, paddingLeft: 8 }}>
+   <a href={links[0]?.link || i.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none", color: "inherit" }} aria-label={`Abrir notícia: ${i.titulo}`}>
     <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: cor, marginTop: 5, flexShrink: 0, boxShadow: `0 0 6px ${cor}88` }} />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -24,14 +28,18 @@ export function ItemNoticia({ i, compacto = false }) {
         <div style={{ fontSize: 10.5, color: "#6b7280", marginTop: 3, display: "flex", flexWrap: "wrap", gap: "2px 8px" }}>
           <span style={{ color: cor, fontWeight: 700 }}>{TIPO_ROTULO[i.tipo] || i.tipo}</span>
           <span>{fmtData(i.data)}</span>
-          {i.fonte && <span>{i.fonte}</span>}
           {(i.bairro || i.cidade) && <span>{[i.bairro, i.cidade].filter(Boolean).join(" · ")}</span>}
           {i.proximidade && <span>{PROX[i.proximidade] || ""}</span>}
           {typeof i.confianca === "number" && <span title="Confiança da classificação">conf. {i.confianca}%</span>}
         </div>
       </div>
     </div>
-  </a>;
+   </a>
+   {!compacto && links.length > 0 && <div style={{ fontSize: 10.5, marginTop: 4, marginLeft: 16, display: "flex", flexWrap: "wrap", gap: "2px 10px" }}>
+     {links.map((l, n) => <a key={l.link} href={l.link} target="_blank" rel="noopener noreferrer" style={{ color: "#9ca3af", textDecoration: "underline" }}>{links.length > 1 ? `Fonte ${n + 1}: ` : "Fonte: "}{l.fonte || new URL(l.link).hostname.replace(/^www\./, "")}</a>)}
+   </div>}
+   {compacto && links[0] && <div style={{ fontSize: 10, color: "#6b7280", marginLeft: 16 }}>{links.map((l) => l.fonte).filter(Boolean).join(" · ")}</div>}
+  </div>;
 }
 
 export default function EntornoLista({ itens, inicial = {}, mostrarFiltros = true, limite = 50 }) {

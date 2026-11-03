@@ -165,10 +165,24 @@ function aplicarClassificacao(itens, respostaJson) {
 }
 
 // Mescla o gravado com o novo: sem duplicidade, só os últimos 90 dias, mais recentes primeiro, teto de itens.
+// A mesma notícia publicada por vários portais vira UM item com vários links (Marcio, 02/11: "link 1, link 2…").
+const chaveTitulo = (t) => semAcento(t).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
 function mesclar(existentes, novos, agora = new Date()) {
   const limite = new Date(agora.getTime() - DIAS_JANELA * 86400000).toISOString();
-  const mapa = new Map();
-  for (const it of [...(existentes || []), ...(novos || [])]) if (it && it.id) mapa.set(it.id, it);
+  const mapa = new Map(), porTitulo = new Map();
+  for (const it of [...(existentes || []), ...(novos || [])]) {
+    if (!it || !it.id) continue;
+    const links = (it.links && it.links.length ? it.links : [{ fonte: it.fonte || "", link: it.link }]).filter((l) => l && l.link);
+    const k = chaveTitulo(it.titulo);
+    const dono = mapa.get(it.id) || (k && porTitulo.get(k));
+    if (dono && dono.id !== it.id) {
+      for (const l of links) if (!dono.links.some((x) => x.link === l.link)) dono.links.push(l);
+      continue;
+    }
+    const novo = { ...it, links: [...links] };
+    if (dono) for (const l of dono.links || []) if (!novo.links.some((x) => x.link === l.link)) novo.links.push(l);
+    mapa.set(novo.id, novo); if (k) porTitulo.set(k, novo);
+  }
   return [...mapa.values()]
     .filter((it) => !it.data || it.data >= limite)
     .sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))
