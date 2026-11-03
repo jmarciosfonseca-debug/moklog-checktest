@@ -1,0 +1,172 @@
+// Núcleo puro do Entorno: monta as buscas, lê RSS, pré-filtra pelo tema, mescla com o que já está gravado e resume.
+// Sem rede e sem banco — tudo testável. CommonJS (compartilhado com api/entorno-coletar.js).
+const { LOCAIS, TEMAS, TIPOS_GRAVES } = require("./locais");
+
+const DIAS_JANELA = 90;
+const MAX_ITENS = 150;
+const MAX_NOVOS_POR_RODADA = 25; // teto de classificação por projeto/tema por rodada (custo e tempo)
+
+const semAcento = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// Google News RSS agrega G1/Globo, UOL, R7, Estadão, CNN Brasil e portais locais, com busca por cidade e janela de tempo.
+function urlGoogleNews(q, dias = DIAS_JANELA) {
+  const query = `${q} when:${dias}d`;
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
+}
+
+const aspas = (t) => (/\s/.test(t) ? `"${t}"` : t);
+const ou = (lista) => `(${lista.map(aspas).join(" OR ")})`;
+
+// Uma consulta por tema. A cidade entra sempre; vizinhas e pontos de interesse ampliam o entorno sem perder o foco.
+function consultasDoProjeto(pid) {
+  const l = LOCAIS[pid];
+  if (!l || !l.cidade) return [];
+  const lugares = [l.cidade, ...(l.vizinhas || []).slice(0, 3)];
+  const seg = `${ou(TEMAS.seguranca.termos.slice(0, 10))} ${ou(lugares)}`;
+  const lugaresMercado = [l.cidade, ...(l.interesse || []).slice(0, 2)];
+  const mer = `${ou(TEMAS.mercado.termos.slice(0, 10))} ${ou(lugaresMercado)}`;
+  return [
+    { tema: "seguranca", url: urlGoogleNews(seg) },
+    { tema: "mercado", url: urlGoogleNews(mer) },
+  ];
+}
+
+// Leitor de RSS mínimo (sem dependência): <item><title/><link/><pubDate/><source/><description/></item>.
+const decodeXml = (s) => String(s || "")
+  .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+  .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, "&")
+  .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+const tag = (bloco, nome) => { const m = new RegExp(`<${nome}(?:\\s[^>]*)?>([\\s\\S]*?)</${nome}>`, "i").exec(bloco); return m ? m[1] : ""; };
+
+function parseRss(xml) {
+  const itens = [];
+  const re = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+  let m;
+  while ((m = re.exec(String(xml || "")))) {
+    const b = m[1];
+    let titulo = decodeXml(tag(b, "title"));
+    let fonte = decodeXml(tag(b, "source"));
+    // Google News: "Título - Fonte"; quando a fonte vem no título, separa.
+    if (!fonte) { const i = titulo.lastIndexOf(" - "); if (i > 10) { fonte = titulo.slice(i + 3).trim(); titulo = titulo.slice(0, i).trim(); } }
+    else if (titulo.endsWith(` - ${fonte}`)) titulo = titulo.slice(0, -(fonte.length + 3)).trim();
+    const link = decodeXml(tag(b, "link")) || (/<link\b[^>]*href="([^"]+)"/i.exec(b) || [])[1] || "";
+    const pub = tag(b, "pubDate") || tag(b, "published") || tag(b, "updated");
+    const d = pub ? new Date(decodeXml(pub)) : null;
+    const data = d && !isNaN(d) ? d.toISOString() : null;
+    const descricao = decodeXml(tag(b, "description")).slice(0, 400);
+    if (titulo && link) itens.push({ titulo, link, fonte, data, descricao });
+  }
+  return itens;
+}
+
+// Pré-filtro barato antes da IA: precisa citar um termo do tema (mata "Neymar ganhou a bola de ouro").
+function passaPreFiltro(item, tema) {
+  const texto = semAcento(`${item.titulo} ${item.descricao}`);
+  return (TEMAS[tema]?.termos || []).some((t) => texto.includes(semAcento(t)));
+}
+
+// Identidade estável de uma notícia (mesmo link em duas buscas = uma notícia). Hash simples e determinístico.
+function idDe(link) {
+  let h = 5381; const s = String(link || "");
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return "n" + h.toString(36) + s.length.toString(36);
+}
+
+// Quais itens lidos ainda não estão gravados (e cabem na rodada).
+function novosParaClassificar(lidos, existentes, tema) {
+  const ids = new Set((existentes || []).map((x) => x.id));
+  const vistos = new Set();
+  const out = [];
+  for (const it of lidos) {
+    const id = idDe(it.link);
+    if (ids.has(id) || vistos.has(id) || !passaPreFiltro(it, tema)) continue;
+    vistos.add(id);
+    out.push({ ...it, id, tema });
+    if (out.length >= MAX_NOVOS_POR_RODADA) break;
+  }
+  return out;
+}
+
+// Prompt de classificação: devolve JSON por id. A IA só confirma relevância/tipo/local — nunca inventa notícia.
+function promptClassificacao(pid, itens) {
+  const l = LOCAIS[pid];
+  const tiposSeg = TEMAS.seguranca.tipos.join(", ");
+  const tiposMer = TEMAS.mercado.tipos.join(", ");
+  const lista = itens.map((it) => `- id=${it.id} | tema=${it.tema} | ${it.data ? it.data.slice(0, 10) : "s/data"} | ${it.fonte || "fonte?"} | ${it.titulo}${it.descricao ? " — " + it.descricao.slice(0, 200) : ""}`).join("\n");
+  return `Você classifica notícias para a equipe de segurança de um condomínio logístico.
+Parque: ${l.nome} — ${l.cidade}/${l.uf}. Entorno: ${(l.vizinhas || []).join(", ") || "—"}. Pontos de interesse: ${(l.interesse || []).join(", ") || "—"}.
+
+Para CADA item abaixo responda em JSON (array), um objeto por id, com os campos:
+- id (copiar)
+- relevante: true só se a notícia (a) for sobre ocorrência criminal/policial que afete a região do parque (tema seguranca) ou (b) for sobre o mercado logístico/ocupantes/sazonalidade que interesse a quem administra o parque (tema mercado). Esporte, celebridades, política nacional, notícias de outra cidade homônima = false.
+- tipo: para seguranca um de [${tiposSeg}]; para mercado um de [${tiposMer}].
+- cidade: cidade da ocorrência (texto curto) ou "" se não ficar claro.
+- bairro: bairro/logradouro citado ou "".
+- proximidade: "cidade" (na cidade do parque), "vizinha" (cidade vizinha/entorno listado), "regiao" (mesma região metropolitana) ou "fora".
+- confianca: 0 a 100 (quanto a notícia claramente trata do tema e do local).
+- resumo: uma frase objetiva, até 160 caracteres, em português, sem opinião.
+
+Itens:
+${lista}
+
+Responda SOMENTE o JSON (array), sem comentários.`;
+}
+
+function extrairJson(texto) {
+  const s = String(texto || "").trim();
+  const a = s.indexOf("["), z = s.lastIndexOf("]");
+  if (a < 0 || z < a) return [];
+  try { const j = JSON.parse(s.slice(a, z + 1)); return Array.isArray(j) ? j : []; } catch { return []; }
+}
+
+const CONFIANCA_MINIMA = 60; // piso para não inflar o painel (registrado em 27/10)
+
+// Junta a classificação aos itens; descarta o que a IA marcou como irrelevante, fora da região ou de baixa confiança.
+function aplicarClassificacao(itens, respostaJson) {
+  const porId = new Map(extrairJson(respostaJson).filter((x) => x && x.id).map((x) => [x.id, x]));
+  const out = [];
+  for (const it of itens) {
+    const c = porId.get(it.id);
+    if (!c || c.relevante !== true) continue;
+    const conf = Math.max(0, Math.min(100, Number(c.confianca) || 0));
+    if (conf < CONFIANCA_MINIMA || c.proximidade === "fora") continue;
+    const tipos = TEMAS[it.tema]?.tipos || [];
+    out.push({
+      id: it.id, tema: it.tema, titulo: it.titulo, link: it.link, fonte: it.fonte || "", data: it.data,
+      tipo: tipos.includes(c.tipo) ? c.tipo : "outro",
+      cidade: String(c.cidade || "").slice(0, 60), bairro: String(c.bairro || "").slice(0, 80),
+      proximidade: ["cidade", "vizinha", "regiao"].includes(c.proximidade) ? c.proximidade : "regiao",
+      confianca: conf, resumo: String(c.resumo || "").slice(0, 200),
+    });
+  }
+  return out;
+}
+
+// Mescla o gravado com o novo: sem duplicidade, só os últimos 90 dias, mais recentes primeiro, teto de itens.
+function mesclar(existentes, novos, agora = new Date()) {
+  const limite = new Date(agora.getTime() - DIAS_JANELA * 86400000).toISOString();
+  const mapa = new Map();
+  for (const it of [...(existentes || []), ...(novos || [])]) if (it && it.id) mapa.set(it.id, it);
+  return [...mapa.values()]
+    .filter((it) => !it.data || it.data >= limite)
+    .sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")))
+    .slice(0, MAX_ITENS);
+}
+
+// Resumo para os mostradores: contagens por tema em 30/60/90 dias, por tipo e tendência (30 dias atuais × 30 anteriores).
+function resumir(itens, agora = new Date()) {
+  const t = agora.getTime();
+  const ha = (d) => new Date(t - d * 86400000).toISOString();
+  const seg = (itens || []).filter((i) => i.tema === "seguranca"), mer = (itens || []).filter((i) => i.tema === "mercado");
+  const conta = (arr, dias) => arr.filter((i) => i.data && i.data >= ha(dias)).length;
+  const porTipo = {};
+  for (const i of seg) porTipo[i.tipo] = (porTipo[i.tipo] || 0) + 1;
+  const atual = conta(seg, 30), anterior = seg.filter((i) => i.data && i.data >= ha(60) && i.data < ha(30)).length;
+  return {
+    seguranca: { d30: atual, d60: conta(seg, 60), d90: conta(seg, 90), graves: seg.filter((i) => TIPOS_GRAVES.includes(i.tipo)).length, porTipo, tendencia: atual > anterior ? "alta" : atual < anterior ? "queda" : "estavel", anterior30: anterior },
+    mercado: { d30: conta(mer, 30), d90: conta(mer, 90) },
+    total: (itens || []).length,
+  };
+}
+
+module.exports = { DIAS_JANELA, MAX_ITENS, MAX_NOVOS_POR_RODADA, CONFIANCA_MINIMA, urlGoogleNews, consultasDoProjeto, parseRss, passaPreFiltro, idDe, novosParaClassificar, promptClassificacao, extrairJson, aplicarClassificacao, mesclar, resumir, semAcento };

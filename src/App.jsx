@@ -21,6 +21,7 @@ import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession } from "./session";
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
+import Entorno from "./entorno/Entorno";
 
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import { recursosHabilitados } from "./gerenciaisConfig";
@@ -1545,6 +1546,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   const [ctmkConfirm, setCtmkConfirm] = useState(null);
   const [v360, setV360] = useState(null); // null | "loading" | {rows, media, erro}
   const [showAuditoria,setShowAuditoria]=useState(false);
+  const [showEntorno,setShowEntorno]=useState(false);
   const [analiseRiscoPacote, setAnaliseRiscoPacote] = useState(null); // "golgi" | "mega" | "klog" | null
   const [gerandoExec, setGerandoExec] = useState(false); // HTML Executivo: leitura das fontes em andamento
   const [v360Grupo, setV360Grupo] = useState("todos"); // todos | golgi | mega | klog — "todos" é uso interno Moked; PDF por cliente nunca mistura
@@ -1685,6 +1687,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
     Object.keys(PROJECTS).forEach(id=>{ if(ANALISE_RISCO_ELIGIBLE.includes(id)) elegiveis[id]=PROJECTS[id]; });
     return <AnaliseRisco projects={elegiveis} stored={stored} pacote={analiseRiscoPacote} onBack={()=>setAnaliseRiscoPacote(null)} />;
   }
+  if(showEntorno) return <Entorno onBack={()=>setShowEntorno(false)} />;
   if(showAuditoria) {
     return <AuditoriaOperacional dark={dark} projectId="P311A"
       carregarScore360={(pid)=>computeScore360Projeto(pid, { stored, ctmkData })}
@@ -2076,10 +2079,10 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             fique órfão por remoção acidental do botão. */}
         <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:8}}>
           {recursosHabilitados().map(r=>{
-            const acao = r.id==="visao-360" ? carregarVisao360 : r.id==="auditoria-operacional" ? (()=>setShowAuditoria(true)) : null;
+            const acao = r.id==="visao-360" ? carregarVisao360 : r.id==="auditoria-operacional" ? (()=>setShowAuditoria(true)) : r.id==="entorno" ? (()=>setShowEntorno(true)) : null;
             if(!acao) return null; // sem ação → não renderiza (o teste acusa órfão)
             return (
-              <BtnVidro key={r.id} cor={r.id==="visao-360"?[56,189,248]:[139,92,246]} arq={r.id==="visao-360"?"visao-360":"auditoria"} fb={EMOJI_PARA_ICONE[String(r.icone).replace(/\uFE0F/g,"")]||"prancheta"} label={r.label} sub={r.id==="visao-360"?"Panorama de todos os projetos":"Auditoria operacional"} onClick={acao}/>
+              <BtnVidro key={r.id} cor={r.id==="visao-360"?[56,189,248]:r.id==="entorno"?[239,68,68]:[139,92,246]} arq={r.id==="visao-360"?"visao-360":r.id==="entorno"?"entorno":"auditoria"} fb={r.id==="entorno"?"globo":EMOJI_PARA_ICONE[String(r.icone).replace(/\uFE0F/g,"")]||"prancheta"} label={r.label} sub={r.id==="visao-360"?"Panorama de todos os projetos":r.id==="entorno"?"Notícias de segurança e mercado no entorno":"Auditoria operacional"} onClick={acao}/>
             );
           })}
         </div>
