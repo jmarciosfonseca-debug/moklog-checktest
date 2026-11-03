@@ -15,7 +15,7 @@ const { requireAdmin } = require("./ai/lib/accessAuth");
 const { getDb } = require("./ai/lib/firebaseAdmin");
 const { callText } = require("./ai/lib/openai");
 const core = require("../src/entorno/core");
-const { projetosComEntorno, LOCAIS, GERAL } = require("../src/entorno/locais");
+const { projetosComEntorno, LOCAIS, GERAL, coordsDe } = require("../src/entorno/locais");
 
 const ORCAMENTO_MS = 50000;
 const TIMEOUT_RSS_MS = 8000;
@@ -43,6 +43,38 @@ async function classificar(pid, itens, erros) {
   return out;
 }
 
+// Geocodificação (03/11): bairro/cidade da notícia → lat/lng via Nominatim (OpenStreetMap, gratuito, 1 req/s),
+// com cache em entorno/_geo para não repetir consultas. Só roda quando o parque tem coordenada.
+const MAX_GEO_POR_RODADA = 8;
+const chaveGeo = (q) => core.semAcento(q).replace(/[^a-z0-9]+/g, "_").slice(0, 80);
+async function geocodificar(db, pid, itens) {
+  const base = coordsDe(pid);
+  if (!base || !itens.length) return itens;
+  const ref = db.collection("entorno").doc("_geo");
+  const cache = (await ref.get()).data() || {};
+  const l = LOCAIS[pid]; let consultas = 0; const novosCache = {};
+  for (const it of itens) {
+    if (it.tema !== "seguranca" || !(it.bairro || it.cidade)) continue;
+    const q = [it.bairro, it.cidade || l.cidade, l.uf, "Brasil"].filter(Boolean).join(", ");
+    const k = chaveGeo(q);
+    let pt = cache[k] || novosCache[k];
+    if (pt === undefined) {
+      if (consultas >= MAX_GEO_POR_RODADA) continue;
+      consultas++;
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(q)}`, { headers: { "User-Agent": "MokLogCheckTest/1.0 (contato via app)", "Accept-Language": "pt-BR" } });
+        const j = r.ok ? await r.json() : [];
+        pt = j[0] ? { lat: Number(j[0].lat), lng: Number(j[0].lon) } : null;
+      } catch { pt = null; }
+      novosCache[k] = pt;
+      await new Promise((ok) => setTimeout(ok, 1100)); // limite do Nominatim
+    }
+    if (pt) { it.geo = pt; it.km = core.distanciaKm(base, pt); }
+  }
+  if (Object.keys(novosCache).length) await ref.set(novosCache, { merge: true }).catch(() => {});
+  return itens;
+}
+
 async function coletarProjeto(db, pid) {
   const ref = db.collection("entorno").doc(pid);
   const atual = (await ref.get()).data() || {};
@@ -53,7 +85,7 @@ async function coletarProjeto(db, pid) {
   const erros = lidos.filter((l) => l.erro).map((l) => `${l.c.fonte || l.c.tema}: ${l.erro}`);
   const vistos = new Set();
   const candidatos = lidos.flatMap((l) => core.novosParaClassificar(l.itens, existentes, { ...l.c, soSeguranca: so })).filter((it) => !vistos.has(it.id) && vistos.add(it.id));
-  const novos = await classificar(pid, candidatos, erros);
+  const novos = await geocodificar(db, pid, await classificar(pid, candidatos, erros));
   const agora = new Date();
   const itens = core.mesclar(existentes, novos, agora);
   const fontes = lidos.map((l) => ({ fonte: l.c.fonte || l.c.tema, lidos: l.itens.length, ok: !l.erro }));

@@ -23,6 +23,12 @@ const clicar = async (el) => { expect(el).toBeTruthy(); await act(async () => el
 const botao = (host, t) => [...host.querySelectorAll("button")].find((b) => b.textContent.trim() === t || b.getAttribute("aria-label") === t);
 const link = (host, t) => [...host.querySelectorAll("a")].find((a) => a.textContent.includes(t));
 
+test("filtro 'perto do parque' e ordem por proximidade", () => {
+  const its = [{ id: "a", tema: "seguranca", km: 1.2, data: "2026-10-01" }, { id: "b", tema: "seguranca", proximidade: "vizinha", data: "2026-11-01" }, { id: "c", tema: "seguranca", proximidade: "cidade", data: "2026-10-20" }, { id: "d", tema: "seguranca", km: 12, data: "2026-11-02" }];
+  expect(filtrar(its, { perto: true }).map((i) => i.id).sort()).toEqual(["a", "c"]);
+  expect(filtrar(its, { ordem: "proximidade" }).map((i) => i.id)).toEqual(["a", "d", "c", "b"]);
+});
+
 test("filtrar por tema, tipo e período", () => {
   expect(filtrar(ITENS, { dias: 30 }).map((i) => i.id)).toEqual(["a", "c"]);
   expect(filtrar(ITENS, { tema: "seguranca", dias: 90 }).map((i) => i.id)).toEqual(["a", "b"]);

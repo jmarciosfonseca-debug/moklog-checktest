@@ -13,11 +13,11 @@ const LOCAIS = {
            fontes: [["Portal Jundiaí", "https://portaljundiai.com.br/feed/"], ["Tribuna de Jundiaí", "https://tribunadejundiai.com.br/feed/"], ["Jundiaí Notícias", "https://jundiainoticias.com.br/feed/"], ["Jornal da Região", "https://jr.jor.br/feed/"], ["Destaque Regional", "https://destaqueregional.com.br/feed/"], ["G1 Sorocaba e Jundiaí", "https://g1.globo.com/rss/g1/sp/sorocaba-jundiai/"]] },
   P605:  { nome: "Golgi Dutra",           grupo: "golgi",   cidade: "Arujá",           uf: "SP", vizinhas: ["Guarulhos", "Itaquaquecetuba", "Santa Isabel"], interesse: ["Dutra"],
            fontes: [["Arujá Repórter", "https://www.arujareporter.com.br/feed/"], ["Prefeitura de Arujá", "https://portaldenoticias.prefeituradearuja.sp.gov.br/feed/"], ["G1 Mogi das Cruzes e Suzano", "https://g1.globo.com/rss/g1/sp/mogi-das-cruzes-suzano/"]] },
-  P606:  { nome: "Golgi Duque de Caxias", grupo: "golgi",   cidade: "Duque de Caxias", uf: "RJ", vizinhas: ["Baixada Fluminense", "Washington Luiz"], interesse: ["Washington Luiz", "Arco Metropolitano"],
-           fontes: [["G1 Rio", "https://g1.globo.com/rss/g1/rj/rio-de-janeiro/"]] },
-  P607:  { nome: "Golgi Brasília",        grupo: "golgi",   cidade: "Santa Maria",     uf: "DF", vizinhas: ["Gama", "Valparaíso de Goiás", "Novo Gama"], interesse: ["BR-040", "Brasília"],
+  P606:  { nome: "Golgi Duque de Caxias", grupo: "golgi",   cidade: "Duque de Caxias", uf: "RJ", bairro: "Vila Santa Alice", vizinhas: ["Baixada Fluminense", "Washington Luiz", "Arco Metropolitano", "Xerém", "Campos Elíseos", "Saracuruna", "Nova Iguaçu"], interesse: ["Washington Luiz", "Arco Metropolitano"],
+           fontes: [["O Dia", "https://odia.ig.com.br/rss/ultimas"], ["Extra", "https://extra.globo.com/rss.xml"], ["G1 Rio", "https://g1.globo.com/rss/g1/rj/rio-de-janeiro/"]] },
+  P607:  { nome: "Golgi Brasília",        grupo: "golgi",   cidade: "Santa Maria",     uf: "DF", vizinhas: ["Gama", "Valparaíso de Goiás", "Novo Gama", "Cidade Ocidental", "Entorno do DF"], interesse: ["BR-040", "Brasília"],
            fontes: [["Diário de Santa Maria", "https://diariosm.com.br/feed/"], ["Adm. Regional de Santa Maria", "https://www.santamaria.df.gov.br/feed/"], ["Jornal de Brasília", "https://jornaldebrasilia.com.br/feed/"], ["Alô Valparaíso", "https://alovalparaiso.com.br/feed/"], ["Grande Brasília", "https://grandebrasilia.com/feed/"], ["Prefeitura de Valparaíso", "https://valparaisodegoias.go.gov.br/feed/"], ["G1 DF", "https://g1.globo.com/rss/g1/df/distrito-federal/"], ["G1 Goiás", "https://g1.globo.com/rss/g1/go/goias/"]] },
-  P311A: { nome: "Mega Curitiba",         grupo: "mega",    cidade: "Quatro Barras",   uf: "PR", vizinhas: ["Curitiba", "Colombo", "Campina Grande do Sul", "Pinhais"], interesse: ["BR-116", "Régis Bittencourt"],
+  P311A: { nome: "Mega Curitiba",         grupo: "mega",    cidade: "Quatro Barras",   uf: "PR", vizinhas: ["Campina Grande do Sul", "Curitiba", "Colombo", "Pinhais"], interesse: ["BR-116", "Régis Bittencourt"],
            fontes: [["G1 Paraná", "https://g1.globo.com/rss/g1/pr/parana/"]] },
   P311B: { nome: "Mega Itajaí",           grupo: "mega",    cidade: "Itajaí",          uf: "SC", vizinhas: ["Navegantes", "Balneário Camboriú", "Brusque"], interesse: ["Porto de Itajaí", "Porto de Navegantes", "BR-101"],
            fontes: [["Jornal de Navegantes", "https://www.jornaldenavegantes.com.br/feed/"], ["Diarinho", "https://diarinho.net/feed/"], ["NSC Total", "https://www.nsctotal.com.br/rss"], ["Município de Itajaí", "https://itajai.sc.gov.br/noticias/feed"], ["G1 Santa Catarina", "https://g1.globo.com/rss/g1/sc/santa-catarina/"]] },
@@ -40,6 +40,34 @@ const GERAL = {
   fontes: [["Mercado Livre Notícias", "https://news.mercadolivre.com/pt/feed/"], ["Shopee Blog", "https://shopee.com.br/blog/feed/"], ["Shopee Ads News", "https://ads.shopee.com.br/news/feed"], ["Mundo Logística", "https://mundologistica.com.br/feed/"], ["Logweb", "https://logweb.com.br/feed/"], ["G1 Economia", "https://g1.globo.com/rss/g1/economia/"]],
 };
 const recebeGeral = (pid) => !!LOCAIS[pid] && !LOCAIS[pid].soSeguranca;
+
+// Coordenadas dos parques (03/11): preenchidas a partir dos links do Google Maps que o Marcio enviar.
+// Sem coordenada, a proximidade usa só cidade/bairro (sem km).
+const COORDS = {
+  P601:  { lat: -23.3346082, lng: -46.8132457, endereco: "Golgi Cajamar — divisa Cajamar/Franco da Rocha" },
+  P602:  { lat: -23.6432789, lng: -46.4645908, endereco: "R. Ponta Grossa — Jardim Paranavaí, Mauá" },
+  P604:  { lat: -23.1625984, lng: -46.9951726, endereco: "Av. Odila Chaves Rodrigues, 1200 — Jundiaí" },
+  P605:  { lat: -23.41005,   lng: -46.3634438, endereco: "Av. Adília Barbosa Neves, 3925 — Bairro do Portão, Arujá" },
+  P606:  { lat: -22.6635131, lng: -43.3519096, endereco: "Estrada Rio D'Ouro — Vila Santa Alice, Duque de Caxias" },
+  P607:  { lat: -16.0479406, lng: -47.9936485, endereco: "DF-290, 60 — Santa Maria, Brasília" },
+  P311A: { lat: -25.3491912, lng: -49.0588546, endereco: "BR-116, 1500 — Campina Grande do Sul / Quatro Barras" },
+  P311B: { lat: -26.8865864, lng: -48.7312218, endereco: "Rod. Jorge Lacerda, 1010 — Santa Regina, Itajaí" },
+  P505:  { lat: -23.4420114, lng: -46.4476851, endereco: "R. Indubel, 940 — Cumbica, Guarulhos" },
+  P260A: { lat: -23.5927658, lng: -46.5915028, endereco: "R. Roberto Koch, 363 — Vila Independência (matriz)" },
+  P260B: { lat: -23.5846026, lng: -46.5980819, endereco: "R. Barão de Resende — Ipiranga (filial)" },
+  P260C: { lat: -23.1214197, lng: -47.2681132, endereco: "Av. Horst Frederico João Heer, 700 — Europark, Indaiatuba" },
+};
+const coordsDe = (pid) => COORDS[pid] || null;
+
+// Portais de alcance nacional, lidos para TODOS os parques (03/11). São "amplos": só entra notícia que cite a
+// cidade/bairro/entorno do parque — evita ruído. Segurança e mercado passam pelo mesmo pré-filtro de tema.
+const FONTES_GERAIS = [
+  ["Agência Brasil", "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml"],
+  ["R7", "https://noticias.r7.com/feed.xml"],
+  ["UOL Notícias", "https://rss.uol.com.br/feed/noticias.xml"],
+  ["CNN Brasil", "https://www.cnnbrasil.com.br/feed/"],
+  ["Metrópoles", "https://www.metropoles.com/feed"],
+];
 
 // Temas. "seguranca" = o que afeta o risco do parque; "mercado" = movimento do setor logístico que interessa ao cliente.
 const TEMAS = {
@@ -67,4 +95,4 @@ const TIPOS_GRAVES = ["latrocinio", "homicidio", "tiroteio", "arrastao", "roubo_
 
 const projetosComEntorno = () => Object.keys(LOCAIS).filter((pid) => LOCAIS[pid].cidade);
 
-module.exports = { LOCAIS, GERAL, recebeGeral, TEMAS, TIPO_ROTULO, TIPOS_GRAVES, projetosComEntorno };
+module.exports = { LOCAIS, GERAL, COORDS, coordsDe, FONTES_GERAIS, recebeGeral, TEMAS, TIPO_ROTULO, TIPOS_GRAVES, projetosComEntorno };
