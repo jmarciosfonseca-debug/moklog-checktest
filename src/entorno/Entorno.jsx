@@ -1,17 +1,14 @@
 // Entorno — painel do gestor (Marcio, 02/11/2026). Notícias de segurança e de mercado logístico no entorno de cada parque,
 // coletadas no servidor (api/entorno-coletar.js) e gravadas em entorno/{pid}. Somente leitura + "Atualizar agora" (gerencial).
 import { useEffect, useMemo, useState } from "react";
-import { getApps } from "firebase/app";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { authFetch } from "../session";
+import { lerEntorno } from "./lerEntorno";
 import { LOCAIS, GERAL, recebeGeral, projetosComEntorno, TIPO_ROTULO } from "./locais";
 import { mesclar, resumir } from "./core";
 import EntornoLista, { corTipo, fmtData } from "./EntornoLista";
 import { C, Cabecalho, VERMELHO2, VERDE, AMARELO, CINZA, AZUL } from "../cliente/Cluster";
 import { MOKED_LOGO } from "../generatePDF";
 
-const db = () => getFirestore(getApps()[0]);
-const ler = (id) => getDoc(doc(db(), "entorno", id)).then((s) => (s.exists() ? s.data() : null)).catch(() => null);
 
 const corTend = (t) => (t === "alta" ? VERMELHO2 : t === "queda" ? VERDE : AMARELO);
 const setaTend = (t) => (t === "alta" ? "▲" : t === "queda" ? "▼" : "▶");
@@ -37,15 +34,17 @@ function CardParque({ pid, d, onAbrir }) {
 
 export default function Entorno({ onBack }) {
   const [dados, setDados] = useState(null), [status, setStatus] = useState(null), [pid, setPid] = useState(null);
-  const [versao, setVersao] = useState(0), [atualizando, setAtualizando] = useState(false), [msg, setMsg] = useState("");
+  const [versao, setVersao] = useState(0), [atualizando, setAtualizando] = useState(false), [msg, setMsg] = useState(""), [erroLeitura, setErroLeitura] = useState("");
   const pids = useMemo(() => projetosComEntorno(), []);
 
   useEffect(() => {
     let vivo = true;
-    Promise.all([...pids.map((p) => ler(p).then((d) => [p, d])), ler("_status").then((s) => ["_status", s]), ler(GERAL.id).then((g) => [GERAL.id, g])]).then((xs) => {
+    // Leitura pelo servidor (03/11/2026): o navegador não tem permissão de ler a coleção entorno direto.
+    lerEntorno().then(({ docs, geral, status: st, erro }) => {
       if (!vivo) return;
-      const m = {}; let st = null, geral = null;
-      xs.forEach(([k, v]) => { if (k === "_status") st = v; else if (k === GERAL.id) geral = v; else m[k] = v; });
+      if (erro) { setErroLeitura(erro); setDados({}); setStatus(null); return; }
+      setErroLeitura("");
+      const m = { ...docs };
       // Mercado geral (Black Friday, e-commerce…) entra no entorno de todo parque elegível; o resumo é recalculado aqui.
       for (const p of pids) {
         if (!m[p] && !(geral && recebeGeral(p))) continue;
@@ -85,6 +84,7 @@ export default function Entorno({ onBack }) {
     </div>
     {msg && <div role="status" style={{ ...C.micro, marginBottom: 8, color: /falha|erro|aguarde|não/i.test(msg) ? AMARELO : VERDE }}>{msg}</div>}
     {!dados && <p role="status" style={C.micro}>Lendo o entorno dos parques…</p>}
+    {erroLeitura && <div role="alert" style={{ ...C.card, borderColor: VERMELHO2 }}><div style={{ ...C.titulo, color: VERMELHO2 }}>Não consegui ler o entorno</div><div style={C.micro}>{erroLeitura}</div></div>}
 
     {dados && !pid && <>
       {totais && <div style={C.card}>

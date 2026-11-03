@@ -18,7 +18,8 @@ import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
 import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno } from "../entorno/EntornoLista";
-import { LOCAIS as LOCAIS_ENTORNO, GERAL as GERAL_ENTORNO, recebeGeral } from "../entorno/locais";
+import { LOCAIS as LOCAIS_ENTORNO, recebeGeral } from "../entorno/locais";
+import { lerEntorno } from "../entorno/lerEntorno";
 import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
@@ -35,7 +36,7 @@ const ler = (col, pid) => getDoc(doc(db(), col, pid)).then((s) => (s.exists() ? 
 // ── Carregamento por projeto: tudo que a gestão vê hoje, em leitura ──────────
 async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, score360, risco) {
   const hoje = hojeISO();
-  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entorno, entornoGeral] = await Promise.all([
+  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entornoResp] = await Promise.all([
     ler("equipes", pid).then((d) => d || {}),
     ler("equipamentos", pid),
     getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(6))).then((s) => s.docs.map((d) => d.data())).catch(() => []),
@@ -44,9 +45,9 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     PERIMETRAL_VIA_RONDAS.includes(pid) ? ler("rondas", pid) : Promise.resolve(null),
     score360 ? score360(pid).catch(() => null) : Promise.resolve(null),
     risco ? risco(pid).catch(() => null) : Promise.resolve(null),
-    ler("entorno", pid), // Entorno (02/11/2026): notícias do entorno deste parque, coletadas no servidor
-    recebeGeral(pid) ? ler("entorno", GERAL_ENTORNO.id) : Promise.resolve(null), // mercado geral (Black Friday etc.)
+    lerEntorno(pid).catch(() => ({ docs: {}, geral: null })), // Entorno (03/11/2026): lido pelo servidor com a sessão do cliente
   ]);
+  const entorno = entornoResp?.docs?.[pid] || null, entornoGeral = recebeGeral(pid) ? entornoResp?.geral || null : null;
   const colabs = (eq.colaboradores || []).filter((c) => c && (c.status || "ativo") === "ativo").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, turno: c.turno, desde: c.dataContratacao, foto: fotoDe(c, fotos), treinos: (c.historico || []).filter((h) => h && h.tipo === "Treinamento").length }));
   const h = stored?.[pid]?.history || []; const last = h[h.length - 1];
   const pendencias = []; if (last) for (const cat of PROJECTS[pid]?.categories || []) { const s = last.state?.[cat.id]; const arr = Array.isArray(s) ? s : s && typeof s === "object" && cat.type === "single" ? [s] : []; arr.forEach((it, i) => { if (it && (it.status === "inop" || it.status === "partial")) pendencias.push({ cat: cat.label, item: cat.itemLabels?.[i] || "", status: it.status, since: it.since || null, note: it.note || "" }); }); }
