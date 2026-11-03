@@ -13,9 +13,9 @@
 // ─────────────────────────────────────────────────────────────
 const { requireAdmin } = require("./ai/lib/accessAuth");
 const { getDb } = require("./ai/lib/firebaseAdmin");
-const { callModel } = require("./ai/lib/openai");
+const { callText } = require("./ai/lib/openai");
 const core = require("../src/entorno/core");
-const { projetosComEntorno } = require("../src/entorno/locais");
+const { projetosComEntorno, LOCAIS, GERAL } = require("../src/entorno/locais");
 
 const ORCAMENTO_MS = 50000;
 const TIMEOUT_RSS_MS = 8000;
@@ -31,27 +31,35 @@ async function lerRss(url) {
   } finally { clearTimeout(t); }
 }
 
-async function classificar(pid, itens) {
-  if (!itens.length) return [];
-  const { outputText } = await callModel({ input: [{ role: "user", content: promptSeguro(pid, itens) }], tools: [] });
-  return core.aplicarClassificacao(itens, outputText);
+// Classifica em lotes de até 25 (sem ferramentas — a Responses API recusa tool_choice com tools vazio; foi isso que
+// derrubou a primeira coleta em 02/11). Falha da IA vira erro registrado, não exceção: o doc é gravado mesmo assim.
+async function classificar(pid, itens, erros) {
+  const out = [];
+  for (let i = 0; i < itens.length; i += 25) {
+    const lote = itens.slice(i, i + 25);
+    try { out.push(...core.aplicarClassificacao(lote, await callText(core.promptClassificacao(pid, lote)))); }
+    catch (e) { erros.push(`IA: ${(e && e.message) || "falha"}`); console.error("entorno/classificar", pid, e && e.message); }
+  }
+  return out;
 }
-const promptSeguro = (pid, itens) => core.promptClassificacao(pid, itens);
 
 async function coletarProjeto(db, pid) {
   const ref = db.collection("entorno").doc(pid);
   const atual = (await ref.get()).data() || {};
   const existentes = Array.isArray(atual.itens) ? atual.itens : [];
-  const consultas = core.consultasDoProjeto(pid);
-  const lidos = await Promise.all(consultas.map((c) => lerRss(c.url).then((it) => ({ tema: c.tema, itens: it })).catch((e) => ({ tema: c.tema, erro: e.message, itens: [] }))));
-  const erros = lidos.filter((l) => l.erro).map((l) => `${l.tema}: ${l.erro}`);
-  const candidatos = lidos.flatMap((l) => core.novosParaClassificar(l.itens, existentes, l.tema));
-  const novos = await classificar(pid, candidatos);
+  const consultas = pid === GERAL.id ? core.consultasGerais() : core.consultasDoProjeto(pid);
+  const so = !!(LOCAIS[pid] && LOCAIS[pid].soSeguranca);
+  const lidos = await Promise.all(consultas.map((c) => lerRss(c.url).then((it) => ({ c, itens: it })).catch((e) => ({ c, erro: e.message, itens: [] }))));
+  const erros = lidos.filter((l) => l.erro).map((l) => `${l.c.fonte || l.c.tema}: ${l.erro}`);
+  const vistos = new Set();
+  const candidatos = lidos.flatMap((l) => core.novosParaClassificar(l.itens, existentes, { ...l.c, soSeguranca: so })).filter((it) => !vistos.has(it.id) && vistos.add(it.id));
+  const novos = await classificar(pid, candidatos, erros);
   const agora = new Date();
   const itens = core.mesclar(existentes, novos, agora);
+  const fontes = lidos.map((l) => ({ fonte: l.c.fonte || l.c.tema, lidos: l.itens.length, ok: !l.erro }));
   const doc = {
     pid, itens, resumo: core.resumir(itens, agora), atualizadoEm: agora.toISOString(),
-    ultimaColeta: { em: agora.toISOString(), lidos: lidos.reduce((n, l) => n + l.itens.length, 0), candidatos: candidatos.length, aceitos: novos.length, erros },
+    ultimaColeta: { em: agora.toISOString(), lidos: lidos.reduce((n, l) => n + l.itens.length, 0), candidatos: candidatos.length, aceitos: novos.length, erros, fontes },
   };
   await ref.set(doc, { merge: true });
   return doc.ultimaColeta;
@@ -81,7 +89,7 @@ module.exports = async (req, res) => {
   }
   await statusRef.set({ emAndamentoAte: agoraMs + ORCAMENTO_MS + 10000 }, { merge: true });
 
-  const todos = projetosComEntorno();
+  const todos = [GERAL.id, ...projetosComEntorno()]; // o mercado geral entra primeiro (serve a todos os parques)
   const pedido = typeof req.query?.pid === "string" && todos.includes(req.query.pid) ? [req.query.pid] : null;
   let fila = pedido || todos;
   if (!pedido && status.cursor && todos.includes(status.cursor)) { const i = todos.indexOf(status.cursor); fila = [...todos.slice(i), ...todos.slice(0, i)]; }
@@ -90,7 +98,7 @@ module.exports = async (req, res) => {
   for (const pid of fila) {
     if (Date.now() - inicio > ORCAMENTO_MS - 12000) { proximo = pid; break; }
     try { feitos[pid] = await coletarProjeto(db, pid); }
-    catch (e) { feitos[pid] = { erro: (e && e.message) || "falha" }; }
+    catch (e) { feitos[pid] = { erro: (e && e.message) || "falha" }; console.error("entorno/coletar", pid, e && e.message); }
   }
   const fim = new Date().toISOString();
   await statusRef.set({ emAndamentoAte: 0, ultimaEm: fim, origem, cursor: pedido ? (status.cursor || null) : proximo, ultimaRodada: { em: fim, feitos, pendentes: proximo ? fila.slice(fila.indexOf(proximo)) : [] } }, { merge: true });

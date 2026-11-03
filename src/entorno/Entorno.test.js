@@ -55,7 +55,7 @@ test("tela do gestor: cards por parque, abre um parque e 'Atualizar' chama o col
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(botao(host, "Abrir entorno de Golgi Cajamar")).toBeTruthy();
     expect(botao(host, "Abrir entorno de Klog Guarulhos")).toBeTruthy();
-    expect(host.textContent).not.toContain("Jatinox Unidade A");
+    expect(host.textContent).toContain("Jatinox Unidade A");
     expect(host.textContent).toContain("Últimos 30 dias · todos os parques");
     await clicar(botao(host, "Abrir entorno de Golgi Cajamar"));
     expect(link(host, "Carga roubada")).toBeTruthy();

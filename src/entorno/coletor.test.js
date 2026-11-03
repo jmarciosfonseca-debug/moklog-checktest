@@ -4,7 +4,7 @@ const docs = {};
 const col = (nome) => ({ doc: (id) => ({ get: async () => ({ data: () => docs[`${nome}/${id}`] }), set: async (d, o) => { docs[`${nome}/${id}`] = o && o.merge ? { ...(docs[`${nome}/${id}`] || {}), ...d } : d; } }) });
 jest.mock("../../api/ai/lib/firebaseAdmin", () => ({ getDb: () => ({ collection: col }) }));
 const chamadasIA = [];
-jest.mock("../../api/ai/lib/openai", () => ({ callModel: async ({ input }) => { chamadasIA.push(input[0].content); const ids = [...input[0].content.matchAll(/id=(n[a-z0-9]+)/g)].map((m) => m[1]); return { outputText: JSON.stringify(ids.map((id) => ({ id, relevante: true, tipo: "roubo", cidade: "Cajamar", bairro: "", proximidade: "cidade", confianca: 80, resumo: "ok" }))) }; } }));
+jest.mock("../../api/ai/lib/openai", () => ({ callText: async (prompt) => { if (global.__iaFalha) throw new Error("tool_choice inválido"); chamadasIA.push(prompt); const ids = [...prompt.matchAll(/id=(n[a-z0-9]+)/g)].map((m) => m[1]); return JSON.stringify(ids.map((id) => ({ id, relevante: true, tipo: "roubo", cidade: "Cajamar", bairro: "", proximidade: "cidade", confianca: 80, resumo: "ok" }))); } }));
 const handler = require("../../api/entorno-coletar");
 
 const RSS = (t, l) => `<rss><channel><item><title>${t} - G1</title><link>${l}</link><pubDate>Fri, 30 Oct 2026 10:00:00 GMT</pubDate><source url="x">G1</source><description>d</description></item></channel></rss>`;
@@ -19,12 +19,12 @@ test("GET sem CRON_SECRET correto e POST sem sessão gerencial são recusados", 
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
-test("coleta de um projeto: lê 2 feeds, só o item do tema vai à IA, grava itens + resumo e preserva o existente", async () => {
+test("coleta de um projeto: lê Google News + portais, só o item do tema vai à IA, grava itens + resumo e preserva o existente", async () => {
   docs["entorno/P601"] = { itens: [{ id: "antigo", tema: "mercado", tipo: "expansao", data: new Date().toISOString(), titulo: "x", link: "y" }] };
   const res = resposta();
   await handler({ method: "POST", headers: { authorization: "Bearer admin" }, query: { pid: "P601" } }, res);
   expect(res.code).toBe(200);
-  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(global.fetch).toHaveBeenCalledTimes(5); // 2 buscas + 3 portais do P601
   expect(chamadasIA).toHaveLength(1);
   expect(chamadasIA[0]).toMatch(/Assalto a caminhão/);
   expect(chamadasIA[0]).not.toMatch(/Neymar/);
@@ -32,7 +32,8 @@ test("coleta de um projeto: lê 2 feeds, só o item do tema vai à IA, grava ite
   expect(d.itens.map((i) => i.id)).toEqual(expect.arrayContaining(["antigo"]));
   expect(d.itens).toHaveLength(2);
   expect(d.resumo.seguranca.d30).toBe(1);
-  expect(d.ultimaColeta).toMatchObject({ lidos: 2, candidatos: 1, aceitos: 1, erros: [] });
+  expect(d.ultimaColeta).toMatchObject({ candidatos: 1, aceitos: 1, erros: [] });
+  expect(d.ultimaColeta.fontes.map((f) => f.fonte)).toEqual(["Google News", "Google News", "Portal Notícia 360", "Portal Dois Pontos", "G1 Cajamar"]);
   expect(res.body.feitos.P601.aceitos).toBe(1);
   expect(docs["entorno/_status"].emAndamentoAte).toBe(0);
 });
@@ -43,8 +44,20 @@ test("rotina (GET com CRON_SECRET) percorre os parques com cidade; falha de RSS 
   await handler({ method: "GET", headers: { authorization: "Bearer s3" }, query: {} }, res);
   expect(res.code).toBe(200);
   const feitos = Object.keys(res.body.feitos);
-  expect(feitos).toEqual(expect.arrayContaining(["P601", "P505", "P311B"]));
-  expect(feitos).not.toContain("P260A");
-  expect(docs["entorno/P601"].ultimaColeta.erros).toHaveLength(2);
+  expect(feitos).toEqual(expect.arrayContaining(["_geral", "P601", "P505", "P311B", "P260A"]));
+  expect(feitos[0]).toBe("_geral");
+  expect(docs["entorno/P601"].ultimaColeta.erros).toHaveLength(5);
+  expect(docs["entorno/P601"].ultimaColeta.fontes.every((f) => !f.ok)).toBe(true);
   expect(chamadasIA).toHaveLength(0); // nada lido → IA não é chamada → custo zero
+});
+
+test("falha da IA não impede a gravação: o doc sai com o erro registrado", async () => {
+  global.__iaFalha = true;
+  try {
+    const res = resposta();
+    await handler({ method: "POST", headers: { authorization: "Bearer admin" }, query: { pid: "P601" } }, res);
+    expect(res.code).toBe(200);
+    expect(docs["entorno/P601"].itens).toEqual([]);
+    expect(docs["entorno/P601"].ultimaColeta.erros.join()).toMatch(/IA: tool_choice/);
+  } finally { global.__iaFalha = false; }
 });

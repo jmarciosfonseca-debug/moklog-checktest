@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { authFetch } from "../session";
-import { LOCAIS, projetosComEntorno, TIPO_ROTULO } from "./locais";
+import { LOCAIS, GERAL, recebeGeral, projetosComEntorno, TIPO_ROTULO } from "./locais";
+import { mesclar, resumir } from "./core";
 import EntornoLista, { corTipo, fmtData } from "./EntornoLista";
 import { C, Cabecalho, VERMELHO2, VERDE, AMARELO, CINZA, AZUL } from "../cliente/Cluster";
 import { MOKED_LOGO } from "../generatePDF";
@@ -41,10 +42,16 @@ export default function Entorno({ onBack }) {
 
   useEffect(() => {
     let vivo = true;
-    Promise.all([...pids.map((p) => ler(p).then((d) => [p, d])), ler("_status").then((s) => ["_status", s])]).then((xs) => {
+    Promise.all([...pids.map((p) => ler(p).then((d) => [p, d])), ler("_status").then((s) => ["_status", s]), ler(GERAL.id).then((g) => [GERAL.id, g])]).then((xs) => {
       if (!vivo) return;
-      const m = {}; let st = null;
-      xs.forEach(([k, v]) => { if (k === "_status") st = v; else m[k] = v; });
+      const m = {}; let st = null, geral = null;
+      xs.forEach(([k, v]) => { if (k === "_status") st = v; else if (k === GERAL.id) geral = v; else m[k] = v; });
+      // Mercado geral (Black Friday, e-commerce…) entra no entorno de todo parque elegível; o resumo é recalculado aqui.
+      for (const p of pids) {
+        if (!m[p] && !(geral && recebeGeral(p))) continue;
+        const itens = mesclar(m[p]?.itens || [], recebeGeral(p) ? (geral?.itens || []).map((i) => ({ ...i, geral: true })) : []);
+        m[p] = { ...(m[p] || {}), itens, resumo: resumir(itens) };
+      }
       setDados(m); setStatus(st);
     });
     return () => { vivo = false; };
@@ -55,7 +62,8 @@ export default function Entorno({ onBack }) {
     try {
       const r = await authFetch("/api/entorno-coletar" + (pid ? `?pid=${pid}` : ""), { method: "POST" });
       const j = await r.json().catch(() => ({}));
-      setMsg(j.mensagem || j.erro || (r.ok ? "Atualizado." : `Falha (${r.status}).`));
+      const falhas = Object.entries(j.feitos || {}).filter(([, v]) => v && v.erro).map(([k, v]) => `${k}: ${v.erro}`);
+      setMsg((j.mensagem || j.erro || (r.ok ? "Atualizado." : `Falha (${r.status}).`)) + (falhas.length ? ` Falhas — ${falhas.join("; ")}` : ""));
       if (r.ok) setVersao((v) => v + 1);
     } catch (e) { setMsg((e && e.message) || "Falha ao acionar a coleta."); }
     finally { setAtualizando(false); }
@@ -89,7 +97,7 @@ export default function Entorno({ onBack }) {
         </div>
       </div>}
       {pids.map((p) => <CardParque key={p} pid={p} d={dados[p]} onAbrir={setPid} />)}
-      <div style={{ ...C.micro, marginTop: 6 }}>Jatinox entra quando a cidade das unidades for cadastrada.</div>
+      <div style={{ ...C.micro, marginTop: 6 }}>Mercado geral (Black Friday, e-commerce, grandes ocupantes) entra em todos os parques, exceto Jatinox (só segurança).</div>
     </>}
 
     {dados && pid && <div style={C.card}>
@@ -97,6 +105,8 @@ export default function Entorno({ onBack }) {
         <div><div style={{ fontSize: 14, fontWeight: 800, color: "#f3f4f6" }}>{LOCAIS[pid].nome}</div><div style={C.micro}>{LOCAIS[pid].cidade}/{LOCAIS[pid].uf} · entorno: {(LOCAIS[pid].vizinhas || []).join(", ") || "—"}</div></div>
         {d?.ultimaColeta && <div style={{ ...C.micro, textAlign: "right" }}>coleta {fmtData(d.ultimaColeta.em)} · {d.ultimaColeta.lidos} lidas · {d.ultimaColeta.aceitos} novas{d.ultimaColeta.erros?.length ? ` · ${d.ultimaColeta.erros.length} falha(s) de fonte` : ""}</div>}
       </div>
+      {d?.ultimaColeta?.fontes && <div style={{ ...C.micro, marginBottom: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>{d.ultimaColeta.fontes.map((f, i) => <span key={i} style={C.chip(f.ok ? VERDE : VERMELHO2)} title={f.ok ? `${f.lidos} lidas` : "falha ao ler"}>{f.fonte} {f.ok ? f.lidos : "✕"}</span>)}</div>}
+      {d?.ultimaColeta?.erros?.length > 0 && <div role="alert" style={{ ...C.micro, color: AMARELO, marginBottom: 8 }}>{d.ultimaColeta.erros.join(" · ")}</div>}
       {!d && <div style={C.micro}>Sem coleta ainda para este parque.</div>}
       {d && <EntornoLista itens={d.itens} />}
     </div>}

@@ -18,7 +18,8 @@ import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
 import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno } from "../entorno/EntornoLista";
-import { LOCAIS as LOCAIS_ENTORNO } from "../entorno/locais";
+import { LOCAIS as LOCAIS_ENTORNO, GERAL as GERAL_ENTORNO, recebeGeral } from "../entorno/locais";
+import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
 const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
@@ -34,7 +35,7 @@ const ler = (col, pid) => getDoc(doc(db(), col, pid)).then((s) => (s.exists() ? 
 // ── Carregamento por projeto: tudo que a gestão vê hoje, em leitura ──────────
 async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, score360, risco) {
   const hoje = hojeISO();
-  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entorno] = await Promise.all([
+  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entorno, entornoGeral] = await Promise.all([
     ler("equipes", pid).then((d) => d || {}),
     ler("equipamentos", pid),
     getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(6))).then((s) => s.docs.map((d) => d.data())).catch(() => []),
@@ -44,6 +45,7 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     score360 ? score360(pid).catch(() => null) : Promise.resolve(null),
     risco ? risco(pid).catch(() => null) : Promise.resolve(null),
     ler("entorno", pid), // Entorno (02/11/2026): notícias do entorno deste parque, coletadas no servidor
+    recebeGeral(pid) ? ler("entorno", GERAL_ENTORNO.id) : Promise.resolve(null), // mercado geral (Black Friday etc.)
   ]);
   const colabs = (eq.colaboradores || []).filter((c) => c && (c.status || "ativo") === "ativo").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, turno: c.turno, desde: c.dataContratacao, foto: fotoDe(c, fotos), treinos: (c.historico || []).filter((h) => h && h.tipo === "Treinamento").length }));
   const h = stored?.[pid]?.history || []; const last = h[h.length - 1];
@@ -58,7 +60,8 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     sistemas: sistemasResumo({ ctmk: ctmkData?.[pid], keyaccess, iluminacao: ilum, energia, perimetralZonasRuins, score360: s360 }),
     colabs, pendencias,
     risco: risc, equipeDoc: eq, equipDoc: equip, fotos,
-    entorno: entorno && Array.isArray(entorno.itens) ? entorno : null,
+    entorno: (() => { const prop = entorno && Array.isArray(entorno.itens) ? entorno.itens : []; const ger = entornoGeral && Array.isArray(entornoGeral.itens) ? entornoGeral.itens.map((i) => ({ ...i, geral: true })) : [];
+      if (!prop.length && !ger.length && !entorno) return null; const itens = mesclarEntorno(prop, ger); return { ...(entorno || {}), itens, resumo: resumirEntorno(itens) }; })(),
     historico: h.map((r, i) => ({ idx: i, data: r.meta?.date || null, pct: (() => { try { return computeHealth(PROJECTS[pid], r.state).pct; } catch { return null; } })(), report: r })).reverse().slice(0, 12),
     ferias: (() => { const f = (eq.ferias || []).filter((x) => x && x.colabId && x.dataInicio); const em7 = (d) => { const n = (new Date(d + "T12:00:00Z") - new Date(hoje + "T12:00:00Z")) / 86400000; return n >= 0 && n <= 7; };
       const nomeDe = (id) => { const c = (eq.colaboradores || []).find((x) => x && x.id === id); return c ? { nome: c.nome, cargo: c.cargo, foto: fotoDe(c, fotos) } : { nome: id, cargo: "", foto: "" }; };

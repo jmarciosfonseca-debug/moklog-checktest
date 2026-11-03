@@ -125,7 +125,17 @@ async function callModel({ input, tools }) {
   return { outputText: outputText || "", toolCalls, raw: resp };
 }
 
+// Chamada simples de texto (sem ferramentas). Usada pelo coletor do Entorno (02/11/2026):
+// a Responses API recusa tool_choice com lista de tools vazia, então aqui não se envia nenhum dos dois.
+async function callText(prompt, { maxOutputTokens = 4000 } = {}) {
+  const params = { model: model(), input: [{ role: "user", content: prompt }], max_output_tokens: maxOutputTokens };
+  const eff = reasoningEffort();
+  if (eff) params.reasoning = { effort: eff };
+  const resp = await client().responses.create(params);
+  return resp.output_text != null ? resp.output_text : extractText(resp);
+}
+
 module.exports = {
-  callModel, model, reasoningEffort,
+  callModel, callText, model, reasoningEffort,
   toResponsesTools, toolResultItem, assistantEchoItems,
 };

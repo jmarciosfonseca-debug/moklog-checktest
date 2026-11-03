@@ -1,6 +1,6 @@
 // Núcleo puro do Entorno: monta as buscas, lê RSS, pré-filtra pelo tema, mescla com o que já está gravado e resume.
 // Sem rede e sem banco — tudo testável. CommonJS (compartilhado com api/entorno-coletar.js).
-const { LOCAIS, TEMAS, TIPOS_GRAVES } = require("./locais");
+const { LOCAIS, GERAL, TEMAS, TIPOS_GRAVES } = require("./locais");
 
 const DIAS_JANELA = 90;
 const MAX_ITENS = 150;
@@ -17,18 +17,28 @@ function urlGoogleNews(q, dias = DIAS_JANELA) {
 const aspas = (t) => (/\s/.test(t) ? `"${t}"` : t);
 const ou = (lista) => `(${lista.map(aspas).join(" OR ")})`;
 
-// Uma consulta por tema. A cidade entra sempre; vizinhas e pontos de interesse ampliam o entorno sem perder o foco.
+// Consultas de um projeto: Google News por tema (a cidade entra sempre; vizinhas e pontos de interesse ampliam o entorno)
+// + os portais indicados pelo Marcio (tema null = o pré-filtro separa segurança/mercado). Feeds "amplos" (G1 regional)
+// só aceitam notícia que cite a cidade/entorno do parque. Projeto soSeguranca (Jatinox) não busca mercado.
+const lugaresDe = (l) => [l.bairro, l.cidade, ...(l.vizinhas || []), ...(l.interesse || [])].filter(Boolean);
 function consultasDoProjeto(pid) {
   const l = LOCAIS[pid];
   if (!l || !l.cidade) return [];
-  const lugares = [l.cidade, ...(l.vizinhas || []).slice(0, 3)];
+  const lugares = [l.bairro || l.cidade, ...(l.vizinhas || []).slice(0, 3)];
   const seg = `${ou(TEMAS.seguranca.termos.slice(0, 10))} ${ou(lugares)}`;
-  const lugaresMercado = [l.cidade, ...(l.interesse || []).slice(0, 2)];
-  const mer = `${ou(TEMAS.mercado.termos.slice(0, 10))} ${ou(lugaresMercado)}`;
-  return [
-    { tema: "seguranca", url: urlGoogleNews(seg) },
-    { tema: "mercado", url: urlGoogleNews(mer) },
-  ];
+  const out = [{ tema: "seguranca", url: urlGoogleNews(seg), fonte: "Google News" }];
+  if (!l.soSeguranca) {
+    const mer = `${ou(TEMAS.mercado.termos.slice(0, 10))} ${ou([l.cidade, ...(l.interesse || []).slice(0, 2)])}`;
+    out.push({ tema: "mercado", url: urlGoogleNews(mer), fonte: "Google News" });
+  }
+  for (const [nome, url] of l.fontes || []) out.push({ tema: null, url, fonte: nome, amplo: /g1\.globo\.com\/rss/.test(url), lugares: lugaresDe(l) });
+  return out;
+}
+
+// Mercado geral (Black Friday, e-commerce, grandes ocupantes) — uma coleta para todos os parques elegíveis.
+function consultasGerais() {
+  const q = `${ou(GERAL.termos.slice(0, 6))} ${ou(["logística", "centro de distribuição", "galpão"])}`;
+  return [{ tema: "mercado", url: urlGoogleNews(q), fonte: "Google News" }, ...(GERAL.fontes || []).map(([nome, url]) => ({ tema: "mercado", url, fonte: nome }))];
 }
 
 // Leitor de RSS mínimo (sem dependência): <item><title/><link/><pubDate/><source/><description/></item>.
@@ -72,16 +82,28 @@ function idDe(link) {
   return "n" + h.toString(36) + s.length.toString(36);
 }
 
-// Quais itens lidos ainda não estão gravados (e cabem na rodada).
-function novosParaClassificar(lidos, existentes, tema) {
+const citaLugar = (item, lugares) => { const t = semAcento(`${item.titulo} ${item.descricao}`); return (lugares || []).some((x) => t.includes(semAcento(x))); };
+const temaDe = (item, consulta) => {
+  if (consulta.tema) return passaPreFiltro(item, consulta.tema) ? consulta.tema : null;
+  if (passaPreFiltro(item, "seguranca")) return "seguranca";
+  return !consulta.soSeguranca && passaPreFiltro(item, "mercado") ? "mercado" : null;
+};
+
+// Quais itens lidos ainda não estão gravados (e cabem na rodada). `consulta` pode ser só o tema (compatível) ou o objeto
+// da consulta ({tema|null, amplo, lugares, soSeguranca}).
+function novosParaClassificar(lidos, existentes, consulta) {
+  const c = typeof consulta === "string" ? { tema: consulta } : consulta || {};
   const ids = new Set((existentes || []).map((x) => x.id));
   const vistos = new Set();
   const out = [];
   for (const it of lidos) {
     const id = idDe(it.link);
-    if (ids.has(id) || vistos.has(id) || !passaPreFiltro(it, tema)) continue;
+    if (ids.has(id) || vistos.has(id)) continue;
+    const tema = temaDe(it, c);
+    if (!tema) continue;
+    if (c.amplo && !citaLugar(it, c.lugares)) continue;
     vistos.add(id);
-    out.push({ ...it, id, tema });
+    out.push({ ...it, id, tema, fonte: it.fonte || c.fonte || "" });
     if (out.length >= MAX_NOVOS_POR_RODADA) break;
   }
   return out;
@@ -89,7 +111,7 @@ function novosParaClassificar(lidos, existentes, tema) {
 
 // Prompt de classificação: devolve JSON por id. A IA só confirma relevância/tipo/local — nunca inventa notícia.
 function promptClassificacao(pid, itens) {
-  const l = LOCAIS[pid];
+  const l = LOCAIS[pid] || (pid === GERAL.id ? { nome: GERAL.nome, cidade: "Brasil (mercado logístico nacional)", uf: "BR", vizinhas: [], interesse: GERAL.termos } : { nome: pid, cidade: "", uf: "", vizinhas: [], interesse: [] });
   const tiposSeg = TEMAS.seguranca.tipos.join(", ");
   const tiposMer = TEMAS.mercado.tipos.join(", ");
   const lista = itens.map((it) => `- id=${it.id} | tema=${it.tema} | ${it.data ? it.data.slice(0, 10) : "s/data"} | ${it.fonte || "fonte?"} | ${it.titulo}${it.descricao ? " — " + it.descricao.slice(0, 200) : ""}`).join("\n");
@@ -102,7 +124,7 @@ Para CADA item abaixo responda em JSON (array), um objeto por id, com os campos:
 - tipo: para seguranca um de [${tiposSeg}]; para mercado um de [${tiposMer}].
 - cidade: cidade da ocorrência (texto curto) ou "" se não ficar claro.
 - bairro: bairro/logradouro citado ou "".
-- proximidade: "cidade" (na cidade do parque), "vizinha" (cidade vizinha/entorno listado), "regiao" (mesma região metropolitana) ou "fora".
+- proximidade: "cidade" (na cidade/bairro do parque), "vizinha" (cidade vizinha/entorno listado), "regiao" (mesma região metropolitana) ou "fora". Para o tema mercado de alcance nacional (Black Friday, e-commerce, grandes ocupantes) use "regiao".
 - confianca: 0 a 100 (quanto a notícia claramente trata do tema e do local).
 - resumo: uma frase objetiva, até 160 caracteres, em português, sem opinião.
 
@@ -169,4 +191,4 @@ function resumir(itens, agora = new Date()) {
   };
 }
 
-module.exports = { DIAS_JANELA, MAX_ITENS, MAX_NOVOS_POR_RODADA, CONFIANCA_MINIMA, urlGoogleNews, consultasDoProjeto, parseRss, passaPreFiltro, idDe, novosParaClassificar, promptClassificacao, extrairJson, aplicarClassificacao, mesclar, resumir, semAcento };
+module.exports = { DIAS_JANELA, MAX_ITENS, MAX_NOVOS_POR_RODADA, CONFIANCA_MINIMA, urlGoogleNews, consultasDoProjeto, consultasGerais, parseRss, passaPreFiltro, idDe, novosParaClassificar, promptClassificacao, extrairJson, aplicarClassificacao, mesclar, resumir, semAcento };

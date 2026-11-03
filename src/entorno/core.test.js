@@ -1,6 +1,6 @@
 // Entorno (02/11/2026): núcleo puro — buscas por projeto, leitura de RSS, pré-filtro de tema, mescla e resumo.
-const { consultasDoProjeto, parseRss, passaPreFiltro, novosParaClassificar, aplicarClassificacao, mesclar, resumir, idDe, promptClassificacao } = require("./core");
-const { LOCAIS, projetosComEntorno } = require("./locais");
+const { consultasDoProjeto, consultasGerais, parseRss, passaPreFiltro, novosParaClassificar, aplicarClassificacao, mesclar, resumir, idDe, promptClassificacao } = require("./core");
+const { LOCAIS, projetosComEntorno, recebeGeral } = require("./locais");
 
 const RSS = `<?xml version="1.0"?><rss><channel><title>x</title>
 <item><title>Quadrilha rouba carga de eletrônicos em Cajamar - G1</title><link>https://g1.globo.com/a</link><pubDate>Thu, 30 Oct 2026 10:00:00 GMT</pubDate><source url="https://g1.globo.com">G1</source><description>&lt;a href="x"&gt;Roubo de carga na Anhanguera&lt;/a&gt;</description></item>
@@ -8,20 +8,39 @@ const RSS = `<?xml version="1.0"?><rss><channel><title>x</title>
 <item><title><![CDATA[Mercado Livre anuncia novo centro de distribuição em Cajamar]]></title><link>https://r7.com/c</link><pubDate>Wed, 29 Oct 2026 11:00:00 GMT</pubDate><description>Expansão logística</description></item>
 </channel></rss>`;
 
-test("cada projeto com cidade tem duas buscas (segurança e mercado) no Google News com a cidade e janela de 90 dias", () => {
+test("cada projeto tem buscas no Google News (segurança e mercado) + portais indicados; janela de 90 dias", () => {
   const q = consultasDoProjeto("P601");
-  expect(q.map((x) => x.tema)).toEqual(["seguranca", "mercado"]);
+  expect(q.slice(0, 2).map((x) => x.tema)).toEqual(["seguranca", "mercado"]);
+  expect(q.slice(2).map((x) => x.fonte)).toEqual(["Portal Notícia 360", "Portal Dois Pontos", "G1 Cajamar"]);
+  expect(q[4].amplo).toBe(true); expect(q[2].amplo).toBe(false); expect(q[2].tema).toBeNull();
+  expect(q[4].lugares).toEqual(expect.arrayContaining(["Cajamar", "Franco da Rocha"]));
   expect(q[0].url).toMatch(/^https:\/\/news\.google\.com\/rss\/search\?q=/);
   expect(decodeURIComponent(q[0].url)).toMatch(/Cajamar/);
   expect(decodeURIComponent(q[0].url)).toMatch(/when:90d/);
   expect(decodeURIComponent(q[1].url)).toMatch(/Mercado Livre/);
 });
 
-test("Jatinox sem cidade não entra na coleta (não inventa entorno)", () => {
-  expect(consultasDoProjeto("P260A")).toEqual([]);
-  expect(projetosComEntorno()).not.toContain("P260A");
-  expect(projetosComEntorno()).toEqual(expect.arrayContaining(["P601", "P505", "P311A", "P311B", "P606", "P607"]));
+test("Jatinox (Ipiranga/SP e Indaiatuba): só segurança, sem busca de mercado; mercado geral só para os demais", () => {
+  const q = consultasDoProjeto("P260A");
+  expect(q.map((x) => x.tema)).toEqual(["seguranca", null, null]);
+  expect(decodeURIComponent(q[0].url)).toMatch(/Ipiranga/);
+  expect(consultasDoProjeto("P260C")[0].url).toMatch(/Indaiatuba/);
+  expect(projetosComEntorno()).toEqual(expect.arrayContaining(["P601", "P505", "P311A", "P311B", "P606", "P607", "P260A", "P260B", "P260C"]));
   for (const pid of projetosComEntorno()) expect(LOCAIS[pid].uf).toMatch(/^[A-Z]{2}$/);
+  expect(recebeGeral("P601")).toBe(true); expect(recebeGeral("P260A")).toBe(false);
+  const g = consultasGerais();
+  expect(g.every((x) => x.tema === "mercado")).toBe(true);
+  expect(decodeURIComponent(g[0].url)).toMatch(/Black Friday/);
+  expect(g.map((x) => x.fonte)).toContain("Mercado Livre Notícias");
+});
+
+test("feed amplo (G1 regional) só aceita notícia que cite o entorno; feed local separa segurança de mercado", () => {
+  const it = parseRss(RSS);
+  const amplo = { tema: null, amplo: true, lugares: ["Jundiaí", "Várzea Paulista"], fonte: "G1" };
+  expect(novosParaClassificar(it, [], amplo)).toEqual([]); // fala de Cajamar, não de Jundiaí
+  const local = { tema: null, fonte: "Portal X" };
+  expect(novosParaClassificar(it, [], local).map((x) => [x.tema, x.fonte])).toEqual([["seguranca", "G1"], ["mercado", "Portal X"]]);
+  expect(novosParaClassificar(it, [], { ...local, soSeguranca: true }).map((x) => x.tema)).toEqual(["seguranca"]);
 });
 
 test("parseRss lê título/fonte/link/data e limpa HTML/CDATA", () => {
