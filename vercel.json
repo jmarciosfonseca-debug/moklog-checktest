@@ -2,5 +2,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "framework": "create-react-app",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "functions": {
+    "api/entorno-coletar.js": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/entorno-coletar", "schedule": "0 9 * * *" }
+  ]
 }

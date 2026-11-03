@@ -32,6 +32,14 @@ export const RECURSOS_GERENCIAIS = [
     gerencialOnly: true,
     enabled: true,
   },
+  {
+    // Entorno (02/11/2026): notícias de segurança e mercado logístico no entorno de cada parque.
+    id: "entorno",
+    label: "Entorno",
+    icone: "📰",
+    gerencialOnly: true,
+    enabled: true,
+  },
 ];
 
 // Helper: recursos habilitados que exigem ponto de entrada acionável.

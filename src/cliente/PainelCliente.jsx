@@ -17,6 +17,8 @@ import { EQUIP_CATS } from "../equipData";
 import { NIVEL_LABEL } from "../riscoConfig";
 import { MOKED_LOGO } from "../generatePDF";
 import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
+import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno } from "../entorno/EntornoLista";
+import { LOCAIS as LOCAIS_ENTORNO } from "../entorno/locais";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
 const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
@@ -32,7 +34,7 @@ const ler = (col, pid) => getDoc(doc(db(), col, pid)).then((s) => (s.exists() ? 
 // ── Carregamento por projeto: tudo que a gestão vê hoje, em leitura ──────────
 async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, score360, risco) {
   const hoje = hojeISO();
-  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc] = await Promise.all([
+  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entorno] = await Promise.all([
     ler("equipes", pid).then((d) => d || {}),
     ler("equipamentos", pid),
     getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(6))).then((s) => s.docs.map((d) => d.data())).catch(() => []),
@@ -41,6 +43,7 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     PERIMETRAL_VIA_RONDAS.includes(pid) ? ler("rondas", pid) : Promise.resolve(null),
     score360 ? score360(pid).catch(() => null) : Promise.resolve(null),
     risco ? risco(pid).catch(() => null) : Promise.resolve(null),
+    ler("entorno", pid), // Entorno (02/11/2026): notícias do entorno deste parque, coletadas no servidor
   ]);
   const colabs = (eq.colaboradores || []).filter((c) => c && (c.status || "ativo") === "ativo").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, turno: c.turno, desde: c.dataContratacao, foto: fotoDe(c, fotos), treinos: (c.historico || []).filter((h) => h && h.tipo === "Treinamento").length }));
   const h = stored?.[pid]?.history || []; const last = h[h.length - 1];
@@ -55,6 +58,7 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     sistemas: sistemasResumo({ ctmk: ctmkData?.[pid], keyaccess, iluminacao: ilum, energia, perimetralZonasRuins, score360: s360 }),
     colabs, pendencias,
     risco: risc, equipeDoc: eq, equipDoc: equip, fotos,
+    entorno: entorno && Array.isArray(entorno.itens) ? entorno : null,
     historico: h.map((r, i) => ({ idx: i, data: r.meta?.date || null, pct: (() => { try { return computeHealth(PROJECTS[pid], r.state).pct; } catch { return null; } })(), report: r })).reverse().slice(0, 12),
     ferias: (() => { const f = (eq.ferias || []).filter((x) => x && x.colabId && x.dataInicio); const em7 = (d) => { const n = (new Date(d + "T12:00:00Z") - new Date(hoje + "T12:00:00Z")) / 86400000; return n >= 0 && n <= 7; };
       const nomeDe = (id) => { const c = (eq.colaboradores || []).find((x) => x && x.id === id); return c ? { nome: c.nome, cargo: c.cargo, foto: fotoDe(c, fotos) } : { nome: id, cargo: "", foto: "" }; };
@@ -148,7 +152,28 @@ function TelaProjeto({ p, onBack, onAbrir }) {
       </div>
       <Luzes p={p} />
     </div>
+    {/* Entorno (02/11/2026): segurança e mercado logístico no entorno deste parque — só o que é da região dele */}
+    <CardEntorno p={p} onAbrir={onAbrir} />
   </>;
+}
+
+function CardEntorno({ p, onAbrir }) {
+  const e = p.entorno, r = e?.resumo, l = LOCAIS_ENTORNO[p.pid];
+  if (!l || !l.cidade) return null; // parque sem entorno cadastrado: não mostra o card
+  const ultimos = e ? filtrarEntorno(e.itens, { dias: 30 }).slice(0, 3) : [];
+  const seg = r?.seguranca, mer = r?.mercado;
+  return <div style={C.card}>
+    <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, width: "100%" }} onClick={() => onAbrir("entorno")} aria-label="Abrir entorno">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><div style={C.titulo}>Entorno · {l.cidade}/{l.uf}</div><span style={C.micro}>últimos 30 dias ›</span></div>
+      {!e && <div style={C.micro}>Sem notícias coletadas ainda.</div>}
+      {e && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div><div style={C.numero(seg?.d30 ? (seg.graves ? VERMELHO2 : AMARELO) : VERDE)}>{seg?.d30 ?? 0}</div><div style={C.micro}>ocorrências noticiadas</div></div>
+        <div><div style={{ ...C.numero(seg?.tendencia === "alta" ? VERMELHO2 : seg?.tendencia === "queda" ? VERDE : AMARELO), fontSize: 20, marginTop: 4 }}>{seg?.tendencia === "alta" ? "▲ em alta" : seg?.tendencia === "queda" ? "▼ em queda" : "▶ estável"}</div><div style={C.micro}>vs. 30 dias anteriores</div></div>
+        <div><div style={C.numero("#38bdf8")}>{mer?.d30 ?? 0}</div><div style={C.micro}>mercado logístico</div></div>
+      </div>}
+    </button>
+    {ultimos.length > 0 && <div style={{ marginTop: 6 }}>{ultimos.map((i) => <ItemNoticia key={i.id} i={i} compacto />)}</div>}
+  </div>;
 }
 
 // ── Detalhes ──────────────────────────────────────────────────────────────────
@@ -161,7 +186,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
   const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false), [verEntradas, setVerEntradas] = useState(false), [aberto, setAberto] = useState({}), [maisTestes, setMaisTestes] = useState(false);
   const alternar = (k) => setAberto((a) => ({ ...a, [k]: !a[k] }));
   const Seta = ({ on }) => <span style={{ color: "#9ca3af", fontSize: 11 }}>{on ? "▴" : "▾"}</span>;
-  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias", fotos: "Fotos · treinamentos" }[tipo];
+  const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias", fotos: "Fotos · treinamentos", entorno: "Entorno" }[tipo];
   const vig = turnoVigente(p.pid, new Date());
   return <>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><button style={C.back} onClick={onBack}>← {p.nome}</button><div style={{ ...C.titulo, marginBottom: 0 }}>{titulo}</div></div>
@@ -271,6 +296,11 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
         {l.length === 0 && <div style={C.micro}>Ninguém.</div>}
         {l.map((x, i) => <Linha key={i} primeiro={i === 0}><Avatar foto={x.foto} nome={x.nome} tam={38} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{x.nome}</div><div style={C.micro}>{x.cargo}{x.inicio ? ` · sai ${fmtD(x.inicio)}` : ""}{x.retorno ? ` · volta ${fmtD(x.retorno)}` : ""}{x.cobertura ? ` · cobertura: ${x.cobertura}` : ""}</div></div></Linha>)}
       </div>)}
+    </div>}
+    {tipo === "entorno" && <div style={C.card}>
+      <div style={C.micro}>{LOCAIS_ENTORNO[p.pid]?.cidade}/{LOCAIS_ENTORNO[p.pid]?.uf} · entorno: {(LOCAIS_ENTORNO[p.pid]?.vizinhas || []).join(", ") || "—"}{p.entorno?.atualizadoEm ? ` · coleta ${new Date(p.entorno.atualizadoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : ""}</div>
+      {!p.entorno && <div style={{ ...C.micro, marginTop: 8 }}>Sem notícias coletadas ainda para este parque.</div>}
+      {p.entorno && <div style={{ marginTop: 8 }}><EntornoLista itens={p.entorno.itens} /></div>}
     </div>}
     {tipo === "sistemas" && <div style={C.card}>
       {s.score360 !== null && <Mostrador valor={s.score360} rotulo="Visão 360" sub="nota do parque" zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} />}
