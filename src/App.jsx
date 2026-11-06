@@ -22,6 +22,7 @@ import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
 import Entorno from "./entorno/Entorno";
+import { FAIXAS_GRAVACAO, legendaGravacao, camerasDaFaixa, corGravacao, gravacaoDoTeste, textoGravacao, MINIMO_DIAS } from "./gravacaoSemanal";
 
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import { recursosHabilitados } from "./gerenciaisConfig";
@@ -1016,6 +1017,7 @@ function generateReportText(project, state, meta, photos) {
       const t=s.total??cat.total; const inop=s.inoperative??[];
       L.push(`  Total: ${t} | OK: ${t-inop.length} | Inoperantes: ${inop.length}`);
       inop.forEach(it=>L.push(`    > ${it.id||"?"}${it.since?` (desde ${fmtDate(it.since)})`:""} ${it.note?`- ${it.note}`:""}`));
+      if(cat.id==="cftv"){const g=gravacaoDoTeste({categories:[cat]},state);if(g)L.push(`  ${textoGravacao(g)}`);}
     }
   }
   const h=computeHealth(project,state);
@@ -1389,6 +1391,33 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
         })}
         <button onClick={add} style={S.addBtn}>+ Registrar inoperante</button>
       </div>
+      {cat.id==="cftv"&&<GravacaoBloco total={total} value={value.gravacao||null} onChange={g=>onChange({...value,gravacao:g})}/>}
+    </div>
+  );
+}
+
+// Tempo de gravação no teste semanal (06/11/2026): faixa (%) de câmeras com menos de 30 dias, com a legenda em
+// quantidade do projeto. Não entra na Saúde Geral — é indicador próprio da CFTV.
+function GravacaoBloco({total,value,onChange}){
+  const pct=value&&FAIXAS_GRAVACAO.includes(Number(value.pct))?Number(value.pct):null;
+  const obs=value?.obs||"";
+  const set=(patch)=>onChange({pct,obs,...patch});
+  return(
+    <div data-testid="gravacao-bloco" style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1e293b"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+        <span style={{fontSize:12,fontWeight:800,color:"#cbd5e1"}}>Tempo de gravação · mínimo {MINIMO_DIAS} dias</span>
+        <span style={{fontSize:11,color:"#64748b"}}>{total} câmeras no projeto</span>
+      </div>
+      <div style={{fontSize:11,color:"#94a3b8",margin:"4px 0 6px"}}>Quantas câmeras estão com <b>menos de {MINIMO_DIAS} dias</b> de gravação? Legenda deste projeto: {legendaGravacao(total).map(l=>l.texto).join(" · ")}</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {FAIXAS_GRAVACAO.map(f=>{const on=pct===f;const c=corGravacao(f);return(
+          <button key={f} aria-pressed={on} onClick={()=>set({pct:on?null:f})} style={{...S.iconBtn,width:"auto",minWidth:64,padding:"6px 10px",fontSize:12,fontWeight:800,color:on?"#fff":c,background:on?c:"transparent",border:`1px solid ${c}`,borderRadius:8}}>
+            {f===0?"0% · nenhuma":`${f}%${f===50?" (máx.)":""} ≈ ${camerasDaFaixa(total,f)}`}
+          </button>);})}
+      </div>
+      {pct===null&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>Não informado — escolha uma faixa.</div>}
+      {pct!==null&&<div style={{fontSize:11,color:corGravacao(pct),marginTop:6,fontWeight:700}}>{pct===0?`Todas as ${total} câmeras com ${MINIMO_DIAS} dias ou mais.`:`≈ ${camerasDaFaixa(total,pct)} de ${total} câmeras abaixo de ${MINIMO_DIAS} dias.`}</div>}
+      <input placeholder="Observação (ex.: menos de 15 dias no NVR 2, HD em troca)…" value={obs} onChange={e=>set({obs:e.target.value})} maxLength={160} style={{...S.inp,width:"100%",boxSizing:"border-box",fontSize:12,marginTop:6}}/>
     </div>
   );
 }
@@ -1907,6 +1936,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
               {cp<100&&cat.type==="count"&&(sv.inoperative??[]).map((it,i)=>(
                 <div key={i} style={{fontSize:11,color:"#ef4444",marginLeft:16,marginTop:2}}>↳ {it.id||"?"}{it.since?` desde ${fmtDate(it.since)}`:""}{it.note?` — ${it.note}`:""}</div>
               ))}
+              {cat.id==="cftv"&&(()=>{const g=gravacaoDoTeste({categories:[cat]},viewReport.report.state);return g?<div style={{fontSize:11,color:g.cor,marginLeft:16,marginTop:4,fontWeight:700}}>⏺ {textoGravacao(g)}</div>:null;})()}
               {cat.type==="notes"&&(sv.items??[]).map((it,i)=>(
                 <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:2}}>▸ {it.label}{it.note?` — ${it.note}`:""}</div>
               ))}
@@ -2404,6 +2434,7 @@ function HistoryScreen({project, stored, onBack, onEdit, onDelete, canManage}) {
               {cp<100&&cat.type==="count"&&Array.isArray(sv.inoperative)&&sv.inoperative.map((it,i)=>(
                 <div key={i} style={{fontSize:11,color:"#ef4444",marginLeft:16,marginTop:3}}>↳ {it?.id||"?"}{it?.since?` desde ${fmtDate(it.since)}`:""}{it?.note?` — ${it.note}`:""}</div>
               ))}
+              {cat.id==="cftv"&&(()=>{const g=gravacaoDoTeste({categories:[cat]},repState);return g?<div style={{fontSize:11,color:g.cor,marginLeft:16,marginTop:4,fontWeight:700}}>⏺ {textoGravacao(g)}</div>:null;})()}
               {cat.type==="notes"&&Array.isArray(sv.items)&&sv.items.map((it,i)=>(
                 <div key={i} style={{fontSize:11,color:"#f59e0b",marginLeft:16,marginTop:3}}>▸ {it?.label}{it?.note?` — ${it.note}`:""}</div>
               ))}
