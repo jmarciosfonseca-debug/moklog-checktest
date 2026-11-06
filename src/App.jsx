@@ -1408,15 +1408,15 @@ function GravacaoBloco({total,value,onChange}){
         <span style={{fontSize:12,fontWeight:800,color:"#cbd5e1"}}>Tempo de gravação · mínimo {MINIMO_DIAS} dias</span>
         <span style={{fontSize:11,color:"#64748b"}}>{total} câmeras no projeto</span>
       </div>
-      <div style={{fontSize:11,color:"#94a3b8",margin:"4px 0 6px"}}>Quantas câmeras estão com <b>menos de {MINIMO_DIAS} dias</b> de gravação? Legenda deste projeto: {legendaGravacao(total).map(l=>l.texto).join(" · ")}</div>
+      <div style={{fontSize:11,color:"#94a3b8",margin:"4px 0 6px"}}>Quantas câmeras estão com <b>menos de {MINIMO_DIAS} dias</b> de gravação? Escolha a faixa (<b>até</b> X%). Legenda deste projeto: {legendaGravacao(total).map(l=>`até ${l.pct}% ≈ ${l.cameras}`).join(" · ")}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
         {FAIXAS_GRAVACAO.map(f=>{const on=pct===f;const c=corGravacao(f);return(
           <button key={f} aria-pressed={on} onClick={()=>set({pct:on?null:f})} style={{...S.iconBtn,width:"auto",minWidth:64,padding:"6px 10px",fontSize:12,fontWeight:800,color:on?"#fff":c,background:on?c:"transparent",border:`1px solid ${c}`,borderRadius:8}}>
-            {f===0?"0% · nenhuma":`${f}%${f===50?" (máx.)":""} ≈ ${camerasDaFaixa(total,f)}`}
+            {f===0?"0% · nenhuma":`até ${f}%${f===50?" (máx.)":""} ≈ ${camerasDaFaixa(total,f)}`}
           </button>);})}
       </div>
       {pct===null&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>Não informado — escolha uma faixa.</div>}
-      {pct!==null&&<div style={{fontSize:11,color:corGravacao(pct),marginTop:6,fontWeight:700}}>{pct===0?`Todas as ${total} câmeras com ${MINIMO_DIAS} dias ou mais.`:`≈ ${camerasDaFaixa(total,pct)} de ${total} câmeras abaixo de ${MINIMO_DIAS} dias.`}</div>}
+      {pct!==null&&<div style={{fontSize:11,color:corGravacao(pct),marginTop:6,fontWeight:700}}>{pct===0?`Todas as ${total} câmeras com ${MINIMO_DIAS} dias ou mais.`:`Até ≈ ${camerasDaFaixa(total,pct)} de ${total} câmeras abaixo de ${MINIMO_DIAS} dias.`}</div>}
       <input placeholder="Observação (ex.: menos de 15 dias no NVR 2, HD em troca)…" value={obs} onChange={e=>set({obs:e.target.value})} maxLength={160} style={{...S.inp,width:"100%",boxSizing:"border-box",fontSize:12,marginTop:6}}/>
     </div>
   );

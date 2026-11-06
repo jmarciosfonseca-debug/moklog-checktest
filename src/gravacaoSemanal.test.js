@@ -6,11 +6,12 @@ import { testeSemanal, luzes } from "./cliente/metricas";
 const P604 = { id: "P604", name: "Golgi Jundiaí", categories: [{ id: "cftv", label: "06 - CFTV", type: "count", total: 73 }, { id: "internet", label: "08 - INTERNET", type: "single" }] };
 
 test("faixas 0/10/20/30/50 e legenda em quantidade do projeto (P604 = 73 câmeras; 100 câmeras = 10/20/30/50)", () => {
-  expect(FAIXAS_GRAVACAO).toEqual([0, 10, 20, 30, 50]);
-  expect(legendaGravacao(73).map((l) => l.texto)).toEqual(["10% ≈ 7", "20% ≈ 15", "30% ≈ 22", "50% ≈ 37"]);
-  expect(legendaGravacao(100).map((l) => l.cameras)).toEqual([10, 20, 30, 50]);
+  expect(FAIXAS_GRAVACAO).toEqual([0, 5, 10, 20, 30, 50]);
+  expect(legendaGravacao(73).map((l) => l.texto)).toEqual(["5% ≈ 4", "10% ≈ 7", "20% ≈ 15", "30% ≈ 22", "50% ≈ 37"]);
+  expect(legendaGravacao(150).map((l) => l.cameras)).toEqual([8, 15, 30, 45, 75]); // 150 câmeras com 8 abaixo = faixa "até 5%"
+  expect(legendaGravacao(100).map((l) => l.cameras)).toEqual([5, 10, 20, 30, 50]);
   expect(camerasDaFaixa(140, 10)).toBe(14);
-  expect([corGravacao(null), corGravacao(0), corGravacao(10), corGravacao(20)]).toEqual(["#64748b", "#22c55e", "#f59e0b", "#ef4444"]);
+  expect([corGravacao(null), corGravacao(0), corGravacao(5), corGravacao(10), corGravacao(20)]).toEqual(["#64748b", "#22c55e", "#f59e0b", "#f59e0b", "#ef4444"]);
 });
 
 test("lê o estado do teste: não informado (teste antigo), 0%, faixa com observação; projeto sem CFTV = null", () => {
@@ -18,7 +19,7 @@ test("lê o estado do teste: não informado (teste antigo), 0%, faixa com observ
   expect(gravacaoDoTeste(P604, { cftv: { total: 73, inoperative: [], gravacao: { pct: 0, obs: "" } } })).toMatchObject({ pct: 0, cameras: 0, nivel: "ok" });
   const g = gravacaoDoTeste(P604, { cftv: { total: 73, inoperative: [], gravacao: { pct: 20, obs: "NVR 2 com 12 dias" } } });
   expect(g).toMatchObject({ pct: 20, cameras: 15, nivel: "critico", obs: "NVR 2 com 12 dias" });
-  expect(textoGravacao(g)).toBe("Tempo de gravação: ~20% das câmeras (≈ 15 de 73) com menos de 30 dias — NVR 2 com 12 dias");
+  expect(textoGravacao(g)).toBe("Tempo de gravação: até 20% das câmeras (até ≈ 15 de 73) com menos de 30 dias — NVR 2 com 12 dias");
   expect(gravacaoDoTeste(P604, { cftv: { total: 73, gravacao: { pct: 37 } } }).pct).toBeNull(); // valor fora das faixas = não informado
   expect(gravacaoDoTeste({ categories: [{ id: "internet", type: "single" }] }, {})).toBeNull();
 });
@@ -27,7 +28,7 @@ test("relatório semanal mostra o bloco de gravação; não entra na saúde gera
   const state = { cftv: { total: 73, inoperative: [], gravacao: { pct: 10, obs: "HD em troca" } }, internet: { status: "ok" } };
   const html = montarLaudoSemanal(P604, state, { date: "2026-11-08", leader: "Ana", cco: "Bruno" }, { hoje: new Date("2026-11-08T12:00:00Z") });
   expect(html).toMatch(/Tempo de gravação CFTV/);
-  expect(html).toMatch(/~10% das câmeras \(≈ 7 de 73\)/);
+  expect(html).toMatch(/Até 10% das câmeras \(até ≈ 7 de 73\)/);
   expect(html).toMatch(/HD em troca/);
   expect(html).toMatch(/74<\/div><div class="mk-kl">ativos testados/); // 73 câmeras + internet: gravação não altera a conta
 });
