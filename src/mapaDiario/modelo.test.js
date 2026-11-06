@@ -254,6 +254,9 @@ describe("resumo que fala de exceção sem posto marcado", () => {
   test("avisa quando cita extra/FT/falta/atraso e nenhum posto é exceção", () => {
     expect(avisoResumoSemExcecao({ ...base, resumo: "Informo que a vigilante Rosemeire está trabalhando em caráter de extra." })).toMatch(/"extra"/);
     expect(avisoResumoSemExcecao({ ...base, resumo: "Houve atraso do CCO." })).toMatch(/"atraso"/);
+    // 06/11/2026: "troca" de óleo/pneu/lâmpada não é troca de plantão — não avisa; "troca de plantão" avisa.
+    expect(avisoResumoSemExcecao({ ...base, resumo: "Moto atingiu km para troca de óleo." })).toBe("");
+    expect(avisoResumoSemExcecao({ ...base, resumo: "Troca de plantão com o Carlos." })).toMatch(/"troca de plantão"/i);
   });
   test("não avisa sem palavra de exceção, nem quando já há posto marcado, nem em palavra parecida", () => {
     expect(avisoResumoSemExcecao({ ...base, resumo: "Pneu da moto furado. Extrato conferido." })).toBe("");

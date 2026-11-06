@@ -268,7 +268,7 @@ function gerarPdfEvento(project, config, ev){
   body{font-family:'Segoe UI',system-ui,sans-serif;color:#0f172a;padding:20px;max-width:760px;margin:0 auto}
   h1{font-size:18px;margin:0} .sub{font-size:12px;color:#64748b;margin-top:2px}
   .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-top:12px}
-  .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px}
   .lbl{color:#64748b;font-weight:700}
   @media print{body{padding:8px}@page{margin:10mm}.no-print{display:none}}
 </style></head><body>
@@ -286,7 +286,7 @@ function gerarPdfEvento(project, config, ev){
   <div class="row"><span class="lbl">Manutencista acionado</span><span>${ev.manutencista?"Sim":"Não"}</span></div>
   <div class="row"><span class="lbl">Impacto na operação</span><span>${ev.impactoOperacao?"Sim":"Não"}${ev.obsImpacto?` — ${ev.obsImpacto}`:""}</span></div>
   <div class="row"><span class="lbl">Inquilino impactado</span><span>${ev.inquilinoImpactado?(ev.inquilinosAfetados||"Sim"):"Não"}</span></div>
-  <div class="row" style="border:none"><span class="lbl">Observações</span><span>${ev.obs||"—"}</span></div>
+  <div class="row" style="border:none;flex-direction:column;align-items:flex-start;gap:4px"><span class="lbl">Observações:</span><span style="white-space:pre-wrap;word-break:break-word;padding-left:8px">${ev.obs||"—"}</span></div>
 </div>
 ${ev.foto?`<div class="card"><img src="${ev.foto}" style="width:100%;border-radius:8px"/></div>`:""}
 </body></html>`;

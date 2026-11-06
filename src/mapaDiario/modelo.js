@@ -257,13 +257,14 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
 
 // O resumo (texto livre) fala de extra/FT/falta/atraso/cobertura/troca, mas nenhum posto foi marcado como exceção:
 // o mapa sairia "Sem ocorrências" e a ficha não receberia nada. Devolve o aviso (ou "") para o líder conferir.
-const PALAVRAS_EXCECAO = /(^|[^a-zà-ú])(extra|ft|folga trabalhada|falta|faltas|faltou|atraso|atrasou|atrasada|cobrindo|cobertura|troca|permuta)(?![a-zà-ú])/i;
+// "troca" sozinha não conta (06/11/2026: "moto atingiu km para troca de óleo" disparava o aviso): só troca DE plantão/turno/escala/horário ou permuta.
+const PALAVRAS_EXCECAO = /(^|[^a-zà-ú])(extra|ft|folga trabalhada|falta|faltas|faltou|atraso|atrasou|atrasada|cobrindo|cobertura|troca de (?:plant[ãa]o|turno|escala|hor[áa]rio)|trocou de (?:plant[ãa]o|turno|escala|hor[áa]rio)|permuta)(?![a-zà-ú])/i;
 export function avisoResumoSemExcecao(mapa) {
   const texto = `${mapa.resumo || ""} ${mapa.observacoes || ""}`;
   const m = PALAVRAS_EXCECAO.exec(texto);
   if (!m) return "";
   if ((mapa.postos || []).some((p) => p.situacao && p.situacao !== "presente")) return "";
-  return `O resumo fala de "${m[2]}", mas nenhum posto está marcado como Falta, FT, Atraso, Cobertura ou Troca. Marque no posto (botão Exceção): é isso que vai para "Faltas/atrasos/FT/trocas" e para a ficha.`;
+  return `O resumo fala de "${m[2]}", mas nenhum posto está marcado como exceção (Falta, FT, Atraso, Cobertura ou Troca). Se for o caso, marque no posto (botão Exceção).`;
 }
 
 // ── FT: sempre no posto extra (o efetivo já vem marcado pelo escopo do projeto) ───────────────────────
