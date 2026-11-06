@@ -4,6 +4,7 @@
 // CTMK, dados da execução do teste. Métricas pela fonte única (relatorios/metricas.js), igual ao consolidado.
 import { documentoMoked, escHTML, dataBR, num1, horaBR } from "./padraoMoked";
 import { itensDoEstado, resumo, porCategoria, falhasPorSistema, diasEntre, DIAS_FOLLOWUP_VENCIDO } from "./metricas";
+import { gravacaoDoTeste, textoGravacao, MINIMO_DIAS } from "../gravacaoSemanal";
 import { canonicalFollowupKey } from "../followups";
 
 const COR = { ok: "#374151", wa: "#D97706", da: "#B91C1C" };
@@ -104,6 +105,10 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
       <table class="mk-tb"><colgroup><col style="width:34%"><col style="width:12%"><col style="width:26%"><col style="width:28%"></colgroup>
       <thead><tr><th>Sistema</th><th class="mk-num">Operac./total</th><th>Onde estão as falhas</th><th>Saúde</th></tr></thead><tbody>${linhasCat}</tbody></table></section>`
     : `<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-kl">sistemas cadastrados</div></div>`;
+  // Tempo de gravação (06/11/2026): faixa informada pela equipe no teste semanal, em quantidade do projeto.
+  const grav = gravacaoDoTeste(project, state);
+  const blocoGravacao = grav ? `<section><div class="mk-h2">Tempo de gravação CFTV <span class="mk-mu">· mínimo ${MINIMO_DIAS} dias · ${grav.total} câmeras</span></div>
+      <div class="mk-nota" style="border-left:4px solid ${grav.cor};padding-left:10px">${grav.pct === null ? "Não informado neste teste." : grav.pct === 0 ? `<b>Todas as câmeras</b> com ${MINIMO_DIAS} dias ou mais de gravação.` : `<b>~${grav.pct}% das câmeras (≈ ${grav.cameras} de ${grav.total})</b> com menos de ${MINIMO_DIAS} dias de gravação.`}${grav.obs ? ` Observação da equipe: ${escHTML(grav.obs)}` : ""}</div></section>` : "";
 
   // ── Pendências e tratativas
   const pill = (st) => (st === "partial" ? '<span class="mk-b mk-b-wa">Parcial</span>' : '<span class="mk-b mk-b-da">Inoperante</span>');
@@ -159,6 +164,6 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
 @media screen and (max-width:640px){.ls-info{grid-template-columns:1fr 1fr}.ls-i:nth-child(4n){border-right:1px solid #EEF0F3}.ls-i:nth-child(2n){border-right:none}}
 </style>`;
 
-  return documentoMoked({ project, titulo: "Relatório Semanal de Operacionalidade", subtitulo: sub, numero, hoje, corpo: css + hero + kpis + disponibilidade + pendencias + energia, fecho: execucao,
+  return documentoMoked({ project, titulo: "Relatório Semanal de Operacionalidade", subtitulo: sub, numero, hoje, corpo: css + hero + kpis + disponibilidade + blocoGravacao + pendencias + energia, fecho: execucao,
     rodape: `${numero} · Laudo Técnico Semanal · ${project.id} ${project.name || ""} · ${semana} · Moked Consulting Security · MokLog CheckTest` });
 }

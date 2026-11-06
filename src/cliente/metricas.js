@@ -2,6 +2,7 @@
 // o "painel do carro": marcadores grandes (teste semanal, equipe) e pequenos (mapa do dia, equipamentos,
 // treinamentos, pendências). Nada aqui grava.
 import { calcularEstabilidade, calcularTreinamento } from "../equipe/maturidade";
+import { gravacaoDoTeste } from "../gravacaoSemanal";
 import { contarEquip } from "../equipData";
 import { ordenarHistorico } from "../equipeEventos";
 import { statusReciclagem } from "../pendencias";
@@ -25,7 +26,8 @@ export function testeSemanal(history, computeHealth, project, hojeISO) {
   const hc = computeHealth(project, last.state);
   const serie = h.slice(-8).map((r) => { try { return { data: r.meta?.date || null, pct: computeHealth(project, r.state).pct }; } catch { return { data: r.meta?.date || null, pct: null }; } });
   const dias = last.meta.date ? diasEntre(last.meta.date, hojeISO) : null;
-  return { pct: hc.pct, inop: hc.inop, parcial: hc.partial, total: hc.total, data: last.meta.date || null, diasAtras: dias, atrasado: dias === null || dias > 8, serie };
+  const gravacao = gravacaoDoTeste(project, last.state); // tempo de gravação (06/11/2026): faixa % abaixo de 30 dias
+  return { pct: hc.pct, inop: hc.inop, parcial: hc.partial, total: hc.total, data: last.meta.date || null, diasAtras: dias, atrasado: dias === null || dias > 8, serie, gravacao };
 }
 
 // Equipe: efetivo, turnover 12 m (fórmula já usada na maturidade), tempo de casa, treinamento.
@@ -124,6 +126,7 @@ export function luzes(p) {
     { id: "teste", rotulo: "Teste atrasado", on: !!p.teste?.atrasado },
     { id: "falta", rotulo: "Falta hoje", on: !!(p.mapa?.hoje && (p.mapa.faltas || p.mapa.vagos)) },
     { id: "inop", rotulo: "Inoperante", on: (p.teste?.inop || 0) + (p.equip?.inop || 0) > 0 },
+    { id: "gravacao", rotulo: "Gravação", on: p.teste?.gravacao?.nivel === "critico" },
     { id: "ctmk", rotulo: "CTMK off", on: !!p.sistemas?.ctmkOff },
     { id: "energia", rotulo: "Energia", on: !!p.sistemas?.energiaAberta },
     { id: "key", rotulo: "KeyAccess", on: (p.sistemas?.keyAbertas || 0) > 0 },
