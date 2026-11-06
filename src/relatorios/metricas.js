@@ -29,7 +29,13 @@ export function itensDoEstado(project, state) {
         out.push({ catId: cat.id, cat: cat.label, item: id, key: `${cat.id}|${id}`, status: it?.status === "partial" ? "partial" : "inop",
           since: it?.since || null, note: it?.note || it?.descricao || "", camera: true });
       });
-      const restantes = Math.max(0, total - lista.length);
+      // Parciais lançados em lista própria (vistoria Single): entram como "partial", um por unidade.
+      const parciais = Array.isArray(s.partial) ? s.partial : [];
+      parciais.forEach((it, j) => {
+        const id = String(it?.id || "").trim() || `Parcial ${j + 1}`;
+        out.push({ catId: cat.id, cat: cat.label, item: id, key: `${cat.id}|${id}`, status: "partial", since: it?.since || null, note: it?.note || "", camera: true });
+      });
+      const restantes = Math.max(0, total - lista.length - parciais.length);
       if (restantes) out.push({ catId: cat.id, cat: cat.label, item: "demais", key: `${cat.id}|__ok`, status: "ok", qtd: restantes, camera: true, agregado: true });
     }
   }

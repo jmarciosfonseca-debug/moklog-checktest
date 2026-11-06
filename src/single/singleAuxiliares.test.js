@@ -17,8 +17,8 @@ test("relatório: data BR, estado com acento, sem expor o identificador interno 
  const atual={id:"i2",data:"2026-10-10",responsavel:"Equipe",estado:"concluida",itens};
  const ant={id:"i1",data:"2026-10-03",estado:"concluida",itens:[{...itens[0],inoperante:10}]};
  const html=htmlSingle({nome:"Cliente",id:"sg_cliente_abc123"},atual,ant);
- expect(html).toContain("10/10/2026");expect(html).toContain("Desde 02/10/2026");expect(html).toContain("Concluída");
- expect(html).not.toContain("sg_cliente_abc123");expect(html).toContain("+4,0 p.p.");expect(html).not.toContain("2026-10-10");
+ expect(html).toContain("10/10/2026");expect(html).toContain("desde 02/10/2026");expect(html).toContain("Relatório Situacional");
+ expect(html).not.toContain("sg_cliente_abc123");expect(html).toContain("+4,0 p.p.");expect(html).toContain("Variação em relação à vistoria de 03/10/2026");expect(html).not.toContain("2026-10-10");
  expect(htmlSingle({nome:"C",id:"sg_x",codigo:"MK-9"},atual)).toContain("MK-9");
 });
 test("sem vistoria anterior (null) o cálculo e a variação não quebram",()=>{
