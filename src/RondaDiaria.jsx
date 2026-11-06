@@ -275,6 +275,9 @@ async function loadColaboradores(projectId){
     return !CARGOS_EXCLUIDOS.some(x=>cg.includes(x));
   });
   if(filtrados.length===0) filtrados = ativos; // cadastro só com cargos excluídos: não trava a operação
+  // 06/11/2026 (P260A): o mesmo nome cadastrado duas vezes aparecia em dobro na lista — fica um só.
+  const vistos = new Set();
+  filtrados = filtrados.filter(c=>{ const k=norm(c.nome); if(vistos.has(k)) return false; vistos.add(k); return true; });
   return filtrados
     .sort((a,b)=>norm(a.nome).localeCompare(norm(b.nome)))
     .map(c=>({ nome:c.nome, cargo: coberturaAtiva(c) ? `${c.cargo} (cobertura líder)` : (c.cargo||"") }));
@@ -529,9 +532,16 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
   const [liderDropOpen, setLiderDropOpen] = useState(false); // lista de responsáveis em cascata (fechada por padrão)
   const adminAuth = authLevel==="admin";
 
-  const turno = turnoAtual();
-  const dataP = dataPlantaoAtual();
+  // Plantão vigente como ESTADO (06/11/2026, P260A): antes era recalculado a cada render — às 06:00/18:00 o cabeçalho
+  // virava para o novo turno, mas a tela continuava com o plantão antigo carregado, e a ronda iniciada às 06h
+  // "sumia" ou aparecia como plantão anterior pendente. Agora a virada é detectada e o plantão novo é carregado.
+  const [slot, setSlot] = useState(()=>({ turno:turnoAtual(), dataP:dataPlantaoAtual() }));
+  const { turno, dataP } = slot;
   const tui = TURNO_UI[turno];
+  useEffect(()=>{
+    const t = setInterval(()=>{ const n={ turno:turnoAtual(), dataP:dataPlantaoAtual() }; setSlot(s=>(s.turno===n.turno&&s.dataP===n.dataP)?s:n); }, 30000);
+    return ()=>clearInterval(t);
+  },[]);
   // Quem está realmente de plantão (Mapa de Equipe do turno): cobertura/FT/Base no lugar do titular que faltou.
   const plantaoMapa = usePlantaoDoMapa(project.id, dataP, turno);
   const liderMapa = liderDePlantao(plantaoMapa && plantaoMapa.pessoas);
@@ -552,6 +562,21 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
       if(pendRef.current){ savePlantaoFull(pendRef.current.full); saveIndexEntry(project.id, entradaLeve(pendRef.current.full)); }
     };
   },[project.id]); // eslint-disable-line
+
+  // Virou o plantão com a tela aberta: grava o que estava pendente, carrega o plantão do novo turno e avisa.
+  const slotInicial = useRef(slot);
+  const [virouPlantao, setVirouPlantao] = useState(false);
+  useEffect(()=>{
+    if(slotInicial.current.turno===turno && slotInicial.current.dataP===dataP) return;
+    slotInicial.current = slot;
+    (async()=>{
+      if(pendRef.current){ const f=pendRef.current.full; pendRef.current=null; await savePlantaoFull(f); await saveIndexEntry(project.id, entradaLeve(f)); }
+      const i = await loadIndex(project.id); setIdx(i);
+      const entrada = (i.plantoes||[]).find(p=>p.dataPlantao===dataP && p.turno===turno);
+      setAtualFull(entrada ? await loadPlantaoFull(entrada) : null);
+      setOpenRondaId(null); setConfirmEnvio(false); setVirouPlantao(true);
+    })();
+  },[turno, dataP]); // eslint-disable-line
 
   const historico = (idx.plantoes||[]).filter(p=>!(p.dataPlantao===dataP && p.turno===turno))
     .sort((a,b)=>(b.dataPlantao||"").localeCompare(a.dataPlantao||"")||(a.turno==="noturno"?-1:1));
@@ -976,8 +1001,8 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         {pendenciaAnt && (
           <div style={{...S.card,border:"1px solid #ef444455",background:dark?"#1a0202":"#fef2f2"}}>
-            <div style={{fontSize:12,fontWeight:800,color:"#ef4444"}}><Ico n="alerta"/> Plantão anterior sem envio</div>
-            <div style={{fontSize:11,...S.txt2,marginTop:2,marginBottom:10}}>{TURNO_UI[ant.turno].icon} {TURNO_UI[ant.turno].label} de {fmtData(ant.dataPlantao)} {plantaoAnt?"não foi enviado.":"não foi registrado."}</div>
+            <div style={{fontSize:12,fontWeight:800,color:"#ef4444"}}><Ico n="alerta"/> Plantão anterior ainda aberto</div>
+            <div style={{fontSize:11,...S.txt2,marginTop:2,marginBottom:10}}>{TURNO_UI[ant.turno].icon} {TURNO_UI[ant.turno].label} de {fmtData(ant.dataPlantao)} {plantaoAnt?"não foi concluído.":"não foi registrado."} <b>Conclua-o primeiro</b>; o plantão de agora abre em seguida.</div>
             <button
               disabled={concluindoAnt}
               onClick={()=>{
@@ -988,7 +1013,7 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
               style={{...S.btnSec, width:"100%", fontSize:13, fontWeight:800,
                 color:"#22c55e", borderColor:"#22c55e55",
                 opacity:concluindoAnt?0.6:1, cursor:concluindoAnt?"default":"pointer"}}>
-              {concluindoAnt ? "Concluindo..." : <><Ico n="checkCirculo"/>{" Concluir plantão anterior"}</>}
+              {concluindoAnt ? "Concluindo..." : <><Ico n="checkCirculo"/>{" Concluir plantão anterior e abrir o de agora"}</>}
             </button>
           </div>
         )}
@@ -1166,7 +1191,9 @@ export default function RondaDiaria({ project, onBack, dark, onToggleTheme, shar
 
         {(atualFull?.rondas||[]).map((r,i)=>renderRonda(r,i,travado))}
 
-        {!travado && (atualFull?.lider
+        {virouPlantao && <div role="status" style={{...S.card,textAlign:"center",fontSize:12,...S.txt2,border:`1px solid ${tui.cor}66`}}>{tui.icon} Virou o plantão: agora é o <b>{tui.label} de {fmtData(dataP)}</b>. O anterior ficou no histórico abaixo.</div>}
+        {!travado && pendenciaAnt && !atualFull?.rondas?.length && <div style={{...S.card,textAlign:"center",fontSize:12,...S.txt2,border:"1px solid #ef444444"}}><Ico n="alerta"/> Conclua o plantão anterior (acima) para registrar as rondas de agora.</div>}
+        {!travado && !(pendenciaAnt && !atualFull?.rondas?.length) && (atualFull?.lider
           ? <button onClick={addRonda} style={S.btn}>▶ Registrar ronda (agora)</button>
           : <div style={{...S.card,textAlign:"center",fontSize:12,...S.txt2,border:"1px solid #f59e0b44"}}><Ico n="alerta"/> Selecione o responsável acima antes de registrar a primeira ronda.</div>
         )}

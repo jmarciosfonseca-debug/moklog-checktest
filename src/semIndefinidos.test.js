@@ -59,3 +59,15 @@ test("ronda diária: concluir plantão anterior usa o plantão completo e mostra
   expect(bloco).toMatch(/saveIndexEntry\(project\.id, entradaLeve\(concluido\)/);
   expect(bloco).toMatch(/setEnvioErr\(`Não consegui concluir o plantão anterior/);
 });
+
+// Ronda (06/11/2026, P260A): plantão vigente é estado com virada detectada; lista de responsáveis sem nome repetido;
+// com plantão anterior aberto, primeiro conclui, depois registra a ronda de agora.
+test("ronda diária: virada de plantão, nomes sem repetição e gate do plantão anterior", () => {
+  const fs = require("fs"), path = require("path");
+  const src = fs.readFileSync(path.join(__dirname, "RondaDiaria.jsx"), "utf8");
+  expect(src).toMatch(/const \[slot, setSlot\] = useState\(\(\)=>\(\{ turno:turnoAtual\(\), dataP:dataPlantaoAtual\(\) \}\)\)/);
+  expect(src).toMatch(/\},\[turno, dataP\]\); \/\/ eslint-disable-line/);
+  expect(src).toMatch(/filtrados = filtrados\.filter\(c=>\{ const k=norm\(c\.nome\); if\(vistos\.has\(k\)\) return false;/);
+  expect(src).toMatch(/Conclua o plantão anterior \(acima\) para registrar as rondas de agora/);
+  expect(src).toMatch(/Concluir plantão anterior e abrir o de agora/);
+});
