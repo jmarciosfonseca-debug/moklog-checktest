@@ -3,7 +3,9 @@
 // e o app traduz para o quantitativo do projeto (ex.: P604 tem 73 câmeras → 10% ≈ 7, 20% ≈ 15, 30% ≈ 22, 50% ≈ 37).
 // Fica guardado em state.cftv.gravacao = { pct, obs }. Não entra na Saúde Geral do teste: é indicador próprio.
 export const MINIMO_DIAS = 30;
-export const FAIXAS_GRAVACAO = [0, 10, 20, 30, 50];
+// Faixas (Marcio, 06/11): 0 · até 5% · 10% · 20% · 30% · 50% (máx.). "Até 5%" cobre o projeto grande com poucas câmeras abaixo
+// (150 câmeras com 8 abaixo não é 10%). Cada faixa é lida como "até X%".
+export const FAIXAS_GRAVACAO = [0, 5, 10, 20, 30, 50];
 
 export const camerasDaFaixa = (total, pct) => Math.round(((Number(total) || 0) * (Number(pct) || 0)) / 100);
 
@@ -32,6 +34,6 @@ export function gravacaoDoTeste(project, state) {
 export function textoGravacao(g) {
   if (!g) return "";
   if (g.pct === null) return `Tempo de gravação (mín. ${MINIMO_DIAS} dias): não informado`;
-  const base = g.pct === 0 ? `Tempo de gravação: todas as ${g.total} câmeras com ≥ ${MINIMO_DIAS} dias` : `Tempo de gravação: ~${g.pct}% das câmeras (≈ ${g.cameras} de ${g.total}) com menos de ${MINIMO_DIAS} dias`;
+  const base = g.pct === 0 ? `Tempo de gravação: todas as ${g.total} câmeras com ≥ ${MINIMO_DIAS} dias` : `Tempo de gravação: até ${g.pct}% das câmeras (até ≈ ${g.cameras} de ${g.total}) com menos de ${MINIMO_DIAS} dias`;
   return g.obs ? `${base} — ${g.obs}` : base;
 }

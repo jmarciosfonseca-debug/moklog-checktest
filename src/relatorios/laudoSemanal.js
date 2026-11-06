@@ -108,7 +108,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
   // Tempo de gravação (06/11/2026): faixa informada pela equipe no teste semanal, em quantidade do projeto.
   const grav = gravacaoDoTeste(project, state);
   const blocoGravacao = grav ? `<section><div class="mk-h2">Tempo de gravação CFTV <span class="mk-mu">· mínimo ${MINIMO_DIAS} dias · ${grav.total} câmeras</span></div>
-      <div class="mk-nota" style="border-left:4px solid ${grav.cor};padding-left:10px">${grav.pct === null ? "Não informado neste teste." : grav.pct === 0 ? `<b>Todas as câmeras</b> com ${MINIMO_DIAS} dias ou mais de gravação.` : `<b>~${grav.pct}% das câmeras (≈ ${grav.cameras} de ${grav.total})</b> com menos de ${MINIMO_DIAS} dias de gravação.`}${grav.obs ? ` Observação da equipe: ${escHTML(grav.obs)}` : ""}</div></section>` : "";
+      <div class="mk-nota" style="border-left:4px solid ${grav.cor};padding-left:10px">${grav.pct === null ? "Não informado neste teste." : grav.pct === 0 ? `<b>Todas as câmeras</b> com ${MINIMO_DIAS} dias ou mais de gravação.` : `<b>Até ${grav.pct}% das câmeras (até ≈ ${grav.cameras} de ${grav.total})</b> com menos de ${MINIMO_DIAS} dias de gravação.`}${grav.obs ? ` Observação da equipe: ${escHTML(grav.obs)}` : ""}</div></section>` : "";
 
   // ── Pendências e tratativas
   const pill = (st) => (st === "partial" ? '<span class="mk-b mk-b-wa">Parcial</span>' : '<span class="mk-b mk-b-da">Inoperante</span>');
