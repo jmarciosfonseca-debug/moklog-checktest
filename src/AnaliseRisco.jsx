@@ -1573,7 +1573,8 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   let baseHTML = "";
   if (ts?.estado && project?.categories) {
     const itensBase = itensDoEstado(project, ts.estado), rb = resumo(itensBase);
-    const totalCat = {}; itensBase.forEach((it) => { totalCat[it.cat] = (totalCat[it.cat] || 0) + 1; });
+    // 06/11/2026: categorias de contagem (CFTV, Single) agregam os operacionais numa linha com qtd — contar unidades, não linhas ("10 de 60", não "10 de 11").
+    const totalCat = {}; itensBase.forEach((it) => { totalCat[it.cat] = (totalCat[it.cat] || 0) + (it.qtd || 1); });
     // Cancela de alta segurança é contenção (motor v2 trata por haste), nunca prateleira — o nome "CANCELAS AS" não casa a regra "cancela alta seg" do riscoConfig.
     const ehContencaoNominal = (cat) => /cancela[s]?\s+as\b|alta\s+seg|bollard|bolard|pino|dilacerador|garra|perimetral|per[ií]metro|p[âa]nico|ctmk|cftv|inc[êe]ndio|sdai|eclusa/i.test(String(cat || ""));
     const camadaCat = (cat) => { if (ehContencaoNominal(cat)) return 1; try { const rc = classificarVetor({ labelItem: "", labelCategoria: cat, escopo: "moked" }); return rc.observacaoManutencao || rc.classe === "Periférico" ? 3 : (rc.classe === "Automação" || rc.classe === "Iluminação") ? 2 : 1; } catch { return 1; } };

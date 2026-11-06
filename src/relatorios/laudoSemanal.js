@@ -26,10 +26,10 @@ export function rotuloSemana(dateStr) {
   return `S${semana} ${MESES[d.getMonth()]}`;
 }
 
-export function numeroLaudo(project, meta) {
+export function numeroLaudo(project, meta, tipo = "RS") {
   if (meta?.docNum) return meta.docNum;
   const d = meta?.date ? String(meta.date).replace(/-/g, "") : "0000";
-  return `MK-${project.id}-RS-${d.slice(-4)}`;
+  return `MK-${project.id}-${tipo}-${d.slice(-4)}`;
 }
 
 // Pendências (itens em falha) com aging e tratativas ativas do follow-up.
@@ -50,7 +50,9 @@ export function pendenciasDoLaudo(project, itens, followupsInfo, hoje = new Date
 // "06 - CANCELAS AS (ALTA SEGURANÇA)" → "CANCELAS AS (ALTA SEGURANÇA)": o número do cadastro não vai para o documento.
 export const nomeSistema = (lbl) => String(lbl || "").replace(/^\s*\d+[A-Za-z]?\s*[-–.]\s*/, "").trim();
 
-export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, energiaInfo = null, followupsInfo = null, linkFollowup = null, hoje = new Date() } = {}) {
+// `single` (06/11/2026): o Relatório Situacional do Modo Single usa este MESMO documento (padrão Moked), com título,
+// numeração (MK-<cód>-RS) e textos próprios da vistoria, mais um bloco extra (falhas por criticidade) antes das pendências.
+export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, energiaInfo = null, followupsInfo = null, linkFollowup = null, hoje = new Date(), single = null } = {}) {
   const itens = itensDoEstado(project, state);
   const r = resumo(itens);
   const saude = Math.round(r.saude * 10) / 10;
@@ -66,9 +68,12 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
   const maiorAging = pend.reduce((m, p) => Math.max(m, p.dias ?? 0), 0);
   const maior = pend.find((p) => p.dias != null);
   const semTrat = pend.filter((p) => !p.trat).length;
-  const numero = numeroLaudo(project, meta);
-  const semana = rotuloSemana(meta?.date);
-  const sub = `<b>${escHTML(project.id)} — ${escHTML(project.name || "")}</b> · ${escHTML(semana)} · teste de ${dataBR(meta?.date)} · Sistemas eletrônicos de segurança patrimonial`;
+  const numero = numeroLaudo(project, meta, single ? "RS" : "RS");
+  const semana = single ? `Vistoria ${single.tipo === "semanal" ? "semanal" : "situacional"}${single.revisao ? ` · revisão ${single.revisao}` : ""}` : rotuloSemana(meta?.date);
+  const titulo = single ? "Relatório Situacional" : "Relatório Semanal de Operacionalidade";
+  const sub = single
+    ? `<b>${escHTML(project.id)} — ${escHTML(project.name || "")}</b> · vistoria de ${dataBR(meta?.date)}${meta?.lider ? ` · ${escHTML(meta.lider)}` : ""}${single.codigo && single.codigo !== project.id ? ` · código ${escHTML(single.codigo)}` : ""} · Sistemas eletrônicos de segurança patrimonial · Modo Single`
+    : `<b>${escHTML(project.id)} — ${escHTML(project.name || "")}</b> · ${escHTML(semana)} · teste de ${dataBR(meta?.date)} · Sistemas eletrônicos de segurança patrimonial`;
 
   // ── Hero: saúde + rosca dos ativos (aprovado em 04/10/2026)
   const C = 2 * Math.PI * 56, seg = (q) => (r.total ? (q / r.total) * C : 0), pctTxt = (q) => (r.total ? num1((q / r.total) * 100) : "0,0");
@@ -79,7 +84,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
     <circle cx="80" cy="80" r="56" stroke="#B91C1C" stroke-dasharray="${seg(r.inop).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-(seg(r.ok) + seg(r.parcial))).toFixed(1)}"/></g>
     <text x="80" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="#111827" font-family="Calibri,Carlito,Arial,sans-serif">${r.total}</text><text x="80" y="97" text-anchor="middle" font-size="11" fill="#6B7280" font-family="Calibri,Carlito,Arial,sans-serif">ativos</text></svg>`;
   const legenda = `<div class="ls-leg"><div><i style="background:#9CA3AF"></i>Operacional <b>${r.ok}</b> <span>(${pctTxt(r.ok)}%)</span></div><div><i style="background:#D97706"></i>Parcial <b>${r.parcial}</b> <span>(${pctTxt(r.parcial)}%)</span></div><div><i style="background:#B91C1C"></i>Inoperante <b>${r.inop}</b> <span>(${pctTxt(r.inop)}%)</span></div></div>`;
-  const hero = `<section class="mk-hero"><div><div class="mk-lb">Saúde geral na semana (${escHTML(semana)})</div><div class="mk-big ${fx === "da" ? "mk-da" : fx === "wa" ? "mk-wa" : ""}">${num1(saude)}%</div>
+  const hero = `<section class="mk-hero"><div><div class="mk-lb">${single ? "Disponibilidade geral na vistoria" : `Saúde geral na semana (${escHTML(semana)})`}</div><div class="mk-big ${fx === "da" ? "mk-da" : fx === "wa" ? "mk-wa" : ""}">${num1(saude)}%</div>
     <div class="mk-mu mk-sm">${r.total} ativos testados · ${r.inop} inoperante${r.inop === 1 ? "" : "s"} · ${r.parcial} parcia${r.parcial === 1 ? "l" : "is"}</div>
     ${ctmkInfo ? `<div class="mk-sm" style="margin-top:6px">CTMK: ${ctmkInfo.status === "offline" ? `<span class="mk-b mk-b-da">OFF${ctmkInfo.days != null ? ` · ${ctmkInfo.days} d` : ""}</span>` : '<span class="mk-b mk-b-ok">ON</span>'}</div>` : ""}</div>
     <div><div class="mk-lb">Visão geral dos ativos</div><div class="ls-vg">${rosca}${legenda}</div></div></section>`;
@@ -89,7 +94,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
     <div class="mk-k"><div class="mk-kv ${pend.length ? "mk-da" : ""}">${pend.length}</div><div class="mk-kl">pendências</div><div class="mk-mu mk-sm">${r.inop} inoperantes · ${r.parcial} parciais</div></div>
     <div class="mk-k"><div class="mk-kv ${maiorAging > 0 ? "mk-da" : ""}">${maiorAging ? maiorAging + " d" : "—"}</div><div class="mk-kl">maior tempo em aberto</div><div class="mk-mu mk-sm">${maior ? escHTML(maior.unico ? maior.cat : maior.item) : "sem pendências"}</div></div>
     <div class="mk-k"><div class="mk-kv ${pend.length && semTrat ? "mk-wa" : ""}">${pend.length ? `${pend.length - semTrat} de ${pend.length}` : "—"}</div><div class="mk-kl">com tratativa registrada</div><div class="mk-mu mk-sm">${pend.length ? `${semTrat} sem tratativa` : ""}</div></div></section>
-  <div class="mk-nota" style="margin:-4px 0 10px">Cada dispositivo é testado individualmente e registrado em tempo real pelo líder no MokLog CheckTest. Status: 0% = inoperante · 1–99% = parcial · 100% = operacional. Saúde = (operacionais + 0,5 × parciais) ÷ ativos testados; cada câmera do CFTV conta como um ativo.</div>`;
+  <div class="mk-nota" style="margin:-4px 0 10px">${single ? "Levantamento feito em vistoria presencial pelo consultor Moked, item a item, com as quantidades informadas pelo cliente; não substitui laudo técnico de fabricante." : "Cada dispositivo é testado individualmente e registrado em tempo real pelo líder no MokLog CheckTest."} Status: 0% = inoperante · 1–99% = parcial · 100% = operacional. Saúde = (operacionais + 0,5 × parciais) ÷ ativos testados; cada câmera do CFTV conta como um ativo.</div>`;
 
   // ── Disponibilidade por sistema (tabela com barra) + onde estão as falhas
   const mx = Math.max(1, ...fs.map((f) => f.inop + f.parcial));
@@ -149,7 +154,9 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
   const preench = meta?.tempoPreenchimentoSeg ? `${Math.floor(meta.tempoPreenchimentoSeg / 60)} min${meta.tempoPreenchimentoSeg % 60 ? ` ${meta.tempoPreenchimentoSeg % 60} s` : ""}` : "—";
   const abertura = meta?.formAberturaAuto ? `${horaBR(meta.formAberturaAuto)} (automática)` : "—";
   const campo = (l, v, cls = "") => `<div class="ls-i"><div class="mk-lb">${l}</div><div class="${cls}">${v}</div></div>`;
-  const execucao = `<section class="mk-bloco"><div class="mk-h2">Execução do teste</div><div class="ls-info">
+  const execucao = single ? `<section class="mk-bloco"><div class="mk-h2">Execução da vistoria</div><div class="ls-info">
+    ${campo("Consultor Moked", escHTML(meta?.lider || "—"))}${campo("Data", dataBR(meta?.date))}${campo("Cliente", escHTML(project.name || "—"))}${campo("Itens levantados", String(cats.length))}
+  </div>${single.observacoes ? `<div class="mk-nota" style="margin-top:8px"><b>Observações do consultor:</b> ${escHTML(single.observacoes)}</div>` : ""}</section>` : `<section class="mk-bloco"><div class="mk-h2">Execução do teste</div><div class="ls-info">
     ${campo("Líder VSPP", escHTML(meta?.leader || "—"))}${campo("CCO", escHTML(meta?.cco || "—"))}${campo("Operador Moked 24h", escHTML(meta?.moked || "—"))}${campo("Horário", `${escHTML(meta?.start || "—")} – ${escHTML(meta?.end || "—")}`)}
     ${campo("Contato Moked", meta?.mokedContact ? "Realizado" : "Não realizado", meta?.mokedContact ? "mk-sim" : "mk-da")}${campo("Horário do contato", escHTML(meta?.mokedTime || "—"))}${campo("Preenchimento", preench)}${campo("Abertura do formulário", abertura)}
   </div></section>`;
@@ -164,6 +171,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
 @media screen and (max-width:640px){.ls-info{grid-template-columns:1fr 1fr}.ls-i:nth-child(4n){border-right:1px solid #EEF0F3}.ls-i:nth-child(2n){border-right:none}}
 </style>`;
 
-  return documentoMoked({ project, titulo: "Relatório Semanal de Operacionalidade", subtitulo: sub, numero, hoje, corpo: css + hero + kpis + disponibilidade + blocoGravacao + pendencias + energia, fecho: execucao,
-    rodape: `${numero} · Laudo Técnico Semanal · ${project.id} ${project.name || ""} · ${semana} · Moked Consulting Security · MokLog CheckTest` });
+  const extras = single?.extrasHTML || "";
+  return documentoMoked({ project, titulo, subtitulo: sub, numero, hoje, corpo: css + hero + kpis + disponibilidade + blocoGravacao + extras + pendencias + energia, fecho: execucao, empresaLogo: !single,
+    rodape: `${numero} · ${single ? "Relatório Situacional" : "Laudo Técnico Semanal"} · ${project.id} ${project.name || ""} · ${semana} · Moked Consulting Security · MokLog CheckTest` });
 }

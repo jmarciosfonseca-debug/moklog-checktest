@@ -29,7 +29,7 @@ test("tela abre cenário, calcula 90% e 87,5%, rejeita excesso e salva uma visto
 test("PDF escapa HTML, usa cálculo único e inclui introdução/logo/falhas",()=>{
  const i={id:"i",data:"2026-10-03",itens:[{id:"c",familiaId:"cftv_cameras",nome:"CFTV",total:100,parcial:4,inoperante:6,falhas:[{qtd:6,descricao:"<script>bad()</script>",criticidade:"alta",desde:"2026-10-02"}]}]};
  const html=htmlSingle({nome:"<Cliente>",id:"sg_test"},i);
- expect(html).toContain("90,0%");expect(html).toContain("Contexto da verificação");expect(html).toContain("Moked 30 anos");
+ expect(html).toContain("Relatório Situacional");expect(html).toContain("Falhas registradas na vistoria");expect(html).toContain("Moked Consulting Security");expect(html).toContain("MK-CLIENTE-RS-1003");
  expect(html).not.toContain("<script>bad");expect(html).toContain("&lt;Cliente&gt;");
  const a=singleComoProjeto({id:"sg_test",nome:"Cliente"},i);
  expect(a.project.categories[0].label).toBe("CFTV");

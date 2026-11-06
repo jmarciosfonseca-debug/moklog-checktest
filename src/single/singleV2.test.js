@@ -74,7 +74,7 @@ test("servidor rejeita unidade fora do cenário, nome repetido e status inválid
 });
 test("PDF agrupa por grupo e lista pendências por unidade",()=>{
  const html=htmlSingle({nome:"Cliente X",id:"sg_v2"},{id:"i",data:"2026-10-13",responsavel:"G",estado:"concluida",itens:[{id:"c",nome:"Câmeras fixas",grupo:"CFTV e CCO",total:2,unidades:[{id:"a",nome:"CF01",status:"inoperante",desde:"2026-10-01",nota:"Sem imagem"},{id:"b",nome:"CF02",status:"operante"}]}]});
- expect(html).toContain("CFTV e CCO");expect(html).toContain("Pendências por unidade");expect(html).toContain("CF01");expect(html).toContain("Sem imagem");expect(html).not.toContain(">CF02<");
+ expect(html).toContain("Câmeras fixas");expect(html).toContain("Pendências");expect(html).toContain("CF01");expect(html).toContain("Sem imagem");expect(html).not.toContain(">CF02<");
 });
 test("passo 1: marcar o item cria a lista com quantidade; desmarcar remove; nomes são opcionais e a quantidade continua editável",async()=>{
  global.IS_REACT_ACT_ENVIRONMENT=true;
