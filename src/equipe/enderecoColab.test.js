@@ -2,6 +2,7 @@
 import { enderecoTexto, enderecoMascarado, chaveEndereco, fmtKm, buscarCep, geocodificarEndereco, distanciaAteProjeto, aplicarEnderecoAoSalvar, enderecoPreenchido } from "./enderecoColab";
 import { mapsDirUrl, mapsEmbedUrl, COORDS } from "../entorno/locais";
 import { gerarMapaEquipeHTML } from "../relatorios/mapaEquipeRelatorio";
+import { textoCompartilhar, whatsappUrl } from "../cliente/Localizacao";
 
 const end = { cep: "04221060", logradouro: "Rua Roberto Koch", numero: "363", complemento: "fundos", bairro: "Vila Independência", cidade: "São Paulo", uf: "SP" };
 
@@ -46,6 +47,10 @@ test("links do Maps: Como chegar parte da posição atual; embed em satélite; t
   expect(mapsDirUrl("P604")).toBe("https://www.google.com/maps/dir/?api=1&destination=-23.1625984,-46.9951726&travelmode=driving");
   expect(mapsEmbedUrl("P604")).toMatch(/t=k/);
   expect(mapsDirUrl("PXXX")).toBe("");
+  const t = textoCompartilhar("P604", "P604 — Golgi Jundiaí");
+  expect(t).toMatch(/^📍 P604 — Golgi Jundiaí\nAv\. Odila Chaves Rodrigues, 1200/);
+  expect(t).toMatch(/Como chegar: https:\/\/www\.google\.com\/maps\/dir/);
+  expect(whatsappUrl(t)).toMatch(/^https:\/\/wa\.me\/\?text=%F0%9F%93%8D/);
 });
 
 test("Mapa de Equipe (relatório do cliente) mostra a distância e o endereço mascarado, nunca o número/CEP", () => {

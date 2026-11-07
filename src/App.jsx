@@ -4723,7 +4723,7 @@ export default function App(){
           {project&&groupProjects.includes(project.id)&&(
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
               {/* Localização do projeto (06/11/2026): satélite + Como chegar, para consultor e líder */}
-              <Localizacao pid={project.id} compacto />
+              <Localizacao pid={project.id} nome={`${project.id} — ${project.name}`} compacto />
               {checkAuth(project.id)?(
                 <>
                   <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
