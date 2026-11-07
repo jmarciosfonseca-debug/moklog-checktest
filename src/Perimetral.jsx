@@ -413,10 +413,10 @@ ${statsRows ? `
 }
 
 // ── PDF CONSOLIDADO do período (padrão Moked — ver relatorios/perimetralConsolidado.js)
-function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true, escopo="selecionados", janela={}) {
+function gerarPDFConsolidado(testes, periodo, project, pcfg, incluirRondas=false, incluirPerim=true, escopo="selecionados", janela={}, versaoCliente=null) {
   if(!testes?.length) return;
-  const html = gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo, incluirPerim, incluirRondas, periodoDe:janela.de||null, periodoAte:janela.ate||null });
-  baixarHtml(html, `consolidado_perimetral_${project.id}_${new Date().toLocaleDateString("pt-BR").replace(/\//g,"-")}.html`);
+  const html = gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo, incluirPerim, incluirRondas, periodoDe:janela.de||null, periodoAte:janela.ate||null, versaoCliente });
+  baixarHtml(html, `consolidado_perimetral_${project.id}_${new Date().toLocaleDateString("pt-BR").replace(/\//g,"-")}${versaoCliente?"_cliente":""}.html`);
 }
 
 // Turno automático (Marcio, 02/11/2026): 06h–17h59 = Diurno, 18h–05h59 = Noturno (hora de Brasília).
@@ -616,7 +616,7 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
         ? (pdfSel.teste?.rondas||[]).length
         : (pdfSel.testes||[]).reduce((acc,t)=>acc+((t.rondas||[]).length),0))
     : 0;
-  const podeGerar = !!pdfSel && (pdfSel.perim || (pdfSel.rondas && nRondasSel>0));
+  const podeGerar = !!pdfSel && (pdfSel.perim || (pdfSel.rondas && nRondasSel>0)) && !(pdfSel.cliente && (pdfSel.zonasCliente||[]).length===0);
   const PdfSelector = pdfSel ? (
     <div onClick={()=>setPdfSel(null)}
       style={{position:"fixed",inset:0,background:"#000000cc",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -652,13 +652,35 @@ export default function Perimetral({ project, onBack, dark, onToggleTheme, share
           </button>
         ))}
 
+        {adminAuth && pdfSel.modo==="consolidado" && (
+          <div data-testid="pe-versao-cliente" style={{border:`1px solid ${pdfSel.cliente?"#a855f7":(dark?"#1e293b":"#e2e8f0")}`,borderRadius:10,padding:"10px 12px"}}>
+            <button onClick={()=>setPdfSel({...pdfSel,cliente:!pdfSel.cliente,zonasCliente:pdfSel.zonasCliente||pcfg.zonas.slice()})}
+              style={{background:"transparent",border:"none",padding:0,cursor:"pointer",display:"flex",alignItems:"center",gap:8,width:"100%",textAlign:"left"}}>
+              <span style={{fontSize:14}}>{pdfSel.cliente?<Ico n="quadradoCheck"/>:<Ico n="quadrado"/>}</span>
+              <span style={{fontSize:13,fontWeight:700,...S.txt}}>Versão para o cliente (recorte do consultor)</span>
+            </button>
+            <div style={{fontSize:10,...S.txt2,marginTop:4,paddingLeft:22}}>Escolha as zonas que entram; o documento declara o recorte (período, testes e zonas fora) e sai com sufixo -C.</div>
+            {pdfSel.cliente && (
+              <div style={{paddingLeft:22,marginTop:8}}>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {pcfg.zonas.map(z=>{const on=(pdfSel.zonasCliente||[]).includes(z);return <button key={z} aria-pressed={on}
+                    onClick={()=>setPdfSel({...pdfSel,zonasCliente:on?(pdfSel.zonasCliente||[]).filter(x=>x!==z):[...(pdfSel.zonasCliente||[]),z]})}
+                    style={{...S.btnSm,fontSize:11,padding:"5px 9px",color:on?"#a855f7":undefined,border:`1px solid ${on?"#a855f7":"#64748b55"}`,opacity:on?1:.6}}>{z}</button>;})}
+                </div>
+                <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,...S.txt,marginTop:8}}><input type="checkbox" checked={!!pdfSel.enxutaCliente} onChange={e=>setPdfSel({...pdfSel,enxutaCliente:e.target.checked})}/> Versão enxuta (sem observações da equipe)</label>
+                {(pdfSel.zonasCliente||[]).length===0 && <div style={{fontSize:10,color:"#f59e0b",marginTop:4}}>Marque ao menos uma zona.</div>}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{display:"flex",gap:8,marginTop:2}}>
           <button onClick={()=>setPdfSel(null)} style={{...S.btnSec,flex:1,fontSize:13}}>Cancelar</button>
           <button disabled={!podeGerar}
             onClick={()=>{
               const sel=pdfSel; setPdfSel(null);
               if(sel.modo==="teste") gerarPDFTeste(sel.teste,testes,project,pcfg,sel.rondas,sel.perim);
-              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim,sel.escopo,sel.janela);
+              else gerarPDFConsolidado(sel.testes,sel.periodo,project,pcfg,sel.rondas,sel.perim,sel.escopo,sel.janela,sel.cliente?{zonas:sel.zonasCliente||[],enxuta:!!sel.enxutaCliente,consultor:"Marcio Fonseca"}:null);
             }}
             style={{...S.btnSm,flex:1,fontSize:13,padding:"11px 0",justifyContent:"center",
               opacity:podeGerar?1:0.4,cursor:podeGerar?"pointer":"not-allowed",

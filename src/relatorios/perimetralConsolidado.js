@@ -142,9 +142,14 @@ function destaque(calc) {
   return `<div class="pe-top"><b>Maior recorrência de resultados adversos:</b> ${top.map(z => `${escHTML(codigoZona(z.zona))} (${z.adversos} de ${z.aferidas}${z.pct !== null ? ` · ${Math.round(z.pct)}%` : ''})`).join('; ')}.</div>`;
 }
 
-export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo = 'selecionados', incluirPerim = true, incluirRondas = false, hoje = new Date(), periodoDe = null, periodoAte = null }) {
+// `versaoCliente` (Marcio, 06/11/2026): recorte definido pelo consultor — zonas incluídas e/ou versão enxuta (sem observações).
+// O documento declara o recorte (período, testes, zonas fora) e recebe sufixo -C; os números continuam sendo os do recorte real.
+export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo = 'selecionados', incluirPerim = true, incluirRondas = false, hoje = new Date(), periodoDe = null, periodoAte = null, versaoCliente = null }) {
   const lista = ordenarTestes(Array.isArray(testes) ? testes : []);
-  const zonas = pcfg?.zonas || [];
+  const todasZonas = pcfg?.zonas || [];
+  const vc = versaoCliente && typeof versaoCliente === 'object' ? versaoCliente : null;
+  const zonas = vc && Array.isArray(vc.zonas) && vc.zonas.length ? todasZonas.filter(z => vc.zonas.includes(z)) : todasZonas;
+  const zonasFora = todasZonas.filter(z => !zonas.includes(z));
   const calc = calcularConsolidado(lista, zonas);
   const emissaoISO = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
   const cob = calcularCobertura(lista, emissaoISO, periodoDe, periodoAte);
@@ -154,7 +159,7 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
   const titulo = soRondas ? 'Consolidado de Rondas Adicionais' : 'Consolidado de Testes Perimetrais';
   const nome = pcfg?.clienteNome || project.name || '';
   const ymd = `${hoje.getFullYear()}${String(hoje.getMonth() + 1).padStart(2, '0')}${String(hoje.getDate()).padStart(2, '0')}`;
-  const numero = `MK-PE-${project.id}-${ymd}`;
+  const numero = `MK-PE-${project.id}-${ymd}${vc ? '-C' : ''}`;
   const nRondas = lista.reduce((a, t) => a + ((t.rondas || []).length), 0);
 
   // Observações vinculadas ao teste e à zona (somente as que existem).
@@ -184,13 +189,14 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
 
   const mapaCard = pcfg?.mapaB64
     ? `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Mapa perimetral <span class="mk-mu">· frequência de resultados adversos por zona</span></div>
-<div class="pe-map"><img src="${/^data:/.test(pcfg.mapaB64) ? pcfg.mapaB64 : `data:image/jpeg;base64,${pcfg.mapaB64}`}" alt="Mapa ${escHTML(project.id)}"><svg>${marcadores(pcfg, calc)}</svg></div>
+<div class="pe-map"><img src="${/^data:/.test(pcfg.mapaB64) ? pcfg.mapaB64 : `data:image/jpeg;base64,${pcfg.mapaB64}`}" alt="Mapa ${escHTML(project.id)}"><svg>${marcadores({ ...pcfg, zonas }, calc)}</svg></div>
 <div class="pe-leg"><b>●</b> verde &lt;30% · <b>●</b> âmbar 30–59% · <b>●</b> vermelho ≥60% · cinza = sem registro. Cada marcador traz a zona e o percentual de parciais + inoperantes.</div></div>`
     : `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Mapa perimetral</div><div class="mk-mu" style="padding:24px 0;text-align:center">Mapa ainda não cadastrado para este projeto.</div></div>`;
   const graficoCard = `<div class="pe-card"><div class="pe-h2" style="margin-top:0">Frequência de resultados adversos por zona</div>${graficoZonas(calc)}${destaque(calc)}</div>`;
   const criterios = `<div class="pe-crit"><b>Critérios.</b> Teste = um registro do sistema; avaliação = resultado de uma zona em um teste. Taxa OK = OK ÷ avaliações aferidas; "sem registro" não entra no denominador nem conta como OK. As faixas baixa (&lt;30%), média (30–59%) e alta (≥60%) classificam a <b>frequência</b> de resultados parciais + inoperantes no período; não representam nível de risco operacional nem disponibilidade contínua do sistema. <b>Cobertura:</b> a regra é no mínimo 1 teste por turno (Diurno e Noturno), 2 por dia; mais de um por turno é aceito. Dias e turnos sem registro são apontados na matriz${escopo === 'periodo' ? '' : ' (nesta emissão a verificação vale apenas dentro da seleção; ausências podem refletir a seleção parcial)'}. Ausência de registro indica falta de lançamento no sistema, não prova por si só que o teste deixou de ser feito.</div>`;
 
-  const resumo = incluirPerim ? `${kpis}<div class="pe-duas">${mapaCard}${graficoCard}</div>${criterios}` : kpis;
+  const recorte = vc ? `<div class="pe-crit" style="border-left:3px solid #111827"><b>Recorte definido pelo consultor${vc.consultor ? ` (${escHTML(vc.consultor)})` : ''}.</b> Período ${escHTML(intervalo)} · ${calc.nTestes} teste(s) · ${zonas.length} de ${todasZonas.length} zonas${zonasFora.length ? ` · zonas não incluídas neste documento: ${zonasFora.map(escHTML).join(', ')}` : ''}${vc.enxuta ? ' · versão enxuta (sem observações da equipe)' : ''}.${vc.motivo ? ` ${escHTML(vc.motivo)}` : ''}</div>` : '';
+  const resumo = incluirPerim ? `${kpis}${recorte}<div class="pe-duas">${mapaCard}${graficoCard}</div>${criterios}` : `${kpis}${recorte}`;
 
   const colgroup = `<colgroup><col style="width:18mm">${comHora ? '<col style="width:11mm">' : ''}<col style="width:19mm"><col style="width:${zonas.length > 14 ? 40 : 54}mm">${zonas.map(() => '<col>').join('')}</colgroup>`;
   const colunas = 3 + (comHora ? 1 : 0) + zonas.length;
@@ -216,7 +222,7 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
 <tr><th class="pe-l">Data</th>${comHora ? '<th>Hora</th>' : ''}<th class="pe-l">Turno</th><th class="pe-l">Responsável</th>${zonas.map(z => `<th>${escHTML(codigoZona(z))}</th>`).join('')}</tr></thead>
 <tbody>${linhas || `<tr><td colspan="${colunas}" class="mk-mu" style="text-align:center;padding:14px">Nenhum teste registrado.</td></tr>`}</tbody></table></section>` : '';
 
-  const obsHTML = incluirPerim && observacoes.length
+  const obsHTML = incluirPerim && observacoes.length && !(vc && vc.enxuta)
     ? `<h2 class="pe-h2">Observações registradas <span class="mk-mu">· ${observacoes.length} no período</span></h2><ol class="pe-obs" style="list-style:none;padding:0;margin:0;columns:2;column-gap:14px">${observacoes.map(o => `<li><b>${o.n}</b> · ${dataBR(o.t.data)} ${escHTML(o.t.turno || '')}${horaValida(o.t) ? ` ${escHTML(horaValida(o.t))}` : ''} · ${escHTML(codigoZona(o.zona))} (${escHTML(String(o.zona))}) · ${escHTML(o.t.quemFez || '—')}<br>${escHTML(o.txt)}</li>`).join('')}</ol>` : '';
 
   const rondasLinhas = lista.flatMap(t => (t.rondas || []).map((r, k) => `<tr><td class="pe-l"><b>${dataBR(t.data)}</b></td><td class="pe-l">${escHTML(t.turno || '—')}</td><td>${k + 1}</td><td>${escHTML(r.hora || '—')}</td><td class="pe-l">${escHTML(r.executante || '—')}</td><td class="pe-l">${escHTML(r.obs || '—')}</td></tr>`)).join('');

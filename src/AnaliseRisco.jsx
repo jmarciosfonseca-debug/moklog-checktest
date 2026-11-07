@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Ico } from "./Icones";
+import { hasGerencial } from "./session";
 import { normalizarZona, resumirColecaoPerimetral, escolherFontePerimetral } from "./perimetralFontes";
 import React, { useState } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -1186,15 +1187,21 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     ts, ctmk, ilum, rondaVirtual, equipe, regional, contextos,
   } = ctx;
 
-  const ref = normalizarRefAR(project.id, ctx.ref || `MK-${project.id}-AR-0001`);
+  const ref = normalizarRefAR(project.id, ctx.ref || `MK-${project.id}-AR-0001`) + (ctx.versaoCliente ? "-C" : "");
   const hoje = hojeBR();
   const periodo = ts?.dataRaw ? `até ${fmtDate(ts.dataRaw)}` : hoje;
   const nFontes = fontesUsadas.length;
 
   // ── Nível geral e régua (4 níveis) ──
   const narrativa = obterNarrativaClassificacao(geral);
-  const nivelGeral = narrativa.nivel; // 1..4
-  const labelGeral = narrativa.label;
+  // Versão para o cliente (Marcio, 06/11/2026): o consultor pode definir a classificação final, com motivo obrigatório,
+  // e o documento registra a classificação do motor ao lado — nunca substitui em silêncio. `enxuta` omite a memória de cálculo.
+  const cli = ctx.versaoCliente && Number(ctx.versaoCliente.nivel) >= 1 ? ctx.versaoCliente : null;
+  const nivelGeral = cli ? Number(cli.nivel) : narrativa.nivel; // 1..4
+  const labelGeral = cli ? (NIVEL_LABEL[nivelGeral] || narrativa.label) : narrativa.label;
+  const parecerHTML = cli ? (cli.nivel !== narrativa.nivel
+    ? `<p class="ar-pq" style="border-left:3px solid #111827;padding-left:10px"><b>Parecer do consultor:</b> classificação definida como <b>${esc(labelGeral)}</b> por ${esc(cli.consultor || "consultor Moked")} — ${esc(cli.motivo || "")}. <span class="ar-mu">Classificação do motor de risco Moked: ${esc(narrativa.label)}.</span></p>`
+    : `<p class="ar-pq ar-mu"><b>Parecer do consultor:</b> ${esc(cli.consultor || "consultor Moked")} confirma a classificação do motor de risco.${cli.motivo ? ` ${esc(cli.motivo)}` : ""}</p>`) : "";
   const alerta = !!geral.alerta;
   const nBloq = geral.nBloqueadores || 0;
   const idxGeral = Math.max(1, Math.min(4, nivelGeral)); // 1..4 p/ régua
@@ -1599,7 +1606,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
     <p class="ar-sub"><b>${esc(project.id)}${project.name && project.name !== project.id ? ` — ${esc(project.name)}` : ""}</b>${dg ? " · Modelo 2 — com Diagnóstico Situacional" : ""}${ts?.ok ? ` · base: laudo semanal de ${esc(ts.data || "")}` : ""}${fontesUsadas.length ? ` · ${fontesUsadas.map((f) => esc(f.titulo)).join(" · ")}` : ""}</p>
     <section class="ar-hero"><div><div class="ar-lb">Classificação do ativo</div><div class="ar-cls" style="color:${corVeredito}">${esc(labelGeral)}</div>
       <div class="regua">${reguaCells}</div><div class="regualeg"><span>menor exposição</span><span>maior exposição</span></div></div>
-      <div><div class="ar-lb">Por que</div>${porQueHTML}</div></section>`;
+      <div><div class="ar-lb">Por que</div>${parecerHTML}${porQueHTML}</div></section>`;
   const novoCSS = `
   :root{--papel:#ffffff;--papel2:#F9FAFB}
   body{background:#e9ebee;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;font-size:13.5px;line-height:1.45}
@@ -1828,12 +1835,12 @@ ${novoCSS}</style></head><body>
     ${manutHTML}
     ${rondaHTML}
 
-    <div class="bloco">
+    ${cli && cli.enxuta ? "" : `<div class="bloco">
       <div class="eyebrow">Como se chega à classificação — memória de cálculo</div>
       ${memoria ? calculoHTML : `<div class="calc-grid">${calculoHTML}</div>`}
       ${memoria ? "" : `<div class="soma"><span class="l">Somatório dos vetores</span><span class="r">${somaR}</span></div>`}
       <div class="nota">O documento executivo mostra os fatores que alteram a classe de risco. A relação integral de itens, fontes e evidências permanece no Anexo Técnico separado.</div>
-    </div>
+    </div>`}
     ${diagHTML}
     <div class="bloco">
       <div class="eyebrow">Matriz de Impacto Operacional e Exposição ao Risco</div>
@@ -2322,6 +2329,46 @@ export default function AnaliseRisco({ projects, stored, pacote, onBack }) {
           )}
         </div>
       )}
+
+      {estado === "pronto" && analisePronta && hasGerencial() && (
+        <VersaoClienteAR analise={analisePronta} onGerar={async (vc) => {
+          const win = window.open("", "_blank");
+          let mapa = null, erroMapa = null;
+          try { mapa = await carregarMapaDataUrl(MAPA_REGIONAL[analisePronta.project.id]); } catch (e) { erroMapa = e.message || "falha ao carregar mapa"; }
+          preencherJanelaRelatorio(win, gerarHTMLAnaliseRisco({ ...analisePronta, versaoCliente: vc }, mapa, erroMapa));
+        }} S={S} />
+      )}
+    </div>
+  );
+}
+
+// Versão para o cliente (06/11/2026) — exclusivo do painel do consultor (sessão gerencial). O consultor escolhe a
+// classificação final e o motivo; o PDF sai com a classificação dele em destaque e a do motor registrada ao lado.
+// "Enxuta" omite a memória de cálculo. A versão Moked (botão principal) permanece intacta.
+export function VersaoClienteAR({ analise, onGerar, S }) {
+  const motor = obterNarrativaClassificacao(analise.geral || {});
+  const [nivel, setNivel] = useState(motor.nivel);
+  const [motivo, setMotivo] = useState("");
+  const [enxuta, setEnxuta] = useState(true);
+  const [erro, setErro] = useState("");
+  const difere = nivel !== motor.nivel;
+  const CORES = { 1: "#5F7A6E", 2: "#c9a24e", 3: "#B7791F", 4: "#B21E27" };
+  const gerar = () => {
+    if (difere && motivo.trim().length < 15) { setErro("Escreva o motivo da classificação (mínimo 15 caracteres) — ele sai no documento."); return; }
+    setErro("");
+    onGerar({ nivel, label: NIVEL_LABEL[nivel], motivo: motivo.trim(), consultor: "Marcio Fonseca", enxuta, motorNivel: motor.nivel, motorLabel: motor.label, em: new Date().toISOString() });
+  };
+  return (
+    <div style={{ ...S.card, border: "1px solid #334155" }} data-testid="versao-cliente">
+      <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>Versão para o cliente · parecer do consultor</div>
+      <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 10 }}>Motor de risco: <b style={{ color: "#f1f5f9" }}>{motor.label}</b>. Escolha a classificação final; se for diferente, o motivo é obrigatório e sai no documento junto com a do motor.</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        {[1, 2, 3, 4].map((n) => <button key={n} aria-pressed={nivel === n} onClick={() => setNivel(n)} style={{ flex: 1, borderRadius: 8, padding: "9px 4px", fontSize: 11, fontWeight: 800, cursor: "pointer", border: `1px solid ${CORES[n]}`, background: nivel === n ? CORES[n] : "transparent", color: nivel === n ? "#fff" : CORES[n] }}>{NIVEL_LABEL[n]}{n === motor.nivel ? " ●" : ""}</button>)}
+      </div>
+      <textarea aria-label="Motivo do consultor" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={400} rows={2} placeholder={difere ? "Motivo (obrigatório): ex. contenção compensada por vigilância 24h; cancela AS em reparo com prazo de 15 dias" : "Observação do consultor (opcional)"} style={{ ...S.ctxInput, marginTop: 0, resize: "vertical" }} />
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#cbd5e1", margin: "8px 0" }}><input type="checkbox" checked={enxuta} onChange={(e) => setEnxuta(e.target.checked)} /> Versão enxuta (sem memória de cálculo)</label>
+      {erro && <div role="alert" style={{ fontSize: 12, color: "#f59e0b", marginBottom: 6 }}>{erro}</div>}
+      <button style={{ ...S.btn, background: "linear-gradient(135deg,#334155,#1e293b)", marginTop: 0 }} onClick={gerar}><Ico n="arquivo"/>{" Gerar versão para o cliente (PDF)"}</button>
     </div>
   );
 }
