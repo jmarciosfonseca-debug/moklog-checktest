@@ -73,15 +73,50 @@ export function distanciaAteProjeto(geo, projectId) {
   return distanciaKm(base, geo);
 }
 
-// Aplica no colaborador ao salvar: geocodifica só quando o endereço mudou (ou nunca foi geocodificado).
+// Rota de carro casa → projeto (07/11/2026): a linha reta subestimava (ex.: 4,2 km em linha reta = 8,8 km de carro).
+// OSRM (malha viária do OpenStreetMap, gratuito, sem chave). Devolve { km, min } ou null (sem rede/sem rota).
+export const ROTA_VERSAO = 1;
+export async function rotaAteProjeto(geo, projectId, fetchFn = typeof fetch !== "undefined" ? fetch : null) {
+  const base = coordsDe(projectId);
+  if (!geo || !base || !fetchFn || typeof geo.lat !== "number") return null;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${geo.lng},${geo.lat};${base.lng},${base.lat}?overview=false&alternatives=false`;
+    const r = await fetchFn(url, { headers: { Accept: "application/json" } });
+    const j = r.ok ? await r.json() : null;
+    const rota = j && j.code === "Ok" && j.routes && j.routes[0];
+    if (!rota || !(rota.distance > 0)) return null;
+    return { km: Math.round(rota.distance / 100) / 10, min: Math.max(1, Math.round(rota.duration / 60)) };
+  } catch { return null; }
+}
+
+// Colaborador com localização mas sem rota calculada (cadastros anteriores a 07/11 ou rota que falhou).
+export const precisaRota = (c) => !!(c && c.geo && typeof c.geo.lat === "number" && c.rotaVersao !== ROTA_VERSAO);
+
+// Texto para a tela e relatórios: rota quando existe; senão a linha reta, dita como tal.
+export function textoDistancia(c, { comLinhaReta = true } = {}) {
+  if (c && typeof c.rotaKm === "number") return `${fmtKm(c.rotaKm)} de carro${typeof c.rotaMin === "number" ? ` · ~${c.rotaMin} min` : ""}${comLinhaReta && typeof c.distanciaKm === "number" ? ` (${fmtKm(c.distanciaKm)} em linha reta)` : ""}`;
+  if (c && typeof c.distanciaKm === "number") return `${fmtKm(c.distanciaKm)} em linha reta`;
+  return "";
+}
+// Distância "oficial" para o relatório: rota quando houver.
+export const kmOficial = (c) => (c && typeof c.rotaKm === "number" ? c.rotaKm : c && typeof c.distanciaKm === "number" ? c.distanciaKm : null);
+
+// Aplica no colaborador ao salvar: geocodifica só quando o endereço mudou (ou nunca foi geocodificado) e calcula a rota.
 export async function aplicarEnderecoAoSalvar(colab, projectId, fetchFn) {
   const e = colab.endereco || null;
-  if (!enderecoPreenchido(e)) return { ...colab, endereco: e || null, geo: null, distanciaKm: null, enderecoChave: "" };
+  if (!enderecoPreenchido(e)) return { ...colab, endereco: e || null, geo: null, distanciaKm: null, rotaKm: null, rotaMin: null, enderecoChave: "" };
   const chave = chaveEndereco(e);
-  if (colab.enderecoChave === chave && colab.geo && typeof colab.distanciaKm === "number") return colab;
+  if (colab.enderecoChave === chave && colab.geo && typeof colab.distanciaKm === "number") {
+    if (!precisaRota(colab)) return colab;
+    return { ...colab, ...(await camposRota(colab.geo, projectId, fetchFn)) };
+  }
   const geo = await geocodificarEndereco(e, fetchFn);
   const km = distanciaAteProjeto(geo, projectId);
-  return { ...colab, endereco: e, enderecoChave: chave, geo: geo || null, distanciaKm: typeof km === "number" ? km : null, geoEm: new Date().toISOString() };
+  return { ...colab, endereco: e, enderecoChave: chave, geo: geo || null, distanciaKm: typeof km === "number" ? km : null, geoEm: new Date().toISOString(), ...(await camposRota(geo, projectId, fetchFn)) };
+}
+async function camposRota(geo, projectId, fetchFn) {
+  const r = await rotaAteProjeto(geo, projectId, fetchFn);
+  return r ? { rotaKm: r.km, rotaMin: r.min, rotaVersao: ROTA_VERSAO, rotaEm: new Date().toISOString() } : { rotaKm: null, rotaMin: null };
 }
 
 export { UFS };

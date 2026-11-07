@@ -53,7 +53,7 @@ import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes, carregarFotos } from "./fotosEquipe";
 import MaturidadeResumo, { IndiceIndividual } from './equipe/MaturidadeResumo';
 import { calcularMapaEquipe } from './equipe/maturidade';
-import { enderecoVazio, enderecoTexto, fmtKm, buscarCep, limparCep, fmtCep, UFS, aplicarEnderecoAoSalvar } from './equipe/enderecoColab';
+import { enderecoVazio, enderecoTexto, fmtKm, buscarCep, limparCep, fmtCep, UFS, aplicarEnderecoAoSalvar, textoDistancia, precisaRota, rotaAteProjeto, ROTA_VERSAO } from './equipe/enderecoColab';
 import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
 import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
 import { abrirParaImpressao } from './relatorios/padraoMoked';
@@ -982,7 +982,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
             </div>
             <div style={{ gridColumn:"1 / -1" }}>
               <div style={S.lbl}>Distância casa → projeto</div>
-              <div style={{ fontSize:13, ...S.txtPrimary, fontWeight:600 }}>{typeof colab.distanciaKm==="number" ? `${fmtKm(colab.distanciaKm)} em linha reta` : enderecoTexto(colab.endereco) ? "não calculada (sem localização)" : "endereço não cadastrado"}</div>
+              <div style={{ fontSize:13, ...S.txtPrimary, fontWeight:600 }}>{textoDistancia(colab) || (enderecoTexto(colab.endereco) ? "não calculada (sem localização)" : "endereço não cadastrado")}</div>
               {enderecoTexto(colab.endereco) && <details style={{ marginTop:4 }}><summary style={{ fontSize:11, color:"#64748b", cursor:"pointer" }}>ver endereço (uso interno)</summary><div style={{ fontSize:12, ...S.txtPrimary, marginTop:4 }}>{enderecoTexto(colab.endereco)}</div></details>}
             </div>
           </div>
@@ -1105,7 +1105,7 @@ function EnderecoForm({ endereco, onChange, distanciaKm, S, dark }) {
     <div style={S.card} data-testid="endereco-form">
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:8 }}>
         <label style={S.lbl}>Endereço residencial</label>
-        <span style={{ fontSize:10, color:"#64748b" }}>{typeof distanciaKm==="number" ? `casa → projeto: ${fmtKm(distanciaKm)}` : "a distância é calculada ao salvar"}</span>
+        <span style={{ fontSize:10, color:"#64748b" }}>{typeof distanciaKm==="number" ? `casa → projeto: ${fmtKm(distanciaKm)} de carro` : "a distância (rota de carro) é calculada ao salvar"}</span>
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:8 }}>
         <div><label style={S.lbl}>CEP</label><input inputMode="numeric" placeholder="00000-000" value={fmtCep(e.cep)} onChange={ev=>cep(ev.target.value)} style={S.inp}/>{buscando && <div style={{ fontSize:10, color:"#64748b" }}>buscando…</div>}</div>
@@ -1259,7 +1259,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
             </div>
           </div>
 
-          <EnderecoForm endereco={form.endereco||enderecoVazio()} onChange={(e)=>setF("endereco",e)} distanciaKm={form.distanciaKm} S={S} dark={dark}/>
+          <EnderecoForm endereco={form.endereco||enderecoVazio()} onChange={(e)=>setF("endereco",e)} distanciaKm={typeof form.rotaKm==="number"?form.rotaKm:form.distanciaKm} S={S} dark={dark}/>
 
           {form.foto&&form.foto.startsWith("data:")&&(
             <div style={{background:"#001a2e",border:"1px solid #0ea5e922",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
@@ -2270,6 +2270,24 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       }
     });
   };
+  // Rota de carro para quem já tem endereço (07/11/2026): ao abrir a Equipe (líder/gerencial), calcula a rota dos cadastros que
+  // só têm linha reta e grava UMA vez, mexendo só nos campos de rota. Sem rede: tenta de novo na próxima abertura.
+  const rotaRodouRef=useRef(false);
+  useEffect(()=>{
+    if(rotaRodouRef.current||!liderAuth||isDemo()) return;
+    const pend=(equipeData.colaboradores||[]).filter(precisaRota).slice(0,40);
+    if(!pend.length) return;
+    rotaRodouRef.current=true;
+    (async()=>{
+      const calc={};
+      for(const c of pend){ const r=await rotaAteProjeto(c.geo, project.id); if(r) calc[c.id]={ rotaKm:r.km, rotaMin:r.min, rotaVersao:ROTA_VERSAO, rotaEm:new Date().toISOString() }; await new Promise(ok=>setTimeout(ok,350)); }
+      if(!Object.keys(calc).length) return;
+      const atual=confirmadaRef.current||equipeData;
+      const novo={...atual, colaboradores:(atual.colaboradores||[]).map(c=>calc[c.id]?{...c,...calc[c.id]}:c)};
+      try{ setEquipeData(novo); atualizarEquipeLocal(await gravar(novo, atual)); }catch(e){ console.warn("rota casa-projeto:", e); }
+    })();
+  },[equipeData.colaboradores, liderAuth]); // eslint-disable-line
+
   const gravarSolicitacoes=async(transformar)=>{
     if(isDemo())throw Error("Demonstração: solicitações não são gravadas.");
     const snap=await getDocFromServer(doc(db,"equipes",project.id));
