@@ -4,9 +4,20 @@
   "framework": "create-react-app",
   "installCommand": "npm install",
   "functions": {
-    "api/entorno-coletar.js": { "maxDuration": 60 }
+    "api/entorno-coletar.js": {
+      "maxDuration": 60
+    }
   },
   "crons": [
-    { "path": "/api/entorno-coletar", "schedule": "0 9 * * *" }
+    {
+      "path": "/api/entorno-coletar",
+      "schedule": "0 9 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/local/:pid",
+      "destination": "/api/local?pid=:pid"
+    }
   ]
 }

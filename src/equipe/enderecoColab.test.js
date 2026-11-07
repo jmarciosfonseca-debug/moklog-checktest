@@ -48,9 +48,16 @@ test("links do Maps: Como chegar parte da posição atual; embed em satélite; t
   expect(mapsEmbedUrl("P604")).toMatch(/t=k/);
   expect(mapsDirUrl("PXXX")).toBe("");
   const t = textoCompartilhar("P604", "P604 — Golgi Jundiaí");
-  expect(t).toMatch(/^📍 P604 — Golgi Jundiaí\nAv\. Odila Chaves Rodrigues, 1200/);
+  expect(t.split("\n")[0]).toBe("https://moklog-checktest.vercel.app/local/P604"); // link primeiro → prévia com o logo da Moked em cima
+  expect(t).toMatch(/Compartilhamos o endereço para sua chegada tranquila no Golgi Jundiaí \(P604\) — projeto com consultoria da Moked\./);
+  expect(t).toMatch(/📍 Av\. Odila Chaves Rodrigues, 1200/);
   expect(t).toMatch(/Como chegar: https:\/\/www\.google\.com\/maps\/dir/);
-  expect(whatsappUrl(t)).toMatch(/^https:\/\/wa\.me\/\?text=%F0%9F%93%8D/);
+  expect(whatsappUrl(t)).toMatch(/^https:\/\/wa\.me\/\?text=https/);
+  const { paginaHTML } = require("../../api/local");
+  const html = paginaHTML("P601");
+  expect(html).toMatch(/<meta property="og:image" content="https:\/\/moklog-checktest\.vercel\.app\/moked\/logo-moked\.png">/);
+  expect(html).toMatch(/og:title" content="Golgi Cajamar — P601 · consultoria Moked"/);
+  expect(html).toMatch(/Como chegar/);
 });
 
 test("Mapa de Equipe (relatório do cliente) mostra a distância e o endereço mascarado, nunca o número/CEP", () => {
