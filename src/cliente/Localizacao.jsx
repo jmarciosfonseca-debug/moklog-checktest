@@ -1,13 +1,16 @@
 // Localização do projeto (Marcio, 06/11/2026): satélite embutido + "Como chegar" (o Google Maps parte de onde a pessoa
 // está e mostra a distância). Usado na Área do Cliente e no menu do projeto. Sem chave de API: embed público do Maps.
 import { useState } from "react";
-import { COORDS, mapsDirUrl, mapsVerUrl, mapsEmbedUrl } from "../entorno/locais";
+import { COORDS, LOCAIS, mapsDirUrl, mapsVerUrl, mapsEmbedUrl } from "../entorno/locais";
 import { C } from "./Cluster";
 
 // Texto de compartilhamento (06/11/2026): nome, endereço e link do Maps — vai pelo WhatsApp ou pelo menu nativo do celular.
+// A primeira linha é o link da página do projeto (prévia com o logo da Moked no WhatsApp); depois o texto e o trajeto.
+export const linkLocal = (pid) => `https://moklog-checktest.vercel.app/local/${pid}`;
 export function textoCompartilhar(pid, nome) {
   const c = COORDS[pid]; if (!c) return "";
-  return `📍 ${nome || pid}\n${c.endereco}\nComo chegar: ${mapsDirUrl(pid)}`;
+  const l = LOCAIS[pid] || {}; const n = l.nome || nome || pid;
+  return `${linkLocal(pid)}\n\nCompartilhamos o endereço para sua chegada tranquila no ${n} (${pid}) — projeto com consultoria da Moked.\n📍 ${c.endereco}\nComo chegar: ${mapsDirUrl(pid)}`;
 }
 export const whatsappUrl = (texto) => `https://wa.me/?text=${encodeURIComponent(texto)}`;
 
@@ -20,7 +23,7 @@ export default function Localizacao({ pid, nome = "", compacto = false }) {
   const texto = textoCompartilhar(pid, nome);
   const compartilhar = async () => {
     try {
-      if (typeof navigator !== "undefined" && navigator.share) { await navigator.share({ title: nome || pid, text: texto }); return; }
+      if (typeof navigator !== "undefined" && navigator.share) { await navigator.share({ title: nome || pid, text: texto, url: linkLocal(pid) }); return; }
     } catch (e) { if (e && e.name === "AbortError") return; }
     window.open(whatsappUrl(texto), "_blank", "noopener");
   };
