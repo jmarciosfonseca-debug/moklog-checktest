@@ -160,7 +160,7 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     {/* Entorno (02/11/2026): segurança e mercado logístico no entorno deste parque — só o que é da região dele */}
     <CardEntorno p={p} onAbrir={onAbrir} />
     {/* Localização (06/11/2026): satélite + Como chegar */}
-    <Localizacao pid={p.pid} compacto />
+    <Localizacao pid={p.pid} nome={p.nome} compacto />
   </>;
 }
 
