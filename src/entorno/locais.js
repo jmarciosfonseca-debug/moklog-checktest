@@ -44,20 +44,24 @@ const recebeGeral = (pid) => !!LOCAIS[pid] && !LOCAIS[pid].soSeguranca;
 // Coordenadas dos parques (03/11): preenchidas a partir dos links do Google Maps que o Marcio enviar.
 // Sem coordenada, a proximidade usa só cidade/bairro (sem km).
 const COORDS = {
-  P601:  { lat: -23.3346082, lng: -46.8132457, endereco: "Golgi Cajamar — divisa Cajamar/Franco da Rocha" },
-  P602:  { lat: -23.6432789, lng: -46.4645908, endereco: "R. Ponta Grossa — Jardim Paranavaí, Mauá" },
-  P604:  { lat: -23.1625984, lng: -46.9951726, endereco: "Av. Odila Chaves Rodrigues, 1200 — Jundiaí" },
-  P605:  { lat: -23.41005,   lng: -46.3634438, endereco: "Av. Adília Barbosa Neves, 3925 — Bairro do Portão, Arujá" },
-  P606:  { lat: -22.6635131, lng: -43.3519096, endereco: "Estrada Rio D'Ouro — Vila Santa Alice, Duque de Caxias" },
-  P607:  { lat: -16.0479406, lng: -47.9936485, endereco: "DF-290, 60 — Santa Maria, Brasília" },
-  P311A: { lat: -25.3491912, lng: -49.0588546, endereco: "BR-116, 1500 — Campina Grande do Sul / Quatro Barras" },
-  P311B: { lat: -26.8865864, lng: -48.7312218, endereco: "Rod. Jorge Lacerda, 1010 — Santa Regina, Itajaí" },
-  P505:  { lat: -23.4420114, lng: -46.4476851, endereco: "R. Indubel, 940 — Cumbica, Guarulhos" },
-  P260A: { lat: -23.5927658, lng: -46.5915028, endereco: "R. Roberto Koch, 363 — Vila Independência (matriz)" },
-  P260B: { lat: -23.5846026, lng: -46.5980819, endereco: "R. Barão de Resende — Ipiranga (filial)" },
-  P260C: { lat: -23.1214197, lng: -47.2681132, endereco: "Av. Horst Frederico João Heer, 700 — Europark, Indaiatuba" },
+  P601:  { lat: -23.3346082, lng: -46.8132457, endereco: "Golgi Cajamar — Franco da Rocha / Cajamar, SP" },
+  P602:  { lat: -23.6951767, lng: -46.4715246, endereco: "Av. Papa João XXIII, 2843 — Parque São Vicente, Mauá/SP, 09370-800 (Golgi Mauá II)" },
+  P604:  { lat: -23.1625984, lng: -46.9951726, endereco: "Av. Odila Chaves Rodrigues, 1200 — Jundiaí/SP, 13213-087" },
+  P605:  { lat: -23.41005,   lng: -46.3634438, endereco: "Av. Adília Barbosa Neves, 3925 — Bairro do Portão, Arujá/SP, 07413-000" },
+  P606:  { lat: -22.6635131, lng: -43.3519096, endereco: "Estrada Rio D'Ouro, s/nº — Vila Santa Alice, Duque de Caxias/RJ" },
+  P607:  { lat: -16.0479406, lng: -47.9936485, endereco: "DF-290, 60 — Santa Maria, Brasília/DF" },
+  P311A: { lat: -25.3491912, lng: -49.0588546, endereco: "BR-116, 1500 — Campina Grande do Sul/PR, 83430-000 (Quatro Barras)" },
+  P311B: { lat: -26.8865864, lng: -48.7312218, endereco: "SC-412 – Rod. Jorge Lacerda, 1010 — Santa Regina, Itajaí/SC, 88311-605" },
+  P505:  { lat: -23.4842896, lng: -46.5520318, endereco: "Rua Endres — Guarulhos/SP, 07043-000" }, // doc do Marcio 06/11 (o Google lista o KLOG na R. Indubel, 940 — Cumbica: confirmar)
+  P260A: { lat: -23.5927658, lng: -46.5915028, endereco: "Rua Roberto Koch, 363 — Vila Independência, São Paulo/SP, 04221-060 (matriz)" },
+  P260B: { lat: -23.5846026, lng: -46.5980819, endereco: "Rua Barão de Resende — Ipiranga, São Paulo/SP, 04210-050 (filial)" },
+  P260C: { lat: -23.1214197, lng: -47.2681132, endereco: "Avenida Horst Frederico João Heer, 700 — Europark, Indaiatuba/SP" },
 };
 const coordsDe = (pid) => COORDS[pid] || null;
+// Links do Google Maps (06/11/2026): "Como chegar" parte da posição atual de quem toca; satélite no embed (t=k).
+const mapsDirUrl = (pid) => { const c = COORDS[pid]; return c ? `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}&travelmode=driving` : ""; };
+const mapsVerUrl = (pid) => { const c = COORDS[pid]; return c ? `https://www.google.com/maps/search/?api=1&query=${c.lat},${c.lng}` : ""; };
+const mapsEmbedUrl = (pid, zoom = 17) => { const c = COORDS[pid]; return c ? `https://maps.google.com/maps?q=${c.lat},${c.lng}&t=k&z=${zoom}&output=embed` : ""; };
 
 // Portais de alcance nacional, lidos para TODOS os parques (03/11). São "amplos": só entra notícia que cite a
 // cidade/bairro/entorno do parque — evita ruído. Segurança e mercado passam pelo mesmo pré-filtro de tema.
@@ -95,4 +99,4 @@ const TIPOS_GRAVES = ["latrocinio", "homicidio", "tiroteio", "arrastao", "roubo_
 
 const projetosComEntorno = () => Object.keys(LOCAIS).filter((pid) => LOCAIS[pid].cidade);
 
-module.exports = { LOCAIS, GERAL, COORDS, coordsDe, FONTES_GERAIS, recebeGeral, TEMAS, TIPO_ROTULO, TIPOS_GRAVES, projetosComEntorno };
+module.exports = { LOCAIS, GERAL, COORDS, coordsDe, mapsDirUrl, mapsVerUrl, mapsEmbedUrl, FONTES_GERAIS, recebeGeral, TEMAS, TIPO_ROTULO, TIPOS_GRAVES, projetosComEntorno };

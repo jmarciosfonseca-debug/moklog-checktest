@@ -22,6 +22,7 @@ import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
 import Entorno from "./entorno/Entorno";
+import Localizacao from "./cliente/Localizacao";
 import { FAIXAS_GRAVACAO, legendaGravacao, camerasDaFaixa, corGravacao, gravacaoDoTeste, textoGravacao, MINIMO_DIAS } from "./gravacaoSemanal";
 
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
@@ -4721,6 +4722,8 @@ export default function App(){
 
           {project&&groupProjects.includes(project.id)&&(
             <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+              {/* Localização do projeto (06/11/2026): satélite + Como chegar, para consultor e líder */}
+              <Localizacao pid={project.id} compacto />
               {checkAuth(project.id)?(
                 <>
                   <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}

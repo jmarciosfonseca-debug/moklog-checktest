@@ -3,6 +3,7 @@
 import { documentoMoked, escHTML as esc, dataBR } from './padraoMoked';
 import { totalQuadro, turnoverSobreQuadro, ocupacaoDoQuadro } from '../equipe/quadroPrevisto';
 import { calcularMapaEquipe, rotuloTreinamentos, notaTreinamentos, TITULO_TREINAMENTOS, CONFIG_MATURIDADE, desligadosUnicos } from '../equipe/maturidade';
+import { enderecoMascarado, fmtKm } from '../equipe/enderecoColab';
 
 export const ROTULOS = { assiduidade: 'Assiduidade', ft: 'Folga trabalhada', treinamento: 'Obrigatórios', reciclagem: 'Reciclagem', tempoCasa: 'Tempo de casa' };
 const ROTULOS_CURTOS = { assiduidade: 'Assiduidade', ft: 'Folga trab.', treinamento: 'Obrigatórios', reciclagem: 'Reciclagem', tempoCasa: 'Tempo casa' };
@@ -111,7 +112,8 @@ function fichaHTML(i, hoje, refs = new Map()) {
   return `<article class="eq-card">
     <div class="eq-topo">${foto(c)}<div class="eq-id"><div class="eq-nome">${esc(c.nome)}</div><div class="eq-cargo">${esc(c.cargo || '')}</div>
       <div class="mk-mu eq-meta">Adm. ${dataBR(c.dataContratacao)}${tempo ? ` · ${tempo}` : ''}</div>
-      <div class="mk-mu eq-meta">${esc(reciclagemTxt(i.reciclagem))}${i.ferias[0] ? ` · Férias ${dataBR(i.ferias[0].dataInicio)}` : ''}</div>${aviso}</div>
+      <div class="mk-mu eq-meta">${esc(reciclagemTxt(i.reciclagem))}${i.ferias[0] ? ` · Férias ${dataBR(i.ferias[0].dataInicio)}` : ''}</div>
+      ${typeof c.distanciaKm === 'number' || enderecoMascarado(c.endereco) ? `<div class="mk-mu eq-meta">${typeof c.distanciaKm === 'number' ? `Reside a <b>${esc(fmtKm(c.distanciaKm))}</b> do projeto` : 'Distância não calculada'}${enderecoMascarado(c.endereco) ? ` · ${esc(enderecoMascarado(c.endereco))}` : ''}</div>` : ''}${aviso}</div>
       <div class="eq-ind">${miniGauge(i.indice)}<div class="eq-classe">${esc(i.classe)}</div></div></div>
     ${barrasEixos(i.eixos)}
     ${promoHTML}
