@@ -52,7 +52,7 @@ const COORDS = {
   P607:  { lat: -16.0479406, lng: -47.9936485, endereco: "DF-290, 60 — Santa Maria, Brasília/DF" },
   P311A: { lat: -25.3491912, lng: -49.0588546, endereco: "BR-116, 1500 — Campina Grande do Sul/PR, 83430-000 (Quatro Barras)" },
   P311B: { lat: -26.8865864, lng: -48.7312218, endereco: "SC-412 – Rod. Jorge Lacerda, 1010 — Santa Regina, Itajaí/SC, 88311-605" },
-  P505:  { lat: -23.4842896, lng: -46.5520318, endereco: "Rua Endres — Guarulhos/SP, 07043-000" }, // doc do Marcio 06/11 (o Google lista o KLOG na R. Indubel, 940 — Cumbica: confirmar)
+  P505:  { lat: -23.4420114, lng: -46.4476851, endereco: "Rua Indubel, 940 — Cumbica, Guarulhos/SP, 07170-353" }, // confirmado pelo Marcio 07/11
   P260A: { lat: -23.5927658, lng: -46.5915028, endereco: "Rua Roberto Koch, 363 — Vila Independência, São Paulo/SP, 04221-060 (matriz)" },
   P260B: { lat: -23.5846026, lng: -46.5980819, endereco: "Rua Barão de Resende — Ipiranga, São Paulo/SP, 04210-050 (filial)" },
   P260C: { lat: -23.1214197, lng: -47.2681132, endereco: "Avenida Horst Frederico João Heer, 700 — Europark, Indaiatuba/SP" },
