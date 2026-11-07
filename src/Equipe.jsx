@@ -53,6 +53,7 @@ import { chkEqNumCheckins, chkEqSlots, chkEqFeitos, CHK_EQ_SEM_CHECAGEM } from "
 import { FotosCtx, fotoDe, injetarFotos, enviarFoto, prepararColaborador, useFotosEquipe, referenciasFotos, fotosPendentes, carregarFotos } from "./fotosEquipe";
 import MaturidadeResumo, { IndiceIndividual } from './equipe/MaturidadeResumo';
 import { calcularMapaEquipe } from './equipe/maturidade';
+import { enderecoVazio, enderecoTexto, fmtKm, buscarCep, limparCep, fmtCep, UFS, aplicarEnderecoAoSalvar } from './equipe/enderecoColab';
 import ConfiguracaoMaturidade from './equipe/ConfiguracaoMaturidade';
 import { gerarMapaEquipeHTML } from './relatorios/mapaEquipeRelatorio';
 import { abrirParaImpressao } from './relatorios/padraoMoked';
@@ -246,6 +247,7 @@ function emptyColab(cargo, projectId, turno) {
     turno: turno || "Diurno",
     status:"ativo",
     historico:[],
+    endereco: enderecoVazio(), geo:null, distanciaKm:null, // 06/11/2026: endereço residencial → distância casa–projeto
     criadoEm: new Date().toISOString()
   };
 }
@@ -978,6 +980,11 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
               <div style={S.lbl}>Última Reciclagem</div>
               <div style={{ fontSize:13, color:colab.ultimaReciclagem?"#22c55e":"#ef4444", fontWeight:600 }}>{fmtDate(colab.ultimaReciclagem)}</div>
             </div>
+            <div style={{ gridColumn:"1 / -1" }}>
+              <div style={S.lbl}>Distância casa → projeto</div>
+              <div style={{ fontSize:13, ...S.txtPrimary, fontWeight:600 }}>{typeof colab.distanciaKm==="number" ? `${fmtKm(colab.distanciaKm)} em linha reta` : enderecoTexto(colab.endereco) ? "não calculada (sem localização)" : "endereço não cadastrado"}</div>
+              {enderecoTexto(colab.endereco) && <details style={{ marginTop:4 }}><summary style={{ fontSize:11, color:"#64748b", cursor:"pointer" }}>ver endereço (uso interno)</summary><div style={{ fontSize:12, ...S.txtPrimary, marginTop:4 }}>{enderecoTexto(colab.endereco)}</div></details>}
+            </div>
           </div>
 
           {/* Cesta de Natal (adendo Equipe) */}
@@ -1085,6 +1092,39 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
 }
 
 // ── Formulário (admin only — cadastrar/editar)
+// Endereço residencial (06/11/2026): CEP preenche rua/bairro/cidade (ViaCEP); ao salvar o app geocodifica e calcula a distância até o projeto.
+function EnderecoForm({ endereco, onChange, distanciaKm, S, dark }) {
+  const [buscando, setBuscando] = useState(false);
+  const e = endereco || enderecoVazio();
+  const set = (k, v) => onChange({ ...e, [k]: v });
+  const cep = async (v) => {
+    set("cep", limparCep(v));
+    if(limparCep(v).length===8){ setBuscando(true); const r = await buscarCep(v); setBuscando(false); if(r) onChange({ ...e, cep:r.cep, logradouro: e.logradouro||r.logradouro, bairro: e.bairro||r.bairro, cidade: e.cidade||r.cidade, uf: e.uf||r.uf }); }
+  };
+  return (
+    <div style={S.card} data-testid="endereco-form">
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:8 }}>
+        <label style={S.lbl}>Endereço residencial</label>
+        <span style={{ fontSize:10, color:"#64748b" }}>{typeof distanciaKm==="number" ? `casa → projeto: ${fmtKm(distanciaKm)}` : "a distância é calculada ao salvar"}</span>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:8 }}>
+        <div><label style={S.lbl}>CEP</label><input inputMode="numeric" placeholder="00000-000" value={fmtCep(e.cep)} onChange={ev=>cep(ev.target.value)} style={S.inp}/>{buscando && <div style={{ fontSize:10, color:"#64748b" }}>buscando…</div>}</div>
+        <div><label style={S.lbl}>Rua / Avenida</label><input placeholder="Rua, avenida, estrada…" value={e.logradouro} onChange={ev=>set("logradouro",ev.target.value)} style={S.inp}/></div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 2fr", gap:8, marginTop:8 }}>
+        <div><label style={S.lbl}>Número</label><input inputMode="numeric" value={e.numero} onChange={ev=>set("numero",ev.target.value)} style={S.inp}/></div>
+        <div><label style={S.lbl}>Complemento</label><input placeholder="apto, bloco, casa…" value={e.complemento} onChange={ev=>set("complemento",ev.target.value)} style={S.inp}/></div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"2fr 2fr 1fr", gap:8, marginTop:8 }}>
+        <div><label style={S.lbl}>Bairro</label><input value={e.bairro} onChange={ev=>set("bairro",ev.target.value)} style={S.inp}/></div>
+        <div><label style={S.lbl}>Cidade</label><input value={e.cidade} onChange={ev=>set("cidade",ev.target.value)} style={S.inp}/></div>
+        <div><label style={S.lbl}>UF</label><select value={e.uf} onChange={ev=>set("uf",ev.target.value)} style={S.inp}><option value="">—</option>{UFS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
+      </div>
+      <div style={{ fontSize:10, color:"#64748b", marginTop:6 }}>Uso interno. No relatório do cliente o endereço sai mascarado (sem número e sem CEP); só a distância é exibida.</div>
+    </div>
+  );
+}
+
 function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark }) {
   const S = getStyles(dark);
   const handleFoto = (e) => {
@@ -1218,6 +1258,8 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
               <input type="date" min="2000-01-01" max="2100-12-31" value={form.ultimaReciclagem} onChange={e=>setF("ultimaReciclagem",e.target.value)} style={S.inp}/>
             </div>
           </div>
+
+          <EnderecoForm endereco={form.endereco||enderecoVazio()} onChange={(e)=>setF("endereco",e)} distanciaKm={form.distanciaKm} S={S} dark={dark}/>
 
           {form.foto&&form.foto.startsWith("data:")&&(
             <div style={{background:"#001a2e",border:"1px solid #0ea5e922",borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:8}}>
@@ -2340,7 +2382,9 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       // (com revisão e 409). Se essa gravação falhar, sobra uma foto sem uso: nada é sobrescrito nem perdido.
       let fotoRef = "";
       if(fotoNova) { fotoRef = await enviarFoto(project.id, form.id, fotoFinal); definirFoto(fotoRef, fotoFinal); }
-      const formFinal = prepararColaborador({ form, fotoFinal: fotoNova ? fotoFinal : "", ref: fotoRef, existente });
+      let formFinal = prepararColaborador({ form, fotoFinal: fotoNova ? fotoFinal : "", ref: fotoRef, existente });
+      // Endereço → geocodificação e distância casa–projeto (só quando o endereço mudou). Falha de rede não impede salvar.
+      try { formFinal = await aplicarEnderecoAoSalvar(formFinal, project.id); } catch(e) { console.warn("endereço:", e); }
       // Remove campos undefined para não quebrar Firestore
       Object.keys(formFinal).forEach(k => { if(formFinal[k]===undefined) formFinal[k]=""; });
       // Limpa campos de Falta que não existem em outros tipos

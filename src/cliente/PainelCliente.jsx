@@ -20,6 +20,7 @@ import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, C
 import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno, ehPerto as ehPertoEntorno } from "../entorno/EntornoLista";
 import { LOCAIS as LOCAIS_ENTORNO, recebeGeral } from "../entorno/locais";
 import { lerEntorno } from "../entorno/lerEntorno";
+import Localizacao from "./Localizacao";
 import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
@@ -158,6 +159,8 @@ function TelaProjeto({ p, onBack, onAbrir }) {
     </div>
     {/* Entorno (02/11/2026): segurança e mercado logístico no entorno deste parque — só o que é da região dele */}
     <CardEntorno p={p} onAbrir={onAbrir} />
+    {/* Localização (06/11/2026): satélite + Como chegar */}
+    <Localizacao pid={p.pid} compacto />
   </>;
 }
 
