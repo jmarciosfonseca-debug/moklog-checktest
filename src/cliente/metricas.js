@@ -114,6 +114,7 @@ export function sistemasResumo({ ctmk, keyaccess, iluminacao, energia, perimetra
   const eventosEnergia = eventos.filter((e) => e && e.inicioQueda).sort((a, b) => String(b.inicioQueda).localeCompare(String(a.inicioQueda))).slice(0, 5).map((e) => ({ inicio: e.inicioQueda, fim: e.fimQueda || e.retorno || null, concluido: !!e.concluido, obs: e.descricao || e.obs || "" }));
   const keyFalhas = (keyaccess?.registros || []).filter((r) => r && !r.horaFim).slice(0, 8).map((r) => ({ data: r.data || "", hora: r.horaInicio || r.hora || "", local: r.local || r.portao || r.descricao || "" }));
   return {
+    temCtmk: !!(ctmk && ctmk.status), temKey: !!keyaccess, // SIS+ (10/11/2026): sem monitoramento não conta como 100%
     ctmkOff, ctmkDias, ctmkOnlineDias, ctmkOnlineDesde, keyAbertas, keyFalhas, quadrantes, eventosEnergia, ilumTotal, ilumDef, ilumPct: ilumTotal ? Math.round(((ilumTotal - ilumDef) / ilumTotal) * 100) : null,
     quedas7d, energiaAberta, perimetralZonasRuins: perimetralZonasRuins || 0,
     score360: typeof score360?.score === "number" ? Math.round(score360.score) : null, vulnerabilidades: score360?.vulnerabilidades || [],

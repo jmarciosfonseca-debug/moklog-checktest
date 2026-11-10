@@ -93,3 +93,36 @@ test("PIN de gestor do parque: entra direto no parque, sem botão de macro; PIN 
     expect(botao(host, "← Meus parques")).toBeUndefined();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+test("SIS+: mostrador 360 → pilares → indicador; ★ favorita no início; gerencial vê a régua Moked e pode ver como o cliente", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  window.localStorage.clear();
+  mockCheckPin.mockImplementation(async () => { global.__escopo = { escopo: "P601", pids: ["P601"] }; return "cliente"; });
+  try {
+    await montar(host, root);
+    await clicar(botao(host, "ENTRAR")); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect([...host.querySelectorAll("[role=img]")].some((e) => (e.getAttribute("aria-label") || "").startsWith("SIS+ condição geral"))).toBe(true);
+    expect(host.textContent).toContain("MOKED"); expect(host.textContent).toContain("Sistema Integrado de Segurança");
+    expect(host.textContent).not.toContain("Área do Gestor");
+    await clicar(botao(host, "Ver detalhes do SIS+"));
+    expect(host.textContent).toContain("RT × 45% + RH × 35% + RA × 20%"); expect(host.textContent).toContain("Régua do cliente: ≥ 85 Bom");
+    await clicar(botao(host, "Abrir Recursos Humanos"));
+    expect(host.textContent).toContain("Satisfação da equipe"); expect(host.textContent).toContain("régua a definir — não entra na nota");
+    await clicar(botao(host, "Pôr nos favoritos: Satisfação da equipe"));
+    await clicar([...host.querySelectorAll('[role="button"]')].find((b) => b.getAttribute("aria-label") === "Abrir Turnover (12 meses)"));
+    expect(host.textContent).toContain("Ver os dados no painel");
+    await clicar(botao(host, "Ver dados de Turnover (12 meses)")); expect(host.textContent).toContain("Quantos temos hoje");
+    await clicar(botao(host, "← Golgi Cajamar")); expect(host.textContent).toContain("Ver os dados no painel"); // volta ao indicador
+    await clicar(botao(host, "← Voltar")); await clicar(botao(host, "← Voltar")); await clicar(botao(host, "← Golgi Cajamar"));
+    expect(host.textContent).toContain("★ Favoritos"); expect(botao(host, "Abrir Satisfação da equipe")).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem("sis_favs:P601"))).toContain("satisfacao");
+  } finally { await act(async () => root.unmount()); host.remove(); }
+  // gerencial
+  const host2 = document.createElement("div"); document.body.appendChild(host2); const root2 = createRoot(host2);
+  global.__escopo = { escopo: "MOKED", pids: ["P601"] };
+  try {
+    await montar(host2, root2); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(host2.textContent).toContain("Área do Gestor · régua interna Moked");
+    await clicar(botao(host2, "Ver detalhes do SIS+")); expect(host2.textContent).toContain("Régua Moked: ≥ 92 Bom · 80–91 Alerta");
+    await clicar(botao(host2, "Como o cliente vê")); expect(host2.textContent).toContain("Área do Gestor · vendo como o cliente"); expect(host2.textContent).toContain("Régua do cliente: ≥ 85 Bom");
+  } finally { await act(async () => root2.unmount()); host2.remove(); }
+});
