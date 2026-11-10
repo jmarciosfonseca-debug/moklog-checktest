@@ -15,16 +15,15 @@ import MaturidadeResumo from "../equipe/MaturidadeResumo";
 import EquipesMontadas, { montarEquipesDisponivel } from "../equipe/EquipesMontadas";
 import { EQUIP_CATS } from "../equipData";
 import { NIVEL_LABEL } from "../riscoConfig";
-import { MOKED_LOGO } from "../generatePDF";
-import { C, Mostrador, Anel, Luz, Cabecalho, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
-import EntornoLista, { ItemNoticia, filtrar as filtrarEntorno, ehPerto as ehPertoEntorno } from "../entorno/EntornoLista";
-import { LOCAIS as LOCAIS_ENTORNO, recebeGeral } from "../entorno/locais";
+import { C, Mostrador, corDe, VERMELHO2, VERDE, AMARELO, CINZA } from "./Cluster";
+import EntornoLista, { filtrar as filtrarEntorno } from "../entorno/EntornoLista";
+import { LOCAIS as LOCAIS_ENTORNO, recebeGeral, TIPOS_GRAVES } from "../entorno/locais";
 import { lerEntorno } from "../entorno/lerEntorno";
 import Localizacao from "./Localizacao";
 import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
 import { calcularMapaEquipe } from "../equipe/maturidade";
 import { baseSIS, calcularSIS, lerFavoritos, gravarFavoritos } from "./sis";
-import { SisInicio, SisDetalhe, FaixaGestor, REGUA_PADRAO } from "./SisPainel";
+import { CSS_SIS, Barra, Home, TelaSis, TelaPilar, TelaItem, TelaFavs, TelaMenu, TelaAvisos, TelaComunicar, Macro } from "./AreaSIS";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
 const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
@@ -77,6 +76,8 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     desligados: (eq.desligados || []).filter((c) => c && typeof c === "object").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, saida: c.desligadoEm || null, motivo: c.motivoDesligamento || c.tipoDesligamento || "", foto: fotoDe(c, fotos) })).sort((a, b) => String(b.saida || "").localeCompare(String(a.saida || ""))),
   };
   p.luzes = luzes(p);
+  // Informativos da home (padrão SIS+): até 3 notícias dos últimos 30 dias, as mais próximas do parque primeiro
+  p.informativos = p.entorno ? filtrarEntorno(p.entorno.itens, { dias: 30, ordem: "proximidade" }).slice(0, 3).map((i) => ({ id: i.id, titulo: i.titulo, link: (i.links && i.links[0]?.link) || i.link || "", fonte: (i.links && i.links[0]?.fonte) || i.fonte || "", dataCurta: i.data ? new Date(i.data).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" }) : "", km: typeof i.km === "number" ? i.km : null, tema: i.tema, grave: TIPOS_GRAVES.includes(i.tipo) })) : [];
   // SIS+ (10/11/2026): base pura para a nota (categorias do teste, distância, maturidade, tratativas, mapas)
   let maturidade = null; try { maturidade = calcularMapaEquipe(eq, hoje); } catch { maturidade = null; }
   const followups = Object.fromEntries((Array.isArray(fuDoc?.registros) ? fuDoc.registros : []).filter((r) => r && r.key).map((r) => [r.key, r]));
@@ -91,107 +92,12 @@ function Avatar({ foto, nome, tam = 36 }) {
     : <div style={{ ...borda, background: "#2a2a31", color: "#64748b", fontSize: tam / 2.8, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{ini}</div>;
 }
 const Linha = ({ children, primeiro }) => <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: primeiro ? "none" : "1px solid #2a2a31" }}>{children}</div>;
-const Luzes = ({ p }) => <div style={{ borderTop: "1px solid #2a2a31", marginTop: 4 }}><div style={{ display: "flex", justifyContent: "space-between", padding: "8px 4px 2px" }}>{p.luzes.map((l) => <Luz key={l.id} on={l.on} rotulo={l.rotulo} />)}</div><div style={{ ...C.micro, textAlign: "center", fontSize: 9 }}>Luzes de aviso: acesa = atenção · apagada = normal</div></div>;
 
 // ── Parque ────────────────────────────────────────────────────────────────────
 function MostradorRisco({ risco, tam = 180 }) {
   // 4 zonas: baixo (verde) · moderado (amarelo) · elevado (laranja) · crítico (vermelho); ponteiro no nível.
   const n = risco?.nivel ?? null; const v = n === null || n === 0 ? null : (n - 0.5) * 25;
   return <Mostrador valor={v} max={100} unidade="" rotulo="Análise de risco" tam={tam} cor={COR_RISCO[n] || CINZA} zonaCritica={[75, 100]} sub={n ? (risco.label || NIVEL_LABEL[n]) : "sem avaliação"} valorTexto={n ? (NIVEL_LABEL[n] || "") : "—"} zonas={[[0, 25, VERDE], [25, 50, AMARELO], [50, 75, LARANJA], [75, 100, VERMELHO2]]} />;
-}
-
-function TelaProjeto({ p, onBack, onAbrir, sis, favs }) {
-  const m = p.mapa, s = p.sistemas;
-  const plantao = m.lista.map((x) => ({ ...x, foto: p.colabs.find((k) => k.id === x.pessoaId)?.foto }));
-  return <>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-      {onBack ? <button style={C.back} onClick={onBack}>← Meus parques</button> : <span />}
-      <div style={{ ...C.titulo, marginBottom: 0 }}>{p.nome}</div>
-    </div>
-    {/* SIS+ (10/11/2026): mostrador 360°, pilares RT/RH/RA e favoritos */}
-    {sis && <SisInicio sis={sis} favs={favs || []} onAbrir={onAbrir} />}
-    {/* turnover */}
-    <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
-      <Mostrador valor={p.equipe.turnover} max={50} tam={250} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
-      <div style={{ textAlign: "right", ...C.micro }}>quantos temos × quantos saíram ›</div>
-    </button>
-    {/* saúde do parque + análise de risco */}
-    <div style={C.grid2}>
-      <button style={C.cardBtn} onClick={() => onAbrir("teste")} aria-label="Abrir teste semanal">
-        <Mostrador valor={p.teste.pct} rotulo="Saúde do parque" tam={160} cor={p.teste.atrasado && p.teste.pct !== null ? AMARELO : undefined} zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={p.teste.data ? `teste ${fmtD(p.teste.data)}${p.teste.atrasado ? " · atrasado" : ""}` : "sem teste"} />
-        <div><span style={C.chip(p.teste.inop ? VERMELHO2 : VERDE)}>{p.teste.inop} inop</span><span style={C.chip(p.teste.parcial ? AMARELO : CINZA)}>{p.teste.parcial} parcial</span></div>
-      </button>
-      <button style={C.cardBtn} onClick={() => onAbrir("risco")} aria-label="Abrir análise de risco">
-        <MostradorRisco risco={p.risco} tam={160} />
-        <div>{p.risco?.determinante ? <span style={C.chip(COR_RISCO[p.risco.nivel] || CINZA)}>{p.risco.determinante}</span> : <span style={C.micro}>&nbsp;</span>}</div>
-      </button>
-    </div>
-    {/* equipe de plantão */}
-    <button style={C.cardBtn} onClick={() => onAbrir("plantao")} aria-label="Abrir equipe de plantão">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Equipe de plantão</div><span style={C.micro}>{m.temMapa ? `${fmtD(m.data)} · ${m.turno === "N" ? "noturno" : "diurno"}${m.hoje ? "" : " (último)"}` : "sem mapa"}</span></div>
-      {m.temMapa ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {plantao.map((x, i) => <div key={i} style={{ textAlign: "center", width: 54 }}>
-          <div style={{ position: "relative", display: "inline-block" }}><Avatar foto={x.foto} nome={x.nome || x.posto} tam={44} /><span title={ROTULO_SITUACAO[x.situacao] || x.situacao} style={{ position: "absolute", right: -2, bottom: -2, width: 12, height: 12, borderRadius: "50%", background: corSit(x.situacao), border: "2px solid #0b0b0e", boxShadow: `0 0 6px ${corSit(x.situacao)}` }} /></div>
-          <div style={{ fontSize: 9, color: "#d1d5db", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{(x.nome || "—").split(" ")[0]}</div>
-          <div style={{ fontSize: 8, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.posto}</div>
-        </div>)}
-      </div> : <div style={C.micro}>Nenhum mapa enviado ainda.</div>}
-      <div style={{ marginTop: 4 }}>{m.faltas > 0 && <span style={C.chip(VERMELHO2)}>{m.faltas} falta{m.faltas === 1 ? "" : "s"}</span>}{m.atrasos > 0 && <span style={C.chip(AMARELO)}>{m.atrasos} atraso{m.atrasos === 1 ? "" : "s"}</span>}{m.ft > 0 && <span style={C.chip("#a855f7")}>{m.ft} FT</span>}{m.vagos > 0 && <span style={C.chip(VERMELHO2)}>{m.vagos} vago{m.vagos === 1 ? "" : "s"}</span>}<span style={{ ...C.micro, float: "right" }}>mapa de hoje · equipe completa ›</span></div>
-    </button>
-    {/* férias */}
-    <button style={C.cardBtn} onClick={() => onAbrir("ferias")} aria-label="Abrir férias">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Férias</div><span style={C.micro}>{p.ferias.emFerias.length} em férias hoje</span></div>
-      {p.ferias.emFerias.length === 0 && p.ferias.saindo.length === 0 && p.ferias.voltando.length === 0 && <div style={C.micro}>Ninguém de férias, saindo ou voltando nos próximos 7 dias.</div>}
-      {[["Em férias", p.ferias.emFerias, "#38bdf8"], ["Saindo em 7 dias", p.ferias.saindo, AMARELO], ["Voltando em 7 dias", p.ferias.voltando, VERDE]].map(([r, l, c]) => l.length ? <div key={r} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-        <span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ fontSize: 12 }}><b>{l.length} {r.toLowerCase()}</b><div style={C.micro}>{l.map((x) => `${(x.nome || "").split(" ").slice(0, 2).join(" ")}${r === "Voltando em 7 dias" ? ` (volta ${fmtD(x.retorno)})` : r === "Saindo em 7 dias" ? ` (sai ${fmtD(x.inicio)})` : x.retorno ? ` (até ${fmtD(x.retorno)})` : ""}`).join(" · ")}</div></div>
-      </div> : null)}
-    </button>
-    {/* fotos — evidências de treinamento */}
-    <div style={C.card}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={C.titulo}>Fotos · treinamentos</div>{p.equipe.evidencias.length > 3 && <button style={{ ...C.back, padding: "3px 8px", fontSize: 11, color: "#FF1E27", textDecoration: "underline" }} onClick={() => onAbrir("fotos")}>Visualizar todas ›</button>}</div>
-      {p.equipe.evidencias.length === 0 && <div style={C.micro}>Sem fotos ainda. O líder anexa a foto ao registrar o treinamento na ficha.</div>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-        {p.equipe.evidencias.slice(0, 6).map((t, i) => <button key={t.id || i} onClick={() => onAbrir("fotos")} aria-label={`Foto: ${t.detalhe || "treinamento"}`} style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", position: "relative" }}>
-          <img src={p.fotos[t.fotoRef]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", clipPath: "polygon(12% 0, 100% 0, 100% 88%, 88% 100%, 0 100%, 0 12%)", border: "1px solid #3a3a42", outline: "1px solid #FF1E2744" }} />
-          <div style={{ position: "absolute", left: 6, right: 6, bottom: 6, fontSize: 9, fontWeight: 700, color: "#f1f5f9", textShadow: "0 1px 3px #000", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "left" }}>{t.detalhe || "Treinamento"}</div>
-        </button>)}
-      </div>
-    </div>
-    {/* relógios menores */}
-    <div style={C.card}>
-      <div style={C.titulo}>Progressos</div>
-      <div style={C.grid2}>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("treino")} aria-label="Abrir treinamentos"><Anel valor={p.equipe.treinadosPct} rotulo="Treinamentos" sub={`${p.equipe.comTreinoFicha ?? 0} com treinamento na ficha · ${p.equipe.comReciclagem ?? 0} com reciclagem em dia${p.equipe.treinoIndicePct !== null ? ` · obrigatórios ${p.equipe.treinoIndicePct}%` : ""}`} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }} onClick={() => onAbrir("equip")} aria-label="Abrir equipamentos"><Anel valor={p.equip.pct} rotulo="Equipamentos" sub={`${p.equip.total} itens · ${p.equip.inop} inop`} /></button>
-        <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, gridColumn: "1 / -1" }} onClick={() => onAbrir("sistemas")} aria-label="Abrir sistemas"><Anel valor={s.score360} rotulo="Sistemas · 360" sub={`CTMK ${s.ctmkOff ? `off-line há ${s.ctmkDias}d` : s.ctmkOnlineDias !== null ? `on-line há ${s.ctmkOnlineDias}d` : "on-line"} · iluminação ${s.ilumPct === null ? "—" : s.ilumPct + "%"} · energia ${s.quedas7d} queda${s.quedas7d === 1 ? "" : "s"}/7d`} /></button>
-      </div>
-      <Luzes p={p} />
-    </div>
-    {/* Entorno (02/11/2026): segurança e mercado logístico no entorno deste parque — só o que é da região dele */}
-    <CardEntorno p={p} onAbrir={onAbrir} />
-    {/* Localização (06/11/2026): satélite + Como chegar */}
-    <Localizacao pid={p.pid} nome={p.nome} compacto />
-  </>;
-}
-
-function CardEntorno({ p, onAbrir }) {
-  const e = p.entorno, r = e?.resumo, l = LOCAIS_ENTORNO[p.pid];
-  if (!l || !l.cidade) return null; // parque sem entorno cadastrado: não mostra o card
-  const ultimos = e ? filtrarEntorno(e.itens, { dias: 30, ordem: "proximidade" }).slice(0, 3) : []; // as mais próximas do parque primeiro
-  const nPerto = e ? (e.itens || []).filter((i) => i.tema === "seguranca" && ehPertoEntorno(i)).length : 0;
-  const seg = r?.seguranca, mer = r?.mercado;
-  return <div style={C.card}>
-    <button style={{ background: "transparent", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0, width: "100%" }} onClick={() => onAbrir("entorno")} aria-label="Abrir entorno">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><div style={C.titulo}>Entorno · {l.cidade}/{l.uf}</div><span style={C.micro}>últimos 30 dias ›</span></div>
-      {!e && <div style={C.micro}>Sem notícias coletadas ainda.</div>}
-      {e && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-        <div><div style={C.numero(seg?.d30 ? (seg.graves ? VERMELHO2 : AMARELO) : VERDE)}>{seg?.d30 ?? 0}</div><div style={C.micro}>ocorrências noticiadas{nPerto ? ` · ${nPerto} perto do parque` : ""}</div></div>
-        <div><div style={{ ...C.numero(seg?.tendencia === "alta" ? VERMELHO2 : seg?.tendencia === "queda" ? VERDE : AMARELO), fontSize: 20, marginTop: 4 }}>{seg?.tendencia === "alta" ? "▲ em alta" : seg?.tendencia === "queda" ? "▼ em queda" : "▶ estável"}</div><div style={C.micro}>vs. 30 dias anteriores</div></div>
-        <div><div style={C.numero("#38bdf8")}>{mer?.d30 ?? 0}</div><div style={C.micro}>mercado logístico</div></div>
-      </div>}
-    </button>
-    {ultimos.length > 0 && <div style={{ marginTop: 6 }}>{ultimos.map((i) => <ItemNoticia key={i.id} i={i} compacto />)}</div>}
-  </div>;
 }
 
 // ── Detalhes ──────────────────────────────────────────────────────────────────
@@ -342,43 +248,6 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
   </>;
 }
 
-// ── Macro (proprietário): resumo do grupo + um card por parque, no padrão do app ─────────────
-function TelaMacro({ escopo, dados, onAbrir, regua = "cliente" }) {
-  const g = consolidarGrupo(dados);
-  const label = GRUPOS_CLIENTE[escopo]?.label || escopo;
-  const parques = Object.values(dados);
-  const riscoPior = Math.max(0, ...parques.map((p) => p.risco?.nivel || 0));
-  const feriasHoje = parques.reduce((a, p) => a + (p.ferias?.emFerias.length || 0), 0);
-  const Luzinha = ({ c, t }) => <span title={t} style={{ width: 10, height: 10, borderRadius: "50%", background: c, boxShadow: `0 0 6px ${c}`, display: "inline-block" }} />;
-  return <>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}><div style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>{label}</div><span style={C.micro}>{g.projetos} parques · {g.equipeAtivos} colaboradores</span></div>
-    <div style={C.grid2}>
-      <div style={C.card}><Mostrador valor={g.testePct} rotulo="Saúde dos parques" tam={180} zonas={[[0, 70, VERMELHO2], [70, 90, AMARELO], [90, 100, VERDE]]} sub={g.testesAtrasados ? `${g.testesAtrasados} teste${g.testesAtrasados === 1 ? "" : "s"} atrasado${g.testesAtrasados === 1 ? "" : "s"}` : "testes em dia"} /></div>
-      <div style={C.card}><Mostrador valor={g.turnover} max={50} invertido rotulo="Turnover 12 m" tam={180} cor={corTurnover(g.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="média dos parques" /></div>
-    </div>
-    <div style={C.card}>
-      <div style={C.titulo}>Hoje no grupo</div>
-      {[[g.faltasHoje ? VERMELHO2 : VERDE, `${g.faltasHoje} falta${g.faltasHoje === 1 ? "" : "s"} nos mapas de hoje`, `${g.mapasHoje} de ${g.projetos} mapas enviados`],
-        [riscoPior ? COR_RISCO[riscoPior] : CINZA, `Risco mais alto: ${riscoPior ? NIVEL_LABEL[riscoPior] : "sem avaliação"}`, parques.filter((p) => p.risco?.nivel === riscoPior && riscoPior).map((p) => p.nome).join(" · ")],
-        ["#38bdf8", `${feriasHoje} em férias hoje`, parques.filter((p) => p.ferias?.emFerias.length).map((p) => `${p.nome} (${p.ferias.emFerias.length})`).join(" · ") || "ninguém"],
-        [g.equipInop ? AMARELO : VERDE, `${g.equipInop} equipamento${g.equipInop === 1 ? "" : "s"} inoperante${g.equipInop === 1 ? "" : "s"}`, `${g.equipPct === null ? "—" : g.equipPct + "%"} operantes no grupo`],
-        [parques.some((p) => p.sistemas?.ctmkOff) ? VERMELHO2 : VERDE, `CTMK: ${parques.filter((p) => p.sistemas?.ctmkOff).length} off-line`, parques.filter((p) => p.sistemas?.ctmkOff).map((p) => p.nome).join(" · ") || "todas on-line"],
-      ].map(([c, t, d], i) => <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", borderTop: i ? "1px solid #2a2a31" : "none" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flexShrink: 0 }} /><div style={{ flex: 1 }}><div style={{ fontSize: 12, fontWeight: 700 }}>{t}</div><div style={C.micro}>{d}</div></div></div>)}
-    </div>
-    <div style={C.titulo}>Parques — toque para abrir o painel</div>
-    {parques.map((p) => <button key={p.pid} style={C.cardBtn} onClick={() => onAbrir(p.pid)} aria-label={`Abrir ${p.nome}`}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#f1f5f9" }}>{p.nome}{(() => { const s = calcularSIS(p, regua); return <span style={{ ...C.chip(s.cor), marginLeft: 8, marginTop: 0 }}>SIS+ {s.geral === null ? "—" : `${s.geral}%`}</span>; })()}</div>
-        <div style={{ display: "flex", gap: 6 }}><Luzinha c={p.teste.atrasado ? AMARELO : corDe(p.teste.pct)} t="Teste semanal" /><Luzinha c={COR_RISCO[p.risco?.nivel] || CINZA} t="Risco" /><Luzinha c={!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE} t="Mapa do dia" /><Luzinha c={corDe(p.equip.pct)} t="Equipamentos" /><Luzinha c={p.sistemas.ctmkOff ? VERMELHO2 : VERDE} t="CTMK" /></div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
-        {[["Saúde", p.teste.pct === null ? "—" : `${p.teste.pct}%`, p.teste.atrasado ? AMARELO : corDe(p.teste.pct)], ["Risco", p.risco?.nivel ? NIVEL_LABEL[p.risco.nivel] : "—", COR_RISCO[p.risco?.nivel] || CINZA], ["Plantão", p.mapa.temMapa ? `${p.mapa.presentes}/${p.mapa.postos}` : "—", p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE], ["Turnover", p.equipe.turnover === null ? "—" : `${p.equipe.turnover}%`, corTurnover(p.equipe.turnover)]].map(([r, v, c]) => <div key={r} style={{ background: "#15151a", borderRadius: 8, padding: "6px 4px", textAlign: "center" }}><div style={{ fontSize: 13, fontWeight: 900, color: c }}>{v}</div><div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: .5 }}>{r}</div></div>)}
-      </div>
-      <div style={{ ...C.micro, marginTop: 6 }}>{p.equipe.ativos} colaboradores · teste {p.teste.data ? fmtD(p.teste.data) : "—"}{p.ferias?.emFerias.length ? ` · ${p.ferias.emFerias.length} em férias` : ""}{p.mapa.faltas ? ` · ${p.mapa.faltas} falta${p.mapa.faltas === 1 ? "" : "s"} hoje` : ""}</div>
-    </button>)}
-  </>;
-}
-
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkData, score360, risco, abrirPDF, onBack }) {
   const [escopo, setEscopo] = useState(() => getClienteScope());
@@ -390,8 +259,8 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const setPid = (x) => { setPidBruto(x); setPilha([]); };
   // SIS+ (10/11/2026): gerencial vê a régua Moked (mais rígida) e pode ver como o cliente vê; cliente só vê a dele.
   const gerencial = escopo?.escopo === "MOKED";
-  const [reguaId, setReguaId] = useState(() => REGUA_PADRAO(getClienteScope()?.escopo === "MOKED"));
-  useEffect(() => { setReguaId(REGUA_PADRAO(gerencial)); }, [gerencial]);
+  const [reguaId, setReguaId] = useState(() => (getClienteScope()?.escopo === "MOKED" ? "moked" : "cliente"));
+  useEffect(() => { setReguaId(gerencial ? "moked" : "cliente"); }, [gerencial]);
   const [favs, setFavs] = useState(() => lerFavoritos(getClienteScope()?.escopo));
   useEffect(() => { if (escopo) setFavs(lerFavoritos(escopo.escopo)); }, [escopo]);
   const alternarFav = (id) => setFavs((f) => { const n = f.includes(id) ? f.filter((x) => x !== id) : [...f, id]; gravarFavoritos(escopo?.escopo, n); return n; });
@@ -434,39 +303,75 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); onBack && onBack(); };
   const perfil = !escopo ? "" : escopo.escopo === "MOKED" ? "Visão Moked (gerencial)" : escopo.pids.length > 1 ? "Proprietário · visão macro" : "Gestor do parque";
 
-  if (!escopo) return <main style={C.main}>
-    <Cabecalho logo={MOKED_LOGO} badge="Área do Cliente" direita={<button style={C.back} onClick={onBack}>← Início</button>} />
-    <div style={{ ...C.card, marginTop: 30, textAlign: "center" }}>
-      <div style={C.titulo}>Acesso de leitura</div>
-      <div style={{ ...C.micro, marginBottom: 16 }}>Gestor do parque ou proprietário</div>
-      <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #3a3a42", background: "#08080a", color: "#f1f5f9", fontSize: 20, textAlign: "center", letterSpacing: 8, borderRadius: 6 }} />
-      {erro && <div role="alert" style={{ color: VERMELHO2, fontSize: 12, marginTop: 8 }}>{erro}</div>}
-      <div><button onClick={entrar} style={{ marginTop: 14, background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "11px 32px", fontWeight: 900, letterSpacing: 2, cursor: "pointer", clipPath: "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)", boxShadow: "0 0 16px #FF1E2755" }}>ENTRAR</button></div>
+  const pAtual = pid && dados?.[pid] ? dados[pid] : null;
+  const sisPorPid = useMemo(() => { const o = {}; Object.values(dados || {}).forEach((x) => { try { o[x.pid] = calcularSIS(x, gerencial ? reguaId : "cliente"); } catch { o[x.pid] = null; } }); return o; }, [dados, reguaId, gerencial]);
+  const hhmm = atualizadoEm ? atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+  const avisos = pAtual ? pAtual.luzes.filter((l) => l.on) : Object.values(dados || {}).flatMap((x) => x.luzes.filter((l) => l.on).map((l) => ({ ...l, parque: x.nome })));
+  const plantao = pAtual ? pAtual.mapa.lista.map((x) => ({ ...x, foto: pAtual.colabs.find((k) => k.id === x.pessoaId)?.foto, cor: corSit(x.situacao), situacaoRotulo: ROTULO_SITUACAO[x.situacao] || x.situacao })) : [];
+  const irMenu = (k) => {
+    if (k === "sair") return sair();
+    if (k === "atualizar") { setPilha([]); return setVersao((v) => v + 1); }
+    if (k === "parques") return setPid(null);
+    setPilha((s) => [...s.filter((x) => x !== "menu"), k]);
+  };
+  const itensMenu = [
+    ...(pAtual ? [["teste", "Teste semanal", pAtual.teste.data ? `último em ${fmtD(pAtual.teste.data)}` : "sem teste"], ["risco", "Análise de risco", pAtual.risco?.nivel ? NIVEL_LABEL[pAtual.risco.nivel] : ""], ["plantao", "Mapa de Equipe", ""], ["turnover", "Turnover", ""], ["ferias", "Férias", ""], ["treino", "Treinamentos", ""], ["fotos", "Fotos · treinamentos", ""], ["equip", "Equipamentos de plantão", ""], ["sistemas", "Sistemas", ""], ["entorno", "Informativos · entorno", ""], ["local", "Localização · como chegar", ""]] : []),
+    ...(pids.length > 1 && pAtual ? [["parques", "Meus parques", ""]] : []),
+    ["atualizar", "Atualizar dados", hhmm ? `atualizado às ${hhmm}` : ""], ["sair", "Sair", ""],
+  ];
+  const Voltar = ({ children }) => <div className="voltar"><button onClick={voltarDetalhe}>← Voltar</button><div className="tit">{children}</div></div>;
+
+  if (!escopo) return <main className="sx"><style>{CSS_SIS}</style>
+    <div className="barra"><button className="ico" onClick={onBack} aria-label="← Início" title="Início">←</button><div className="logo">MOK<span>E</span>D</div><span style={{ width: 34 }} /></div>
+    <div className="corpo">
+      <div className="ola">Área do Cliente</div><div className="sub">Gestor do parque ou proprietário · acesso de leitura</div>
+      <div className="card" style={{ marginTop: 30, textAlign: "center" }}>
+        <div className="tit" style={{ marginBottom: 12 }}>Digite seu PIN</div>
+        <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #3a3a42", background: "#08080a", color: "#f1f5f9", fontSize: 20, textAlign: "center", letterSpacing: 8 }} />
+        {erro && <div role="alert" style={{ color: VERMELHO2, fontSize: 12, marginTop: 8 }}>{erro}</div>}
+        <div><button onClick={entrar} style={{ marginTop: 14, background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "11px 32px", fontWeight: 900, letterSpacing: 2, cursor: "pointer", clipPath: "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)", boxShadow: "0 0 16px #FF1E2755" }}>ENTRAR</button></div>
+      </div>
     </div>
   </main>;
 
-  return <main style={C.main}>
-    <Cabecalho logo={MOKED_LOGO} badge="Área do Cliente" direita={<button style={C.back} onClick={sair} aria-label="Sair">Sair</button>} />
-    <div style={{ ...C.micro, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-      <span>{perfil} · somente leitura{atualizadoEm ? ` · atualizado às ${atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
-      <button onClick={() => setVersao((v) => v + 1)} disabled={carregando} style={{ ...C.back, minHeight: 28, padding: "3px 10px", fontSize: 11 }} aria-label="Atualizar">{carregando ? "Lendo…" : "Atualizar"}</button>
+  let tela = null;
+  if (detalhe === "menu") tela = <TelaMenu itens={itensMenu} onIr={irMenu} onVoltar={voltarDetalhe} perfil={`${perfil} · somente leitura`} />;
+  else if (detalhe === "avisos") tela = <TelaAvisos avisos={avisos} onVoltar={voltarDetalhe} />;
+  else if (detalhe === "comunicar") tela = <TelaComunicar onVoltar={voltarDetalhe} />;
+  else if (pAtual) {
+    const sis = sisAtual, comum = { sis, favs, onFav: alternarFav, onIr: abrirDetalhe, onVoltar: voltarDetalhe };
+    if (!detalhe) tela = <Home p={pAtual} sis={sis} favs={favs} onIr={abrirDetalhe} atualizado={hhmm} plantao={plantao} />;
+    else if (detalhe === "sis") tela = <TelaSis {...comum} />;
+    else if (detalhe === "favs") tela = <TelaFavs {...comum} />;
+    else if (detalhe.startsWith("pilar:")) tela = <TelaPilar k={detalhe.slice(6)} {...comum} />;
+    else if (detalhe.startsWith("ind:")) tela = <TelaItem id={detalhe.slice(4)} p={pAtual} sisOutra={sisOutra} {...comum} />;
+    else if (detalhe === "local") tela = <><Voltar>Localização</Voltar><Localizacao pid={pAtual.pid} nome={pAtual.nome} /></>;
+    else tela = <Detalhe key={detalhe} p={pAtual} tipo={detalhe} onBack={voltarDetalhe} abrirPDF={abrirPDF} />;
+  } else if (dados) {
+    const parques = Object.values(dados), g = consolidarGrupo(dados);
+    const riscoPior = Math.max(0, ...parques.map((x) => x.risco?.nivel || 0));
+    tela = <Macro nome={escopo.escopo === "MOKED" ? "Moked" : GRUPOS_CLIENTE[escopo.escopo]?.label || escopo.escopo} parques={parques} sisPorPid={sisPorPid} onAbrir={setPid}
+      sub={`${g.projetos} parques · ${g.equipeAtivos} colaboradores · ${perfil}${hhmm ? ` · atualizado às ${hhmm}` : ""}`}
+      hojeGrupo={<div className="card"><div className="tit">Hoje no grupo</div>
+        {[[g.faltasHoje ? VERMELHO2 : VERDE, `${g.faltasHoje} falta${g.faltasHoje === 1 ? "" : "s"} nos mapas de hoje`, `${g.mapasHoje} de ${g.projetos} mapas enviados`],
+          [riscoPior ? COR_RISCO[riscoPior] : CINZA, `Risco mais alto: ${riscoPior ? NIVEL_LABEL[riscoPior] : "sem avaliação"}`, parques.filter((x) => x.risco?.nivel === riscoPior && riscoPior).map((x) => x.nome).join(" · ")],
+          [g.testesAtrasados ? AMARELO : VERDE, `${g.testesAtrasados} teste${g.testesAtrasados === 1 ? "" : "s"} semana${g.testesAtrasados === 1 ? "l" : "is"} atrasado${g.testesAtrasados === 1 ? "" : "s"}`, ""],
+          [parques.some((x) => x.sistemas?.ctmkOff) ? VERMELHO2 : VERDE, `CTMK: ${parques.filter((x) => x.sistemas?.ctmkOff).length} off-line`, parques.filter((x) => x.sistemas?.ctmkOff).map((x) => x.nome).join(" · ") || "todas on-line"],
+        ].map(([c, t, d], i) => <div key={i} className="row" style={{ cursor: "default" }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: c, flex: "none" }} /><div className="nm">{t}{d && <div className="mu">{d}</div>}</div></div>)}
+      </div>} />;
+  }
+
+  return <main className="sx"><style>{CSS_SIS}</style>
+    <Barra onMenu={() => setPilha((s) => (s[s.length - 1] === "menu" ? s.slice(0, -1) : [...s, "menu"]))} onAvisos={() => setPilha((s) => [...s, "avisos"])} avisos={avisos.length} />
+    {gerencial && <div className="gestor-faixa">Área do Gestor · {reguaId === "moked" ? "régua interna Moked" : "vendo como o cliente"}<button onClick={() => setReguaId(reguaId === "moked" ? "cliente" : "moked")}>{reguaId === "moked" ? "ver como o cliente" : "voltar à régua Moked"}</button></div>}
+    <div className="corpo">
+      {carregando && <p role="status" className="mu">Lendo os dados dos parques…</p>}
+      {!carregando && Object.keys(falhas).length > 0 && <div role="alert" className="card" style={{ borderColor: VERMELHO2 }}>
+        <div className="tit" style={{ color: VERMELHO2 }}>Não consegui ler {Object.keys(falhas).length === 1 ? "um parque" : `${Object.keys(falhas).length} parques`}</div>
+        {Object.entries(falhas).map(([k, v]) => <div key={k} className="mu">{k}: {v}</div>)}
+        <div className="mu" style={{ marginTop: 6 }}>Abra o menu ☰ e toque em Atualizar dados.</div>
+      </div>}
+      {!carregando && tela}
     </div>
-    {carregando && <p role="status" style={C.micro}>Lendo os dados dos parques…</p>}
-    {!carregando && Object.keys(falhas).length > 0 && <div role="alert" style={{ ...C.card, borderColor: VERMELHO2 }}>
-      <div style={{ ...C.titulo, color: VERMELHO2 }}>Não consegui ler {Object.keys(falhas).length === 1 ? "um parque" : `${Object.keys(falhas).length} parques`}</div>
-      {Object.entries(falhas).map(([k, v]) => <div key={k} style={C.micro}>{k}: {v}</div>)}
-      <div style={{ ...C.micro, marginTop: 6 }}>Toque em Atualizar para tentar de novo.</div>
-    </div>}
-    {!carregando && dados && (
-      pid && dados[pid]
-        ? <>
-          {gerencial && <FaixaGestor reguaId={reguaId} onRegua={setReguaId} />}
-          {detalhe && /^(sis$|favs$|pilar:|ind:)/.test(detalhe) && sisAtual
-            ? <SisDetalhe key={detalhe} tipo={detalhe} sis={sisAtual} nomeParque={dados[pid].nome} favs={favs} onFav={alternarFav} onAbrir={abrirDetalhe} onVoltar={voltarDetalhe} gestor={gerencial ? { outra: sisOutra } : null} />
-            : detalhe ? <Detalhe key={detalhe} p={dados[pid]} tipo={detalhe} onBack={voltarDetalhe} abrirPDF={abrirPDF} />
-              : <TelaProjeto p={dados[pid]} onBack={pids.length > 1 ? () => setPid(null) : null} onAbrir={abrirDetalhe} sis={sisAtual} favs={favs} />}
-        </>
-        : <TelaMacro escopo={escopo.escopo} dados={dados} onAbrir={setPid} regua={gerencial ? reguaId : "cliente"} />
-    )}
   </main>;
 }
