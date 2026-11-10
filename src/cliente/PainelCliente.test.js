@@ -27,7 +27,9 @@ const clicar = async (el) => { expect(el).toBeTruthy(); await act(async () => el
 const botao = (host, t) => [...host.querySelectorAll("button")].find((b) => b.textContent.includes(t) || b.getAttribute("aria-label") === t);
 const montar = async (host, root) => { await act(async () => root.render(<PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={health} ctmkData={{ P601: { status: "offline", offlineSince: "2026-10-18T10:00:00Z" } }} score360={async () => ({ score: 77.7, vulnerabilidades: ["CTMK off-line"] })} risco={async () => ({ nivel: 3, label: "ELEVADO", motivo: "1 via transponível", determinante: "Cancela P1", faltantes: [], vetores: [{ label: "Cancela P1", nivel: 3, inop: 2, total: 5, piorDias: 12, detalhe: "Cancela inoperante há 12 dias", note: "" }] })} abrirPDF={mockPDF} onBack={() => {}} />)); await act(async () => { await new Promise((r) => setTimeout(r, 20)); }); };
 
-test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com nome e situação", async () => {
+const menu = async (host, item) => { await clicar(botao(host, "Menu")); await clicar([...host.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === item)); };
+
+test("PIN de proprietário: macro do grupo → parque (padrão SIS+) → telas do menu ☰ com os dados de antes", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   mockCheckPin.mockImplementation(async (_p, o) => { if (!o.cliente) return null; global.__escopo = { escopo: "GOLGI", pids: ["P601", "P602"] }; return "cliente"; });
   try {
@@ -36,61 +38,66 @@ test("PIN de proprietário: macro do grupo → parque → detalhe do mapa com no
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "1234"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await clicar(botao(host, "ENTRAR")); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect(mockCheckPin).toHaveBeenCalledWith("1234", { cliente: true });
-    expect(host.textContent).toContain("2 parques · 4 colaboradores");
+    expect(host.textContent).toContain("Olá, Golgi"); expect(host.textContent).toContain("2 parques · 4 colaboradores");
     expect(host.textContent).toContain("Proprietário · visão macro");
     expect(host.textContent).toContain("2 faltas nos mapas de hoje");                    // consolidado do dia (mock: mesmo mapa nos 2 parques)
     await clicar(botao(host, "Abrir Golgi Cajamar"));
-    expect(host.textContent).toContain("SAÚDE DO PARQUE"); expect(host.textContent).toContain("50%");
-    expect(host.textContent).toContain("ANÁLISE DE RISCO"); expect(host.textContent).toContain("ELEVADO");
-    expect(host.textContent).toContain("Equipe de plantão"); expect(host.textContent).toContain("Ana"); expect(host.textContent).toContain("1 falta");
-    // análise de risco: item expande com quantidade e tempo
-    await clicar(botao(host, "Abrir análise de risco")); expect(host.textContent).not.toContain("há 12 dias");
+    expect(host.textContent).toContain("Olá, Golgi Cajamar"); expect(host.textContent).toContain("P601 · status da sua segurança");
+    expect(host.textContent).toContain("MOKED"); expect(host.textContent).toContain("Sistema Integrado de Segurança");
+    expect(host.textContent).toContain("⭐ Favoritos"); expect(host.textContent).toContain("Informativos · entorno"); expect(host.textContent).toContain("⚠ Comunicar problema");
+    expect(host.textContent).toContain("Equipe de plantão agora"); expect(host.textContent).toContain("Ana"); expect(host.textContent).toContain("1 falta");
+    // 🔔 avisos = luzes acesas
+    await clicar(botao(host, "Avisos: 4")); expect(host.textContent).toContain("CTMK off"); await clicar(botao(host, "← Início"));
+    // análise de risco pelo menu
+    await menu(host, "Análise de risco"); expect(host.textContent).toContain("ELEVADO"); expect(host.textContent).not.toContain("há 12 dias");
     await clicar(botao(host, "Detalhe: Cancela P1")); expect(host.textContent).toContain("2 de 5 inoperantes · há 12 dias");
-    await clicar(botao(host, "← Golgi Cajamar"));
+    await clicar(botao(host, "← Golgi Cajamar")); expect(host.textContent).toContain("Olá, Golgi Cajamar");
     // equipe de plantão: abas mapa (modelo do líder) / equipe completa por turno
     await clicar(botao(host, "Abrir equipe de plantão"));
     expect(host.querySelector('[data-testid="ver-mapas-mock"]')).not.toBeNull();
     await clicar(botao(host, "Equipe montada"));
     expect(host.querySelector('[data-testid="equipes-montadas"]')).not.toBeNull(); expect(host.textContent).toContain("NOTURNO"); expect(host.textContent).toContain("Bia Souza");
     await clicar(botao(host, "Maturidade")); expect(host.textContent).toContain("QUADRO"); expect(host.textContent).toContain("MATURIDADE");
-    await clicar(botao(host, "← Golgi Cajamar")); expect(host.textContent).toContain("1 em férias hoje");
-    await clicar(botao(host, "Abrir férias")); expect(host.textContent).toContain("Ana Lima");
+    await clicar(botao(host, "← Golgi Cajamar"));
+    await menu(host, "Férias"); expect(host.textContent).toContain("Ana Lima"); await clicar(botao(host, "← Golgi Cajamar"));
     // turnover: tabela + quem saiu
-    await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir turnover"));
+    await menu(host, "Turnover");
     expect(host.textContent).toContain("Quantos temos hoje"); expect(host.textContent).not.toContain("Zé Saiu");
     await clicar(botao(host, "Ver quem saiu")); expect(host.textContent).toContain("Zé Saiu"); expect(host.textContent).toContain("Pediu demissão");
     expect(host.textContent).toContain("Entraram nos últimos 12 meses");
     await clicar(botao(host, "Ver quem entrou")); expect(host.textContent).toContain("Bia Souza (VSPP Líder, desde 01/08/2026)");
     // teste semanal: toque abre o PDF
-    await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir teste semanal"));
+    await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Teste semanal");
     expect(host.textContent).toContain("O que está puxando a nota para baixo"); expect(host.textContent).toContain("sem imagem");
     await clicar(botao(host, `Abrir teste de ${hoje.slice(8, 10)}/${hoje.slice(5, 7)}/${hoje.slice(0, 4)}`));
     expect(mockPDF).toHaveBeenCalledWith("P601", stored.P601.history[0]);
     // treinamentos por colaborador
-    await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir treinamentos"));
+    await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Treinamentos");
     expect(host.textContent).toContain('1 registro "não aplicado" (não contam)');
     await clicar(botao(host, "Treinamentos de Ana Lima")); expect(host.textContent).toContain("Brigada");
     await clicar(botao(host, "Treinamentos de Bia Souza")); expect(host.textContent).toContain("NÃO APLICADO");
     // equipamentos item a item
-    await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir equipamentos"));
+    await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Equipamentos de plantão");
     expect(host.textContent).toContain("Smartphones");
-    await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "Abrir sistemas"));
+    await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Sistemas");
     expect(host.textContent).toContain("OFF-LINE"); expect(host.textContent).toContain("1 falha em aberto");
     await clicar(botao(host, "Detalhe: CTMK (central)")); expect(host.textContent).toContain("Sem comunicação com a central");
-    await clicar(botao(host, "← Golgi Cajamar")); await clicar(botao(host, "← Meus parques"));
+    await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Meus parques");
     expect(host.textContent).toContain("2 parques · 4 colaboradores");
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
-test("PIN de gestor do parque: entra direto no parque, sem botão de macro; PIN errado avisa", async () => {
+test("PIN de gestor do parque: entra direto no parque, sem 'Meus parques' no menu; PIN errado avisa", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   mockCheckPin.mockResolvedValueOnce(null).mockImplementation(async () => { global.__escopo = { escopo: "P601", pids: ["P601"] }; return "cliente"; });
   try {
     await montar(host, root);
     await clicar(botao(host, "ENTRAR")); expect(host.textContent).toContain("PIN inválido");
     await clicar(botao(host, "ENTRAR")); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    expect(host.textContent).toContain("Gestor do parque");
-    expect(host.textContent).toContain("Golgi Cajamar");
-    expect(botao(host, "← Meus parques")).toBeUndefined();
+    expect(host.textContent).toContain("Olá, Golgi Cajamar");
+    await clicar(botao(host, "Menu"));
+    expect(host.textContent).toContain("Gestor do parque · somente leitura");
+    expect(botao(host, "Meus parques")).toBeUndefined();
+    await clicar(botao(host, "Sair")); expect(host.querySelector('[aria-label="PIN do cliente"]')).not.toBeNull();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 test("SIS+: mostrador 360 → pilares → indicador; ★ favorita no início; gerencial vê a régua Moked e pode ver como o cliente", async () => {
@@ -101,20 +108,20 @@ test("SIS+: mostrador 360 → pilares → indicador; ★ favorita no início; ge
     await montar(host, root);
     await clicar(botao(host, "ENTRAR")); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect([...host.querySelectorAll("[role=img]")].some((e) => (e.getAttribute("aria-label") || "").startsWith("SIS+ condição geral"))).toBe(true);
-    expect(host.textContent).toContain("MOKED"); expect(host.textContent).toContain("Sistema Integrado de Segurança");
     expect(host.textContent).not.toContain("Área do Gestor");
-    await clicar(botao(host, "Ver detalhes do SIS+"));
-    expect(host.textContent).toContain("RT × 45% + RH × 35% + RA × 20%"); expect(host.textContent).toContain("Régua do cliente: ≥ 85 Bom");
+    await clicar(botao(host, "Ver detalhes da nota"));
+    expect(host.textContent).toContain("SIS+ · detalhamento"); expect(host.textContent).toContain("Nota geral = RT 45% + RH 35% + RA 20%"); expect(host.textContent).toContain("Régua do cliente: ≥ 85 Bom");
     await clicar(botao(host, "Abrir Recursos Humanos"));
-    expect(host.textContent).toContain("Satisfação da equipe"); expect(host.textContent).toContain("régua a definir — não entra na nota");
+    expect(host.textContent).toContain("Satisfação da equipe"); expect(host.textContent).toContain("a definir");
     await clicar(botao(host, "Pôr nos favoritos: Satisfação da equipe"));
     await clicar([...host.querySelectorAll('[role="button"]')].find((b) => b.getAttribute("aria-label") === "Abrir Turnover (12 meses)"));
-    expect(host.textContent).toContain("Ver os dados no painel");
+    expect(host.textContent).toContain("O que compõe"); expect(host.textContent).toContain("★ Nos favoritos"); // turnover é favorito padrão
     await clicar(botao(host, "Ver dados de Turnover (12 meses)")); expect(host.textContent).toContain("Quantos temos hoje");
-    await clicar(botao(host, "← Golgi Cajamar")); expect(host.textContent).toContain("Ver os dados no painel"); // volta ao indicador
-    await clicar(botao(host, "← Voltar")); await clicar(botao(host, "← Voltar")); await clicar(botao(host, "← Golgi Cajamar"));
-    expect(host.textContent).toContain("★ Favoritos"); expect(botao(host, "Abrir Satisfação da equipe")).toBeTruthy();
+    await clicar(botao(host, "← Golgi Cajamar")); expect(host.textContent).toContain("O que compõe"); // volta ao indicador
+    await clicar(botao(host, "← Voltar")); await clicar(botao(host, "← Voltar")); await clicar(botao(host, "← Início"));
+    expect(host.textContent).toContain("⭐ Favoritos"); expect(botao(host, "Abrir Satisfação da equipe")).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem("sis_favs:P601"))).toContain("satisfacao");
+    await clicar(botao(host, "Editar favoritos")); expect(host.textContent).toContain("⭐ Editar favoritos");
   } finally { await act(async () => root.unmount()); host.remove(); }
   // gerencial
   const host2 = document.createElement("div"); document.body.appendChild(host2); const root2 = createRoot(host2);
@@ -122,7 +129,7 @@ test("SIS+: mostrador 360 → pilares → indicador; ★ favorita no início; ge
   try {
     await montar(host2, root2); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect(host2.textContent).toContain("Área do Gestor · régua interna Moked");
-    await clicar(botao(host2, "Ver detalhes do SIS+")); expect(host2.textContent).toContain("Régua Moked: ≥ 92 Bom · 80–91 Alerta");
-    await clicar(botao(host2, "Como o cliente vê")); expect(host2.textContent).toContain("Área do Gestor · vendo como o cliente"); expect(host2.textContent).toContain("Régua do cliente: ≥ 85 Bom");
+    await clicar(botao(host2, "Ver detalhes da nota")); expect(host2.textContent).toContain("Régua Moked: ≥ 92 Bom · 80–91 Alerta");
+    await clicar(botao(host2, "ver como o cliente")); expect(host2.textContent).toContain("Área do Gestor · vendo como o cliente"); expect(host2.textContent).toContain("Régua do cliente: ≥ 85 Bom");
   } finally { await act(async () => root2.unmount()); host2.remove(); }
 });
