@@ -22,6 +22,9 @@ import { LOCAIS as LOCAIS_ENTORNO, recebeGeral } from "../entorno/locais";
 import { lerEntorno } from "../entorno/lerEntorno";
 import Localizacao from "./Localizacao";
 import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
+import { calcularMapaEquipe } from "../equipe/maturidade";
+import { baseSIS, calcularSIS, lerFavoritos, gravarFavoritos } from "./sis";
+import { SisInicio, SisDetalhe, FaixaGestor, REGUA_PADRAO } from "./SisPainel";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
 const COR_RISCO = { 1: VERDE, 2: AMARELO, 3: LARANJA, 4: VERMELHO2, 0: CINZA };
@@ -37,16 +40,17 @@ const ler = (col, pid) => getDoc(doc(db(), col, pid)).then((s) => (s.exists() ? 
 // ── Carregamento por projeto: tudo que a gestão vê hoje, em leitura ──────────
 async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, score360, risco) {
   const hoje = hojeISO();
-  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entornoResp] = await Promise.all([
+  const [eq, equip, mapasSnap, fotos, keyaccess, ilum, energia, peri, rondas, s360, risc, entornoResp, fuDoc] = await Promise.all([
     ler("equipes", pid).then((d) => d || {}),
     ler("equipamentos", pid),
-    getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(6))).then((s) => s.docs.map((d) => d.data())).catch(() => []),
+    getDocs(query(collection(db(), "equipes", pid, "mapas"), orderBy("data", "desc"), limit(20))).then((s) => s.docs.map((d) => d.data())).catch(() => []),
     carregarFotos(db(), pid).catch(() => ({})),
     ler("keyaccess_falhas", pid), ler("iluminacao", pid), ler("energia_ocorrencias", pid), ler("perimetral", pid),
     PERIMETRAL_VIA_RONDAS.includes(pid) ? ler("rondas", pid) : Promise.resolve(null),
     score360 ? score360(pid).catch(() => null) : Promise.resolve(null),
     risco ? risco(pid).catch(() => null) : Promise.resolve(null),
     lerEntorno(pid).catch(() => ({ docs: {}, geral: null })), // Entorno (03/11/2026): lido pelo servidor com a sessão do cliente
+    ler("followups", pid), // SIS+ (10/11/2026): tratativas das pendências
   ]);
   const entorno = entornoResp?.docs?.[pid] || null, entornoGeral = recebeGeral(pid) ? entornoResp?.geral || null : null;
   const colabs = (eq.colaboradores || []).filter((c) => c && (c.status || "ativo") === "ativo").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, turno: c.turno, desde: c.dataContratacao, foto: fotoDe(c, fotos), treinos: (c.historico || []).filter((h) => h && h.tipo === "Treinamento").length }));
@@ -73,6 +77,10 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
     desligados: (eq.desligados || []).filter((c) => c && typeof c === "object").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, saida: c.desligadoEm || null, motivo: c.motivoDesligamento || c.tipoDesligamento || "", foto: fotoDe(c, fotos) })).sort((a, b) => String(b.saida || "").localeCompare(String(a.saida || ""))),
   };
   p.luzes = luzes(p);
+  // SIS+ (10/11/2026): base pura para a nota (categorias do teste, distância, maturidade, tratativas, mapas)
+  let maturidade = null; try { maturidade = calcularMapaEquipe(eq, hoje); } catch { maturidade = null; }
+  const followups = Object.fromEntries((Array.isArray(fuDoc?.registros) ? fuDoc.registros : []).filter((r) => r && r.key).map((r) => [r.key, r]));
+  try { p.sisBase = baseSIS({ project: PROJECTS[pid], state: last?.state, equipeDoc: eq, mapas: mapasSnap, followups, maturidade, hojeISO: hoje }); } catch { p.sisBase = null; }
   return p;
 }
 
@@ -92,7 +100,7 @@ function MostradorRisco({ risco, tam = 180 }) {
   return <Mostrador valor={v} max={100} unidade="" rotulo="Análise de risco" tam={tam} cor={COR_RISCO[n] || CINZA} zonaCritica={[75, 100]} sub={n ? (risco.label || NIVEL_LABEL[n]) : "sem avaliação"} valorTexto={n ? (NIVEL_LABEL[n] || "") : "—"} zonas={[[0, 25, VERDE], [25, 50, AMARELO], [50, 75, LARANJA], [75, 100, VERMELHO2]]} />;
 }
 
-function TelaProjeto({ p, onBack, onAbrir }) {
+function TelaProjeto({ p, onBack, onAbrir, sis, favs }) {
   const m = p.mapa, s = p.sistemas;
   const plantao = m.lista.map((x) => ({ ...x, foto: p.colabs.find((k) => k.id === x.pessoaId)?.foto }));
   return <>
@@ -100,6 +108,8 @@ function TelaProjeto({ p, onBack, onAbrir }) {
       {onBack ? <button style={C.back} onClick={onBack}>← Meus parques</button> : <span />}
       <div style={{ ...C.titulo, marginBottom: 0 }}>{p.nome}</div>
     </div>
+    {/* SIS+ (10/11/2026): mostrador 360°, pilares RT/RH/RA e favoritos */}
+    {sis && <SisInicio sis={sis} favs={favs || []} onAbrir={onAbrir} />}
     {/* turnover */}
     <button style={C.cardBtn} onClick={() => onAbrir("turnover")} aria-label="Abrir turnover">
       <Mostrador valor={p.equipe.turnover} max={50} tam={250} rotulo="Turnover 12 m" unidade="%" invertido cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={p.equipe.turnover === null ? (p.equipe.turnoverMotivo || "não aferido") : `${p.equipe.ativos} hoje · ${p.equipe.saidas12m} saíram · ${p.equipe.entradas12m} entraram`} />
@@ -333,7 +343,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
 }
 
 // ── Macro (proprietário): resumo do grupo + um card por parque, no padrão do app ─────────────
-function TelaMacro({ escopo, dados, onAbrir }) {
+function TelaMacro({ escopo, dados, onAbrir, regua = "cliente" }) {
   const g = consolidarGrupo(dados);
   const label = GRUPOS_CLIENTE[escopo]?.label || escopo;
   const parques = Object.values(dados);
@@ -358,7 +368,7 @@ function TelaMacro({ escopo, dados, onAbrir }) {
     <div style={C.titulo}>Parques — toque para abrir o painel</div>
     {parques.map((p) => <button key={p.pid} style={C.cardBtn} onClick={() => onAbrir(p.pid)} aria-label={`Abrir ${p.nome}`}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#f1f5f9" }}>{p.nome}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#f1f5f9" }}>{p.nome}{(() => { const s = calcularSIS(p, regua); return <span style={{ ...C.chip(s.cor), marginLeft: 8, marginTop: 0 }}>SIS+ {s.geral === null ? "—" : `${s.geral}%`}</span>; })()}</div>
         <div style={{ display: "flex", gap: 6 }}><Luzinha c={p.teste.atrasado ? AMARELO : corDe(p.teste.pct)} t="Teste semanal" /><Luzinha c={COR_RISCO[p.risco?.nivel] || CINZA} t="Risco" /><Luzinha c={!p.mapa.hoje ? CINZA : p.mapa.faltas || p.mapa.vagos ? VERMELHO2 : VERDE} t="Mapa do dia" /><Luzinha c={corDe(p.equip.pct)} t="Equipamentos" /><Luzinha c={p.sistemas.ctmkOff ? VERMELHO2 : VERDE} t="CTMK" /></div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
@@ -374,7 +384,19 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const [escopo, setEscopo] = useState(() => getClienteScope());
   const [pin, setPin] = useState(""), [erro, setErro] = useState("");
   const [dados, setDados] = useState(null), [carregando, setCarregando] = useState(false);
-  const [pid, setPid] = useState(null), [detalhe, setDetalhe] = useState(null);
+  const [pid, setPidBruto] = useState(null), [pilha, setPilha] = useState([]); // pilha de telas de detalhe (SIS+ → pilar → indicador → dados)
+  const detalhe = pilha.length ? pilha[pilha.length - 1] : null;
+  const abrirDetalhe = (t) => setPilha((s) => [...s, t]), voltarDetalhe = () => setPilha((s) => s.slice(0, -1));
+  const setPid = (x) => { setPidBruto(x); setPilha([]); };
+  // SIS+ (10/11/2026): gerencial vê a régua Moked (mais rígida) e pode ver como o cliente vê; cliente só vê a dele.
+  const gerencial = escopo?.escopo === "MOKED";
+  const [reguaId, setReguaId] = useState(() => REGUA_PADRAO(getClienteScope()?.escopo === "MOKED"));
+  useEffect(() => { setReguaId(REGUA_PADRAO(gerencial)); }, [gerencial]);
+  const [favs, setFavs] = useState(() => lerFavoritos(getClienteScope()?.escopo));
+  useEffect(() => { if (escopo) setFavs(lerFavoritos(escopo.escopo)); }, [escopo]);
+  const alternarFav = (id) => setFavs((f) => { const n = f.includes(id) ? f.filter((x) => x !== id) : [...f, id]; gravarFavoritos(escopo?.escopo, n); return n; });
+  const sisAtual = useMemo(() => (pid && dados?.[pid] ? calcularSIS(dados[pid], gerencial ? reguaId : "cliente") : null), [pid, dados, reguaId, gerencial]);
+  const sisOutra = useMemo(() => (gerencial && pid && dados?.[pid] ? calcularSIS(dados[pid], reguaId === "moked" ? "cliente" : "moked") : null), [pid, dados, reguaId, gerencial]);
   const [falhas, setFalhas] = useState({}), [atualizadoEm, setAtualizadoEm] = useState(null), [versao, setVersao] = useState(0);
   const pids = useMemo(() => (escopo ? (escopo.pids || Object.keys(PROJECTS)) : []), [escopo, PROJECTS]);
   // Carga estável (28/10/2026): as funções e dados vindos do App mudam a cada render dele; antes isso reiniciava a
@@ -409,7 +431,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
       setPin(""); setEscopo(getClienteScope());
     } finally { window.removeEventListener("moklog-auth-error", ouvir); }
   };
-  const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); setDetalhe(null); onBack && onBack(); };
+  const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); onBack && onBack(); };
   const perfil = !escopo ? "" : escopo.escopo === "MOKED" ? "Visão Moked (gerencial)" : escopo.pids.length > 1 ? "Proprietário · visão macro" : "Gestor do parque";
 
   if (!escopo) return <main style={C.main}>
@@ -437,9 +459,14 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
     </div>}
     {!carregando && dados && (
       pid && dados[pid]
-        ? (detalhe ? <Detalhe key={detalhe} p={dados[pid]} tipo={detalhe} onBack={() => setDetalhe(null)} abrirPDF={abrirPDF} />
-          : <TelaProjeto p={dados[pid]} onBack={pids.length > 1 ? () => setPid(null) : null} onAbrir={setDetalhe} />)
-        : <TelaMacro escopo={escopo.escopo} dados={dados} onAbrir={setPid} />
+        ? <>
+          {gerencial && <FaixaGestor reguaId={reguaId} onRegua={setReguaId} />}
+          {detalhe && /^(sis$|favs$|pilar:|ind:)/.test(detalhe) && sisAtual
+            ? <SisDetalhe key={detalhe} tipo={detalhe} sis={sisAtual} nomeParque={dados[pid].nome} favs={favs} onFav={alternarFav} onAbrir={abrirDetalhe} onVoltar={voltarDetalhe} gestor={gerencial ? { outra: sisOutra } : null} />
+            : detalhe ? <Detalhe key={detalhe} p={dados[pid]} tipo={detalhe} onBack={voltarDetalhe} abrirPDF={abrirPDF} />
+              : <TelaProjeto p={dados[pid]} onBack={pids.length > 1 ? () => setPid(null) : null} onAbrir={abrirDetalhe} sis={sisAtual} favs={favs} />}
+        </>
+        : <TelaMacro escopo={escopo.escopo} dados={dados} onAbrir={setPid} regua={gerencial ? reguaId : "cliente"} />
     )}
   </main>;
 }
