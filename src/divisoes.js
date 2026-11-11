@@ -16,7 +16,10 @@ const idsDoSegmento = (seg) => MOKPAT.filter(([, s]) => s === seg).map(([id]) =>
 // Projeto MokPat nasce sem checklist: o inventário de equipamentos é cadastrado pelo líder (etapa seguinte).
 const projetosMokpat = () => Object.fromEntries(MOKPAT.map(([id, seg]) => [id, { id, name: SEGMENTOS[seg].nome, short: `${SEGMENTOS[seg].nome} ${id}`, div: "mokpat", seg, categories: [] }]));
 const DIVISAO_IDS = { mokpat: MOKPAT_IDS };
+// Funções do cadastro de colaborador no MokPat (Marcio, 11/11/2026). "VSPP Líder" é o mesmo nome do MokLog de propósito:
+// é ele que identifica o líder no mapa de equipe e nas regras de liderança. Faltou alguma? É só acrescentar aqui.
+const CARGOS_MOKPAT = ["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro"];
 const divisaoDoProjeto = (pid) => (MOKPAT_IDS.includes(pid) ? "mokpat" : "moklog");
 const faixa = (ids) => (ids.length > 2 ? `${ids[0]} — ${ids[ids.length - 1]}` : ids.join(", "));
 
-module.exports = { MOKPAT, MOKPAT_IDS, SEGMENTOS, DIVISAO_IDS, idsDoSegmento, projetosMokpat, divisaoDoProjeto, faixa };
+module.exports = { CARGOS_MOKPAT, MOKPAT, MOKPAT_IDS, SEGMENTOS, DIVISAO_IDS, idsDoSegmento, projetosMokpat, divisaoDoProjeto, faixa };

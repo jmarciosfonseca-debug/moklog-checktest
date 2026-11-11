@@ -1,4 +1,5 @@
 import { Ico } from "./Icones";
+import { CARGOS_MOKPAT, divisaoDoProjeto } from "./divisoes";
 import { getDocsSeguro } from "./lerServidor";
 import { iconeTema } from "./temaClaro";
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
@@ -2130,7 +2131,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const S = getStyles(dark);
   const adminAuth = authLevel === "admin";
   const liderAuth = authLevel === "lider" || authLevel === "admin";
-  const cargos = CARGOS_PROJETO[project.id] || ["Colaborador"];
+  const cargos = CARGOS_PROJETO[project.id] || (divisaoDoProjeto(project.id) === "mokpat" ? CARGOS_MOKPAT : ["Colaborador"]); // MokPat (11/11/2026): lista padrão da divisão
 
   // ── ADENDO EQUIPE — FV / Cesta de Natal / Aprovação ─────────────────
   // Reavalia ao abrir/voltar ao app (hook existente), sem relógio contínuo.
