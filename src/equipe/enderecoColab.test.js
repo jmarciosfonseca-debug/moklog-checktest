@@ -44,7 +44,7 @@ test("distância casa → projeto e aplicação ao salvar (só geocodifica quand
 });
 
 test("links do Maps: Como chegar parte da posição atual; embed em satélite; todos os 12 parques têm coordenada", () => {
-  expect(Object.keys(COORDS).sort()).toEqual(["P260A", "P260B", "P260C", "P311A", "P311B", "P505", "P601", "P602", "P604", "P605", "P606", "P607"]);
+  expect(Object.keys(COORDS).filter((p) => p !== "P939").sort()).toEqual(["P260A", "P260B", "P260C", "P311A", "P311B", "P505", "P601", "P602", "P604", "P605", "P606", "P607"]); // P939 = MokPat (11/11/2026), coberto em mokpat.test.js
   expect(mapsDirUrl("P604")).toBe("https://www.google.com/maps/dir/?api=1&destination=-23.1625984,-46.9951726&travelmode=driving");
   expect(mapsEmbedUrl("P604")).toMatch(/t=k/);
   expect(mapsDirUrl("PXXX")).toBe("");
