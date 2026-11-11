@@ -56,6 +56,8 @@ const COORDS = {
   P260A: { lat: -23.5927658, lng: -46.5915028, endereco: "Rua Roberto Koch, 363 — Vila Independência, São Paulo/SP, 04221-060 (matriz)" },
   P260B: { lat: -23.5846026, lng: -46.5980819, endereco: "Rua Barão de Resende — Ipiranga, São Paulo/SP, 04210-050 (filial)" },
   P260C: { lat: -23.1214197, lng: -47.2681132, endereco: "Avenida Horst Frederico João Heer, 700 — Europark, Indaiatuba/SP" },
+  // MokPat (11/11/2026): coordenada informada pelo Marcio — base da distância casa → projeto no cadastro do colaborador.
+  P939:  { lat: -23.5482861, lng: -46.7142361, endereco: "Av. Prof. Fonseca Rodrigues, 706 — Alto de Pinheiros, São Paulo/SP, 05461-010" },
 };
 const coordsDe = (pid) => COORDS[pid] || null;
 // Links do Google Maps (06/11/2026): "Como chegar" parte da posição atual de quem toca; satélite no embed (t=k).

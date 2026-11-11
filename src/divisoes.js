@@ -18,7 +18,7 @@ const projetosMokpat = () => Object.fromEntries(MOKPAT.map(([id, seg]) => [id, {
 const DIVISAO_IDS = { mokpat: MOKPAT_IDS };
 // Funções do cadastro de colaborador no MokPat (Marcio, 11/11/2026). "VSPP Líder" é o mesmo nome do MokLog de propósito:
 // é ele que identifica o líder no mapa de equipe e nas regras de liderança. Faltou alguma? É só acrescentar aqui.
-const CARGOS_MOKPAT = ["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro"];
+const CARGOS_MOKPAT = ["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro", "Ascensorista"];
 const divisaoDoProjeto = (pid) => (MOKPAT_IDS.includes(pid) ? "mokpat" : "moklog");
 const faixa = (ids) => (ids.length > 2 ? `${ids[0]} — ${ids[ids.length - 1]}` : ids.join(", "));
 

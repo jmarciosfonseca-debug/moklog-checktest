@@ -5,6 +5,7 @@
 // e a página abre com satélite, "Como chegar" e "Abrir no Maps". Não expõe nada além do endereço do parque.
 // Rota amigável: /local/P601 (vercel.json → /api/local?pid=P601).
 // ─────────────────────────────────────────────────────────────
+const { divisaoDoProjeto } = require("../src/divisoes");
 const { COORDS, LOCAIS, mapsDirUrl, mapsVerUrl, mapsEmbedUrl } = require("../src/entorno/locais");
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -42,7 +43,8 @@ h1{font-size:20px;margin:16px 0 4px}.pid{color:#9ca3af;font-size:12px;letter-spa
 module.exports = async (req, res) => {
   const pid = String(req.query?.pid || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
   res.setHeader("Cache-Control", "public, max-age=3600");
-  if (!COORDS[pid]) { res.status(404).setHeader("Content-Type", "text/plain; charset=utf-8"); return res.end("Projeto não encontrado."); }
+  // MokPat: endereço de projeto patrimonial (residencial/comercial) não tem página pública.
+  if (!COORDS[pid] || divisaoDoProjeto(pid) !== "moklog") { res.status(404).setHeader("Content-Type", "text/plain; charset=utf-8"); return res.end("Projeto não encontrado."); }
   res.status(200).setHeader("Content-Type", "text/html; charset=utf-8");
   return res.end(paginaHTML(pid));
 };
