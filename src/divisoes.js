@@ -2,19 +2,17 @@
 // Comercial) e MokImp (implantação). CommonJS de propósito: lido pelo app (React) e pelo servidor (api/).
 // Regra de separação: o PIN do gestor de uma divisão só abre os projetos dela; o PIN de líder segue sendo por projeto.
 // O PIN gerencial Moked (admin) é global.
-const RESIDENCIAL = ["P032", "P035", "P160", "P256", "P380", "P560", "P925", "P931", "P932", "P936", "P939", "P942", "P944", "P946", "P947", "P950", "P951", "P952", "P953", "P954", "P955", "P956", "P957", "P958", "P959", "P961"];
-const COMERCIAL = ["P703", "P740", "P763", "P770", "P777", "P868"];
-const MOKPAT = [...RESIDENCIAL.map((id) => [id, "residencial"]), ...COMERCIAL.map((id) => [id, "comercial"])].sort((a, b) => a[0].localeCompare(b[0]));
-// MokImp: área aberta em 11/11/2026, ainda sem projetos. Para cadastrar: ["P123", "segmento"] (segmento opcional).
-const MOKIMP = [];
+const lista = (residencial, comercial) => [...residencial.map((id) => [id, "residencial"]), ...comercial.map((id) => [id, "comercial"])].sort((a, b) => a[0].localeCompare(b[0]));
+const MOKPAT = lista(["P032", "P035", "P160", "P256", "P380", "P560", "P925", "P936", "P939", "P946", "P947", "P955", "P956"], ["P740", "P770", "P777", "P868"]);
+// MokImp (lista do Marcio, 11/11/2026). Atenção: estes 15 são do MokImp, não do MokPat.
+const MOKIMP = lista(["P931", "P932", "P942", "P944", "P950", "P951", "P952", "P953", "P954", "P957", "P958", "P959", "P961"], ["P703", "P763"]);
 const SEGMENTOS = {
   residencial: { key: "residencial", label: "Projetos Residencial", nome: "Residencial", cor: "#c9a48a" },
   comercial: { key: "comercial", label: "Projetos Comercial", nome: "Comercial", cor: "#38bdf8" },
-  implantacao: { key: "implantacao", label: "Projetos Implantação", nome: "Implantação", cor: "#38bdf8" },
 };
 const DIVISOES = {
   mokpat: { id: "mokpat", nome: "MokPat", sub: "Patrimonial · Residencial e Comercial", lista: MOKPAT, segmentos: ["residencial", "comercial"] },
-  mokimp: { id: "mokimp", nome: "MokImp", sub: "Implantação", lista: MOKIMP, segmentos: ["implantacao"] },
+  mokimp: { id: "mokimp", nome: "MokImp", sub: "Implantação · Residencial e Comercial", lista: MOKIMP, segmentos: ["residencial", "comercial"] },
 };
 const MOKPAT_IDS = MOKPAT.map(([id]) => id);
 const DIVISAO_IDS = Object.fromEntries(Object.values(DIVISOES).map((d) => [d.id, d.lista.map(([id]) => id)]));

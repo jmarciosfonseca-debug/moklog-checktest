@@ -4662,12 +4662,12 @@ export default function App(){
       golgi: ["P601","P602","P604","P605","P606","P607"],
       mega:  ["P311A","P311B"],
       klog:  ["P505"],
-      ...Object.fromEntries(Object.keys(SEGMENTOS).map(k=>[k,idsDoSegmento(k)])),
+      ...Object.fromEntries(Object.keys(SEGMENTOS).map(k=>[k,idsDoSegmento(k,divisao)])), // Residencial/Comercial existem no MokPat e no MokImp: só os da divisão aberta
     }[homeGroupEf] || [];
     const _escopoLider = !hasGerencial() ? getScopedProjectId() : null;
     if(_escopoLider && groupProjects.includes(_escopoLider)) groupProjects = [_escopoLider];
-    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog",residencial:"MokPat · Projetos Residencial",comercial:"MokPat · Projetos Comercial",implantacao:"MokImp · Projetos Implantação"};
-    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a",residencial:"#c9a48a",comercial:"#38bdf8",implantacao:"#38bdf8"};
+    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog",residencial:`${DIVNOME} · Projetos Residencial`,comercial:`${DIVNOME} · Projetos Comercial`};
+    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a",residencial:"#c9a48a",comercial:"#38bdf8"};
     const color = groupColors[homeGroupEf];
     return (
       <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
