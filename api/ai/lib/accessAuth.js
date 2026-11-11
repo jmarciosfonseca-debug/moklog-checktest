@@ -3,8 +3,8 @@ const TTL=8*3600000,WINDOW=15*60000;
 const {DIVISAO_IDS}=require('../../../src/divisoes');
 // MokPat (11/11/2026): projetos patrimoniais entram na lista de projetos válidos; o gestor da divisão tem nível próprio
 // ('gestor', com div) e só alcança os projetos da divisão dele. requireAdmin continua exclusivo do admin Moked.
-const PROJECTS=['P260A','P260B','P260C','P311A','P311B','P505','P601','P602','P604','P605','P606','P607',...DIVISAO_IDS.mokpat];
-const GESTORES={mokpat:'MOKPAT_PIN_HASH'};
+const PROJECTS=['P260A','P260B','P260C','P311A','P311B','P505','P601','P602','P604','P605','P606','P607',...Object.values(DIVISAO_IDS).flat()];
+const GESTORES={mokpat:'MOKPAT_PIN_HASH',mokimp:'MOKIMP_PIN_HASH'};
 // Painel do Cliente (só leitura). PIN por projeto = gestor do parque; PIN por grupo = proprietário (vê todos do grupo).
 const GRUPOS={GOLGI:['P601','P602','P604','P605','P606','P607'],MEGA:['P311A','P311B'],P260:['P260A','P260B','P260C'],P505:['P505'],
  // MokPat (11/11/2026): o cliente do P939 responde também pelo P944 (entra no escopo quando o projeto for cadastrado).
@@ -23,12 +23,16 @@ function hashes(){
  return c;
 }
 function equalPin(pin,h){if(!h)return false;let a,b;if(h.startsWith('scrypt:')){const [,salt,v]=h.split(':');a=crypto.scryptSync(pin,Buffer.from(salt,'hex'),32);b=Buffer.from(v,'hex');}else{a=crypto.createHash('sha256').update(pin).digest();b=Buffer.from(h,'hex');}return a.length===b.length&&crypto.timingSafeEqual(a,b);}
-function classify(pin,c,pid,ronda){
+function classify(pin,c,pid,ronda,div){
  const admin=equalPin(pin,c.admin),demo=equalPin(pin,c.demo),leaders=PROJECTS.filter(p=>equalPin(pin,c.lider[p])),operator=equalPin(pin,c.ronda);
  const clientes=Object.keys(c.cliente||{}).filter(k=>equalPin(pin,c.cliente[k].hash));
  const outros=Number(admin)+Number(demo)+leaders.length+Number(operator)+clientes.length;
  // PIN de gestor de divisão que coincide com outro PIN já existente não vale como gestor (e não derruba o acesso de quem já usava).
- const gestores=outros?[]:Object.keys(c.gestor||{}).filter(d=>equalPin(pin,c.gestor[d]));
+ let gestores=outros?[]:Object.keys(c.gestor||{}).filter(d=>equalPin(pin,c.gestor[d]));
+ // Mesmo PIN de gestor em mais de uma divisão (PIN inicial provisório): vale a divisão da porta por onde entrou; sem porta
+ // (Área do Cliente), a do projeto pedido ou a primeira que já tem projetos.
+ if(gestores.length>1){const d=gestores.includes(div)?div:gestores.find(g=>pid&&DIVISAO_IDS[g].includes(pid))||(!div&&(gestores.find(g=>DIVISAO_IDS[g].length)||gestores[0]));gestores=d?[d]:[];if(!d)return null;}
+ else if(gestores.length===1&&div&&DIVISAO_IDS[div]&&gestores[0]!==div)return null; // gestor de uma divisão na porta de outra
  if(outros+gestores.length>1)return null; // Ambiguous shared PINs never escalate a leader to admin.
  if(admin)return {nivel:'admin'};if(demo)return {nivel:'demo'};
  if(gestores.length===1)return pid&&!DIVISAO_IDS[gestores[0]].includes(pid)?null:{nivel:'gestor',div:gestores[0]};
@@ -51,10 +55,10 @@ function verify(token,now=Date.now()){
 const {noProjeto}=require('./escopoDivisao');
 function requireAdmin(req,res){const m=/^Bearer ([-\w]+\.[-\w]+)$/.exec(req.headers?.authorization||''),a=verify(m?.[1]);if(!a){res.status(401).json({ok:false,erro:'Sessão ausente ou expirada. Entre novamente.'});return null;}if(a.nivel!=='admin'){res.status(403).json({ok:false,erro:'Acesso exclusivamente gerencial.'});return null;}return a;}
 function clientIp(req){const value=process.env.VERCEL==='1'?req.headers?.['x-vercel-forwarded-for']||req.headers?.['x-forwarded-for']:req.socket?.remoteAddress;const ip=typeof value==='string'?value.split(',')[0].trim():'';if(!net.isIP(ip))throw Error('AUTH_IP');return ip;}
-async function attempt(db,ip,pin,c,pid,ronda,now=Date.now()){
+async function attempt(db,ip,pin,c,pid,ronda,now=Date.now(),div){
  const ref=db.collection('auth_tentativas').doc(crypto.createHmac('sha256',secret()).update(ip).digest('hex'));
  return db.runTransaction(async t=>{const old=(await t.get(ref)).data()||{};if(old.bloqueadoAte>now)return {blocked:true,retry:Math.ceil((old.bloqueadoAte-now)/1000)};
- const identity=classify(pin,c,pid,ronda);if(identity){t.set(ref,{falhas:0,inicioMs:now,bloqueadoAte:0,expiraEm:new Date(now+WINDOW*2)});return {identity};}
+ const identity=classify(pin,c,pid,ronda,div);if(identity){t.set(ref,{falhas:0,inicioMs:now,bloqueadoAte:0,expiraEm:new Date(now+WINDOW*2)});return {identity};}
  const reset=!old.inicioMs||now-old.inicioMs>=WINDOW||(old.bloqueadoAte&&old.bloqueadoAte<=now),falhas=reset?1:(old.falhas||0)+1;
  t.set(ref,{falhas,inicioMs:reset?now:old.inicioMs,bloqueadoAte:falhas>=5?now+WINDOW:0,expiraEm:new Date(now+WINDOW*2)});return falhas>=5?{blocked:true,retry:900}:{invalid:true};});
 }

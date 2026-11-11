@@ -8,7 +8,7 @@ const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10p
 const botao = { background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "13px 38px", fontWeight: 900, letterSpacing: 2.5, fontSize: 14, cursor: "pointer", clipPath: chanfro, boxShadow: "0 0 18px #FF1E2766", textTransform: "uppercase", width: "100%" };
 
 // MokPat (11/11/2026): mesma porta, com o logo e o nome da divisão. O PIN é validado na divisão aberta (session.js).
-const DIV = { moklog: { nome: "MokLog", logo: "/moked/divisoes/moklog.jpg", sub: "PIN do consultor abre todos os parques · PIN do projeto abre só o seu" }, mokpat: { nome: "MokPat", logo: "/moked/divisoes/mokpat.jpg", sub: "PIN do consultor abre todos os projetos · PIN do projeto abre só o seu" } };
+const DIV = { moklog: { nome: "MokLog", logo: "/moked/divisoes/moklog.jpg", sub: "PIN do consultor abre todos os parques · PIN do projeto abre só o seu" }, mokpat: { nome: "MokPat", logo: "/moked/divisoes/mokpat.jpg", sub: "PIN do consultor abre todos os projetos · PIN do projeto abre só o seu" }, mokimp: { nome: "MokImp", logo: "/moked/divisoes/mokimp.jpg", sub: "PIN do consultor abre todos os projetos · PIN do projeto abre só o seu" } };
 export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, divisao = "moklog", logo = (DIV[divisao] || DIV.moklog).logo }) {
   const d = DIV[divisao] || DIV.moklog;
   const [pin, setPin] = useState("");

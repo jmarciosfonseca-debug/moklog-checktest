@@ -2131,7 +2131,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const S = getStyles(dark);
   const adminAuth = authLevel === "admin";
   const liderAuth = authLevel === "lider" || authLevel === "admin";
-  const cargos = CARGOS_PROJETO[project.id] || (divisaoDoProjeto(project.id) === "mokpat" ? CARGOS_MOKPAT : ["Colaborador"]); // MokPat (11/11/2026): lista padrão da divisão
+  const cargos = CARGOS_PROJETO[project.id] || (divisaoDoProjeto(project.id) !== "moklog" ? CARGOS_MOKPAT : ["Colaborador"]); // MokPat e MokImp (11/11/2026): lista padrão das divisões novas
 
   // ── ADENDO EQUIPE — FV / Cesta de Natal / Aprovação ─────────────────
   // Reavalia ao abrir/voltar ao app (hook existente), sem relógio contínuo.

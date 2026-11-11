@@ -22,7 +22,7 @@ import { lerEntorno } from "../entorno/lerEntorno";
 import Localizacao from "./Localizacao";
 import { mesclar as mesclarEntorno, resumir as resumirEntorno } from "../entorno/core";
 import { calcularMapaEquipe } from "../equipe/maturidade";
-import { divisaoDoProjeto } from "../divisoes";
+import { divisaoDoProjeto, DIVISOES } from "../divisoes";
 import { baseSIS, calcularSIS, lerFavoritos, gravarFavoritos } from "./sis";
 import { CSS_SIS, Barra, Home, TelaSis, TelaPilar, TelaItem, TelaFavs, TelaMenu, TelaAvisos, TelaComunicar, Macro } from "./AreaSIS";
 const LARANJA = "#f97316";
@@ -259,7 +259,8 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const abrirDetalhe = (t) => setPilha((s) => [...s, t]), voltarDetalhe = () => setPilha((s) => s.slice(0, -1));
   const setPid = (x) => { setPidBruto(x); setPilha([]); };
   // SIS+ (10/11/2026): gerencial vê a régua Moked (mais rígida) e pode ver como o cliente vê; cliente só vê a dele.
-  const gerencial = escopo?.escopo === "MOKED" || escopo?.escopo === "MOKPAT";
+  const gestorDiv = !!escopo && !!DIVISOES[String(escopo.escopo).toLowerCase()]; // gestor de divisão (MokPat, MokImp)
+  const gerencial = escopo?.escopo === "MOKED" || gestorDiv;
   const [reguaId, setReguaId] = useState(() => (getClienteScope()?.escopo === "MOKED" ? "moked" : "cliente"));
   useEffect(() => { setReguaId(gerencial ? "moked" : "cliente"); }, [gerencial]);
   const [favs, setFavs] = useState(() => lerFavoritos(getClienteScope()?.escopo));
@@ -270,7 +271,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const [falhas, setFalhas] = useState({}), [atualizadoEm, setAtualizadoEm] = useState(null), [versao, setVersao] = useState(0);
   // Gerencial Moked (pids null) vê os parques MokLog; MokPat entra pelo PIN do gestor MokPat ou do cliente do projeto.
   const pids = useMemo(() => (escopo ? (escopo.pids || Object.keys(PROJECTS).filter((p) => divisaoDoProjeto(p) === "moklog")).filter((p) => PROJECTS[p]) : []), [escopo, PROJECTS]);
-  const pat = !!escopo && pids.length > 0 && pids.every((p) => divisaoDoProjeto(p) === "mokpat"), termo = pat ? "projetos" : "parques";
+  const pat = !!escopo && pids.length > 0 && pids.every((p) => divisaoDoProjeto(p) !== "moklog"), termo = pat ? "projetos" : "parques";
   // Carga estável (28/10/2026): as funções e dados vindos do App mudam a cada render dele; antes isso reiniciava a
   // leitura a cada atualização e cancelava a leitura em andamento (painel em branco/zerado). Agora a leitura roda
   // uma vez por escopo (ou ao tocar em Atualizar) e usa sempre a versão mais recente dos dados do App.
@@ -304,7 +305,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
     } finally { window.removeEventListener("moklog-auth-error", ouvir); }
   };
   const sair = () => { clearSession(); setEscopo(null); setDados(null); setPid(null); onBack && onBack(); };
-  const perfil = !escopo ? "" : escopo.escopo === "MOKED" ? "Visão Moked (gerencial)" : escopo.escopo === "MOKPAT" ? "Visão MokPat (gestor)" : pids.length > 1 ? "Proprietário · visão macro" : pat ? "Cliente do projeto" : "Gestor do parque";
+  const perfil = !escopo ? "" : escopo.escopo === "MOKED" ? "Visão Moked (gerencial)" : gestorDiv ? `Visão ${DIVISOES[escopo.escopo.toLowerCase()].nome} (gestor)` : pids.length > 1 ? "Proprietário · visão macro" : pat ? "Cliente do projeto" : "Gestor do parque";
 
   const pAtual = pid && dados?.[pid] ? dados[pid] : null;
   const sisPorPid = useMemo(() => { const o = {}; Object.values(dados || {}).forEach((x) => { try { o[x.pid] = calcularSIS(x, gerencial ? reguaId : "cliente"); } catch { o[x.pid] = null; } }); return o; }, [dados, reguaId, gerencial]);

@@ -14,6 +14,7 @@ export const GRUPOS_CLIENTE = {
   P505: { label: "Klog", pids: ["P505"] },
   // MokPat (11/11/2026)
   MOKPAT: { label: "MokPat", pids: null },
+  MOKIMP: { label: "MokImp", pids: null },
   P939: { label: "P939 · P944", pids: ["P939", "P944"] },
 };
 export const grupoDe = (escopo) => GRUPOS_CLIENTE[escopo] || null;

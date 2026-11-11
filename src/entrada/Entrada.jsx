@@ -8,7 +8,7 @@ export const DIVISOES = [
   { id: "mokpat", nome: "MokPat", sub: "Patrimonial", ativo: true, cor: "#E50914" },
   { id: "mokvip", nome: "MokVip", sub: "Executivos e eventos", ativo: false, cor: "#a855f7" },
   { id: "mokres", nome: "MokRes", sub: "Residencial", ativo: false, cor: "#22c55e" },
-  { id: "mokimp", nome: "MokImp", sub: "Implantação", ativo: false, cor: "#38bdf8" },
+  { id: "mokimp", nome: "MokImp", sub: "Implantação", ativo: true, cor: "#E50914" },
   { id: "moktec", nome: "MokTec", sub: "Tecnologia", ativo: false, cor: "#e11d48" },
 ];
 export const logoDivisao = (id) => `/moked/divisoes/${id}.jpg`;
