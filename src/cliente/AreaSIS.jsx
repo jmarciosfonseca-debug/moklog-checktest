@@ -244,7 +244,7 @@ export function TelaComunicar({ onVoltar }) {
 }
 
 // ── Visão macro do proprietário (vários parques) no mesmo padrão ──
-export function Macro({ nome, parques, sisPorPid, onAbrir, sub, hojeGrupo }) {
+export function Macro({ nome, parques, sisPorPid, onAbrir, sub, hojeGrupo, termo = "parques" }) {
   const vs = parques.map((p) => sisPorPid[p.pid]?.geral).filter((v) => typeof v === "number");
   const media = vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : null;
   const regua = parques.length ? sisPorPid[parques[0].pid]?.regua : undefined;
@@ -252,7 +252,7 @@ export function Macro({ nome, parques, sisPorPid, onAbrir, sub, hojeGrupo }) {
     <div className="ola">Olá, {nome}</div>
     <div className="sub">{sub}</div>
     <G360 v={media} regua={regua} />
-    <div className="card"><div className="tit">Seus parques</div>
+    <div className="card"><div className="tit">Seus {termo}</div>
       {parques.map((p) => { const s = sisPorPid[p.pid]; return <button key={p.pid} className="pilar" onClick={() => onAbrir(p.pid)} aria-label={`Abrir ${p.nome}`}>
         <Semi v={s?.geral ?? null} regua={regua} tam={92} />
         <div style={{ flex: 1 }}><div style={{ fontWeight: 800 }}>{p.nome}</div><div className="mu">{ORDEM_PILARES.map((k) => `${k} ${pc(s?.pilares[k].valor)}`).join(" · ")}</div><div style={{ marginTop: 4 }}><Chip v={s?.geral ?? null} regua={regua} /></div></div>

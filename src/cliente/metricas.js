@@ -12,6 +12,9 @@ export const GRUPOS_CLIENTE = {
   MEGA: { label: "Mega", pids: ["P311A", "P311B"] },
   P260: { label: "Jatinox", pids: ["P260A", "P260B", "P260C"] },
   P505: { label: "Klog", pids: ["P505"] },
+  // MokPat (11/11/2026)
+  MOKPAT: { label: "MokPat", pids: null },
+  P939: { label: "P939 · P944", pids: ["P939", "P944"] },
 };
 export const grupoDe = (escopo) => GRUPOS_CLIENTE[escopo] || null;
 
