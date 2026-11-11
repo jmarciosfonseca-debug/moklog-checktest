@@ -1,11 +1,11 @@
 // Token emitido pelo servidor. O PIN nunca é guardado; o token fica na memória e, por decisão do Marcio (26/10/2026),
 // também no aparelho por uma janela curta de inatividade — gerencial/cliente 30 min, líder 15 min — para não pedir PIN
 // a cada troca de tela ou ao fechar e reabrir. A janela renova a cada toque; o teto é a validade do token no servidor.
-import { divisaoDoProjeto, MOKPAT_IDS } from './divisoes';
+import { divisaoDoProjeto, DIVISAO_IDS, DIVISOES, ehDivisao } from './divisoes';
 let current=null,pending=null;
 // Divisão aberta no app (MokLog | MokPat). O PIN de gestor de divisão e o PIN de líder só valem na divisão do projeto deles.
 let divisaoAtiva='moklog';
-export function setDivisaoAtiva(d){divisaoAtiva=d==='mokpat'?'mokpat':'moklog';}
+export function setDivisaoAtiva(d){divisaoAtiva=ehDivisao(d)?d:'moklog';}
 export function getDivisaoAtiva(){return divisaoAtiva;}
 // Divisão da sessão gerencial: null = gerencial Moked (global); 'mokpat' = gestor só do MokPat.
 export function getDivisaoSessao(){const s=getSession();return s&&s.nivel==='gerencial'?s.div||null:null;}
@@ -25,7 +25,7 @@ export function isDemo(){return getSession()?.nivel==='demo';}
 export function hasGerencial(){return ['gerencial','demo'].includes(getSession()?.nivel);}
 export function getScopedProjectId(){const s=getSession();return s?.nivel==='equipe'?s.projectId:null;}
 // Painel do Cliente: {escopo:'GOLGI'|'P601', pids:[...]} ou null. Gerencial/demo veem todos (escopo 'MOKED').
-export function getClienteScope(){const s=getSession();if(!s)return null;if(s.nivel==='cliente')return {escopo:s.escopo,pids:s.pids||[]};if(s.nivel==='gerencial'&&s.div)return s.div==='mokpat'?{escopo:'MOKPAT',pids:[...MOKPAT_IDS]}:null;if(['gerencial','demo'].includes(s.nivel))return {escopo:'MOKED',pids:null};return null;}
+export function getClienteScope(){const s=getSession();if(!s)return null;if(s.nivel==='cliente')return {escopo:s.escopo,pids:s.pids||[]};if(s.nivel==='gerencial'&&s.div)return DIVISOES[s.div]?{escopo:s.div.toUpperCase(),pids:[...DIVISAO_IDS[s.div]]}:null;if(['gerencial','demo'].includes(s.nivel))return {escopo:'MOKED',pids:null};return null;}
 export function clearSession(){current=null;persistir(true);announce();}
 export function touchSession(){const s=getSession();if(!s)return;s.exp=janela(s.nivel,s.srvExp);persistir(false);}
 export function grantSession(){return getSession();} // Legacy callbacks cannot manufacture access.
@@ -35,7 +35,7 @@ export async function checkPin(value,opts={}){
  // Sem resposta em 12 s o pedido é abortado: antes, um fetch pendurado deixava `pending` preso e todo PIN seguinte
  // voltava "inválido" até recarregar a página (relato do Marcio no computador, 28/10/2026).
  const ctrl=typeof AbortController!=='undefined'?new AbortController():null;const tmr=ctrl?setTimeout(()=>ctrl.abort(),12000):null;
- let r;try{r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{})}),...(ctrl?{signal:ctrl.signal}:{})});}finally{if(tmr)clearTimeout(tmr);}
+ let r;try{r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{}),...(!opts.cliente&&divisaoAtiva!=='moklog'?{div:divisaoAtiva}:{})}),...(ctrl?{signal:ctrl.signal}:{})});}finally{if(tmr)clearTimeout(tmr);}
  const data=await r.json().catch(()=>({}));
  if(!r.ok||!data.ok){window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:data.erro||'Servidor de acesso indisponível.'}));return null;}
  if(data.nivel==='gestor'){if((!opts.cliente&&data.div!==divisaoAtiva)||opts.allowAdmin===false)return null; // na Área do Cliente o gestor entra direto no escopo da divisão dele

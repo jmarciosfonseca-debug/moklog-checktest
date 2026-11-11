@@ -19,7 +19,7 @@ import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession, setDivisaoAtiva, getDivisaoAtiva, gerencialNaDivisao } from "./session";
-import { projetosMokpat, SEGMENTOS, idsDoSegmento, divisaoDoProjeto, faixa as faixaIds } from "./divisoes";
+import { projetosNovasDivisoes, SEGMENTOS, DIVISOES, idsDoSegmento, divisaoDoProjeto, faixa as faixaIds } from "./divisoes";
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
 import Entorno from "./entorno/Entorno";
@@ -648,7 +648,7 @@ const PROJECTS = {
 };
 // MokPat (11/11/2026): projetos patrimoniais (Residencial / Comercial) entram no mesmo cadastro, marcados com div "mokpat".
 // Nascem sem checklist — o inventário de equipamentos é alimentado pelo líder de cada projeto.
-Object.assign(PROJECTS, projetosMokpat());
+Object.assign(PROJECTS, projetosNovasDivisoes()); // MokPat e MokImp
 // Só os projetos da divisão aberta (MokLog | MokPat): listas gerais (painel, pendências, registros, avisos) nunca misturam divisões.
 const projetosDaDivisao = (div) => Object.fromEntries(Object.entries(PROJECTS).filter(([id]) => divisaoDoProjeto(id) === div));
 const projetosAtivos = () => projetosDaDivisao(getDivisaoAtiva());
@@ -659,7 +659,8 @@ const GRUPOS_HOME = {
     {key:"klog",    label:"Projetos Klog",  sub:"P505",           color:"#3b82f6", ids:["P505"]},
     {key:"jatinox", label:"Jatinox",        sub:"P260A · B · C",  color:"#dc2626", ids:["P260A"]},
   ],
-  mokpat: ["residencial","comercial"].map(k=>({key:k,label:SEGMENTOS[k].label,sub:faixaIds(idsDoSegmento(k)),color:SEGMENTOS[k].cor,ids:idsDoSegmento(k),ext:"png"})),
+  // Divisões novas: um card por segmento que já tem projeto (MokImp abre vazio até a lista chegar).
+  ...Object.fromEntries(Object.values(DIVISOES).map(d=>[d.id,d.segmentos.map(k=>({key:k,label:SEGMENTOS[k].label,sub:faixaIds(idsDoSegmento(k,d.id)),color:SEGMENTOS[k].cor,ids:idsDoSegmento(k,d.id),ext:"png"})).filter(g=>g.ids.length)])),
 };
 
 function daysSince(dateStr) {
@@ -3598,7 +3599,8 @@ export default function App(){
   const [portal,setPortal]=useState("entrada");
   // Divisão aberta (MokLog | MokPat). O módulo de sessão guarda a mesma informação para validar o PIN na divisão certa.
   const [divisao,setDivisaoEstado]=useState("moklog");
-  const MOKPAT=divisao==="mokpat";
+  const MOKPAT=divisao!=="moklog"; // qualquer divisão nova (MokPat, MokImp): mesma casca, sem os itens exclusivos do MokLog
+  const DIVNOME=DIVISOES[divisao]?.nome||"MokLog";
   const [,setSessionRevision]=useState(0);
   // ── Auth anônimo: acompanha se o crachá já chegou. NÃO bloqueia a UI
   // (failsafe): se demorar/falhar, o app segue — a regra ainda é `if true`.
@@ -3959,7 +3961,7 @@ export default function App(){
   const [pinAlvo,setPinAlvo]=useState(null); // projeto do PIN quando ele não está em PROJECTS (Jatinox B/C): não troca o projeto aberto
   const comPin=(pid,abrir)=>{ if(checkAuth(pid)){abrir();return;} pendenteAposPin.current=abrir; if(PROJECTS[pid]){ setPinAlvo(null); setProject(PROJECTS[pid]); } else setPinAlvo({id:pid,name:(JATINOX_SUBS[pid]||{}).name||pid}); setScreen("pin_gate"); };
   // Líder entra direto no painel do projeto dele (sem a Home com todos os grupos).
-  const GRUPO_DO_PROJETO={...Object.fromEntries(Object.values(projetosDaDivisao("mokpat")).map(p=>[p.id,p.seg])),P601:"golgi",P602:"golgi",P604:"golgi",P605:"golgi",P606:"golgi",P607:"golgi",P311A:"mega",P311B:"mega",P505:"klog",P260A:"jatinox",P260B:"jatinox",P260C:"jatinox"};
+  const GRUPO_DO_PROJETO={...Object.fromEntries(Object.values(PROJECTS).filter(p=>p.seg).map(p=>[p.id,p.seg])),P601:"golgi",P602:"golgi",P604:"golgi",P605:"golgi",P606:"golgi",P607:"golgi",P311A:"mega",P311B:"mega",P505:"klog",P260A:"jatinox",P260B:"jatinox",P260C:"jatinox"};
   const entrarNoProjetoDoLider=(pid)=>{
     if(PROJECTS[pid]) setProject(PROJECTS[pid]);
     if(pid==="P260A"){ setHomeGroup(null); setScreen("p260a_home"); return; }
@@ -4235,7 +4237,7 @@ export default function App(){
   );
 
   // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
-  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||a==="mokpat"){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
+  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
   if(portal==="moklog_pin") return <PinMoklog key={divisao} divisao={divisao} sessaoLider={(()=>{ const x=getScopedProjectId(); return x&&divisaoDoProjeto(x)===divisao?x:null; })()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
     if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }
     else { setHomeGroup(null); setScreen("home"); }
@@ -4660,12 +4662,12 @@ export default function App(){
       golgi: ["P601","P602","P604","P605","P606","P607"],
       mega:  ["P311A","P311B"],
       klog:  ["P505"],
-      residencial: idsDoSegmento("residencial"), comercial: idsDoSegmento("comercial"),
+      ...Object.fromEntries(Object.keys(SEGMENTOS).map(k=>[k,idsDoSegmento(k)])),
     }[homeGroupEf] || [];
     const _escopoLider = !hasGerencial() ? getScopedProjectId() : null;
     if(_escopoLider && groupProjects.includes(_escopoLider)) groupProjects = [_escopoLider];
-    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog",residencial:"MokPat · Projetos Residencial",comercial:"MokPat · Projetos Comercial"};
-    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a",residencial:"#c9a48a",comercial:"#38bdf8"};
+    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog",residencial:"MokPat · Projetos Residencial",comercial:"MokPat · Projetos Comercial",implantacao:"MokImp · Projetos Implantação"};
+    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a",residencial:"#c9a48a",comercial:"#38bdf8",implantacao:"#38bdf8"};
     const color = groupColors[homeGroupEf];
     return (
       <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
@@ -4837,11 +4839,11 @@ export default function App(){
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
           <MoklogLogo size={52}/>
-          <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>{MOKPAT?"MokPat":"MokLog"} CheckTest</h1>
+          <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>{DIVNOME} CheckTest</h1>
           <div style={{flex:1}}>
-            <div style={{fontSize:22,fontWeight:900,color:T.title,letterSpacing:-0.5}}>{MOKPAT?"MokPat":"MokLog"}</div>
+            <div style={{fontSize:22,fontWeight:900,color:T.title,letterSpacing:-0.5}}>{DIVNOME}</div>
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
-            <div style={{fontSize:11,color:T.sub,marginTop:1}}>{MOKPAT?"Patrimonial · Residencial e Comercial":"Sistema de Teste Semanal de Segurança"}</div>
+            <div style={{fontSize:11,color:T.sub,marginTop:1}}>{MOKPAT?DIVISOES[divisao].sub:"Sistema de Teste Semanal de Segurança"}</div>
           </div>
           <button onClick={()=>{ setHomeGroup(null); setPortal("entrada"); }} aria-label="Trocar de área" style={{background:"transparent",border:`1px solid ${T.cardBorderNeutral}`,color:T.sub,borderRadius:10,padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>← Áreas</button>
         </div>
@@ -4879,6 +4881,7 @@ export default function App(){
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {GRUPOS_HOME[divisao].length===0&&<div style={{gridColumn:"1 / -1",textAlign:"center",padding:"28px 12px",color:T.sub,fontSize:13,border:`1px dashed ${T.cardBorderNeutral}`,borderRadius:16}}>Nenhum projeto cadastrado em {DIVNOME} ainda.</div>}
             {GRUPOS_HOME[divisao].map(grp=>{
               const grpProjects = grp.ids.map(id=>PROJECTS[id]).filter(Boolean);
               const healths = grpProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.slice(-1)[0];return last?computeHealth(p,last.state):null;}).filter(Boolean);
@@ -4938,7 +4941,7 @@ export default function App(){
             onAbrir={(a)=>{ const pid=a.projetoId||""; if(pid==="TODOS") return; setJatinoxSel(null); setHomeGroup(PROJECTS[pid]?.seg?PROJECTS[pid].seg:pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>}
         </div>
 
-        <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>{MOKPAT?"MokPat":"MokLog"} CheckTest © Moked Consulting Security</div>
+        <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>{DIVNOME} CheckTest © Moked Consulting Security</div>
       </div>
       {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
       {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}

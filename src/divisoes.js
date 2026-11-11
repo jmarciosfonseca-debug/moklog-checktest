@@ -1,25 +1,33 @@
-// Divisões da plataforma Moked (Marcio, 11/11/2026): MokLog (condomínios logísticos) e MokPat (patrimonial),
-// esta dividida em Residencial e Comercial. CommonJS de propósito: lido pelo app (React) e pelo servidor (api/).
-// Regra de separação: o PIN do gestor MokPat só abre projetos MokPat; o PIN de líder segue sendo por projeto.
+// Divisões da plataforma Moked (Marcio, 11/11/2026): MokLog (condomínios logísticos), MokPat (patrimonial — Residencial e
+// Comercial) e MokImp (implantação). CommonJS de propósito: lido pelo app (React) e pelo servidor (api/).
+// Regra de separação: o PIN do gestor de uma divisão só abre os projetos dela; o PIN de líder segue sendo por projeto.
 // O PIN gerencial Moked (admin) é global.
-const MOKPAT = [
-  ["P032", "residencial"], ["P035", "residencial"], ["P160", "residencial"], ["P256", "residencial"], ["P380", "residencial"], ["P560", "residencial"],
-  ["P740", "comercial"], ["P770", "comercial"], ["P777", "comercial"], ["P868", "comercial"],
-  ["P925", "residencial"], ["P936", "residencial"], ["P939", "residencial"], ["P946", "residencial"], ["P947", "residencial"], ["P955", "residencial"], ["P956", "residencial"],
-];
+const RESIDENCIAL = ["P032", "P035", "P160", "P256", "P380", "P560", "P925", "P931", "P932", "P936", "P939", "P942", "P944", "P946", "P947", "P950", "P951", "P952", "P953", "P954", "P955", "P956", "P957", "P958", "P959", "P961"];
+const COMERCIAL = ["P703", "P740", "P763", "P770", "P777", "P868"];
+const MOKPAT = [...RESIDENCIAL.map((id) => [id, "residencial"]), ...COMERCIAL.map((id) => [id, "comercial"])].sort((a, b) => a[0].localeCompare(b[0]));
+// MokImp: área aberta em 11/11/2026, ainda sem projetos. Para cadastrar: ["P123", "segmento"] (segmento opcional).
+const MOKIMP = [];
 const SEGMENTOS = {
   residencial: { key: "residencial", label: "Projetos Residencial", nome: "Residencial", cor: "#c9a48a" },
   comercial: { key: "comercial", label: "Projetos Comercial", nome: "Comercial", cor: "#38bdf8" },
+  implantacao: { key: "implantacao", label: "Projetos Implantação", nome: "Implantação", cor: "#38bdf8" },
+};
+const DIVISOES = {
+  mokpat: { id: "mokpat", nome: "MokPat", sub: "Patrimonial · Residencial e Comercial", lista: MOKPAT, segmentos: ["residencial", "comercial"] },
+  mokimp: { id: "mokimp", nome: "MokImp", sub: "Implantação", lista: MOKIMP, segmentos: ["implantacao"] },
 };
 const MOKPAT_IDS = MOKPAT.map(([id]) => id);
-const idsDoSegmento = (seg) => MOKPAT.filter(([, s]) => s === seg).map(([id]) => id);
-// Projeto MokPat nasce sem checklist: o inventário de equipamentos é cadastrado pelo líder (etapa seguinte).
-const projetosMokpat = () => Object.fromEntries(MOKPAT.map(([id, seg]) => [id, { id, name: SEGMENTOS[seg].nome, short: `${SEGMENTOS[seg].nome} ${id}`, div: "mokpat", seg, categories: [] }]));
-const DIVISAO_IDS = { mokpat: MOKPAT_IDS };
-// Funções do cadastro de colaborador no MokPat (Marcio, 11/11/2026). "VSPP Líder" é o mesmo nome do MokLog de propósito:
-// é ele que identifica o líder no mapa de equipe e nas regras de liderança. Faltou alguma? É só acrescentar aqui.
+const DIVISAO_IDS = Object.fromEntries(Object.values(DIVISOES).map((d) => [d.id, d.lista.map(([id]) => id)]));
+const idsDoSegmento = (seg, div) => Object.values(DIVISOES).filter((d) => !div || d.id === div).flatMap((d) => d.lista.filter(([, s]) => (s || d.segmentos[0]) === seg).map(([id]) => id));
+// Projeto de divisão nova nasce sem checklist: o inventário de equipamentos é cadastrado pelo líder (etapa seguinte).
+const projetosDaDivisaoNova = (div) => Object.fromEntries((DIVISOES[div]?.lista || []).map(([id, s]) => { const seg = s || DIVISOES[div].segmentos[0]; return [id, { id, name: SEGMENTOS[seg].nome, short: `${SEGMENTOS[seg].nome} ${id}`, div, seg, categories: [] }]; }));
+const projetosMokpat = () => projetosDaDivisaoNova("mokpat");
+const projetosNovasDivisoes = () => Object.assign({}, ...Object.keys(DIVISOES).map(projetosDaDivisaoNova));
+// Funções do cadastro de colaborador nas divisões novas (Marcio, 11/11/2026). "VSPP Líder" é o mesmo nome do MokLog de
+// propósito: é ele que identifica o líder no mapa de equipe e nas regras de liderança. Faltou alguma? É só acrescentar aqui.
 const CARGOS_MOKPAT = ["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro", "Ascensorista"];
-const divisaoDoProjeto = (pid) => (MOKPAT_IDS.includes(pid) ? "mokpat" : "moklog");
+const divisaoDoProjeto = (pid) => Object.keys(DIVISAO_IDS).find((d) => DIVISAO_IDS[d].includes(pid)) || "moklog";
+const ehDivisao = (d) => d === "moklog" || !!DIVISOES[d];
 const faixa = (ids) => (ids.length > 2 ? `${ids[0]} — ${ids[ids.length - 1]}` : ids.join(", "));
 
-module.exports = { CARGOS_MOKPAT, MOKPAT, MOKPAT_IDS, SEGMENTOS, DIVISAO_IDS, idsDoSegmento, projetosMokpat, divisaoDoProjeto, faixa };
+module.exports = { CARGOS_MOKPAT, MOKPAT, MOKPAT_IDS, MOKIMP, SEGMENTOS, DIVISOES, DIVISAO_IDS, idsDoSegmento, projetosMokpat, projetosNovasDivisoes, divisaoDoProjeto, ehDivisao, faixa };

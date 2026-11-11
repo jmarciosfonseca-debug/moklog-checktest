@@ -7,10 +7,10 @@ afterEach(() => { delete global.fetch; });
 const reply = (extra) => ({ ok: true, status: 200, json: async () => ({ ok: true, token: "tok", exp: Date.now() + 8 * 3600000, ...extra }) });
 
 test("cadastro: 17 projetos, residencial × comercial, sem checklist inicial", () => {
-  expect(MOKPAT_IDS).toHaveLength(17);
-  expect(idsDoSegmento("comercial")).toEqual(["P740", "P770", "P777", "P868"]);
-  expect(idsDoSegmento("residencial")).toHaveLength(13);
-  expect(faixa(idsDoSegmento("residencial"))).toBe("P032 — P956");
+  expect(MOKPAT_IDS).toHaveLength(32); // 17 iniciais + 15 de 11/11 (tarde)
+  expect(idsDoSegmento("comercial")).toEqual(["P703", "P740", "P763", "P770", "P777", "P868"]);
+  expect(idsDoSegmento("residencial")).toHaveLength(26); expect(idsDoSegmento("residencial")).toEqual(expect.arrayContaining(["P931", "P944", "P961"]));
+  expect(faixa(idsDoSegmento("residencial"))).toBe("P032 — P961");
   const p = projetosMokpat();
   expect(p.P032).toMatchObject({ id: "P032", name: "Residencial", div: "mokpat", seg: "residencial", categories: [] });
   expect(divisaoDoProjeto("P740")).toBe("mokpat"); expect(divisaoDoProjeto("P601")).toBe("moklog");
@@ -58,7 +58,7 @@ test("servidor: gestor classificado pela divisão; admin só nos projetos dela; 
 test("funções do colaborador MokPat: as 9 pedidas, com VSPP Líder igual ao MokLog; Equipe usa a lista da divisão", () => {
   expect(CARGOS_MOKPAT).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro", "Ascensorista"]);
   const src = require("fs").readFileSync(require("path").join(__dirname, "Equipe.jsx"), "utf8");
-  expect(src).toMatch(/divisaoDoProjeto\(project\.id\) === "mokpat" \? CARGOS_MOKPAT/);
+  expect(src).toMatch(/divisaoDoProjeto\(project\.id\) !== "moklog" \? CARGOS_MOKPAT/); // vale para MokPat e MokImp
 });
 
 test("P939 tem localização cravada (distância do colaborador), mas não ganha página pública de endereço", async () => {
@@ -80,8 +80,30 @@ test("Área do Cliente: PIN do gestor MokPat entra direto (sem passar pela porta
   Object.assign(process.env, { SESSION_SECRET: "s".repeat(40), ADMIN_PIN_HASH: h("adm"), DEMO_PIN_HASH: h("demo"), CLIENTE_PIN_HASHES: JSON.stringify({ GOLGI: h("golgi") }), CLIENTE_PIN_HASH_P939: h("pin-cliente-teste") });
   try {
     const auth = require("../api/ai/lib/accessAuth"), c = auth.hashes();
-    expect(auth.classify("pin-cliente-teste", c)).toEqual({ nivel: "cliente", escopo: "P939", pids: ["P939"] }); // P944 entra quando for cadastrado
+    expect(auth.classify("pin-cliente-teste", c)).toEqual({ nivel: "cliente", escopo: "P939", pids: ["P939", "P944"] }); // P944 cadastrado em 11/11
     expect(auth.classify("golgi", c)).toMatchObject({ nivel: "cliente", escopo: "GOLGI" });
-    expect(auth.verify(auth.issue(auth.classify("pin-cliente-teste", c), Date.now(), c).token)).toMatchObject({ nivel: "cliente", pids: ["P939"] });
+    expect(auth.verify(auth.issue(auth.classify("pin-cliente-teste", c), Date.now(), c).token)).toMatchObject({ nivel: "cliente", pids: ["P939", "P944"] });
   } finally { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); }
+});
+
+test("MokImp: área aberta sem projetos; mesmo PIN provisório nos dois gestores é resolvido pela porta", async () => {
+  const { DIVISOES, DIVISAO_IDS } = require("./divisoes");
+  expect(DIVISOES.mokimp).toMatchObject({ nome: "MokImp", sub: "Implantação" }); expect(DIVISAO_IDS.mokimp).toEqual([]);
+  const crypto = require("crypto"), h = (p) => crypto.createHash("sha256").update(p).digest("hex"); const antes = { ...process.env };
+  Object.assign(process.env, { SESSION_SECRET: "s".repeat(40), ADMIN_PIN_HASH: h("adm"), DEMO_PIN_HASH: h("demo"), MOKPAT_PIN_HASH: h("igual"), MOKIMP_PIN_HASH: h("igual") });
+  try {
+    const auth = require("../api/ai/lib/accessAuth"), c = auth.hashes();
+    expect(auth.classify("igual", c, undefined, false, "mokpat")).toEqual({ nivel: "gestor", div: "mokpat" });
+    expect(auth.classify("igual", c, undefined, false, "mokimp")).toEqual({ nivel: "gestor", div: "mokimp" });
+    expect(auth.classify("igual", c)).toEqual({ nivel: "gestor", div: "mokpat" });            // Área do Cliente: a divisão que já tem projetos
+    expect(auth.classify("igual", c, "P939")).toEqual({ nivel: "gestor", div: "mokpat" });
+    expect(auth.noProjeto({ nivel: "gestor", div: "mokimp" }, "P939").nivel).toBe("negado");   // gestor MokImp não alcança projeto MokPat
+    process.env.MOKIMP_PIN_HASH = h("outro"); const c2 = auth.hashes();
+    expect(auth.classify("outro", c2, undefined, false, "mokpat")).toBeNull();                 // PINs diferentes: gestor MokImp não entra pela porta MokPat
+    expect(auth.classify("outro", c2, undefined, false, "mokimp")).toEqual({ nivel: "gestor", div: "mokimp" });
+  } finally { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); }
+  setDivisaoAtiva("mokimp"); fetch.mockResolvedValue(reply({ nivel: "gestor", div: "mokimp" }));
+  expect((await checkPinAnyProject("x")).level).toBe("admin"); expect(JSON.parse(fetch.mock.calls[0][1].body).div).toBe("mokimp");
+  expect(gerencialNaDivisao("mokimp")).toBe(true); expect(gerencialNaDivisao("mokpat")).toBe(false); expect(getAccess("P939")).toBeNull();
+  expect(getClienteScope()).toEqual({ escopo: "MOKIMP", pids: [] });
 });
