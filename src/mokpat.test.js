@@ -1,6 +1,6 @@
 // MokPat (11/11/2026): 17 projetos (13 residenciais, 4 comerciais), gestor da divisão separado do MokLog.
 import { checkPin, checkPinAnyProject, getAccess, getSession, clearSession, setDivisaoAtiva, hasGerencial, gerencialNaDivisao, getClienteScope, authFetch } from "./session";
-const { MOKPAT_IDS, idsDoSegmento, projetosMokpat, divisaoDoProjeto, faixa } = require("./divisoes");
+const { CARGOS_MOKPAT, MOKPAT_IDS, idsDoSegmento, projetosMokpat, divisaoDoProjeto, faixa } = require("./divisoes");
 
 beforeEach(() => { clearSession(); setDivisaoAtiva("moklog"); global.fetch = jest.fn(); });
 afterEach(() => { delete global.fetch; });
@@ -53,4 +53,10 @@ test("servidor: gestor classificado pela divisão; admin só nos projetos dela; 
     process.env.MOKPAT_PIN_HASH = h("l601"); expect(auth.classify("l601", auth.hashes())).toEqual({ nivel: "lider", pid: "P601" }); // colisão não derruba o líder
     delete process.env.MOKPAT_PIN_HASH; expect(auth.classify("pat", auth.hashes())).toBeNull(); // sem a variável, a divisão fica sem gestor (não quebra o resto)
   } finally { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); }
+});
+
+test("funções do colaborador MokPat: as 8 pedidas, com VSPP Líder igual ao MokLog; Equipe usa a lista da divisão", () => {
+  expect(CARGOS_MOKPAT).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro"]);
+  const src = require("fs").readFileSync(require("path").join(__dirname, "Equipe.jsx"), "utf8");
+  expect(src).toMatch(/divisaoDoProjeto\(project\.id\) === "mokpat" \? CARGOS_MOKPAT/);
 });
