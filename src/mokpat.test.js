@@ -55,8 +55,20 @@ test("servidor: gestor classificado pela divisão; admin só nos projetos dela; 
   } finally { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); }
 });
 
-test("funções do colaborador MokPat: as 8 pedidas, com VSPP Líder igual ao MokLog; Equipe usa a lista da divisão", () => {
-  expect(CARGOS_MOKPAT).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro"]);
+test("funções do colaborador MokPat: as 9 pedidas, com VSPP Líder igual ao MokLog; Equipe usa a lista da divisão", () => {
+  expect(CARGOS_MOKPAT).toEqual(["VSPP Líder", "VSPP Apoio", "Vigilante de Monitoramento", "Vigilante", "Controlador de Acesso", "Recepcionista", "Porteiro", "Mensageiro", "Ascensorista"]);
   const src = require("fs").readFileSync(require("path").join(__dirname, "Equipe.jsx"), "utf8");
   expect(src).toMatch(/divisaoDoProjeto\(project\.id\) === "mokpat" \? CARGOS_MOKPAT/);
+});
+
+test("P939 tem localização cravada (distância do colaborador), mas não ganha página pública de endereço", async () => {
+  const { coordsDe } = require("./entorno/locais");
+  expect(coordsDe("P939")).toMatchObject({ lat: -23.5482861, lng: -46.7142361 });
+  const { distanciaAteProjeto } = require("./equipe/enderecoColab");
+  const km = distanciaAteProjeto({ lat: -23.561, lng: -46.656 }, "P939"); // região da Av. Paulista
+  expect(km).toBeGreaterThan(5); expect(km).toBeLessThan(7);
+  const handler = require("../api/local");
+  const res = { status(s) { this.s = s; return this; }, setHeader() {}, end(t) { this.t = t; } };
+  await handler({ query: { pid: "P939" }, headers: {} }, res);
+  expect(res.s).toBe(404);
 });
