@@ -4724,7 +4724,7 @@ export default function App(){
                       </div>:<div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Sem registros ainda</div>}
                     </div>
                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                      {!p.div&&<CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,hasGerencial())}/>}
+                      <CtmkBadge info={ctmkData[p.id]} onToggle={()=>requestCtmkToggle(p.id,hasGerencial())}/>
                       {rsCounts[p.id]&&rsCounts[p.id].naoVistas>0&&(
                         <div title="RS pendentes de visualização" style={{display:"flex",alignItems:"center",gap:5,background:"#B21E27",color:"#fff",borderRadius:6,padding:"2px 8px",fontWeight:800,fontSize:12,boxShadow:"0 2px 6px rgba(178,30,39,.4)"}}>
                           <span style={{fontSize:13}}><Ico n="escudo"/></span>{rsCounts[p.id].naoVistas} RS
