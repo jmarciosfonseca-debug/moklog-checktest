@@ -18,7 +18,8 @@ import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
 import Perimetral from "./Perimetral";
 import Ambulancia from "./Ambulancia";
-import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession } from "./session";
+import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession, setDivisaoAtiva, getDivisaoAtiva, gerencialNaDivisao } from "./session";
+import { projetosMokpat, SEGMENTOS, idsDoSegmento, divisaoDoProjeto, faixa as faixaIds } from "./divisoes";
 import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
 import Entorno from "./entorno/Entorno";
@@ -191,10 +192,10 @@ if (typeof document !== "undefined" && !document.getElementById("mk-modulos-css"
   document.head.appendChild(st);
 }
 // Arte 3D do cliente (public/icones/clientes/<chave>.svg); se não carregar, usa o ícone de linha informado
-function IconeCliente({ arq, cor, fallback }) {
+function IconeCliente({ arq, cor, fallback, ext = "svg" }) {
   const [falhou, setFalhou] = useState(false);
   if (falhou) return fallback;
-  return <img src={`/icones/clientes/${arq}.svg`} alt="" width={92} height={92} draggable={false} onError={()=>setFalhou(true)}
+  return <img src={`/icones/clientes/${arq}.${ext}`} alt="" width={92} height={92} draggable={false} onError={()=>setFalhou(true)}
     style={{ display:"block", margin:"-4px 0 -2px", filter:"drop-shadow(0 6px 14px rgba(0,0,0,.55))" }}/>;
 }
 
@@ -645,6 +646,22 @@ const PROJECTS = {
     ]},
   P260A: {id:"P260A",name:"Jatinox Unidade A",short:"Jatinox A",categories:[{id:"panic_fix",label:"01 - Bot\u00f5es de P\u00e2nico Fixos",type:"items",itemLabels:["CCO","P1","P2","P3","P5"]},{id:"panic_mob",label:"01B - P\u00e2nico M\u00f5veis",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02"]},{id:"cerca",label:"02 - Cerca El\u00e9trica",type:"items",itemLabels:["Zona 07","Zona 08"]},{id:"eclusa_cco",label:"03 - Eclusa CCO (Abertura)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},{id:"eclusa_p3",label:"04 - Port\u00e3o Eclusa P3",type:"items",itemLabels:["Externa (com interfone)","Interna (com interfone)"]},{id:"telefonia",label:"05 - Telefonia",type:"items",itemLabels:["Smartphone CCO/L\u00edder 01","Smartphone CCO/L\u00edder 02","Ramal P1","Ramal P2"]},{id:"cftv",label:"06 - Imagens CFTV",type:"count",total:65},{id:"campainhas",label:"07 - Campainhas",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02"]},{id:"sala_cftv",label:"08 - Sala de CFTV CCO",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04","Monitor 05","Monitor 06","Monitor 07","Teclado 01","Teclado 02","Teclado 03","RAC","Telefone Fixo 01","Telefone Fixo 02"]},{id:"cam_sistema",label:"09 - C\u00e2meras Sistema Sala",type:"count",total:132},{id:"recepcao_p3",label:"10 - Recep\u00e7\u00e3o P3",type:"items",itemLabels:["Monitor 01","Monitor 02","Teclado 01","Teclado 02","CPU 01","CPU 02","Telefone Fixo 01","Telefone Fixo 02","Impressora","Intercomunicador de Guich\u00ea","DVR 01","DVR 02"]},{id:"sirenes",label:"11 - Sirenes c/ Ilumina\u00e7\u00e3o",type:"items",itemLabels:["Roberto Koch (s/ ilum.)","Presidente Wilson 01 (c/ ilum.)","Presidente Wilson 02 (c/ ilum.)","Ubarana 01 (c/ ilum.)","Ubarana 02 (c/ ilum.)","Ubarana 03 (c/ ilum.)","Ubarana 04 (c/ ilum.)","Ubarana 05 (c/ ilum.)"]},{id:"manutencao",label:"12 - Visita de Manuten\u00e7\u00e3o",type:"maintenance"},{id:"infra",label:"13 - Infraestrutura / Obs.",type:"notes"}]},
 };
+// MokPat (11/11/2026): projetos patrimoniais (Residencial / Comercial) entram no mesmo cadastro, marcados com div "mokpat".
+// Nascem sem checklist — o inventário de equipamentos é alimentado pelo líder de cada projeto.
+Object.assign(PROJECTS, projetosMokpat());
+// Só os projetos da divisão aberta (MokLog | MokPat): listas gerais (painel, pendências, registros, avisos) nunca misturam divisões.
+const projetosDaDivisao = (div) => Object.fromEntries(Object.entries(PROJECTS).filter(([id]) => divisaoDoProjeto(id) === div));
+const projetosAtivos = () => projetosDaDivisao(getDivisaoAtiva());
+const PROJECTS_MOKLOG = projetosDaDivisao("moklog");
+const GRUPOS_HOME = {
+  moklog: [
+    {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#559ba4", ids:["P601","P602","P604","P605","P606","P607"]},
+    {key:"mega",    label:"Projetos Mega",  sub:"P311A, P311B",   color:"#f97316", ids:["P311A","P311B"]},
+    {key:"klog",    label:"Projetos Klog",  sub:"P505",           color:"#3b82f6", ids:["P505"]},
+    {key:"jatinox", label:"Jatinox",        sub:"P260A · B · C",  color:"#dc2626", ids:["P260A"]},
+  ],
+  mokpat: ["residencial","comercial"].map(k=>({key:k,label:SEGMENTOS[k].label,sub:faixaIds(idsDoSegmento(k)),color:SEGMENTOS[k].cor,ids:idsDoSegmento(k),ext:"png"})),
+};
 
 function daysSince(dateStr) {
   if(!dateStr) return null;
@@ -702,7 +719,7 @@ function getProjectScore(project, history) {
 
 function getAllPendencies(stored) {
   const result = [];
-  Object.values(PROJECTS).forEach(project => {
+  Object.values(projetosAtivos()).forEach(project => {
     const hist = stored[project.id]?.history ?? [];
     if(!hist.length) return;
     const last = hist[hist.length - 1];
@@ -1584,7 +1601,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
   const carregarVisao360 = async () => {
     setV360("loading");
     try {
-      const ids = Object.keys(PROJECTS);
+      const ids = Object.keys(projetosAtivos());
       // Busca em paralelo os módulos que não estão em memória (KeyAccess, Bolsão, Perimetral, Ronda VSPP)
       const [keySnaps, bolsaoSnaps, periSnaps, rondasIdxSnaps, rondaSnap, ilumSnaps, energiaSnaps] = await Promise.all([
         Promise.all(ids.map(pid=>getDoc(doc(db,"keyaccess_falhas",pid)).catch(()=>null))),
@@ -2074,7 +2091,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
       </div>
     );
   }
-  const allProjects=Object.values(PROJECTS);
+  const allProjects=Object.values(projetosAtivos());
   const valid=allProjects.map(p=>{const hist=stored[p.id]?.history??[];if(!hist.length)return null;const last=hist[hist.length-1];const h=computeHealth(p,last.state);return{...p,pct:h.pct,date:last.meta?.date,inopN:h.inop,hist};}).filter(Boolean);
   const avgPct=valid.length?Math.round(valid.reduce((a,b)=>a+b.pct,0)/valid.length):null;
   const totalInopAll=valid.reduce((a,b)=>a+b.inopN,0);
@@ -2650,7 +2667,7 @@ function EquipamentosListagem({ dark, onBack, onToggleTheme, onOpenEquip }) {
   const backBtn={background:"transparent",border:`1px solid ${border}`,color:txt2,borderRadius:7,padding:"7px 12px",fontSize:12,cursor:"pointer",flexShrink:0,fontWeight:600};
 
   // Lista única de projetos (Jatinox já está em PROJECTS — sem append manual).
-  const allProjects = listaProjetosUnica(PROJECTS);
+  const allProjects = listaProjetosUnica(projetosAtivos());
 
   const [equipData, setEquipData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -2751,7 +2768,7 @@ function RegistrosMenu({ dark, stored, onToggleTheme, onAcessos, onEquipe, onEqu
 
   // Lista única de projetos (Jatinox já está em PROJECTS — sem append manual).
   // Antes, JATINOX_LIST re-adicionava P260B/P260C, contando-os em dobro.
-  const allProjects = listaProjetosUnica(PROJECTS);
+  const allProjects = listaProjetosUnica(projetosAtivos());
 
   // Estatísticas do dashboard (Colaboradores + Equipamentos) — Firestore com fallback localStorage
   const [dashStats, setDashStats] = useState(null);
@@ -3580,6 +3597,9 @@ export default function App(){
   const [screen,setScreen]=useState("home");
   // Porta de entrada Moked: "entrada" (logo → vídeo → áreas) | "moklog" (app atual) | "cliente" (Área do Cliente)
   const [portal,setPortal]=useState("entrada");
+  // Divisão aberta (MokLog | MokPat). O módulo de sessão guarda a mesma informação para validar o PIN na divisão certa.
+  const [divisao,setDivisaoEstado]=useState("moklog");
+  const MOKPAT=divisao==="mokpat";
   const [,setSessionRevision]=useState(0);
   // ── Auth anônimo: acompanha se o crachá já chegou. NÃO bloqueia a UI
   // (failsafe): se demorar/falhar, o app segue — a regra ainda é `if true`.
@@ -3839,14 +3859,14 @@ export default function App(){
   // ── Monitor de falhas KeyAccess ainda abertas (sem horaFim) — alimenta o banner da Home
   const [keyAccessOpenCount, setKeyAccessOpenCount] = useState(0);
   // ── Painel de Avisos: insumos do checklist (equipamento inoperante, relatório semanal atrasado) calculados do `stored` em tempo real
-  const avisosPendencias = useMemo(()=>getAllPendencies(stored).map(p=>({projetoId:p.project.id,cat:p.cat,item:p.item,status:p.status,days:p.days})),[stored]);
+  const avisosPendencias = useMemo(()=>getAllPendencies(stored).map(p=>({projetoId:p.project.id,cat:p.cat,item:p.item,status:p.status,days:p.days})),[stored,divisao]); // eslint-disable-line
   const avisosUltimoRelatorio = useMemo(()=>{
     const o={};
-    Object.keys(PROJECTS).forEach(pid=>{ const datas=(stored[pid]?.history??[]).map(r=>r?.meta?.date).filter(Boolean).sort(); o[pid]=datas.length?datas[datas.length-1]:null; });
+    Object.keys(projetosAtivos()).forEach(pid=>{ const datas=(stored[pid]?.history??[]).map(r=>r?.meta?.date).filter(Boolean).sort(); o[pid]=datas.length?datas[datas.length-1]:null; });
     return o;
   },[stored]);
   // Último teste semanal de cada projeto × o da semana anterior (o painel compara e avisa o que mudou)
-  const avisosTestes = useMemo(()=>testesDoHistorico(PROJECTS, stored, { resolveStatus, computeHealth }),[stored]);
+  const avisosTestes = useMemo(()=>testesDoHistorico(projetosAtivos(), stored, { resolveStatus, computeHealth }),[stored,divisao]); // eslint-disable-line
   useEffect(()=>{
     if(!loaded) return;
     const ids=Object.keys(PROJECTS);
@@ -3940,7 +3960,7 @@ export default function App(){
   const [pinAlvo,setPinAlvo]=useState(null); // projeto do PIN quando ele não está em PROJECTS (Jatinox B/C): não troca o projeto aberto
   const comPin=(pid,abrir)=>{ if(checkAuth(pid)){abrir();return;} pendenteAposPin.current=abrir; if(PROJECTS[pid]){ setPinAlvo(null); setProject(PROJECTS[pid]); } else setPinAlvo({id:pid,name:(JATINOX_SUBS[pid]||{}).name||pid}); setScreen("pin_gate"); };
   // Líder entra direto no painel do projeto dele (sem a Home com todos os grupos).
-  const GRUPO_DO_PROJETO={P601:"golgi",P602:"golgi",P604:"golgi",P605:"golgi",P606:"golgi",P607:"golgi",P311A:"mega",P311B:"mega",P505:"klog",P260A:"jatinox",P260B:"jatinox",P260C:"jatinox"};
+  const GRUPO_DO_PROJETO={...Object.fromEntries(Object.values(projetosDaDivisao("mokpat")).map(p=>[p.id,p.seg])),P601:"golgi",P602:"golgi",P604:"golgi",P605:"golgi",P606:"golgi",P607:"golgi",P311A:"mega",P311B:"mega",P505:"klog",P260A:"jatinox",P260B:"jatinox",P260C:"jatinox"};
   const entrarNoProjetoDoLider=(pid)=>{
     if(PROJECTS[pid]) setProject(PROJECTS[pid]);
     if(pid==="P260A"){ setHomeGroup(null); setScreen("p260a_home"); return; }
@@ -4216,13 +4236,13 @@ export default function App(){
   );
 
   // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
-  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog") setPortal(hasGerencial()?"moklog":"moklog_pin"); }}/>;
-  if(portal==="moklog_pin") return <PinMoklog sessaoLider={getScopedProjectId()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
+  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||a==="mokpat"){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
+  if(portal==="moklog_pin") return <PinMoklog key={divisao} divisao={divisao} sessaoLider={(()=>{ const x=getScopedProjectId(); return x&&divisaoDoProjeto(x)===divisao?x:null; })()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
     if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }
     else { setHomeGroup(null); setScreen("home"); }
     setPortal("moklog");
   }}/>;
-  if(portal==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
+  if(portal==="cliente") return <PainelCliente PROJECTS={PROJECTS_MOKLOG} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
     abrirPDF={async (pid,rep)=>{ const proj=PROJECTS[pid]; const c=ctmkData[pid]; const idade=c?.status==="offline"?ctmkOfflineIdade(c.offlineSince):null; const ctmkInfo=c?{status:c.status,days:idade?idade.dias:null,offlineLabel:idade?idade.label:null}:undefined;
       const [i,e,f]=await Promise.all([loadInquilinosParaPDF(pid),loadEnergiaResumoParaPDF(pid),loadFollowups(db,pid).catch(()=>({}))]); await generatePDF(proj,rep.state,rep.meta,[],ctmkInfo,i,e,f); }}
     onBack={()=>setPortal("entrada")}/>;
@@ -4641,11 +4661,12 @@ export default function App(){
       golgi: ["P601","P602","P604","P605","P606","P607"],
       mega:  ["P311A","P311B"],
       klog:  ["P505"],
+      residencial: idsDoSegmento("residencial"), comercial: idsDoSegmento("comercial"),
     }[homeGroupEf] || [];
     const _escopoLider = !hasGerencial() ? getScopedProjectId() : null;
     if(_escopoLider && groupProjects.includes(_escopoLider)) groupProjects = [_escopoLider];
-    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog"};
-    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a"};
+    const groupNames = {golgi:"Projetos Golgi",mega:"Projetos Mega",klog:"Projetos Klog",residencial:"MokPat · Projetos Residencial",comercial:"MokPat · Projetos Comercial"};
+    const groupColors = {golgi:"#1d4ed8",mega:"#0ea5e9",klog:"#16a34a",residencial:"#c9a48a",comercial:"#38bdf8"};
     const color = groupColors[homeGroupEf];
     return (
       <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
@@ -4655,7 +4676,7 @@ export default function App(){
             <button onClick={()=>{ if(_escopoLider){ clearSession(); setHomeGroup(null); setPortal("entrada"); } else setHomeGroup(null); }} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}>{_escopoLider?`${_escopoLider} — ${PROJECTS[_escopoLider]?.name||""}`:groupNames[homeGroupEf]}</div>
-              <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.join(" · ")}</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>{groupProjects.length>8?`${groupProjects.length} projetos · ${faixaIds(groupProjects)}`:groupProjects.join(" · ")}</div>
             </div>
             {(()=>{if(RS_TRANCADO&&!hasGerencial())return null;const tp=groupProjects.reduce((a,pid)=>a+((rsCounts[pid]&&rsCounts[pid].naoVistas)||0),0);return tp>0?(
               <div title="RS pendentes de visualização no grupo" style={{display:"flex",alignItems:"center",gap:6,background:"#B21E27",color:"#fff",borderRadius:8,padding:"5px 10px",fontWeight:800,fontSize:12,boxShadow:"0 2px 8px rgba(178,30,39,.4)"}}>
@@ -4791,7 +4812,7 @@ export default function App(){
     );
   }
 
-  const totalInopHome=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);
+  const totalInopHome=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=projetosAtivos()[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);
   // ── HOME — Main cards
   return(
     <div style={{...S.page, background:"var(--mk-page)", minHeight:"100vh"}}>
@@ -4817,17 +4838,18 @@ export default function App(){
       <div style={S.homeWrap}>
         <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
           <MoklogLogo size={52}/>
-          <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>MokLog CheckTest</h1>
-          <div>
-            <div style={{fontSize:22,fontWeight:900,color:T.title,letterSpacing:-0.5}}>MokLog</div>
+          <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>{MOKPAT?"MokPat":"MokLog"} CheckTest</h1>
+          <div style={{flex:1}}>
+            <div style={{fontSize:22,fontWeight:900,color:T.title,letterSpacing:-0.5}}>{MOKPAT?"MokPat":"MokLog"}</div>
             <div style={{fontSize:14,fontWeight:700,color:"#cc2222",letterSpacing:1}}>CheckTest</div>
-            <div style={{fontSize:11,color:T.sub,marginTop:1}}>Sistema de Teste Semanal de Segurança</div>
+            <div style={{fontSize:11,color:T.sub,marginTop:1}}>{MOKPAT?"Patrimonial · Residencial e Comercial":"Sistema de Teste Semanal de Segurança"}</div>
           </div>
+          <button onClick={()=>{ setHomeGroup(null); setPortal("entrada"); }} aria-label="Trocar de área" style={{background:"transparent",border:`1px solid ${T.cardBorderNeutral}`,color:T.sub,borderRadius:10,padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>← Áreas</button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
           <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[229,9,20]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
           <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[229,9,20]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
-            {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=PROJECTS[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
+            {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=projetosAtivos()[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
           </TopoBtn>
           <TopoBtn arq="painel" fb="grafico" label="Painel" cor={[229,9,20]} aria="Abrir painel gerencial" onClick={()=>setScreen("dashboard")}/>
           <button className="mk-navigation" onClick={()=>setDark(!dark)} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,padding:"8px 4px 6px",borderRadius:14,cursor:"pointer",color:"#e2e8f0",fontSize:11,fontWeight:700,background:"radial-gradient(120% 130% at 50% 0%, rgba(165,180,252,.2), rgba(165,180,252,.03) 70%), #0a1322",border:"1px solid rgba(165,180,252,.38)",boxShadow:"0 4px 14px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.07)"}} aria-label="Alternar tema claro/escuro"><span style={{display:"flex",width:34,height:34,alignItems:"center",justifyContent:"center"}}>{React.cloneElement(iconeTema(),{width:34,height:34})}</span><span>Tema</span></button>
@@ -4858,12 +4880,7 @@ export default function App(){
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[
-              {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#559ba4", ids:["P601","P602","P604","P605","P606","P607"]},
-              {key:"mega",    label:"Projetos Mega",  sub:"P311A, P311B",   color:"#f97316", ids:["P311A","P311B"]},
-              {key:"klog",    label:"Projetos Klog",  sub:"P505",           color:"#3b82f6", ids:["P505"]},
-              {key:"jatinox", label:"Jatinox",        sub:"P260A · B · C",  color:"#dc2626", ids:["P260A"]},
-            ].map(grp=>{
+            {GRUPOS_HOME[divisao].map(grp=>{
               const grpProjects = grp.ids.map(id=>PROJECTS[id]).filter(Boolean);
               const healths = grpProjects.map(p=>{const hist=stored[p.id]?.history??[];const last=hist.slice(-1)[0];return last?computeHealth(p,last.state):null;}).filter(Boolean);
               const hasProblems = healths.some(h=>h.pct<90);
@@ -4873,7 +4890,7 @@ export default function App(){
                 <button key={grp.key} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
                   style={{background:T.card,border:`1px solid ${T.cardBorderNeutral}`,borderRadius:20,padding:"20px 14px 18px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",boxShadow:T.cardShadow()}}>
                   <span aria-hidden={!hasProblems} style={{...badgeMoked("parcial"),fontSize:10,alignSelf:"flex-end",visibility:hasProblems?"visible":"hidden"}}>Atenção</span>
-                  <IconeCliente arq={grp.key} cor={grp.color} fallback={<svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <IconeCliente arq={grp.key} ext={grp.ext} cor={grp.color} fallback={<svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 18L26 4L48 18V42H4V18Z" stroke={grp.color} strokeWidth="2.5" strokeLinejoin="round" fill={grp.color+"11"}/>
                     <rect x="18" y="26" width="16" height="16" rx="1" stroke={grp.color} strokeWidth="2" fill={grp.color+"22"}/>
                     <rect x="10" y="20" width="8" height="8" rx="1" stroke={grp.color} strokeWidth="1.5" fill="none"/>
@@ -4899,7 +4916,7 @@ export default function App(){
           </div>
 
           {/* 🚨 KeyAccess Falha — registro rápido de campo, sem PIN. Cor reage a falhas realmente abertas */}
-          <button onClick={()=>setShowKeyAccess(true)}
+          {!MOKPAT&&<button onClick={()=>setShowKeyAccess(true)}
             style={{marginTop:10,width:"100%",background:keyAccessOpenCount>0?(dark?"linear-gradient(160deg,#1e0505,#12060a)":"linear-gradient(160deg,#fef2f2,#fee2e2)"):T.card,border:`1px solid ${keyAccessOpenCount>0?"#ef444466":T.cardBorderNeutral}`,borderRadius:16,padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:keyAccessOpenCount>0?(dark?"0 8px 22px rgba(0,0,0,.5), 0 0 22px #ef444426":"0 4px 14px rgba(239,68,68,.18)"):T.saudeShadow}}>
             <div style={{flexShrink:0,width:44,height:44,borderRadius:12,background:dark?"#0f172a":"#fff",border:`1px solid ${keyAccessOpenCount>0?"#ef444444":"#22c55e44"}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -4913,15 +4930,16 @@ export default function App(){
               <div style={{fontSize:11,color:"#94a3b8"}}>{keyAccessOpenCount>0?`${keyAccessOpenCount} falha${keyAccessOpenCount!==1?"s":""} aberta${keyAccessOpenCount!==1?"s":""} agora`:"Registrar falha de acesso/saída em campo"}</div>
             </div>
             <span style={{color:keyAccessOpenCount>0?"#ef4444":"#94a3b8",fontSize:18,flexShrink:0}}>›</span>
-          </button>
+          </button>}
 
-          <PainelAvisos dark={dark} gerencial={hasGerencial()} projetos={Object.keys(PROJECTS)} ctmkData={ctmkData}
+          {/* Painel de Avisos: as regras de hoje são do MokLog (mapa, CTMK, parques). No MokPat entra quando os projetos tiverem dados. */}
+          {!MOKPAT&&<PainelAvisos dark={dark} gerencial={hasGerencial()} projetos={Object.keys(projetosAtivos())} ctmkData={ctmkData}
             pendencias={avisosPendencias} ultimoRelatorio={avisosUltimoRelatorio} testes={avisosTestes}
             nomeProj={(pid)=>PROJECTS[pid]?.name?`${pid} · ${PROJECTS[pid].name}`:pid}
-            onAbrir={(a)=>{ const pid=a.projetoId||""; if(pid==="TODOS") return; setJatinoxSel(null); setHomeGroup(pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>
+            onAbrir={(a)=>{ const pid=a.projetoId||""; if(pid==="TODOS") return; setJatinoxSel(null); setHomeGroup(PROJECTS[pid]?.seg?PROJECTS[pid].seg:pid.startsWith("P260")?"jatinox":pid.startsWith("P311")?"mega":pid==="P505"?"klog":"golgi"); }}/>}
         </div>
 
-        <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>MokLog CheckTest © Moked Consulting Security</div>
+        <div style={{fontSize:10,color:"#64748b",opacity:.7,textAlign:"center",lineHeight:1.8}}>{MOKPAT?"MokPat":"MokLog"} CheckTest © Moked Consulting Security</div>
       </div>
       {/* Assistente IA Gerencial — botão flutuante só no perfil gerencial */}
       {hasGerencial() && <BotaoIA onClick={()=>setShowIA(true)}/>}

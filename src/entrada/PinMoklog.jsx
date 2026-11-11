@@ -7,7 +7,10 @@ const fundo = { minHeight: "100vh", background: "radial-gradient(140% 70% at 50%
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
 const botao = { background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "13px 38px", fontWeight: 900, letterSpacing: 2.5, fontSize: 14, cursor: "pointer", clipPath: chanfro, boxShadow: "0 0 18px #FF1E2766", textTransform: "uppercase", width: "100%" };
 
-export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, logo = "/moked/divisoes/moklog.jpg" }) {
+// MokPat (11/11/2026): mesma porta, com o logo e o nome da divisão. O PIN é validado na divisão aberta (session.js).
+const DIV = { moklog: { nome: "MokLog", logo: "/moked/divisoes/moklog.jpg", sub: "PIN do consultor abre todos os parques · PIN do projeto abre só o seu" }, mokpat: { nome: "MokPat", logo: "/moked/divisoes/mokpat.jpg", sub: "PIN do consultor abre todos os projetos · PIN do projeto abre só o seu" } };
+export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, divisao = "moklog", logo = (DIV[divisao] || DIV.moklog).logo }) {
+  const d = DIV[divisao] || DIV.moklog;
   const [pin, setPin] = useState("");
   const [erro, setErro] = useState("");
   const [busy, setBusy] = useState(false);
@@ -21,11 +24,11 @@ export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, logo
     } finally { setBusy(false); }
   };
   return <main style={fundo} data-testid="moklog-pin">
-    <img src={logo} alt="MokLog" style={{ width: "min(60vw, 240px)", background: "#fff", padding: "8px 16px", clipPath: chanfro, marginBottom: 22 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+    <img src={logo} alt={d.nome} style={{ width: "min(60vw, 240px)", background: "#fff", padding: "8px 16px", clipPath: chanfro, marginBottom: 22 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
     <div style={{ width: "100%", maxWidth: 360, background: "linear-gradient(160deg,#121216,#0b0b0e)", border: "1px solid #2a2a31", padding: "22px 20px", clipPath: chanfro, textAlign: "center" }}>
-      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase" }}>Acesso MokLog</div>
-      <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 4, marginBottom: 16 }}>PIN do consultor abre todos os parques · PIN do projeto abre só o seu</div>
-      <input type="password" inputMode="numeric" aria-label="PIN MokLog" placeholder="PIN" maxLength={8} value={pin} autoFocus
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase" }}>Acesso {d.nome}</div>
+      <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 4, marginBottom: 16 }}>{d.sub}</div>
+      <input type="password" inputMode="numeric" aria-label={`PIN ${d.nome}`} placeholder="PIN" maxLength={8} value={pin} autoFocus
         onChange={(e) => { setPin(e.target.value); setErro(""); }} onKeyDown={(e) => { if (e.key === "Enter") tentar(); }}
         style={{ width: "100%", boxSizing: "border-box", background: "#050507", color: "#f3f4f6", border: "1px solid #3a3a42", padding: "12px 10px", fontSize: 22, letterSpacing: 10, textAlign: "center", marginBottom: 10 }} />
       {erro && <div role="alert" style={{ fontSize: 12, color: "#FF1E27", fontWeight: 700, marginBottom: 8 }}>{erro}</div>}
