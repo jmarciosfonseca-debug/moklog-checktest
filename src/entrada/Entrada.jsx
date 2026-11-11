@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 export const DIVISOES = [
   { id: "moklog", nome: "MokLog", sub: "Condomínios logísticos", ativo: true, cor: "#E50914" },
-  { id: "mokpat", nome: "MokPat", sub: "Patrimonial", ativo: false, cor: "#f59e0b" },
+  { id: "mokpat", nome: "MokPat", sub: "Patrimonial", ativo: true, cor: "#E50914" },
   { id: "mokvip", nome: "MokVip", sub: "Executivos e eventos", ativo: false, cor: "#a855f7" },
   { id: "mokres", nome: "MokRes", sub: "Residencial", ativo: false, cor: "#22c55e" },
   { id: "mokimp", nome: "MokImp", sub: "Implantação", ativo: false, cor: "#38bdf8" },

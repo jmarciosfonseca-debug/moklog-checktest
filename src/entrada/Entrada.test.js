@@ -17,9 +17,10 @@ test("logo → Entrar → vídeo (pulável) → escolha de área; MokLog e Área
     expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
     expect(host.textContent).toContain("Escolha a sua área"); expect(host.textContent).toContain("Área do Cliente");
     expect(host.textContent).toContain("Em breve");
-    await clicar(botao(host, "MokPat")); expect(host.querySelector('[data-testid="entrada-construcao"]')).not.toBeNull(); expect(host.textContent).toContain("Em construção"); expect(esc).not.toHaveBeenCalled();
+    await clicar(botao(host, "MokVip")); expect(host.querySelector('[data-testid="entrada-construcao"]')).not.toBeNull(); expect(host.textContent).toContain("Em construção"); expect(esc).not.toHaveBeenCalled();
     await clicar(botao(host, "Voltar")); expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
     await clicar(botao(host, "MokLog")); expect(esc).toHaveBeenLastCalledWith("moklog");
+    await clicar(botao(host, "MokPat")); expect(esc).toHaveBeenLastCalledWith("mokpat"); // MokPat ativo (11/11/2026)
     await clicar(botao(host, "Área do Cliente")); expect(esc).toHaveBeenLastCalledWith("cliente");
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
