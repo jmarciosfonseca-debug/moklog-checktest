@@ -652,7 +652,6 @@ Object.assign(PROJECTS, projetosMokpat());
 // Só os projetos da divisão aberta (MokLog | MokPat): listas gerais (painel, pendências, registros, avisos) nunca misturam divisões.
 const projetosDaDivisao = (div) => Object.fromEntries(Object.entries(PROJECTS).filter(([id]) => divisaoDoProjeto(id) === div));
 const projetosAtivos = () => projetosDaDivisao(getDivisaoAtiva());
-const PROJECTS_MOKLOG = projetosDaDivisao("moklog");
 const GRUPOS_HOME = {
   moklog: [
     {key:"golgi",   label:"Projetos Golgi", sub:"P601 — P607",    color:"#559ba4", ids:["P601","P602","P604","P605","P606","P607"]},
@@ -4242,7 +4241,7 @@ export default function App(){
     else { setHomeGroup(null); setScreen("home"); }
     setPortal("moklog");
   }}/>;
-  if(portal==="cliente") return <PainelCliente PROJECTS={PROJECTS_MOKLOG} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
+  if(portal==="cliente") return <PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={computeHealth} ctmkData={ctmkData} score360={(pid)=>computeScore360Projeto(pid,{stored,ctmkData})} risco={(pid)=>calcularRiscoProjeto(PROJECTS[pid],stored)}
     abrirPDF={async (pid,rep)=>{ const proj=PROJECTS[pid]; const c=ctmkData[pid]; const idade=c?.status==="offline"?ctmkOfflineIdade(c.offlineSince):null; const ctmkInfo=c?{status:c.status,days:idade?idade.dias:null,offlineLabel:idade?idade.label:null}:undefined;
       const [i,e,f]=await Promise.all([loadInquilinosParaPDF(pid),loadEnergiaResumoParaPDF(pid),loadFollowups(db,pid).catch(()=>({}))]); await generatePDF(proj,rep.state,rep.meta,[],ctmkInfo,i,e,f); }}
     onBack={()=>setPortal("entrada")}/>;

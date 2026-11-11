@@ -23,7 +23,7 @@ test("PIN do gestor MokPat: só entra pela porta MokPat e só alcança projetos 
   expect((await checkPinAnyProject("x")).level).toBe("admin");
   expect(hasGerencial()).toBe(true); expect(gerencialNaDivisao("mokpat")).toBe(true); expect(gerencialNaDivisao("moklog")).toBe(false);
   expect(getAccess("P032")).toBe("admin"); expect(getAccess("P601")).toBeNull();
-  expect(getClienteScope()).toBeNull();                                                         // não abre a Área do Cliente MokLog
+  expect(getClienteScope()).toMatchObject({ escopo: "MOKPAT" }); expect(getClienteScope().pids).toEqual(MOKPAT_IDS); // Área do Cliente: só projetos MokPat
   await expect(authFetch("/api/fv-plano")).rejects.toThrow("gerencial");                        // FV segue exclusivo do gerencial Moked
 });
 
@@ -71,4 +71,17 @@ test("P939 tem localização cravada (distância do colaborador), mas não ganha
   const res = { status(s) { this.s = s; return this; }, setHeader() {}, end(t) { this.t = t; } };
   await handler({ query: { pid: "P939" }, headers: {} }, res);
   expect(res.s).toBe(404);
+});
+
+test("Área do Cliente: PIN do gestor MokPat entra direto (sem passar pela porta MokPat); PIN de cliente por variável própria", async () => {
+  fetch.mockResolvedValue(reply({ nivel: "gestor", div: "mokpat" }));
+  expect(await checkPin("x", { cliente: true })).toBe("admin"); expect(getClienteScope().escopo).toBe("MOKPAT"); expect(getAccess("P601")).toBeNull();
+  const crypto = require("crypto"), h = (p) => crypto.createHash("sha256").update(p).digest("hex"); const antes = { ...process.env };
+  Object.assign(process.env, { SESSION_SECRET: "s".repeat(40), ADMIN_PIN_HASH: h("adm"), DEMO_PIN_HASH: h("demo"), CLIENTE_PIN_HASHES: JSON.stringify({ GOLGI: h("golgi") }), CLIENTE_PIN_HASH_P939: h("pin-cliente-teste") });
+  try {
+    const auth = require("../api/ai/lib/accessAuth"), c = auth.hashes();
+    expect(auth.classify("pin-cliente-teste", c)).toEqual({ nivel: "cliente", escopo: "P939", pids: ["P939"] }); // P944 entra quando for cadastrado
+    expect(auth.classify("golgi", c)).toMatchObject({ nivel: "cliente", escopo: "GOLGI" });
+    expect(auth.verify(auth.issue(auth.classify("pin-cliente-teste", c), Date.now(), c).token)).toMatchObject({ nivel: "cliente", pids: ["P939"] });
+  } finally { for (const k of Object.keys(process.env)) if (!(k in antes)) delete process.env[k]; Object.assign(process.env, antes); }
 });

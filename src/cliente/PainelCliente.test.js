@@ -133,3 +133,23 @@ test("SIS+: mostrador 360 → pilares → indicador; ★ favorita no início; ge
     await clicar(botao(host2, "ver como o cliente")); expect(host2.textContent).toContain("Área do Gestor · vendo como o cliente"); expect(host2.textContent).toContain("Régua do cliente: ≥ 85 Bom");
   } finally { await act(async () => root2.unmount()); host2.remove(); }
 });
+test("MokPat na Área do Cliente: cliente do P939 entra direto no projeto; gestor MokPat vê a lista; gerencial Moked segue só com MokLog", async () => {
+  const PAT = { ...PROJECTS, P939: { id: "P939", name: "Residencial", div: "mokpat", seg: "residencial", categories: [] }, P740: { id: "P740", name: "Comercial", div: "mokpat", seg: "comercial", categories: [] } };
+  const abrir = async (escopo) => { const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host); global.__escopo = escopo;
+    await act(async () => root.render(<PainelCliente PROJECTS={PAT} stored={stored} computeHealth={health} ctmkData={{}} score360={async () => null} risco={async () => null} onBack={() => {}} />));
+    await act(async () => { await new Promise((r) => setTimeout(r, 40)); }); return { host, fim: async () => { await act(async () => root.unmount()); host.remove(); } }; };
+  let t = await abrir({ escopo: "P939", pids: ["P939", "P944"] }); // P944 ainda não cadastrado: ignorado sem erro
+  try {
+    expect(t.host.textContent).toContain("Olá, P939 · Residencial"); expect(t.host.textContent).toContain("Sistema Integrado de Segurança");
+    expect(t.host.textContent).not.toContain("Não consegui ler"); expect(t.host.textContent).not.toContain("Área do Gestor");
+    await clicar(botao(t.host, "Menu")); expect(t.host.textContent).toContain("Cliente do projeto · somente leitura"); expect(botao(t.host, "Meus projetos")).toBeUndefined();
+  } finally { await t.fim(); }
+  t = await abrir({ escopo: "MOKPAT", pids: ["P939", "P740", "P032"] });
+  try {
+    expect(t.host.textContent).toContain("Olá, MokPat"); expect(t.host.textContent).toContain("2 projetos"); expect(t.host.textContent).toContain("Seus projetos");
+    expect(t.host.textContent).toContain("Área do Gestor · régua interna Moked"); expect(t.host.textContent).toContain("P740 · Comercial");
+    expect(t.host.textContent).not.toContain("Golgi Cajamar");
+  } finally { await t.fim(); }
+  t = await abrir({ escopo: "MOKED", pids: null });
+  try { expect(t.host.textContent).toContain("2 parques"); expect(t.host.textContent).not.toContain("P939"); } finally { await t.fim(); }
+});

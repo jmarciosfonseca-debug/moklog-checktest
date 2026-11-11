@@ -6,8 +6,12 @@ const {DIVISAO_IDS}=require('../../../src/divisoes');
 const PROJECTS=['P260A','P260B','P260C','P311A','P311B','P505','P601','P602','P604','P605','P606','P607',...DIVISAO_IDS.mokpat];
 const GESTORES={mokpat:'MOKPAT_PIN_HASH'};
 // Painel do Cliente (só leitura). PIN por projeto = gestor do parque; PIN por grupo = proprietário (vê todos do grupo).
-const GRUPOS={GOLGI:['P601','P602','P604','P605','P606','P607'],MEGA:['P311A','P311B'],P260:['P260A','P260B','P260C'],P505:['P505']};
-function escoposCliente(){const m=JSON.parse(process.env.CLIENTE_PIN_HASHES||'{}');if(!m||typeof m!=='object'||Array.isArray(m))throw Error('AUTH_CONFIG');const out={};for(const [k,h] of Object.entries(m)){const pids=GRUPOS[k]||(PROJECTS.includes(k)?[k]:null);if(pids&&h)out[k]={hash:h,pids};}return out;}
+const GRUPOS={GOLGI:['P601','P602','P604','P605','P606','P607'],MEGA:['P311A','P311B'],P260:['P260A','P260B','P260C'],P505:['P505'],
+ // MokPat (11/11/2026): o cliente do P939 responde também pelo P944 (entra no escopo quando o projeto for cadastrado).
+ P939:['P939','P944'].filter(p=>PROJECTS.includes(p))};
+function escoposCliente(){const m=JSON.parse(process.env.CLIENTE_PIN_HASHES||'{}');if(!m||typeof m!=='object'||Array.isArray(m))throw Error('AUTH_CONFIG');
+ // Também aceita uma variável por escopo (CLIENTE_PIN_HASH_<ESCOPO>), como nos líderes: acrescentar cliente não mexe no JSON existente.
+ for(const k of [...Object.keys(GRUPOS),...PROJECTS])if(!m[k]&&process.env['CLIENTE_PIN_HASH_'+k])m[k]=process.env['CLIENTE_PIN_HASH_'+k];const out={};for(const [k,h] of Object.entries(m)){const pids=GRUPOS[k]||(PROJECTS.includes(k)?[k]:null);if(pids&&h)out[k]={hash:h,pids};}return out;}
 function secret(){const s=process.env.SESSION_SECRET||'';if(Buffer.byteLength(s)<32)throw Error('AUTH_CONFIG');return s;}
 function hashes(){
  const map=JSON.parse(process.env.LIDER_PIN_HASHES||'{}');if(!map||typeof map!=='object'||Array.isArray(map))throw Error('AUTH_CONFIG');
