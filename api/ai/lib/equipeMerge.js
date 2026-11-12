@@ -94,21 +94,23 @@ function principalOk(p){
   &&(p.obs==null||(typeof p.obs==='string'&&p.obs.length<=300))
   &&(p.fotoRef==null||(typeof p.fotoRef==='string'&&/^[-\w]{1,100}$/.test(p.fotoRef)));
 }
-// Cadeado da equipe (Marcio, 12/11/2026): fechado pelo consultor, o líder segue lançando o dia a dia (falta, FT, atraso,
-// treinamento, uniforme, checagem), mas não cadastra, não edita o cadastro, não desliga, não reativa e não apaga nada.
-const CADASTRO=['nome','cargo','turno','escala','telefone','email','cpfCifrado','cpfFinal','cpfHmac','dataContratacao','foto','fotoRef','temFoto','status','endereco','projectId','criadoEm','trajetoria'];
+// Cadeado da equipe (Marcio, 12/11/2026): fechado pelo consultor, o líder segue cadastrando, editando dados (endereço, datas,
+// telefone…) e lançando o dia a dia; o que fica travado é o que tira ou muda alguém: desligar, reativar, excluir,
+// apagar lançamento e mudar função (promoção). Mover entre projetos já é só do consultor.
+const TRAVADOS=['cargo','status','projectId','criadoEm','trajetoria'];
 function validarCadeado(before,after){
  if(!(before.cadeado&&before.cadeado.fechado===true))return;
- const negar=()=>{throw Object.assign(Error('Equipe trancada pelo consultor. Lançamentos do dia a dia continuam liberados; para cadastrar, editar cadastro, desligar ou excluir, peça ao consultor para abrir o cadeado.'),{status:403});};
- for(const lista of ['colaboradores','desligados']){
-  const a=before[lista]||[],d=after[lista]||[];
-  if(a.length!==d.length||a.some(x=>!d.some(y=>y.id===x.id)))negar();   // ninguém entra, sai ou muda de lista
-  for(const x of a){
-   const y=d.find(z=>z.id===x.id);
-   if(CADASTRO.some(k=>!equal(x[k],y[k])))negar();
-   if((x.historico||[]).some(h=>h&&h.id&&!(y.historico||[]).some(n=>n&&n.id===h.id)))negar();   // lançamento antigo não some
-  }
+ const negar=()=>{throw Object.assign(Error('Equipe trancada pelo consultor. Cadastro, edição de dados e lançamentos continuam liberados; para desligar, excluir, apagar lançamento ou mudar função, peça ao consultor para abrir o cadeado.'),{status:403});};
+ const antes=before.colaboradores||[],depois=after.colaboradores||[],da=before.desligados||[],dd=after.desligados||[];
+ if(antes.some(x=>!depois.some(y=>y.id===x.id)))negar();                                  // ninguém sai dos ativos (desligar/excluir)
+ if(da.length!==dd.length||da.some(x=>!dd.some(y=>y.id===x.id)))negar();                   // histórico de saídas não muda (reativar/excluir)
+ if(depois.some(y=>!antes.some(x=>x.id===y.id)&&da.some(x=>x.id===y.id)))negar();          // nem reativa por outro caminho
+ for(const x of antes){
+  const y=depois.find(z=>z.id===x.id);
+  if(TRAVADOS.some(k=>!equal(x[k],y[k])))negar();
+  if((x.historico||[]).some(h=>h&&h.id&&!(y.historico||[]).some(n=>n&&n.id===h.id)))negar();   // lançamento antigo não some
  }
+ for(const x of da){const y=dd.find(z=>z.id===x.id);if(!equal(x,y))negar();}
 }
 function validateLeader(before,after){
  for(const field of ['fv','campanhasSazonais','historicoDesde','treinamentosEsperados','cadeado'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}

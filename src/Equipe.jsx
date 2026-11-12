@@ -878,8 +878,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, trancada, onVerCpf, projectN
         <div style={{ background:`linear-gradient(160deg,${dark?"#0c1220":"#f8fafc"} 0%,${tc.bg} 100%)`, borderBottom:`1px solid ${tc.border}`, padding:"20px 16px 18px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-            {!adminAuth && liderAuth && trancada && <span title="Equipe trancada pelo consultor" style={{ marginLeft:"auto", fontSize:11, color:"#f59e0b", fontWeight:700 }}><Ico n="cadeado"/> Cadastro trancado</span>}
-            {(adminAuth||(liderAuth&&!trancada)) && (
+            {(adminAuth||liderAuth) && (
               <button onClick={onEdit} style={{ ...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", marginLeft:"auto", padding:"6px 14px", fontSize:12 }}>
                 <Ico n="editar"/> Editar
               </button>
@@ -1097,7 +1096,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, trancada, onVerCpf, projectN
                         <button onClick={()=>onEditHist(colab.id, h)} style={{ background:"transparent", border:"1px solid #f59e0b44", color:"#f59e0b", fontSize:11, cursor:"pointer", padding:"2px 8px", borderRadius:5 }}><Ico n="editar"/></button>
                       )}
                       {/* Excluir: gerencial sempre; líder exceto Medida Disciplinar */}
-                      {(adminAuth || (liderAuth && h.tipo!=="Medida Disciplinar")) && (
+                      {(adminAuth || (liderAuth && !trancada && h.tipo!=="Medida Disciplinar")) && (
                         <button onClick={()=>onRemoveHist(colab.id, h.id)} style={{ background:"transparent", border:"none", color:"#ef444466", fontSize:14, cursor:"pointer", padding:"2px 5px" }}><Ico n="x"/></button>
                       )}
                     </div>
@@ -1164,7 +1163,7 @@ function EnderecoForm({ endereco, onChange, distanciaKm, S, dark }) {
   );
 }
 
-function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark }) {
+function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark, cargoTravado = false }) {
   const S = getStyles(dark);
   const handleFoto = (e) => {
     const file = e.target.files?.[0]; if(!file) return;
@@ -1217,7 +1216,7 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
             </div>
             <div>
               <label style={S.lbl}>Cargo</label>
-              <select value={form.cargo} onChange={e=>setF("cargo",e.target.value)} style={{ ...S.inp, cursor:"pointer" }}>
+              <select value={form.cargo} disabled={cargoTravado} title={cargoTravado?"Equipe trancada: mudança de função é com o consultor":undefined} onChange={e=>setF("cargo",e.target.value)} style={{ ...S.inp, cursor:cargoTravado?"not-allowed":"pointer", opacity:cargoTravado?0.6:1 }}>
                 {cargos.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
@@ -2248,7 +2247,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const adminAuth = authLevel === "admin";
   const liderAuth = authLevel === "lider" || authLevel === "admin";
   const trancada = !!(equipeData.cadeado && equipeData.cadeado.fechado === true);   // cadeado da equipe (só o consultor abre/fecha)
-  const podeCadastro = adminAuth || (liderAuth && !trancada);
+  const podeCadastro = adminAuth || liderAuth;                  // cadastrar e editar dados: líder sempre pode
+  const podeExcluir = adminAuth || (liderAuth && !trancada);    // desligar, excluir e apagar lançamento: só com o cadeado aberto
   const cargos = CARGOS_PROJETO[project.id] || (divisaoDoProjeto(project.id) !== "moklog" ? CARGOS_MOKPAT : ["Colaborador"]); // MokPat e MokImp (11/11/2026): lista padrão das divisões novas
 
   // ── ADENDO EQUIPE — FV / Cesta de Natal / Aprovação ─────────────────
@@ -2479,7 +2479,6 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const saveColab = async () => {
     if(!form.nome.trim()) { alert("Informe o nome"); return; }
     if(!liderAuth) { alert("Acesso negado"); return; }
-    if(!podeCadastro) { alert("Equipe trancada pelo consultor. Peça a abertura do cadeado para cadastrar ou editar."); return; }
     if(cpfDigitos(form.cpf) && !cpfValido(form.cpf)) { alert("CPF inválido. Confira os 11 dígitos."); return; }
     setSaving(true);
     try {
@@ -2763,7 +2762,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
   const desligarColab = async (colab, motivo, tipoDeslig, dataDeslig, liderNome) => {
     if(!adminAuth && !liderAuth) return;
-    if(!podeCadastro) { alert("Equipe trancada pelo consultor. Peça a abertura do cadeado para desligar."); return; }
+    if(!podeExcluir) { alert("Equipe trancada pelo consultor. Peça a abertura do cadeado para desligar."); return; }
     if(!adminAuth && !liderNome) { alert("Escolha o líder que está apontando o desligamento."); return; }
     const desligado = {
       ...colab,
@@ -2811,7 +2810,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const alternarCadeado = async () => {
     if(!adminAuth) return;
     const fechar = !trancada;
-    if(!window.confirm(fechar ? "Trancar a equipe? O líder continua lançando falta, FT, atraso e treinamento, mas não cadastra, não edita cadastro, não desliga e não exclui." : "Abrir o cadeado? O líder volta a poder cadastrar, editar e desligar até você trancar de novo.")) return;
+    if(!window.confirm(fechar ? "Trancar a equipe? O líder continua cadastrando, editando dados e lançando o dia a dia, mas não desliga, não exclui, não apaga lançamento e não muda função." : "Abrir o cadeado? O líder volta a poder desligar, excluir e apagar lançamentos até você trancar de novo.")) return;
     await save({ ...equipeData, cadeado:{ fechado:fechar } });
   };
   const verCpf = async (colab) => {
@@ -2889,7 +2888,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       onToggleTheme={toggleDark}/>
   );
   if(screen==="edit"&&form&&podeCadastro) return (
-    <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
+    <FormScreen cargoTravado={!adminAuth&&trancada} form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("view");setForm(null);}} saving={saving} isEdit={true} dark={dark}/>
   );
 
@@ -2972,6 +2971,24 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
         <div style={{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:10 }}>
 
+          {(
+            <div data-testid="cadeado-equipe" style={{ display:"flex", alignItems:"center", gap:12, borderRadius:12, padding:"12px 14px", background:trancada?"#2a1602":"#06180c", border:`1px solid ${trancada?"#f59e0b88":"#22c55e55"}` }}>
+              <div style={{ fontSize:22, color:trancada?"#f59e0b":"#22c55e", lineHeight:1 }}><Ico n={trancada?"cadeado":"cadeadoAberto"}/></div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:800, color:trancada?"#f59e0b":"#22c55e" }}>{trancada?"Equipe trancada":"Equipe aberta"}</div>
+                <div style={{ fontSize:11, color:"#94a3b8", lineHeight:1.4, marginTop:2 }}>
+                  {trancada ? "Ninguém desliga, exclui, apaga lançamento, promove ou move sem o consultor. Cadastro e edição de dados seguem liberados." : "O líder pode desligar, excluir e apagar lançamentos."}
+                </div>
+              </div>
+              {adminAuth && (
+                <button onClick={alternarCadeado} disabled={saving} aria-pressed={trancada}
+                  style={{ ...S.btnSm, whiteSpace:"nowrap", fontSize:12, fontWeight:800, padding:"9px 14px", color:"#fff", background:trancada?"#15803d":"#b45309", border:"none" }}>
+                  {trancada ? "Abrir" : "Trancar"}
+                </button>
+              )}
+              {!adminAuth && <span style={{ fontSize:10, color:"#64748b", textAlign:"right", maxWidth:92, lineHeight:1.3 }}>Só o consultor abre ou tranca</span>}
+            </div>
+          )}
           {adminAuth && <QuadroEfetivo projectId={project.id} equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} dark={dark} gerando={matrizGerando} onMatriz={gerarMatriz} />}
           {adminAuth && <MaturidadeResumo dark={dark} equipe={equipeData} hoje={new Date().toLocaleDateString('sv-SE')} />}
           {adminAuth && <ConfiguracaoMaturidade key={project.id} dark={dark} equipe={equipeData} onSave={patch => save({ ...equipeData, ...patch })} />}
@@ -2992,10 +3009,6 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                   <button onClick={()=>setScreen("aprovacoes")}
                     style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
                     <Ico n="checkCirculo"/> Aprovações
-                  </button>
-                  <button onClick={alternarCadeado} disabled={saving} aria-pressed={trancada} title={trancada?"Equipe trancada — toque para abrir":"Equipe aberta — toque para trancar"}
-                    style={{ ...S.btnSm, color: trancada?"#fff":"#f59e0b", background: trancada?"#b45309":"transparent", border:`1px solid ${trancada?"#b45309":"#f59e0b66"}`, fontSize:10, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:800 }}>
-                    <Ico n={trancada?"cadeado":"cadeadoAberto"}/> {trancada?"Equipe trancada":"Equipe aberta"}
                   </button>
                   <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
                 </div>
@@ -3052,7 +3065,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             </div>
           ) : liderAuth ? (
             <div style={{ background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}><Ico n="capacete"/> Acesso Líder — Pode adicionar registros{trancada && <div style={{ color:"#f59e0b", fontWeight:700, marginTop:3 }}><Ico n="cadeado"/> Equipe trancada pelo consultor: cadastro, edição e desligamento só com ele.</div>}</div>
+              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}><Ico n="capacete"/> Acesso Líder — Pode adicionar registros</div>
               <div style={{ display:"flex", gap:6 }}>
                 <button onClick={()=>setScreen("ferias")}
                   style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
