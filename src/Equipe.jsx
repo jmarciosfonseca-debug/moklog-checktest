@@ -1,10 +1,10 @@
 import { Ico } from "./Icones";
 import { LOGO_FAIXA_HTML } from "./logoOficial";
-import { CARGOS_MOKPAT, divisaoDoProjeto } from "./divisoes";
+import { CARGOS_MOKPAT, divisaoDoProjeto, DIVISAO_IDS } from "./divisoes";
 import { getDocsSeguro } from "./lerServidor";
 import { iconeTema } from "./temaClaro";
 import { checkPin,authFetch,authFetchEquipe,getSession } from "./session";
-import { useState, useEffect, useContext, useRef } from "react";
+import { useState, useEffect, useContext, useRef, Fragment } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer, collection, query, where } from "firebase/firestore";
 import { setDoc, deleteDoc } from "./fireGuard";
@@ -243,7 +243,7 @@ function emptyColab(cargo, projectId, turno) {
   return {
     id: Date.now().toString() + Math.random().toString(36).substring(2,6),
     cargo, projectId,
-    nome:"", telefone:"",
+    nome:"", telefone:"", email:"",
     dataContratacao:"", ultimaReciclagem:"",
     foto:"", escala:"12x36",
     turno: turno || "Diurno",
@@ -795,7 +795,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
+function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, onMover, destinosMover, projetoAtual, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
   const hist    = ordenarHistorico(colab.historico);   // cronológico pela data do fato (aplicação), não pelo lançamento
   const fotosFicha = useContext(FotosCtx) || {};        // fotos de treinamento (fotoRef no item do histórico)
@@ -869,6 +869,8 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
               <div style={{ fontSize:12, color:"#94a3b8", marginTop:3 }}>{colab.cargo}</div>
               {coberturaAtiva(colab) && <div style={{fontSize:10,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"2px 8px",borderRadius:6,display:"inline-block",marginTop:5}}><Ico n="atualizar"/> Cobrindo Líder até {fmtDate(colab.coberturaFim)}</div>}
               {colab.telefone && <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}><Ico n="celular"/> {colab.telefone}</div>}
+              {colab.email && <div style={{ fontSize:12, color:"#64748b", marginTop:2, wordBreak:"break-all" }}>✉ {colab.email}</div>}
+              <Trajetoria colab={colab}/>
               <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:tc.badge, background:tc.bg, border:`1px solid ${tc.border}`, padding:"3px 9px", borderRadius:6 }}>
                   {TURNO_CONFIG[colab.turno]?.icon || <><Ico n="relogio"/></>} {colab.turno}
@@ -1084,6 +1086,9 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           {adminAuth && colab.status==="ativo" && onPromover && (
             <PromoverModal colab={colab} cargos={cargosFicha} onPromover={onPromover} S={S}/>
           )}
+          {adminAuth && colab.status==="ativo" && onMover && (destinosMover||[]).length>0 && (
+            <MoverModal colab={colab} de={projetoAtual} destinos={destinosMover} onMover={onMover} S={S}/>
+          )}
           {(adminAuth || liderAuth) && colab.status==="ativo" && (
             <DesligarModal colab={colab} onDesligar={onDesligar} S={S} dark={dark} lideres={lideresFicha} exigeLider={!adminAuth}/>
           )}
@@ -1188,6 +1193,10 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
               <label style={S.lbl}>Telefone</label>
               <input value={form.telefone} onChange={e=>setF("telefone",e.target.value)} placeholder="(00) 00000-0000" style={S.inp}/>
             </div>
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={S.lbl}>E-mail</label>
+            <input type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" maxLength={120} value={form.email||""} onChange={e=>setF("email",e.target.value.trim().toLowerCase())} placeholder="nome@empresa.com.br" style={S.inp}/>
           </div>
 
           {/* Cobertura temporária de liderança */}
@@ -1609,6 +1618,58 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
 
 
 // ── Modal desligamento com motivo, tipo e data
+// Trajetória entre projetos (12/11/2026): P311A → P311B → … com a data de cada mudança.
+function Trajetoria({ colab, compacta = false }) {
+  const t = Array.isArray(colab.trajetoria) ? colab.trajetoria.filter(m=>m&&m.de&&m.para) : [];
+  if(!t.length) return null;
+  const passos = [{ pid:t[0].de }, ...t.map(m=>({ pid:m.para, data:m.data }))];
+  return (
+    <div data-trajetoria="1" style={{ display:"flex", alignItems:"center", gap:5, flexWrap:"wrap", marginTop:compacta?3:6 }}>
+      {passos.map((x,i)=>(
+        <Fragment key={i}>
+          {i>0 && <span aria-hidden="true" style={{ color:"#64748b", fontSize:11 }}>→</span>}
+          <span title={x.data?`Desde ${fmtDate(x.data)}`:"Projeto de origem"} style={{ fontSize:10, fontWeight:800, color:i===passos.length-1?"#38bdf8":"#94a3b8", background:i===passos.length-1?"#001a2e":"transparent", border:`1px solid ${i===passos.length-1?"#0ea5e955":"#33415588"}`, padding:"2px 7px", borderRadius:6 }}>
+            {x.pid}{!compacta&&x.data?<span style={{ fontWeight:500, opacity:.75 }}> · {fmtDate(x.data)}</span>:null}
+          </span>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+// Mover para outro projeto — só o consultor. O cadastro vai inteiro; na origem fica no histórico como Transferência.
+function MoverModal({ colab, de, destinos, onMover, S }) {
+  const [open, setOpen] = useState(false);
+  const [para, setPara] = useState("");
+  const [data, setData] = useState(todayStr());
+  const [busy, setBusy] = useState(false);
+  if(!open) return (
+    <button onClick={()=>setOpen(true)} style={{ ...S.btnSec, color:"#38bdf8", borderColor:"#0ea5e944", fontSize:13 }}>⇄ Mover para outro projeto</button>
+  );
+  return (
+    <div style={{ background:"#00131f", border:"1px solid #0ea5e955", borderRadius:12, padding:16 }}>
+      <div style={{ fontSize:13, fontWeight:700, color:"#38bdf8", marginBottom:10 }}>⇄ Mover — {colab.nome}</div>
+      <div style={S.lbl}>Projeto atual</div>
+      <div style={{ fontSize:13, color:"#e2e8f0", marginBottom:10 }}>{de}</div>
+      <div style={S.lbl}>Mover para *</div>
+      <select aria-label="Projeto de destino" value={para} onChange={e=>setPara(e.target.value)} style={{ ...S.inp, marginBottom:10 }}>
+        <option value="">Escolher projeto…</option>
+        {destinos.map(d=><option key={d.id} value={d.id}>{d.rotulo}</option>)}
+      </select>
+      <div style={S.lbl}>Data da mudança</div>
+      <input type="date" value={data} onChange={e=>setData(e.target.value)} style={{ ...S.inp, marginBottom:10 }}/>
+      <div style={{ fontSize:11, color:"#94a3b8", lineHeight:1.5, marginBottom:12 }}>
+        O cadastro vai completo (foto, endereço, histórico, uniforme, férias). No {de} ele fica no histórico como <b>Transferência</b>, sem contar como desligamento. A distância até o novo projeto é recalculada.
+      </div>
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={()=>setOpen(false)} style={{ ...S.btnSec, flex:1, fontSize:13 }}>Cancelar</button>
+        <button disabled={busy||!para||!data} onClick={async()=>{ setBusy(true); try{ await onMover(colab, para, data); } catch(e){ alert(e.message||"Não foi possível mover."); } finally { setBusy(false); } }}
+          style={{ flex:1, background:"linear-gradient(135deg,#0284c7,#0369a1)", color:"#fff", border:"none", borderRadius:10, padding:"13px", fontSize:13, fontWeight:700, cursor:"pointer", opacity:(busy||!para||!data)?0.5:1 }}>{busy?"Movendo…":para?`Mover para ${para}`:"Mover"}</button>
+      </div>
+    </div>
+  );
+}
+
 function PromoverModal({ colab, cargos, onPromover, S }) {
   const [open, setOpen] = useState(false);
   const [cargoNovo, setCargoNovo] = useState("");
@@ -2670,6 +2731,23 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     setSelColab(newColabs.find(c=>c.id===colab.id));
   };
 
+  // Mover entre projetos: uma transação no servidor nos dois projetos. Só o consultor.
+  const divisaoAtual = divisaoDoProjeto(project.id);
+  const destinosMover = (divisaoAtual==="moklog" ? Object.keys(nomesProjetos||{}) : (DIVISAO_IDS[divisaoAtual]||[]))
+    .filter(p=>p!==project.id && divisaoDoProjeto(p)===divisaoAtual)
+    .map(p=>({ id:p, rotulo:(nomesProjetos||{})[p] && divisaoAtual==="moklog" ? `${p} — ${nomesProjetos[p]}` : p }));
+  const moverColab = async (colab, para, data) => {
+    if(!adminAuth) return;
+    if(isDemo()) throw Error("Demonstração: a mudança de projeto não é gravada.");
+    if(!window.confirm(`Mover ${colab.nome} do ${project.id} para o ${para}?`)) return;
+    const response=await authFetchEquipe("/api/equipe-save",{method:"POST",body:JSON.stringify({acao:"mover",pid:project.id,para,colabId:colab.id,data})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.ok) throw Error(result.erro||"Não foi possível mover.");
+    try{localStorage.setItem(`equipe_${project.id}`,JSON.stringify(result.data));localStorage.removeItem(`equipe_${para}`);}catch{}
+    confirmadaRef.current=result.data;
+    setEquipeData(result.data); setSelColab(null); setScreen("list");
+  };
+
   const reativarColab = async (colab) => {
     if(!adminAuth) return;
     const reativado = {...colab, status:"ativo", desligadoEm:null, motivoDesligamento:undefined, tipoDesligamento:undefined};
@@ -2781,6 +2859,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
         onEditHist={(colabId, item)=>{setEditHistItem(item);setScreen("editHist");}}
         onDesligar={desligarColab}
         onPromover={promoverColab}
+        onMover={moverColab} destinosMover={destinosMover} projetoAtual={project.id}
         cargosFicha={cargos}
         lideresFicha={(equipeData.colaboradores||[]).filter(c=>c.status==="ativo"&&ehLider(c,equipeData.colaboradores)).map(c=>c.nome)}
         onRemoveHist={removeHist}
@@ -3283,7 +3362,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             <div style={S.card}>
               <button onClick={()=>setShowDesligados(!showDesligados)}
                 style={{ width:"100%", background:"transparent", border:"none", display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", padding:0 }}>
-                <span style={{ fontSize:12, fontWeight:700, color:"#ef4444" }}><Ico n="pontoVermelho"/> Desligados ({desligados.length})</span>
+                <span style={{ fontSize:12, fontWeight:700, color:"#ef4444" }}><Ico n="pontoVermelho"/> Desligados e transferidos ({desligados.length})</span>
                 <span style={{ color:"#334155", fontSize:12 }}>{showDesligados?"▲":"▼"}</span>
               </button>
               {showDesligados && (
@@ -3296,12 +3375,12 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                           <div style={{ fontSize:12, fontWeight:700, color:"#94a3b8" }}>{c.nome}</div>
                           <div style={{ fontSize:10, color:"#475569" }}>{c.cargo}</div>
                           <div style={{ display:"flex", gap:6, marginTop:3, flexWrap:"wrap" }}>
-                            {c.tipoDesligamento&&<span style={{ fontSize:9, color:"#ef4444", background:"#2a0202", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.tipoDesligamento}</span>}
+                            {c.tipoDesligamento&&<span style={{ fontSize:9, color:c.tipoDesligamento==="Transferência"?"#38bdf8":"#ef4444", background:c.tipoDesligamento==="Transferência"?"#001a2e":"#2a0202", padding:"1px 6px", borderRadius:4, fontWeight:700 }}>{c.tipoDesligamento}</span>}
                             {c.desligadoEm&&<span style={{ fontSize:9, color:"#64748b" }}><Ico n="calendario"/> {fmtDate(c.desligadoEm)}</span>}
                           </div>
-                          {c.motivoDesligamento&&<div style={{ fontSize:10, color:"#64748b", marginTop:2, fontStyle:"italic" }}>{c.motivoDesligamento}</div>}
+                          {c.tipoDesligamento==="Transferência" ? <Trajetoria colab={c} compacta/> : c.motivoDesligamento&&<div style={{ fontSize:10, color:"#64748b", marginTop:2, fontStyle:"italic" }}>{c.motivoDesligamento}</div>}
                         </div>
-                        {adminAuth && (
+                        {adminAuth && c.tipoDesligamento!=="Transferência" && (
                           <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
                             <button onClick={()=>reativarColab(c)}
                               style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px" }}>

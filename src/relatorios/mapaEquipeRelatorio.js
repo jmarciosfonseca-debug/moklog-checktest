@@ -132,7 +132,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const turnQuadro = quadro ? turnoverSobreQuadro(project.id, modelo.desligados12m) : null;
   const catalogo = Array.isArray(equipe.treinamentosEsperados) ? equipe.treinamentosEsperados.filter(t => t && String(t.nome || '').trim()) : [];
   const inicio = new Date(`${hoje}T12:00:00`); inicio.setFullYear(inicio.getFullYear() - 1);
-  const desligados = incluirDesligados ? desligadosUnicos(equipe.desligados, (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo')).unicos.filter(c => c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
+  const desligados = incluirDesligados ? desligadosUnicos(equipe.desligados, (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo')).unicos.filter(c => c.tipoDesligamento !== 'Transferência' && c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
   const alertas = modelo.alertas;
 
   // Escopo considerado: postos, regime, escala e pessoas previstas (matriz de dimensionamento) + alerta de posto vago.

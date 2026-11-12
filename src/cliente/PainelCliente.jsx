@@ -74,7 +74,7 @@ async function carregarProjeto(pid, PROJECTS, stored, computeHealth, ctmkData, s
       return { emFerias: f.filter((x) => x.dataInicio <= hoje && (!x.dataRetorno || hoje <= x.dataRetorno)).map((x) => ({ ...nomeDe(x.colabId), inicio: x.dataInicio, retorno: x.dataRetorno || null, cobertura: x.cobertura || "" })),
         saindo: f.filter((x) => x.dataInicio > hoje && em7(x.dataInicio)).map((x) => ({ ...nomeDe(x.colabId), inicio: x.dataInicio, retorno: x.dataRetorno || null })),
         voltando: f.filter((x) => x.dataRetorno && x.dataRetorno >= hoje && em7(x.dataRetorno) && x.dataInicio <= hoje).map((x) => ({ ...nomeDe(x.colabId), inicio: x.dataInicio, retorno: x.dataRetorno })) }; })(),
-    desligados: (eq.desligados || []).filter((c) => c && typeof c === "object").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, saida: c.desligadoEm || null, motivo: c.motivoDesligamento || c.tipoDesligamento || "", foto: fotoDe(c, fotos) })).sort((a, b) => String(b.saida || "").localeCompare(String(a.saida || ""))),
+    desligados: (eq.desligados || []).filter((c) => c && typeof c === "object" && c.tipoDesligamento !== "Transferência").map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, saida: c.desligadoEm || null, motivo: c.motivoDesligamento || c.tipoDesligamento || "", foto: fotoDe(c, fotos) })).sort((a, b) => String(b.saida || "").localeCompare(String(a.saida || ""))),
   };
   p.luzes = luzes(p);
   // Informativos da home (padrão SIS+): até 3 notícias dos últimos 30 dias, as mais próximas do parque primeiro
