@@ -1,3 +1,4 @@
+import UsoTemp from "./painelProjeto/UsoTemp"; // TEMPORÁRIO (Fase 0 do Painel do projeto)
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
 import MokedSelo from "./MokedSimbolo";
 import { temaMoked, badgeMoked, estadoMoked, ESTADOS_MOKED } from "./temaMoked";
@@ -4351,7 +4352,7 @@ export default function App(){
       />
     </ErrorBoundary>
   );
-  if(screen==="dashboard") return <Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/>;
+  if(screen==="dashboard") return <>{getAccess("P601")==="admin" && divisao==="moklog" && <UsoTemp/>}<Dashboard stored={stored} ctmkData={ctmkData} onToggleCtmk={toggleCtmk} onBack={()=>setScreen("home")} onDeleteReport={deleteReport} onEditReport={startEditReport} onGestaoFV={()=>setScreen("gestao_fv")} dark={dark}/></>;
   if(screen==="history") return <ErrorBoundary moduleName="Histórico de Relatórios"><HistoryScreen project={project} stored={stored} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")} onEdit={startEditReport} onDelete={deleteReport} canManage={getProjectAuthMode(project.id)==="admin"}/></ErrorBoundary>;
   if(screen==="report") return <ReportScreen project={project} state={state} meta={meta} photos={photos} ctmkData={ctmkData} onBack={()=>setScreen("form")} onHome={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/>;
 

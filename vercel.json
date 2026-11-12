@@ -6,6 +6,9 @@
   "functions": {
     "api/entorno-coletar.js": {
       "maxDuration": 60
+    },
+    "api/painel-uso.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
