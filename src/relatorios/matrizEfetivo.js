@@ -59,11 +59,11 @@ export function montarMatrizEfetivo({ nomes = {}, ocupacoes = null, hoje = new D
   };
 
   const css = `<style>.mk-tot td{border-top:1.5px solid #111827;background:#F9FAFB}.mk-num{text-align:right;white-space:nowrap}.mk-da{color:#B91C1C}</style>`;
-  const fecho = `<p class="mk-nota">Gabarito oficial de dimensionamento Moked: ${total === TOTAL_HOMOLOGADO ? `${TOTAL_HOMOLOGADO} colaboradores homologados em ${ORDEM_PROJETOS.length} unidades` : `${total} colaboradores`}. Ativos e vagas vêm do cadastro de equipe do MokLog CheckTest na data de emissão; vaga = previsto − ativos.${parcial ? ` Totais parciais: ${ORDEM_PROJETOS.length - comDados.length} unidade(s) sem cadastro de equipe no sistema.` : ""}</p>`;
+  const fecho = `<p class="mk-nota">Gabarito oficial de dimensionamento Moked: ${total === TOTAL_HOMOLOGADO ? `${TOTAL_HOMOLOGADO} colaboradores homologados em ${ORDEM_PROJETOS.length} unidades` : `${total} colaboradores`}. Ativos e vagas vêm do cadastro de equipe do Moked CheckTest na data de emissão; vaga = previsto − ativos.${parcial ? ` Totais parciais: ${ORDEM_PROJETOS.length - comDados.length} unidade(s) sem cadastro de equipe no sistema.` : ""}</p>`;
   return documentoMoked({
     project: { id: "", name: "Rede Moked" }, titulo: "Matriz de Dimensionamento de Efetivo", numero, hoje, tag: "ACESSO GERENCIAL", empresaLogo: false,
     subtitulo: `Mapeamento de postos, escalas e efetivo · ${ORDEM_PROJETOS.length} unidades operacionais · referência ${dataBR(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`)}`,
     corpo: css + kpis + resumo + regras + ORDEM_PROJETOS.map(blocoUnidade).join("") + fecho,
-    rodape: `${numero} · Matriz de Dimensionamento de Efetivo · Moked Consulting Security · MokLog CheckTest`,
+    rodape: `${numero} · Matriz de Dimensionamento de Efetivo · Moked Consulting Security · Moked CheckTest`,
   });
 }

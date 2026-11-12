@@ -2,7 +2,7 @@ import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ─────────────────────────────────────────────────────────────
-// Ocorrencias.jsx — Módulo de Registro Situacional (RS) do MokLog CheckTest
+// Ocorrencias.jsx — Módulo de Registro Situacional (RS) do Moked CheckTest
 //
 // Traz o registro de ocorrências para dentro do app (substitui o fluxo
 // externo 2CONTROL), com taxonomia 100% logística (rsCatalogo.js).
@@ -254,7 +254,7 @@ function corpoEmailRS(project, r){
   L.push("");
   L.push("----------------------------------------");
   L.push("MOKED SECURITY CONSULTING - Documento de Uso Interno e Confidencial");
-  L.push("Gerado pelo MokLog CheckTest");
+  L.push("Gerado pelo Moked CheckTest");
   return L.join("\n");
 }
 function assuntoEmailRS(project, r){

@@ -93,5 +93,5 @@ export function montarComparativoGrupo(groupLabel, groupData, periodLabel, { hoj
   const projeto = { id: a.rows[0]?.id || "", name: `Grupo ${groupLabel}` };
   return documentoMoked({ project: projeto, titulo: "Relatório Comparativo Interparques", subtitulo: sub, numero, hoje, tag: "ACESSO GERENCIAL", empresaLogo: false,
     corpo: css + hero + kpis + ranking + cronicos + semEvolucao,
-    rodape: `${numero} · Comparativo Interparques · Grupo ${groupLabel} · Moked Consulting Security · MokLog CheckTest` });
+    rodape: `${numero} · Comparativo Interparques · Grupo ${groupLabel} · Moked Consulting Security · Moked CheckTest` });
 }

@@ -262,7 +262,7 @@ function enviarWhatsApp(project, tipo, nome, status, justificativa, data) {
     `📝 ${justificativa}\n` +
     `📅 ${fmtDate(data)}\n` +
     `⏳ Aguardando resolução\n\n` +
-    `_MokLog CheckTest © Moked Security_`
+    `_Moked CheckTest © Moked Security_`
   );
   window.open(`https://wa.me/?text=${msg}`, "_blank");
 }
@@ -365,7 +365,7 @@ ${section("Lanternas","🔦",[],[...data.lanternas||[]])}
 ${(data.ztrax||[]).length?section("Pânico ZTRAX","🚨",[],[...data.ztrax]):""}
 ${(data.bodycam||[]).length?section("Bodycam","📹",[],[...data.bodycam]):""}
 ${motoSection}
-<div class="footer">MokLog CheckTest © Moked Consulting Security · ${project.id} · Emitido em ${hoje}</div>
+<div class="footer">Moked CheckTest © Moked Consulting Security · ${project.id} · Emitido em ${hoje}</div>
 </body></html>`;
 
   const blob = new Blob([html],{type:"text/html"});

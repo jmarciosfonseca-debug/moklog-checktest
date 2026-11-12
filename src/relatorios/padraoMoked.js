@@ -20,7 +20,7 @@ export function barrasMoked(itens, fmt = (v) => String(v)) {
 // fecho (opcional): último bloco do relatório, impresso JUNTO da assinatura — evita folha só com assinatura.
 // Bloco "Base dos dados + assinatura". Exportado para ser embutido no fim de uma tabela (CCO), junto das últimas linhas.
 export function blocoFimMoked() {
-  return `<section class="mk-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div></div>
+  return `<section class="mk-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no Moked CheckTest, supervisionados pela Moked Consulting Security.</div></div>
 <div class="mk-ass"><div class="mk-linha"></div><b>José Fonseca</b><div class="mk-mu">Consultor de Segurança · Moked Consulting Security</div><div class="mk-mu">jose.fonseca@moked.com.br</div></div></section>`;
 }
 
@@ -29,7 +29,7 @@ export function blocoFimMoked() {
 // empresaLogo=false: só o logo Moked (documentos de grupo/gerenciais, sem empresa de segurança única).
 export function documentoMoked({ project, titulo, subtitulo, numero, corpo, interno = false, tag = "", hoje = new Date(), rodape, fecho = "", fimEmbutido = false, empresaLogo = true }) {
   const theme = empresaLogo && project?.id ? (getTheme(project.id) || {}) : {};
-  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escHTML(titulo)} — ${escHTML(project?.id || "")}</title><style>${cssMoked()}${rodapePagina(rodape || `${numero} · ${titulo} · ${project?.id || ""} ${project?.name || ""} · Moked Consulting Security · MokLog CheckTest`)}</style></head><body>
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${escHTML(titulo)} — ${escHTML(project?.id || "")}</title><style>${cssMoked()}${rodapePagina(rodape || `${numero} · ${titulo} · ${project?.id || ""} ${project?.name || ""} · Moked Consulting Security · Moked CheckTest`)}</style></head><body>
 <div class="mk-noprint"><button onclick="window.print()" class="mk-print">Imprimir / Salvar PDF</button></div>
 <header class="mk-topo"><div class="mk-logos"><img src="${MOKED_LOGO}" class="mk-lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="mk-sep"></span><img src="${theme.empresaLogo}" class="mk-lg" alt="${escHTML(theme.empresaNome || "")}">` : ""}</div>
 <div class="mk-meta">${interno ? '<div class="mk-tag">VERSÃO INTERNA</div>' : tag ? `<div class="mk-tag">${escHTML(tag)}</div>` : ""}<div><b>${escHTML(titulo)}</b> · Nº ${escHTML(numero)}</div><div>Emissão ${hoje.toLocaleDateString("pt-BR")} · José Fonseca</div></div></header>

@@ -80,7 +80,7 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
     if (!itens.length) return "";
     return `<h2>Comprovantes</h2><div class="cps">` + itens.map((x) => `<figure><img src="${fotos[x.fotoId]}" alt="Comprovante"/><figcaption>${esc(x.descricao || "Gasto")} · ${esc(brl(Number(String(x.valor).replace(",", ".")) || 0))}<br/>${esc(x.rota)}</figcaption></figure>`).join("") + `</div>`;
   })()}
-  <footer>Horários e localizações cravados pelo aparelho no momento de cada marcação. Documento gerado pelo MokLog CheckTest · MK RD.</footer>
+  <footer>Horários e localizações cravados pelo aparelho no momento de cada marcação. Documento gerado pelo Moked CheckTest · MK RD.</footer>
   </body></html>`;
 }
 

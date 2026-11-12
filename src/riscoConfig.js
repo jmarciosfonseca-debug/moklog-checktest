@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// riscoConfig.js — Motor de classificação de risco (MokLog CheckTest)
+// riscoConfig.js — Motor de classificação de risco (Moked CheckTest)
 // Régua v2, fechada com Marcio em 27/07/2026.
 //
 // PRINCÍPIOS (invioláveis):

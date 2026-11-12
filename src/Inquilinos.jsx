@@ -110,7 +110,7 @@ function gerarPDFInquilinos(project, unidades) {
   <tbody>${rows}</tbody>
 </table>
 <div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · Inquilinos</div>
+  <div>Moked CheckTest © Moked Consulting Security · Inquilinos</div>
   <div style="margin-top:3px">${project.id} — ${project.name||""} · ${hoje}</div>
 </div></body></html>`;
 

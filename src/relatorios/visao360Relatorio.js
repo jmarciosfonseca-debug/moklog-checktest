@@ -82,5 +82,5 @@ export function gerarVisao360HTML({ rows, media, grupoLabel = null, cfg, hoje = 
     ? `<div class="mk-vazio"><div class="mk-dv">Nenhuma planta avaliada</div></div>`
     : `${kpis(rows, media)}${blocoAtencao(pontosDeAtencao(rows))}${tabelaRanking(rows)}${pend.length ? `<section class="mk-bloco"><h2 class="mk-h2">Onde a nota foi descontada <span class="mk-mu">· pontos por tipo de pendência</span></h2>${barrasMoked(pend, (v) => `−${v}`)}</section>` : ""}${legenda(cfg)}`;
   const unico = { id: grupoLabel ? `Grupo ${grupoLabel}` : "Todas as plantas", name: "" };
-  return documentoMoked({ project: unico, titulo: "Visão 360", subtitulo: sub, numero, corpo, interno: !grupoLabel, hoje, empresaLogo: false, rodape: `${numero} · Visão 360 · ${unico.id} · Moked Consulting Security · MokLog CheckTest` });
+  return documentoMoked({ project: unico, titulo: "Visão 360", subtitulo: sub, numero, corpo, interno: !grupoLabel, hoje, empresaLogo: false, rodape: `${numero} · Visão 360 · ${unico.id} · Moked Consulting Security · Moked CheckTest` });
 }

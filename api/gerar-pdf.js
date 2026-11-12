@@ -130,7 +130,7 @@ export default async function handler(req, res) {
     page.drawRectangle({ x: M, y: y - 34, width: W, height: 34, color: PRETO });
     page.drawRectangle({ x: M, y: y - 34, width: 5, height: 34, color: VERMELHO });
     page.drawText("RELATORIO DE AUDITORIA OPERACIONAL", { x: M + 14, y: y - 15, size: 12, font: fontBold, color: rgb(1,1,1) });
-    page.drawText("Seguranca Patrimonial - dados extraidos do MokLog CheckTest", { x: M + 14, y: y - 27, size: 7.5, font, color: rgb(0.85,0.85,0.85) });
+    page.drawText("Seguranca Patrimonial - dados extraidos do Moked CheckTest", { x: M + 14, y: y - 27, size: 7.5, font, color: rgb(0.85,0.85,0.85) });
     y -= 46;
 
     texto(`${limpa(projectId)} - ${limpa(projetoNome)}`, M, 12, fontBold, PRETO); y -= 18;
@@ -211,7 +211,7 @@ export default async function handler(req, res) {
     // ── Rodapé (aviso) ──
     espaco(24);
     page.drawLine({ start: { x: M, y }, end: { x: M + W, y }, thickness: 0.5, color: CINZA_CLARO }); y -= 12;
-    texto("Dados operacionais extraidos do MokLog CheckTest. Conclusoes criticas exigem validacao gerencial.", M, 7.5, font, CINZA, W);
+    texto("Dados operacionais extraidos do Moked CheckTest. Conclusoes criticas exigem validacao gerencial.", M, 7.5, font, CINZA, W);
 
     const bytes = await pdf.save();
     const dataArq = (emissao || "").slice(0,10).replace(/\//g,"-") || new Date().toISOString().slice(0,10);

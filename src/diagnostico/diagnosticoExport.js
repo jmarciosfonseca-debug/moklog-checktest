@@ -206,7 +206,7 @@ export function gerarDiagnosticoHTML(rel, { hoje = new Date() } = {}) {
   const sub = `${escHTML(rel.projeto)}${rel.nomeProjeto && rel.nomeProjeto !== rel.projeto ? ` — ${escHTML(rel.nomeProjeto)}` : ""}${rel.grupo ? ` · ${escHTML(rel.grupo)}` : ""}${rel.rotuloRevisao ? ` · ${escHTML(rel.rotuloRevisao)}` : ""} · catálogo v${escHTML(rel.versao)} · ${escHTML(rel.estado)} · dados de ${escHTML(dataBr(rel.geradoEm))}`;
   const numero = numeroDiagnostico(rel);
   const project = { id: rel.projeto, name: "" };
-  return documentoMoked({ project, titulo: "Diagnóstico Situacional", subtitulo: sub, numero, corpo: `${kpis}${leitura}${semaforo}${plano}${padrao}${evolucao}${resumoStatus}${nota}`, interno: true, hoje, empresaLogo: false, rodape: `${numero} · Diagnóstico Situacional · ${rel.projeto} · Moked Consulting Security · MokLog CheckTest` });
+  return documentoMoked({ project, titulo: "Diagnóstico Situacional", subtitulo: sub, numero, corpo: `${kpis}${leitura}${semaforo}${plano}${padrao}${evolucao}${resumoStatus}${nota}`, interno: true, hoje, empresaLogo: false, rodape: `${numero} · Diagnóstico Situacional · ${rel.projeto} · Moked Consulting Security · Moked CheckTest` });
 }
 
 // Cópia de segurança do rascunho local (JSON). Só lê; nunca altera nem apaga o rascunho.

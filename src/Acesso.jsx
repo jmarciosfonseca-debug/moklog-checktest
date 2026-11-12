@@ -114,7 +114,7 @@ function gerarPDFRegistro(r, projectId) {
   </div>
   ${dur?`<div class="dur" style="margin-top:12px">⏳ Tempo no pátio: ${dur}</div>`:""}
 </div>
-<div class="footer">MokLog CheckTest © Moked Consulting Security · Controle de Acesso ${projectId}</div>
+<div class="footer">Moked CheckTest © Moked Consulting Security · Controle de Acesso ${projectId}</div>
 </body>
 </html>`;
   const blob = new Blob([html], {type:"text/html"});
@@ -182,7 +182,7 @@ function gerarPDFConsolidado(lista, projectId) {
   </thead>
   <tbody>${rows}</tbody>
 </table>
-<div class="footer">MokLog CheckTest © Moked Consulting Security</div>
+<div class="footer">Moked CheckTest © Moked Consulting Security</div>
 </body>
 </html>`;
 
@@ -210,7 +210,7 @@ function enviarWhatsApp(r, projectId) {
     `Entrada Pátio: ${r.entradaPatio||"--"}\n` +
     `Saída Pátio: ${r.saidaPatio||"--"}\n` +
     (dur?`⏳ Tempo no pátio: ${dur}\n`:"")+
-    `\n_MokLog CheckTest © Moked Security_`
+    `\n_Moked CheckTest © Moked Security_`
   );
   window.open(`https://wa.me/?text=${msg}`, "_blank");
 }

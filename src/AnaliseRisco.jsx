@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AnaliseRisco.jsx — Relatório Situacional / Análise de Risco (MokLog CheckTest)
+// AnaliseRisco.jsx — Relatório Situacional / Análise de Risco (Moked CheckTest)
 // Consolida até 7 fontes JÁ inseridas no app e gera PDF padrão MOKED.
 //
 // Fontes:
@@ -1638,7 +1638,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
   .consultor{margin-top:16px;padding:14px 18px}.consultor p{margin:4px 0 0}.assina{margin-top:14px;padding-top:10px}
   .consultor,.assina{page-break-inside:avoid;break-inside:avoid}
   .ar-fecho{page-break-inside:avoid;break-inside:avoid}   /* pontos fortes + palavra do consultor + assinatura ficam juntos */
-  @page{@bottom-left{content:"${String(`${ref} · Análise de Risco · ${project.id} ${project.name || ""} · Moked Consulting Security · MokLog CheckTest`).replace(/[\\"]/g, "")}";font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}@bottom-right{content:"pág. " counter(page) " de " counter(pages);font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}}
+  @page{@bottom-left{content:"${String(`${ref} · Análise de Risco · ${project.id} ${project.name || ""} · Moked Consulting Security · Moked CheckTest`).replace(/[\\"]/g, "")}";font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}@bottom-right{content:"pág. " counter(page) " de " counter(pages);font-family:Calibri,Carlito,Arial,sans-serif;font-size:7.5pt;color:#9CA3AF}}
 `;
 
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
@@ -1875,7 +1875,7 @@ ${novoCSS}</style></head><body>
   </div>
 
   <div class="rodape">
-    <span><b>MokLog CheckTest</b> · documento consolidado — análise de risco patrimonial</span>
+    <span><b>Moked CheckTest</b> · documento consolidado — análise de risco patrimonial</span>
     <span>${esc(ref)} · gerado em ${esc(hoje)}</span>
   </div>
 </div>

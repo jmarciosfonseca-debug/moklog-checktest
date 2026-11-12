@@ -133,7 +133,7 @@ function gerarPdfBodycam(project, registros){
   <thead><tr><th>Dia</th><th>Horário</th><th>Porteiro</th><th>Câmera Líder</th><th>Câmera Ronda</th><th>Status</th><th>Observação</th></tr></thead>
   <tbody>${linhas}</tbody>
 </table>
-<div class="footer">MokLog CheckTest · Moked Consulting Security · Bodycam ${project.id}</div>
+<div class="footer">Moked CheckTest · Moked Consulting Security · Bodycam ${project.id}</div>
 </body></html>`;
   const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);

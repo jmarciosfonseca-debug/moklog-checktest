@@ -94,7 +94,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
     <div class="mk-k"><div class="mk-kv ${pend.length ? "mk-da" : ""}">${pend.length}</div><div class="mk-kl">pendências</div><div class="mk-mu mk-sm">${r.inop} inoperantes · ${r.parcial} parciais</div></div>
     <div class="mk-k"><div class="mk-kv ${maiorAging > 0 ? "mk-da" : ""}">${maiorAging ? maiorAging + " d" : "—"}</div><div class="mk-kl">maior tempo em aberto</div><div class="mk-mu mk-sm">${maior ? escHTML(maior.unico ? maior.cat : maior.item) : "sem pendências"}</div></div>
     <div class="mk-k"><div class="mk-kv ${pend.length && semTrat ? "mk-wa" : ""}">${pend.length ? `${pend.length - semTrat} de ${pend.length}` : "—"}</div><div class="mk-kl">com tratativa registrada</div><div class="mk-mu mk-sm">${pend.length ? `${semTrat} sem tratativa` : ""}</div></div></section>
-  <div class="mk-nota" style="margin:-4px 0 10px">${single ? "Levantamento feito em vistoria presencial pelo consultor Moked, item a item, com as quantidades informadas pelo cliente; não substitui laudo técnico de fabricante." : "Cada dispositivo é testado individualmente e registrado em tempo real pelo líder no MokLog CheckTest."} Status: 0% = inoperante · 1–99% = parcial · 100% = operacional. Saúde = (operacionais + 0,5 × parciais) ÷ ativos testados; cada câmera do CFTV conta como um ativo.</div>`;
+  <div class="mk-nota" style="margin:-4px 0 10px">${single ? "Levantamento feito em vistoria presencial pelo consultor Moked, item a item, com as quantidades informadas pelo cliente; não substitui laudo técnico de fabricante." : "Cada dispositivo é testado individualmente e registrado em tempo real pelo líder no Moked CheckTest."} Status: 0% = inoperante · 1–99% = parcial · 100% = operacional. Saúde = (operacionais + 0,5 × parciais) ÷ ativos testados; cada câmera do CFTV conta como um ativo.</div>`;
 
   // ── Disponibilidade por sistema (tabela com barra) + onde estão as falhas
   const mx = Math.max(1, ...fs.map((f) => f.inop + f.parcial));
@@ -173,5 +173,5 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
 
   const extras = single?.extrasHTML || "";
   return documentoMoked({ project, titulo, subtitulo: sub, numero, hoje, corpo: css + hero + kpis + disponibilidade + blocoGravacao + extras + pendencias + energia, fecho: execucao, empresaLogo: !single,
-    rodape: `${numero} · ${single ? "Relatório Situacional" : "Laudo Técnico Semanal"} · ${project.id} ${project.name || ""} · ${semana} · Moked Consulting Security · MokLog CheckTest` });
+    rodape: `${numero} · ${single ? "Relatório Situacional" : "Laudo Técnico Semanal"} · ${project.id} ${project.name || ""} · ${semana} · Moked Consulting Security · Moked CheckTest` });
 }

@@ -224,7 +224,7 @@ export default function PaginaExterna({ token }) {
           </>
         )}
         <div style={{ fontSize: 11, color: C.mudo, textAlign: "center", marginTop: 24 }}>
-          Com a manutenção {mãos.manutencao} · Com a Moked {mãos.moked} · Aguardando a administração {mãos.administracao}<br />MokLog CheckTest © Moked Security Consulting
+          Com a manutenção {mãos.manutencao} · Com a Moked {mãos.moked} · Aguardando a administração {mãos.administracao}<br />Moked CheckTest © Moked Security Consulting
         </div>
       </div>
 

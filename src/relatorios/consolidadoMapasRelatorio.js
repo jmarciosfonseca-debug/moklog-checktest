@@ -83,8 +83,8 @@ export function gerarConsolidadoMapasHTML({ resultado, nomeProj = (p) => p, proj
   const corpo = vazio
     ? `<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-dv">Nenhum mapa concluído encontrado com esses filtros</div><div class="mk-nota">Confira o período, o projeto, o plantão e o líder escolhidos.</div></div>`
     : `${kpis(resultado.totais)}${tabelaProjetos(resultado.porProjeto, nomeProj)}${tabelaOcorrencias(resultado.ocorrencias, av)}${detalhado ? `<section><h2 class="mk-h2">Mapas do período <span class="mk-mu">· ${resultado.mapas.length}</span></h2>${resultado.mapas.map((m) => blocoMapa(m, nomeProj, av)).join("")}</section>` : ""}
-<p class="mk-nota">Base: mapas concluídos pelos líderes no MokLog CheckTest. Falta e FT seguem para a ficha do colaborador na Equipe. Km = soma do rodado informado nos veículos de cada mapa.</p>`;
+<p class="mk-nota">Base: mapas concluídos pelos líderes no Moked CheckTest. Falta e FT seguem para a ficha do colaborador na Equipe. Km = soma do rodado informado nos veículos de cada mapa.</p>`;
   const corpoFinal = fotos ? `${corpo}${av.css()}` : corpo; // css por último: já sabe quais fotos foram usadas
   const unico = projeto && projeto.id ? projeto : { id: f.projetos && f.projetos.length > 1 ? "Seleção de projetos" : "Todos os projetos", name: "" };
-  return documentoMoked({ project: unico, titulo: "Consolidado do Mapa de Equipe", subtitulo: sub, numero, corpo: corpoFinal, tag: "ACESSO GERENCIAL", hoje, empresaLogo: !!(projeto && projeto.id), rodape: `${numero} · Consolidado do Mapa de Equipe · ${unico.id} ${unico.name || ""} · Moked Consulting Security · MokLog CheckTest` });
+  return documentoMoked({ project: unico, titulo: "Consolidado do Mapa de Equipe", subtitulo: sub, numero, corpo: corpoFinal, tag: "ACESSO GERENCIAL", hoje, empresaLogo: !!(projeto && projeto.id), rodape: `${numero} · Consolidado do Mapa de Equipe · ${unico.id} ${unico.name || ""} · Moked Consulting Security · Moked CheckTest` });
 }

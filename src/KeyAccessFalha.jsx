@@ -1,10 +1,11 @@
 import CampoData from "./CampoData";
+import { simboloSVG } from "./MokedSimbolo";
 import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
 // ════════════════════════════════════════════════════════════════════════
 // KeyAccessFalha.jsx — Registro de falhas do sistema KeyAccess
-// MokLog CheckTest · Moked Consulting Security
+// Moked CheckTest · Moked Consulting Security
 //
 // Fluxo de campo (SEM PIN): Home → escolhe projeto → escolhe quem está
 // registrando (lista da Equipe) → marca o tipo de falha → salva.
@@ -37,21 +38,7 @@ import { grantSession, hasGerencial } from "./session";
 const COL = "keyaccess_falhas";
 
 // Brasão Moked (mesmo do Mapa de Equipe) — usado no cabeçalho do PDF.
-const MOKED_LOGO_SVG = `<svg class="logo" width="54" height="54" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="kbg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2a2a2a"/><stop offset="100%" stop-color="#111"/></radialGradient>
-    <linearGradient id="kmetal" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#d0d0d0"/><stop offset="40%" stop-color="#888"/><stop offset="100%" stop-color="#555"/></linearGradient>
-    <linearGradient id="kred" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#cc2222"/><stop offset="50%" stop-color="#991111"/><stop offset="100%" stop-color="#7a0e0e"/></linearGradient>
-  </defs>
-  <rect width="100" height="100" rx="14" fill="url(#kbg)"/>
-  <circle cx="50" cy="50" r="38" fill="none" stroke="url(#kmetal)" stroke-width="7"/>
-  <circle cx="50" cy="50" r="26" fill="none" stroke="url(#kred)" stroke-width="8"/>
-  <circle cx="50" cy="50" r="7" fill="#111"/>
-  <rect x="47.5" y="8" width="5" height="18" rx="2" fill="url(#kred)"/>
-  <rect x="47.5" y="74" width="5" height="18" rx="2" fill="url(#kred)"/>
-  <rect x="8" y="47.5" width="18" height="5" rx="2" fill="url(#kmetal)"/>
-  <rect x="74" y="47.5" width="18" height="5" rx="2" fill="url(#kmetal)"/>
-</svg>`;
+const MOKED_LOGO_SVG = simboloSVG({ largura: 78, fundo: "claro", classe: "logo" });
 
 // Apenas estes 8 projetos usam KeyAccess (P260A/B/C e P505 não usam).
 export const PROJETOS_KA = [
@@ -908,7 +895,7 @@ async function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, d
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#121212;font-size:12px;padding:18px}
   .hdr{display:flex;align-items:center;gap:16px;border-bottom:3px solid #B21E27;padding-bottom:14px;margin-bottom:16px}
-  .hdr .logo{width:54px;height:54px;flex:none}
+  .hdr .logo{width:78px;height:auto;flex:none}
   .hdr .brand{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.7px}
   .hdr .title{font-size:20px;font-weight:900;color:#121212;line-height:1.15;margin-top:2px}
   .hdr .sub{font-size:12px;color:#B21E27;font-weight:700;margin-top:2px}
@@ -990,7 +977,7 @@ ${blocoGeralHTML}
 
 ${blocos}
 
-<div class="footer">MokLog CheckTest © Moked Consulting Security · Análise Técnica de Falhas KeyAccess · Classificação Local/Geral por cruzamento dos ${PROJETOS_KA.length} parques</div>
+<div class="footer">Moked CheckTest © Moked Consulting Security · Análise Técnica de Falhas KeyAccess · Classificação Local/Geral por cruzamento dos ${PROJETOS_KA.length} parques</div>
 </body></html>`;
 
   const blob = new Blob([html],{type:"text/html"});
