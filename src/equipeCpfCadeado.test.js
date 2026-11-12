@@ -32,27 +32,29 @@ test("CPF inválido é recusado; vazio apaga; sem chave no servidor não grava C
 });
 
 describe("cadeado", () => {
-  const base = (fechado) => ({ cadeado: { fechado }, colaboradores: [{ id: "a", nome: "A", cargo: "Vigilante", telefone: "1", historico: [{ id: "h1", tipo: "Falta" }], uniforme: { solicitacoes: [] } }, { id: "b", nome: "B", historico: [] }], desligados: [{ id: "z", nome: "Z" }] });
+  const base = (fechado) => ({ cadeado: { fechado }, colaboradores: [{ id: "a", nome: "A", cargo: "Vigilante", telefone: "1", endereco: { cidade: "SP" }, dataContratacao: "2024-01-01", historico: [{ id: "h1", tipo: "Falta" }], uniforme: { solicitacoes: [] } }, { id: "b", nome: "B", historico: [] }], desligados: [{ id: "z", nome: "Z", motivoDesligamento: "x" }] });
   const tenta = (fechado, mudar) => { const b = base(fechado), a = clone(b); mudar(a); return () => validateLeader(b, a); };
 
-  test("fechado: o líder segue lançando o dia a dia", () => {
-    expect(tenta(true, (a) => a.colaboradores[0].historico.unshift({ id: "h2", tipo: "FT", data: "2026-11-12" }))).not.toThrow();
-    expect(tenta(true, (a) => { a.colaboradores[1].rotaKm = 12; a.colaboradores[1].ultimaReciclagem = "2026-11-01"; })).not.toThrow();
-    expect(tenta(true, (a) => { a.checagemEquipe = { alvo: "2026-11-14", checkins: [] }; })).not.toThrow();
-  });
   test.each([
-    ["cadastrar", (a) => a.colaboradores.push({ id: "c", nome: "C" })],
+    ["lançar FT", (a) => a.colaboradores[0].historico.unshift({ id: "h2", tipo: "FT", data: "2026-11-12" })],
+    ["editar endereço, data, telefone, e-mail e CPF", (a) => Object.assign(a.colaboradores[0], { endereco: { cidade: "Osasco" }, dataContratacao: "2024-02-01", telefone: "2", email: "a@b.com", cpfCifrado: "v1:x", cpfFinal: "25", nome: "A. Silva", turno: "Noturno" })],
+    ["cadastrar colaborador novo", (a) => a.colaboradores.push({ id: "c", nome: "C", cargo: "Porteiro" })],
+    ["rota e checagem", (a) => { a.colaboradores[1].rotaKm = 12; a.checagemEquipe = { alvo: "2026-11-14", checkins: [] }; }],
+  ])("fechado: líder consegue %s", (_, mudar) => { expect(tenta(true, mudar)).not.toThrow(); });
+
+  test.each([
     ["excluir", (a) => a.colaboradores.pop()],
     ["desligar", (a) => a.desligados.unshift({ ...a.colaboradores.shift(), status: "desligado" })],
     ["reativar", (a) => a.colaboradores.push(a.desligados.pop())],
-    ["editar nome", (a) => { a.colaboradores[0].nome = "Outro"; }],
-    ["editar telefone", (a) => { a.colaboradores[0].telefone = "2"; }],
-    ["trocar CPF", (a) => { a.colaboradores[0].cpfCifrado = "v1:x"; }],
+    ["excluir do histórico de saídas", (a) => a.desligados.pop()],
+    ["alterar registro de saída", (a) => { a.desligados[0].motivoDesligamento = "outro"; }],
+    ["mudar função (promover)", (a) => { a.colaboradores[0].cargo = "VSPP Líder"; }],
     ["apagar lançamento antigo", (a) => { a.colaboradores[0].historico = []; }],
   ])("fechado: líder não consegue %s", (_, mudar) => { expect(tenta(true, mudar)).toThrow(/trancada pelo consultor/); });
+
   test("aberto: o líder faz tudo isso; e nunca mexe no próprio cadeado", () => {
-    expect(tenta(false, (a) => a.colaboradores.push({ id: "c", nome: "C" }))).not.toThrow();
-    expect(tenta(false, (a) => { a.colaboradores[0].nome = "Outro"; })).not.toThrow();
+    expect(tenta(false, (a) => a.colaboradores.pop())).not.toThrow();
+    expect(tenta(false, (a) => { a.colaboradores[0].historico = []; })).not.toThrow();
     expect(tenta(true, (a) => { a.cadeado = { fechado: false }; })).toThrow(/exclusivamente gerencial/);
     expect(tenta(false, (a) => { a.cadeado = { fechado: true }; })).toThrow(/exclusivamente gerencial/);
   });
