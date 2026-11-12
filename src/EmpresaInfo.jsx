@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import { Ico, EmIco, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -164,6 +165,7 @@ function gerarPDFEmpresa(project, info, dark) {
 <div class="no-print" style="text-align:center;margin-bottom:16px">
   <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
+${LOGO_FAIXA_HTML}
 <div class="header">
   <div>
     <div style="font-size:11px;opacity:.7;text-transform:uppercase;letter-spacing:.5px">Moked Consulting Security</div>

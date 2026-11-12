@@ -1,4 +1,5 @@
 import { Ico } from "./Icones";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import { CARGOS_MOKPAT, divisaoDoProjeto } from "./divisoes";
 import { getDocsSeguro } from "./lerServidor";
 import { iconeTema } from "./temaClaro";
@@ -1833,7 +1834,8 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
     @media print{@page{margin:12mm}}</style></head>
     <body>
     <div class="no-print" style="margin-bottom:12px"><button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / PDF</button></div>
-    <div class="header"><h1 style="margin:0 0 4px;font-size:18px">🏖️ Projeção de Férias</h1>
+    ${LOGO_FAIXA_HTML}
+<div class="header"><h1 style="margin:0 0 4px;font-size:18px">🏖️ Projeção de Férias</h1>
     <p style="margin:0;font-size:12px;opacity:.8">${project.id} — ${project.name||""} · Gerado em ${hoje}</p></div>
     <table><thead><tr><th>Colaborador</th><th>Início</th><th>Retorno</th><th>Cobertura</th><th>Período Aq.</th><th>Alerta</th></tr></thead>
     <tbody>${rows}</tbody></table>

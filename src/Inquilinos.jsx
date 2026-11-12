@@ -1,4 +1,5 @@
 import { Ico, IcoTxt } from "./Icones";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
@@ -89,6 +90,7 @@ function gerarPDFInquilinos(project, unidades) {
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="background:#334155;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
+${LOGO_FAIXA_HTML}
 <div class="header">
   <div>
     <p style="font-size:10px;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
