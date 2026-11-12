@@ -4403,7 +4403,7 @@ export default function App(){
           <button onClick={()=>{if(editingIdx!==null){setEditingIdx(null);setScreen("dashboard");}else{setScreen(project?.id==="P260A"?"p260a_home":"home");}}} style={S.backBtn} aria-label={editingIdx!==null?"Cancelar edição":"Voltar ao início"}>← {editingIdx!==null?"Cancelar":"Inicio"}</button>
           <MoklogLogo size={32}/>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>MokLog <span style={{color:"#cc2222"}}>CheckTest</span></div>
+            <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>{DIVNOME} <span style={{color:"#cc2222"}}>CheckTest</span></div>
             <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}{editingIdx!==null?" · editando":""}</div>
           </div>
           {health&&<HealthRing pct={health.pct} size={46}/>}

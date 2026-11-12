@@ -112,3 +112,24 @@ test("MokImp: 15 projetos (13 residenciais, 2 comerciais); mesmo PIN provisório
   expect(gerencialNaDivisao("mokimp")).toBe(true); expect(gerencialNaDivisao("mokpat")).toBe(false); expect(getAccess("P939")).toBeNull(); expect(getAccess("P931")).toBe("admin");
   expect(getClienteScope()).toEqual({ escopo: "MOKIMP", pids: DIVISAO_IDS.mokimp });
 });
+
+// Teste Semanal do P939 (12/11/2026): checklist montado a partir do inventário enviado pela equipe MokPat.
+test("P939: inventário da planilha vira o checklist do teste semanal; os demais seguem sem checklist", () => {
+  const { projetosNovasDivisoes } = require("./divisoes");
+  const { INVENTARIO } = require("./inventarioDivisoes");
+  const { grupoDaCategoria } = require("./cliente/sis");
+  const p = projetosNovasDivisoes(), cats = p.P939.categories;
+  expect(INVENTARIO.P939).toHaveLength(37);
+  expect(INVENTARIO.P939.reduce((a, [, , q]) => a + q, 0)).toBe(121); // total da coluna P939 na planilha
+  expect(cats).toHaveLength(39); // 37 itens + visita de manutenção + observações
+  expect(new Set(cats.map((c) => c.id)).size).toBe(39);
+  expect(cats[0]).toEqual({ id: "cftv", label: "01 - CÂMERA CFTV FIXA", type: "count", total: 38 });
+  const de = (id) => cats.find((c) => c.id === id);
+  expect(de("inv_64")).toMatchObject({ type: "items", itemLabels: ["Zona 01", "Zona 02"], grupo: "perimetro" });
+  expect(de("inv_21").itemLabels).toHaveLength(8);
+  expect(de("inv_80")).toMatchObject({ type: "single", label: "31 - LINK DE INTERNET", grupo: "comunicacao" });
+  expect(cats.slice(-2).map((c) => c.type)).toEqual(["maintenance", "notes"]);
+  expect(["inv_05", "inv_19", "inv_37", "inv_59", "inv_60", "inv_71", "inv_83", "inv_81", "manutencao"].map((id) => grupoDaCategoria(de(id))))
+    .toEqual(["cftv", "acesso", "acesso", "panico", "perimetro", "incendio", "infra", "energia", "ignorar"]);
+  expect(Object.values(p).filter((x) => x.categories.length).map((x) => x.id)).toEqual(["P939"]);
+});
