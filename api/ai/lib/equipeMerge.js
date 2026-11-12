@@ -1,10 +1,11 @@
 const {protegerCpfs}=require('./cpf');
+const {chkEqResumoCiclo,chkEqArquivar}=require('../../../src/checagemEquipeRegras');
 const stable=x=>Array.isArray(x)?x.map(stable):(x!==null&&typeof x==='object')?Object.keys(x).sort().reduce((o,k)=>{if(x[k]!==undefined)o[k]=stable(x[k]);return o;},{}):x;
 const equal=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 // O caminho do conflito vai para o log. Só pode conter NOMES DE CAMPOS conhecidos e slots de checagem conhecidos:
 // qualquer outra chave (nome de pessoa, id, texto digitado) vira "*" e qualquer slot desconhecido vira "?".
-const CAMPOS=new Set(['colaboradores','desligados','checagemEquipe','checkins','alvo','concluidoEm','proximoAlvo','slotId','slotLabel','lider','statusEquipe','nota','em','historico','uniforme','solicitacoes','itens','ferias','perfilSeguranca','tipoEquipe','armada','ccoDedicada','fv','nome','cargo','turno','status','escala','telefone','projectId','criadoEm','atualizadoEm','dataContratacao','ultimaReciclagem','foto','fotoRef','temFoto','desligadoEm','motivoDesligamento','tipoDesligamento','id','tipo','data','dataFim','dataInicio','dataRetorno','subtipo','detalhe','obs','observacao','item','marca','tamanho','motivo','aprovacao','aprovacaoHist','solicitadoEm','whatsEnviadoEm','whatsEnvios','exigeWhats','whatsDispensadoEm','colabId','email','cpf','cpfCifrado','cpfFinal','cpfHmac','cadeado','fechado','por','trajetoria','transferidoPara','transferidoDe','de','para','cobertura','usa','ultimaTroca','listaMontada']);
+const CAMPOS=new Set(['colaboradores','desligados','checagemEquipe','checkins','alvo','concluidoEm','proximoAlvo','slotId','slotLabel','lider','statusEquipe','nota','em','historico','uniforme','solicitacoes','itens','ferias','perfilSeguranca','tipoEquipe','armada','ccoDedicada','fv','nome','cargo','turno','status','escala','telefone','projectId','criadoEm','atualizadoEm','dataContratacao','ultimaReciclagem','foto','fotoRef','temFoto','desligadoEm','motivoDesligamento','tipoDesligamento','id','tipo','data','dataFim','dataInicio','dataRetorno','subtipo','detalhe','obs','observacao','item','marca','tamanho','motivo','aprovacao','aprovacaoHist','solicitadoEm','whatsEnviadoEm','whatsEnvios','exigeWhats','whatsDispensadoEm','colabId','email','cpf','cpfCifrado','cpfFinal','cpfHmac','cadeado','fechado','por','checagemHistorico','feitos','esperados','completo','arquivadoEm','trajetoria','transferidoPara','transferidoDe','de','para','cobertura','usa','ultimaTroca','listaMontada']);
 const SLOTS=/^(?:(?:sab|dom)_(?:diurno|noturno)|diurno|noturno|check_[1-9])$/;
 function limparCaminho(p){
  return String(p||'').split('/').map(seg=>{
@@ -130,9 +131,18 @@ function validateLeader(before,after){
   }
  }
 }
+// Histórico da checagem de equipe (Painel do projeto): quando o fim de semana muda, o ciclo anterior é arquivado
+// do jeito que ficou — completo ou incompleto. Sem isso só os fins de semana concluídos apareceriam.
+function arquivarChecagem(pid,current,result){
+ const old=current.checagemEquipe,next=result.checagemEquipe;
+ if(!old||!old.alvo||!next||next.alvo===old.alvo||String(next.alvo)<String(old.alvo))return;
+ const resumo=chkEqResumoCiclo(old,pid,current.colaboradores,new Date().toISOString());
+ if(resumo)result.checagemHistorico=chkEqArquivar(current.checagemHistorico,resumo);
+}
 function protegerChecagem(current,result,identity){
  const deny=()=>{throw Object.assign(Error('Plantão já checado. Somente o gerencial pode corrigir a assinatura.'),{status:403});};
  if(!equal(current.checagemCorrecoes,result.checagemCorrecoes))throw Object.assign(Error('Histórico de correções é mantido pelo servidor.'),{status:403});
+ if(!equal(current.checagemHistorico,result.checagemHistorico))throw Object.assign(Error('Histórico da checagem é mantido pelo servidor.'),{status:403});
  const old=current.checagemEquipe,next=result.checagemEquipe;
  if(equal(old,next)||!old)return;
  if(old.alvo!==next?.alvo){
@@ -162,10 +172,11 @@ async function save(db,pid,before,after,identity){
   }
   protegerCpfs(result);
   protegerChecagem(current,result,identity);
+  arquivarChecagem(pid,current,result);
   validateQuantities(current,result);
   if(identity.nivel==='lider')validateLeader(current,result);
   if(!equal(current.cadeado,result.cadeado)){const f=!!(result.cadeado&&result.cadeado.fechado===true);result.cadeado={fechado:f,em:new Date().toISOString(),por:'Gerencial'};}   // carimbo do servidor
   tx.set(ref,result);return result;
  });
 }
-module.exports={merge,save,validateLeader,validateQuantities,validarCadeado};
+module.exports={merge,save,validateLeader,validateQuantities,validarCadeado,arquivarChecagem};

@@ -19,6 +19,7 @@ import { checkPin } from "./session";
 import { useState, useEffect } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { minutosDaFalha, duracaoDaFalha } from "./keyaccessDuracao";
 import { setDoc } from "./fireGuard";
 
 const firebaseConfig = {
@@ -86,38 +87,12 @@ function getTipos(r){
 // Hora de início, com fallback pro campo antigo "hora" (registros anteriores).
 function getHoraInicio(r){ return r.horaInicio || r.hora || ""; }
 
-// Calcula quanto tempo a falha ficou no ar, quando há hora de início e de retorno.
-function calcDuracaoFalha(horaInicio, horaFim){
-  if(!horaInicio||!horaFim) return null;
-  try{
-    const [h1,m1]=horaInicio.split(":").map(Number);
-    const [h2,m2]=horaFim.split(":").map(Number);
-    let mins=(h2*60+m2)-(h1*60+m1);
-    if(mins<0) mins+=24*60; // virou o dia
-    if(mins<=0) return null;
-    const h=Math.floor(mins/60), m=mins%60;
-    return h>0 ? `${h}h ${m}min` : `${m} min`;
-  }catch{ return null; }
-}
-
 // Texto de exibição do responsável: P607 usa um colaborador específico
 // (Vigilante Ronda); os demais projetos usam o toggle Rondas/AGP de CCO.
 function getResponsavelTexto(r){
   if(r.vigilanteRonda?.nome) return `Vigilante Ronda: ${r.vigilanteRonda.nome}`;
   if(r.responsavelTurno?.length) return `Responsável: ${r.responsavelTurno.join(", ")}`;
   return "";
-}
-
-// Versão numérica (em minutos) da duração — usada pra somar nos relatórios.
-function calcMinutosFalha(horaInicio, horaFim){
-  if(!horaInicio||!horaFim) return null;
-  try{
-    const [h1,m1]=horaInicio.split(":").map(Number);
-    const [h2,m2]=horaFim.split(":").map(Number);
-    let mins=(h2*60+m2)-(h1*60+m1);
-    if(mins<0) mins+=24*60;
-    return mins>0 ? mins : null;
-  }catch{ return null; }
 }
 
 function todayStr(){ return new Date().toLocaleDateString("sv-SE"); }
@@ -349,7 +324,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                 {recentes.map(r=>{
                   const tipos = getTipos(r);
                   const horaIni = getHoraInicio(r);
-                  const dur = calcDuracaoFalha(horaIni, r.horaFim);
+                  const dur = duracaoDaFalha(r);
                   return (
                     <div key={r.id} style={{...S.card,padding:"10px 12px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
@@ -363,7 +338,7 @@ export default function KeyAccessFalha({ dark, onToggleTheme, onBack }){
                       </div>
                       {tipos.includes("outro")&&r.tipoCustom&&<div style={{fontSize:12,...S.txt,marginBottom:3}}>{r.tipoCustom}</div>}
                       <div style={{fontSize:11,...S.txt2}}>
-                        <Ico n="calendario"/> {fmtDate(r.data)} · <Ico n="cronometro"/> {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · <Ico n="usuario"/> {r.registradoPor?.nome||"—"}
+                        <Ico n="calendario"/> {fmtDate(r.data)} · <Ico n="cronometro"/> {horaIni}{r.horaFim?` – ${r.dataFim&&r.dataFim!==r.data?fmtDate(r.dataFim)+" ":""}${r.horaFim}`:""}{dur?` (${dur})`:""} · <Ico n="usuario"/> {r.registradoPor?.nome||"—"}
                       </div>
                       {r.obs&&<div style={{fontSize:11,...S.txt2,marginTop:3,fontStyle:"italic"}}>{r.obs}</div>}
                     </div>
@@ -418,21 +393,27 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
   const [data, setData] = useState(todayStr());
   const [horaInicio, setHoraInicio] = useState(nowHM());
   const [horaFim, setHoraFim] = useState("");
+  const [dataRetorno, setDataRetorno] = useState(""); // vazio = mesmo dia do início
   const [impactos, setImpactos] = useState([]); // array: pode ter "entrada", "saida", "inquilino"
   const [vigilanteRonda, setVigilanteRonda] = useState(null); // colaborador com cargo "Vigilante Ronda" — universal, todos os projetos
   const [obs, setObs] = useState("");
 
-  const duracao = calcDuracaoFalha(horaInicio, horaFim);
+  // Sem data de retorno escolhida: mesmo dia; se a hora de retorno é menor que a de início, a falha virou o dia (como já era antes).
+  const diaSeguinte = (iso) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+  const dataFim = horaFim ? (dataRetorno || (horaFim <= horaInicio ? diaSeguinte(data) : data)) : "";
+  const retornoAntes = !!horaFim && (dataFim < data || (dataFim === data && horaFim <= horaInicio));
+  const duracao = duracaoDaFalha({ data, horaInicio, horaFim, dataFim });
   const podeSalvar = registradoPor && tipos.length>0 && (!tipos.includes("outro")||tipoCustom.trim());
 
   const salvar = () => {
     if(!registradoPor){ alert("Selecione quem está registrando."); return; }
     if(tipos.length===0){ alert("Selecione ao menos um tipo de falha."); return; }
     if(tipos.includes("outro")&&!tipoCustom.trim()){ alert("Descreva a falha."); return; }
+    if(retornoAntes){ alert("O retorno está antes do início. Confira a data e a hora de retorno."); return; }
     try{ localStorage.setItem(`ka_last_user_${project.id}`, JSON.stringify(registradoPor)); }catch(e){}
     onSalvo({
       id: crypto.randomUUID(),
-      data, horaInicio, horaFim, tipos, tipoCustom: tipos.includes("outro")?tipoCustom.trim():"",
+      data, horaInicio, horaFim, ...(horaFim ? { dataFim } : {}), tipos, tipoCustom: tipos.includes("outro")?tipoCustom.trim():"",
       impacto: impactos,
       vigilanteRonda: vigilanteRonda ? {id:vigilanteRonda.id, nome:vigilanteRonda.nome} : null,
       obs: obs.trim(),
@@ -498,6 +479,13 @@ function FormularioFalha({ project, equipe, equipeCompleta, dark, S, onVoltar, o
             <label style={S.lbl}>Hora de Retorno (quando voltou ao normal — opcional)</label>
             <input type="time" value={horaFim} onChange={e=>setHoraFim(e.target.value)} style={S.inp}/>
           </div>
+          {horaFim && (
+            <div>
+              <label style={S.lbl}>Data de Retorno (se voltou em outro dia)</label>
+              <CampoData value={dataFim} onChange={(v)=>setDataRetorno(v)} style={S.inp}/>
+              {retornoAntes && <div style={{fontSize:11,color:"#ef4444",marginTop:4}}>O retorno está antes do início.</div>}
+            </div>
+          )}
           {duracao && (
             <div style={{fontSize:12,fontWeight:700,color:"#f59e0b",background:dark?"#1a1000":"#fffbeb",border:"1px solid #f59e0b44",borderRadius:8,padding:"7px 11px"}}>
               <Ico n="cronometro"/> Tempo fora do ar: {duracao}
@@ -693,7 +681,7 @@ function RelatoriosKA({ dark, S, onBack }){
                     {comIntervalos.map(r=>{
                       const tiposR = getTipos(r);
                       const horaIni = getHoraInicio(r);
-                      const dur = calcDuracaoFalha(horaIni, r.horaFim);
+                      const dur = duracaoDaFalha(r);
                       return (
                         <div key={r.id} style={{borderTop:`1px solid ${dark?"#0f172a":"#f1f5f9"}`,padding:"8px 0"}}>
                           {r.diasDesdeAnterior!==null&&(
@@ -710,7 +698,7 @@ function RelatoriosKA({ dark, S, onBack }){
                           </div>
                           {tiposR.includes("outro")&&r.tipoCustom&&<div style={{fontSize:11,...S.txt}}>{r.tipoCustom}</div>}
                           <div style={{fontSize:10,...S.txt2}}>
-                            <Ico n="calendario"/> {fmtDate(r.data)} · <Ico n="cronometro"/> {horaIni}{r.horaFim?` – ${r.horaFim}`:""}{dur?` (${dur})`:""} · <Ico n="usuario"/> {r.registradoPor?.nome||"—"}
+                            <Ico n="calendario"/> {fmtDate(r.data)} · <Ico n="cronometro"/> {horaIni}{r.horaFim?` – ${r.dataFim&&r.dataFim!==r.data?fmtDate(r.dataFim)+" ":""}${r.horaFim}`:""}{dur?` (${dur})`:""} · <Ico n="usuario"/> {r.registradoPor?.nome||"—"}
                           </div>
                           {getResponsavelTexto(r)&&<div style={{fontSize:10,color:"#a855f7",fontWeight:700,marginTop:2}}>{getResponsavelTexto(r)}</div>}
                           {r.obs&&<div style={{fontSize:10,...S.txt2,fontStyle:"italic",marginTop:2}}>{r.obs}</div>}
@@ -776,7 +764,7 @@ async function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, d
     const listaCompleta = dadosTodos8[pid]||[];
     const lista = filtrar(listaCompleta).sort((a,b)=>(a.data+getHoraInicio(a)).localeCompare(b.data+getHoraInicio(b)));
     const comIntervalos = calcIntervalos(lista);
-    const minutosTotais = lista.reduce((acc,r)=> acc + (calcMinutosFalha(getHoraInicio(r), r.horaFim)||0), 0);
+    const minutosTotais = lista.reduce((acc,r)=> acc + (minutosDaFalha(r)||0), 0);
     const temPendente = lista.some(r=>!r.horaFim);
     const diasAtual = calcDiasSemFalha(listaCompleta);
     const nGerais = lista.filter(isGeral).length;
@@ -855,9 +843,9 @@ async function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, d
         ? tiposR.map(tk=>{ const tag=TAGS_FALHA.find(t=>t.key===tk)||TAG_OUTRO; return tk==="outro"?(r.tipoCustom||"Outro"):tag.label; }).join("; ")
         : "Não informado";
       const horaIni = getHoraInicio(r);
-      const minutos = calcMinutosFalha(horaIni, r.horaFim);
+      const minutos = minutosDaFalha(r);
       const tratativa = r.horaFim
-        ? `Voltou a funcionar às ${r.horaFim}${minutos?` (Duração: ${minutos} min)`:""}.${r.obs?" "+r.obs:""}`
+        ? `Voltou a funcionar ${r.dataFim&&r.dataFim!==r.data?"em "+fmtDate(r.dataFim)+" ":""}às ${r.horaFim}${minutos?` (Duração: ${minutos} min)`:""}.${r.obs?" "+r.obs:""}`
         : (r.obs ? r.obs : "Não informado");
       const respTxt = getResponsavelTexto(r);
       const impactosBadges = getImpactos(r).length
@@ -987,4 +975,4 @@ ${blocos}
   URL.revokeObjectURL(url);
 }
 
-export const _internal = { calcDiasSemFalha, calcIntervalos, diffDias, calcDuracaoFalha, calcMinutosFalha, getTipos, getImpactos };
+export const _internal = { calcDiasSemFalha, calcIntervalos, diffDias, calcDuracaoFalha: (hi, hf) => duracaoDaFalha({ horaInicio: hi, horaFim: hf }), calcMinutosFalha: (hi, hf) => minutosDaFalha({ horaInicio: hi, horaFim: hf }), getTipos, getImpactos };
