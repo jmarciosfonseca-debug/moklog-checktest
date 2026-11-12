@@ -1837,7 +1837,7 @@ export function ProjecaoFerias({ project, colaboradores, adminAuth, liderAuth, o
     <p style="margin:0;font-size:12px;opacity:.8">${project.id} — ${project.name||""} · Gerado em ${hoje}</p></div>
     <table><thead><tr><th>Colaborador</th><th>Início</th><th>Retorno</th><th>Cobertura</th><th>Período Aq.</th><th>Alerta</th></tr></thead>
     <tbody>${rows}</tbody></table>
-    <div style="margin-top:14px;font-size:10px;color:#94a3b8;text-align:center">MokLog CheckTest © Moked Consulting Security · ${project.id}</div>
+    <div style="margin-top:14px;font-size:10px;color:#94a3b8;text-align:center">Moked CheckTest © Moked Consulting Security · ${project.id}</div>
     </body></html>`;
 
     const blob = new Blob([html],{type:"text/html"});

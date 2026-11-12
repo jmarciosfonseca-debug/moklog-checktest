@@ -155,7 +155,7 @@ function montarHTML({ theme, projectId, titulo, corpo, totalItens, subtitulo, me
     ${corpo}
     <div class="rodape">
       <span>Moked Consulting Security · Gestão de Uniforme e Material Tático</span>
-      <span>Documento gerado automaticamente pelo MokLog CheckTest</span>
+      <span>Documento gerado automaticamente pelo Moked CheckTest</span>
     </div>
   </div>
 </body></html>`;

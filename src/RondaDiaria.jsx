@@ -501,7 +501,7 @@ ${incluirRondas?`<div class="kpis">
 </div>`:""}
 ${secaoPerim}
 ${incluirRondas?secoes:""}
-<div class="footer">MokLog CheckTest · Moked Consulting Security · Ronda Perimetral Diária ${project.id}</div>
+<div class="footer">Moked CheckTest · Moked Consulting Security · Ronda Perimetral Diária ${project.id}</div>
 </body></html>`;
   const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);

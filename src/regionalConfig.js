@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // regionalConfig.js — Diagnóstico Regional de Risco por projeto (Etapa c)
-// MokLog CheckTest · Análise de Risco v2
+// Moked CheckTest · Análise de Risco v2
 //
 // Terceira perna do tripé (Operacional + Sinistros + REGIONAL).
 // O dado ESTRUTURADO vive aqui (versionado, auditável, lido pelo motor).

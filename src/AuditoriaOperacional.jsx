@@ -227,7 +227,7 @@ export default function AuditoriaOperacional({ dark, onBack, projectId = "P311A"
           </Card>
 
           <div style={{ fontSize:9.5, color:txt2, textAlign:"center", padding:"6px 0 20px", fontStyle:"italic" }}>
-            Dados operacionais extraídos do MokLog CheckTest. Conclusões críticas exigem validação gerencial.
+            Dados operacionais extraídos do Moked CheckTest. Conclusões críticas exigem validação gerencial.
           </div>
         </>
         )}

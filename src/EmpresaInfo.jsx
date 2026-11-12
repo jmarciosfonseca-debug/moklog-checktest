@@ -202,7 +202,7 @@ function gerarPDFEmpresa(project, info, dark) {
   ${admRows || "<div style='font-size:12px;color:#94a3b8'>Nenhum membro cadastrado</div>"}
 </div>
 
-<div class="footer">MokLog CheckTest © Moked Consulting Security · ${project.id} · ${hoje}</div>
+<div class="footer">Moked CheckTest © Moked Consulting Security · ${project.id} · ${hoje}</div>
 </body></html>`;
 
   const blob = new Blob([html],{type:"text/html"});

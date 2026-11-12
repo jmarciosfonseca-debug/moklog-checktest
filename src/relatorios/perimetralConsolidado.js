@@ -230,7 +230,7 @@ export function gerarConsolidadoPerimetralHTML({ testes, project, pcfg, escopo =
     ? `<h2 class="pe-h2" style="${incluirPerim ? 'break-before:page' : ''}">Rondas adicionais registradas nos testes <span class="mk-mu">· ${nRondas} registro(s) — não fazem parte da matriz perimetral</span></h2>
 <table class="pe-mx"><colgroup><col style="width:20mm"><col style="width:20mm"><col style="width:10mm"><col style="width:16mm"><col style="width:60mm"><col></colgroup><thead><tr><th class="pe-l">Data</th><th class="pe-l">Turno</th><th>#</th><th>Hora</th><th class="pe-l">Executante</th><th class="pe-l">Observação</th></tr></thead><tbody>${rondasLinhas || `<tr><td colspan="6" class="mk-mu" style="text-align:center;padding:12px">Nenhuma ronda adicional registrada no período.</td></tr>`}</tbody></table>` : '';
 
-  const fim = `<section class="pe-fim"><div><b>Base dos dados.</b> Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div><div class="pe-ass"><div class="mk-linha"></div><b>José Fonseca</b> · Consultor de Segurança · Moked Consulting Security · jose.fonseca@moked.com.br</div></section>`;
+  const fim = `<section class="pe-fim"><div><b>Base dos dados.</b> Registros lançados pelas equipes no Moked CheckTest, supervisionados pela Moked Consulting Security.</div><div class="pe-ass"><div class="mk-linha"></div><b>José Fonseca</b> · Consultor de Segurança · Moked Consulting Security · jose.fonseca@moked.com.br</div></section>`;
 
   return documentoMoked({
     project, titulo,

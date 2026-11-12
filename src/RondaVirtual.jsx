@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════════
 // RondaVirtual.jsx — Aba "Ronda Virtual (CFTV)" do módulo CCO
-// MokLog CheckTest · Moked Consulting Security
+// Moked CheckTest · Moked Consulting Security
 //
 // Integração: este componente é renderizado DENTRO do AcessoCCO quando
 // tema === "ronda". Ele recebe por props os helpers já existentes no

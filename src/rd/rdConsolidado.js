@@ -178,7 +178,7 @@ export function htmlConsolidado(c, memoria, consultor) {
   <table><thead><tr><th>Dia</th><th>Projeto</th><th>Tipo</th><th class="n">Horário</th><th class="n">Km</th><th class="n">Despesas</th><th>O que foi tratado</th></tr></thead><tbody>
   ${c.agenda.map((a) => `<tr><td class="c">${esc(diaSemana(a.data))}</td><td>${esc(nome(a.destino))}</td><td class="c">${esc(a.tipo)}</td><td class="n">${hhmm(a.inicio)}–${hhmm(a.fim)}</td><td class="n">${a.km != null ? esc(kmFmt(a.km)) : "—"}</td><td class="n">${a.despesas ? esc(brl(a.despesas)) : "—"}</td><td>${esc(a.texto || "—").replace(/Em aberto:/g, '<span class="ab">Em aberto:</span>')}</td></tr>`).join("")}
   </tbody></table>
-  <footer>Horas por projeto = da abertura do trecho (saída de casa ou do ponto anterior) até a saída do cliente; o retorno para casa conta nas horas registradas do período. Km = km de término − km de início (painel do veículo), conferido pelas marcações com GPS. Despesas separadas por tipo a partir da descrição de cada lançamento. Reembolso de km = km rodados × valor por km definido em Configurar. Documento gerado pelo MokLog CheckTest · MK RD.</footer>
+  <footer>Horas por projeto = da abertura do trecho (saída de casa ou do ponto anterior) até a saída do cliente; o retorno para casa conta nas horas registradas do período. Km = km de término − km de início (painel do veículo), conferido pelas marcações com GPS. Despesas separadas por tipo a partir da descrição de cada lançamento. Reembolso de km = km rodados × valor por km definido em Configurar. Documento gerado pelo Moked CheckTest · MK RD.</footer>
   </body></html>`;
 }
 

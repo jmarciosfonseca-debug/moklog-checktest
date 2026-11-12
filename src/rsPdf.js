@@ -1,4 +1,4 @@
-// ── MokLog CheckTest — rsPdf.js (padrão Moked)
+// ── Moked CheckTest — rsPdf.js (padrão Moked)
 // Relatório Situacional (RS) de ocorrências: RS individual → gerarPdfRS(project, registro);
 // pacote de RS → gerarPdfPacoteRS(project, registros, meta).
 // Usa o padrão visual Moked (relatorios/padraoMoked.js), igual aos demais relatórios.

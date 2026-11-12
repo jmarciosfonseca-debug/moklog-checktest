@@ -398,7 +398,7 @@ ${statsRows ? `
 `:""}
 
 <div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · ${project.id} — ${pcfg.clienteNome||project.name}</div>
+  <div>Moked CheckTest © Moked Consulting Security · ${project.id} — ${pcfg.clienteNome||project.name}</div>
   <div style="margin-top:3px">${fmtDate(teste.data)} · ${teste.turno}</div>
 </div>
 </body></html>`;

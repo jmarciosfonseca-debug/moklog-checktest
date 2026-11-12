@@ -1,6 +1,6 @@
 {
-  "name": "MokLog CheckTest",
-  "short_name": "MokLog",
+  "name": "Moked CheckTest",
+  "short_name": "Moked",
   "description": "Sistema de Teste Semanal de Segurança - Moked Consulting",
   "start_url": "/",
   "display": "standalone",

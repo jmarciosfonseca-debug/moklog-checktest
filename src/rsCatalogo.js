@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // rsCatalogo.js — Catálogo do módulo RS (Registro Situacional)
-// MokLog CheckTest
+// Moked CheckTest
 //
 // FONTE ÚNICA da taxonomia de ocorrências. Puro dado, sem lógica —
 // pensado para o Marcio editar textos livremente sem tocar em componentes.

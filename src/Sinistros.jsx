@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // Sinistros.jsx — Histórico de Sinistros por projeto (Etapa b)
-// MokLog CheckTest · Análise de Risco v2
+// Moked CheckTest · Análise de Risco v2
 //
 // Terceira perna do tripé de classificação (junto com Operacional e Regional).
 // Preenchido no painel GERENCIAL (sessão validada no servidor). Um documento por projeto:

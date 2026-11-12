@@ -13,7 +13,7 @@ import { consolidarRondas, periodoUltimosDias } from "./rondaVirtualRelatorio";
 // Nível 3 (resumo de cada relatório): cada fonte chega já carregada pelo app no clique (só leitura).
 // Convenção das fontes em extras[pid]: undefined = não pedida; null = leitura falhou ("não aferido"); [] = sem registros.
 export const MODULOS_FUTUROS = ["Análise de risco", "Equipamentos críticos"];
-// Onde está o relatório completo de cada tema no MokLog CheckTest (nomes como aparecem no app).
+// Onde está o relatório completo de cada tema no Moked CheckTest (nomes como aparecem no app).
 export const RELATORIO_COMPLETO = {
   "Checklist semanal": "Laudo semanal — Histórico de Relatórios do projeto",
   "Consolidado (tendência)": "Consolidado do período — Histórico de Relatórios do projeto",
@@ -179,7 +179,7 @@ export function montarProjetos(rows, extras = {}, agora = new Date()) {
     });
     cards.forEach((c) => {
       const rel = RELATORIO_COMPLETO[c.titulo]; if (!rel || c.efeito === "não aferido" || c.efeito === "sem registros") return;
-      c.detalhe = `${c.detalhe || `<p>${escHTML(c.texto)}.</p>`}<p class="rel">Mais detalhes no relatório específico: <b>${escHTML(rel)}</b>, no MokLog CheckTest.</p>`;
+      c.detalhe = `${c.detalhe || `<p>${escHTML(c.texto)}.</p>`}<p class="rel">Mais detalhes no relatório específico: <b>${escHTML(rel)}</b>, no Moked CheckTest.</p>`;
     });
     return { id: r.id, nome: r.name, score: r.score, base: r.base, semChecklist: !!r.semChecklist, penalidades: r.penalidades || [], tendencia: ex.tendencia || [], cards };
   });
@@ -239,7 +239,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--moked);outline-offs
 <header><div class="marca">${logoSrc ? `<img src="${escHTML(logoSrc)}" alt="Moked Consulting Security">` : ""}<div><b>Relatório Executivo — ${escHTML(grupoLabel)}</b><span>Saúde operacional consolidada por projeto</span></div></div>
 <div class="emit">Emissão ${escHTML(emissao)}<br>Moked Consulting Security</div></header>
 <main id="app"></main>
-<div class="rodape">${escHTML(notaCalculo)} Documento gerado pelo MokLog CheckTest com os dados disponíveis no momento da emissão; não se atualiza sozinho.</div>
+<div class="rodape">${escHTML(notaCalculo)} Documento gerado pelo Moked CheckTest com os dados disponíveis no momento da emissão; não se atualiza sozinho.</div>
 </div>
 <script>
 var D=${json};var GRUPO=${JSON.stringify(escHTML(grupoLabel))};var MEDIA=${media};var FUT=${JSON.stringify(MODULOS_FUTUROS)};var est=null;

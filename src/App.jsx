@@ -1,4 +1,5 @@
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
+import MokedSelo from "./MokedSimbolo";
 import { temaMoked, badgeMoked, estadoMoked, ESTADOS_MOKED } from "./temaMoked";
 import { getDocsSeguro } from "./lerServidor";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -274,7 +275,7 @@ async function sendEmailJS(subject, message, fromName) {
         service_id: EMAILJS_SERVICE_ID,
         template_id: EMAILJS_TEMPLATE_ID,
         user_id: EMAILJS_PUBLIC_KEY,
-        template_params: { subject, message, name: fromName || "MokLog CheckTest", email: "moklog@moked.com.br" }
+        template_params: { subject, message, name: fromName || "Moked CheckTest", email: "moklog@moked.com.br" }
       })
     });
     return true;
@@ -388,10 +389,10 @@ function checkPendingNotifications(stored) {
     const todayStr = now.toLocaleDateString("sv-SE");
     const filledToday = lastDate === todayStr;
     if(hour >= 8 && hour < 14) {
-      sendNotification("MokLog CheckTest", `${p.id} – ${p.name}: Lembrete do teste semanal de hoje!`);
+      sendNotification("Moked CheckTest", `${p.id} – ${p.name}: Lembrete do teste semanal de hoje!`);
     }
     if(hour >= 14 && !filledToday) {
-      sendNotification("MokLog CheckTest ⚠️", `${p.id} – Teste semanal ainda não registrado. Não esqueça!`);
+      sendNotification("Moked CheckTest ⚠️", `${p.id} – Teste semanal ainda não registrado. Não esqueça!`);
     }
   });
   } catch(e){ console.log("Notif check error:",e); }
@@ -1065,36 +1066,8 @@ function StatusRing({ pct=0, size=64, color="#22c55e", empty=false }) {
   );
 }
 
-function MoklogLogo({ size = 44 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#2a2a2a"/><stop offset="100%" stopColor="#111"/>
-        </radialGradient>
-        <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#d0d0d0"/><stop offset="40%" stopColor="#888"/>
-          <stop offset="60%" stopColor="#aaa"/><stop offset="100%" stopColor="#555"/>
-        </linearGradient>
-        <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#cc2222"/><stop offset="50%" stopColor="#991111"/>
-          <stop offset="100%" stopColor="#7a0e0e"/>
-        </linearGradient>
-      </defs>
-      <rect width="100" height="100" rx="14" fill="url(#bgGrad)"/>
-      <circle cx="50" cy="50" r="38" fill="none" stroke="url(#metalGrad)" strokeWidth="7"/>
-      <circle cx="50" cy="50" r="26" fill="none" stroke="url(#redGrad)" strokeWidth="8"/>
-      <circle cx="50" cy="50" r="7" fill="#111"/><circle cx="50" cy="50" r="5" fill="#222"/>
-      <rect x="47.5" y="8" width="5" height="18" rx="2" fill="url(#redGrad)"/>
-      <rect x="47.5" y="74" width="5" height="18" rx="2" fill="url(#redGrad)"/>
-      <rect x="8" y="47.5" width="18" height="5" rx="2" fill="url(#metalGrad)"/>
-      <rect x="74" y="47.5" width="18" height="5" rx="2" fill="url(#metalGrad)"/>
-      <path d="M14 30 L8 30 L8 70 L14 70" fill="none" stroke="url(#metalGrad)" strokeWidth="4" strokeLinecap="round"/>
-      <path d="M86 30 L92 30 L92 70 L86 70" fill="none" stroke="url(#metalGrad)" strokeWidth="4" strokeLinecap="round"/>
-      <circle cx="35" cy="32" r="3" fill="white" opacity="0.25"/>
-    </svg>
-  );
-}
+// 12/11/2026: o "alvo" redondo saiu; o cabeçalho usa o símbolo oficial Moked (src/MokedSimbolo.jsx).
+const MoklogLogo = MokedSelo;
 
 function HealthRing({ pct, size=56 }) {
   const r=22, circ=2*Math.PI*r, dash=circ*(pct/100);
@@ -2536,13 +2509,13 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
   const [emailSent,setEmailSent]=useState(false);
   const [sending,setSending]=useState(false);
   const text=generateReportText(project,state,meta,photos);
-  const subject=`[${project.id}] MokLog CheckTest – Teste Semanal – ${fmtDate(meta.date)}`;
+  const subject=`[${project.id}] Moked CheckTest – Teste Semanal – ${fmtDate(meta.date)}`;
   const handleWhatsApp=()=>{
     const h=computeHealth(project,state);
     const waIssues=[];
     for(const cat of project.categories){const s=state[cat.id];if(!s)continue;if(cat.type==="single"){const st=resolveStatus(s);if(st!=="ok")waIssues.push(`• ${cat.label}: ${st==="partial"?"Parcial":"Inop"}`);}else if(cat.type==="items"){s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok")waIssues.push(`• ${cat.itemLabels[i]}: ${st==="partial"?"Parcial":"Inop"}`);});}else if(cat.type==="count"){const inopN=s.inoperative?.length??0;if(inopN>0)waIssues.push(`• ${cat.label}: ${inopN} inop`);}}
     const inopText=waIssues.length>0?`\n\n*Itens com problema:*\n${waIssues.slice(0,10).join("\n")}${waIssues.length>10?`\n...+${waIssues.length-10} mais`:""}`:"\n\n✅ Todos os itens operando normalmente.";
-    const msg=encodeURIComponent(`*[${project.id}] MokLog CheckTest – ${fmtDate(meta.date)}*\n📍 ${project.name}\n📊 Saúde: *${h.pct}%* | ✅ ${h.ok} OK | ⚠️ ${h.partial} Parcial | 🔴 ${h.inop} Inop\n👤 Líder: ${meta.leader||"—"} · CCO: ${meta.cco||"—"}\n✍️ Assinatura: ${meta.signature||"—"}`+inopText+`\n\n🔗 https://moklog-checktest.vercel.app\n_MokLog CheckTest © Moked Security_`);
+    const msg=encodeURIComponent(`*[${project.id}] Moked CheckTest – ${fmtDate(meta.date)}*\n📍 ${project.name}\n📊 Saúde: *${h.pct}%* | ✅ ${h.ok} OK | ⚠️ ${h.partial} Parcial | 🔴 ${h.inop} Inop\n👤 Líder: ${meta.leader||"—"} · CCO: ${meta.cco||"—"}\n✍️ Assinatura: ${meta.signature||"—"}`+inopText+`\n\n🔗 https://moklog-checktest.vercel.app\n_Moked CheckTest © Moked Security_`);
     window.open(`https://wa.me/?text=${msg}`,"_blank");
   };
   const handleEmail=async()=>{
@@ -2551,7 +2524,7 @@ function ReportScreen({project, state, meta, photos, ctmkData={}, onBack, onHome
     const issues=[];
     for(const cat of project.categories){const s=state[cat.id];if(!s)continue;if(cat.type==="single"){const st=resolveStatus(s);if(st!=="ok")issues.push(`  • ${cat.label}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${s.since?` desde ${fmtDate(s.since)}`:""} ${s.note?`- ${s.note}`:""}`);}else if(cat.type==="items"){s.forEach((v,i)=>{const st=resolveStatus(v);if(st!=="ok")issues.push(`  • ${cat.label} / ${cat.itemLabels[i]}: ${st==="partial"?"PARCIAL":"INOPERANTE"}${v.since?` desde ${fmtDate(v.since)}`:""} ${v.note?`- ${v.note}`:""}`);});}else if(cat.type==="count"){(s.inoperative??[]).forEach(it=>issues.push(`  • ${cat.label} [${it.id||"?"}]${it.since?` desde ${fmtDate(it.since)}`:""} ${it.note?`- ${it.note}`:""}`));}}
     const msg=[`================================================`,"  MOKLOG CHECKTEST - RELATORIO DE TESTE SEMANAL","================================================",`Projeto  : ${project.id} - ${project.name}`,`Data     : ${fmtDate(meta.date)}`,`Lider    : ${meta.leader||"--"}`,`CCO      : ${meta.cco||"--"}`,`Assinatura: ${meta.signature||"--"}`,`Saude: ${h.pct}% | OK: ${h.ok} | Parcial: ${h.partial} | Inop: ${h.inop}`,issues.length>0?`\nProblemas:\n${issues.join("\n")}`:"Todos OK","\nhttps://moklog-checktest.vercel.app","================================================"].join("\n");
-    const success=await sendEmailJS(subject,msg,`MokLog CheckTest – ${project.id}`);
+    const success=await sendEmailJS(subject,msg,`Moked CheckTest – ${project.id}`);
     setSending(false);
     if(success)setEmailSent(true);else alert("Erro ao enviar. Verifique a conexao.");
   };
@@ -2628,7 +2601,7 @@ function ViewScreen({projectId, token, stored}) {
         <div style={{background:"#060c18",border:"1px solid #0f172a",borderRadius:12,padding:"16px",marginBottom:12}}>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <MoklogLogo size={40}/>
-            <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>MokLog CheckTest</div><div style={{fontSize:12,color:"#cc2222",fontWeight:700}}>{project.id} – {project.name}</div><div style={{fontSize:11,color:"#64748b"}}>Pendencias para manutencao · {fmtDate(last.meta?.date)}</div></div>
+            <div style={{flex:1}}><div style={{fontSize:15,fontWeight:800,color:"#f1f5f9"}}>Moked CheckTest</div><div style={{fontSize:12,color:"#cc2222",fontWeight:700}}>{project.id} – {project.name}</div><div style={{fontSize:11,color:"#64748b"}}>Pendencias para manutencao · {fmtDate(last.meta?.date)}</div></div>
             <HealthRing pct={h.pct} size={52}/>
           </div>
         </div>
@@ -2647,7 +2620,7 @@ function ViewScreen({projectId, token, stored}) {
             </div>
           ))}
         </div>
-        <div style={{marginTop:16,fontSize:11,color:"#94a3b8",textAlign:"center"}}>MokLog CheckTest © Moked Security Consulting · Somente leitura</div>
+        <div style={{marginTop:16,fontSize:11,color:"#94a3b8",textAlign:"center"}}>Moked CheckTest © Moked Security Consulting · Somente leitura</div>
       </div>
     </div>
   );

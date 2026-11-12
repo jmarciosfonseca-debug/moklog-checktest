@@ -19,7 +19,7 @@ function paginaHTML(pid) {
   const desc = `Compartilhamos o endereço para sua chegada tranquila no ${nome} (${pid}), projeto com consultoria da Moked. ${c.endereco}`;
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulo)} · Moked</title>
-<meta property="og:type" content="website"><meta property="og:site_name" content="Moked Consulting Security · MokLog CheckTest">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Moked Consulting Security · Moked CheckTest">
 <meta property="og:title" content="${esc(titulo)} · consultoria Moked"><meta property="og:description" content="${esc(desc)}">
 <meta property="og:image" content="${BASE}/moked/logo-moked.png"><meta property="og:image:width" content="1000"><meta property="og:image:height" content="700">
 <meta property="og:url" content="${BASE}/local/${esc(pid)}"><meta name="twitter:card" content="summary">
@@ -36,7 +36,7 @@ h1{font-size:20px;margin:16px 0 4px}.pid{color:#9ca3af;font-size:12px;letter-spa
 <div class="end">📍 ${esc(c.endereco)}</div>
 <div class="mapa"><iframe title="Mapa" src="${esc(mapsEmbedUrl(pid, 16))}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
 <div class="bt"><a class="b p" href="${esc(mapsDirUrl(pid))}">⌖ Como chegar</a><a class="b s" href="${esc(mapsVerUrl(pid))}">Abrir no Maps</a></div>
-<div class="nota">Compartilhamos o endereço para sua chegada tranquila. "Como chegar" abre o Google Maps a partir de onde você está. Moked Consulting Security · MokLog CheckTest.</div>
+<div class="nota">Compartilhamos o endereço para sua chegada tranquila. "Como chegar" abre o Google Maps a partir de onde você está. Moked Consulting Security · Moked CheckTest.</div>
 </main></body></html>`;
 }
 

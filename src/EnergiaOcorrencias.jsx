@@ -169,7 +169,7 @@ function montarMensagemWhats(project, config, ev){
     `👥 Inquilino(s) impactado(s): ${ev.inquilinoImpactado?(ev.inquilinosAfetados||"Sim"):"Não"}`,
   ];
   if(ev.obs) linhas.push(``, `📝 ${ev.obs}`);
-  linhas.push(``, `Operador: ${ev.operador||"—"} · Registrado via MokLog CheckTest`);
+  linhas.push(``, `Operador: ${ev.operador||"—"} · Registrado via Moked CheckTest`);
   return linhas.join("\\n");
 }
 function abrirWhatsApp(project, config, ev){
@@ -227,7 +227,7 @@ function gerarPdfDieselAvulso(project, ev){
   </div>
 </div>
 <div class="intro">
-  Este registro documenta uma <b>solicitação avulsa de abastecimento de diesel</b> para os geradores do site, aberta pela equipe de segurança sem vínculo com queda de energia. Inclui a empresa acionada, os horários cravados de cada etapa, o tempo de resposta do fornecedor e a quantidade abastecida — gerado pelo sistema <b>MokLog CheckTest</b>.
+  Este registro documenta uma <b>solicitação avulsa de abastecimento de diesel</b> para os geradores do site, aberta pela equipe de segurança sem vínculo com queda de energia. Inclui a empresa acionada, os horários cravados de cada etapa, o tempo de resposta do fornecedor e a quantidade abastecida — gerado pelo sistema <b>Moked CheckTest</b>.
 </div>
 <div class="kpis">
   <div class="kpi"><div class="kpi-val">${tempoResposta}</div><div class="kpi-lbl">Tempo de resposta</div></div>
@@ -252,7 +252,7 @@ ${dz.foto?`<div class="foto"><div class="sec-title">📷 Evidência — bomba do
   <div class="resp">Responsável pela extração<br><b>José Fonseca</b><br>Gestor de Divisão — MokLog</div>
   <div class="selo"><b>Moked Consulting Security</b><br>30+ anos · ISO 9001:2015 · ISO 37001:2016</div>
 </div>
-<div class="footer">MokLog CheckTest © Moked Consulting Security · Solicitação de Diesel · ${project.id} — ${project.name||""}</div>
+<div class="footer">Moked CheckTest © Moked Consulting Security · Solicitação de Diesel · ${project.id} — ${project.name||""}</div>
 </body></html>`;
   const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);

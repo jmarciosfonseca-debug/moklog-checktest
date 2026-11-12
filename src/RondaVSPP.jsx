@@ -172,7 +172,7 @@ ${historico.length?`<div class="section" style="margin-top:12px">
 </div>`:""}
 
 <div class="footer">
-  <div>MokLog CheckTest © Moked Consulting Security · Ronda VSPP — Turno Diurno</div>
+  <div>Moked CheckTest © Moked Consulting Security · Ronda VSPP — Turno Diurno</div>
   <div style="margin-top:3px">${project.id} — Golgi Cajamar · ${fmtDate(reg.data)}</div>
 </div></body></html>`;
 

@@ -1,4 +1,4 @@
-// ── MokLog CheckTest — generatePDF.js
+// ── Moked CheckTest — generatePDF.js
 // Laudo semanal, consolidado e comparativo de grupo — todos no padrão Moked (relatorios/padraoMoked.js).
 // THEMES: logo/nome da empresa de segurança por projeto (usado no cabeçalho dos documentos).
 import QRCode from "qrcode";
@@ -278,7 +278,7 @@ export function montarConsolidado(project, reports, opts = {}) {
   const equipe = sorted.map((r, i) => `<tr><td><b>${escHTML(rot[i])}</b> <span class="mu">${fmtDate(r.meta?.date).slice(0, 5)}</span></td><td>${escHTML(r.meta?.leader || "--")}</td><td>${escHTML(r.meta?.cco || "--")}</td><td>${escHTML(r.meta?.moked || "--")}</td><td>${r.meta?.start && r.meta?.end ? `${escHTML(r.meta.start)}–${escHTML(r.meta.end)}` : "--"}</td><td class="num">${r.meta?.tempoPreenchimentoSeg ? Math.floor(r.meta.tempoPreenchimentoSeg / 60) + " min" : "--"}</td></tr>`).join("");
   const docNum = `MK-${project.id}-RC-${(datas[n - 1] || "0000").replace(/-/g, "").slice(-4)}`;
   const periodo = `${fmtDate(datas[0]).slice(0, 5)} a ${fmtDate(datas[n - 1])}`;
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Consolidado — ${escHTML(project.id)} — ${periodo}</title><style>${consolidadoNovoCSS()}${rodapePagina(`${docNum} · Relatório Consolidado · ${project.id} ${project.name || ""} · Moked Consulting Security · MokLog CheckTest`)}</style></head><body>
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Consolidado — ${escHTML(project.id)} — ${periodo}</title><style>${consolidadoNovoCSS()}${rodapePagina(`${docNum} · Relatório Consolidado · ${project.id} ${project.name || ""} · Moked Consulting Security · Moked CheckTest`)}</style></head><body>
 <div class="no-print" style="text-align:center;margin:0 0 16px"><button onclick="window.print()" class="bt-print">Imprimir / Salvar PDF</button></div>
 <header class="topo"><div class="logos"><img src="${MOKED_LOGO}" class="lm" alt="Moked Consulting Security">${theme.empresaLogo ? `<span class="sep"></span><img src="${theme.empresaLogo}" class="lg" alt="${escHTML(theme.empresaNome || "")}">` : ""}</div>
 <div class="meta">${opts.interno ? '<div class="tag">VERSÃO INTERNA</div>' : ""}<div><b>Relatório Consolidado</b> · Nº ${docNum}</div><div>Emissão ${hoje.toLocaleDateString("pt-BR")} · José Fonseca</div></div></header>

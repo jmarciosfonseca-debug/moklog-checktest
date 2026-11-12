@@ -201,7 +201,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
 
   // Fecho compacto (uma faixa de ~12 mm): "Como ler" flui com o texto; só a assinatura é indivisível.
   // Evita a folha isolada apenas com assinatura que o bloco padrão (mais alto) pode gerar.
-  const fim = `<section class="eq-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no MokLog CheckTest, supervisionados pela Moked Consulting Security.</div></div>
+  const fim = `<section class="eq-fim"><div><div class="mk-mu">Base dos dados</div><div class="mk-sm">Registros lançados pelas equipes no Moked CheckTest, supervisionados pela Moked Consulting Security.</div></div>
     <div class="eq-ass"><div class="mk-linha"></div><b>José Fonseca</b> · Consultor de Segurança · Moked Consulting Security · jose.fonseca@moked.com.br</div></section>`;
   // "Como ler" + assinatura formam um bloco indivisível (~25 mm): a assinatura nunca fica sozinha numa folha.
   const corpo = `${css}${empresa.logo ? `<img class="eq-empresa" src="${esc(empresa.logo)}" alt="${esc(empresa.empresa || '')}">` : ''}${escopo}${kpis}${resumo}${grade}${descricoesHTML}${desligadosHTML}<div class="mk-fecho">${comoLer}${fim}</div>`;
