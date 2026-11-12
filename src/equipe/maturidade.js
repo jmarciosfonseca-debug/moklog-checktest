@@ -83,6 +83,9 @@ export function calcularTreinamento(colaborador, catalogo, hoje) {
 //  - mesmo nome com ids diferentes e mesma data de saída = registro lançado em duplicidade;
 //  - quem consta como ATIVO com o mesmo id não está desligado (registro velho que sobrou).
 const chaveNome = (c) => String(c?.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+// Saída por transferência para outro projeto (não é demissão: fica no histórico, fora do turnover).
+export const ehTransferencia = (c) => !!c && c.tipoDesligamento === 'Transferência';
+
 export function desligadosUnicos(desligados, ativos = []) {
   const idsAtivos = new Set((ativos || []).map(c => c && c.id).filter(Boolean));
   const lista = (Array.isArray(desligados) ? desligados : []).filter(c => c && typeof c === 'object');
@@ -119,7 +122,7 @@ export function calcularEstabilidade(equipe, hoje) {
   const ativos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo');
   const { unicos: desligados, duplicadosIgnorados } = desligadosUnicos(equipe.desligados, ativos);
   const naJanela = d => d !== null && d >= +inicio && d <= fim;
-  const saidas = desligados.filter(c => naJanela(data(c.desligadoEm))).length;
+  const saidas = desligados.filter(c => !ehTransferencia(c) && naJanela(data(c.desligadoEm))).length; // transferência entre projetos não é desligamento
   const entradas = ativos.filter(c => naJanela(data(c.dataContratacao))).length;
   const efetivoInicial = ativos.length - entradas + saidas;
   const efetivoMedio = (ativos.length + efetivoInicial) / 2;

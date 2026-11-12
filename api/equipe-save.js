@@ -4,6 +4,15 @@ const {save}=require('./ai/lib/equipeMerge');
 // Telemetria sem dados pessoais: projeto, perfil, tempo (ms), tamanho do pedido (KB) e, em conflito, o CAMINHO das chaves.
 function log(status,pid,a,t0,body,path){try{console.log(JSON.stringify({evt:'equipeSave',status,pid,nivel:a&&a.nivel,ms:Date.now()-t0,kbIn:Math.round(JSON.stringify(body||{}).length/1024),...(status===409?{conflitoEm:path||''}:{})}));}catch{}}
 const {noProjeto}=require('./ai/lib/escopoDivisao');
+const {moverNoBanco}=require('./ai/lib/equipeMover');
+// Transferência entre projetos: só o consultor (gerencial) ou o gestor da divisão, e este só dentro da divisão dele.
+async function moverColaborador(res,a,body,t0){
+ const {pid,para,colabId,data}=body;
+ if(![pid,para].every(p=>auth.PROJECTS.includes(p)&&noProjeto(a,p).nivel==='admin'))return res.status(403).json({ok:false,erro:'Só o consultor move colaboradores entre projetos.'});
+ if(typeof colabId!=='string'||!/^[-\w]{1,80}$/.test(colabId))return res.status(400).json({ok:false,erro:'Colaborador inválido.'});
+ try{const origem=await moverNoBanco(getDb(),{de:pid,para,colabId,data});console.log(JSON.stringify({evt:'equipeMover',status:200,de:pid,para,nivel:a.nivel,ms:Date.now()-t0}));return res.status(200).json({ok:true,data:origem});}
+ catch(e){console.log(JSON.stringify({evt:'equipeMover',status:e.status||503,de:pid,para,nivel:a.nivel,ms:Date.now()-t0}));return res.status(e.status||503).json({ok:false,erro:e.status?e.message:'Não foi possível mover agora. Nada foi alterado; tente novamente.'});}
+}
 module.exports=async(req,res)=>{
  const t0=Date.now();
  res.setHeader('Cache-Control','no-store');
@@ -12,6 +21,7 @@ module.exports=async(req,res)=>{
  if(!a)return res.status(401).json({ok:false,erro:'Sessão ausente ou expirada. Entre novamente.'});
  if(!['admin','lider','gestor'].includes(a.nivel))return res.status(403).json({ok:false,erro:'Perfil sem permissão para gravar.'});
  let body;try{body=typeof req.body==='string'?JSON.parse(req.body):req.body;}catch{return res.status(400).json({ok:false,erro:'Pedido inválido'});}
+ if(body&&body.acao==='mover')return moverColaborador(res,a,body,t0);
  const {pid,before,after}=body||{};
  a=noProjeto(a,pid);if(a.nivel==='negado')return res.status(403).json({ok:false,erro:'Projeto sem permissão.'}); // gestor de divisão: só os projetos dela
  if(!auth.PROJECTS.includes(pid)||(a.nivel==='lider'&&a.pid!==pid))return res.status(403).json({ok:false,erro:'Projeto sem permissão.'});
