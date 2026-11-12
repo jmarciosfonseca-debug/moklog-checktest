@@ -48,6 +48,7 @@ const MAPA_CATEGORIAS = [
 ];
 export function grupoDaCategoria(cat) {
   if (cat && cat.id === "cftv") return "cftv";
+  if (cat && cat.grupo) return cat.grupo; // inventário das divisões novas já vem classificado pela seção da planilha
   const l = sem(cat && cat.label).replace(/^\d+\s*-\s*/, "");
   for (const [g, re] of MAPA_CATEGORIAS) if (re.test(l)) return g;
   return "infra";
