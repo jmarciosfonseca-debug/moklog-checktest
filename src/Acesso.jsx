@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import ListaCascata from "./ListaCascata.jsx";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
@@ -91,6 +92,7 @@ function gerarPDFRegistro(r, projectId) {
 </style>
 </head>
 <body>
+${LOGO_FAIXA_HTML}
 <div class="header">
   <h1>🚛 Registro de Acesso — ${projectId}</h1>
   <p>Emitido em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</p>
@@ -166,6 +168,7 @@ function gerarPDFConsolidado(lista, projectId) {
 </style>
 </head>
 <body>
+${LOGO_FAIXA_HTML}
 <div class="header">
   <h1>🚛 Consolidado de Acessos — ${projectId}</h1>
   <p>Gerado em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})} · ${sorted.length} registro(s)</p>

@@ -12,6 +12,7 @@
 // • Horário é sempre capturado na hora do toque — nunca digitado à mão.
 // ─────────────────────────────────────────────────────────────
 import { Ico } from "./Icones";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import { useState, useEffect } from "react";
 import { avisarFalhaServidor } from "./avisoSalvar";
 
@@ -122,6 +123,7 @@ function gerarPdfBodycam(project, registros){
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
+${LOGO_FAIXA_HTML}
 <h1>🎬 Descarregamento de Bodycam — ${project.id}</h1>
 <div class="sub">${project.name||""} · Gerado em ${agora.toLocaleDateString("pt-BR")} às ${fmtHora(agora)}</div>
 <div class="kpis">

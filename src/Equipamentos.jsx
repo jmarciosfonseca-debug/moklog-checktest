@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import ListaCascata from "./ListaCascata.jsx";
 import { Ico } from "./Icones";
 import IconeEquip from "./IconeEquip";
@@ -341,6 +342,7 @@ function gerarPDFEquipamentos(project, data, segLogos) {
 <div style="text-align:center;margin-bottom:16px">
   <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
+${LOGO_FAIXA_HTML}
 <div class="header">
   <div>
     <div style="font-size:11px;opacity:.7;text-transform:uppercase">Moked Consulting Security</div>

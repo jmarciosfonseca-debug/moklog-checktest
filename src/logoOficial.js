@@ -11,3 +11,5 @@ export const logoMokedSVG = (fundo = "claro") => ARTE.replace("__NEUTRO__", fund
 const dataUrl = (s) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s);
 export const LOGO_MOKED_OFICIAL = dataUrl(logoMokedSVG("claro"));
 export const LOGO_MOKED_OFICIAL_ESCURO = dataUrl(logoMokedSVG("escuro"));
+// Faixa do logo oficial para o topo dos documentos que montam o próprio HTML (fundo claro).
+export const LOGO_FAIXA_HTML = `<div class="mk-logo-oficial" style="margin:0 0 12px"><img src="${LOGO_MOKED_OFICIAL}" alt="Moked Security Consulting" style="height:46px;width:auto;display:block"></div>`;

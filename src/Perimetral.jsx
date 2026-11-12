@@ -1,4 +1,5 @@
 import CampoData from "./CampoData";
+import { LOGO_FAIXA_HTML } from "./logoOficial";
 import { Ico } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -320,6 +321,7 @@ function gerarPDFTeste(teste, allTestes, project, pcfg, incluirRondas=true, incl
   <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>
 </div>
 
+${LOGO_FAIXA_HTML}
 <div class="header">
   <div>
     <p style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px">Moked Consulting Security</p>
