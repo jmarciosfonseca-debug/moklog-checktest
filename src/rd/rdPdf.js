@@ -62,7 +62,7 @@ export function htmlRd(dia, memoria, consultor, fotos = {}) {
   footer{margin-top:26px;border-top:1px solid #c7ced5;padding-top:8px;font-size:9.5px;color:#64748b}
   ${CSS_BARRA_PDF}</style></head><body>
   ${barraPdf(`MK RD · ${dataBR(dia?.data)} — toque no botão para salvar em PDF`)}
-  <header><div><h1>MK RD · Relatório Diário</h1><div class="sub">${esc(dataBR(dia?.data))}${consultor ? " · " + esc(consultor) : ""}</div></div><img src="${LOGO_MOKED_30}" alt="Moked 30 anos"/></header>
+  <header><div><h1>MK RD · Relatório Diário</h1><div class="sub">${esc(dataBR(dia?.data))}${consultor ? " · " + esc(consultor) : ""}</div></div><img src="${LOGO_MOKED_30}" alt="Moked Security Consulting"/></header>
   <h2>01 · Trechos do dia</h2>
   <table><thead><tr><th>Trecho</th><th>Saída</th><th>Chegada</th><th class="num">Km</th><th class="num">Pedágios</th><th class="num">Permanência</th></tr></thead><tbody>${linhas || '<tr><td colspan="6">Sem trechos.</td></tr>'}</tbody></table>
   <div class="tot">

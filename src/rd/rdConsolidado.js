@@ -151,7 +151,7 @@ export function htmlConsolidado(c, memoria, consultor) {
   ${barraPdf(`MK RD · Consolidado ${dataBR(c.de)} a ${dataBR(c.ate)} — toque no botão para salvar em PDF`)}
   <header><div><h1>MK RD · Consolidado do período</h1><div>${esc(dataBR(c.de))} a ${esc(dataBR(c.ate))}${consultor ? " · " + esc(consultor) : ""}</div>
   <p class="intro">Fechamento do Relatório Diário: horas, deslocamentos, visitas e custos do período, apurados das marcações do app. As horas de cada projeto contam da abertura do trecho (saída de casa) até a saída do cliente.</p></div>
-  <img src="${LOGO_MOKED_30}" alt="Moked 30 anos"/></header>
+  <img src="${LOGO_MOKED_30}" alt="Moked Security Consulting"/></header>
   <div class="cards">
    ${card(horas1(c.horas), "horas registradas")}
    ${card(esc(kmFmt(c.km)), c.kmMoto > 0 ? `rodados · carro ${esc(kmFmt(c.kmCarro))} / moto ${esc(kmFmt(c.kmMoto))}` : "rodados")}

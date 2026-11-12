@@ -86,7 +86,7 @@ export default async function handler(req, res) {
         ? Buffer.from(LOGO_MOKED_B64, "base64")
         : Uint8Array.from(atob(LOGO_MOKED_B64), (ch) => ch.charCodeAt(0));
       logoImg = await pdf.embedJpg(bytes);
-      logoDims = logoImg.scale(0.22); // ~132px de largura
+      logoDims = logoImg.scale(160 / logoImg.width); // 160pt de largura (imagem em alta resolução: nítida no zoom)
     } catch (e) { logoImg = null; }
 
     let page = pdf.addPage([595, 842]); // A4 retrato (pt)

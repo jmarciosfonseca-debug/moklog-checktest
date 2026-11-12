@@ -21,16 +21,16 @@ function paginaHTML(pid) {
 <title>${esc(titulo)} · Moked</title>
 <meta property="og:type" content="website"><meta property="og:site_name" content="Moked Consulting Security · Moked CheckTest">
 <meta property="og:title" content="${esc(titulo)} · consultoria Moked"><meta property="og:description" content="${esc(desc)}">
-<meta property="og:image" content="${BASE}/moked/logo-moked.png"><meta property="og:image:width" content="1000"><meta property="og:image:height" content="700">
+<meta property="og:image" content="${BASE}/moked/logo-moked.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:url" content="${BASE}/local/${esc(pid)}"><meta name="twitter:card" content="summary">
 <style>body{margin:0;background:#0b0b0e;color:#e5e7eb;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}main{max-width:560px;margin:0 auto;padding:18px 14px 40px}
-.logo{background:#fff;padding:8px 14px;display:inline-block;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}.logo img{height:40px;display:block}
+.logo{background:#fff;padding:8px 14px;display:inline-block;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}.logo img{height:50px;display:block}
 h1{font-size:20px;margin:16px 0 4px}.pid{color:#9ca3af;font-size:12px;letter-spacing:2px;text-transform:uppercase}.end{color:#d1d5db;font-size:14px;margin:8px 0 14px}
 .mapa{border:1px solid #2a2a31;background:#000;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}iframe{border:0;display:block;width:100%;height:280px}
 .bt{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}a.b{flex:1;text-align:center;text-decoration:none;font-weight:800;letter-spacing:1px;text-transform:uppercase;font-size:13px;padding:13px 14px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 .p{background:linear-gradient(180deg,#FF1E27,#9f0710);color:#fff}.s{background:#111115;border:1px solid #3a3a42;color:#d1d5db}.nota{color:#6b7280;font-size:11px;margin-top:14px}</style></head>
 <body><main>
-<div class="logo"><img src="/moked/logo-moked.png" alt="Moked Consulting Security"></div>
+<div class="logo"><img src="/moked/logo-moked.svg" alt="Moked Security Consulting"></div>
 <div class="pid" style="margin-top:14px">${esc(pid)} · consultoria Moked</div>
 <h1>${esc(nome)}</h1>
 <div class="end">📍 ${esc(c.endereco)}</div>

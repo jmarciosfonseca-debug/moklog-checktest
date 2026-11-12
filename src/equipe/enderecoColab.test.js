@@ -65,7 +65,8 @@ test("Mapa de Equipe (relatório do cliente) mostra a distância e o endereço m
   const equipe = { colaboradores: [{ id: "a", nome: "Ana Lima", cargo: "Vigilante", status: "ativo", dataContratacao: "2024-01-10", ultimaReciclagem: "2026-01-10", historico: [], endereco: end, distanciaKm: 3.1, rotaKm: 7.8, rotaMin: 14 }] };
   const html = gerarMapaEquipeHTML({ project: { id: "P260A", name: "Jatinox A" }, equipe, hoje: "2026-11-06" });
   expect(html).toMatch(/Reside a <b>7,8 km<\/b> do projeto \(de carro, ~14 min\) · Rua Roberto Koch, \*\*\* · Vila Independência, São Paulo\/SP · CEP \*\*\*\*\*-\*\*\*/);
-  expect(html).not.toMatch(/363|04221/);
+  // o logo oficial é um SVG embutido (números nas curvas): a checagem de privacidade vale para o conteúdo, não para a imagem
+  expect(html.replace(/src="data:image\/[^"]+"/g, 'src=""')).not.toMatch(/363|04221/);
 });
 
 test("rota de carro (07/11): OSRM com origem casa e destino projeto; linha reta só como referência; falha de rede não quebra", async () => {
