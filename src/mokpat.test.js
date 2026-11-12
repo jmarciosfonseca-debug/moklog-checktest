@@ -88,9 +88,9 @@ test("Área do Cliente: PIN do gestor MokPat entra direto (sem passar pela porta
 
 test("MokImp: 15 projetos (13 residenciais, 2 comerciais); mesmo PIN provisório nos dois gestores é resolvido pela porta", async () => {
   const { DIVISOES, DIVISAO_IDS } = require("./divisoes");
-  expect(DIVISOES.mokimp.nome).toBe("MokImp"); expect(DIVISAO_IDS.mokimp).toHaveLength(15);
+  expect(DIVISOES.mokimp.nome).toBe("MokImp"); expect(DIVISAO_IDS.mokimp).toHaveLength(17);
   expect(idsDoSegmento("residencial", "mokimp")).toEqual(["P931", "P932", "P942", "P944", "P950", "P951", "P952", "P953", "P954", "P957", "P958", "P959", "P961"]);
-  expect(idsDoSegmento("comercial", "mokimp")).toEqual(["P703", "P763"]);
+  expect(idsDoSegmento("comercial", "mokimp")).toEqual(["P703", "P760", "P761", "P763"]);
   expect(divisaoDoProjeto("P944")).toBe("mokimp"); expect(divisaoDoProjeto("P939")).toBe("mokpat");
   expect(DIVISAO_IDS.mokimp.filter((p) => DIVISAO_IDS.mokpat.includes(p))).toEqual([]); // nenhum projeto em duas divisões
   const crypto = require("crypto"), h = (p) => crypto.createHash("sha256").update(p).digest("hex"); const antes = { ...process.env };

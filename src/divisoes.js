@@ -6,7 +6,7 @@ const { categoriasDoInventario } = require("./inventarioDivisoes");
 const lista = (residencial, comercial) => [...residencial.map((id) => [id, "residencial"]), ...comercial.map((id) => [id, "comercial"])].sort((a, b) => a[0].localeCompare(b[0]));
 const MOKPAT = lista(["P032", "P035", "P160", "P256", "P380", "P560", "P925", "P936", "P939", "P946", "P947", "P955", "P956"], ["P740", "P770", "P777", "P868"]);
 // MokImp (lista do Marcio, 11/11/2026). Atenção: estes 15 são do MokImp, não do MokPat.
-const MOKIMP = lista(["P931", "P932", "P942", "P944", "P950", "P951", "P952", "P953", "P954", "P957", "P958", "P959", "P961"], ["P703", "P763"]);
+const MOKIMP = lista(["P931", "P932", "P942", "P944", "P950", "P951", "P952", "P953", "P954", "P957", "P958", "P959", "P961"], ["P703", "P760", "P761", "P763"]);
 const SEGMENTOS = {
   residencial: { key: "residencial", label: "Projetos Residencial", nome: "Residencial", cor: "#c9a48a" },
   comercial: { key: "comercial", label: "Projetos Comercial", nome: "Comercial", cor: "#38bdf8" },
