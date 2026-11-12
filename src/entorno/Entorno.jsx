@@ -7,7 +7,7 @@ import { LOCAIS, GERAL, recebeGeral, projetosComEntorno, TIPO_ROTULO } from "./l
 import { mesclar, resumir } from "./core";
 import EntornoLista, { corTipo, fmtData, ehPerto } from "./EntornoLista";
 import { C, Cabecalho, VERMELHO2, VERDE, AMARELO, CINZA, AZUL } from "../cliente/Cluster";
-import { MOKED_LOGO } from "../generatePDF";
+import { LOGO_MOKED_OFICIAL_ESCURO as MOKED_LOGO } from "../logoOficial"; // tela de fundo escuro
 
 
 const corTend = (t) => (t === "alta" ? VERMELHO2 : t === "queda" ? VERDE : AMARELO);

@@ -1,5 +1,5 @@
 import CampoData from "./CampoData";
-import { simboloSVG } from "./MokedSimbolo";
+import { LOGO_MOKED_OFICIAL } from "./logoOficial";
 import { Ico, IcoTxt } from "./Icones";
 import { iconeTema } from "./temaClaro";
 import { checkPin } from "./session";
@@ -38,7 +38,7 @@ import { grantSession, hasGerencial } from "./session";
 const COL = "keyaccess_falhas";
 
 // Brasão Moked (mesmo do Mapa de Equipe) — usado no cabeçalho do PDF.
-const MOKED_LOGO_SVG = simboloSVG({ largura: 78, fundo: "claro", classe: "logo" });
+const MOKED_LOGO_SVG = `<img class="logo" src="${LOGO_MOKED_OFICIAL}" alt="Moked Security Consulting">`; // logo oficial com selos ISO
 
 // Apenas estes 8 projetos usam KeyAccess (P260A/B/C e P505 não usam).
 export const PROJETOS_KA = [
@@ -895,7 +895,7 @@ async function gerarPDFRelatorioKA({ modo, projsSel, dadosPorProjeto, dataIni, d
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#121212;font-size:12px;padding:18px}
   .hdr{display:flex;align-items:center;gap:16px;border-bottom:3px solid #B21E27;padding-bottom:14px;margin-bottom:16px}
-  .hdr .logo{width:78px;height:auto;flex:none}
+  .hdr .logo{width:190px;height:auto;flex:none}
   .hdr .brand{font-size:11px;color:#64748b;font-weight:800;text-transform:uppercase;letter-spacing:.7px}
   .hdr .title{font-size:20px;font-weight:900;color:#121212;line-height:1.15;margin-top:2px}
   .hdr .sub{font-size:12px;color:#B21E27;font-weight:700;margin-top:2px}

@@ -12,7 +12,7 @@ export const DIVISOES = [
   { id: "moktec", nome: "MokTec", sub: "Tecnologia", ativo: false, cor: "#e11d48" },
 ];
 export const logoDivisao = (id) => `/moked/divisoes/${id}.jpg`;
-export const LOGO_MOKED_URL = "/moked/logo-moked.png";
+export const LOGO_MOKED_URL = "/moked/logo-moked-escuro.svg"; // logo oficial (12/11/2026), versão para fundo escuro, vetorial
 export const VIDEO_INTRO_URL = "/moked/intro.mp4";
 // O vídeo toca a cada entrada (decisão do Marcio); "Pular" fica sempre visível.
 
@@ -33,7 +33,7 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   useEffect(() => { if (etapa !== "video") return undefined; tocar(); const t = setTimeout(fimVideo, 25000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
 
   if (etapa === "splash") return <main style={fundo} data-testid="entrada-splash">
-    <img src={logo} alt="Moked Security Consulting" style={{ width: "min(70vw, 320px)", borderRadius: "48% / 40%", padding: "14px 22px", background: "#0b0f19", boxShadow: "0 0 0 1px #475569" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+    <img src={logo} alt="Moked Security Consulting" style={{ width: "min(78vw, 360px)", borderRadius: 18, padding: "18px 22px", background: "#0b0f19", boxShadow: "0 0 0 1px #475569" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
     <div style={{ marginTop: 36 }}><button onClick={entrar} style={botaoVermelho}>Entrar</button></div>
     <div style={{ marginTop: 14, fontSize: 10.5, color: "#6b7280", letterSpacing: 1 }}>SECURITY · CONSULTING</div>
   </main>;
@@ -58,7 +58,7 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   </main>;
 
   return <main style={{ ...fundo, justifyContent: "flex-start", padding: "28px 20px 20px" }} data-testid="entrada-areas">
-    <img src={logo} alt="Moked" style={{ width: 150, marginBottom: 6 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+    <img src={logo} alt="Moked" style={{ width: 190, marginBottom: 6 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
     <div style={{ width: "100%", maxWidth: 480 }}>
       <button onClick={() => onEscolher("cliente")} aria-label="Área do Cliente" style={{ width: "100%", background: "#1f2937", border: "1px solid #475569", color: "#f3f4f6", padding: "14px 16px", fontWeight: 900, letterSpacing: 2, fontSize: 13, cursor: "pointer", clipPath: chanfro, marginBottom: 22, textTransform: "uppercase", boxShadow: "none" }}>Área do Cliente ›</button>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", marginBottom: 12 }}>Escolha a sua área</div>

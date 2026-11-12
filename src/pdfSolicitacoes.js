@@ -133,7 +133,7 @@ function css(theme) {
 function montarHTML({ theme, projectId, titulo, corpo, totalItens, subtitulo, metaTxt, campanha = false }) {
   const nomeProj = NOMES_PROJETO[projectId] || projectId;
   const hoje = new Date().toLocaleDateString("pt-BR");
-  const logo = campanha ? `<img src="${LOGO_MOKED_30}" alt="Moked - Mais de 30 anos de experiência e excelência" style="width:250px;max-width:46%;height:auto;object-fit:contain;"/>` : theme.mokedLogo ? `<img src="${theme.mokedLogo}" alt="Moked"/>` : `<div style="font-weight:800;color:${theme.headerBg};font-size:18px;">MOKED</div>`;
+  const logo = campanha ? `<img src="${LOGO_MOKED_30}" alt="Moked Security Consulting" style="width:250px;max-width:46%;height:auto;object-fit:contain;"/>` : theme.mokedLogo ? `<img src="${theme.mokedLogo}" alt="Moked"/>` : `<div style="font-weight:800;color:${theme.headerBg};font-size:18px;">MOKED</div>`;
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">

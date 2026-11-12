@@ -73,7 +73,7 @@ body{font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;color:#1F2937;font-
 .mk-noprint{text-align:center;margin:0 0 16px}.mk-print{background:#111827;color:#fff;border:none;border-radius:6px;padding:10px 26px;font-size:14px;font-weight:700;cursor:pointer}
 @media print{.mk-noprint{display:none}body{padding:0;max-width:none}}
 .mk-mu{color:#6B7280}.mk-sm{font-size:8.4pt}
-.mk-topo{display:flex;justify-content:space-between;align-items:center}.mk-logos{display:flex;align-items:center;gap:12px}.mk-lm{height:36px}.mk-lg{height:34px;max-width:130px;object-fit:contain}.mk-sep{width:1px;height:30px;background:#D1D5DB}
+.mk-topo{display:flex;justify-content:space-between;align-items:center}.mk-logos{display:flex;align-items:center;gap:12px}.mk-lm{height:48px}.mk-lg{height:34px;max-width:130px;object-fit:contain}.mk-sep{width:1px;height:30px;background:#D1D5DB}
 .mk-meta{text-align:right;font-size:8.6pt;color:#4B5563;line-height:1.45}.mk-tag{display:inline-block;font-size:7.4pt;letter-spacing:.08em;font-weight:700;color:#B91C1C;border:1px solid #FCA5A5;border-radius:3px;padding:1px 6px;margin-bottom:3px}
 .mk-regua{height:3px;background:linear-gradient(90deg,#111827 0 72%,#B91C1C 72% 100%);margin:9px 0 12px;border-radius:2px}
 .mk-h1{font-size:19pt;font-weight:700;margin:0;color:#111827}.mk-sub{margin:2px 0 12px;color:#4B5563;font-size:10pt}
