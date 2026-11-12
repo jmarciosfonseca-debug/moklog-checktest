@@ -32,5 +32,22 @@ test("ficha: histórico por categoria, último primeiro, 3 visíveis por grupo e
     const trein=host.querySelector("[data-testid='hist-grupo-Treinamento']");
     expect(trein.textContent).toContain("DDS sigilo"); expect(trein.textContent).not.toContain("Concierge"); // 5 no grupo → 3 visíveis
     expect(trein.textContent).toContain("Ver mais 2");
+    // cascata geral: um toque abre todos os grupos; outro recolhe
+    const cascata=host.querySelector("[data-testid='hist-cascata']"); expect(cascata.textContent).toContain("Ver tudo");
+    await clicar(cascata);
+    expect(host.querySelector("[data-testid='hist-grupo-Treinamento']").textContent).toContain("Concierge");
+    expect(host.querySelector("[data-testid='hist-cascata']").textContent).toContain("Recolher");
+    await clicar(host.querySelector("[data-testid='hist-cascata']"));
+    expect(host.querySelector("[data-testid='hist-grupo-Treinamento']").textContent).not.toContain("Concierge");
+    expect(host.querySelector("[data-testid='hist-grupo-Falta']").textContent).not.toContain("03/08/2026");
   }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+test("saídas por período: 12, 24, 36 meses ou todas; mantém o índice original", () => {
+  const { desligadosNoPeriodo } = require("./Equipe");
+  const lista = [{ id: "a", desligadoEm: "2026-10-01" }, { id: "b", desligadoEm: "2025-06-01" }, { id: "c", desligadoEm: "2024-03-01" }, { id: "d", desligadoEm: "2021-01-01" }, { id: "e" }, null];
+  const hoje = new Date("2026-11-12T12:00:00");
+  const ids = (m) => desligadosNoPeriodo(lista, m, hoje).map((x) => x.c.id);
+  expect(ids(12)).toEqual(["a"]); expect(ids(24)).toEqual(["a", "b"]); expect(ids(36)).toEqual(["a", "b", "c"]); expect(ids(0)).toEqual(["a", "b", "c", "d", "e"]);
+  expect(desligadosNoPeriodo(lista, 24, hoje).map((x) => x.idx)).toEqual([0, 1]);
 });

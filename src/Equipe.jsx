@@ -228,6 +228,15 @@ async function campanhaDoServidor(projectId, chave) {
   } catch(e) { return null; }
 }
 
+// Saídas dentro do período (meses; 0 = todas). Sem data de saída só aparece em "Todos". Devolve { c, idx } com o índice original.
+export function desligadosNoPeriodo(lista, meses, hoje = new Date()) {
+  const todos = (Array.isArray(lista) ? lista : []).map((c, idx) => ({ c, idx })).filter((x) => x.c && typeof x.c === "object");
+  if (!meses) return todos;
+  const lim = new Date(hoje); lim.setMonth(lim.getMonth() - meses);
+  const corte = lim.toLocaleDateString("sv-SE");
+  return todos.filter((x) => /^\d{4}-\d{2}-\d{2}/.test(String(x.c.desligadoEm || "")) && String(x.c.desligadoEm).slice(0, 10) >= corte);
+}
+
 // CPF: na tela circula só mascarado (•••.•••.•••-NN). O número digitado segue ao servidor, que cifra e não devolve.
 const cpfDigitos = (v) => String(v == null ? "" : v).replace(/\D/g, "").slice(0, 11);
 const cpfFmt = (v) => { const d = cpfDigitos(v); return d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2"); };
@@ -811,6 +820,8 @@ function FichaScreen({ colab, adminAuth, liderAuth, trancada, onVerCpf, projectN
   const hist    = ordenarHistorico(colab.historico);   // cronológico pela data do fato (aplicação), não pelo lançamento
   const fotosFicha = useContext(FotosCtx) || {};        // fotos de treinamento (fotoRef no item do histórico)
   const [histAberto, setHistAberto] = useState({});     // cascata: grupos do histórico expandidos
+  const gruposHist = agruparHistorico(hist);
+  const tudoAberto = gruposHist.filter(g=>g.itens.length>HIST_VISIVEIS).every(g=>histAberto[g.tipo]) && gruposHist.some(g=>g.itens.length>HIST_VISIVEIS);
   const faltas  = (colab.historico||[]).filter(h=>h.tipo==="Falta").length;
   const fts     = (colab.historico||[]).filter(h=>h.tipo==="FT").length;
   const mds     = (colab.historico||[]).filter(h=>h.tipo==="Medida Disciplinar").length;
@@ -1029,17 +1040,25 @@ function FichaScreen({ colab, adminAuth, liderAuth, trancada, onVerCpf, projectN
           <div style={S.card}>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
               <div style={{ fontSize:13, fontWeight:700, ...S.txtPrimary }}>Histórico <span style={{ fontSize:11, color:"#64748b" }}>({(colab.historico||[]).length})</span></div>
+              <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+              {gruposHist.some(g=>g.itens.length>HIST_VISIVEIS) && (
+                <button data-testid="hist-cascata" aria-expanded={tudoAberto} onClick={()=>setHistAberto(tudoAberto ? {} : Object.fromEntries(gruposHist.map(g=>[g.tipo,true])))}
+                  style={{ ...S.btnSm, color:"#94a3b8", border:"1px solid #33415588", background:"transparent", padding:"7px 12px", fontSize:12 }}>
+                  {tudoAberto ? "▴ Recolher" : "▾ Ver tudo"}
+                </button>
+              )}
               {canAddHist && (
                 <button onClick={onAddHist} style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", background:"#001a2e", padding:"7px 14px", fontSize:12 }}>
                   + Adicionar
                 </button>
               )}
+              </div>
             </div>
             {hist.length === 0 && (
               <div style={{ textAlign:"center", padding:"20px 0", color:"#334155", fontSize:12 }}>Nenhum registro ainda</div>
             )}
             <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {agruparHistorico(hist).map(g => { const hcG = HIST_COLORS[g.tipo] || HIST_COLORS["Medida Disciplinar"]; const aberto = !!histAberto[g.tipo]; const itens = aberto ? g.itens : g.itens.slice(0, HIST_VISIVEIS); const resto = g.itens.length - itens.length;
+              {gruposHist.map(g => { const hcG = HIST_COLORS[g.tipo] || HIST_COLORS["Medida Disciplinar"]; const aberto = !!histAberto[g.tipo]; const itens = aberto ? g.itens : g.itens.slice(0, HIST_VISIVEIS); const resto = g.itens.length - itens.length;
               return <div key={g.tipo} data-testid={"hist-grupo-"+g.tipo}>
               <div style={{ fontSize:10, fontWeight:700, color:hcG.color, textTransform:"uppercase", letterSpacing:.5, margin:"2px 0 5px" }}>{g.tipo} <span style={{ color:"#64748b", fontWeight:600 }}>({g.itens.length})</span> <span style={{ color:"#475569", fontWeight:500, textTransform:"none", letterSpacing:0 }}>· mais recente primeiro</span></div>
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
@@ -2191,6 +2210,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const [form, setForm] = useState(null);
   const [histForm, setHistForm] = useState({ tipo:"Falta", data:todayStr(), detalhe:"" });
   const [showDesligados, setShowDesligados] = useState(false);
+  const [periodoDeslig, setPeriodoDeslig] = useState(12); // meses exibidos na lista de saídas (0 = todos)
   const [selPDF, setSelPDF] = useState([]); // ids selecionados para PDF
   const [pdfComDesligados, setPdfComDesligados] = useState(false); // incluir desligados no PDF
   const [matrizGerando, setMatrizGerando] = useState(false);
@@ -2934,6 +2954,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   // ── Lista principal
   const ativos = equipeData.colaboradores.filter(c=>c.status==="ativo");
   const desligados = equipeData.desligados || [];
+  const desligadosVisiveis = desligadosNoPeriodo(desligados, periodoDeslig); // mantém o índice original (excluir usa)
   const turnosComEquipe = getTurnos(project.id).filter(t => ativos.some(c=>c.turno===t));
   const semTurno = ativos.filter(c=>!getTurnos(project.id).includes(c.turno));
 
@@ -3423,9 +3444,17 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                 <span style={{ fontSize:12, fontWeight:700, color:"#ef4444" }}><Ico n="pontoVermelho"/> Desligados e transferidos ({desligados.length})</span>
                 <span style={{ color:"#334155", fontSize:12 }}>{showDesligados?"▲":"▼"}</span>
               </button>
-              {showDesligados && (
+              {showDesligados && (<>
+                <div role="group" aria-label="Período das saídas" style={{ display:"flex", gap:6, flexWrap:"wrap", margin:"10px 0 2px" }}>
+                  {[[12,"12 meses"],[24,"24 meses"],[36,"36 meses"],[0,"Todos"]].map(([m,rot])=>{ const n=desligadosNoPeriodo(desligados,m).length; const on=periodoDeslig===m; return (
+                    <button key={m} aria-pressed={on} onClick={()=>setPeriodoDeslig(m)}
+                      style={{ ...S.btnSm, fontSize:10, padding:"4px 10px", fontWeight:700, color:on?"#fff":"#94a3b8", background:on?"#475569":"transparent", border:`1px solid ${on?"#475569":"#33415588"}` }}>
+                      {rot} ({n})
+                    </button>); })}
+                </div>
+                {desligadosVisiveis.length===0 && <div style={{ fontSize:11, color:"#64748b", padding:"10px 2px" }}>Nenhuma saída neste período.</div>}
                 <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:6 }}>
-                  {desligados.map((c,idx)=>(
+                  {desligadosVisiveis.map(({c,idx})=>(
                     <div key={`${c.id}-${idx}`} style={{ background:"#1a0202", borderRadius:10, padding:"10px 12px", border:"1px solid #ef444422", marginBottom:6 }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <Avatar colab={c} size={40} border="#ef444444"/>
@@ -3459,7 +3488,7 @@ Esta ação não pode ser desfeita.`))
                     </div>
                   ))}
                 </div>
-              )}
+              </>)}
             </div>
           )}
 
