@@ -228,8 +228,19 @@ async function campanhaDoServidor(projectId, chave) {
   } catch(e) { return null; }
 }
 
+// CPF: na tela circula só mascarado (•••.•••.•••-NN). O número digitado segue ao servidor, que cifra e não devolve.
+const cpfDigitos = (v) => String(v == null ? "" : v).replace(/\D/g, "").slice(0, 11);
+const cpfFmt = (v) => { const d = cpfDigitos(v); return d.replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1-$2"); };
+export function cpfValido(v) {
+  const d = cpfDigitos(v); if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const dv = (n) => { let x = 0; for (let i = 0; i < n; i++) x += Number(d[i]) * (n + 1 - i); const r = (x * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === Number(d[9]) && dv(10) === Number(d[10]);
+}
+const cpfMascarado = (c) => (c && c.cpfFinal ? `•••.•••.•••-${c.cpfFinal}` : "");
+const semCpfEmTexto = (d) => ({ ...d, colaboradores: (d.colaboradores || []).map((c) => { if (!c || !("cpf" in c)) return c; const { cpf, ...r } = c; return cpfDigitos(cpf) ? { ...r, cpfFinal: cpfDigitos(cpf).slice(9) } : r; }) });
+
 async function saveEquipe(projectId, data, before) {
-  if(isDemo())return data;
+  if(isDemo())return semCpfEmTexto(data);
   if(!before)throw Error("Base da edição ausente. Reabra a tela.");
   const response=await authFetchEquipe("/api/equipe-save",{method:"POST",body:JSON.stringify({pid:projectId,before,after:data})});
   const result=await response.json();
@@ -795,7 +806,7 @@ export function AprovacoesScreen({ colaboradores, ano, anos, onAno, onAprovar, o
   );
 }
 
-function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, onMover, destinosMover, projetoAtual, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
+function FichaScreen({ colab, adminAuth, liderAuth, trancada, onVerCpf, projectNome, onBack, onEdit, onAddHist, onDesligar, onPromover, onMover, destinosMover, projetoAtual, cargosFicha, lideresFicha, onRemoveHist, onEditHist, onEncerrarAfast, onSolicitarUniforme, onConfirmarUniforme, onSalvarListaUniforme, cestaAno, cestaTipo, cestaRegistro, onToggleCesta, onAprovar, onTodas, anoAprovacao, onRegistrarWhats, dark, maturidade = null }) {
   const S = getStyles(dark);
   const hist    = ordenarHistorico(colab.historico);   // cronológico pela data do fato (aplicação), não pelo lançamento
   const fotosFicha = useContext(FotosCtx) || {};        // fotos de treinamento (fotoRef no item do histórico)
@@ -856,7 +867,8 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
         <div style={{ background:`linear-gradient(160deg,${dark?"#0c1220":"#f8fafc"} 0%,${tc.bg} 100%)`, borderBottom:`1px solid ${tc.border}`, padding:"20px 16px 18px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
             <button onClick={onBack} style={S.backBtn}>← Voltar</button>
-            {(adminAuth||liderAuth) && (
+            {!adminAuth && liderAuth && trancada && <span title="Equipe trancada pelo consultor" style={{ marginLeft:"auto", fontSize:11, color:"#f59e0b", fontWeight:700 }}><Ico n="cadeado"/> Cadastro trancado</span>}
+            {(adminAuth||(liderAuth&&!trancada)) && (
               <button onClick={onEdit} style={{ ...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", marginLeft:"auto", padding:"6px 14px", fontSize:12 }}>
                 <Ico n="editar"/> Editar
               </button>
@@ -870,6 +882,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
               {coberturaAtiva(colab) && <div style={{fontSize:10,fontWeight:800,color:"#0ea5e9",background:"#001a2e",border:"1px solid #0ea5e944",padding:"2px 8px",borderRadius:6,display:"inline-block",marginTop:5}}><Ico n="atualizar"/> Cobrindo Líder até {fmtDate(colab.coberturaFim)}</div>}
               {colab.telefone && <div style={{ fontSize:12, color:"#64748b", marginTop:2 }}><Ico n="celular"/> {colab.telefone}</div>}
               {colab.email && <div style={{ fontSize:12, color:"#64748b", marginTop:2, wordBreak:"break-all" }}>✉ {colab.email}</div>}
+              {colab.cpfFinal && <CpfLinha colab={colab} onVer={adminAuth ? onVerCpf : null}/>}
               <Trajetoria colab={colab}/>
               <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:10, fontWeight:700, color:tc.badge, background:tc.bg, border:`1px solid ${tc.border}`, padding:"3px 9px", borderRadius:6 }}>
@@ -1089,7 +1102,7 @@ function FichaScreen({ colab, adminAuth, liderAuth, projectNome, onBack, onEdit,
           {adminAuth && colab.status==="ativo" && onMover && (destinosMover||[]).length>0 && (
             <MoverModal colab={colab} de={projetoAtual} destinos={destinosMover} onMover={onMover} S={S}/>
           )}
-          {(adminAuth || liderAuth) && colab.status==="ativo" && (
+          {(adminAuth || (liderAuth && !trancada)) && colab.status==="ativo" && (
             <DesligarModal colab={colab} onDesligar={onDesligar} S={S} dark={dark} lideres={lideresFicha} exigeLider={!adminAuth}/>
           )}
         </div>
@@ -1193,6 +1206,13 @@ function FormScreen({ form, setF, cargos, onSave, onCancel, saving, isEdit, dark
               <label style={S.lbl}>Telefone</label>
               <input value={form.telefone} onChange={e=>setF("telefone",e.target.value)} placeholder="(00) 00000-0000" style={S.inp}/>
             </div>
+          </div>
+          <div style={{ marginBottom:12 }}>
+            <label style={S.lbl}>CPF</label>
+            <input inputMode="numeric" autoComplete="off" maxLength={14} aria-label="CPF" value={cpfFmt(form.cpf||"")} onChange={e=>setF("cpf",cpfDigitos(e.target.value))}
+              placeholder={form.cpfFinal ? `${cpfMascarado(form)} — já cadastrado; digite só para trocar` : "000.000.000-00"} style={S.inp}/>
+            {cpfDigitos(form.cpf).length===11 && !cpfValido(form.cpf) && <div style={{ fontSize:11, color:"#ef4444", marginTop:4 }}>CPF inválido — confira os dígitos.</div>}
+            <div style={{ fontSize:10, color:"#64748b", marginTop:4 }}>Fica protegido: na tela aparece só o final. O número completo só o consultor consegue ver.</div>
           </div>
           <div style={{ marginBottom:12 }}>
             <label style={S.lbl}>E-mail</label>
@@ -1618,6 +1638,19 @@ function AddHistScreen({ colabNome, adminAuth, histForm, setHistForm, onSave, on
 
 
 // ── Modal desligamento com motivo, tipo e data
+// CPF na ficha: sempre mascarado; o consultor pode pedir o número completo ao servidor (some sozinho em 20 s).
+function CpfLinha({ colab, onVer }) {
+  const [cpf, setCpf] = useState(""); const [busy, setBusy] = useState(false);
+  useEffect(()=>{ if(!cpf) return undefined; const t=setTimeout(()=>setCpf(""),20000); return ()=>clearTimeout(t); },[cpf]);
+  return (
+    <div style={{ fontSize:12, color:"#64748b", marginTop:2, display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+      <span>CPF {cpf || cpfMascarado(colab)}</span>
+      {onVer && !cpf && <button disabled={busy} onClick={async()=>{ setBusy(true); try{ setCpf(await onVer(colab)); }catch(e){ alert(e.message||"Não foi possível consultar."); } finally{ setBusy(false); } }}
+        style={{ background:"transparent", border:"1px solid #33415588", color:"#94a3b8", fontSize:10, padding:"1px 8px", borderRadius:6, cursor:"pointer" }}>{busy?"…":"ver"}</button>}
+    </div>
+  );
+}
+
 // Trajetória entre projetos (12/11/2026): P311A → P311B → … com a data de cada mudança.
 function Trajetoria({ colab, compacta = false }) {
   const t = Array.isArray(colab.trajetoria) ? colab.trajetoria.filter(m=>m&&m.de&&m.para) : [];
@@ -2194,6 +2227,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const S = getStyles(dark);
   const adminAuth = authLevel === "admin";
   const liderAuth = authLevel === "lider" || authLevel === "admin";
+  const trancada = !!(equipeData.cadeado && equipeData.cadeado.fechado === true);   // cadeado da equipe (só o consultor abre/fecha)
+  const podeCadastro = adminAuth || (liderAuth && !trancada);
   const cargos = CARGOS_PROJETO[project.id] || (divisaoDoProjeto(project.id) !== "moklog" ? CARGOS_MOKPAT : ["Colaborador"]); // MokPat e MokImp (11/11/2026): lista padrão das divisões novas
 
   // ── ADENDO EQUIPE — FV / Cesta de Natal / Aprovação ─────────────────
@@ -2424,6 +2459,8 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   const saveColab = async () => {
     if(!form.nome.trim()) { alert("Informe o nome"); return; }
     if(!liderAuth) { alert("Acesso negado"); return; }
+    if(!podeCadastro) { alert("Equipe trancada pelo consultor. Peça a abertura do cadeado para cadastrar ou editar."); return; }
+    if(cpfDigitos(form.cpf) && !cpfValido(form.cpf)) { alert("CPF inválido. Confira os 11 dígitos."); return; }
     setSaving(true);
     try {
       // Comprime foto para max 400px e qualidade 0.7 antes de salvar
@@ -2469,6 +2506,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       try { formFinal = await aplicarEnderecoAoSalvar(formFinal, project.id); } catch(e) { console.warn("endereço:", e); }
       // Remove campos undefined para não quebrar Firestore
       Object.keys(formFinal).forEach(k => { if(formFinal[k]===undefined) formFinal[k]=""; });
+      if(!cpfDigitos(formFinal.cpf)) delete formFinal.cpf; // sem CPF novo digitado: o já cadastrado continua como está
       // Limpa campos de Falta que não existem em outros tipos
       if(formFinal.subtipo===undefined) formFinal.subtipo="";
       if(formFinal.dataFim===undefined) formFinal.dataFim="";
@@ -2705,6 +2743,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
 
   const desligarColab = async (colab, motivo, tipoDeslig, dataDeslig, liderNome) => {
     if(!adminAuth && !liderAuth) return;
+    if(!podeCadastro) { alert("Equipe trancada pelo consultor. Peça a abertura do cadeado para desligar."); return; }
     if(!adminAuth && !liderNome) { alert("Escolha o líder que está apontando o desligamento."); return; }
     const desligado = {
       ...colab,
@@ -2748,6 +2787,21 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     setEquipeData(result.data); setSelColab(null); setScreen("list");
   };
 
+  // Cadeado da equipe: só o consultor abre e fecha. Fechado, o líder lança o dia a dia mas não mexe no cadastro.
+  const alternarCadeado = async () => {
+    if(!adminAuth) return;
+    const fechar = !trancada;
+    if(!window.confirm(fechar ? "Trancar a equipe? O líder continua lançando falta, FT, atraso e treinamento, mas não cadastra, não edita cadastro, não desliga e não exclui." : "Abrir o cadeado? O líder volta a poder cadastrar, editar e desligar até você trancar de novo.")) return;
+    await save({ ...equipeData, cadeado:{ fechado:fechar } });
+  };
+  const verCpf = async (colab) => {
+    if(isDemo()) throw Error("Demonstração: CPF não disponível.");
+    const response=await authFetchEquipe("/api/equipe-save",{method:"POST",body:JSON.stringify({acao:"cpf",pid:project.id,colabId:colab.id})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.ok) throw Error(result.erro||"Não foi possível consultar.");
+    return result.cpf;
+  };
+
   const reativarColab = async (colab) => {
     if(!adminAuth) return;
     const reativado = {...colab, status:"ativo", desligadoEm:null, motivoDesligamento:undefined, tipoDesligamento:undefined};
@@ -2786,7 +2840,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
   );
 
   // ── Formulário: cadastro (líder ou admin) / edição (admin only)
-  if(screen==="add"&&form&&liderAuth) return (
+  if(screen==="add"&&form&&podeCadastro) return (
     <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("list");setForm(null);}} saving={saving} isEdit={false} dark={dark}/>
   );
@@ -2814,7 +2868,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
       dark={dark}
       onToggleTheme={toggleDark}/>
   );
-  if(screen==="edit"&&form&&liderAuth) return (
+  if(screen==="edit"&&form&&podeCadastro) return (
     <FormScreen form={form} setF={setF} cargos={cargos} onSave={saveColab}
       onCancel={()=>{setScreen("view");setForm(null);}} saving={saving} isEdit={true} dark={dark}/>
   );
@@ -2842,7 +2896,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
     return (
       <>
       {fvControle}
-      <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} dark={dark}
+      <FichaScreen colab={colab} adminAuth={adminAuth} liderAuth={liderAuth} trancada={trancada} onVerCpf={verCpf} dark={dark}
         maturidade={(()=>{ try { return calcularMapaEquipe(equipeData, new Date().toLocaleDateString('sv-SE')).individuos.find(i=>i.colaborador.id===colab.id) || null; } catch { return null; } })()}
         projectNome={`${project.id} · ${project.name||""}`}
         onSolicitarUniforme={solicitarUniforme}
@@ -2918,6 +2972,10 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                     style={{ ...S.btnSm, color:"#22c55e", border:"1px solid #22c55e44", fontSize:10, padding:"4px 10px", whiteSpace:"nowrap" }}>
                     <Ico n="checkCirculo"/> Aprovações
                   </button>
+                  <button onClick={alternarCadeado} disabled={saving} aria-pressed={trancada} title={trancada?"Equipe trancada — toque para abrir":"Equipe aberta — toque para trancar"}
+                    style={{ ...S.btnSm, color: trancada?"#fff":"#f59e0b", background: trancada?"#b45309":"transparent", border:`1px solid ${trancada?"#b45309":"#f59e0b66"}`, fontSize:10, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:800 }}>
+                    <Ico n={trancada?"cadeado":"cadeadoAberto"}/> {trancada?"Equipe trancada":"Equipe aberta"}
+                  </button>
                   <button onClick={()=>{clearSession();setAuthLevel(null);setScreen("pin");}} style={{ ...S.btnSm, color:"#64748b", fontSize:10 }}>Sair</button>
                 </div>
               </div>
@@ -2973,7 +3031,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
             </div>
           ) : liderAuth ? (
             <div style={{ background:"#001a2e", border:"1px solid #0ea5e933", borderRadius:10, padding:"10px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}><Ico n="capacete"/> Acesso Líder — Pode adicionar registros</div>
+              <div style={{ fontSize:12, color:"#0ea5e9", fontWeight:700 }}><Ico n="capacete"/> Acesso Líder — Pode adicionar registros{trancada && <div style={{ color:"#f59e0b", fontWeight:700, marginTop:3 }}><Ico n="cadeado"/> Equipe trancada pelo consultor: cadastro, edição e desligamento só com ele.</div>}</div>
               <div style={{ display:"flex", gap:6 }}>
                 <button onClick={()=>setScreen("ferias")}
                   style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:10, padding:"4px 10px" }}>
@@ -3022,7 +3080,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
           })()}
 
           {/* Botão cadastrar — líder ou admin */}
-          {liderAuth && (
+          {podeCadastro && (
             <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,"Diurno"));setScreen("add");}}
               style={{ ...S.btn, fontSize:13 }}>
               + Cadastrar Colaborador
@@ -3281,7 +3339,7 @@ function EquipeAppInner({ project, onBack, dark: darkProp, onToggleTheme, shared
                     <span style={{ fontSize:13, fontWeight:700, color:tc.badge }}>{turno}</span>
                     <span style={{ fontSize:10, color:"#64748b", background:"#0a0f1e", padding:"2px 8px", borderRadius:10 }}>{colabsDoTurno.length}</span>
                   </div>
-                  {liderAuth && (
+                  {podeCadastro && (
                     <button onClick={()=>{setForm(emptyColab(cargos[0],project.id,turno));setScreen("add");}}
                       style={{ ...S.btnSm, fontSize:10, color:tc.badge, border:`1px solid ${tc.badge}44`, padding:"4px 10px" }}>
                       + Adicionar

@@ -1,9 +1,10 @@
+const {protegerCpfs}=require('./cpf');
 const stable=x=>Array.isArray(x)?x.map(stable):(x!==null&&typeof x==='object')?Object.keys(x).sort().reduce((o,k)=>{if(x[k]!==undefined)o[k]=stable(x[k]);return o;},{}):x;
 const equal=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
 const object=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 // O caminho do conflito vai para o log. Só pode conter NOMES DE CAMPOS conhecidos e slots de checagem conhecidos:
 // qualquer outra chave (nome de pessoa, id, texto digitado) vira "*" e qualquer slot desconhecido vira "?".
-const CAMPOS=new Set(['colaboradores','desligados','checagemEquipe','checkins','alvo','concluidoEm','proximoAlvo','slotId','slotLabel','lider','statusEquipe','nota','em','historico','uniforme','solicitacoes','itens','ferias','perfilSeguranca','tipoEquipe','armada','ccoDedicada','fv','nome','cargo','turno','status','escala','telefone','projectId','criadoEm','atualizadoEm','dataContratacao','ultimaReciclagem','foto','fotoRef','temFoto','desligadoEm','motivoDesligamento','tipoDesligamento','id','tipo','data','dataFim','dataInicio','dataRetorno','subtipo','detalhe','obs','observacao','item','marca','tamanho','motivo','aprovacao','aprovacaoHist','solicitadoEm','whatsEnviadoEm','whatsEnvios','exigeWhats','whatsDispensadoEm','colabId','email','trajetoria','transferidoPara','transferidoDe','de','para','cobertura','usa','ultimaTroca','listaMontada']);
+const CAMPOS=new Set(['colaboradores','desligados','checagemEquipe','checkins','alvo','concluidoEm','proximoAlvo','slotId','slotLabel','lider','statusEquipe','nota','em','historico','uniforme','solicitacoes','itens','ferias','perfilSeguranca','tipoEquipe','armada','ccoDedicada','fv','nome','cargo','turno','status','escala','telefone','projectId','criadoEm','atualizadoEm','dataContratacao','ultimaReciclagem','foto','fotoRef','temFoto','desligadoEm','motivoDesligamento','tipoDesligamento','id','tipo','data','dataFim','dataInicio','dataRetorno','subtipo','detalhe','obs','observacao','item','marca','tamanho','motivo','aprovacao','aprovacaoHist','solicitadoEm','whatsEnviadoEm','whatsEnvios','exigeWhats','whatsDispensadoEm','colabId','email','cpf','cpfCifrado','cpfFinal','cpfHmac','cadeado','fechado','por','trajetoria','transferidoPara','transferidoDe','de','para','cobertura','usa','ultimaTroca','listaMontada']);
 const SLOTS=/^(?:(?:sab|dom)_(?:diurno|noturno)|diurno|noturno|check_[1-9])$/;
 function limparCaminho(p){
  return String(p||'').split('/').map(seg=>{
@@ -93,8 +94,25 @@ function principalOk(p){
   &&(p.obs==null||(typeof p.obs==='string'&&p.obs.length<=300))
   &&(p.fotoRef==null||(typeof p.fotoRef==='string'&&/^[-\w]{1,100}$/.test(p.fotoRef)));
 }
+// Cadeado da equipe (Marcio, 12/11/2026): fechado pelo consultor, o líder segue lançando o dia a dia (falta, FT, atraso,
+// treinamento, uniforme, checagem), mas não cadastra, não edita o cadastro, não desliga, não reativa e não apaga nada.
+const CADASTRO=['nome','cargo','turno','escala','telefone','email','cpfCifrado','cpfFinal','cpfHmac','dataContratacao','foto','fotoRef','temFoto','status','endereco','projectId','criadoEm','trajetoria'];
+function validarCadeado(before,after){
+ if(!(before.cadeado&&before.cadeado.fechado===true))return;
+ const negar=()=>{throw Object.assign(Error('Equipe trancada pelo consultor. Lançamentos do dia a dia continuam liberados; para cadastrar, editar cadastro, desligar ou excluir, peça ao consultor para abrir o cadeado.'),{status:403});};
+ for(const lista of ['colaboradores','desligados']){
+  const a=before[lista]||[],d=after[lista]||[];
+  if(a.length!==d.length||a.some(x=>!d.some(y=>y.id===x.id)))negar();   // ninguém entra, sai ou muda de lista
+  for(const x of a){
+   const y=d.find(z=>z.id===x.id);
+   if(CADASTRO.some(k=>!equal(x[k],y[k])))negar();
+   if((x.historico||[]).some(h=>h&&h.id&&!(y.historico||[]).some(n=>n&&n.id===h.id)))negar();   // lançamento antigo não some
+  }
+ }
+}
 function validateLeader(before,after){
- for(const field of ['fv','campanhasSazonais','historicoDesde','treinamentosEsperados'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}
+ for(const field of ['fv','campanhasSazonais','historicoDesde','treinamentosEsperados','cadeado'])if(!equal(before[field],after[field])){const e=Error('Alteração exclusivamente gerencial.');e.status=403;throw e;}
+ validarCadeado(before,after);
  const old=[...(before.colaboradores||[]),...(before.desligados||[])].flatMap(c=>(c.uniforme?.solicitacoes||[]).map(s=>({c:c.id,s})));
  for(const c of [...(after.colaboradores||[]),...(after.desligados||[])])for(const s of c.uniforme?.solicitacoes||[]){
   const prev=old.find(x=>x.c===c.id&&x.s.id===s.id)?.s;
@@ -140,10 +158,12 @@ async function save(db,pid,before,after,identity){
    const configs=result.campanhasSazonais;
    if(!object(configs)||Object.entries(configs).some(([k,v])=>! /^(natal|pascoa)_20\d{2}$/.test(k)||!object(v)||Object.keys(v).some(f=>!['oculta','valorCentavos','extras','principal'].includes(f))||(v.extras!==undefined&&!extrasOk(v.extras))||(v.principal!==undefined&&!principalOk(v.principal))||(v.oculta!==undefined&&typeof v.oculta!=='boolean')||(v.valorCentavos!==undefined&&(!Number.isSafeInteger(v.valorCentavos)||v.valorCentavos<0||v.valorCentavos>100000000))))throw Object.assign(Error('Configuração de campanha inválida.'),{status:400});
   }
+  protegerCpfs(result);
   protegerChecagem(current,result,identity);
   validateQuantities(current,result);
   if(identity.nivel==='lider')validateLeader(current,result);
+  if(!equal(current.cadeado,result.cadeado)){const f=!!(result.cadeado&&result.cadeado.fechado===true);result.cadeado={fechado:f,em:new Date().toISOString(),por:'Gerencial'};}   // carimbo do servidor
   tx.set(ref,result);return result;
  });
 }
-module.exports={merge,save,validateLeader,validateQuantities};
+module.exports={merge,save,validateLeader,validateQuantities,validarCadeado};
