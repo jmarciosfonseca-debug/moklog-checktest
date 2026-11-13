@@ -32,6 +32,9 @@
 .olam .ol-num { font-family: var(--ol-display); font-variant-numeric: tabular-nums; }
 
 .olam .ol-pagina { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; }
+/* Grade da tela: no celular, uma coluna na ordem de leitura; no computador, tela cheia em duas colunas (nota e ações à esquerda, explicação à direita). */
+.olam .ol-grade { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "nota" "porque" "acoes" "info"; align-items: start; }
+.olam .ol-a-nota { grid-area: nota; } .olam .ol-a-porque { grid-area: porque; } .olam .ol-a-acoes { grid-area: acoes; } .olam .ol-a-info { grid-area: info; }
 .olam .ol-voltar { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; margin-bottom: 14px; border-radius: 999px; border: 1px solid var(--ol-border);
   background: transparent; color: var(--ol-fg-muted); font-size: .875rem; font-weight: 600; cursor: pointer; }
 .olam .ol-voltar:hover { color: var(--ol-fg); border-color: var(--ol-input); }
@@ -92,6 +95,13 @@
 @keyframes olCresce { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .olam .ol-barra > i { animation: none; } }
 @media (min-width: 720px) { .olam .ol-pagina { padding: 32px 24px 64px; } .olam .ol-nota { font-size: 3.75rem; } }
+@media (min-width: 1024px) {
+  .olam .ol-pagina { max-width: 1240px; padding: 36px 40px 72px; }
+  .olam .ol-grade { gap: 24px; grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); grid-template-areas: "nota porque" "acoes porque" "info porque"; grid-template-rows: auto auto 1fr; }
+  .olam .ol-card { padding: 24px; }
+  .olam .ol-titulo { font-size: 1.75rem; } .olam .ol-logo { height: 34px; }
+  .olam .ol-nota-grade { flex-direction: column; align-items: flex-start; gap: 14px; } .olam .ol-nota { font-size: 4.5rem; }
+}
 
 /* Cartão de entrada na tela do projeto (fica dentro do visual atual do app: só o próprio cartão usa .olam). */
 .olam.ol-entrada { min-height: 0; background: var(--ol-card); border: 1px solid var(--ol-border); border-radius: 16px; padding: 14px 16px; width: 100%; display: flex; align-items: center; gap: 14px;

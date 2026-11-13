@@ -63,8 +63,8 @@ export default function PainelProjeto({ project, history, ctmk, dark = true, onB
         {est.fase === "erro" && <div className="ol-card"><div className="ol-vazio" role="alert">Não foi possível calcular a nota agora.</div><button type="button" className="ol-botao" onClick={() => buscar(true)}>Tentar de novo</button></div>}
 
         {r && (
-          <div className="ol-pilha">
-            <section className="ol-card" aria-label="Nota do projeto">
+          <div className="ol-grade">
+            <section className="ol-card ol-a-nota" aria-label="Nota do projeto">
               <div className="ol-nota-grade">
                 <div className={`ol-nota ${classeFaixa(r.faixa)}`} data-testid="painel-nota">{r.nota === null ? "—" : r.nota}<small>/100</small></div>
                 <div>
@@ -84,12 +84,12 @@ export default function PainelProjeto({ project, history, ctmk, dark = true, onB
               )}
             </section>
 
-            <section className="ol-card" aria-label="Por que esta nota">
+            <section className="ol-card ol-a-porque" aria-label="Por que esta nota">
               <div className="ol-eyebrow ol-secao">Por que esta nota</div>
               {r.itens.map((i) => <Item key={i.id} i={i} />)}
             </section>
 
-            <section className="ol-card" aria-label="O que fazer para subir">
+            <section className="ol-card ol-a-acoes" aria-label="O que fazer para subir">
               <div className="ol-eyebrow ol-secao">O que fazer para subir</div>
               {r.acoes.length === 0 && <div className="ol-vazio">Nenhum ponto relevante a recuperar agora.</div>}
               {r.acoes.map((a, k) => (
@@ -100,7 +100,7 @@ export default function PainelProjeto({ project, history, ctmk, dark = true, onB
               ))}
             </section>
 
-            <section className="ol-card ol-rodape" aria-label="Informações">
+            <section className="ol-card ol-rodape ol-a-info" aria-label="Informações">
               <div className="ol-frase">
                 {r.intervalos ? <>Intervalos registrados em 30 dias: <b className="ol-num" style={{ color: "var(--ol-fg)" }}>{r.intervalos.registros30}</b> (informativo, ainda sem pontos).</> : "Intervalos: sem registro (informativo)."}
                 {est.falhou && <><br />A última atualização falhou; mostrando o cálculo anterior.</>}
