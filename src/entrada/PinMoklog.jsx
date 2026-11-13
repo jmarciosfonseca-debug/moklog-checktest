@@ -23,9 +23,12 @@ export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, divi
       onEntrar(r); // { level: "admin"|"demo"|"lider", projectId }
     } finally { setBusy(false); }
   };
-  return <main style={fundo} data-testid="moklog-pin">
-    <img src={logo} alt={d.nome} style={{ width: "min(60vw, 240px)", background: "#fff", padding: "8px 16px", clipPath: chanfro, marginBottom: 22 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-    <div style={{ width: "100%", maxWidth: 360, background: "linear-gradient(160deg,#121216,#0b0b0e)", border: "1px solid #2a2a31", padding: "22px 20px", clipPath: chanfro, textAlign: "center" }}>
+  return <main style={fundo} className="mk-entrada" data-testid="moklog-pin">
+    <div className="mk-entrada-hero">
+      <img src={logo} alt={d.nome} style={{ width: "min(60vw, 240px)", background: "#fff", padding: "8px 16px", clipPath: chanfro, marginBottom: 22 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+      <div className="mk-so-pc"><h1>Acesso <span>{d.nome}</span></h1><p>{d.sub}.</p></div>
+    </div>
+    <div className="mk-entrada-cartao" style={{ width: "100%", maxWidth: 360, background: "linear-gradient(160deg,#121216,#0b0b0e)", border: "1px solid #2a2a31", padding: "22px 20px", clipPath: chanfro, textAlign: "center" }}>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase" }}>Acesso {d.nome}</div>
       <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 4, marginBottom: 16 }}>{d.sub}</div>
       <input type="password" inputMode="numeric" aria-label={`PIN ${d.nome}`} placeholder="PIN" maxLength={8} value={pin} autoFocus
