@@ -76,7 +76,7 @@ export function categoriasDoTeste(project, state) {
 }
 
 // Chave da tratativa igual à do app (followups.js → canonicalFollowupKey).
-const chaveFu = (cat, item) => { const n = (v) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); return `${n(cat)}__${n(item)}`; };
+export const chaveFu = (cat, item) => { const n = (v) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, ""); return `${n(cat)}__${n(item)}`; };
 
 // ── Base do SIS por projeto: o que não está pronto em p (categorias, distância, maturidade, tratativas, mapas) ──
 export function baseSIS({ project, state, equipeDoc, mapas, followups, maturidade, hojeISO, agoraMs = Date.now() }) {

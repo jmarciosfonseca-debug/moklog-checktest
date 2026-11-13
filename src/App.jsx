@@ -1,3 +1,5 @@
+import PainelProjeto from "./painelProjeto/PainelProjeto";
+import CartaoPainel from "./painelProjeto/CartaoPainel";
 import { Ico, EMOJI_PARA_ICONE } from "./Icones";
 import MokedSelo from "./MokedSimbolo";
 import { temaMoked, badgeMoked, estadoMoked, ESTADOS_MOKED } from "./temaMoked";
@@ -3677,6 +3679,7 @@ export default function App(){
   const [state,setState]=useState(null);
   const [meta,setMeta]=useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
   const [stored,setStored]=useState({});
+  const [painelInicial,setPainelInicial]=useState(null); // Painel do projeto: nota já calculada pelo cartão
   const [ctmkData,setCtmkData]=useState({});
   const [crashed,setCrashed]=useState(false);
 
@@ -4275,6 +4278,7 @@ export default function App(){
     </div>
   );
 
+  if(screen==="painel_projeto"&&project) return <ErrorBoundary moduleName="Painel do projeto"><PainelProjeto project={project} history={stored?.[project.id]?.history} ctmk={ctmkData?.[project.id]} dark={_themeDark} resultadoInicial={painelInicial} onBack={()=>setScreen(project?.id==="P260A"?"p260a_home":"home")}/></ErrorBoundary>;
   if(screen==="pendencies") return <PendenciesScreen stored={stored} onBack={()=>setScreen("home")}/>;
   if(screen==="pin_gate"){ const alvo=pinAlvo||project; return <ProjectPinGate project={alvo} onSuccess={(mode)=>{grantAuth(alvo.id,mode||"lider");setPinAlvo(null);setScreen(!pinAlvo&&alvo.id==="P260A"?"p260a_home":"home");const f=pendenteAposPin.current;pendenteAposPin.current=null;if(f)setTimeout(f,0);}} onBack={()=>{pendenteAposPin.current=null;setPinAlvo(null);setScreen("home");}}/>; }
 
@@ -4316,6 +4320,7 @@ export default function App(){
               </div>
             )}
 
+            <CartaoPainel project={project} history={stored?.[project.id]?.history} ctmk={ctmkData?.[project.id]} dark={_themeDark} onAbrir={(r)=>{setPainelInicial(r||null);setScreen("painel_projeto");}}/>
             <button onClick={()=>{const base=lastForP260A?buildFromLast(project,lastForP260A.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);setEditingIdx(null);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
               style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
                 animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
@@ -4721,6 +4726,7 @@ export default function App(){
               <Localizacao pid={project.id} nome={`${project.id} — ${project.name}`} compacto />
               {checkAuth(project.id)?(
                 <>
+                  <CartaoPainel project={project} history={stored?.[project.id]?.history} ctmk={ctmkData?.[project.id]} dark={_themeDark} onAbrir={(r)=>{setPainelInicial(r||null);setScreen("painel_projeto");}}/>
                   <button onClick={()=>{const base=lastForProject?buildFromLast(project,lastForProject.state):buildBlank(project);const m={date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""};setState(base);setMeta(m);initialFormRef.current={state:base,meta:m};setPhotos([]);formTimerRef.current=Date.now();setFormElapsed(0);setScreen("form");setActive(null);}}
                     style={{background:"linear-gradient(135deg,#3b82f6,#1e40af)",border:"none",borderRadius:20,padding:"16px 18px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:14,textAlign:"left",boxShadow:"0 6px 22px rgba(37,99,235,.4), inset 0 1px 0 rgba(255,255,255,.15)",
                       animation:isSunday()?"mkPulse 1.4s ease-in-out infinite":"none"}}>
