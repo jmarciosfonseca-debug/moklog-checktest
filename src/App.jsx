@@ -4650,7 +4650,7 @@ export default function App(){
     return (
       <div style={{...S.page, background:dark?"#04080f":"#f1f5f9"}}>
         <SyncBadge/><DemoBanner/>
-        <div style={S.homeWrap}>
+        <div className="mk-grupo" style={S.homeWrap}>
           <div style={{display:"flex",alignItems:"center",gap:10,paddingBottom:12,borderBottom:`1px solid ${T.listHdr}`}}>
             <button onClick={()=>{ if(_escopoLider){ clearSession(); setHomeGroup(null); setPortal("entrada"); } else setHomeGroup(null); }} style={S.backBtn} aria-label="Voltar">← Voltar</button>
             <div style={{flex:1}}>
@@ -4676,7 +4676,7 @@ export default function App(){
             </div>
           )}
 
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div className="mk-grupo-lista" style={{display:"flex",flexDirection:"column",gap:8}}>
             {groupProjects.map(pid => {
               const p = PROJECTS[pid]; if(!p) return null;
               const hist = stored[p.id]?.history??[];
@@ -4721,7 +4721,7 @@ export default function App(){
           </div>
 
           {project&&groupProjects.includes(project.id)&&(
-            <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+            <div className="mk-grupo-proj" style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
               {/* Localização do projeto (06/11/2026): satélite + Como chegar, para consultor e líder */}
               <Localizacao pid={project.id} nome={`${project.id} — ${project.name}`} compacto />
               {checkAuth(project.id)?(
@@ -4740,7 +4740,7 @@ export default function App(){
                   <style>{`@keyframes mkPulse{0%,100%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 0 rgba(59,130,246,.6)}70%{box-shadow:0 6px 22px rgba(37,99,235,.4), 0 0 0 12px rgba(59,130,246,0)}}`}</style>
                   <button onClick={()=>setScreen("history")} style={{...S.secBtn,fontSize:13}}><Ico n="calendario"/> Histórico de Relatórios Semanais</button>
                   {botaoMapaDiario(project)}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div className="mk-modulos" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button className="mk-navigation" onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={T.modIconBg("#0ea5e9")} txt={T.ttl("#0ea5e9")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
                     <button className="mk-navigation" onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="porta" cor="#22c55e" arq="cco" bg={T.modIconBg("#22c55e")} txt={T.ttl("#22c55e")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button className="mk-navigation" onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="registro" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
                     <button className="mk-navigation" onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="escudo" cor="#f59e0b" arq="equipamentos" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
@@ -4771,7 +4771,7 @@ export default function App(){
                       (a sessão expira em 8 h): tocar pede o PIN do projeto e abre direto o mapa. Sem este botão aqui,
                       o líder "não acha o mapa" e manda o texto digitado à mão — e o painel gerencial fica Pendente. */}
                   {botaoMapaDiario(project)}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div className="mk-modulos" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <button className="mk-navigation" onClick={()=>{setEquipeProject(project);setShowEquipe(true);}} style={{background:T.mod("#0ea5e9"),border:"1.5px solid #0ea5e944",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="usuarios" cor="#0ea5e9" arq="equipe" bg={T.modIconBg("#0ea5e9")} txt={T.ttl("#0ea5e9")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#0ea5e9")}}>Equipe</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Gestão de Recursos</div><ContadorEquipe projectId={project.id}/></div><span style={{color:T.modChev("#0ea5e9"),fontSize:18}}>›</span></button>
                     <button className="mk-navigation" onClick={()=>{setAcessoCCOProject(project);setShowAcessoCCO(true);}} style={{background:T.mod("#22c55e"),border:"1.5px solid #22c55e44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="porta" cor="#22c55e" arq="cco" bg={T.modIconBg("#22c55e")} txt={T.ttl("#22c55e")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#22c55e")}}>CCO</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Central de Operações</div></div><span style={{color:T.modChev("#22c55e"),fontSize:18}}>›</span></button><button className="mk-navigation" onClick={()=>{abrirRS(project);}} style={{gridColumn:"1/-1",background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="prancheta" cor="#f59e0b" arq="registro" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Registro Situacional</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Ocorrências (RS){RS_TRANCADO?<>{" "}<Ico n="cadeado"/></>:""}</div></div>{!RS_TRANCADO&&rsCounts[project.id]&&rsCounts[project.id].total>0&&(<div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,marginRight:4}}><span style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>{rsCounts[project.id].total} RS</span>{rsCounts[project.id].naoVistas>0&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#B21E27",borderRadius:4,padding:"1px 6px"}}>{rsCounts[project.id].naoVistas} nova(s)</span>}</div>)}<span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
                     <button className="mk-navigation" onClick={()=>{setEquipamentosProject(project);setShowEquipamentos(true);}} style={{background:T.mod("#f59e0b"),border:"1.5px solid #f59e0b44",borderRadius:16,padding:"16px 14px",cursor:"pointer",width:"100%",display:"flex",alignItems:"center",gap:12,textAlign:"left",boxShadow:T.modShadow}}><IconeModulo n="escudo" cor="#f59e0b" arq="equipamentos" bg={T.modIconBg("#f59e0b")} txt={T.ttl("#f59e0b")}/><div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:800,color:T.ttl("#f59e0b")}}>Equipamentos</div><div style={{fontSize:10,color:"#64748b",marginTop:1}}>Manutenção & Controle</div><ContadorEquipamentos projectId={project.id}/></div><span style={{color:T.modChev("#f59e0b"),fontSize:18}}>›</span></button>
@@ -4815,8 +4815,8 @@ export default function App(){
         </div>
       )}
       <SyncBadge/><DemoBanner/>
-      <div style={S.homeWrap}>
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
+      <div className="mk-home" style={S.homeWrap}>
+        <div className="mk-home-cab" style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
           <MoklogLogo size={52}/>
           <h1 style={{position:"absolute",width:1,height:1,overflow:"hidden"}}>{DIVNOME} CheckTest</h1>
           <div style={{flex:1}}>
@@ -4826,7 +4826,7 @@ export default function App(){
           </div>
           <button onClick={()=>{ setHomeGroup(null); setPortal("entrada"); }} aria-label="Trocar de área" style={{background:"transparent",border:`1px solid ${T.cardBorderNeutral}`,color:T.sub,borderRadius:10,padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer"}}>← Áreas</button>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
+        <div className="mk-home-topo" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
           <TopoBtn arq="inop" fb="pontoVermelho" label="Inop" cor={[229,9,20]} aria="Ver pendências" onClick={()=>setScreen("pendencies")} anim={totalInopHome>0?"mkPulse 2.2s infinite":"none"}/>
           <TopoBtn arq="registro" fb="prancheta" label="Registros" cor={[229,9,20]} aria="Ver registros" onClick={()=>setShowRegistros(true)}>
             {(()=>{const t=Object.entries(stored).reduce((a,[pid,p])=>{const h=p.history||[];const last=h[h.length-1];const pj=projetosAtivos()[pid];if(!last||!pj)return a;try{return a+computeHealth(pj,last.state).inop;}catch(e){return a;}},0);return t>0?<span style={{position:"absolute",top:-4,right:-4,background:"#ef4444",color:"#fff",fontSize:9,fontWeight:900,borderRadius:8,padding:"1px 5px",minWidth:15,textAlign:"center",boxShadow:"0 2px 6px #ef444466"}}>{t>99?"99+":t}</span>:null;})()}
@@ -4859,7 +4859,7 @@ export default function App(){
             <div style={{flex:1,minWidth:0}}><div style={{fontSize:15,fontWeight:850,color:T.diagTxt}}>Diagnóstico Situacional</div><div style={{fontSize:11,color:T.diagSub,marginTop:3}}>Catálogo publicado · rascunho local</div></div>
             <span style={{color:T.diagArrow,fontSize:20}}>›</span>
           </button>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div className="mk-home-grupos" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
             {GRUPOS_HOME[divisao].length===0&&<div style={{gridColumn:"1 / -1",textAlign:"center",padding:"28px 12px",color:T.sub,fontSize:13,border:`1px dashed ${T.cardBorderNeutral}`,borderRadius:16}}>Nenhum projeto cadastrado em {DIVNOME} ainda.</div>}
             {GRUPOS_HOME[divisao].map(grp=>{
               const grpProjects = grp.ids.map(id=>PROJECTS[id]).filter(Boolean);

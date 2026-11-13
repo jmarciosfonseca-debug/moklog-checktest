@@ -1,0 +1,51 @@
+/* Padrão de site (Marcio, 12/11/2026): no computador o app ocupa a tela com layout próprio; no celular nada muda.
+   Como as telas têm o estilo escrito dentro delas, aqui só entram regras para telas largas (a partir de 1024 px),
+   aplicadas por classe. Sem a classe, a tela continua exatamente como era. */
+.mk-so-pc { display: none; }
+/* Celular: a grade dos módulos passava da largura da tela em aparelhos estreitos (375 px) e criava rolagem lateral. */
+.mk-modulos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+.mk-modulos > * { min-width: 0; }
+.mk-entrada-hero, .mk-entrada-acesso { display: flex; flex-direction: column; align-items: center; width: 100%; }
+
+@media (min-width: 1024px) {
+  .mk-so-pc { display: block; }
+
+  /* ── Entrada e PIN: marca e texto à esquerda, acesso à direita ── */
+  .mk-entrada { flex-direction: row !important; justify-content: center !important; align-items: center !important; gap: clamp(48px, 7vw, 120px); padding: 48px clamp(40px, 6vw, 96px) !important; }
+  .mk-entrada-hero { align-items: flex-start; width: auto; max-width: 600px; flex: 1 1 0; }
+  .mk-entrada-hero img { width: min(34vw, 420px) !important; margin-bottom: 28px !important; }
+  .mk-entrada-hero h1 { font-size: clamp(2.4rem, 4vw, 3.6rem); line-height: 1.05; font-weight: 900; letter-spacing: -.02em; margin: 0 0 14px; color: #f8fafc; }
+  .mk-entrada-hero h1 span { color: #E50914; }
+  .mk-entrada-hero p { font-size: 1.1rem; line-height: 1.6; color: #9ca3af; margin: 0; max-width: 520px; }
+  .mk-entrada-acesso { width: 400px; flex: none; background: #111827; border: 1px solid #334155; border-radius: 18px; padding: 44px 36px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.8); }
+  .mk-entrada-acesso > div:first-child { margin-top: 0 !important; width: 100%; }
+  .mk-entrada-acesso button { width: 100%; padding-top: 16px !important; padding-bottom: 16px !important; font-size: 15px !important; }
+  .mk-entrada-cartao { width: 420px !important; max-width: 420px !important; padding: 36px 32px !important; flex: none; }
+
+  /* ── Escolha da área ── */
+  .mk-areas { padding: 56px 40px 40px !important; }
+  .mk-areas > img { width: 260px !important; margin-bottom: 28px !important; }
+  .mk-areas-wrap { max-width: 1040px !important; }
+  .mk-areas-wrap > button:first-child { max-width: 520px; margin-left: auto; margin-right: auto; display: block; margin-bottom: 36px !important; padding: 18px 16px !important; font-size: 15px !important; }
+  .mk-areas-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 18px !important; }
+  .mk-areas-grid img, .mk-areas-grid button > div:first-child { height: 120px !important; }
+  .mk-areas-grid button > div:last-child { font-size: 11px !important; padding: 6px 8px !important; }
+
+  /* ── Home da área: cabeçalho em linha, grupos de projeto em grade ── */
+  .mk-home { max-width: 1200px !important; padding: 36px 40px 56px !important; display: grid !important; grid-template-columns: minmax(0, 1fr) auto; column-gap: 24px; align-items: center; }
+  .mk-home > * { grid-column: 1 / -1; min-width: 0; }
+  .mk-home > .mk-home-cab { grid-column: 1; margin-bottom: 0 !important; }
+  .mk-home > .mk-home-topo { grid-column: 2; margin-bottom: 0 !important; grid-template-columns: repeat(4, 112px) !important; }
+  .mk-home-grupos { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 16px !important; }
+
+  /* ── Tela do grupo/projeto: lista de projetos à esquerda, projeto selecionado à direita ── */
+  .mk-grupo { max-width: 1280px !important; padding: 32px 40px 56px !important; display: grid !important; grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); column-gap: 28px; align-items: start; }
+  .mk-grupo > * { grid-column: 1 / -1; min-width: 0; }
+  .mk-grupo > .mk-grupo-lista { grid-column: 1; position: sticky; top: 16px; }
+  .mk-grupo > .mk-grupo-proj { grid-column: 2; margin-top: 0 !important; }
+  .mk-grupo > .mk-grupo-lista:last-child { grid-column: 1 / -1; position: static; display: grid !important; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } /* nenhum projeto aberto: a lista ocupa a tela */
+  .mk-modulos { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 12px !important; }
+}
+@media (min-width: 1440px) { .mk-modulos { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+/* Aparelho estreito: cartões de módulo mais compactos para o título caber. */
+@media (max-width: 400px) { .mk-modulos > button { padding-left: 10px !important; padding-right: 8px !important; gap: 9px !important; } .mk-modulos > button > div > div:first-child { font-size: 13.5px !important; } .mk-modulos > button > span:last-child { display: none; } }
