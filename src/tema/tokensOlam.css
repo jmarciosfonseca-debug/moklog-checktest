@@ -1,0 +1,102 @@
+/* Visual "OLAM" (painel de gestão do Grupo MOKED) — tokens e componentes, ESCOPADOS em .olam.
+   Nada aqui vale fora de um elemento com a classe .olam: as telas atuais do app não mudam.
+   Cores: primeiro em hex (qualquer aparelho entende); por cima, em oklch, só onde o navegador suporta. */
+.olam {
+  --ol-bg: #070c18; --ol-sidebar: #060a14; --ol-card: #121a2a; --ol-popover: #151d2f; --ol-muted: #1a2335; --ol-secondary: #1f283b;
+  --ol-border: #273045; --ol-input: #2c364b; --ol-fg: #e9edf2; --ol-fg-muted: #98a4b8;
+  --ol-primary: #7cc4f2; --ol-primary-fg: #060c1a; --ol-accent: #1c3250;
+  --ol-success: #2fa866; --ol-warning: #e0a83a; --ol-danger: #e8564c;
+  --ol-radius: 8px; --ol-shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+  --ol-sans: "Public Sans Variable", "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ol-display: "Archivo Variable", "Archivo", "Public Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  background: var(--ol-bg); color: var(--ol-fg); font-family: var(--ol-sans); min-height: 100vh; -webkit-font-smoothing: antialiased;
+}
+@supports (color: oklch(50% .1 200)) {
+  .olam {
+    --ol-bg: oklch(14% .028 258); --ol-sidebar: oklch(13% .022 258); --ol-card: oklch(20.5% .03 258); --ol-popover: oklch(22% .03 258);
+    --ol-muted: oklch(24% .028 258); --ol-secondary: oklch(26% .03 258); --ol-border: oklch(29% .03 258); --ol-input: oklch(31% .03 258);
+    --ol-fg: oklch(94% .008 250); --ol-fg-muted: oklch(72% .02 250); --ol-primary: oklch(80% .11 235); --ol-primary-fg: oklch(14% .03 255);
+    --ol-accent: oklch(30% .06 245); --ol-success: oklch(66% .15 155); --ol-warning: oklch(78% .15 80); --ol-danger: oklch(68% .2 25);
+  }
+}
+/* Tema claro (o botão de tema do app continua valendo). */
+.olam.olam-claro {
+  --ol-bg: #f4f6fa; --ol-sidebar: #ffffff; --ol-card: #ffffff; --ol-popover: #ffffff; --ol-muted: #e6eaf1; --ol-secondary: #eef1f6;
+  --ol-border: #d6dce6; --ol-input: #c9d1de; --ol-fg: #101828; --ol-fg-muted: #516079;
+  --ol-primary: #1668a8; --ol-primary-fg: #ffffff; --ol-accent: #dbeafe;
+  --ol-success: #177a45; --ol-warning: #a16207; --ol-danger: #c2281f;
+  --ol-shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px -14px rgba(16,24,40,.18);
+}
+.olam *, .olam *::before, .olam *::after { box-sizing: border-box; }
+.olam button { font-family: inherit; }
+.olam .ol-num { font-family: var(--ol-display); font-variant-numeric: tabular-nums; }
+
+.olam .ol-pagina { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; }
+.olam .ol-voltar { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; margin-bottom: 14px; border-radius: 999px; border: 1px solid var(--ol-border);
+  background: transparent; color: var(--ol-fg-muted); font-size: .875rem; font-weight: 600; cursor: pointer; }
+.olam .ol-voltar:hover { color: var(--ol-fg); border-color: var(--ol-input); }
+.olam .ol-eyebrow { font-family: var(--ol-display); font-size: .7rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ol-fg-muted); }
+.olam .ol-titulo { font-family: var(--ol-display); font-size: 1.5rem; font-weight: 700; line-height: 1.2; margin: 6px 0 4px; color: var(--ol-fg); }
+.olam .ol-sub { font-size: .9rem; color: var(--ol-fg-muted); line-height: 1.5; margin: 0; }
+.olam .ol-cab { padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--ol-border); }
+.olam .ol-cab-linha { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.olam .ol-logo { height: 26px; width: auto; flex: none; opacity: .95; }
+
+.olam .ol-card { background: var(--ol-card); border: 1px solid var(--ol-border); border-radius: var(--ol-radius); padding: 20px; box-shadow: var(--ol-shadow); }
+.olam .ol-pilha { display: flex; flex-direction: column; gap: 20px; }
+.olam .ol-secao { margin: 0 0 14px; }
+
+/* Cartão da nota */
+.olam .ol-nota-grade { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.olam .ol-nota { font-family: var(--ol-display); font-weight: 800; font-size: 3.5rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.olam .ol-nota small { font-size: 1.25rem; font-weight: 600; color: var(--ol-fg-muted); margin-left: 4px; }
+.olam .ol-meta { font-size: .8rem; color: var(--ol-fg-muted); margin-top: 10px; line-height: 1.5; }
+.olam .ol-selo { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; }
+.olam .ol-selo::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+.olam .ol-bom { color: var(--ol-success); } .olam .ol-alerta { color: var(--ol-warning); } .olam .ol-critico { color: var(--ol-danger); } .olam .ol-semdado { color: var(--ol-fg-muted); }
+.olam .ol-selo.ol-bom { background: rgba(47,168,102,.15); } .olam .ol-selo.ol-alerta { background: rgba(224,168,58,.15); }
+.olam .ol-selo.ol-critico { background: rgba(232,86,76,.15); } .olam .ol-selo.ol-semdado { background: var(--ol-muted); }
+.olam .ol-aviso { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; padding: 12px 14px; border-radius: var(--ol-radius); background: var(--ol-muted); font-size: .85rem; line-height: 1.5; color: var(--ol-fg); }
+.olam .ol-aviso b { color: var(--ol-warning); font-weight: 700; }
+.olam .ol-aviso ul { margin: 4px 0 0; padding-left: 18px; color: var(--ol-fg-muted); }
+
+/* Por que esta nota */
+.olam .ol-item { width: 100%; display: block; text-align: left; background: transparent; border: 0; border-top: 1px solid var(--ol-border); padding: 16px 0; color: inherit; cursor: pointer; min-height: 44px; }
+.olam .ol-item:first-of-type { border-top: 0; padding-top: 4px; }
+.olam .ol-item:last-of-type { padding-bottom: 4px; }
+.olam .ol-item-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.olam .ol-item-nome { font-size: .95rem; font-weight: 600; color: var(--ol-fg); }
+.olam .ol-pontos { font-family: var(--ol-display); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ol-primary); }
+.olam .ol-pontos.cheio { color: var(--ol-success); } .olam .ol-pontos.zero { color: var(--ol-danger); } .olam .ol-pontos.neutro, .olam .ol-pontos.na { color: var(--ol-fg-muted); }
+.olam .ol-barra { height: 6px; border-radius: 999px; background: var(--ol-muted); overflow: hidden; margin: 10px 0 8px; }
+.olam .ol-barra > i { display: block; height: 100%; border-radius: 999px; background: var(--ol-primary); transform-origin: left center; animation: olCresce .9s cubic-bezier(.2,.8,.2,1) both; }
+.olam .ol-barra > i.cheio { background: var(--ol-success); } .olam .ol-barra > i.neutro { background: var(--ol-fg-muted); opacity: .55; }
+.olam .ol-frase { font-size: .875rem; color: var(--ol-fg-muted); line-height: 1.5; }
+.olam .ol-detalhe { margin-top: 10px; padding: 10px 12px; border-radius: var(--ol-radius); background: var(--ol-muted); }
+.olam .ol-detalhe-linha { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: .82rem; color: var(--ol-fg); border-top: 1px solid var(--ol-border); }
+.olam .ol-detalhe-linha:first-child { border-top: 0; }
+.olam .ol-detalhe-linha span:last-child { color: var(--ol-fg-muted); text-align: right; flex: none; max-width: 55%; }
+.olam .ol-mais { font-size: .75rem; color: var(--ol-primary); font-weight: 600; margin-top: 6px; display: inline-block; }
+
+/* O que fazer para subir */
+.olam .ol-acao { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--ol-border); }
+.olam .ol-acao:first-of-type { border-top: 0; padding-top: 4px; } .olam .ol-acao:last-of-type { padding-bottom: 4px; }
+.olam .ol-acao-n { flex: none; width: 28px; height: 28px; border-radius: 999px; background: var(--ol-secondary); color: var(--ol-fg); font-family: var(--ol-display); font-weight: 700; font-size: .85rem; display: flex; align-items: center; justify-content: center; }
+.olam .ol-acao-txt { font-size: .92rem; font-weight: 600; color: var(--ol-fg); line-height: 1.4; }
+.olam .ol-acao-sub { font-size: .8rem; color: var(--ol-fg-muted); margin-top: 3px; }
+.olam .ol-vazio { font-size: .9rem; color: var(--ol-fg-muted); padding: 6px 0; }
+.olam .ol-botao { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ol-border); background: var(--ol-secondary); color: var(--ol-fg); font-size: .85rem; font-weight: 600; cursor: pointer; }
+.olam .ol-botao:disabled { opacity: .5; cursor: default; }
+.olam .ol-rodape { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+@keyframes olCresce { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .olam .ol-barra > i { animation: none; } }
+@media (min-width: 720px) { .olam .ol-pagina { padding: 32px 24px 64px; } .olam .ol-nota { font-size: 3.75rem; } }
+
+/* Cartão de entrada na tela do projeto (fica dentro do visual atual do app: só o próprio cartão usa .olam). */
+.olam.ol-entrada { min-height: 0; background: var(--ol-card); border: 1px solid var(--ol-border); border-radius: 16px; padding: 14px 16px; width: 100%; display: flex; align-items: center; gap: 14px;
+  text-align: left; cursor: pointer; box-shadow: var(--ol-shadow); color: var(--ol-fg); }
+.olam.ol-entrada:disabled { cursor: default; }
+.olam.ol-entrada .ol-entrada-nota { font-family: var(--ol-display); font-weight: 800; font-size: 1.9rem; line-height: 1; font-variant-numeric: tabular-nums; min-width: 52px; text-align: center; }
+.olam.ol-entrada .ol-entrada-tit { font-size: .95rem; font-weight: 700; }
+.olam.ol-entrada .ol-entrada-sub { font-size: .78rem; color: var(--ol-fg-muted); margin-top: 3px; }
