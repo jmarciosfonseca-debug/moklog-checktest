@@ -7,6 +7,7 @@ import { setDoc } from "../fireGuard";
 import { diasEntre, chaveMapa } from "./regras";
 import { quemEstaDePlantao, turnoDoMapa } from "./plantao";
 import { contarOcorrencias } from "./painel";
+import { ocorrenciasDoMapa } from "./consolidado";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
 import { semUndefined, corrigirRondaNosRotulos, ehMoto, kmInteiro } from "./modelo";
@@ -163,7 +164,10 @@ export async function loadEnviosDoTurno(itens) {
     try {
       const snap = await getDocFromServer(doc(db(), "equipes", projetoId, "mapas", chave));
       const m = snap.exists() ? corrigirRondaNosRotulos(snap.data()) : null;
-      return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null, ocorrencias: m && m.status === "enviado" ? contarOcorrencias(m) : 0 };
+      // Falta e posto vago valem também no rascunho (o líder marca durante o turno): mesma regra do Painel de Avisos.
+      const faltas = m ? ocorrenciasDoMapa({ ...m, projetoId, data, turno }).filter((l) => l.tipo === "falta").length : 0;
+      const vagos = m ? (m.postos || []).filter((x) => x && x.situacao === "vago").length : 0;
+      return { projetoId, data, turno, enviadoEm: m && m.status === "enviado" ? m.enviadoEm : null, ocorrencias: m && m.status === "enviado" ? contarOcorrencias(m) : 0, faltas, vagos };
     } catch (e) {
       return { projetoId, data, turno, erroLeitura: true };
     }

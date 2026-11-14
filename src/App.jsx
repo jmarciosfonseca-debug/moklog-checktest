@@ -167,6 +167,10 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import PainelMapasEquipe from "./mapaDiario/PainelMapasEquipe";
 import PainelAvisos from "./avisos/PainelAvisos";
+import SeloFalta from "./avisos/SeloFalta";
+import { useFaltasDoDia, somarFaltas } from "./avisos/faltasDoDia";
+import VerMapasProjeto from "./mapaDiario/VerMapasProjeto";
+import { MAPA_DIARIO_ATIVO } from "./mapaDiario/ativo";
 import Documentos from "./documentos/Documentos";
 import { temDocumentos } from "./documentos/catalogo";
 import { testesDoHistorico } from "./avisos/testeSemanal";
@@ -3679,6 +3683,9 @@ export default function App(){
   const [state,setState]=useState(null);
   const [meta,setMeta]=useState({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:""});
   const [stored,setStored]=useState({});
+  // Falta no posto (14/11/2026): selo nos cartões de projeto e de grupo. Só gerencial, só MokLog, só plantões do dia.
+  const faltasDia=useFaltasDoDia({ativo:!MOKPAT&&MAPA_DIARIO_ATIVO&&hasGerencial(),demo:isDemo()});
+  const [faltaAberta,setFaltaAberta]=useState(null);
   const [painelInicial,setPainelInicial]=useState(null); // Painel do projeto: nota já calculada pelo cartão
   const [ctmkData,setCtmkData]=useState({});
   const [crashed,setCrashed]=useState(false);
@@ -4715,6 +4722,10 @@ export default function App(){
                   {h&&<div style={{marginTop:8,height:3,background:T.track,borderRadius:2,overflow:"hidden"}}>
                     <div style={{height:"100%",width:`${h.pct}%`,background:pcolor,borderRadius:2}}/>
                   </div>}
+                  {faltasDia[p.id]&&<div style={{marginTop:10,cursor:"default"}} onClick={e=>e.stopPropagation()}>
+                    <SeloFalta info={faltasDia[p.id]} detalhe aberto={faltaAberta===p.id} onClick={()=>setFaltaAberta(v=>v===p.id?null:p.id)}/>
+                    {faltaAberta===p.id&&<div style={{marginTop:8}}><VerMapasProjeto projetoId={p.id} data={faltasDia[p.id].plantoes[0].data} turno={faltasDia[p.id].plantoes[0].turno} dark={dark}/></div>}
+                  </div>}
                 </div>
               );
             })}
@@ -4891,6 +4902,7 @@ export default function App(){
                       <span style={{fontSize:12,color:"#9ca3af"}}>Sem dados</span>
                     </div>
                   )}
+                  <SeloFalta info={somarFaltas(faltasDia,grp.ids)}/>
                 </button>
               );
             })}
