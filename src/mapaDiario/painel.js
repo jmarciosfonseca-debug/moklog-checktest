@@ -49,7 +49,7 @@ export function resumoDoPainel({ agora, mapas = [], projetos = PROJETOS_DO_MAPA,
     if (m?.erroLeitura) return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, estado: "sem-leitura", brilha: false, enviado: false, ocorrencias: 0 };
     const enviadoEm = m && m.enviadoEm ? new Date(m.enviadoEm) : null;
     const estado = estadoDoMapa({ inicio: v.inicio, agora, enviadoEm, janelaMin });
-    return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, enviadoEm, estado, brilha: brilha(estado), enviado: estado === "enviado", ocorrencias: m?.ocorrencias || 0 };
+    return { projetoId, data: v.data, turno: v.turno, inicio: v.inicio, enviadoEm, estado, brilha: brilha(estado), enviado: estado === "enviado", ocorrencias: m?.ocorrencias || 0, faltas: m?.faltas || 0, vagos: m?.vagos || 0 };
   });
   const ordem = { pendente: 0, cobranca: 1, "sem-leitura": 2, aguardando: 3, enviado: 4, "sem-horario": 5 };
   itens.sort((a, b) => ordem[a.estado] - ordem[b.estado] || a.projetoId.localeCompare(b.projetoId));
@@ -59,6 +59,8 @@ export function resumoDoPainel({ agora, mapas = [], projetos = PROJETOS_DO_MAPA,
     pendentes: itens.filter((i) => i.estado === "pendente"),
     emCobranca: itens.filter((i) => i.estado === "cobranca"),
     brilha: itens.some((i) => i.brilha),
+    faltas: itens.reduce((a, i) => a + (i.faltas || 0), 0),
+    vagos: itens.reduce((a, i) => a + (i.vagos || 0), 0),
     itens,
   };
 }

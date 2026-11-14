@@ -27,11 +27,12 @@ export const lerEquipe = (d) => {
 };
 
 // onDados(fonte, pid, valor) · onErro(fonte, pid, erro|null). Devolve { parar, esperados }.
-export function assinarFontes({ projetos, gerencial, mapasAtivo = true, onDados, onErro, intervaloMapasMs = 60000 }) {
+// apenasMapas: assina só os mapas dos plantões da janela (selo de falta nos cartões de projeto).
+export function assinarFontes({ projetos, gerencial, mapasAtivo = true, apenasMapas = false, onDados, onErro, intervaloMapasMs = 60000 }) {
   const db = getFirestore(getApps()[0]);
   const paradas = [];
   let esperados = 0;
-  for (const f of FONTES_DOC) {
+  for (const f of apenasMapas ? [] : FONTES_DOC) {
     if (f.gerencial && !gerencial) continue;
     if (f.chave === "keyaccess" && !AVISOS_CFG.keyAccess.ativo) continue; // o botão KeyAccess da Home já cobre
     const pids = f.pids === "todos" ? projetos : f.pids === "mapa" ? PROJETOS_DO_MAPA : f.pids;
@@ -47,7 +48,7 @@ export function assinarFontes({ projetos, gerencial, mapasAtivo = true, onDados,
     }
   }
   let vivo = true;
-  if (gerencial) {
+  if (gerencial && !apenasMapas) {
     esperados += PROJETOS_DO_MAPA.length; // equipes (férias)
     const lerEquipes = async () => {
       await Promise.all(PROJETOS_DO_MAPA.map(async (pid) => {
