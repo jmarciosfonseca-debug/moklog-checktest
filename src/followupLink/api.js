@@ -1,4 +1,5 @@
 import { authFetch } from "../session";
+import { ENDERECO_APP } from "../enderecoApp";
 
 async function ler(r) {
   const data = await r.json().catch(() => ({}));
@@ -19,7 +20,7 @@ export async function gerencial(acao, corpo) {
 }
 
 // Endereço público do app: links gerados em domínios de preview (protegidos pela Vercel) saem sempre pelo domínio principal.
-export const ORIGEM_PUBLICA = "https://moklog-checktest.vercel.app";
+export const ORIGEM_PUBLICA = ENDERECO_APP;
 export const urlDoLink = (token, origem = window.location.origin) => {
   const base = /\.vercel\.app$/.test(new URL(origem).hostname) ? ORIGEM_PUBLICA : origem;
   return `${base}/?fu=${token}`;

@@ -115,7 +115,7 @@ test("laudo semanal com link: traz QR e o endereço; sem link nada muda", () => 
 test("urlDoLink: domínios vercel.app (inclusive preview) saem pelo domínio principal; domínio próprio é mantido", () => {
   const { urlDoLink } = require("./api");
   const t = "a".repeat(43);
-  expect(urlDoLink(t, "https://moklog-checktest-git-x-marcio.vercel.app")).toBe(`https://moklog-checktest.vercel.app/?fu=${t}`);
+  expect(urlDoLink(t, "https://moklog-checktest-git-x-marcio.vercel.app")).toBe(`https://moked-checktest.vercel.app/?fu=${t}`);
   expect(urlDoLink(t, "https://app.moked.com.br")).toBe(`https://app.moked.com.br/?fu=${t}`);
 });
 
