@@ -114,7 +114,7 @@ export function descreverFiltros(f = {}, nomeProj = (p) => p) {
   return partes;
 }
 
-const somaKm = (mapa) => (mapa.veiculos || []).reduce((s, v) => { const r = kmRodado(v); return r != null && r >= 0 ? s + r : s; }, 0);
+const somaKm = (mapa) => (mapa.semVeiculo ? [] : mapa.veiculos || []).reduce((s, v) => { const r = kmRodado(v); return r != null && r >= 0 ? s + r : s; }, 0);
 
 // Líderes que aparecem nos mapas já lidos (para o seletor).
 export function listaLideres(mapas) {

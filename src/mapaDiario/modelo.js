@@ -194,11 +194,55 @@ export const soDigitos = (v) => String(v ?? "").replace(/\D/g, "");
 // Km final de um veículo no plantão: o corrigido depois (erro de digitação apontado pelo plantão seguinte) vence o digitado.
 export const kmFinalDoVeiculo = (v) => (v ? (v.kmAtualCorrigido != null && v.kmAtualCorrigido !== "" ? v.kmAtualCorrigido : v.kmAtual) : null);
 
+// Veículo trocado NO MEIO do plantão (Marcio, 16/11/2026): o rodado é a soma dos dois trechos — o do veículo que saiu
+// (km final dele − km anterior, quando informado) e o do que entrou (km atual − km inicial dele). Nunca dá número negativo por causa da troca.
 export function kmRodado(v) {
   const a = num(v.kmAnterior), b = num(kmFinalDoVeiculo(v));
+  const t = v.trocaNoPlantao;
+  if (t) {
+    const ini = num(t.kmInicialNova), fim = num(t.kmFinalAnterior);
+    if (b == null || Number.isNaN(b) || ini == null || Number.isNaN(ini)) return null;
+    const trecho1 = a != null && fim != null && !Number.isNaN(a) && !Number.isNaN(fim) && fim >= a ? fim - a : 0;
+    return trecho1 + (b - ini);
+  }
   if (a == null || b == null || Number.isNaN(a) || Number.isNaN(b)) return null;
   return b - a;
 }
+
+// ── Sem veículo no plantão ───────────────────────────────────────────────────
+// O líder marca "Sem veículo" e o bloco some (sem km obrigatório). A marca passa para os próximos plantões até alguém desmarcar.
+export const semVeiculo = (mapa) => !!(mapa && mapa.semVeiculo);
+export function marcarSemVeiculo(mapa, sim, { por = "", agora = new Date() } = {}) {
+  return { ...mapa, semVeiculo: sim ? { em: agora.toISOString(), por } : false };
+}
+
+// ── Troca de veículo no meio do plantão ──────────────────────────────────────
+// Só o km inicial do veículo que entrou é obrigatório; o resto ajuda o relatório. Nada aqui impede concluir o mapa.
+export function registrarTrocaNoPlantao(mapa, veiculoId, { kmInicialNova, kmFinalAnterior = "", placaNova = "", motivo = "", por = "", agora = new Date() }) {
+  const v = (mapa.veiculos || []).find((x) => x.id === veiculoId);
+  if (!v) return { mapa, erros: ["Veículo não encontrado no mapa."] };
+  const ini = soDigitos(kmInicialNova), fim = soDigitos(kmFinalAnterior);
+  if (ini === "") return { mapa, erros: ["Informe o km com que o veículo novo começou (só números)."] };
+  const placaAnterior = v.trocaNoPlantao ? (v.trocaNoPlantao.placaAnterior || "") : (v.placa || "");
+  const placa = String(placaNova || "").trim().toUpperCase();
+  const trocaNoPlantao = { kmInicialNova: Number(ini), kmFinalAnterior: fim === "" ? null : Number(fim), placaNova: placa, placaAnterior, motivo: String(motivo || "").trim(), por, em: agora.toISOString() };
+  const veiculos = mapa.veiculos.map((x) => (x.id === veiculoId ? { ...x, ...(placa ? { placa } : {}), trocaNoPlantao } : x));
+  return { mapa: { ...mapa, veiculos }, erros: [] };
+}
+export function desfazerTrocaNoPlantao(mapa, veiculoId) {
+  return { ...mapa, veiculos: (mapa.veiculos || []).map((x) => {
+    if (x.id !== veiculoId || !x.trocaNoPlantao) return x;
+    const { trocaNoPlantao, ...resto } = x;
+    return trocaNoPlantao.placaNova ? { ...resto, placa: trocaNoPlantao.placaAnterior || "" } : resto;
+  }) };
+}
+export function rotuloTrocaNoPlantao(v) {
+  const t = v && v.trocaNoPlantao;
+  if (!t) return "";
+  return ["trocado no plantão", t.kmFinalAnterior != null ? `o anterior saiu com ${t.kmFinalAnterior}` : "", `o novo${t.placaNova ? ` (${t.placaNova})` : ""} começou em ${t.kmInicialNova}`, t.motivo].filter(Boolean).join(" · ");
+}
+// Km atual menor que o anterior sem troca marcada: só para CONFIRMAR antes de enviar — nunca bloqueia (Marcio, 16/11/2026).
+export const kmMenorQueAnterior = (mapa) => (semVeiculo(mapa) ? [] : (mapa.veiculos || []).filter((v) => { const r = kmRodado(v); return !v.trocaNoPlantao && r != null && r < 0; }));
 
 // Validação para concluir. Devolve lista de textos curtos; vazia = pode concluir.
 export function validarParaConcluir(mapa, itensContaveis = []) {
@@ -230,7 +274,7 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
     }
   });
   // Obrigatórios: km da moto, resumo da passagem e se houve visita da supervisão neste turno.
-  if (projetoComMoto(mapa.projetoId)) {
+  if (projetoComMoto(mapa.projetoId) && !semVeiculo(mapa)) {
     const moto = (mapa.veiculos || []).find(ehMoto);
     if (!moto || num(moto.kmAtual) == null || Number.isNaN(num(moto.kmAtual))) erros.push("Moto: informe a quilometragem atual (obrigatório)");
   }
@@ -248,10 +292,7 @@ export function validarParaConcluir(mapa, itensContaveis = []) {
     if (!(q > 0)) erros.push(`Material — informe a quantidade de ${it.nome}`);
   });
   if (!mat.semAlteracao && !(mat.excecoes || []).length && !(mat.obs || "").trim()) erros.push('Material: marque "Sem alteração" ou descreva o que mudou');
-  (mapa.veiculos || []).forEach((v) => {
-    const r = kmRodado(v);
-    if (num(v.kmAtual) != null && num(v.kmAnterior) != null && r != null && r < 0) erros.push(`${v.rotulo || "Veículo"}: km atual menor que o anterior`);
-  });
+  // Km menor que o anterior NÃO bloqueia mais (troca de moto, odômetro trocado…): a tela só pede confirmação — ver kmMenorQueAnterior.
   return erros;
 }
 
@@ -452,14 +493,16 @@ export function herdarKmDoUltimoPlantao(mapa, ultimo, motoCadastro = null) {
     const iMoto = veiculos.findIndex(ehMoto);
     if (iMoto >= 0) veiculos = veiculos.map((v, i) => {
       if (i !== iMoto) return v;
-      const comPlaca = cad.placa ? { ...v, placa: String(cad.placa).trim() } : v;
+      const comPlaca = cad.placa && !(v.trocaNoPlantao && v.trocaNoPlantao.placaNova) ? { ...v, placa: String(cad.placa).trim() } : v; // troca feita neste plantão: a placa do mapa é a nova
       if (!trocada || v.correcaoKm) return comPlaca;
       const um = lista.find(ehMoto);
       const placaAnterior = (um && um.placa) || ((cad.anteriores || []).slice(-1)[0] || {}).placa || "";
       return { ...comPlaca, kmAnterior: kmInteiro(cad.kmInicial ?? cad.km), kmAnteriorDe: null, trocaMoto: { placaAnterior, placaNova: cad.placa || "", em: cad.trocadaEm || null } };
     });
   }
-  return { ...mapa, veiculos };
+  // "Sem veículo" marcado no plantão anterior vale aqui também, até alguém desmarcar (false = desmarcado à mão neste mapa).
+  const herdaSem = mapa.semVeiculo === undefined && ultimo && ultimo.semVeiculo ? { semVeiculo: { ...ultimo.semVeiculo, herdado: true } } : {};
+  return { ...mapa, ...herdaSem, veiculos };
 }
 
 // ── Troca de moto ────────────────────────────────────────────────────────────
@@ -469,6 +512,9 @@ export function motoTrocadaDesde(motoCadastro, ultimo) {
   const cad = motoCadastro && typeof motoCadastro === "object" ? motoCadastro : null;
   if (!cad || !cad.trocadaEm) return false;                 // nunca houve troca registrada: segue como sempre
   const um = ((ultimo && ultimo.veiculos) || []).find(ehMoto);
+  // A troca foi apontada no próprio mapa anterior (no meio do plantão) e o cadastro ainda está com a moto antiga: o mapa é o mais novo, o km dele vale.
+  const tp = um && um.trocaNoPlantao;
+  if (tp && tp.placaNova && cad.placa && normPlaca(cad.placa) === normPlaca(tp.placaAnterior)) return false;
   if (um && um.placa && cad.placa) return normPlaca(um.placa) !== normPlaca(cad.placa);
   if (!ultimo) return true;
   const quando = ultimo.enviadoEm || `${ultimo.data || ""}T23:59:59.999Z`;
@@ -530,12 +576,13 @@ export function rotuloCorrecaoKm(v) {
 
 // Na hora de enviar: km como número inteiro e id estável do veículo.
 export function veiculosInteiros(mapa) {
+  if (semVeiculo(mapa)) return { ...mapa, veiculos: (mapa.veiculos || []).map((v) => { const { trocaNoPlantao, ...r } = v; return { ...r, id: ehMoto(v) ? "moto" : v.id, kmAnterior: kmInteiro(v.kmAnterior), kmAtual: null }; }) };
   return { ...mapa, veiculos: (mapa.veiculos || []).map((v) => ({ ...v, id: ehMoto(v) ? "moto" : v.id, kmAnterior: kmInteiro(v.kmAnterior), kmAtual: kmInteiro(v.kmAtual) })) };
 }
 
 export const LIMITE_KM_PLANTAO = 300;
 // Veículos que rodaram mais que o limite num único plantão (só para confirmar, nunca bloqueia).
-export const rodadoAlto = (mapa, limite = LIMITE_KM_PLANTAO) => (mapa.veiculos || []).filter((v) => { const r = kmRodado(v); return r != null && r > limite; });
+export const rodadoAlto = (mapa, limite = LIMITE_KM_PLANTAO) => (semVeiculo(mapa) ? [] : mapa.veiculos || []).filter((v) => { const r = kmRodado(v); return r != null && r > limite; });
 
 // ── Saída antecipada / substituição (A2) ─────────────────────────────────────
 // Mapa já enviado: material, km, supervisão e resumo ficam travados; só dá para apontar que alguém saiu

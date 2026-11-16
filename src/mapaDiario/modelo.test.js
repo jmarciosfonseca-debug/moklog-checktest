@@ -1,4 +1,4 @@
-import { ehMoto, garantirMoto, semUndefined, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo , corrigirRondaNosRotulos, soDigitos } from "./modelo";
+import { ehMoto, garantirMoto, semUndefined, completarPostosFixos, projetoComMoto, ausentesDaEquipe, foraDaEquipe, ehPostoExtra, vincularFalta, desfazerVinculoFalta, mudarSituacao, removerPosto, candidatosAFalta, avisoResumoSemExcecao, novoMapa, postosPadrao, validarParaConcluir, kmRodado, excecoesDoMapa, pessoasRepetidas, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo , corrigirRondaNosRotulos, soDigitos, kmMenorQueAnterior } from "./modelo";
 import { montarTextoWhatsApp, cabecalhoProjeto, linkWhatsApp } from "./texto";
 
 import { postoVazio as postoVazioT } from "./modelo";
@@ -67,12 +67,13 @@ test("exceções exigem o detalhe mínimo", () => {
   expect(valida(com(0, "falta", {}))).toEqual([]);
   expect(valida(com(0, "ft", { quemFaltouId: "z", quemFaltou: "Z" }))).toEqual([]);
 });
-test("quilometragem: rodado = atual − anterior; negativo bloqueia", () => {
+test("quilometragem: rodado = atual − anterior; negativo não bloqueia (só confirmação na tela)", () => {
   expect(kmRodado({ kmAnterior: 1200, kmAtual: 1262 })).toBe(62);
   expect(kmRodado({ kmAnterior: "1200,5", kmAtual: "1210,5" })).toBe(10);
   expect(kmRodado({ kmAnterior: 1200, kmAtual: null })).toBeNull();
   const m = { ...preencher(mapa(), ["A", "B", "C"]), veiculos: [{ rotulo: "Moto", kmAnterior: 1200, kmAtual: 1100 }] };
-  expect(valida(m).join()).toMatch(/km atual menor/);
+  expect(valida(m).join()).not.toMatch(/km atual menor/);
+  expect(kmMenorQueAnterior(m)).toHaveLength(1);
 });
 test("exceções e pessoas repetidas", () => {
   const m = preencher(mapa(), ["A", "B", "C"]);
@@ -412,9 +413,9 @@ test("odômetro: ponto de milhar vale milhar (71.330 = 71330) e só dígitos sã
   expect(soDigitos("71.330 km")).toBe("71330");
   expect(soDigitos("71,3")).toBe("713");
   const m = { ...preencher(mapa(), ["A", "B", "C"]), veiculos: [{ rotulo: "Moto", kmAnterior: 71500, kmAtual: "71200" }, { rotulo: "Veículo 2", kmAnterior: 900, kmAtual: "800" }] };
-  const erros = validarParaConcluir(m);
-  expect(erros).toContain("Moto: km atual menor que o anterior");
-  expect(erros).toContain("Veículo 2: km atual menor que o anterior");
+  // 16/11/2026: km menor que o anterior não bloqueia mais — vira só confirmação na tela.
+  expect(validarParaConcluir(m).join(" ")).not.toContain("menor que o anterior");
+  expect(kmMenorQueAnterior(m).map((v) => v.rotulo)).toEqual(["Moto", "Veículo 2"]);
 });
 
 // ---- A1: km anterior vem do ÚLTIMO plantão do projeto, qualquer turno/equipe ----
