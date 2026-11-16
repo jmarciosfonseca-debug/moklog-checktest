@@ -184,7 +184,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     if (menores.length && !window.confirm(`${menores.map((v) => `${v.rotulo || "Veículo"}: km atual ${v.kmAtual} é menor que o anterior ${v.kmAnterior}`).join(" · ")}.\n\nSe o veículo foi trocado, cancele e toque em "Troquei de veículo neste plantão".\n\nEnviar assim mesmo? (OK para concluir, Cancelar para ajustar)`)) return;
     const altos = rodadoAlto(mapaC);
     if (altos.length && !window.confirm(`${altos.map((v) => `${v.rotulo || "Veículo"}: ${kmRodado(v)} km`).join(" · ")} num único plantão. Confira o odômetro.\n\nEstá correto? (OK para concluir, Cancelar para corrigir)`)) return;
-    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
+    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat, mapaC.material?.quantidades), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
     await enviarComConfirmacao(final);
   }
   // Envio OFICIAL: grava e CONFIRMA no servidor antes de liberar o WhatsApp. Sem confirmação,
@@ -687,7 +687,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                   <div style={{ flex: 1 }}>
                     <div style={{ ...S.h, marginBottom: 2 }}>Material, armamento e munição</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: corRes }}>{resumo}</div>
-                    <div style={{ fontSize: 11, color: cor.txt2, marginTop: 2 }}>{itensMat.length ? `Lista do projeto: ${resumoItens(itensMat)}` : "Nenhum equipamento cadastrado neste projeto: complete em Equipamentos"}</div>
+                    <div style={{ fontSize: 11, color: cor.txt2, marginTop: 2 }}>{itensMat.length ? `Lista do projeto: ${resumoItens(itensMat, mat.quantidades)}` : "Nenhum equipamento cadastrado neste projeto: complete em Equipamentos"}</div>
                   </div>
                   <button aria-expanded={matAberto} aria-label="Conferir material" onClick={() => setMatAberto((v) => !v)} style={S.btn}>{matAberto ? "Recolher ▴" : "Conferir ▾"}</button>
                 </div>

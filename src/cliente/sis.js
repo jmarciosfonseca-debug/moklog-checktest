@@ -8,6 +8,7 @@
 // até a Moked definir a régua dele (peso: null). Quando definir, basta dar peso e a função de cálculo.
 
 import { kmOficial } from "../equipe/enderecoColab";
+import { fraseGravacao } from "../gravacaoSemanal";
 
 export const PILARES = {
   RT: { sigla: "RT", nome: "Recursos Técnicos", peso: 0.45 },
@@ -120,7 +121,7 @@ export const INDICADORES = [
     const g = p.teste?.gravacao;
     if (!g) return { valor: null, texto: "Projeto sem CFTV no teste semanal." };
     if (g.pct === null) return { valor: null, texto: "Não informado no último teste semanal." };
-    return { valor: lim(100 - g.pct * (r.id === "moked" ? 2 : 1)), texto: g.pct === 0 ? `Todas as ${g.total} câmeras com 30 dias ou mais de gravação.` : `Até ${g.pct}% das câmeras (≈ ${g.cameras} de ${g.total}) com menos de 30 dias de gravação.${g.obs ? ` ${g.obs}` : ""}` };
+    return { valor: lim(100 - g.pct * (r.id === "moked" ? 2 : 1)), texto: g.origem === "cco" ? `${fraseGravacao(g).replace(/^./, (c) => c.toUpperCase())}.${g.obs ? ` ${g.obs}` : ""}` : g.pct === 0 ? `Todas as ${g.total} câmeras com 30 dias ou mais de gravação.` : `Até ${g.pct}% das câmeras (≈ ${g.cameras} de ${g.total}) com menos de 30 dias de gravação.${g.obs ? ` ${g.obs}` : ""}` };
   } },
   { id: "acesso", pilar: "RT", nome: "Controle de acesso", peso: 2, origem: "app", abrir: "teste", calc: porCategoria("acesso", "controle de acesso") },
   { id: "perimetro", pilar: "RT", nome: "Perímetro", peso: 2, origem: "app", abrir: "teste", calc: (p, r) => {

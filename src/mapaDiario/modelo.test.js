@@ -206,7 +206,7 @@ describe("base do Codex por projeto", () => {
     expect(nomes("P311A", "D").filter((n) => n.startsWith("Rádio HT"))).toHaveLength(5);
     expect(nomes("P311A", "N").filter((n) => n.startsWith("Rádio HT"))).toHaveLength(4);
     expect(nomes("P311B", "D").some((n) => /Bodycam/.test(n))).toBe(false);
-    expect(resumoItens(itensDeEquipamento(null, "P311B", "D"))).toBe("Armamento 2 · Munição 1 · Placas balísticas 4");
+    expect(resumoItens(itensDeEquipamento(null, "P311B", "D"))).toBe("Armamento 2 · Munição 36 · Placas balísticas 4");
   });
   test("quantidades confirmadas pelo Marcio: P601/P602 2 rev. + 36 mun.; P505 3 rev. + 52 mun.; P260C 1 pistola + 1 revólver", () => {
     ["P601", "P602"].forEach((pid) => { expect(nomes(pid, "D").filter((n) => n.startsWith("Revólver .38"))).toHaveLength(2); expect(itensDeEquipamento(null, pid, "D").find((i) => i.categoria === "municao").detalhe).toBe("36 munições"); });
@@ -450,4 +450,20 @@ test("saída antecipada: valida, guarda histórico da alteração e descreve a c
   expect(r.mapa.alteracoes[0]).toMatchObject({ tipo: "saida-antecipada", postoId: "p1", estadoAnterior: { pessoaNome: "Ana", situacao: "presente" } });
   expect(rotuloSaida(r.mapa.postos[0])).toBe("Saída antecipada às 14:30 — Consulta urgente — cobertura: Beto das 14:30 às 18:00");
   expect(registrarSaidaAntecipada(mp, { postoId: "p1", motivo: "Mal súbito", hora: "14:30", coberturas: [{ tipo: "ft", pessoaNome: "Beto" }] }).erros.join()).toContain("horário de entrada");
+});
+
+// Marcio, 16/11/2026 (P311B): a munição saía "Munição 1" no mapa enviado; tem que ir a QUANTIDADE.
+describe("resumo do material em quantidade", () => {
+  const { quantidadeDoItem } = require("./modelo");
+  test("munição do cadastro com 36 unidades numa linha só conta 36", () => {
+    const eq = { armamento: [{ id: 1, identificacao: "Arma 01" }, { id: 2, identificacao: "Arma 02" }], municao: [{ id: 1, identificacao: "Munição .38", qtd: "36" }], placas: [{ id: 1, identificacao: "Placas", qtd: 4 }] };
+    expect(resumoItens(itensDeEquipamento(eq, "P311B", "D"))).toBe("Armamento 2 · Munição 36 · Placas balísticas 4");
+  });
+  test("item que o líder conta usa a quantidade informada; sem informar vale 1", () => {
+    const it = { rotuloCategoria: "Munição", contar: true, chaveQtd: "municao:Munição" };
+    expect(resumoItens([it])).toBe("Munição 1");
+    expect(resumoItens([it], { "municao:Munição": { nome: "Munição", qtd: "36" } })).toBe("Munição 36");
+    expect(quantidadeDoItem({ qtd: 0 })).toBe(1);
+    expect(quantidadeDoItem({ qtd: "abc" })).toBe(1);
+  });
 });

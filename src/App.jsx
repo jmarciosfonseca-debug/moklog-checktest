@@ -27,7 +27,8 @@ import PainelLider from "./PainelLider";
 import AuditoriaOperacional from "./AuditoriaOperacional";
 import Entorno from "./entorno/Entorno";
 import Localizacao from "./cliente/Localizacao";
-import { FAIXAS_GRAVACAO, legendaGravacao, camerasDaFaixa, corGravacao, gravacaoDoTeste, textoGravacao, MINIMO_DIAS } from "./gravacaoSemanal";
+import { gravacaoDoTeste, textoGravacao } from "./gravacaoSemanal";
+import GravacaoBloco from "./GravacaoBloco";
 
 import { listaProjetosUnica, loadEquipData, contarEquip } from "./equipData";
 import { recursosHabilitados } from "./gerenciaisConfig";
@@ -604,6 +605,9 @@ const PROJECTS = {
       {id:"cftv",label:"06 - CFTV",type:"count",total:114},
       {id:"computadores",label:"07 - COMPUTADORES / CCO",type:"items",itemLabels:["Computador Principal","Computador Secund\u00e1rio","Internet"]},
       {id:"dilaceradores",label:"08 - DILACERADORES",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},
+      // 16/11/2026 (Marcio, com o líder do P311B): faltavam as 4 cancelas na lista. "Cancela / Haste" = a cancela do local e a haste dela
+      // (colisão, dano na haste). Rótulo "08B" para não renumerar os demais, que são a chave das tratativas.
+      {id:"cancelas",label:"08B - CANCELAS / HASTE",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},
       {id:"qr_code",label:"09 - LEITORES QR CODE",type:"items",itemLabels:["Cancela 01 Sup","Cancela 01 Inf","Cancela 02 Sup","Cancela 02 Inf","Cancela 04 Sup","Cancela 04 Inf","Sa\u00edda Cancela 02 Sup","Sa\u00edda Cancela 02 Inf","Sa\u00edda Cancela 03 Sup","Sa\u00edda Cancela 03 Inf","Sa\u00edda Cancela 04 Sup","Sa\u00edda Cancela 04 Inf"]},
       {id:"materiais",label:"10 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x2)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
       {id:"mon_cda",label:"11 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04"]},
@@ -1345,7 +1349,7 @@ function ItemsCat({cat, values, onChange, photos, setPhotos, recurrence}){
   );
 }
 
-function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
+function CountCat({cat, value, onChange, photos, setPhotos, recurrence, pid}){
   const total=value.total??cat.total;
   const inop=value.inoperative??[];
   const p=calcPct(total-inop.length,total);
@@ -1389,33 +1393,7 @@ function CountCat({cat, value, onChange, photos, setPhotos, recurrence}){
         })}
         <button onClick={add} style={S.addBtn}>+ Registrar inoperante</button>
       </div>
-      {cat.id==="cftv"&&<GravacaoBloco total={total} value={value.gravacao||null} onChange={g=>onChange({...value,gravacao:g})}/>}
-    </div>
-  );
-}
-
-// Tempo de gravação no teste semanal (06/11/2026): faixa (%) de câmeras com menos de 30 dias, com a legenda em
-// quantidade do projeto. Não entra na Saúde Geral — é indicador próprio da CFTV.
-function GravacaoBloco({total,value,onChange}){
-  const pct=value&&FAIXAS_GRAVACAO.includes(Number(value.pct))?Number(value.pct):null;
-  const obs=value?.obs||"";
-  const set=(patch)=>onChange({pct,obs,...patch});
-  return(
-    <div data-testid="gravacao-bloco" style={{marginTop:10,paddingTop:10,borderTop:"1px solid #1e293b"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
-        <span style={{fontSize:12,fontWeight:800,color:"#cbd5e1"}}>Tempo de gravação · mínimo {MINIMO_DIAS} dias</span>
-        <span style={{fontSize:11,color:"#64748b"}}>{total} câmeras no projeto</span>
-      </div>
-      <div style={{fontSize:11,color:"#94a3b8",margin:"4px 0 6px"}}>Quantas câmeras estão com <b>menos de {MINIMO_DIAS} dias</b> de gravação? Escolha a faixa (<b>até</b> X%). Legenda deste projeto: {legendaGravacao(total).map(l=>`até ${l.pct}% ≈ ${l.cameras}`).join(" · ")}</div>
-      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-        {FAIXAS_GRAVACAO.map(f=>{const on=pct===f;const c=corGravacao(f);return(
-          <button key={f} aria-pressed={on} onClick={()=>set({pct:on?null:f})} style={{...S.iconBtn,width:"auto",minWidth:64,padding:"6px 10px",fontSize:12,fontWeight:800,color:on?"#fff":c,background:on?c:"transparent",border:`1px solid ${c}`,borderRadius:8}}>
-            {f===0?"0% · nenhuma":`até ${f}%${f===50?" (máx.)":""} ≈ ${camerasDaFaixa(total,f)}`}
-          </button>);})}
-      </div>
-      {pct===null&&<div style={{fontSize:11,color:"#f59e0b",marginTop:6}}>Não informado — escolha uma faixa.</div>}
-      {pct!==null&&<div style={{fontSize:11,color:corGravacao(pct),marginTop:6,fontWeight:700}}>{pct===0?`Todas as ${total} câmeras com ${MINIMO_DIAS} dias ou mais.`:`Até ≈ ${camerasDaFaixa(total,pct)} de ${total} câmeras abaixo de ${MINIMO_DIAS} dias.`}</div>}
-      <input placeholder="Observação (ex.: menos de 15 dias no NVR 2, HD em troca)…" value={obs} onChange={e=>set({obs:e.target.value})} maxLength={160} style={{...S.inp,width:"100%",boxSizing:"border-box",fontSize:12,marginTop:6}}/>
+      {cat.id==="cftv"&&<GravacaoBloco S={S} pid={pid} total={total} value={value.gravacao||null} onChange={g=>onChange({...value,gravacao:g})}/>}
     </div>
   );
 }
@@ -4508,7 +4486,7 @@ export default function App(){
                 <div style={{paddingBottom:8}}>
                   {cat.type==="single"&&<SingleCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence}/>}
                   {cat.type==="items"&&<ItemsCat cat={cat} values={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence}/>}
-                  {cat.type==="count"&&<CountCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence}/>}
+                  {cat.type==="count"&&<CountCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)} photos={photos} setPhotos={setPhotos} recurrence={recurrence} pid={project?.id}/>}
                   {cat.type==="notes"&&<NotesCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)}/>}
                   {cat.type==="maintenance"&&<MaintenanceCat cat={cat} value={sv} onChange={v=>updateCat(cat.id,v)}/>}
                 </div>
