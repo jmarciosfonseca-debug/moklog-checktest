@@ -1,7 +1,7 @@
 // Porta do MokLog (Marcio, 26/10/2026): o PIN vem ANTES da Home. PIN gerencial → Home completa (todos os grupos);
 // PIN de projeto (líder) → só o painel do projeto dele. A Área do Cliente tem a própria porta.
 import { useState } from "react";
-import { checkPinAnyProject } from "../session";
+import { checkPinPorta } from "../session";
 
 const fundo = { minHeight: "100vh", background: "radial-gradient(140% 70% at 50% -10%, #1a0507 0%, #0b0f19 40%, #0b0f19 100%)", color: "#e5e7eb", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 };
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
@@ -18,9 +18,14 @@ export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, divi
     if (!pin.trim() || busy) return;
     setBusy(true); setErro("");
     try {
-      const r = await checkPinAnyProject(pin.trim());
-      if (!r) { setErro("PIN inválido"); return; }
-      onEntrar(r); // { level: "admin"|"demo"|"lider", projectId }
+      // Mostra o motivo real do servidor (limite de tentativas, servidor indisponível, relógio do aparelho) em vez de só "PIN inválido".
+      let motivo = "";
+      const ouvir = (e) => { motivo = (e && e.detail) || ""; };
+      window.addEventListener("moklog-auth-error", ouvir);
+      let r;
+      try { r = await checkPinPorta(pin.trim()); } finally { window.removeEventListener("moklog-auth-error", ouvir); }
+      if (!r) { setErro(motivo || "PIN inválido"); return; }
+      onEntrar(r); // { level: "admin"|"demo"|"lider"|"cliente", projectId } — "cliente" abre a Área do Cliente
     } finally { setBusy(false); }
   };
   return <main style={fundo} className="mk-entrada" data-testid="moklog-pin">
@@ -31,7 +36,7 @@ export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, divi
     <div className="mk-entrada-cartao" style={{ width: "100%", maxWidth: 360, background: "linear-gradient(160deg,#121216,#0b0b0e)", border: "1px solid #2a2a31", padding: "22px 20px", clipPath: chanfro, textAlign: "center" }}>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase" }}>Acesso {d.nome}</div>
       <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 4, marginBottom: 16 }}>{d.sub}</div>
-      <input type="password" inputMode="numeric" aria-label={`PIN ${d.nome}`} placeholder="PIN" maxLength={8} value={pin} autoFocus
+      <input type="password" inputMode="numeric" aria-label={`PIN ${d.nome}`} placeholder="PIN" maxLength={12} value={pin} autoFocus autoComplete="off"
         onChange={(e) => { setPin(e.target.value); setErro(""); }} onKeyDown={(e) => { if (e.key === "Enter") tentar(); }}
         style={{ width: "100%", boxSizing: "border-box", background: "#050507", color: "#f3f4f6", border: "1px solid #3a3a42", padding: "12px 10px", fontSize: 22, letterSpacing: 10, textAlign: "center", marginBottom: 10 }} />
       {erro && <div role="alert" style={{ fontSize: 12, color: "#FF1E27", fontWeight: 700, marginBottom: 8 }}>{erro}</div>}

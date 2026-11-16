@@ -41,7 +41,8 @@ export function tratarDisciplinar(texto, { interno, modo = MODO_DISCIPLINAR }) {
   const original = String(texto || "");
   if (interno || modo === "C") return { texto: original, omitidos: 0, oculto: false };
   if (modo === "B" || modo === "pendente") return { texto: "", omitidos: 0, oculto: true };
-  const frases = original.split(/(?<=[.!?;])\s+|\n+/);
+  // Sem "lookbehind" (?<=…): o Safari do iPhone anterior ao iOS 16.4 não entende essa sintaxe e o app INTEIRO deixava de abrir.
+  const frases = original.replace(/([.!?;])\s+/g, "$1\u0000").split(/\u0000|\n+/);
   let omitidos = 0;
   const texto2 = frases.map((f) => { if (RE_DISCIPLINAR.test(f)) { omitidos++; return "[trecho de uso interno omitido]"; } return f; }).join(" ");
   return { texto: texto2, omitidos, oculto: false };
