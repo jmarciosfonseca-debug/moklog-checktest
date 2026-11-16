@@ -6,7 +6,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao, semVeiculo, marcarSemVeiculo, registrarTrocaNoPlantao, desfazerTrocaNoPlantao, rotuloTrocaNoPlantao, kmMenorQueAnterior } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
@@ -55,6 +55,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [eqEdit, setEqEdit] = useState(null);       // correção de cadastro de equipamento pelo líder
   const [saidaForm, setSaidaForm] = useState(null);   // saída antecipada / substituição (mapa já enviado)
   const [saidaErros, setSaidaErros] = useState([]);
+  const [trocaForm, setTrocaForm] = useState(null);  // troca de veículo no meio do plantão { veiculoId, kmFinalAnterior, kmInicialNova, placaNova, motivo, erros }
   const [kmForm, setKmForm] = useState(null);        // correção do km anterior { veiculoId, km, motivo, erros }
   const [baixaForm, setBaixaForm] = useState(null);  // baixa de equipamento pelo líder { id, motivo, obs, erro, salvando }
   const [baixaMsg, setBaixaMsg] = useState("");
@@ -178,6 +179,9 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     const aviso = avisoResumoSemExcecao(mapaC);
     if (aviso && !confirmouResumo) { setAvisos([`${aviso} Se está certo assim, toque em Concluir mapa de novo.`]); setConfirmouResumo(true); return; }
     const agora = agoraFn().toISOString();
+    // Km menor que o anterior não trava mais: só confirma (se trocou de veículo, o líder pode voltar e apontar a troca).
+    const menores = kmMenorQueAnterior(mapaC);
+    if (menores.length && !window.confirm(`${menores.map((v) => `${v.rotulo || "Veículo"}: km atual ${v.kmAtual} é menor que o anterior ${v.kmAnterior}`).join(" · ")}.\n\nSe o veículo foi trocado, cancele e toque em "Troquei de veículo neste plantão".\n\nEnviar assim mesmo? (OK para concluir, Cancelar para ajustar)`)) return;
     const altos = rodadoAlto(mapaC);
     if (altos.length && !window.confirm(`${altos.map((v) => `${v.rotulo || "Veículo"}: ${kmRodado(v)} km`).join(" · ")} num único plantão. Confira o odômetro.\n\nEstá correto? (OK para concluir, Cancelar para corrigir)`)) return;
     const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
@@ -344,6 +348,33 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
   // Quem está preenchendo (para o histórico das correções): o líder do posto de líder no mapa.
   const quemPreenche = () => ((mapa && mapa.postos) || []).find((p) => p.lider && (p.pessoaNome || "").trim())?.pessoaNome || "Líder do plantão";
+
+  // Troca de veículo no meio do plantão: o líder aponta e segue; o rodado soma os dois trechos. Função de render, não componente.
+  const renderTroca = (v) => {
+    if (v.trocaNoPlantao) return null;
+    if (!trocaForm || trocaForm.veiculoId !== v.id) return <button onClick={() => setTrocaForm({ veiculoId: v.id, kmFinalAnterior: "", kmInicialNova: "", placaNova: "", motivo: "", erros: [] })} style={{ ...S.btn, marginTop: 6, marginLeft: 6, fontSize: 11, padding: "4px 10px" }} aria-label={`Troquei de veículo neste plantão ${v.rotulo || "Veículo"}`}>Troquei de veículo neste plantão</button>;
+    const campo = (k, rot, num = true) => <label style={{ display: "flex", flexDirection: "column", gap: 3 }}><span style={S.lab}>{rot}</span><input aria-label={rot} type="text" inputMode={num ? "numeric" : "text"} value={trocaForm[k]} onChange={(e) => setTrocaForm((f) => ({ ...f, [k]: num ? soDigitos(e.target.value) : e.target.value }))} style={S.in} /></label>;
+    const salvar = () => {
+      const r = registrarTrocaNoPlantao(mapa, v.id, { ...trocaForm, por: quemPreenche(), agora: agoraFn() });
+      if (r.erros.length) return setTrocaForm((f) => ({ ...f, erros: r.erros }));
+      alterar(() => r.mapa);
+      setTrocaForm(null);
+    };
+    return (
+      <div data-testid="troca-veiculo" style={{ marginTop: 6, padding: 8, border: `1px dashed ${cor.line}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 12, color: cor.txt2 }}>O veículo quebrou ou foi substituído durante o plantão? Informe com que km o novo começou. No campo "Km atual" vai o odômetro do veículo novo no fim do plantão.</div>
+        {campo("kmInicialNova", "Km com que o veículo novo começou (obrigatório)")}
+        {campo("kmFinalAnterior", "Km final do veículo que saiu (se souber)")}
+        {campo("placaNova", "Placa do veículo novo (se souber)", false)}
+        {campo("motivo", "Motivo (ex.: moto quebrou)", false)}
+        {trocaForm.erros.length > 0 && <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{trocaForm.erros.map((e) => <div key={e}>{e}</div>)}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={salvar} style={{ ...S.btn, fontWeight: 800 }}>Registrar troca</button>
+          <button onClick={() => setTrocaForm(null)} style={S.btn}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
 
   // Correção do km anterior (erro de digitação no plantão passado). Função de render, não componente.
   const renderCorrigirKm = (v) => {
@@ -728,21 +759,30 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
           <div style={S.card}>
             <div style={S.h}>Veículos (odômetro)</div>
-            {mapa.veiculos.map((v, i) => (
+            {semVeiculo(mapa) && (
+              <div data-testid="sem-veiculo" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 180, fontSize: 13, color: cor.txt2 }}>Sem veículo neste plantão{mapa.semVeiculo.herdado ? " (marcado no plantão anterior)" : ""}. Nada de km para informar.</div>
+                <button onClick={() => alterar((m) => marcarSemVeiculo(m, false))} style={S.btn}>Tem veículo</button>
+              </div>
+            )}
+            {!semVeiculo(mapa) && mapa.veiculos.map((v, i) => (
               <div key={v.id || i} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}><div style={S.lab}>{v.rotulo || "Veículo"}{v.placa ? ` ${v.placa}` : ""} · anterior {v.kmAnterior ?? "—"}{v.correcaoKm ? " (corrigido)" : ""}{ehMoto(v) && projetoComMoto(pid) ? " · obrigatório" : ""}</div>
-                    <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual (só números)" value={v.kmAtual ?? ""} onChange={(e) => { const dig = soDigitos(e.target.value); alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: dig } : x)) })); }} style={{ ...S.in, ...(kmRodado(v) != null && kmRodado(v) < 0 ? { borderColor: "#dc2626" } : {}) }} />
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" aria-label={`Km atual ${v.rotulo}`} placeholder="Km atual (só números)" value={v.kmAtual ?? ""} onChange={(e) => { const dig = soDigitos(e.target.value); alterar((m) => ({ ...m, veiculos: m.veiculos.map((x, k) => (k === i ? { ...x, kmAtual: dig } : x)) })); }} style={{ ...S.in, ...(kmRodado(v) != null && kmRodado(v) < 0 ? { borderColor: "#d97706" } : {}) }} />
                   </div>
-                  <div style={{ fontSize: 12, color: cor.txt2, minWidth: 70 }}>{kmRodado(v) != null ? `rodou ${kmRodado(v)} km` : ""}</div>
+                  <div style={{ fontSize: 12, color: cor.txt2, minWidth: 70 }}>{kmRodado(v) == null ? "" : kmRodado(v) < 0 ? "rodado a conferir" : `rodou ${kmRodado(v)} km`}</div>
                 </div>
                 {v.trocaMoto && <div role="status" style={{ fontSize: 12, color: cor.ac, fontWeight: 700, marginTop: 4 }}>Moto substituída{v.trocaMoto.em ? ` em ${dataBR(String(v.trocaMoto.em).slice(0, 10))}` : ""}{v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}: o km anterior é o km inicial da moto nova.</div>}
-                {kmRodado(v) != null && kmRodado(v) < 0 && <div role="alert" style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginTop: 4 }}>Menor que o anterior ({v.kmAnterior}). Confira o odômetro. Se o km anterior foi digitado errado no plantão passado, toque em "Corrigir km anterior".</div>}
+                {kmRodado(v) != null && kmRodado(v) < 0 && !v.trocaNoPlantao && <div role="alert" style={{ fontSize: 12, color: "#d97706", fontWeight: 700, marginTop: 4 }}>Menor que o anterior ({v.kmAnterior}). Trocou de veículo? Toque em "Troquei de veículo neste plantão". Se o km anterior foi digitado errado, toque em "Corrigir km anterior". Dá para concluir assim mesmo.</div>}
+                {v.trocaNoPlantao && <div role="status" data-testid="troca-no-plantao" style={{ fontSize: 12, color: cor.ac, fontWeight: 700, marginTop: 4 }}>{rotuloTrocaNoPlantao(v).replace(/^t/, "T")}. <button onClick={() => alterar((m) => desfazerTrocaNoPlantao(m, v.id))} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Desfazer troca</button></div>}
                 {v.correcaoKm && <div role="status" style={{ fontSize: 12, color: cor.txt2, marginTop: 4 }}>Km anterior {rotuloCorrecaoKm(v)}. <button onClick={() => alterar((m) => desfazerCorrecaoKm(m, v.id))} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Desfazer correção</button></div>}
                 {renderCorrigirKm(v)}
+                {renderTroca(v)}
               </div>
             ))}
-            <button onClick={() => alterar((m) => ({ ...m, veiculos: [...m.veiculos, { id: `v${Date.now().toString(36)}`, rotulo: m.veiculos.length ? `Veículo ${m.veiculos.length + 1}` : "Moto", kmAnterior: null, kmAtual: null }] }))} style={S.btn}>+ Veículo</button>
+            <button onClick={() => alterar((m) => ({ ...m, veiculos: [...m.veiculos, { id: `v${Date.now().toString(36)}`, rotulo: m.veiculos.length ? `Veículo ${m.veiculos.length + 1}` : "Moto", kmAnterior: null, kmAtual: null }] }))} style={{ ...S.btn, display: semVeiculo(mapa) ? "none" : undefined }}>+ Veículo</button>
+            {!semVeiculo(mapa) && <button onClick={() => alterar((m) => marcarSemVeiculo(m, true, { por: quemPreenche(), agora: agoraFn() }))} style={{ ...S.btn, marginLeft: 8 }}>Sem veículo neste plantão</button>}
           </div>
 
           <div style={S.card}>

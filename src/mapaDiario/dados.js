@@ -9,7 +9,7 @@ import { quemEstaDePlantao, turnoDoMapa } from "./plantao";
 import { contarOcorrencias } from "./painel";
 import { isDemo, authFetchEquipe } from "../session";
 import { aplicarNaFicha, lancamentosDoMapa } from "./ficha";
-import { semUndefined, corrigirRondaNosRotulos, ehMoto, kmInteiro } from "./modelo";
+import { semUndefined, corrigirRondaNosRotulos, ehMoto, kmInteiro, substituirMoto } from "./modelo";
 import { gravarSecaoEquipamentos, darBaixaEquipamento } from "../equipamentosStore";
 import { afastamentoVigente, desligamentosRecentes } from "../equipeEventos";
 
@@ -262,10 +262,18 @@ export async function atualizarKmMotoNoCadastro(pid, mapa) {
   const moto = eq.moto;
   if (!moto || typeof moto !== "object") return { atualizado: false };
   const np = (p) => String(p || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // Moto trocada no meio do plantão com a placa nova informada: o cadastro passa a ser a moto nova (a antiga vai para o histórico, com a baixa).
+  const t = v.trocaNoPlantao;
+  if (t && t.placaNova && np(t.placaNova) !== np(moto.placa)) {
+    const r = substituirMoto(moto, { placa: t.placaNova, kmInicial: t.kmInicialNova, motivo: t.motivo || "Troca no meio do plantão (apontada no Mapa de Equipe)", por: t.por || "", agora: t.em ? new Date(t.em) : new Date() });
+    if (r.erros.length) return { atualizado: false };
+    await gravarSecaoEquipamentos(pid, "moto", eq, { ...r.moto, km });
+    return { atualizado: true, km, trocada: true };
+  }
   if (v.placa && moto.placa && np(v.placa) !== np(moto.placa)) return { atualizado: false };
   const atual = kmInteiro(moto.km);
   if (atual === km) return { atualizado: false };
-  if (atual != null && km < atual && !v.correcaoKm) return { atualizado: false };
+  if (atual != null && km < atual && !v.correcaoKm && !t) return { atualizado: false }; // troca sem placa: o odômetro é o da moto nova, mesmo menor
   await gravarSecaoEquipamentos(pid, "moto", eq, { ...moto, km });
   return { atualizado: true, km };
 }

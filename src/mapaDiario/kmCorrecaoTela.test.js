@@ -76,8 +76,11 @@ test("km anterior errado (713300): líder corrige com motivo, conclui e o plant�
   expect(host.textContent).toContain("anterior 713300");
   await digitar(q('input[aria-label="Km atual Moto"]'), "71380");
   expect(host.textContent).toContain('toque em "Corrigir km anterior"');
+  window.confirm = jest.fn(() => false);                              // 16/11/2026: não bloqueia mais — pede confirmação; o líder cancela para corrigir
   await clicar(botao("Concluir mapa"));
-  expect(io.enviarMapa).not.toHaveBeenCalled();                       // trava continua valendo sem correção
+  expect(window.confirm.mock.calls[0][0]).toContain("menor que o anterior");
+  expect(io.enviarMapa).not.toHaveBeenCalled();
+  window.confirm = jest.fn(() => true);
 
   await clicar(q('button[aria-label="Corrigir km anterior Moto"]'));
   await clicar(botao("Salvar correção"));

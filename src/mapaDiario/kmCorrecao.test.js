@@ -1,4 +1,4 @@
-import { corrigirKmAnterior, desfazerCorrecaoKm, herdarKmDoUltimoPlantao, kmRodado, kmFinalDoVeiculo, validarParaConcluir, veiculosInteiros, motoTrocadaDesde, substituirMoto, rotuloCorrecaoKm } from "./modelo";
+import { corrigirKmAnterior, desfazerCorrecaoKm, herdarKmDoUltimoPlantao, kmRodado, kmFinalDoVeiculo, validarParaConcluir, veiculosInteiros, motoTrocadaDesde, substituirMoto, rotuloCorrecaoKm, kmMenorQueAnterior } from "./modelo";
 import { kmMotoDoMapa, validarKmMoto } from "../kmMoto";
 import { montarTextoWhatsApp } from "./texto";
 import { consolidar } from "./consolidado";
@@ -9,11 +9,11 @@ const mapaBase = (veic) => ({ id: "P604_2026-10-18_D", projetoId: "P604", data: 
 const ultimoComErro = { id: "P604_2026-10-17_N", data: "2026-10-17", turno: "N", status: "enviado", enviadoEm: "2026-10-17T21:10:00.000Z", veiculos: [{ id: "moto", rotulo: "Moto", kmAnterior: 71290, kmAtual: 713300 }] };
 
 describe("Correção do km anterior (erro de digitação no plantão passado)", () => {
-  test("sem correção o mapa não conclui; corrigido, conclui e guarda original, motivo e quem", () => {
+  test("sem correção a tela pede confirmação; corrigido, conclui e guarda original, motivo e quem", () => {
     let m = herdarKmDoUltimoPlantao(mapaBase([{ id: "moto", rotulo: "Moto", kmAnterior: null, kmAtual: null }]), ultimoComErro);
     expect(m.veiculos[0]).toMatchObject({ kmAnterior: 713300, kmAnteriorDe: "P604_2026-10-17_N" });
     m = { ...m, veiculos: m.veiculos.map((v) => ({ ...v, kmAtual: "71380" })) };
-    expect(validarParaConcluir(m).join(" ")).toContain("km atual menor que o anterior");
+    expect(kmMenorQueAnterior(m)).toHaveLength(1); // não bloqueia, mas a tela pede confirmação
 
     const r = corrigirKmAnterior(m, "moto", { km: "71.330", motivo: "Erro de digitação no plantão anterior", por: "Luiz D.", agora: AGORA });
     expect(r.erros).toEqual([]);
