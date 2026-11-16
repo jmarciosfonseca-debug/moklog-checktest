@@ -9,7 +9,7 @@ const { divisaoDoProjeto } = require("../src/divisoes");
 const { COORDS, LOCAIS, mapsDirUrl, mapsVerUrl, mapsEmbedUrl } = require("../src/entorno/locais");
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const BASE = "https://moklog-checktest.vercel.app";
+const { ENDERECO_APP: BASE } = require("../src/enderecoApp");
 
 function nomeDe(pid) { return (LOCAIS[pid] && LOCAIS[pid].nome) || pid; }
 

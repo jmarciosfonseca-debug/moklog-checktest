@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { COORDS, LOCAIS, mapsDirUrl, mapsVerUrl, mapsEmbedUrl } from "../entorno/locais";
 import { C } from "./Cluster";
+import { ENDERECO_APP } from "../enderecoApp";
 
 // Texto de compartilhamento (06/11/2026): nome, endereço e link do Maps — vai pelo WhatsApp ou pelo menu nativo do celular.
 // A primeira linha é o link da página do projeto (prévia com o logo da Moked no WhatsApp); depois o texto e o trajeto.
-export const linkLocal = (pid) => `https://moklog-checktest.vercel.app/local/${pid}`;
+export const linkLocal = (pid) => `${ENDERECO_APP}/local/${pid}`;
 export function textoCompartilhar(pid, nome) {
   const c = COORDS[pid]; if (!c) return "";
   const l = LOCAIS[pid] || {}; const n = l.nome || nome || pid;

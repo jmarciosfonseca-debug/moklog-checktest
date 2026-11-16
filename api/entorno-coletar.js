@@ -25,7 +25,7 @@ async function lerRss(url) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_RSS_MS);
   try {
-    const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "MokLogCheckTest/1.0 (+https://moklog-checktest.vercel.app)", Accept: "application/rss+xml, application/xml, text/xml" } });
+    const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "MokLogCheckTest/1.0 (+https://moked-checktest.vercel.app)", Accept: "application/rss+xml, application/xml, text/xml" } });
     if (!r.ok) throw new Error(`RSS ${r.status}`);
     return core.parseRss(await r.text());
   } finally { clearTimeout(t); }
