@@ -41,9 +41,11 @@ export async function checkPin(value,opts={}){
  if(data.nivel==='gestor'){if((!opts.cliente&&data.div!==divisaoAtiva)||opts.allowAdmin===false)return null; // na Área do Cliente o gestor entra direto no escopo da divisão dele
  data.nivel='admin';data.gestorDiv=data.div;} // gestor de divisão = gerencial só dentro da divisão dele
  else if(data.nivel==='lider'&&data.pid&&divisaoDoProjeto(data.pid)!==divisaoAtiva&&!opts.projectId)return null; // PIN de líder não abre projeto de outra divisão
- if(!['admin','lider','demo','ronda','cliente'].includes(data.nivel)||typeof data.token!=='string'||!Number.isFinite(data.exp)||data.exp<=Date.now()||(data.nivel==='lider'&&opts.projectId&&data.pid!==opts.projectId))return null;
+ // Relógio do aparelho muito adiantado faz a sessão "nascer vencida": antes dava "PIN inválido" sem explicação (16/11/2026).
+ if(Number.isFinite(data.exp)&&data.exp<=Date.now()){window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:'A data e a hora deste aparelho estão incorretas. Ajuste para automático e tente de novo.'}));return null;}
+ if(!['admin','lider','demo','ronda','cliente'].includes(data.nivel)||typeof data.token!=='string'||!Number.isFinite(data.exp)||(data.nivel==='lider'&&opts.projectId&&data.pid!==opts.projectId))return null;
  if(opts.allowAdmin===false&&data.nivel==='admin')return null;
- if(data.nivel==='cliente'&&!opts.cliente)return null; // PIN de cliente só entra pelo Painel do Cliente
+ if(data.nivel==='cliente'&&!opts.cliente&&!opts.aceitaCliente)return null; // PIN de cliente só abre o Painel do Cliente (a porta da divisão encaminha para lá)
  if(opts.cliente&&!['cliente','admin','demo'].includes(data.nivel))return null;
  if((opts.adminOnly||(!opts.projectId&&!opts.anyProject&&!opts.cliente))&&!['admin','demo'].includes(data.nivel))return null;
  const nivel={admin:'gerencial',lider:'equipe',demo:'demo',ronda:'ronda',cliente:'cliente'}[data.nivel];
@@ -51,6 +53,9 @@ export async function checkPin(value,opts={}){
  })();
  try{return await pending;}catch{window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:'Sem conexão com o servidor de acesso.'}));return null;}finally{pending=null;}
 }
+// Porta da divisão (16/11/2026, Marcio): cliente que digita o PIN na porta errada (MokLog em vez de "Área do Cliente") recebia
+// "PIN inválido" mesmo com o PIN certo. Agora a porta aceita o PIN de cliente e devolve level "cliente": o app abre a Área do Cliente.
+export async function checkPinPorta(value){const level=await checkPin(value,{anyProject:true,aceitaCliente:true});return level?{level,projectId:getSession()?.projectId||null}:null;}
 export async function checkPinAnyProject(value){const level=await checkPin(value,{anyProject:true});return level?{level,projectId:getSession()?.projectId||null}:null;}
 export function authHeaders(){const s=getSession();if(!s||s.nivel!=='gerencial'||s.div)throw Error('Sessão gerencial ausente ou expirada. Entre novamente.');return {'Content-Type':'application/json',Authorization:'Bearer '+s.token};}
 export async function authFetch(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,...authHeaders()}});if(r.status===401)clearSession();return r;}
