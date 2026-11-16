@@ -92,8 +92,9 @@ export function ocupacaoDoQuadro(pid, ativos) {
   return { pid, linhas, previsto, ativos: ativosTotal, vagas: Math.max(0, previsto - ativosTotal), excedente: Math.max(0, ativosTotal - previsto), semPosto, ocupacaoPct: previsto ? Math.round(ativosTotal / previsto * 100) : null };
 }
 
-// Turnover sobre o quadro previsto: desligamentos dos últimos 12 meses ÷ postos do quadro completo.
-export function turnoverSobreQuadro(pid, desligados12m) {
+// Turnover sobre o quadro previsto: movimentação dos últimos 12 meses ÷ postos do quadro completo.
+// Movimentação = (admissões + desligamentos) ÷ 2 — mesma fórmula do turnover (16/11/2026).
+export function turnoverSobreQuadro(pid, movimentacao12m) {
   const q = totalQuadro(pid);
-  return q > 0 ? desligados12m / q * 100 : null;
+  return q > 0 && Number.isFinite(movimentacao12m) ? movimentacao12m / q * 100 : null;
 }

@@ -113,27 +113,43 @@ export function desligadosUnicos(desligados, ativos = []) {
   return { unicos, ignorados, duplicadosIgnorados: ignorados.length };
 }
 
-// Turnover dos últimos 12 meses = saídas ÷ efetivo médio × 100.
-//  efetivo médio = (efetivo no início + efetivo hoje) ÷ 2; efetivo no início = ativos hoje − entradas + saídas (janela de 12 meses).
-export function calcularEstabilidade(equipe, hoje) {
+// Turnover (Marcio, 16/11/2026, fórmula pedida pelo cliente e padrão de RH):
+//   turnover = ((admissões + desligamentos) ÷ 2) ÷ efetivo médio × 100
+// Antes era só desligamentos ÷ efetivo médio — os dois dão o mesmo número quando cada saída é reposta.
+//  - admissões = quem foi admitido na janela (os que seguem ativos + os que entraram e já saíram);
+//  - desligamentos = saídas na janela, sem duplicidade; transferência entre projetos não entra em nenhum dos dois lados;
+//  - efetivo médio = (efetivo no início + efetivo hoje) ÷ 2;
+//  - janela de 12, 24 ou 36 meses: `turnover` é sempre a MÉDIA POR ANO (comparável entre janelas); `turnoverPeriodo` é o acumulado.
+export const JANELAS_TURNOVER = [12, 24, 36];
+export function calcularEstabilidade(equipe, hoje, opts = {}) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
-  const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - 1);
+  const meses = JANELAS_TURNOVER.includes(opts.meses) ? opts.meses : 12;
+  const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - meses / 12);
   const ativos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo');
   const { unicos: desligados, duplicadosIgnorados } = desligadosUnicos(equipe.desligados, ativos);
   const naJanela = d => d !== null && d >= +inicio && d <= fim;
-  const saidas = desligados.filter(c => !ehTransferencia(c) && naJanela(data(c.desligadoEm))).length; // transferência entre projetos não é desligamento
-  const entradas = ativos.filter(c => naJanela(data(c.dataContratacao))).length;
-  const efetivoInicial = ativos.length - entradas + saidas;
+  const sairam = desligados.filter(c => !ehTransferencia(c) && naJanela(data(c.desligadoEm))); // transferência entre projetos não é desligamento
+  const saidas = sairam.length;
+  const entradas = ativos.filter(c => naJanela(data(c.dataContratacao))).length;            // admitidos na janela que seguem ativos
+  const entraramESairam = sairam.filter(c => naJanela(data(c.dataContratacao))).length;      // admitidos na janela que já saíram
+  const admissoes = entradas + entraramESairam;
+  const efetivoInicial = ativos.length - entradas + (saidas - entraramESairam);              // quem já estava no início da janela
   const efetivoMedio = (ativos.length + efetivoInicial) / 2;
   const semDataSaida = desligados.filter(c => data(c.desligadoEm) === null).length;
   const semDataEntrada = ativos.filter(c => data(c.dataContratacao) === null).length;
   const incompleto = semDataSaida > 0 || semDataEntrada > 0;
-  const turnover = incompleto || efetivoMedio < 3 ? null : saidas / efetivoMedio * 100;
+  const aferido = !incompleto && efetivoMedio >= 3;
+  const movimentacao = (admissoes + saidas) / 2;
+  const anos = meses / 12;
+  const turnoverPeriodo = aferido ? movimentacao / efetivoMedio * 100 : null;
+  const turnover = aferido ? turnoverPeriodo / anos : null;
+  const taxaSaidas = aferido ? saidas / efetivoMedio * 100 / anos : null; // fórmula anterior, mostrada ao lado para separar perda de crescimento
   const motivoNaoAferido = turnover !== null ? null : incompleto
     ? `${semDataEntrada ? `${semDataEntrada} ativo(s) sem data de admissão` : ''}${semDataEntrada && semDataSaida ? ' e ' : ''}${semDataSaida ? `${semDataSaida} desligado(s) sem data de saída` : ''}`
     : 'efetivo médio abaixo de 3';
-  return { efetivoMedio, efetivoInicial, ativosHoje: ativos.length, entradas12m: entradas, desligados12m: saidas, duplicadosIgnorados, turnover, motivoNaoAferido, estabilidade: turnover === null ? null : Math.max(0, 100 - 2 * turnover) };
+  return { meses, efetivoMedio, efetivoInicial, ativosHoje: ativos.length, entradas12m: entradas, admissoes, desligados12m: saidas, saidas, movimentacao, duplicadosIgnorados,
+    turnover, turnoverPeriodo, taxaSaidas, motivoNaoAferido, estabilidade: turnover === null ? null : Math.max(0, 100 - 2 * turnover) };
 }
 
 export function agregarEquipe(individuos, estabilidade) {

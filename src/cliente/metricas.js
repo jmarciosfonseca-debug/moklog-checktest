@@ -1,7 +1,7 @@
 // Painel do Cliente — métricas puras (sem banco, sem relógio global). Lê os mesmos dados do app e devolve
 // o "painel do carro": marcadores grandes (teste semanal, equipe) e pequenos (mapa do dia, equipamentos,
 // treinamentos, pendências). Nada aqui grava.
-import { calcularEstabilidade, calcularTreinamento } from "../equipe/maturidade";
+import { calcularEstabilidade, calcularTreinamento, JANELAS_TURNOVER } from "../equipe/maturidade";
 import { gravacaoDoTeste } from "../gravacaoSemanal";
 import { contarEquip } from "../equipData";
 import { ordenarHistorico } from "../equipeEventos";
@@ -54,11 +54,24 @@ export function equipeResumo(equipe, hojeISO, catalogo = []) {
   const naoAplicados = todosTreinos.filter((x) => !x.aplicado).length;
   const entradas12m = (() => { const ini = new Date(hojeISO + "T12:00:00Z"); ini.setUTCFullYear(ini.getUTCFullYear() - 1); const i = ini.toISOString().slice(0, 10); return ativos.filter((c) => c.dataContratacao && c.dataContratacao >= i && c.dataContratacao <= hojeISO).map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, desde: c.dataContratacao })); })();
   const evidencias = todosTreinos.filter((x) => x.fotoRef).slice(0, 30); // galeria: só treinamentos com foto
+  // Turnover por período (12/24/36 meses) para a busca do cliente: média por ano + acumulado + quem entrou.
+  const r1 = (v) => (typeof v === "number" ? Math.round(v * 10) / 10 : null);
+  const historicoDesde = /^\d{4}-\d{2}-\d{2}$/.test(String(equipe?.historicoDesde || "")) ? equipe.historicoDesde : null;
+  const turnoverPeriodos = Object.fromEntries(JANELAS_TURNOVER.map((meses) => {
+    const ini = new Date(hojeISO + "T12:00:00Z"); ini.setUTCFullYear(ini.getUTCFullYear() - meses / 12); const inicio = ini.toISOString().slice(0, 10);
+    let e = null; try { e = calcularEstabilidade({ colaboradores: colabs, desligados: equipe?.desligados || [] }, hojeISO, { meses }); } catch { e = null; }
+    const noPeriodo = (d) => !!d && d >= inicio && d <= hojeISO;
+    const entradasLista = ativos.filter((c) => noPeriodo(c.dataContratacao)).map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, desde: c.dataContratacao }));
+    return [meses, { meses, inicio, turnover: e ? r1(e.turnover) : null, turnoverPeriodo: e ? r1(e.turnoverPeriodo) : null, taxaSaidas: e ? r1(e.taxaSaidas) : null,
+      motivo: e ? e.motivoNaoAferido : "sem dados", admissoes: e ? e.admissoes : 0, saidas: e ? e.saidas : 0, efetivoMedio: e ? r1(e.efetivoMedio) : null,
+      entradasLista, entraramESairam: e ? e.admissoes - entradasLista.length : 0,
+      parcialDesde: historicoDesde && historicoDesde > inicio ? historicoDesde : null }];
+  }));
   return {
     ativos: ativos.length, porCargo, tempoMedioMeses,
     turnover: est && est.turnover !== null ? Math.round(est.turnover * 10) / 10 : null,
     turnoverMotivo: est ? est.motivoNaoAferido : "sem dados",
-    entradas12m: est ? est.entradas12m : 0, saidas12m: est ? est.desligados12m : 0,
+    entradas12m: est ? est.entradas12m : 0, saidas12m: est ? est.desligados12m : 0, admissoes12m: est ? est.admissoes : 0, turnoverPeriodos,
     treinadosPct: pct(comTreino, ativos.length), treinoIndicePct: treinoPct, comTreinoFicha, comReciclagem, ultimosTreinos, evidencias, naoAplicados, entradas12mLista: entradas12m,
   };
 }

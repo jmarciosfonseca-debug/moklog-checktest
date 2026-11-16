@@ -553,7 +553,7 @@ async function coletarEquipe(pid) {
     const turnoverPct = est.turnover === null ? null : Math.round(est.turnover);
     // Quadro previsto (matriz de dimensionamento): turnover sobre os postos e vagas abertas.
     const quadro = totalQuadro(pid);
-    const turnoverQuadroPct = quadro ? Math.round((desligados / quadro) * 100) : null;
+    const turnoverQuadroPct = quadro ? Math.round((est.movimentacao / quadro) * 100) : null; // (admissões + desligamentos) ÷ 2 ÷ postos — fórmula única do app (16/11/2026)
     const vagas = quadro ? Math.max(0, quadro - colabs.length) : null;
     let brigadaNaoAplicada = 0, reciclagemVencida = 0, reciclagemAlerta = 0;
     colabs.forEach((c) => {
@@ -584,7 +584,7 @@ async function coletarEquipe(pid) {
       afastado: !!liderRaw.afastamentoAberto || (liderRaw.status || "ativo") === "afastado",
       coberturaAtiva: !!liderRaw.coberturaAtiva,
     } : null;
-    return { ok: true, temDado: true, total: colabs.length, desligados, turnoverPct, efetivoMedio: est.efetivoMedio, entradas12m: est.entradas12m, duplicadosIgnorados: est.duplicadosIgnorados, quadro, turnoverQuadroPct, vagas, motivoTurnover: est.motivoNaoAferido, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca, lider };
+    return { ok: true, temDado: true, total: colabs.length, desligados, turnoverPct, efetivoMedio: est.efetivoMedio, entradas12m: est.entradas12m, admissoes: est.admissoes, duplicadosIgnorados: est.duplicadosIgnorados, quadro, turnoverQuadroPct, vagas, motivoTurnover: est.motivoNaoAferido, brigadaNaoAplicada, reciclagemVencida, reciclagemAlerta, perfilSeguranca, lider };
   } catch (e) { return { ok: false, temDado: false, motivo: "erro ao ler equipe" }; }
 }
 
@@ -1448,7 +1448,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       fcards.push({
         n: `${equipe.turnoverQuadroPct}%`,
         l: "Turnover · 12 meses",
-        s: `${equipe.desligados} deslig. ÷ quadro de ${equipe.quadro} postos${equipe.turnoverPct != null ? ` (efetivo médio real: ${equipe.turnoverPct}%)` : ""} · ${equipe.total} ativos, ${equipe.vagas} vaga(s) · ${compl}`,
+        s: `(${equipe.admissoes ?? 0} adm. + ${equipe.desligados} deslig.) ÷ 2 ÷ quadro de ${equipe.quadro} postos${equipe.turnoverPct != null ? ` (efetivo médio real: ${equipe.turnoverPct}%)` : ""} · ${equipe.total} ativos, ${equipe.vagas} vaga(s) · ${compl}`,
       });
     } else if (equipe.turnoverPct != null && equipe.desligados != null) {
       const desl = equipe.desligados;
@@ -1456,7 +1456,7 @@ export function gerarHTMLAnaliseRisco(ctx, mapaDataUrl = null, erroMapa = null) 
       fcards.push({
         n: `${equipe.turnoverPct}%`,
         l: "Turnover · 12 meses",
-        s: `${desl} deslig. ÷ efetivo médio ${String(medio).replace(".", ",")} · ${equipe.total} ativos · ${compl}`,
+        s: `(${equipe.admissoes ?? 0} adm. + ${desl} deslig.) ÷ 2 ÷ efetivo médio ${String(medio).replace(".", ",")} · ${equipe.total} ativos · ${compl}`,
       });
     } else {
       fcards.push({ n: `${equipe.total}`, l: "Efetivo ativo", s: compl });
