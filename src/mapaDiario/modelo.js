@@ -140,10 +140,17 @@ export function itensDeEquipamento(data, projetoId = null, turno = null) {
   return [...cad, ...base].sort((a, b) => ordem.indexOf(a.categoria) - ordem.indexOf(b.categoria));
 }
 
-// "Armamento 2 · Munição 1 · Rádios HT 3": o que existe neste projeto para conferir.
-export function resumoItens(itens) {
+// "Armamento 2 · Munição 36 · Rádios HT 3": o que existe neste projeto para conferir, em QUANTIDADE (não em linhas).
+// 16/11/2026 (Marcio, P311B): a munição é UMA linha com 36 unidades e saía "Munição 1" no mapa enviado. Agora soma a
+// quantidade do cadastro/base e, nos itens que o líder conta, a quantidade que ele informou.
+export function quantidadeDoItem(item, quantidades = {}) {
+  const n = (v) => { const x = Number(String(v ?? "").replace(",", ".")); return Number.isFinite(x) && x > 0 ? x : null; };
+  const informada = item && item.chaveQtd ? n((quantidades || {})[item.chaveQtd]?.qtd) : null;
+  return informada ?? n(item && item.qtd) ?? 1;
+}
+export function resumoItens(itens, quantidades = {}) {
   const cont = new Map();
-  (itens || []).forEach((i) => cont.set(i.rotuloCategoria, (cont.get(i.rotuloCategoria) || 0) + 1));
+  (itens || []).forEach((i) => cont.set(i.rotuloCategoria, (cont.get(i.rotuloCategoria) || 0) + quantidadeDoItem(i, quantidades)));
   return [...cont.entries()].map(([k, n]) => `${k} ${n}`).join(" · ");
 }
 

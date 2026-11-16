@@ -45,7 +45,7 @@ export function itensDaBase(projetoId, turno, rotulos) {
       out.push({
         id: `base:${cat}:${idx}:${u}`, categoria: cat, rotuloCategoria: rotulos[cat] || "Outros",
         nome: unidades > 1 ? `${nome} ${u} de ${unidades}` : nome,
-        detalhe: det || (unidades === 1 && qtd > 1 ? `${qtd} un.` : ""), cadastro: "ok", origem: "base",
+        detalhe: det || (unidades === 1 && qtd > 1 ? `${qtd} un.` : ""), cadastro: "ok", origem: "base", qtd: unidades === 1 && qtd > 1 ? qtd : null,
         ...(qtd == null && !NAO_CONTAVEL.has(nome) ? { contar: true, chaveQtd: `${cat}:${nome}` } : {}),
       });
     }
