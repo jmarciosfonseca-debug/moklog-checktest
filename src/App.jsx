@@ -461,7 +461,8 @@ const PROJECTS = {
       {id:"fire",label:"01 - ALARME DE INC\u00caNDIO (REPETIDORAS)",type:"items",itemLabels:["Repetidora 01","Repetidora 02","Repetidora 03","Repetidora 04"]},{id:"panic_fix",label:"01B - P\u00c2NICO FIXO",type:"items",itemLabels:["Fixo 01"]},{id:"panic_mob",label:"01C - P\u00c2NICO M\u00d3VEL",type:"items",itemLabels:["M\u00f3vel 01","M\u00f3vel 02","M\u00f3vel 03"]},{id:"eclusa_cco",label:"01D - ECLUSA CCO (ABERTURA)",type:"items",itemLabels:["Porta 01 \u2014 Local","Porta 01 \u2014 Remota","Porta 02 \u2014 Local","Porta 02 \u2014 Remota"]},
       {id:"perimeter",label:"02 - ALARME PERIMETRAL",type:"items",itemLabels:["Zona 01","Zona 02","Zona 03","Zona 04","Zona 05","Zona 06","Zona 07"]},
       {id:"ac",label:"03 - AR-CONDICIONADO",type:"items",itemLabels:["CCO 01","CCO 02","Recep\u00e7\u00e3o"]},
-      {id:"cancelas_estac",label:"04 - CANCELAS ADM (ADMINISTRATIVAS)",type:"items",itemLabels:["Cancela 01","Cancela 02"]},
+      // 16/11/2026 (Marcio): "04 - CANCELAS ADM" (id cancelas_estac, 2 cancelas) saiu do teste semanal do P604. Os números dos outros itens
+      // NÃO foram renumerados de propósito: o rótulo é a chave das tratativas (follow-up). Para voltar, basta recolocar a linha com o mesmo id.
       {id:"cancelas_baia",label:"05 - CANCELAS AS (ALTA SEGURAN\u00c7A)",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},
       {id:"cftv",label:"06 - CFTV",type:"count",total:73},
       {id:"interfone",label:"07 - INTERFONE / INTERCOMUNICADOR",type:"items",itemLabels:["CCO","Recep\u00e7\u00e3o"]},
