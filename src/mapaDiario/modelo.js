@@ -240,12 +240,65 @@ export function desfazerTrocaNoPlantao(mapa, veiculoId) {
   return { ...mapa, veiculos: (mapa.veiculos || []).map((x) => {
     if (x.id !== veiculoId || !x.trocaNoPlantao) return x;
     const { trocaNoPlantao, ...resto } = x;
+    // Desfazer a entrada da reserva tira a reserva; desfazer a saída devolve a reserva como estava.
+    if (trocaNoPlantao.tipo === "reserva") { const { reserva, ...semReserva } = resto; return { ...semReserva, placa: trocaNoPlantao.placaAnterior || "" }; }
+    if (trocaNoPlantao.tipo === "retorno" || trocaNoPlantao.tipo === "nova-principal") { const { reservaEncerrada, ...semFim } = resto; const { ate, kmFinal, retorno, ...reserva } = reservaEncerrada || {}; return { ...semFim, ...(reservaEncerrada ? { reserva } : {}), placa: (reservaEncerrada && reservaEncerrada.placa) || "" }; }
     return trocaNoPlantao.placaNova ? { ...resto, placa: trocaNoPlantao.placaAnterior || "" } : resto;
   }) };
+}
+
+// ── Moto reserva (pedido dos líderes, 17/11/2026) ────────────────────────────
+// A moto principal vai para a manutenção e chega uma reserva, com outro odômetro. Enquanto a reserva estiver em uso
+// (pode durar vários plantões), os lançamentos seguem com o km DELA. Quando a principal volta — ou vem outra no lugar —
+// o líder encerra a reserva e informa o km de retorno. Nada é apagado: cada mapa guarda o que aconteceu nele.
+//   v.reserva          = reserva em uso { placa, kmInicial, desde, principal: { placa, km }, motivo, por } — passa para os próximos plantões
+//   v.trocaNoPlantao   = o que mudou NESTE plantão (tipo "reserva" | "retorno" | "nova-principal"): a conta do rodado soma os dois trechos
+//   v.reservaEncerrada = a reserva que terminou neste plantão, com km final e o que voltou
+export const reservaAtiva = (v) => !!(v && v.reserva);
+export function iniciarReserva(mapa, veiculoId, { kmFinalPrincipal = "", kmInicialReserva, placaReserva = "", motivo = "", por = "", agora = new Date() }) {
+  const v = (mapa.veiculos || []).find((x) => x.id === veiculoId);
+  if (!v) return { mapa, erros: ["Veículo não encontrado no mapa."] };
+  if (v.reserva) return { mapa, erros: ["Já existe uma moto reserva em uso. Encerre a reserva atual antes de registrar outra."] };
+  if (v.trocaNoPlantao) return { mapa, erros: ["Já há uma troca registrada neste plantão. Desfaça a troca antes."] };
+  const ini = soDigitos(kmInicialReserva), fim = soDigitos(kmFinalPrincipal);
+  if (ini === "") return { mapa, erros: ["Informe o km com que a moto reserva chegou (só números)."] };
+  const placa = String(placaReserva || "").trim().toUpperCase();
+  const em = agora.toISOString();
+  const kmPrincipal = fim !== "" ? Number(fim) : kmInteiro(v.kmAnterior);
+  const reserva = { placa, kmInicial: Number(ini), desde: em, principal: { placa: v.placa || "", km: kmPrincipal }, motivo: String(motivo || "").trim(), por };
+  const trocaNoPlantao = { tipo: "reserva", kmInicialNova: Number(ini), kmFinalAnterior: fim === "" ? null : Number(fim), placaNova: placa, placaAnterior: v.placa || "", motivo: reserva.motivo, por, em };
+  return { mapa: { ...mapa, veiculos: mapa.veiculos.map((x) => (x.id === veiculoId ? { ...x, placa, reserva, trocaNoPlantao } : x)) }, erros: [] };
+}
+// tipo: "mesma" (a principal voltou da manutenção) ou "nova" (veio outra moto principal no lugar).
+export function encerrarReserva(mapa, veiculoId, { tipo = "mesma", kmRetorno, kmFinalReserva = "", placaNova = "", motivo = "", por = "", agora = new Date() }) {
+  const v = (mapa.veiculos || []).find((x) => x.id === veiculoId);
+  if (!v || !v.reserva) return { mapa, erros: ["Não há moto reserva em uso."] };
+  if (v.trocaNoPlantao) return { mapa, erros: ["A reserva começou neste mesmo plantão. Se foi engano, toque em \"Desfazer\"."] };
+  const ret = soDigitos(kmRetorno), fim = soDigitos(kmFinalReserva);
+  const nova = tipo === "nova";
+  if (ret === "") return { mapa, erros: [nova ? "Informe o km inicial da moto nova (só números)." : "Informe o km com que a moto principal voltou (só números)."] };
+  const em = agora.toISOString();
+  const placa = nova ? String(placaNova || "").trim().toUpperCase() : (v.reserva.principal && v.reserva.principal.placa) || "";
+  const kmFinal = fim !== "" ? Number(fim) : kmInteiro(v.kmAnterior);
+  const reservaEncerrada = { ...v.reserva, ate: em, kmFinal, retorno: { tipo: nova ? "nova" : "mesma", km: Number(ret), placa } };
+  const trocaNoPlantao = { tipo: nova ? "nova-principal" : "retorno", kmInicialNova: Number(ret), kmFinalAnterior: fim === "" ? null : Number(fim), placaNova: nova ? placa : "", placaAnterior: nova ? ((v.reserva.principal && v.reserva.principal.placa) || "") : (v.reserva.placa || ""), motivo: String(motivo || "").trim(), por, em };
+  const veiculos = mapa.veiculos.map((x) => { if (x.id !== veiculoId) return x; const { reserva, ...resto } = x; return { ...resto, placa, reservaEncerrada, trocaNoPlantao }; });
+  return { mapa: { ...mapa, veiculos }, erros: [] };
+}
+const dmCurto = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${m[3]}/${m[2]}` : ""; };
+// "Moto reserva ABC1D23 em uso desde 17/11 · principal em manutenção (parou com 105058)"
+export function rotuloReserva(v) {
+  const r = v && v.reserva;
+  if (!r) return "";
+  const pr = r.principal || {};
+  return [`moto reserva${r.placa ? ` ${r.placa}` : ""} em uso${dmCurto(r.desde) ? ` desde ${dmCurto(r.desde)}` : ""}`, `principal${pr.placa ? ` ${pr.placa}` : ""} em manutenção${pr.km != null ? ` (parou com ${pr.km})` : ""}`, r.motivo].filter(Boolean).join(" · ");
 }
 export function rotuloTrocaNoPlantao(v) {
   const t = v && v.trocaNoPlantao;
   if (!t) return "";
+  if (t.tipo === "reserva") return ["moto principal recolhida para manutenção neste plantão", t.kmFinalAnterior != null ? `parou com ${t.kmFinalAnterior}` : "", `a reserva${t.placaNova ? ` (${t.placaNova})` : ""} chegou com ${t.kmInicialNova}`, t.motivo].filter(Boolean).join(" · ");
+  if (t.tipo === "retorno") return ["moto reserva recolhida neste plantão", t.kmFinalAnterior != null ? `saiu com ${t.kmFinalAnterior}` : "", `a moto principal voltou com ${t.kmInicialNova}`, t.motivo].filter(Boolean).join(" · ");
+  if (t.tipo === "nova-principal") return ["moto reserva recolhida neste plantão", t.kmFinalAnterior != null ? `saiu com ${t.kmFinalAnterior}` : "", `entrou outra moto principal${t.placaNova ? ` (${t.placaNova})` : ""} com ${t.kmInicialNova}`, t.motivo].filter(Boolean).join(" · ");
   return ["trocado no plantão", t.kmFinalAnterior != null ? `o anterior saiu com ${t.kmFinalAnterior}` : "", `o novo${t.placaNova ? ` (${t.placaNova})` : ""} começou em ${t.kmInicialNova}`, t.motivo].filter(Boolean).join(" · ");
 }
 // Km atual menor que o anterior sem troca marcada: só para CONFIRMAR antes de enviar — nunca bloqueia (Marcio, 16/11/2026).
@@ -484,6 +537,9 @@ export function herdarKmDoUltimoPlantao(mapa, ultimo, motoCadastro = null) {
   const norm = (r) => String(r || "").trim().toLowerCase();
   const idEstavel = (v) => (ehMoto(v) ? "moto" : v.id);
   let veiculos = (mapa.veiculos || []).map((v) => ({ ...v, id: idEstavel(v) }));
+  // Moto reserva em uso no plantão anterior continua em uso aqui, até o líder encerrar (reservaEncerrada = encerrada neste mapa).
+  const um0 = lista.find(ehMoto);
+  if (um0 && um0.reserva) veiculos = veiculos.map((v) => (ehMoto(v) && !v.reserva && !v.reservaEncerrada && !v.trocaNoPlantao ? { ...v, reserva: um0.reserva, placa: um0.reserva.placa || "" } : v));
   const trocada = motoTrocadaDesde(motoCadastro, ultimo);
   lista.forEach((u) => {
     const km = kmInteiro(kmFinalDoVeiculo(u) ?? u.kmAnterior);
@@ -500,6 +556,7 @@ export function herdarKmDoUltimoPlantao(mapa, ultimo, motoCadastro = null) {
     const iMoto = veiculos.findIndex(ehMoto);
     if (iMoto >= 0) veiculos = veiculos.map((v, i) => {
       if (i !== iMoto) return v;
+      if (v.reserva) return v; // com a reserva em uso, a placa do mapa é a da reserva (o cadastro guarda a principal)
       const comPlaca = cad.placa && !(v.trocaNoPlantao && v.trocaNoPlantao.placaNova) ? { ...v, placa: String(cad.placa).trim() } : v; // troca feita neste plantão: a placa do mapa é a nova
       if (!trocada || v.correcaoKm) return comPlaca;
       const um = lista.find(ehMoto);
@@ -519,6 +576,7 @@ export function motoTrocadaDesde(motoCadastro, ultimo) {
   const cad = motoCadastro && typeof motoCadastro === "object" ? motoCadastro : null;
   if (!cad || !cad.trocadaEm) return false;                 // nunca houve troca registrada: segue como sempre
   const um = ((ultimo && ultimo.veiculos) || []).find(ehMoto);
+  if (um && (um.reserva || um.reservaEncerrada)) return false; // reserva em uso (ou recém-encerrada) no último plantão: o km do mapa é o que vale, não o do cadastro
   // A troca foi apontada no próprio mapa anterior (no meio do plantão) e o cadastro ainda está com a moto antiga: o mapa é o mais novo, o km dele vale.
   const tp = um && um.trocaNoPlantao;
   if (tp && tp.placaNova && cad.placa && normPlaca(cad.placa) === normPlaca(tp.placaAnterior)) return false;
@@ -544,6 +602,37 @@ export function substituirMoto(motoAtual, { placa, modelo = "", ano = "", kmInic
   const baixada = atual && (atual.placa || atual.km) ? [{ ...semHist, baixa: { em, por, motivo: String(motivo).trim(), kmFinal: kmInteiro(atual.km) } }] : [];
   const nova = { placa: p, modelo: String(modelo || "").trim(), ano: String(ano || "").trim(), km: Number(k), kmInicial: Number(k), kmManutencao: "", proximaRevisao: "", status: "ok", historico: [], trocadaEm: em, trocadaPor: por, anteriores: [...(Array.isArray(anteriores) ? anteriores : []), ...baixada] };
   return { erros: [], moto: nova };
+}
+
+// O que o cadastro de Equipamentos (moto) passa a ser depois de um mapa concluído. Devolve null quando não há o que gravar.
+//  - uso normal: só o km sobe (nunca desce sem correção ou troca);
+//  - troca no plantão com placa nova: a moto do cadastro passa a ser a nova (a antiga vai para `anteriores`, com a baixa);
+//  - moto reserva: o cadastro continua sendo a PRINCIPAL, parada no km em que foi recolhida; o km da reserva fica em `reservaAtual`.
+//    Ao encerrar, a reserva vai para `reservas` (histórico para auditoria) e `reservaAtual` sai.
+export function cadastroDaMotoAposMapa(motoCadastro, v) {
+  const km = v ? kmInteiro(v.kmAtual) : null;
+  if (km == null || !motoCadastro || typeof motoCadastro !== "object") return null;
+  let moto = motoCadastro;
+  if (v.reserva) {
+    const r = v.reserva, kmPrincipal = kmInteiro(r.principal && r.principal.km);
+    return { km, reserva: true, moto: { ...moto, ...(kmPrincipal != null ? { km: kmPrincipal } : {}), reservaAtual: { placa: r.placa || "", kmInicial: r.kmInicial, km, desde: r.desde || null, motivo: r.motivo || "", por: r.por || "" } } };
+  }
+  const fim = v.reservaEncerrada && moto.reservaAtual ? v.reservaEncerrada : null;
+  if (fim) {
+    const { reservaAtual, ...semReserva } = moto;
+    moto = { ...semReserva, reservas: [...(Array.isArray(moto.reservas) ? moto.reservas : []), { placa: fim.placa || "", kmInicial: fim.kmInicial, kmFinal: fim.kmFinal ?? reservaAtual.km ?? null, desde: fim.desde || null, ate: fim.ate || null, motivo: fim.motivo || "", retorno: fim.retorno || null }] };
+  }
+  const t = v.trocaNoPlantao;
+  if (t && t.tipo !== "retorno" && t.placaNova && normPlaca(t.placaNova) !== normPlaca(moto.placa)) {
+    const r = substituirMoto(moto, { placa: t.placaNova, kmInicial: t.kmInicialNova, motivo: t.motivo || (t.tipo === "nova-principal" ? "Substituída após a manutenção (apontado no Mapa de Equipe)" : "Troca no meio do plantão (apontada no Mapa de Equipe)"), por: t.por || "", agora: t.em ? new Date(t.em) : new Date() });
+    if (r.erros.length) return fim ? { km: kmInteiro(moto.km), moto } : null;
+    return { km, trocada: true, moto: { ...r.moto, km, ...(Array.isArray(moto.reservas) ? { reservas: moto.reservas } : {}) } };
+  }
+  if (v.placa && moto.placa && normPlaca(v.placa) !== normPlaca(moto.placa) && !fim) return null;
+  const atual = kmInteiro(moto.km);
+  if (atual === km && !fim) return null;
+  if (atual != null && km < atual && !v.correcaoKm && !t) return fim ? { km: atual, moto } : null; // km nunca desce sem correção ou troca
+  return { km, moto: { ...moto, km } };
 }
 
 // ── Correção do km anterior (erro de digitação no plantão anterior) ─────────
