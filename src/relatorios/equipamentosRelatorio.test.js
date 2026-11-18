@@ -40,7 +40,8 @@ test("mantém todas as categorias, colunas e dados, numa tabela só", () => {
   ["Smartphones", "Rádios HT", "Armamento", "Munição", "Placas balísticas", "Lanternas", "Pânico ZTRAX", "Bodycam", "Motocicleta", "Inventário"].forEach((t) => expect(html).toContain(t));
   expect(html).not.toContain("Outros equipamentos");            // categoria vazia não aparece
   ["Intelbras", "AGD184004", "AGD184019", "325.753", "25/04/2031", "11/09/2031", "SXX 0E52", "44587 km", "44691 km", "42294 km", "Troca de óleo", "15/10/2026"].forEach((t) => expect(html).toContain(t));
-  expect(html).toContain("<b>36</b> un.");
+  expect(html).toContain('<td class="mk-eq-q">36</td>');
+  expect(html).toContain("sem ocorrência registrada");
   expect((html.match(/<table class="mk-tb mk-eq"/g) || []).length).toBeLessThanOrEqual(5);   // compacto: sem uma tabela por categoria
   expect(html).toContain('rowspan="5"');                         // categoria uma vez só, não repetida em cada linha
 });
@@ -72,6 +73,15 @@ test("histórico: pendências resolvidas com dias, trocas/baixas e resumo (médi
   expect(html).toContain("2 resolvidas · 1 troca/baixa · média de 5 d para resolver · maior: 7 d");
   expect(html).toContain("Trocado por modelo novo");
   expect(html).toContain("Não acende");
+});
+
+test("inventário mostra quantidade e a última ocorrência de cada item", () => {
+  const dados = { lanternas: [{ id: "l", identificacao: "Lanterna Tático", qtd: 2, status: "ok", ocorrencias: [{ abertaEm: "2026-10-01", fechadaEm: "2026-10-03" }, { abertaEm: "2026-11-01", fechadaEm: "2026-11-04" }] }], ztrax: [{ id: "z", identificacao: "ZTRAX", status: "inop", dataProblem: "2026-11-15", justificativa: "x" }] };
+  const { html } = montarRelatorioEquipamentos(P, dados, { hoje: HOJE });
+  expect(html).toContain('<td class="mk-eq-q">2</td>');
+  expect(html).toContain("01/11/2026 · resolvida em 3 d");
+  expect(html).toContain("(2 no total)");
+  expect(html).toContain("15/11/2026 · <b class=\"mk-da\">em aberto (2 d)</b>");
 });
 
 test("sem histórico: explica que passa a ser montado; histórico longo mostra os 15 mais recentes", () => {

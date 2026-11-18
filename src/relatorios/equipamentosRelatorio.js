@@ -79,8 +79,17 @@ function detalhe(chave, r, hoje) {
     if (r.nSerie) p.push(`Série ${escHTML(r.nSerie)}`);
     if (r.validade) { const v = new Date(r.validade) < hoje; p.push(`Val. ${dataBR(r.validade)}${v ? ' <span class="mk-b mk-b-da">vencida</span>' : ""}`); }
   }
-  if (chave === "municao" || chave === "outros") p.push(`<b>${escHTML(r.qtd || 0)}</b> ${chave === "municao" ? "un." : ""}`.trim());
   return p.length ? p.join(" · ") : "—";
+}
+
+// Última ocorrência do item: pendência aberta agora, ou a última encerrada (com dias para resolver).
+function ultimaOcorrencia(r, h) {
+  if (comProblema(r)) return `${r.dataProblem ? dataBR(r.dataProblem) : "—"} · <b class="mk-da">em aberto${r.dataProblem ? ` (${diasEntre(r.dataProblem, h)} d)` : ""}</b>`;
+  const fechadas = (Array.isArray(r.ocorrencias) ? r.ocorrencias : []).filter((o) => o && o.fechadaEm);
+  const o = fechadas[fechadas.length - 1];
+  if (!o) return '<span class="mk-mu">sem ocorrência registrada</span>';
+  const d = diasEntre(o.abertaEm, o.fechadaEm);
+  return `${o.abertaEm ? dataBR(o.abertaEm) : "—"} · resolvida${d !== null ? ` em ${d} d` : ""}${fechadas.length > 1 ? ` <span class="mk-mu">(${fechadas.length} no total)</span>` : ""}`;
 }
 
 function inventario(data, hoje) {
@@ -88,11 +97,10 @@ function inventario(data, hoje) {
   const grupos = SECOES_EQUIPAMENTOS.map((s) => ({ s, itens: (Array.isArray(data[s.chave]) ? data[s.chave] : []).filter(Boolean) })).filter((g) => g.itens.length);
   if (!grupos.length) return "";
   const linhas = grupos.map(({ s, itens }) => itens.map((r, k) => {
-    const d = comProblema(r) ? diasEntre(r.dataProblem, h) : null;
     const cat = k === 0 ? `<td class="mk-eq-cat" rowspan="${itens.length}">${s.titulo}<div class="mk-mu">${itens.length} ${itens.length === 1 ? "item" : "itens"}</div></td>` : "";
-    return `<tr${k === 0 ? ' class="mk-eq-ini"' : ""}>${cat}<td><b>${txt(r.identificacao)}</b></td><td>${detalhe(s.chave, r, hoje)}</td><td>${selo(r)}${d !== null ? ` <span class="mk-da mk-sm">${d} d</span>` : ""}</td></tr>`;
+    return `<tr${k === 0 ? ' class="mk-eq-ini"' : ""}>${cat}<td><b>${txt(r.identificacao)}</b></td><td class="mk-eq-q">${escHTML(r.qtd ?? 1)}</td><td>${detalhe(s.chave, r, hoje)}</td><td>${ultimaOcorrencia(r, h)}</td><td>${selo(r)}</td></tr>`;
   }).join("")).join("");
-  return `<h2 class="mk-h2">Inventário</h2><table class="mk-tb mk-eq"><thead><tr><th style="width:17%">Categoria</th><th style="width:30%">Identificação</th><th>Detalhes</th><th style="width:17%">Status</th></tr></thead><tbody>${linhas}</tbody></table>`;
+  return `<h2 class="mk-h2">Inventário</h2><table class="mk-tb mk-eq"><thead><tr><th style="width:12%">Categoria</th><th style="width:21%">Identificação</th><th style="width:6%">Qtd</th><th style="width:20%">Detalhes</th><th style="width:28%">Última ocorrência</th><th style="width:13%">Status</th></tr></thead><tbody>${linhas}</tbody></table>`;
 }
 
 function tabelaAbertas(abertas) {
@@ -135,7 +143,7 @@ export function montarRelatorioEquipamentos(project, data = {}, { hoje = new Dat
 <div class="mk-k"><div class="mk-kv${r.parcial ? " mk-wa" : ""}">${r.parcial}</div><div class="mk-kl">parcial ou baixo</div></div>
 <div class="mk-k"><div class="mk-kv${r.inop ? " mk-da" : ""}">${r.inop}</div><div class="mk-kl">inoperante ou crítico</div></div></div>`;
   const pend = pendenciasDoInventario(data, hoje);
-  const estilo = `<style>.mk-eq{font-size:8.6pt}.mk-eq td{padding:2.5px 6px;vertical-align:top;overflow-wrap:anywhere;line-height:1.25}.mk-eq th{padding:3px 6px}.mk-eq-cat{font-weight:700;background:#F8FAFC;border-right:1px solid #E5E7EB}.mk-eq-cat .mk-mu{font-weight:400}.mk-eq-ini td{border-top:1.5px solid #CBD5E1}.mk-kpis{margin-bottom:6px}.mk-k{padding:5px 8px}.mk-h2{margin-top:10px}.mk-vazio-linha{margin:2px 0 6px;font-size:9pt;color:#6B7280}.mk-eq-sec{break-inside:avoid}</style>`;
+  const estilo = `<style>.mk-eq{font-size:8.6pt}.mk-eq td{padding:2.5px 6px;vertical-align:top;overflow-wrap:anywhere;line-height:1.25}.mk-eq th{padding:3px 6px}.mk-eq-cat{font-weight:700;background:#F8FAFC;border-right:1px solid #E5E7EB}.mk-eq-cat .mk-mu{font-weight:400}.mk-eq-q{text-align:center;font-weight:700}.mk-eq-ini td{border-top:1.5px solid #CBD5E1}.mk-kpis{margin-bottom:6px}.mk-k{padding:5px 8px}.mk-h2{margin-top:10px}.mk-vazio-linha{margin:2px 0 6px;font-size:9pt;color:#6B7280}.mk-eq-sec{break-inside:avoid}</style>`;
   const corpo = estilo + kpis + (r.total ? tabelaAbertas(pend.abertas) + tabelaHistorico(pend) + inventario(data, hoje) + secaoMoto(data.moto) : `<div class="mk-vazio"><b>Nenhum equipamento cadastrado neste projeto.</b></div>`) + blocoFimMoked();
   const html = documentoMoked({ project, titulo: "Inventário de Equipamentos", subtitulo: `${escHTML(project.id)} — ${escHTML(project.name || "")} · posição em ${hoje.toLocaleDateString("pt-BR")}`, numero, corpo, hoje, fimEmbutido: true });
   return { html, numero, resumo: r, pendencias: pend };
