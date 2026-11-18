@@ -477,3 +477,21 @@ test("mapa enviado mostra Editar mapa (1x); mapa já editado pelo líder não mo
   expect(src).toMatch(/!mapa\.edicaoLiderEm && [\s\S]{0,200}Editar mapa \(1x\)/);
   expect(src).toMatch(/edicaoLiderRef\.current && !mapaC\.edicaoLiderEm \? \{ edicaoLiderEm: agora \}/);
 });
+
+test("equipamento inoperante no cadastro entra sozinho no mapa e vai no envio; resolvido depois, sai", async () => {
+  const inop = { lanternas: [{ id: "l1", identificacao: "Lanterna Tático", status: "inop", dataProblem: "2026-10-08", justificativa: "Não acende" }] };
+  await montar({ loadEquipamentos: jest.fn(async () => inop) });
+  expect(q('[data-testid="pendencias-equip"]').textContent).toContain("Lanterna Tático — INOPERANTE há 3 dias (desde 08/10): Não acende");
+  await clicar(botao("Concluir mapa"));
+  expect(salvos[0].material.pendenciasEquip).toHaveLength(1);
+  expect(salvos[0].material.pendenciasEquip[0]).toMatchObject({ nome: "Lanterna Tático", dias: 3 });
+});
+test("resolvida entre abrir e concluir: o envio já sai sem a pendência", async () => {
+  const inop = { lanternas: [{ id: "l1", identificacao: "Lanterna Tático", status: "inop", dataProblem: "2026-10-08", justificativa: "Não acende" }] };
+  const resolvido = { lanternas: [{ id: "l1", identificacao: "Lanterna Tático", status: "ok" }] };
+  const loadEquipamentos = jest.fn().mockResolvedValueOnce(inop).mockResolvedValue(resolvido);
+  await montar({ loadEquipamentos });
+  expect(q('[data-testid="pendencias-equip"]')).not.toBeNull();
+  await clicar(botao("Concluir mapa"));
+  expect(salvos[0].material.pendenciasEquip).toEqual([]);
+});
