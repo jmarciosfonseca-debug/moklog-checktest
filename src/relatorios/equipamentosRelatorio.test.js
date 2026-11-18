@@ -35,16 +35,51 @@ test("documento no padrão Moked: cabeçalho, número, sem emoji e sem o cabeça
   expect(html.lastIndexOf("mk-fim")).toBeGreaterThan(html.lastIndexOf("Motocicleta"));
 });
 
-test("mantém todas as seções, colunas e dados", () => {
+test("mantém todas as categorias, colunas e dados, numa tabela só", () => {
   const { html } = montarRelatorioEquipamentos(P, DADOS, { hoje: HOJE });
-  ["Smartphones", "Rádios HT", "Armamento", "Munição", "Placas balísticas", "Lanternas", "Pânico ZTRAX", "Bodycam", "Motocicleta"].forEach((t) => expect(html).toContain(t));
-  expect(html).not.toContain("Outros equipamentos");            // seção vazia não aparece
+  ["Smartphones", "Rádios HT", "Armamento", "Munição", "Placas balísticas", "Lanternas", "Pânico ZTRAX", "Bodycam", "Motocicleta", "Inventário"].forEach((t) => expect(html).toContain(t));
+  expect(html).not.toContain("Outros equipamentos");            // categoria vazia não aparece
   ["Intelbras", "AGD184004", "AGD184019", "325.753", "25/04/2031", "11/09/2031", "SXX 0E52", "44587 km", "44691 km", "42294 km", "Troca de óleo", "15/10/2026"].forEach((t) => expect(html).toContain(t));
-  expect(html).toContain("<td><b>36</b></td>");
-  expect(html).toContain("2 d em aberto");
+  expect(html).toContain("<b>36</b> un.");
+  expect((html.match(/<table class="mk-tb mk-eq"/g) || []).length).toBeLessThanOrEqual(5);   // compacto: sem uma tabela por categoria
+  expect(html).toContain('rowspan="5"');                         // categoria uma vez só, não repetida em cada linha
+});
+
+test("pendências em aberto: equipamento, aberta em, dias em aberto e motivo", () => {
+  const { html, pendencias } = montarRelatorioEquipamentos(P, DADOS, { hoje: HOJE });
+  expect(pendencias.abertas).toHaveLength(1);
+  expect(pendencias.abertas[0]).toMatchObject({ nome: "Bodycam Reserva", cat: "bodycam", dias: 2, abertaEm: "2026-11-15" });
+  expect(html).toContain("Pendências em aberto");
   expect(html).toContain("A Bodycam Reserva não foi entregue no posto");
-  expect(html).toContain('<span class="mk-b mk-b-da">1 com problema</span>');
-  expect(html).toContain("5 itens"); expect(html).toContain("1 item");
+  expect(html).toContain("15/11/2026");
+  expect(html).toContain("<b class=\"mk-da\">2 d</b>");
+});
+
+test("histórico: pendências resolvidas com dias, trocas/baixas e resumo (média e maior)", () => {
+  const dados = {
+    lanternas: [{ id: "l1", identificacao: "Lanterna Tático", status: "ok", ocorrencias: [{ abertaEm: "2026-11-01", status: "inop", justificativa: "Não acende", fechadaEm: "2026-11-04", fechadaPor: "Gerencial" }] }],
+    radiosHT: [{ id: "r1", identificacao: "Rádio CCO", marca: "Intelbras", status: "ok", ocorrencias: [{ abertaEm: "2026-11-05", status: "parcial", justificativa: "Bateria viciada", fechadaEm: "2026-11-12" }] }],
+    baixados: [{ id: "s0", identificacao: "Smartphone Antigo", categoria: "smartphones", status: "inop", dataProblem: "2026-11-08", justificativa: "Tela quebrada", baixa: { motivo: "Substituído", obs: "Trocado por modelo novo", por: "Gerencial", em: "2026-11-10T15:00:00.000Z" } }],
+  };
+  const { html, pendencias } = montarRelatorioEquipamentos(P, dados, { hoje: HOJE });
+  expect(pendencias.abertas).toHaveLength(0);
+  expect(pendencias.resumo).toEqual({ resolvidas: 2, trocas: 1, media: 5, maior: 7 });
+  expect(pendencias.historico.map((x) => x.nome)).toEqual(["Rádio CCO", "Smartphone Antigo", "Lanterna Tático"]);   // mais recente primeiro
+  const troca = pendencias.historico.find((x) => x.tipo === "Substituído");
+  expect(troca).toMatchObject({ abertaEm: "2026-11-08", fechadaEm: "2026-11-10", dias: 2 });
+  expect(html).toContain("Nenhuma pendência de equipamento em aberto.");
+  expect(html).toContain("Histórico de pendências e trocas");
+  expect(html).toContain("2 resolvidas · 1 troca/baixa · média de 5 d para resolver · maior: 7 d");
+  expect(html).toContain("Trocado por modelo novo");
+  expect(html).toContain("Não acende");
+});
+
+test("sem histórico: explica que passa a ser montado; histórico longo mostra os 15 mais recentes", () => {
+  expect(montarRelatorioEquipamentos(P, DADOS, { hoje: HOJE }).html).toContain("Ainda não há pendência encerrada");
+  const muitos = { lanternas: [{ id: "x", identificacao: "L", status: "ok", ocorrencias: Array.from({ length: 20 }, (_, k) => ({ abertaEm: "2026-10-01", justificativa: "n" + k, fechadaEm: `2026-10-${String(k + 2).padStart(2, "0")}` })) }] };
+  const r = montarRelatorioEquipamentos(P, muitos, { hoje: HOJE });
+  expect(r.pendencias.historico).toHaveLength(20);
+  expect(r.html).toContain("+ 5 registro(s) mais antigo(s) no app.");
 });
 
 test("validade vencida, km de manutenção atingido, moto reserva e texto do usuário escapado", () => {

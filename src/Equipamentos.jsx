@@ -9,6 +9,7 @@ import { checkPin } from "./session";
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, getDocFromServer } from "firebase/firestore";
+import { reconciliarItem, reconciliarLista } from "./equipamentosOcorrencias";
 import { gravarSecaoEquipamentos, darBaixaEquipamento, MOTIVOS_BAIXA } from "./equipamentosStore";
 import { validarKmMoto, kmMotoDoMapa, soDigitosKm } from "./kmMoto";
 import { registrarManutencao, ultimaManutencao } from "./motoManutencao";
@@ -871,7 +872,10 @@ export default function Equipamentos({ project, onBack, dark, onToggleTheme, sha
     gravando.current=true;setSaving(true);setSaveError("");
     const before=confirmado.current;
     try{
-      const resposta=await gravarSecaoEquipamentos(project.id,section,before,val);
+      // Abertura/fechamento de pendência fica registrada no item (`ocorrencias`) para o histórico do relatório.
+      const opc={por:adminAuth?"Gerencial":"Líder (PIN do projeto)"};
+      const comHistorico=Array.isArray(val)?reconciliarLista(before[section],val,opc):(section==="moto"&&val&&typeof val==="object"?reconciliarItem(before[section],val,opc):val);
+      const resposta=await gravarSecaoEquipamentos(project.id,section,before,comHistorico);
       // Outras seções mantêm a base que esta tela realmente mostrou ao usuário.
       // Reconsultar explicitamente fecha rascunhos e atualiza o documento completo.
       const saved={...before,[section]:resposta[section],...(resposta.updatedAt?{updatedAt:resposta.updatedAt}:{})};
