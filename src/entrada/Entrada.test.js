@@ -45,3 +45,13 @@ test("por padrão o vídeo antigo NÃO toca: Entrar vai direto para a escolha de
     expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+
+test("etapaInicial='areas' (voltar de dentro de uma área) abre direto na escolha de área, sem passar por Entrar", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Entrada onEscolher={() => {}} etapaInicial="areas" />));
+    expect(host.querySelector('[data-testid="entrada-splash"]')).toBeNull();
+    expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
+    expect(host.textContent).toContain("Escolha a sua área");
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});

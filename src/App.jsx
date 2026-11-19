@@ -3555,6 +3555,9 @@ export default function App(){
   const [screen,setScreen]=useState("home");
   // Porta de entrada Moked: "entrada" (logo → vídeo → áreas) | "moklog" (app atual) | "cliente" (Área do Cliente)
   const [portal,setPortal]=useState("entrada");
+  // Voltar de dentro de uma área leva direto à "Escolha a sua área" (não à tela do logo com o botão Entrar).
+  const portalAnt=useRef(null);
+  useEffect(()=>{ portalAnt.current=portal; },[portal]);
   // Divisão aberta (MokLog | MokPat). O módulo de sessão guarda a mesma informação para validar o PIN na divisão certa.
   const [divisao,setDivisaoEstado]=useState("moklog");
   const MOKPAT=divisao!=="moklog"; // qualquer divisão nova (MokPat, MokImp): mesma casca, sem os itens exclusivos do MokLog
@@ -4202,7 +4205,7 @@ export default function App(){
   );
 
   // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
-  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
+  if(portal==="entrada") return <Entrada etapaInicial={portalAnt.current&&portalAnt.current!=="entrada"?"areas":"splash"} onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
   if(portal==="moklog_pin") return <PinMoklog key={divisao} divisao={divisao} sessaoLider={(()=>{ const x=getScopedProjectId(); return x&&divisaoDoProjeto(x)===divisao?x:null; })()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
     if(r.level==="cliente"){ setPortal("cliente"); return; } // PIN de cliente digitado na porta da divisão: abre a Área do Cliente
     if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }

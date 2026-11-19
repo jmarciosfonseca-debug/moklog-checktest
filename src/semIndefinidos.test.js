@@ -77,3 +77,8 @@ test("atalho 'Áreas' existe nos cabeçalhos internos do gerencial (grupo, Jatin
   expect(app).toContain('data-testid="botao-areas"');
   expect((app.match(/<BotaoAreas\/>/g) || []).length).toBeGreaterThanOrEqual(3);
 });
+
+test("voltar para a entrada vindo de dentro de uma área abre na escolha de área", () => {
+  const fs = require("fs"), app = fs.readFileSync(require("path").join(__dirname, "App.jsx"), "utf8");
+  expect(app).toContain('etapaInicial={portalAnt.current&&portalAnt.current!=="entrada"?"areas":"splash"}');
+});
