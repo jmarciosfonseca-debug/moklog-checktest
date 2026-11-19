@@ -9,7 +9,7 @@ const botao = (host, t) => [...host.querySelectorAll("button")].find((b) => b.te
 test("logo → Entrar → vídeo (pulável) → escolha de área; MokLog e Área do Cliente chamam o app; outras divisões ficam em breve", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host); const esc = jest.fn();
   try {
-    await act(async () => root.render(<Entrada onEscolher={esc} />));
+    await act(async () => root.render(<Entrada onEscolher={esc} pularVideo={false} />));
     expect(host.querySelector('[data-testid="entrada-splash"]')).not.toBeNull();
     await clicar(botao(host, "Entrar"));
     expect(host.querySelector('[data-testid="entrada-video"] video')).not.toBeNull();
@@ -28,10 +28,20 @@ test("vídeo toca a cada entrada; se o navegador bloquear o autoplay, aparece o 
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   const play = jest.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.reject(new Error("NotAllowed")));
   try {
-    await act(async () => root.render(<Entrada onEscolher={() => {}} />));
+    await act(async () => root.render(<Entrada onEscolher={() => {}} pularVideo={false} />));
     await clicar(botao(host, "Entrar"));
     await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
     expect(host.querySelector('[data-testid="entrada-video"]')).not.toBeNull();
     expect(botao(host, "Tocar vídeo")).toBeTruthy();
   } finally { play.mockRestore(); await act(async () => root.unmount()); host.remove(); }
+});
+test("por padrão o vídeo antigo NÃO toca: Entrar vai direto para a escolha de área", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Entrada onEscolher={() => {}} />));
+    await clicar(botao(host, "Entrar"));
+    expect(host.querySelector('[data-testid="entrada-video"]')).toBeNull();
+    expect(host.querySelector("video")).toBeNull();
+    expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
+  } finally { await act(async () => root.unmount()); host.remove(); }
 });
