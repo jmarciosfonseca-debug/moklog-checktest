@@ -55,3 +55,34 @@ test("etapaInicial='areas' (voltar de dentro de uma área) abre direto na escolh
     expect(host.textContent).toContain("Escolha a sua área");
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+
+test("abertura mostra a frase da marca e o mostrador decorativo", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Entrada onEscolher={() => {}} />));
+    expect(host.querySelector('[data-testid="entrada-frase"]').textContent).toMatch(/o software por trás do hardware/);
+    expect(host.querySelector('[data-testid="mostrador-sis"]').className).toContain("scan");
+    expect(botao(host, "Entrar")).toBeTruthy();
+  } finally { act(() => root.unmount()); host.remove(); }
+});
+
+test("abertura 3D toca quando pedida, pula com um toque e segue para o logo com Entrar", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Entrada onEscolher={() => {}} comAbertura />));
+    expect(host.querySelector('[data-testid="entrada-abertura"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="entrada-splash"]')).toBeNull();
+    await clicar(host.querySelector('[data-testid="entrada-abertura"]'));
+    expect(host.querySelector('[data-testid="entrada-abertura"]')).toBeNull();
+    expect(host.querySelector('[data-testid="entrada-splash"]')).not.toBeNull();
+  } finally { act(() => root.unmount()); host.remove(); }
+});
+
+test("sem abertura pedida (voltou logo / Áreas) não toca a abertura", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Entrada onEscolher={() => {}} etapaInicial="areas" />));
+    expect(host.querySelector('[data-testid="entrada-abertura"]')).toBeNull();
+    expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
+  } finally { act(() => root.unmount()); host.remove(); }
+});

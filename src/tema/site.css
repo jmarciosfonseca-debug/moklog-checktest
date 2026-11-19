@@ -18,7 +18,7 @@
   .mk-entrada-hero h1 span { color: #E50914; }
   .mk-entrada-hero p { font-size: 1.1rem; line-height: 1.6; color: #9ca3af; margin: 0; max-width: 520px; }
   .mk-entrada-acesso { width: 400px; flex: none; background: #111827; border: 1px solid #334155; border-radius: 18px; padding: 44px 36px; box-shadow: 0 24px 60px -30px rgba(0,0,0,.8); }
-  .mk-entrada-acesso > div:first-child { margin-top: 0 !important; width: 100%; }
+  .mk-entrada-acesso .mk-entrar { margin-top: 0 !important; width: 100%; }
   .mk-entrada-acesso button { width: 100%; padding-top: 16px !important; padding-bottom: 16px !important; font-size: 15px !important; }
   .mk-entrada-cartao { width: 420px !important; max-width: 420px !important; padding: 36px 32px !important; flex: none; }
 
@@ -49,3 +49,14 @@
 @media (min-width: 1440px) { .mk-modulos { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
 /* Aparelho estreito: cartões de módulo mais compactos para o título caber. */
 @media (max-width: 400px) { .mk-modulos > button { padding-left: 10px !important; padding-right: 8px !important; gap: 9px !important; } .mk-modulos > button > div > div:first-child { font-size: 13.5px !important; } .mk-modulos > button > span:last-child { display: none; } }
+
+/* Abertura (19/11/2026): frase da marca + mostrador SIS decorativo */
+.mk-frase { margin-top: 14px; font-size: 12.5px; letter-spacing: .6px; color: #9ca3af; text-align: center; }
+.mk-frase b { color: #f3f4f6; letter-spacing: 3px; font-weight: 900; }
+.mk-entrada-dial { display: flex; justify-content: center; margin-top: 18px; }
+@media (min-width: 1024px) {
+  .mk-frase { font-size: 15px; text-align: left; margin: 0 0 22px; }
+  .mk-entrada-dial { margin-top: 0; margin-bottom: 26px; }
+}
+
+@keyframes mkFadeIn { from { opacity: 0; } }

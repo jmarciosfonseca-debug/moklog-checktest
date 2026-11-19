@@ -13,7 +13,7 @@ test('nenhum arquivo do app usa identificador indefinido', async () => {
 
 test("porta de entrada Moked: App abre em Entrada e a Área do Cliente saiu da Home", () => {
   const app = require("fs").readFileSync("src/App.jsx", "utf8");
-  expect(app).toContain('const [portal,setPortal]=useState("entrada")');
+  expect(app).toContain('const [portal,setPortal]=useState(()=>retomada?retomada.portal:"entrada")'); // abre em Entrada, ou retoma onde estava (sessão ativa e uso recente)
   expect(app).toContain('if(portal==="entrada") return <Entrada');
   expect(app).not.toMatch(/arq="cliente"/);
   expect(app).not.toMatch(/screen==="cliente"/);
@@ -80,5 +80,5 @@ test("atalho 'Áreas' existe nos cabeçalhos internos do gerencial (grupo, Jatin
 
 test("voltar para a entrada vindo de dentro de uma área abre na escolha de área", () => {
   const fs = require("fs"), app = fs.readFileSync(require("path").join(__dirname, "App.jsx"), "utf8");
-  expect(app).toContain('etapaInicial={portalAnt.current&&portalAnt.current!=="entrada"?"areas":"splash"}');
+  expect(app).toContain('etapaInicial={(portalAnt.current&&portalAnt.current!=="entrada")||!aberturaPendente?"areas":"splash"}');
 });

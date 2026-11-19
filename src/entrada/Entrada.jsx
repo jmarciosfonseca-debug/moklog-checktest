@@ -2,6 +2,8 @@
 // introdução (public/moked/intro.mp4, ~14 s; se não existir ou falhar, pula) → "Escolha a sua área" (divisões) com a
 // Área do Cliente no topo. MokLog abre o app atual; as demais divisões ficam "em breve" até existirem.
 import { useEffect, useRef, useState } from "react";
+import MostradorSIS from "../ui/MostradorSIS";
+import AberturaMoked from "./AberturaMoked";
 
 export const DIVISOES = [
   { id: "moklog", nome: "MokLog", sub: "Condomínios logísticos", ativo: true, cor: "#E50914" },
@@ -21,8 +23,9 @@ const fundo = { minHeight: "100vh", background: "#0b0f19", color: "#e5e7eb", fon
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
 const botaoVermelho = { background: "#B91C1C", color: "#fff", border: "none", padding: "13px 38px", fontWeight: 900, letterSpacing: 2.5, fontSize: 14, cursor: "pointer", clipPath: chanfro, boxShadow: "none", textTransform: "uppercase" };
 
-export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = true, etapaInicial = "splash" }) {
-  const [etapa, setEtapa] = useState(etapaInicial); // splash | video | areas | construcao
+export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = true, etapaInicial = "splash", comAbertura = false, onAberturaFim }) {
+  const [etapa, setEtapa] = useState(comAbertura && etapaInicial === "splash" ? "abertura" : etapaInicial); // abertura | splash | video | areas | construcao
+  const veioDaAbertura = useRef(comAbertura);
   const [emConstrucao, setEmConstrucao] = useState(null);
   const vid = useRef(null);
   const [bloqueado, setBloqueado] = useState(false); // navegador recusou o autoplay → mostra "Tocar"
@@ -33,17 +36,21 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
 
   useEffect(() => { if (etapa !== "video") return undefined; tocar(); const t = setTimeout(fimVideo, 25000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
 
+  if (etapa === "abertura") return <AberturaMoked logo={logo} onFim={() => { setEtapa("splash"); if (onAberturaFim) onAberturaFim(); }} />;
+
   // No computador (padrão de site): marca e texto à esquerda, acesso à direita. No celular: como sempre, tudo centralizado.
-  if (etapa === "splash") return <main style={fundo} className="mk-entrada" data-testid="entrada-splash">
+  if (etapa === "splash") return <main style={veioDaAbertura.current ? { ...fundo, animation: "mkFadeIn .6s ease" } : fundo} className="mk-entrada" data-testid="entrada-splash">
     <div className="mk-entrada-hero">
       <img src={logo} alt="Moked Security Consulting" style={{ width: "min(78vw, 360px)", borderRadius: 18, padding: "18px 22px", background: "#0b0f19", boxShadow: "0 0 0 1px #475569" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+      <div className="mk-frase" data-testid="entrada-frase"><b>MOKED</b> · o software por trás do hardware</div>
       <div className="mk-so-pc">
         <h1>Moked <span>CheckTest</span></h1>
         <p>A operação de segurança de cada projeto em um só lugar: testes, equipe, rondas e a nota que explica como o projeto está hoje.</p>
       </div>
     </div>
     <div className="mk-entrada-acesso">
-      <div style={{ marginTop: 36 }}><button onClick={entrar} style={botaoVermelho}>Entrar</button></div>
+      <div className="mk-entrada-dial"><MostradorSIS scan inclinar tamanho={190} intensidade={0.6} atraso={0.3} /></div>
+      <div className="mk-entrar" style={{ marginTop: 18 }}><button onClick={entrar} style={botaoVermelho}>Entrar</button></div>
       <div style={{ marginTop: 14, fontSize: 10.5, color: "#6b7280", letterSpacing: 1 }}>SECURITY · CONSULTING</div>
     </div>
   </main>;
