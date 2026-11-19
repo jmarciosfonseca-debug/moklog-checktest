@@ -369,7 +369,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   }
 
   return <main className="sx"><style>{CSS_SIS}</style>
-    <Barra onMenu={() => setPilha((s) => (s[s.length - 1] === "menu" ? s.slice(0, -1) : [...s, "menu"]))} onAvisos={() => setPilha((s) => [...s, "avisos"])} avisos={avisos.length} />
+    <Barra onMenu={() => setPilha((s) => (s[s.length - 1] === "menu" ? s.slice(0, -1) : [...s, "menu"]))} onAvisos={() => setPilha((s) => [...s, "avisos"])} avisos={avisos.length} onAreas={onBack} />
     {gerencial && <div className="gestor-faixa">Área do Gestor · {reguaId === "moked" ? "régua interna Moked" : "vendo como o cliente"}<button onClick={() => setReguaId(reguaId === "moked" ? "cliente" : "moked")}>{reguaId === "moked" ? "ver como o cliente" : "voltar à régua Moked"}</button></div>}
     <div className="corpo">
       {carregando && <p role="status" className="mu">Lendo os dados dos {termo}…</p>}

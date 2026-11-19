@@ -3555,6 +3555,9 @@ export default function App(){
   const [screen,setScreen]=useState("home");
   // Porta de entrada Moked: "entrada" (logo → vídeo → áreas) | "moklog" (app atual) | "cliente" (Área do Cliente)
   const [portal,setPortal]=useState("entrada");
+  // Voltar de dentro de uma área leva direto à "Escolha a sua área" (não à tela do logo com o botão Entrar).
+  const portalAnt=useRef(null);
+  useEffect(()=>{ portalAnt.current=portal; },[portal]);
   // Divisão aberta (MokLog | MokPat). O módulo de sessão guarda a mesma informação para validar o PIN na divisão certa.
   const [divisao,setDivisaoEstado]=useState("moklog");
   const MOKPAT=divisao!=="moklog"; // qualquer divisão nova (MokPat, MokImp): mesma casca, sem os itens exclusivos do MokLog
@@ -4177,6 +4180,9 @@ export default function App(){
     finally{ setSyncing(false); }
   };
 
+  // Atalho para a escolha de área (MokLog, MokPat, Área do Cliente…) de qualquer tela interna, sem passar pelo início.
+  const BotaoAreas=()=>(<button type="button" onClick={()=>{ setHomeGroup(null); setPortal("entrada"); }} aria-label="Escolher outra área" title="Escolher outra área" data-testid="botao-areas" style={{...S.backBtn,fontSize:11,fontWeight:700}}>Áreas ⇥</button>);
+
   const SyncBadge=()=>(
     <>
       {syncing && (
@@ -4199,7 +4205,7 @@ export default function App(){
   );
 
   // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
-  if(portal==="entrada") return <Entrada onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
+  if(portal==="entrada") return <Entrada etapaInicial={portalAnt.current&&portalAnt.current!=="entrada"?"areas":"splash"} onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
   if(portal==="moklog_pin") return <PinMoklog key={divisao} divisao={divisao} sessaoLider={(()=>{ const x=getScopedProjectId(); return x&&divisaoDoProjeto(x)===divisao?x:null; })()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
     if(r.level==="cliente"){ setPortal("cliente"); return; } // PIN de cliente digitado na porta da divisão: abre a Área do Cliente
     if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }
@@ -4398,6 +4404,7 @@ export default function App(){
             <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>{DIVNOME} <span style={{color:"#cc2222"}}>CheckTest</span></div>
             <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}{editingIdx!==null?" · editando":""}</div>
           </div>
+          {editingIdx===null&&<BotaoAreas/>}
           {health&&<HealthRing pct={health.pct} size={46}/>}
         </div>
         {health&&<div style={{height:3,background:"#060c18",borderRadius:2,overflow:"hidden",marginBottom:8}}>
@@ -4544,6 +4551,7 @@ export default function App(){
             <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}><Ico n="predio"/> Jatinox</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>P260A · P260B · P260C</div>
           </div>
+          {!_pidLiderHome&&<BotaoAreas/>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {Object.values(JATINOX_SUBS).filter(jp=>!_pidLiderHome||jp.id===_pidLiderHome).map(jp=>{
@@ -4649,6 +4657,7 @@ export default function App(){
                 <span style={{fontSize:14}}><Ico n="escudo"/></span>Total RS Pendentes: {tp}
               </div>
             ):null;})()}
+            {!_escopoLider&&<BotaoAreas/>}
           </div>
 
           {draft&&groupProjects.includes(draft.projectId)&&(
