@@ -21,11 +21,12 @@ const fundo = { minHeight: "100vh", background: "#0b0f19", color: "#e5e7eb", fon
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
 const botaoVermelho = { background: "#B91C1C", color: "#fff", border: "none", padding: "13px 38px", fontWeight: 900, letterSpacing: 2.5, fontSize: 14, cursor: "pointer", clipPath: chanfro, boxShadow: "none", textTransform: "uppercase" };
 
-export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = false, etapaInicial = "splash" }) {
+export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = true, etapaInicial = "splash" }) {
   const [etapa, setEtapa] = useState(etapaInicial); // splash | video | areas | construcao
   const [emConstrucao, setEmConstrucao] = useState(null);
   const vid = useRef(null);
   const [bloqueado, setBloqueado] = useState(false); // navegador recusou o autoplay → mostra "Tocar"
+  // Vídeo antigo desligado (texto "Moqued", logo antigo, "Mok Dir"). Volta com pularVideo={false} quando houver abertura nova aprovada.
   const entrar = () => { if (pularVideo) setEtapa("areas"); else setEtapa("video"); };
   const fimVideo = () => setEtapa("areas");
   const tocar = () => { const v = vid.current; if (!v) return; const r = v.play(); if (r && r.catch) r.then(() => setBloqueado(false)).catch(() => setBloqueado(true)); };
