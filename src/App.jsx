@@ -44,6 +44,8 @@ import { itensDoEstado, falhasPorSistema } from "./relatorios/metricas";
 import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
 import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
 import PainelCliente from "./cliente/PainelCliente";
+import MostradorSIS, { inclinarCard, soltarCard } from "./ui/MostradorSIS";
+import { aberturaFria, lerRetomada, salvarLocal, marcarVisto } from "./retomar";
 import Entrada from "./entrada/Entrada";
 import PinMoklog from "./entrada/PinMoklog";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
@@ -1057,24 +1059,6 @@ function generateReportText(project, state, meta, photos) {
   if(photos?.length) L.push(`Fotos: ${photos.length} foto(s) registrada(s)`);
   L.push("=".repeat(50));
   return L.join("\n");
-}
-
-// ── StatusRing: anel de progresso com gradiente, trilho e brilho
-function StatusRing({ pct=0, size=64, color="#22c55e", empty=false }) {
-  const sw = 6;
-  const r = (size - sw*2)/2, C = 2*Math.PI*r;
-  const val = Math.max(0, Math.min(100, pct));
-  const off = C*(1 - (empty?0:val)/100);
-  const tone = empty ? "#64748b" : val>=90 ? ESTADOS_MOKED.ok : val>=70 ? ESTADOS_MOKED.parcial : ESTADOS_MOKED.falha;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{flexShrink:0}} role="img" aria-label={empty?"Sem dados":`Saúde operacional: ${val}%`}>
-      <circle cx={size/2} cy={size/2} r={r} stroke={_themeDark?"#475569":"#cbd5e1"} strokeWidth={sw} fill="none"/>
-      {!empty&&<circle cx={size/2} cy={size/2} r={r} stroke={tone} strokeWidth={sw} fill="none"
-        strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} transform={`rotate(-90 ${size/2} ${size/2})`}/>}
-      <text x="50%" y="52%" dominantBaseline="central" textAnchor="middle" fill={_themeDark?"#F3F4F6":"#111827"}
-        fontSize={size*0.28} fontWeight="800" fontFamily="inherit">{empty?"—":val+"%"}</text>
-    </svg>
-  );
 }
 
 // 12/11/2026: o "alvo" redondo saiu; o cabeçalho usa o símbolo oficial Moked (src/MokedSimbolo.jsx).
@@ -3554,10 +3538,21 @@ function DemoBanner(){
 export default function App(){
   const [screen,setScreen]=useState("home");
   // Porta de entrada Moked: "entrada" (logo → vídeo → áreas) | "moklog" (app atual) | "cliente" (Área do Cliente)
-  const [portal,setPortal]=useState("entrada");
+  // Retomada (19/11/2026): fechou sem querer e voltou logo (ou F5) → volta para onde estava, já logado, sem abertura.
+  const [retomada]=useState(()=>lerRetomada());
+  const [aberturaPendente,setAberturaPendente]=useState(()=>!lerRetomada()&&aberturaFria());
+  const [portal,setPortal]=useState(()=>retomada?retomada.portal:"entrada");
   // Voltar de dentro de uma área leva direto à "Escolha a sua área" (não à tela do logo com o botão Entrar).
   const portalAnt=useRef(null);
   useEffect(()=>{ portalAnt.current=portal; },[portal]);
+  // Lembra onde o usuário está (só portal/grupo) e quando foi visto pela última vez.
+  useEffect(()=>{
+    const visto=()=>marcarVisto();
+    const oculta=()=>{ if(document.visibilityState==="hidden") visto(); };
+    const iv=setInterval(()=>{ if(document.visibilityState==="visible") visto(); },60000);
+    document.addEventListener("visibilitychange",oculta); window.addEventListener("pagehide",visto);
+    return ()=>{ clearInterval(iv); document.removeEventListener("visibilitychange",oculta); window.removeEventListener("pagehide",visto); };
+  },[]);
   // Divisão aberta (MokLog | MokPat). O módulo de sessão guarda a mesma informação para validar o PIN na divisão certa.
   const [divisao,setDivisaoEstado]=useState("moklog");
   const MOKPAT=divisao!=="moklog"; // qualquer divisão nova (MokPat, MokImp): mesma casca, sem os itens exclusivos do MokLog
@@ -3658,7 +3653,8 @@ export default function App(){
   const [showEquipe,setShowEquipe]=useState(false);
   const [equipeProject,setEquipeProject]=useState(null);
   const [mapaDiarioProject,setMapaDiarioProject]=useState(null);
-  const [homeGroup,setHomeGroup]=useState(null);
+  const [homeGroup,setHomeGroup]=useState(()=>retomada?.homeGroup||null);
+  useEffect(()=>{ salvarLocal({portal,divisao,homeGroup}); },[portal,divisao,homeGroup]);
   const [showIA,setShowIA]=useState(false); // drawer do Assistente IA Gerencial
   const [jatinoxSel,setJatinoxSel]=useState(null);
   const [project,setProject]=useState(PROJECTS.P601);
@@ -4205,7 +4201,7 @@ export default function App(){
   );
 
   // Porta do MokLog (26/10/2026): PIN antes da Home. Sessão gerencial já aberta pula a porta.
-  if(portal==="entrada") return <Entrada etapaInicial={portalAnt.current&&portalAnt.current!=="entrada"?"areas":"splash"} onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
+  if(portal==="entrada") return <Entrada comAbertura={aberturaPendente} onAberturaFim={()=>setAberturaPendente(false)} etapaInicial={(portalAnt.current&&portalAnt.current!=="entrada")||!aberturaPendente?"areas":"splash"} onEscolher={(a)=>{ if(a==="cliente") setPortal("cliente"); else if(a==="moklog"||DIVISOES[a]){ setDivisaoAtiva(a); setDivisaoEstado(a); setHomeGroup(null); setScreen("home"); if(divisaoDoProjeto(project.id)!==a){ const pj=Object.values(projetosDaDivisao(a))[0]; if(pj) setProject(pj); } setPortal(gerencialNaDivisao(a)?"moklog":"moklog_pin"); } }}/>;
   if(portal==="moklog_pin") return <PinMoklog key={divisao} divisao={divisao} sessaoLider={(()=>{ const x=getScopedProjectId(); return x&&divisaoDoProjeto(x)===divisao?x:null; })()} onVoltar={()=>setPortal("entrada")} onEntrar={(r)=>{
     if(r.level==="cliente"){ setPortal("cliente"); return; } // PIN de cliente digitado na porta da divisão: abre a Área do Cliente
     if(r.level==="lider"&&r.projectId){ const pid=r.projectId; grantAuth(pid,"lider"); entrarNoProjetoDoLider(pid); }
@@ -4868,7 +4864,7 @@ export default function App(){
               const avgPct = healths.length?Math.round(healths.reduce((a,h)=>a+h.pct,0)/healths.length):null;
               const totalInop = healths.reduce((a,h)=>a+h.inop,0);
               return(
-                <button key={grp.key} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
+                <button key={grp.key} className="mk-brilho" onPointerMove={inclinarCard} onPointerLeave={soltarCard} onClick={()=>{setHomeGroup(grp.key);setJatinoxSel(null);}}
                   style={{background:T.card,border:`1px solid ${T.cardBorderNeutral}`,borderRadius:20,padding:"20px 14px 18px",cursor:"pointer",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",boxShadow:T.cardShadow()}}>
                   <span aria-hidden={!hasProblems} style={{...badgeMoked("parcial"),fontSize:10,alignSelf:"flex-end",visibility:hasProblems?"visible":"hidden"}}>Atenção</span>
                   <IconeCliente arq={grp.key} ext={grp.ext} cor={grp.color} fallback={<svg width="52" height="44" viewBox="0 0 52 44" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -4882,12 +4878,12 @@ export default function App(){
                   <div style={{fontSize:11,color:T.cardSub}}>{grp.sub}</div>
                   {avgPct!==null?(
                     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-                      <StatusRing pct={avgPct} size={46} color={avgPct>=90?"#22c55e":avgPct>=70?"#f59e0b":"#ef4444"}/>
+                      <MostradorSIS mini tamanho={58} valor={avgPct} atraso={.15}/>
                       {totalInop>0&&<span style={{...badgeMoked("falha"),fontSize:11}}>{totalInop} inop</span>}
                     </div>
                   ):(
                     <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
-                      <StatusRing empty size={46} color="#6b7280"/>
+                      <MostradorSIS mini tamanho={58} valor={null}/>
                       <span style={{fontSize:12,color:"#9ca3af"}}>Sem dados</span>
                     </div>
                   )}
