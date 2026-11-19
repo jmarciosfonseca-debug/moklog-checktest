@@ -107,9 +107,12 @@ const valItem = (i) => (i.aDefinir ? 0 : i.valor);
 const corItem = (i, r) => (i.aDefinir ? "#6b7280" : fx(i.valor, r).cor);
 
 // ── Barra superior: ☰ · MOKED · 🔔 ──
-export function Barra({ onMenu, onAvisos, avisos = 0 }) {
+export function Barra({ onMenu, onAvisos, avisos = 0, onAreas }) {
   return <div className="barra">
-    <button className="ico" onClick={onMenu} title="Menu" aria-label="Menu">☰</button>
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <button className="ico" onClick={onMenu} title="Menu" aria-label="Menu">☰</button>
+      {onAreas && <button className="ico" onClick={onAreas} title="Escolher outra área" aria-label="Escolher outra área" data-testid="cliente-areas" style={{ width: "auto", padding: "0 10px", fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>← Áreas</button>}
+    </div>
     <div className="logo">MOK<span>E</span>D</div>
     <button className="ico" onClick={onAvisos} title="Avisos" aria-label={`Avisos: ${avisos}`}>🔔{avisos > 0 && <span className="b">{avisos}</span>}</button>
   </div>;

@@ -71,3 +71,9 @@ test("ronda diária: virada de plantão, nomes sem repetição e gate do plantã
   expect(src).toMatch(/Conclua o plantão anterior \(acima\) para registrar as rondas de agora/);
   expect(src).toMatch(/Concluir plantão anterior e abrir o de agora/);
 });
+
+test("atalho 'Áreas' existe nos cabeçalhos internos do gerencial (grupo, Jatinox e formulário)", () => {
+  const fs = require("fs"), app = fs.readFileSync(require("path").join(__dirname, "App.jsx"), "utf8");
+  expect(app).toContain('data-testid="botao-areas"');
+  expect((app.match(/<BotaoAreas\/>/g) || []).length).toBeGreaterThanOrEqual(3);
+});

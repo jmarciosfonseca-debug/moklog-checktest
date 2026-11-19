@@ -4177,6 +4177,9 @@ export default function App(){
     finally{ setSyncing(false); }
   };
 
+  // Atalho para a escolha de área (MokLog, MokPat, Área do Cliente…) de qualquer tela interna, sem passar pelo início.
+  const BotaoAreas=()=>(<button type="button" onClick={()=>{ setHomeGroup(null); setPortal("entrada"); }} aria-label="Escolher outra área" title="Escolher outra área" data-testid="botao-areas" style={{...S.backBtn,fontSize:11,fontWeight:700}}>Áreas ⇥</button>);
+
   const SyncBadge=()=>(
     <>
       {syncing && (
@@ -4398,6 +4401,7 @@ export default function App(){
             <div style={{fontSize:13,fontWeight:900,color:"#f8fafc"}}>{DIVNOME} <span style={{color:"#cc2222"}}>CheckTest</span></div>
             <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{project.id} – {project.name}{editingIdx!==null?" · editando":""}</div>
           </div>
+          {editingIdx===null&&<BotaoAreas/>}
           {health&&<HealthRing pct={health.pct} size={46}/>}
         </div>
         {health&&<div style={{height:3,background:"#060c18",borderRadius:2,overflow:"hidden",marginBottom:8}}>
@@ -4544,6 +4548,7 @@ export default function App(){
             <div style={{fontSize:16,fontWeight:900,color:dark?"#f8fafc":"#0f172a"}}><Ico n="predio"/> Jatinox</div>
             <div style={{fontSize:11,color:"#94a3b8"}}>P260A · P260B · P260C</div>
           </div>
+          {!_pidLiderHome&&<BotaoAreas/>}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {Object.values(JATINOX_SUBS).filter(jp=>!_pidLiderHome||jp.id===_pidLiderHome).map(jp=>{
@@ -4649,6 +4654,7 @@ export default function App(){
                 <span style={{fontSize:14}}><Ico n="escudo"/></span>Total RS Pendentes: {tp}
               </div>
             ):null;})()}
+            {!_escopoLider&&<BotaoAreas/>}
           </div>
 
           {draft&&groupProjects.includes(draft.projectId)&&(

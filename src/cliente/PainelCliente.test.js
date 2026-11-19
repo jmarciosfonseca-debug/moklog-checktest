@@ -153,3 +153,20 @@ test("MokPat na Área do Cliente: cliente do P939 entra direto no projeto; gesto
   t = await abrir({ escopo: "MOKED", pids: null });
   try { expect(t.host.textContent).toContain("2 parques"); expect(t.host.textContent).not.toContain("P939"); } finally { await t.fim(); }
 });
+
+test("logado: botão '← Áreas' em qualquer tela leva direto à escolha de área (sem passar pelo início)", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  const voltar = jest.fn();
+  mockCheckPin.mockImplementation(async (_p, o) => { if (!o.cliente) return null; global.__escopo = { escopo: "GOLGI", pids: ["P601", "P602"] }; return "cliente"; });
+  try {
+    await act(async () => root.render(<PainelCliente PROJECTS={PROJECTS} stored={stored} computeHealth={health} ctmkData={{}} score360={async () => null} risco={async () => null} abrirPDF={mockPDF} onBack={voltar} />));
+    const input = host.querySelector('[aria-label="PIN do cliente"]');
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "1234"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await clicar(botao(host, "ENTRAR")); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    await clicar(botao(host, "Abrir Golgi Cajamar"));
+    await clicar(botao(host, "Menu"));                                       // dentro de uma tela de detalhe (menu ☰)
+    expect(botao(host, "Escolher outra área")).toBeTruthy();
+    await clicar(botao(host, "Escolher outra área"));
+    expect(voltar).toHaveBeenCalledTimes(1);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
