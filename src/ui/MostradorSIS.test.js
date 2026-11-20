@@ -33,3 +33,11 @@ test("valor fora de 0–100 é limitado", async () => {
   const { m, fim } = await montar(<MostradorSIS mini valor={140} />);
   expect(m.textContent).toContain("100%"); fim();
 });
+
+test("anel fino é variante do mesmo mostrador e a lista de projetos do grupo usa", async () => {
+  const { m, fim } = await montar(<MostradorSIS mini fino valor={72} />);
+  expect(m.className).toContain("fino");
+  expect(m.textContent).toContain("72%"); fim();
+  const app = require("fs").readFileSync("src/App.jsx", "utf8");
+  expect(app).toContain("<MostradorSIS mini fino tamanho={52} valor={h.pct}");
+});
