@@ -31,7 +31,9 @@ export function Avatar({ fotos, pessoaId, nome, tam = 36, dark, cor = "#64748b" 
     : <span aria-hidden="true" data-testid="avatar-iniciais" style={{ ...base, display: "inline-flex", alignItems: "center", justifyContent: "center", background: dark ? "#1e293b" : "#e2e8f0", color: dark ? "#cbd5e1" : "#475569", fontSize: Math.round(tam * 0.36), fontWeight: 800 }}>{iniciais(nome)}</span>;
 }
 
-export default function MapaVisual({ mapa, dark, fotos = null }) {
+export default function MapaVisual({ mapa, dark, fotos = null, onPessoa = null }) {
+  // onPessoa (opcional, Área do Cliente): torna foto/nome tocáveis para abrir o cartão de identidade
+  const tocar = (info, filho) => (onPessoa && (info.nome || "").trim() ? <button type="button" aria-label={`Ver identificação de ${info.nome}`} onClick={() => onPessoa(info)} style={{ background: "none", border: 0, padding: 0, cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>{filho}</button> : filho);
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#94a3b8" : "#64748b";
   const borda = dark ? "#1e293b" : "#e2e8f0";
@@ -50,7 +52,8 @@ export default function MapaVisual({ mapa, dark, fotos = null }) {
   return (
     <div data-testid="mapa-visual" style={{ background: fundo, border: `1px solid ${borda}`, borderRadius: 12, padding: 10, display: "grid", gap: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: 12, color: txt2 }}>
-        <span>Líder: <b style={{ color: txt }}>{lider || "—"}</b></span>
+        <span>Líder: {onPessoa && lider ? (() => { const pl = postos.find((x) => (x.pessoaNome || "").trim() === String(lider).trim()); const info = { pessoaId: pl?.pessoaId, nome: lider, posto: pl?.rotulo || "Líder", situacao: pl?.situacao || "presente", foto: pl ? fotoDaPessoa(fotos, pl.pessoaId, pl.pessoaNome) : fotoDaPessoa(fotos, "", lider), lider: true };
+          return <button type="button" aria-label={`Ver identificação de ${lider}`} onClick={() => onPessoa(info)} style={{ background: "none", border: 0, padding: 0, cursor: "pointer", color: txt, fontWeight: 700, fontSize: "inherit", textDecoration: "underline dotted" }}>{lider}</button>; })() : <b style={{ color: txt }}>{lider || "—"}</b>}</span>
         <span>{rascunho ? <Pilula tipo="atraso">Rascunho — ainda não concluído</Pilula> : `Concluído ${horaBR(mapa.enviadoEm)} · ${dataBR((mapa.enviadoEm || "").slice(0, 10) || mapa.data)}`}</span>
       </div>
 
@@ -73,7 +76,7 @@ export default function MapaVisual({ mapa, dark, fotos = null }) {
           const { detalhe } = p.situacao && p.situacao !== "presente" ? detalheDoPosto(p, postos) : { detalhe: "" };
           return (
             <div key={p.id || i} style={{ display: "flex", alignItems: "center", gap: 10, borderLeft: `4px solid ${e.cor}`, background: dark ? "#0f172a" : "#fff", borderRadius: 8, padding: "6px 10px" }}>
-              <Avatar fotos={fotos} pessoaId={p.pessoaId} nome={p.pessoaNome} dark={dark} cor={e.cor} />
+              {tocar({ pessoaId: p.pessoaId, nome: p.pessoaNome, posto: p.rotulo, situacao: p.situacao || "presente", foto: fotoDaPessoa(fotos, p.pessoaId, p.pessoaNome) }, <Avatar fotos={fotos} pessoaId={p.pessoaId} nome={p.pessoaNome} dark={dark} cor={e.cor} />)}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: txt2, textTransform: "uppercase", letterSpacing: ".05em" }}>{p.rotulo || "Posto"}{p.horario ? ` · ${String(p.horario.inicio || "").replace(":", "h")}–${String(p.horario.fim || "").replace(":", "h")}` : ""}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: txt, overflowWrap: "anywhere" }}>{(p.pessoaNome || "").trim() || "—"}</div>

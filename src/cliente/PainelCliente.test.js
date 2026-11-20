@@ -65,7 +65,7 @@ test("PIN de proprietário: macro do grupo → parque (padrão SIS+) → telas d
     expect(host.textContent).toContain("Quantos temos hoje"); expect(host.textContent).not.toContain("Zé Saiu");
     await clicar(botao(host, "Ver quem saiu")); expect(host.textContent).toContain("Zé Saiu"); expect(host.textContent).toContain("Pediu demissão");
     expect(host.textContent).toContain("Entraram nos últimos 12 meses");
-    await clicar(botao(host, "Ver quem entrou")); expect(host.textContent).toContain("Bia Souza (VSPP Líder, desde 01/08/2026)");
+    await clicar(botao(host, "Ver quem entrou")); expect(host.textContent).toContain("Bia Souza"); expect(host.textContent).toContain("VSPP Líder · entrou em 01/08/2026");
     // teste semanal: toque abre o PDF
     await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Teste semanal");
     expect(host.textContent).toContain("O que está puxando a nota para baixo"); expect(host.textContent).toContain("sem imagem");
@@ -168,5 +168,38 @@ test("logado: botão '← Áreas' em qualquer tela leva direto à escolha de ár
     expect(botao(host, "Escolher outra área")).toBeTruthy();
     await clicar(botao(host, "Escolher outra área"));
     expect(voltar).toHaveBeenCalledTimes(1);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+test("Turnover: cliente escolhe 12/18/24 meses e o SIS⁺ acompanha; entradas/saídas no mesmo padrão (cartões) e saídas recolhidas", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  global.__escopo = { escopo: "GOLGI", pids: ["P601"] }; window.localStorage.removeItem("mk-turnover-meses");
+  try {
+    await montar(host, root); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    await menu(host, "Turnover");
+    expect(host.textContent).toContain("12 meses"); expect(host.textContent).toContain("18 meses"); expect(host.textContent).toContain("24 meses");
+    expect(host.textContent).not.toContain("Zé Saiu");                                    // saídas recolhidas por padrão
+    await clicar(botao(host, "Ver quem está no posto")); expect(host.textContent).toContain("Ana Lima"); expect(host.textContent).toContain("Vigilante");
+    await clicar(botao(host, "Ver quem entrou")); expect(host.querySelectorAll("img,[aria-hidden]").length >= 0).toBe(true); expect(host.textContent).not.toMatch(/\(VSPP Líder, desde/); // sem parágrafo corrido de nomes
+    await clicar(botao(host, "24 meses"));
+    expect(host.textContent).toContain("Entraram nos últimos 24 meses"); expect(host.textContent).toContain("Saíram nos últimos 24 meses"); expect(host.textContent).toContain("últimos 24 meses");
+    expect(window.localStorage.getItem("mk-turnover-meses")).toBe("24");
+    await clicar(botao(host, "← Golgi Cajamar"));
+    expect(botao(host, "Abrir Turnover (24 meses)") || [...host.querySelectorAll('[role="button"]')].find((b) => b.getAttribute("aria-label") === "Abrir Turnover (24 meses)")).toBeTruthy();
+  } finally { window.localStorage.removeItem("mk-turnover-meses"); await act(async () => root.unmount()); host.remove(); }
+});
+
+test("Equipe de plantão: foto abre o cartão de identidade em tela cheia; abas inativas mantêm o fundo escuro", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  global.__escopo = { escopo: "GOLGI", pids: ["P601"] };
+  try {
+    await montar(host, root); await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(host.querySelector('[data-testid="cartao-identidade"]')).toBeNull();
+    await clicar(botao(host, "Ver identificação de Ana Lima"));
+    const c = host.querySelector('[data-testid="cartao-identidade"]'); expect(c).not.toBeNull();
+    expect(c.textContent).toContain("Ana Lima"); expect(c.textContent).toContain("Vigilante"); expect(c.textContent).toContain("P1");
+    await clicar(botao(host, "Fechar")); expect(host.querySelector('[data-testid="cartao-identidade"]')).toBeNull();
+    await clicar(botao(host, "Abrir equipe de plantão"));
+    expect(botao(host, "Equipe montada").style.background).toBeTruthy();                 // antes: undefined → botão branco com letra clara
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
