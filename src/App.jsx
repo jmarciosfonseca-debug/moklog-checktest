@@ -4681,7 +4681,7 @@ export default function App(){
                 <div key={pid} style={{background:isActive?T.listBgActive:T.listBg,border:`2px solid ${isActive?color+"66":T.listBorder}`,boxShadow:dark?"none":"0 1px 3px rgba(15,23,42,.08)",borderRadius:16,padding:"16px 14px",cursor:"pointer"}}
                   onClick={()=>setProject(p)}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
-                    {h?<HealthRing pct={h.pct} size={50}/>:
+                    {h?<MostradorSIS mini fino tamanho={52} valor={h.pct} atraso={.1}/>:
                       <div style={{width:50,height:50,borderRadius:"50%",border:"2px solid #1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"#94a3b8"}}>—</div>}
                     <div style={{flex:1}}>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>

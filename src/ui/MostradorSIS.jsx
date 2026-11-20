@@ -32,6 +32,12 @@ export const CSS_MOSTRADOR = `
 .mkd.mini .mkd-num{font-size:calc(var(--s)*.27)}
 .mkd.mini .mkd-needle line{stroke-width:9}
 .mkd.mini .mkd-ticks{display:none}
+/* Anel fino: mesmo mostrador do SIS, aro mais delgado, para listas com vários itens (não pesar a tela). */
+.mkd.fino .mkd-ring,.mkd.fino .mkd-sheen{-webkit-mask:radial-gradient(circle,transparent 63%,#000 64%,#000 70%,transparent 71%);mask:radial-gradient(circle,transparent 63%,#000 64%,#000 70%,transparent 71%)}
+.mkd.fino .mkd-face{inset:11%}
+.mkd.fino .mkd-txt{inset:11%}
+.mkd.fino .mkd-num{font-size:calc(var(--s)*.25)}
+.mkd.fino .mkd-needle line{display:none}
 .mkd.vazio .mkd-needle{display:none}
 .mkd.vazio .mkd-num{color:#6b7280}
 /* Brilho (Marcio, 19/11): reflexo suave nos cards de vitrine. Não muda tamanho nem posição de nada. */
@@ -83,7 +89,7 @@ function useContagem(alvo, atrasoMs, ligado) {
  * scan: ponteiro varrendo, sem número (abertura)
  * intensidade: 0.6 sutil (padrão) · 1.3 marcado
  */
-export default function MostradorSIS({ valor = null, tamanho, mini = false, scan = false, intensidade = 0.6, atraso = 0.2, inclinar = false, rotulo = "MOKED", legenda = "Sistema Integrado de Segurança", className = "", style }) {
+export default function MostradorSIS({ valor = null, tamanho, mini = false, fino = false, scan = false, intensidade = 0.6, atraso = 0.2, inclinar = false, rotulo = "MOKED", legenda = "Sistema Integrado de Segurança", className = "", style }) {
   const ref = useRef(null);
   const tem = typeof valor === "number" && !scan;
   const n = useContagem(tem ? Math.max(0, Math.min(100, valor)) : null, atraso * 1000 + 250, !mini);
@@ -102,7 +108,7 @@ export default function MostradorSIS({ valor = null, tamanho, mini = false, scan
   const vars = { "--k": intensidade, "--a": v, "--d": `${atraso}s`, ...(tamanho ? { "--s": `${tamanho}px` } : null), ...style };
   const aria = scan ? "Mostrador SIS+ (decorativo)" : tem ? `SIS ${v}%` : "Sem dados";
   return (
-    <div ref={ref} className={`mkd${mini ? " mini" : ""}${scan ? " scan" : ""}${tem || scan ? "" : " vazio"} ${className}`.trim()} style={vars}
+    <div ref={ref} className={`mkd${mini ? " mini" : ""}${fino ? " fino" : ""}${scan ? " scan" : ""}${tem || scan ? "" : " vazio"} ${className}`.trim()} style={vars}
       role="img" aria-label={aria} data-testid="mostrador-sis" onPointerMove={mover} onPointerLeave={soltar}>
       <div className="mkd-tilt">
         <div className="mkd-rim" /><div className="mkd-well" /><div className="mkd-ring" /><div className="mkd-sheen" /><div className="mkd-face" />
