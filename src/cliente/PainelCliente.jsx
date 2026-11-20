@@ -5,7 +5,8 @@ import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { checkPin, clearSession, getClienteScope } from "../session";
 import { carregarFotos, fotoDe } from "../fotosEquipe";
-import { testeSemanal, equipeResumo, mapaResumo, equipamentosResumo, consolidarGrupo, sistemasResumo, luzes, GRUPOS_CLIENTE } from "./metricas";
+import CartaoIdentidade from "./CartaoIdentidade";
+import { PERIODOS_TURNOVER, testeSemanal, equipeResumo, mapaResumo, equipamentosResumo, consolidarGrupo, sistemasResumo, luzes, GRUPOS_CLIENTE } from "./metricas";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "../v360Perimetral";
 import { ROTULO_SITUACAO } from "../mapaDiario/modelo";
 import VerMapasProjeto from "../mapaDiario/VerMapasProjeto";
@@ -105,10 +106,10 @@ function MostradorRisco({ risco, tam = 180 }) {
 
 // ── Detalhes ──────────────────────────────────────────────────────────────────
 function Abas({ abas, atual, onMudar }) {
-  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? "#FF1E27" : "#3a3a42", color: atual === k ? "#fecaca" : "#d1d5db", background: atual === k ? "#2a0b0e" : undefined, boxShadow: atual === k ? "0 0 10px #FF1E2755" : "none" }}>{r}</button>)}</div>;
+  return <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>{abas.map(([k, r]) => <button key={k} aria-pressed={atual === k} onClick={() => onMudar(k)} style={{ ...C.back, flex: 1, textAlign: "center", borderColor: atual === k ? "#FF1E27" : "#3a3a42", color: atual === k ? "#fecaca" : "#d1d5db", background: atual === k ? "#2a0b0e" : C.back.background, boxShadow: atual === k ? "0 0 10px #FF1E2755" : "none" }}>{r}</button>)}</div>;
 }
 
-function Detalhe({ p, tipo, onBack, abrirPDF }) {
+function Detalhe({ p, tipo, onBack, abrirPDF, onPessoa, mesesTurn = 12, onMeses }) {
   const s = p.sistemas;
   const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false), [verEntradas, setVerEntradas] = useState(false), [aberto, setAberto] = useState({}), [maisTestes, setMaisTestes] = useState(false);
   const alternar = (k) => setAberto((a) => ({ ...a, [k]: !a[k] }));
@@ -156,7 +157,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
 
     {tipo === "plantao" && <>
       <Abas abas={[["mapa", "Mapa de hoje"], ["equipe", "Equipe montada"], ["maturidade", "Maturidade"]]} atual={aba} onMudar={setAba} />
-      {aba === "mapa" && <div style={C.card}>{vig ? <VerMapasProjeto projetoId={p.pid} data={vig.data} turno={vig.turno} dark /> : <div style={C.micro}>Sem turno configurado.</div>}</div>}
+      {aba === "mapa" && <div style={C.card}>{vig ? <VerMapasProjeto projetoId={p.pid} data={vig.data} turno={vig.turno} dark onPessoa={onPessoa} /> : <div style={C.micro}>Sem turno configurado.</div>}</div>}
       {aba === "maturidade" && <div style={C.card}><QuadroEfetivo projectId={p.pid} equipe={p.equipeDoc} hoje={hojeISO()} dark /><div style={{ height: 10 }} /><MaturidadeResumo equipe={p.equipeDoc} hoje={hojeISO()} dark /></div>}
       {aba === "equipe" && montarEquipesDisponivel(p.pid, p.equipeDoc.colaboradores) && <div style={C.card}><EquipesMontadas colaboradores={p.equipeDoc.colaboradores} fotos={p.fotos} dark /></div>}
       {aba === "equipe" && !montarEquipesDisponivel(p.pid, p.equipeDoc.colaboradores) && <div style={C.card}>
@@ -167,23 +168,45 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       </div>}
     </>}
 
-    {tipo === "turnover" && <div style={C.card}>
-      <Mostrador valor={p.equipe.turnover} max={50} invertido rotulo="Turnover 12 m" cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="saídas ÷ efetivo médio · últimos 12 meses" />
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-        <tbody>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Quantos temos hoje</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #2a2a31" }}>{p.equipe.ativos}</td></tr>
-          {Object.entries(p.equipe.porCargo).map(([c, n]) => <tr key={c}><td style={{ padding: "3px 0 3px 12px", color: "#9ca3af" }}>{c}</td><td style={{ textAlign: "right", color: "#9ca3af" }}>{n}</td></tr>)}
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Entraram nos últimos 12 meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem entrou" onClick={() => setVerEntradas((v) => !v)} style={{ ...C.back, color: VERDE, fontWeight: 900 }}>{p.equipe.entradas12m} {verEntradas ? "▴" : "▾ ver quem"}</button></td></tr>
-          {verEntradas && <tr><td colSpan={2} style={{ padding: "4px 0 8px 12px", color: "#9ca3af", fontSize: 11.5 }}>{p.equipe.entradas12mLista.length ? p.equipe.entradas12mLista.map((c) => `${c.nome} (${c.cargo || "—"}, desde ${fmtD(c.desde)})`).join(" · ") : "Ninguém admitido no período."}</td></tr>}
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Saíram nos últimos 12 meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem saiu" onClick={() => setVerSaidas((v) => !v)} style={{ ...C.back, color: VERMELHO2, fontWeight: 900 }}>{p.equipe.saidas12m} {verSaidas ? "▴" : "▾ ver quem"}</button></td></tr>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Total de desligamentos registrados</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31", color: "#9ca3af" }}>{p.desligados.length}</td></tr>
-        </tbody>
-      </table>
-      {verSaidas && <div style={{ marginTop: 8 }}>
-        {p.desligados.length === 0 && <div style={C.micro}>Nenhum desligamento registrado.</div>}
-        {p.desligados.map((c, i) => <Linha key={c.id || i} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={38} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.saida ? ` · saiu em ${fmtD(c.saida)}` : ""}{c.motivo ? ` · ${c.motivo}` : ""}</div></div></Linha>)}
-      </div>}
-    </div>}
+    {tipo === "turnover" && (() => {
+      const m = p.equipe.meses || 12, f = m / 12, hojeD = hojeISO();
+      const colabPorId = Object.fromEntries(p.colabs.map((c) => [c.id, c]));
+      const entradas = (p.equipe.entradas12mLista || []).map((c) => ({ ...c, foto: colabPorId[c.id]?.foto }));
+      // saídas do período, sem duplicidade (mesmo id, ou mesmo nome + data)
+      const vistos = new Set();
+      const saidas = p.desligados.filter((c) => c.saida && c.saida >= p.equipe.inicio && c.saida <= hojeD && (() => { const k = c.id || `${(c.nome || "").toLowerCase()}|${c.saida}`; if (vistos.has(k)) return false; vistos.add(k); return true; })())
+        .sort((a, b) => String(b.saida).localeCompare(String(a.saida)));
+      const anteriores = p.desligados.filter((c) => !saidas.includes(c));
+      const Cartao = ({ c, destaque, rodape }) => <Linha primeiro={false}><Avatar foto={c.foto} nome={c.nome} tam={destaque ? 48 : 40} /><div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12.5, fontWeight: 800, overflowWrap: "anywhere" }}>{c.nome}</div><div style={C.micro}>{rodape}</div></div></Linha>;
+      const Cab = ({ titulo, n, cor, aberto, onClick, aria }) => <button aria-label={aria} aria-expanded={aberto} onClick={onClick} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "transparent", border: "none", borderTop: "1px solid #2a2a31", color: "inherit", cursor: "pointer", textAlign: "left", padding: "10px 0", font: "inherit", fontSize: 12.5 }}>
+        <span>{titulo}</span><span style={{ ...C.chip(cor), margin: 0, fontSize: 12, fontWeight: 900 }}>{n} {aberto ? "▴" : "▾"}</span></button>;
+      return <div style={C.card}>
+        <div role="group" aria-label="Período do turnover" style={{ display: "flex", gap: 6, marginBottom: 6 }}>{PERIODOS_TURNOVER.map((x) => <button key={x} aria-pressed={m === x} onClick={() => onMeses && onMeses(x)} style={{ ...C.back, flex: 1, textAlign: "center", fontWeight: 800, borderColor: m === x ? "#FF1E27" : "#3a3a42", color: m === x ? "#fecaca" : "#d1d5db", background: m === x ? "#2a0b0e" : C.back.background, boxShadow: m === x ? "0 0 10px #FF1E2755" : "none" }}>{x} meses</button>)}</div>
+        <Mostrador valor={p.equipe.turnover} max={50 * f} invertido rotulo={`Turnover ${m} m`} cor={corTurnover(p.equipe.turnover === null ? null : p.equipe.turnover / f)} zonas={[[0, 5 * f, VERDE], [5 * f, 12.5 * f, AMARELO], [12.5 * f, 25 * f, LARANJA], [25 * f, 50 * f, VERMELHO2]]} sub={`saídas ÷ efetivo médio · últimos ${m} meses`} />
+        {m !== 12 && typeof p.equipe.turnover === "number" && <div style={{ ...C.micro, textAlign: "center", marginTop: -6, marginBottom: 8 }}>≈ {(Math.round((p.equipe.turnover * 12 / m) * 10) / 10).toLocaleString("pt-BR")}% ao ano · a nota SIS⁺ usa o valor anualizado</div>}
+        {p.equipe.turnover === null && <div style={{ ...C.micro, textAlign: "center", marginBottom: 8 }}>Não aferido: {p.equipe.turnoverMotivo}</div>}
+
+        <div data-testid="no-posto" style={{ border: "1px solid #22c55e66", background: "linear-gradient(160deg, #0f1a13, #0b0b0e 70%)", boxShadow: "0 0 18px #22c55e1f", padding: "10px 12px", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 2, color: "#4ade80", textTransform: "uppercase" }}>Quantos temos hoje</span><span style={{ fontSize: 26, fontWeight: 900 }}>{p.equipe.ativos}</span></div>
+          {Object.entries(p.equipe.porCargo).map(([c, n]) => <div key={c} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", padding: "2px 0 2px 12px" }}><span>{c}</span><span>{n}</span></div>)}
+          <button aria-label="Ver quem está no posto" aria-expanded={!!aberto.ativos} onClick={() => alternar("ativos")} style={{ ...C.back, width: "100%", marginTop: 8, color: "#86efac", borderColor: "#22c55e66" }}>{aberto.ativos ? "▴ Recolher equipe" : "▾ Ver quem está no posto"}</button>
+          {aberto.ativos && <div>{p.colabs.map((c) => <Cartao key={c.id} c={c} destaque rodape={`${c.cargo || "—"}${c.desde ? ` · desde ${fmtD(c.desde)}` : ""}`} />)}</div>}
+        </div>
+
+        <Cab aria="Ver quem entrou" titulo={`Entraram nos últimos ${m} meses`} n={p.equipe.entradas12m} cor={VERDE} aberto={verEntradas} onClick={() => setVerEntradas((v) => !v)} />
+        {verEntradas && <div>{entradas.length ? entradas.map((c) => <Cartao key={c.id || c.nome} c={c} rodape={`${c.cargo || "—"} · entrou em ${fmtD(c.desde)}`} />) : <div style={{ ...C.micro, padding: "4px 0 8px" }}>Ninguém admitido no período.</div>}</div>}
+
+        <Cab aria="Ver quem saiu" titulo={`Saíram nos últimos ${m} meses`} n={p.equipe.saidas12m} cor={VERMELHO2} aberto={verSaidas} onClick={() => setVerSaidas((v) => !v)} />
+        {verSaidas && <div>
+          {saidas.length === 0 && <div style={{ ...C.micro, padding: "4px 0 8px" }}>Nenhum desligamento no período.</div>}
+          {saidas.map((c, i) => <Cartao key={c.id || i} c={c} rodape={`${c.cargo || "—"}${c.saida ? ` · saiu em ${fmtD(c.saida)}` : ""}${c.motivo ? ` · ${c.motivo}` : ""}`} />)}
+        </div>}
+
+        <Cab aria="Ver desligamentos anteriores" titulo="Desligamentos anteriores ao período" n={anteriores.length} cor={CINZA} aberto={!!aberto.antes} onClick={() => alternar("antes")} />
+        {aberto.antes && <div>{anteriores.map((c, i) => <Cartao key={c.id || i} c={c} rodape={`${c.cargo || "—"}${c.saida ? ` · saiu em ${fmtD(c.saida)}` : ""}${c.motivo ? ` · ${c.motivo}` : ""}`} />)}</div>}
+        <div style={{ ...C.micro, borderTop: "1px solid #2a2a31", paddingTop: 8 }}>Total de desligamentos registrados: {p.desligados.length}</div>
+      </div>;
+    })()}
 
     {tipo === "equip" && <div style={C.card}>
       <div style={{ ...C.micro, marginBottom: 6 }}>{p.equip.total} itens · {p.equip.ok} ok · {p.equip.parcial} parciais · {p.equip.inop} inoperantes</div>
@@ -256,7 +279,7 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
 export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkData, score360, risco, abrirPDF, onBack }) {
   const [escopo, setEscopo] = useState(() => getClienteScope());
   const [pin, setPin] = useState(""), [erro, setErro] = useState("");
-  const [dados, setDados] = useState(null), [carregando, setCarregando] = useState(false);
+  const [dadosBruto, setDados] = useState(null), [carregando, setCarregando] = useState(false);
   const [pid, setPidBruto] = useState(null), [pilha, setPilha] = useState([]); // pilha de telas de detalhe (SIS+ → pilar → indicador → dados)
   const detalhe = pilha.length ? pilha[pilha.length - 1] : null;
   const abrirDetalhe = (t) => setPilha((s) => [...s, t]), voltarDetalhe = () => setPilha((s) => s.slice(0, -1));
@@ -269,6 +292,12 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const [favs, setFavs] = useState(() => lerFavoritos(getClienteScope()?.escopo));
   useEffect(() => { if (escopo) setFavs(lerFavoritos(escopo.escopo)); }, [escopo]);
   const alternarFav = (id) => setFavs((f) => { const n = f.includes(id) ? f.filter((x) => x !== id) : [...f, id]; gravarFavoritos(escopo?.escopo, n); return n; });
+  // Período do turnover (12/18/24 meses): escolhido na tela de Turnover; a nota SIS⁺ acompanha. Lembrado neste aparelho.
+  const [mesesTurn, setMesesTurn] = useState(() => { try { const v = Number(localStorage.getItem("mk-turnover-meses")); return PERIODOS_TURNOVER.includes(v) ? v : 12; } catch { return 12; } });
+  const escolherMeses = (m) => { setMesesTurn(m); try { localStorage.setItem("mk-turnover-meses", String(m)); } catch {} };
+  const dadosBase = dadosBruto;
+  const dados = useMemo(() => { if (!dadosBase || mesesTurn === 12) return dadosBase; const o = {}; for (const [k, x] of Object.entries(dadosBase)) { const per = x.equipe?.periodos?.[mesesTurn]; o[k] = per ? { ...x, equipe: { ...x.equipe, ...per } } : x; } return o; }, [dadosBase, mesesTurn]);
+  const [cartao, setCartao] = useState(null);
   const sisAtual = useMemo(() => (pid && dados?.[pid] ? calcularSIS(dados[pid], gerencial ? reguaId : "cliente") : null), [pid, dados, reguaId, gerencial]);
   const sisOutra = useMemo(() => (gerencial && pid && dados?.[pid] ? calcularSIS(dados[pid], reguaId === "moked" ? "cliente" : "moked") : null), [pid, dados, reguaId, gerencial]);
   const [falhas, setFalhas] = useState({}), [atualizadoEm, setAtualizadoEm] = useState(null), [versao, setVersao] = useState(0);
@@ -314,7 +343,15 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const sisPorPid = useMemo(() => { const o = {}; Object.values(dados || {}).forEach((x) => { try { o[x.pid] = calcularSIS(x, gerencial ? reguaId : "cliente"); } catch { o[x.pid] = null; } }); return o; }, [dados, reguaId, gerencial]);
   const hhmm = atualizadoEm ? atualizadoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
   const avisos = pAtual ? pAtual.luzes.filter((l) => l.on) : Object.values(dados || {}).flatMap((x) => x.luzes.filter((l) => l.on).map((l) => ({ ...l, parque: x.nome })));
-  const plantao = pAtual ? pAtual.mapa.lista.map((x) => ({ ...x, foto: pAtual.colabs.find((k) => k.id === x.pessoaId)?.foto, cor: corSit(x.situacao), situacaoRotulo: ROTULO_SITUACAO[x.situacao] || x.situacao })) : [];
+  const plantao = pAtual ? pAtual.mapa.lista.map((x) => { const k = pAtual.colabs.find((c) => c.id === x.pessoaId); return { ...x, foto: k?.foto, cor: corSit(x.situacao), situacaoRotulo: ROTULO_SITUACAO[x.situacao] || x.situacao, cargo: k?.cargo, turno: k?.turno, desde: k?.desde, treinos: k?.treinos, lider: /l[ií]der/i.test(`${x.posto || ""} ${k?.cargo || ""}`) }; }) : [];
+  // Cartão de identidade: completa com o cadastro (por id; sem id, pelo nome) o que o mapa não traz
+  const abrirCartao = (x) => {
+    if (!x || !pAtual) return;
+    const nm = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const k = pAtual.colabs.find((c) => (x.pessoaId && c.id === x.pessoaId) || (x.nome && nm(c.nome) === nm(x.nome)));
+    const sit = x.situacao || "presente";
+    setCartao({ nome: x.nome || k?.nome, posto: x.posto, situacaoRotulo: x.situacaoRotulo || ROTULO_SITUACAO[sit] || sit, cor: x.cor || corSit(sit), foto: x.foto || k?.foto, cargo: x.cargo || k?.cargo, turno: x.turno || k?.turno, desde: x.desde || k?.desde, treinos: x.treinos ?? k?.treinos, lider: x.lider || /l[ií]der/i.test(`${x.posto || ""} ${k?.cargo || ""}`) });
+  };
   const irMenu = (k) => {
     if (k === "sair") return sair();
     if (k === "atualizar") { setPilha([]); return setVersao((v) => v + 1); }
@@ -347,13 +384,13 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   else if (detalhe === "comunicar") tela = <TelaComunicar onVoltar={voltarDetalhe} />;
   else if (pAtual) {
     const sis = sisAtual, comum = { sis, favs, onFav: alternarFav, onIr: abrirDetalhe, onVoltar: voltarDetalhe };
-    if (!detalhe) tela = <Home p={pAtual} sis={sis} favs={favs} onIr={abrirDetalhe} atualizado={hhmm} plantao={plantao} />;
+    if (!detalhe) tela = <Home p={pAtual} sis={sis} favs={favs} onIr={abrirDetalhe} atualizado={hhmm} plantao={plantao} onPessoa={abrirCartao} />;
     else if (detalhe === "sis") tela = <TelaSis {...comum} />;
     else if (detalhe === "favs") tela = <TelaFavs {...comum} />;
     else if (detalhe.startsWith("pilar:")) tela = <TelaPilar k={detalhe.slice(6)} {...comum} />;
     else if (detalhe.startsWith("ind:")) tela = <TelaItem id={detalhe.slice(4)} p={pAtual} sisOutra={sisOutra} {...comum} />;
     else if (detalhe === "local") tela = <><Voltar>Localização</Voltar><Localizacao pid={pAtual.pid} nome={pAtual.nome} /></>;
-    else tela = <Detalhe key={detalhe} p={pAtual} tipo={detalhe} onBack={voltarDetalhe} abrirPDF={abrirPDF} />;
+    else tela = <Detalhe key={detalhe} p={pAtual} tipo={detalhe} onBack={voltarDetalhe} abrirPDF={abrirPDF} onPessoa={abrirCartao} mesesTurn={mesesTurn} onMeses={escolherMeses} />;
   } else if (dados) {
     const parques = Object.values(dados), g = consolidarGrupo(dados);
     const riscoPior = Math.max(0, ...parques.map((x) => x.risco?.nivel || 0));
@@ -380,5 +417,6 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
       </div>}
       {!carregando && tela}
     </div>
+    <CartaoIdentidade pessoa={cartao} onFechar={() => setCartao(null)} />
   </main>;
 }

@@ -115,10 +115,12 @@ export function desligadosUnicos(desligados, ativos = []) {
 
 // Turnover dos últimos 12 meses = saídas ÷ efetivo médio × 100.
 //  efetivo médio = (efetivo no início + efetivo hoje) ÷ 2; efetivo no início = ativos hoje − entradas + saídas (janela de 12 meses).
-export function calcularEstabilidade(equipe, hoje) {
+// `meses` (12 por padrão; o cliente escolhe 12/18/24): a janela e o efetivo médio seguem o período; o resultado é o % acumulado nele.
+export function calcularEstabilidade(equipe, hoje, meses = 12) {
   const fim = data(hoje);
   if (fim === null) throw new Error('Data de referência inválida');
-  const inicio = new Date(fim); inicio.setUTCFullYear(inicio.getUTCFullYear() - 1);
+  const inicio = new Date(fim);
+  if (meses % 12 === 0) inicio.setUTCFullYear(inicio.getUTCFullYear() - meses / 12); else inicio.setUTCMonth(inicio.getUTCMonth() - meses);
   const ativos = (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo');
   const { unicos: desligados, duplicadosIgnorados } = desligadosUnicos(equipe.desligados, ativos);
   const naJanela = d => d !== null && d >= +inicio && d <= fim;
@@ -133,7 +135,7 @@ export function calcularEstabilidade(equipe, hoje) {
   const motivoNaoAferido = turnover !== null ? null : incompleto
     ? `${semDataEntrada ? `${semDataEntrada} ativo(s) sem data de admissão` : ''}${semDataEntrada && semDataSaida ? ' e ' : ''}${semDataSaida ? `${semDataSaida} desligado(s) sem data de saída` : ''}`
     : 'efetivo médio abaixo de 3';
-  return { efetivoMedio, efetivoInicial, ativosHoje: ativos.length, entradas12m: entradas, desligados12m: saidas, duplicadosIgnorados, turnover, motivoNaoAferido, estabilidade: turnover === null ? null : Math.max(0, 100 - 2 * turnover) };
+  return { meses, inicio: inicio.toISOString().slice(0, 10), efetivoMedio, efetivoInicial, ativosHoje: ativos.length, entradas12m: entradas, desligados12m: saidas, duplicadosIgnorados, turnover, motivoNaoAferido, estabilidade: turnover === null ? null : Math.max(0, 100 - 2 * turnover) };
 }
 
 export function agregarEquipe(individuos, estabilidade) {

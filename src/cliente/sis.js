@@ -150,7 +150,9 @@ export const INDICADORES = [
   { id: "turnover", pilar: "RH", nome: "Turnover (12 meses)", peso: 2, origem: "app", abrir: "turnover", calc: (p, r) => {
     const t = p.equipe?.turnover;
     if (typeof t !== "number") return { valor: null, texto: `Turnover não aferido${p.equipe?.turnoverMotivo ? ` (${p.equipe.turnoverMotivo})` : ""}.` };
-    return { valor: lim(100 - t * (r.id === "moked" ? 3 : 2)), texto: `${t.toLocaleString("pt-BR")}% em 12 meses · ${plural(p.equipe.saidas12m || 0, "saída")} · ${plural(p.equipe.entradas12m || 0, "entrada")}.` };
+    // O cliente escolhe 12/18/24 meses; a nota usa o turnover ANUALIZADO (t × 12 ÷ meses) para não punir quem olha um período maior.
+    const m = p.equipe?.meses || 12, anual = t * 12 / m;
+    return { valor: lim(100 - anual * (r.id === "moked" ? 3 : 2)), texto: `${t.toLocaleString("pt-BR")}% em ${m} meses${m === 12 ? "" : ` (≈ ${(Math.round(anual * 10) / 10).toLocaleString("pt-BR")}% ao ano)`} · ${plural(p.equipe.saidas12m || 0, "saída")} · ${plural(p.equipe.entradas12m || 0, "entrada")}.` };
   } },
   { id: "treino", pilar: "RH", nome: "Treinamento e reciclagem", peso: 2, origem: "app", abrir: "treino", calc: (p, r) => {
     const e = p.equipe || {};
@@ -219,7 +221,7 @@ export function calcularSIS(p, reguaId = "cliente") {
   const itens = INDICADORES.map((ind) => {
     let res; try { res = ind.calc(p, r) || {}; } catch { res = { valor: null, texto: "Não foi possível calcular." }; }
     const aDefinir = ind.peso === null;
-    return { id: ind.id, pilar: ind.pilar, nome: ind.nome, peso: ind.peso, origem: ind.origem, abrir: ind.abrir || null, aDefinir, valor: aDefinir ? null : res.valor ?? null, exibir: aDefinir ? 0 : res.valor ?? null, texto: res.texto || "", ...faixaDoItem(aDefinir ? null : res.valor, r) };
+    return { id: ind.id, pilar: ind.pilar, nome: ind.id === "turnover" ? `Turnover (${p.equipe?.meses || 12} meses)` : ind.nome, peso: ind.peso, origem: ind.origem, abrir: ind.abrir || null, aDefinir, valor: aDefinir ? null : res.valor ?? null, exibir: aDefinir ? 0 : res.valor ?? null, texto: res.texto || "", ...faixaDoItem(aDefinir ? null : res.valor, r) };
   });
   const pilares = {};
   for (const k of ORDEM_PILARES) {

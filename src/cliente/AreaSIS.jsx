@@ -56,7 +56,8 @@ export const CSS_SIS = `
 .sx .news i{width:6px;border-radius:2px;flex:none}
 .sx .btnp{display:block;width:100%;text-align:center;padding:12px;border:1px solid #f9731688;background:#1a0d02;color:#fdba74;font-weight:800;letter-spacing:1px;text-transform:uppercase;font-size:12px;cursor:pointer;margin-top:12px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)}
 .sx .plantao{display:flex;gap:8px;overflow:auto;padding-bottom:2px}
-.sx .pp{flex:none;width:68px;text-align:center}.sx .pp .av{width:44px;height:44px;border-radius:50%;margin:0 auto;background:#1f2937;display:grid;place-items:center;font-weight:800;border:2px solid;overflow:hidden}
+.sx .pp{flex:none;width:84px;text-align:center;background:none;border:0;padding:0;color:inherit;font:inherit;font-size:12px;cursor:pointer}.sx .pp .av{width:60px;height:60px;border-radius:50%;margin:0 auto 4px;background:#1f2937;display:grid;place-items:center;font-weight:800;border:3px solid;overflow:hidden;box-shadow:0 0 0 3px #0000,0 0 14px var(--glow,#0000)}.sx .pp b{display:block;font-size:12.5px;line-height:1.15}
+.sx .plantao-card{border-color:#22c55e66;box-shadow:0 0 0 1px #22c55e22,0 0 22px #22c55e22,inset 0 1px 0 #ffffff0a;background:linear-gradient(160deg,#0f1a13,#0b0b0e 65%)}.sx .vivo{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#4ade80;border:1px solid #22c55e66;background:#22c55e14;padding:2px 8px}.sx .vivo i{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:mkvivo 1.6s infinite}@keyframes mkvivo{0%{box-shadow:0 0 0 0 #22c55e99}100%{box-shadow:0 0 0 8px #22c55e00}}
 .sx .pp .av img{width:100%;height:100%;object-fit:cover}
 .sx .pp div{font-size:9.5px;color:#d1d5db;margin-top:3px;line-height:1.15}
 .sx .big{font-size:30px;font-weight:900}
@@ -119,7 +120,7 @@ export function Barra({ onMenu, onAvisos, avisos = 0, onAreas }) {
 }
 
 // ── Início do parque (home da prévia) ──
-export function Home({ p, sis, favs, onIr, atualizado, plantao }) {
+export function Home({ p, sis, favs, onIr, atualizado, plantao, onPessoa }) {
   const r = sis.regua, fav = favs.map((id) => sis.itens.find((i) => i.id === id)).filter(Boolean);
   const m = p.mapa;
   return <>
@@ -129,16 +130,17 @@ export function Home({ p, sis, favs, onIr, atualizado, plantao }) {
     <div className="pil3">{ORDEM_PILARES.map((k) => { const pl = sis.pilares[k], [a, ...b] = pl.nome.split(" "); return <button key={k} className="pil" onClick={() => onIr(`pilar:${k}`)} aria-label={`Abrir ${pl.nome}`}>
       <div className="s">{pl.sigla}</div><div className="n">{a}<br />{b.join(" ")}</div><div className="v" style={{ color: fx(pl.valor, r).cor }}>{pc(pl.valor)}</div><div className="pmais">+</div>
     </button>; })}</div>
-    <div className="card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div className="tit">⭐ Favoritos</div><button className="lnk" onClick={() => onIr("favs")} aria-label="Editar favoritos">Editar</button></div>
-      {fav.length ? <div className="favs">{fav.slice(0, 6).map((i) => <button key={i.id} className="fav" style={{ borderColor: corItem(i, r) + "88" }} onClick={() => onIr(`ind:${i.id}`)} aria-label={`Abrir ${i.nome}`}><div className="l">{i.nome}</div><div className="v" style={{ color: corItem(i, r) }}>{pc(valItem(i))}</div></button>)}</div>
-        : <div className="mu" style={{ marginTop: 6 }}>Nenhum favorito. Toque na ⭐ de qualquer indicador.</div>}
-    </div>
-    <div className="card"><div style={{ display: "flex", justifyContent: "space-between" }}><div className="tit">Equipe de plantão agora</div><span className="mu">{m.temMapa ? `${m.turno === "N" ? "Noturno" : "Diurno"} · ${m.data.slice(8, 10)}/${m.data.slice(5, 7)}${m.hoje ? "" : " (último)"}` : ""}</span></div>
+    <div className={`card${m.temMapa && m.hoje ? " plantao-card" : ""}`}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}><div className="tit">Equipe de plantão agora</div>{m.temMapa && m.hoje ? <span className="vivo"><i />NO POSTO</span> : null}</div>
+      {m.temMapa && <div className="mu" style={{ marginTop: 2 }}>{`${m.turno === "N" ? "Noturno" : "Diurno"} · ${m.data.slice(8, 10)}/${m.data.slice(5, 7)}${m.hoje ? "" : " (último mapa enviado)"}`} · toque na foto para ver a identificação</div>}
       {m.temMapa ? <>
-        <div className="plantao" style={{ marginTop: 8 }}>{plantao.map((x, n) => <div key={n} className="pp"><div className="av" style={{ borderColor: x.cor }} title={x.situacaoRotulo}>{x.foto ? <img src={x.foto} alt="" /> : iniciais(x.nome || x.posto)}</div><div>{nomeCurto(x.nome)}<br /><span className="mu">{x.posto}</span></div></div>)}</div>
+        <div className="plantao" style={{ marginTop: 10 }}>{plantao.map((x, n) => <button key={n} type="button" className="pp" onClick={() => onPessoa && onPessoa(x)} aria-label={`Ver identificação de ${x.nome || x.posto}`}><div className="av" style={{ borderColor: x.cor, "--glow": x.cor + "66" }} title={x.situacaoRotulo}>{x.foto ? <img src={x.foto} alt="" /> : iniciais(x.nome || x.posto)}</div><b>{nomeCurto(x.nome)}</b><span className="mu">{x.posto}</span></button>)}</div>
         <button className="lnk" style={{ color: "var(--mu)", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: 6, textAlign: "left" }} onClick={() => onIr("plantao")} aria-label="Abrir equipe de plantão">
           {m.presentes} de {m.postos} postos{m.faltas ? ` · ${m.faltas} falta${m.faltas === 1 ? "" : "s"}` : ""}{m.atrasos ? ` · ${m.atrasos} atraso${m.atrasos === 1 ? "" : "s"}` : ""}{m.vagos ? ` · ${m.vagos} vago${m.vagos === 1 ? "" : "s"}` : ""} · Mapa de Equipe completo ›</button>
       </> : <div className="mu" style={{ marginTop: 6 }}>Nenhum mapa enviado ainda.</div>}
+    </div>
+    <div className="card"><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div className="tit">⭐ Favoritos</div><button className="lnk" onClick={() => onIr("favs")} aria-label="Editar favoritos">Editar</button></div>
+      {fav.length ? <div className="favs">{fav.slice(0, 6).map((i) => <button key={i.id} className="fav" style={{ borderColor: corItem(i, r) + "88" }} onClick={() => onIr(`ind:${i.id}`)} aria-label={`Abrir ${i.nome}`}><div className="l">{i.nome}</div><div className="v" style={{ color: corItem(i, r) }}>{pc(valItem(i))}</div></button>)}</div>
+        : <div className="mu" style={{ marginTop: 6 }}>Nenhum favorito. Toque na ⭐ de qualquer indicador.</div>}
     </div>
     <Informativos p={p} onIr={onIr} />
     <button className="btnp" onClick={() => onIr("comunicar")} title="Fase 2 — a decidir">⚠ Comunicar problema</button>

@@ -24,7 +24,7 @@ export function plantoesRecentes(data, turno, qtd = QTD_PLANTOES) {
 
 const dm = (iso) => iso.split("-").reverse().slice(0, 2).join("/");
 
-export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = loadMapa, lerFotos = loadFotosProjeto }) {
+export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = loadMapa, lerFotos = loadFotosProjeto, onPessoa = null }) {
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#94a3b8" : "#64748b";
   const borda = dark ? "#1e293b" : "#e2e8f0";
@@ -83,7 +83,7 @@ export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = lo
             </div>
             {aberto_ && (
               <div style={{ marginTop: 6 }}>
-                {m ? <MapaVisual mapa={m} dark={dark} fotos={fotos} />
+                {m ? <MapaVisual mapa={m} dark={dark} fotos={fotos} onPessoa={onPessoa} />
                   : <div style={{ fontSize: 12, color: it.erro ? "#dc2626" : txt2, padding: "6px 4px" }}>{it.erro ? "Não consegui ler este mapa agora. Tente de novo em instantes." : idx === 0 ? "Este plantão ainda não tem mapa preenchido." : "Não há mapa para este plantão."}</div>}
               </div>
             )}

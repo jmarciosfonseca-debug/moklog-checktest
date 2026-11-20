@@ -34,6 +34,7 @@ export function testeSemanal(history, computeHealth, project, hojeISO) {
   return { pct: hc.pct, inop: hc.inop, parcial: hc.partial, total: hc.total, data: last.meta.date || null, diasAtras: dias, atrasado: dias === null || dias > 8, serie, gravacao };
 }
 
+export const PERIODOS_TURNOVER = [12, 18, 24];
 // Equipe: efetivo, turnover 12 m (fórmula já usada na maturidade), tempo de casa, treinamento.
 export function equipeResumo(equipe, hojeISO, catalogo = []) {
   const colabs = (equipe?.colaboradores || []).filter((c) => c && typeof c === "object");
@@ -52,10 +53,18 @@ export function equipeResumo(equipe, hojeISO, catalogo = []) {
   const todosTreinos = ordenarHistorico(ativos.flatMap((c) => (c.historico || []).filter((x) => x && x.tipo === "Treinamento").map((x) => ({ ...x, colabNome: c.nome, colabId: c.id, aplicado: aplicado(x) })))).reverse();
   const ultimosTreinos = todosTreinos.filter((x) => x.aplicado).slice(0, 12);
   const naoAplicados = todosTreinos.filter((x) => !x.aplicado).length;
-  const entradas12m = (() => { const ini = new Date(hojeISO + "T12:00:00Z"); ini.setUTCFullYear(ini.getUTCFullYear() - 1); const i = ini.toISOString().slice(0, 10); return ativos.filter((c) => c.dataContratacao && c.dataContratacao >= i && c.dataContratacao <= hojeISO).map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, desde: c.dataContratacao })); })();
+  const janela = (meses) => { const ini = new Date(hojeISO + "T12:00:00Z"); if (meses % 12 === 0) ini.setUTCFullYear(ini.getUTCFullYear() - meses / 12); else ini.setUTCMonth(ini.getUTCMonth() - meses); return ini.toISOString().slice(0, 10); };
+  const entradasDe = (meses) => { const i = janela(meses); return ativos.filter((c) => c.dataContratacao && c.dataContratacao >= i && c.dataContratacao <= hojeISO).map((c) => ({ id: c.id, nome: c.nome, cargo: c.cargo, desde: c.dataContratacao })).sort((a, b) => String(b.desde).localeCompare(String(a.desde))); };
+  const entradas12m = entradasDe(12);
+  // Períodos que o cliente pode escolher na tela de Turnover (12/18/24 meses): mesmos campos do resumo, prontos para mesclar.
+  const periodos = {};
+  for (const m of PERIODOS_TURNOVER) {
+    let e = null; try { e = calcularEstabilidade({ colaboradores: colabs, desligados: equipe?.desligados || [] }, hojeISO, m); } catch { e = null; }
+    periodos[m] = { meses: m, inicio: janela(m), turnover: e && e.turnover !== null ? Math.round(e.turnover * 10) / 10 : null, turnoverMotivo: e ? e.motivoNaoAferido : "sem dados", entradas12m: e ? e.entradas12m : 0, saidas12m: e ? e.desligados12m : 0, entradas12mLista: entradasDe(m) };
+  }
   const evidencias = todosTreinos.filter((x) => x.fotoRef).slice(0, 30); // galeria: só treinamentos com foto
   return {
-    ativos: ativos.length, porCargo, tempoMedioMeses,
+    meses: 12, inicio: janela(12), periodos, ativos: ativos.length, porCargo, tempoMedioMeses,
     turnover: est && est.turnover !== null ? Math.round(est.turnover * 10) / 10 : null,
     turnoverMotivo: est ? est.motivoNaoAferido : "sem dados",
     entradas12m: est ? est.entradas12m : 0, saidas12m: est ? est.desligados12m : 0,
