@@ -259,7 +259,7 @@ function IconeModulo({ n, cor, arq, bg, txt }) {
     </div>
   );
   return (
-    <div style={{ width:44, height:44, borderRadius:12, background:bg, border:`1px solid ${cor}33`, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+    <div style={{ width:44, height:44, borderRadius:12, background:`linear-gradient(145deg,rgba(255,255,255,.10),transparent 45%),${bg}`, border:"2px solid #94a3b8", boxShadow:"inset 0 1px 0 rgba(255,255,255,.35), inset 0 -2px 3px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.4)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
       <span style={{ fontSize:22, display:"flex", color:txt }}><Ico n={n}/></span>
     </div>
   );
