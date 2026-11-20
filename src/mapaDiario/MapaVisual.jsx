@@ -3,6 +3,7 @@
 import { ocorrenciasDoMapa, detalheDoPosto, liderDoMapa } from "./consolidado";
 import { kmRodado, rotuloBaixa, rotuloCorrecaoKm, rotuloTrocaNoPlantao, semVeiculo } from "./modelo";
 import { fotoDaPessoa, iniciais } from "./fotos";
+import { emAbertoDoMapa, linhaEmAberto } from "./emAberto";
 
 export const ESTILO = {
   presente: { cor: "#16a34a", ic: "✓", rot: "Presente" },
@@ -91,6 +92,7 @@ export default function MapaVisual({ mapa, dark, fotos = null, onPessoa = null }
       <div style={{ display: "grid", gap: 3, fontSize: 12.5, color: txt }}>
         <div><b>Material:</b> {mat.semAlteracao && !exc.length ? <span style={{ color: "#16a34a", fontWeight: 700 }}>✓ Sem alteração{(mat.baixas || []).length ? " no restante" : ""}</span> : <span style={{ color: "#d97706", fontWeight: 700 }}>⚠ Com alteração — {exc.map((x) => `${x.nome} (${x.situacao === "indisponivel" ? "indisponível" : "anomalia"}${x.obs ? `: ${x.obs}` : ""})`).join("; ") || (mat.obs || "")}</span>}</div>
         {(mat.baixas || []).map((b) => <div key={b.id} style={{ color: "#d97706", fontWeight: 700 }}>🔻 {rotuloBaixa(b)}</div>)}
+        {emAbertoDoMapa(mapa).map((x) => <div key={`ab:${x.id}`} data-testid="em-aberto" style={{ color: txt2, fontSize: 12 }}><span aria-hidden="true" style={{ color: x.status === "inoperante" ? "#b91c1c" : "#b45309" }}>⚠</span> {linhaEmAberto(x)}</div>)}
         {(mapa.veiculos || []).filter((v) => v && (v.correcaoKm || v.kmAtualCorrigido != null || v.trocaMoto || v.trocaNoPlantao)).map((v) => <div key={`kmc:${v.id}`} style={{ color: txt2 }}>{v.rotulo || "Veículo"}{v.placa ? ` ${v.placa}` : ""}: {[v.correcaoKm ? `km anterior ${rotuloCorrecaoKm(v)}` : "", v.kmAtualCorrigido != null ? `km atual corrigido depois para ${v.kmAtualCorrigido} (era ${v.kmAtual})` : "", v.trocaMoto ? `moto substituída${v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}` : "", rotuloTrocaNoPlantao(v)].filter(Boolean).join(" · ")}</div>)}
         {semVeic && <div><b>Veículo:</b> sem veículo neste plantão</div>}
         {veic.length > 0 && <div><b>Km rodado:</b> {veic.map((v) => (v.r < 0 ? `${v.rotulo} a conferir` : `${v.rotulo} ${v.r} km`)).join(" · ")}</div>}

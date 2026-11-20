@@ -18,6 +18,7 @@ const nomeDe = (p) => (p.pessoaNome || "").trim();
 const horarioDe = (p) => (p.horario ? ` (${hh(p.horario.inicio)}–${hh(p.horario.fim)})` : "");
 
 import { plantoesAfastamento, linhaDesligamento } from "../equipeEventos";
+import { emAbertoDoMapa, linhaEmAberto } from "./emAberto";
 const afast = (n) => { const k = plantoesAfastamento(n); return k ? ` — *AFASTADO por ${k} plantões*` : ""; };
 
 // Linha do efetivo: posto em negrito; a exceção ganha emoji e a palavra em negrito.
@@ -89,6 +90,9 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "", desligamentos = []
   if (qs.length) m.push(`📦 Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
   (mat.baixas || []).forEach((b) => m.push(`🔻 ${rotuloBaixa(b)}`));
   blocos.push(m);
+  // Equipamentos parcial/inoperante vindos do cadastro (automático, em todo plantão, com os dias em aberto).
+  const aberto = emAbertoDoMapa(mapa);
+  if (aberto.length) blocos.push(["⚠️ *EQUIPAMENTOS EM ABERTO*", ...aberto.map((x) => `• ${linhaEmAberto(x)}`)]);
   // Veículo sem nenhuma leitura não vira linha (antes saía "Veículo 2: —").
   const veic = [];
   (semVeiculo(mapa) ? [] : mapa.veiculos || []).forEach((v) => {

@@ -7,6 +7,7 @@ import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
 import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao, semVeiculo, marcarSemVeiculo, registrarTrocaNoPlantao, desfazerTrocaNoPlantao, rotuloTrocaNoPlantao, kmMenorQueAnterior } from "./modelo";
+import { emAbertoDosItens, emAbertoDoMapa, linhaEmAberto } from "./emAberto";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
@@ -184,7 +185,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     if (menores.length && !window.confirm(`${menores.map((v) => `${v.rotulo || "Veículo"}: km atual ${v.kmAtual} é menor que o anterior ${v.kmAnterior}`).join(" · ")}.\n\nSe o veículo foi trocado, cancele e toque em "Troquei de veículo neste plantão".\n\nEnviar assim mesmo? (OK para concluir, Cancelar para ajustar)`)) return;
     const altos = rodadoAlto(mapaC);
     if (altos.length && !window.confirm(`${altos.map((v) => `${v.rotulo || "Veículo"}: ${kmRodado(v)} km`).join(" · ")} num único plantão. Confira o odômetro.\n\nEstá correto? (OK para concluir, Cancelar para corrigir)`)) return;
-    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat, mapaC.material?.quantidades), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
+    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat, mapaC.material?.quantidades), ...(cadastroFalhou ? {} : { emAberto: emAbertoDosItens(itensMat, agoraFn()) }), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
     await enviarComConfirmacao(final);
   }
   // Envio OFICIAL: grava e CONFIRMA no servidor antes de liberar o WhatsApp. Sem confirmação,
@@ -682,12 +683,20 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
               const livres = exc.filter((e) => String(e.id).startsWith("livre:"));
               const resumo = exc.length ? `${exc.length} com alteração` : mat.semAlteracao ? "Sem alteração · tudo disponível" : "Alterado";
               const corRes = exc.length || !mat.semAlteracao ? "#f59e0b" : "#16a34a";
+              // Itens parcial/inoperante do cadastro de Equipamentos: entram sozinhos (o mapa já concluído mostra o que foi gravado).
+              const abertos = mapa.status === "enviado" && !editando && Array.isArray(mat.emAberto) ? emAbertoDoMapa(mapa) : emAbertoDosItens(itensMat, agoraFn());
               return (<>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ ...S.h, marginBottom: 2 }}>Material, armamento e munição</div>
                     <div style={{ fontSize: 12, fontWeight: 800, color: corRes }}>{resumo}</div>
                     <div style={{ fontSize: 11, color: cor.txt2, marginTop: 2 }}>{itensMat.length ? `Lista do projeto: ${resumoItens(itensMat, mat.quantidades)}` : "Nenhum equipamento cadastrado neste projeto: complete em Equipamentos"}</div>
+                    {abertos.length > 0 && (
+                      <div data-testid="em-aberto" style={{ marginTop: 6, display: "grid", gap: 2 }}>
+                        {abertos.map((x) => <div key={x.id} style={{ fontSize: 12, color: cor.txt2 }}><span aria-hidden="true" style={{ color: x.status === "inoperante" ? "#b91c1c" : "#b45309" }}>⚠</span> {linhaEmAberto(x)}</div>)}
+                        <div style={{ fontSize: 10.5, color: cor.txt2, opacity: 0.8 }}>Vem do cadastro de Equipamentos e sai em todo plantão até ser marcado como resolvido lá.</div>
+                      </div>
+                    )}
                   </div>
                   <button aria-expanded={matAberto} aria-label="Conferir material" onClick={() => setMatAberto((v) => !v)} style={S.btn}>{matAberto ? "Recolher ▴" : "Conferir ▾"}</button>
                 </div>

@@ -477,3 +477,36 @@ test("mapa enviado mostra Editar mapa (1x); mapa já editado pelo líder não mo
   expect(src).toMatch(/!mapa\.edicaoLiderEm && [\s\S]{0,200}Editar mapa \(1x\)/);
   expect(src).toMatch(/edicaoLiderRef\.current && !mapaC\.edicaoLiderEm \? \{ edicaoLiderEm: agora \}/);
 });
+
+// ── Equipamentos em aberto (parcial/inoperante) puxados do cadastro (Marcio, 20/11/2026) ──
+const CAD_ABERTO = () => ({
+  armamento: [{ id: "a1", identificacao: "Arma 01", status: "ok" }, { id: "a2", identificacao: "Arma 02", status: "inop", dataProblem: "2026-10-08", justificativa: "Gatilho travando" }],
+  radiosHT: [{ id: "r1", identificacao: "Rádio HT 01", status: "parcial", dataProblem: "2026-10-10", justificativa: "Bateria fraca" }],
+  municao: [{ id: "m1", identificacao: "Munição .38", qtd: 24, status: "ok" }],
+});
+test("equipamentos em aberto: aparecem sozinhos no mapa, com dias, e saem gravados e no WhatsApp ao concluir", async () => {
+  await montar({ loadEquipamentos: jest.fn(async () => CAD_ABERTO()) });
+  const blocoAberto = q('[data-testid="em-aberto"]');
+  expect(blocoAberto.textContent).toContain("⚠ Arma 02 — inoperante há 3 dias · Gatilho travando");
+  expect(blocoAberto.textContent).toContain("⚠ Rádio HT 01 — parcial há 1 dia");
+  expect(blocoAberto.textContent).not.toContain("Arma 01");
+  await clicar(botao("Concluir mapa"));
+  const gravado = salvos[salvos.length - 1];
+  expect(gravado.status).toBe("enviado");
+  expect(gravado.material.emAberto.map((x) => `${x.nome}|${x.status}|${x.dias}`)).toEqual(["Arma 02|inoperante|3", "Rádio HT 01|parcial|1"]);
+  const t = q('pre[aria-label="Texto do mapa"]').textContent;
+  expect(t).toContain("⚠️ *EQUIPAMENTOS EM ABERTO*");
+  expect(t).toContain("• Arma 02 — inoperante há 3 dias · Gatilho travando");
+});
+test("equipamentos em aberto: tudo ok no cadastro, nenhum bloco e nada no texto", async () => {
+  await montar();
+  expect(q('[data-testid="em-aberto"]')).toBeNull();
+  await clicar(botao("Concluir mapa"));
+  expect(salvos[salvos.length - 1].material.emAberto).toEqual([]);
+  expect(q('pre[aria-label="Texto do mapa"]').textContent).not.toContain("EQUIPAMENTOS EM ABERTO");
+});
+test("equipamentos em aberto: se o cadastro não pôde ser lido, não grava a lista (não afirma que está tudo ok)", async () => {
+  await montar({ loadEquipamentos: jest.fn(async () => { throw new Error("offline"); }) });
+  await clicar(botao("Concluir mapa"));
+  expect("emAberto" in salvos[salvos.length - 1].material).toBe(false);
+});
