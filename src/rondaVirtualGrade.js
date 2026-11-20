@@ -103,4 +103,19 @@ function statusSlot(slot, proximoOffset, agoraMin, registro, limiteFinalMin=null
   return "bloqueado";                                  // estourou → não executada
 }
 
-export { TOLERANCIA_MIN, PROJETOS_GRADE_ESPECIAL, temGradeEspecial, buildSlots, inicioTurnoHora, fimTurnoHora, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot };
+// Data (YYYY-MM-DD) a gravar num turno NOVO. O noturno que começa às 18h e cruza a meia-noite pertence ao dia em que COMEÇOU:
+// aberto de madrugada (ex.: 01h, antes do fim do turno às 06h), o turno é o de ONTEM — senão todos os horários ficam
+// "aguardando" até as 18h de hoje e a operadora não consegue registrar nada. O diurno usa sempre a data de hoje.
+function dataInicioNovoTurno(tipo, projectId, agora = new Date()) {
+  const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  if (tipo === "noturno" && agora.getHours() < fimTurnoHora(tipo, projectId)) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// O turno ainda está dentro da jornada de 12h (do início até 1min antes do fim)?
+function turnoEmJanela(tipo, dataInicio, agora = new Date(), projectId) {
+  const m = minutosDesdeInicio(tipo, dataInicio, agora, projectId);
+  return m >= 0 && m <= limiteFinalTurnoMin(tipo, projectId);
+}
+
+export { dataInicioNovoTurno, turnoEmJanela, TOLERANCIA_MIN, PROJETOS_GRADE_ESPECIAL, temGradeEspecial, buildSlots, inicioTurnoHora, fimTurnoHora, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot };
