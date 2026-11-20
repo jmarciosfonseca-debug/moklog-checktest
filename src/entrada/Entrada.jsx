@@ -3,7 +3,7 @@
 // Área do Cliente no topo. MokLog abre o app atual; as demais divisões ficam "em breve" até existirem.
 import { useEffect, useRef, useState } from "react";
 import MostradorSIS from "../ui/MostradorSIS";
-import AberturaMoked from "./AberturaMoked";
+import AberturaSIS from "./AberturaSIS";
 
 export const DIVISOES = [
   { id: "moklog", nome: "MokLog", sub: "Condomínios logísticos", ativo: true, cor: "#E50914" },
@@ -23,6 +23,30 @@ const fundo = { minHeight: "100vh", background: "#0b0f19", color: "#e5e7eb", fon
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
 const botaoVermelho = { background: "#B91C1C", color: "#fff", border: "none", padding: "13px 38px", fontWeight: 900, letterSpacing: 2.5, fontSize: 14, cursor: "pointer", clipPath: chanfro, boxShadow: "none", textTransform: "uppercase" };
 
+const reducao = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Áreas "flutuando" (Marcio, 20/11/2026): cartões levitam com sombra no chão, inclinação leve com o dedo/mouse, fundo com o anel do SIS
+// bem apagado e piso em perspectiva. A Área do Cliente fica larga, mais abaixo.
+const CSS_AREAS = `
+.mk-flut{position:relative;overflow:hidden;perspective:900px;perspective-origin:50% 38%;background:radial-gradient(90% 60% at 50% 30%,#1a0a0e 0%,#0b0f19 58%,#05070c 100%) !important}
+.mk-flut-anel{position:absolute;left:50%;top:34%;width:min(150vw,900px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;opacity:.16;background:conic-gradient(from 180deg,#b91c1c,#ef4444 25deg,#f97316 55deg,#facc15 95deg,#84cc16 135deg,#16a34a 180deg,#84cc16 225deg,#facc15 265deg,#f97316 305deg,#ef4444 335deg,#b91c1c);-webkit-mask:radial-gradient(circle,transparent 58%,#000 59%,#000 70%,transparent 71%);mask:radial-gradient(circle,transparent 58%,#000 59%,#000 70%,transparent 71%)}
+.mk-flut-piso{position:absolute;left:-60%;right:-60%;bottom:-10%;height:50%;transform-origin:50% 100%;transform:rotateX(74deg);pointer-events:none;background:repeating-linear-gradient(90deg,rgba(229,9,20,.16) 0 1px,transparent 1px 56px),repeating-linear-gradient(0deg,rgba(229,9,20,.16) 0 1px,transparent 1px 56px);-webkit-mask:linear-gradient(0deg,#000,transparent 85%);mask:linear-gradient(0deg,#000,transparent 85%);animation:mkPiso 6s linear infinite}
+@keyframes mkAreasIn{from{opacity:0}to{opacity:1}}
+@keyframes mkPiso{to{background-position:0 56px,0 56px}}
+.mk-flut .mk-areas-wrap{position:relative;transform-style:preserve-3d;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .3s ease-out;display:flex;flex-direction:column}
+.mk-flut .mk-areas-grid{transform-style:preserve-3d}
+.mk-t{position:relative;transform-style:preserve-3d;opacity:0;translate:0 40px;animation:mkEnt .9s cubic-bezier(.2,.8,.2,1) calc(.15s + var(--i)*.09s) forwards,mkFlut 6.4s ease-in-out calc(var(--d)) infinite}
+.mk-t::after{content:"";position:absolute;left:14%;right:14%;bottom:-15px;height:12px;border-radius:50%;background:radial-gradient(rgba(0,0,0,.7),transparent 70%);animation:mkSombra 6.4s ease-in-out calc(var(--d)) infinite;pointer-events:none}
+.mk-t > button{filter:drop-shadow(0 10px 14px rgba(0,0,0,.55));transition:filter .2s}
+.mk-t > button:active{filter:brightness(1.12)}
+.mk-flut .mk-cli{margin-top:44px}
+.mk-flut .mk-cli::after{bottom:-19px}
+@keyframes mkEnt{to{opacity:1;translate:0 0}}
+@keyframes mkFlut{0%,100%{transform:translateZ(var(--z,30px)) translateY(0) rotateX(0)}50%{transform:translateZ(var(--z,30px)) translateY(-8px) rotateX(2.5deg)}}
+@keyframes mkSombra{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(.82);opacity:.5}}
+@media (prefers-reduced-motion:reduce){.mk-t,.mk-t::after,.mk-flut-piso{animation:none!important}.mk-t{opacity:1;translate:0 0}}
+@media (min-width:1024px){.mk-flut .mk-areas-wrap{max-width:1040px !important}.mk-flut .mk-cli{max-width:520px;width:100%;margin-left:auto;margin-right:auto;margin-top:56px}}
+`;
+
 export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VIDEO_INTRO_URL, pularVideo = true, etapaInicial = "splash", comAbertura = false, onAberturaFim }) {
   const [etapa, setEtapa] = useState(comAbertura && etapaInicial === "splash" ? "abertura" : etapaInicial); // abertura | splash | video | areas | construcao
   const veioDaAbertura = useRef(comAbertura);
@@ -36,7 +60,7 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
 
   useEffect(() => { if (etapa !== "video") return undefined; tocar(); const t = setTimeout(fimVideo, 25000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
 
-  if (etapa === "abertura") return <AberturaMoked logo={logo} onFim={() => { setEtapa("splash"); if (onAberturaFim) onAberturaFim(); }} />;
+  if (etapa === "abertura") return <AberturaSIS onFim={() => { setEtapa("areas"); if (onAberturaFim) onAberturaFim(); }} />; // órbita do SIS → qualquer toque vai às Áreas (sem "Entrar")
 
   // No computador (padrão de site): marca e texto à esquerda, acesso à direita. No celular: como sempre, tudo centralizado.
   if (etapa === "splash") return <main style={veioDaAbertura.current ? { ...fundo, animation: "mkFadeIn .6s ease" } : fundo} className="mk-entrada" data-testid="entrada-splash">
@@ -74,21 +98,25 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
     <div style={{ marginTop: 26 }}><button onClick={() => setEmConstrucao(null)} style={botaoVermelho}>Voltar</button></div>
   </main>;
 
-  return <main style={{ ...fundo, justifyContent: "flex-start", padding: "28px 20px 20px" }} className="mk-areas" data-testid="entrada-areas">
-    <img src={logo} alt="Moked" style={{ width: 190, marginBottom: 6 }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+  const inclinar = (e) => { if (reducao()) return; const w = e.currentTarget.querySelector(".mk-areas-wrap"); if (!w) return; w.style.setProperty("--ry", ((e.clientX / window.innerWidth - 0.5) * 8).toFixed(1) + "deg"); w.style.setProperty("--rx", (-(e.clientY / window.innerHeight - 0.5) * 6).toFixed(1) + "deg"); };
+  return <main style={{ ...fundo, justifyContent: "flex-start", padding: "34px 20px 24px", animation: veioDaAbertura.current ? "mkAreasIn .7s ease" : undefined }} className="mk-areas mk-flut" data-testid="entrada-areas" onPointerMove={inclinar}>
+    <style>{CSS_AREAS}</style>
+    <div className="mk-flut-anel" aria-hidden="true" />
+    <div className="mk-flut-piso" aria-hidden="true" />
+    <img src={logo} alt="Moked" style={{ width: 190, marginBottom: 6, position: "relative" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
     <div className="mk-areas-wrap" style={{ width: "100%", maxWidth: 480 }}>
-      <button onClick={() => onEscolher("cliente")} aria-label="Área do Cliente" style={{ width: "100%", background: "#1f2937", border: "1px solid #475569", color: "#f3f4f6", padding: "14px 16px", fontWeight: 900, letterSpacing: 2, fontSize: 13, cursor: "pointer", clipPath: chanfro, marginBottom: 22, textTransform: "uppercase", boxShadow: "none" }}>Área do Cliente ›</button>
-      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", marginBottom: 12 }}>Escolha a sua área</div>
-      <div className="mk-areas-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        {DIVISOES.map((d) => <button key={d.id} aria-label={d.nome} onClick={() => (d.ativo ? onEscolher(d.id) : setEmConstrucao(d))}
-          style={{ background: "#fff", border: `2px solid ${d.ativo ? d.cor : "#2a2a31"}`, padding: 0, cursor: "pointer", clipPath: chanfro, boxShadow: "none", opacity: d.ativo ? 1 : .6, position: "relative", overflow: "hidden", gridColumn: d.largo ? "1 / -1" : "auto" }}>
+      <div className="mk-flut-tit" style={{ fontSize: 12, fontWeight: 800, letterSpacing: 2.5, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", marginBottom: 16 }}>Escolha a sua área</div>
+      <div className="mk-areas-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px 14px" }}>
+        {DIVISOES.map((d, i) => <div key={d.id} className="mk-t" style={{ "--i": i, "--d": `${-i * 1.1}s`, "--z": `${24 + (i % 2) * 16}px`, "--c": d.cor, gridColumn: d.largo ? "1 / -1" : "auto" }}><button aria-label={d.nome} onClick={() => (d.ativo ? onEscolher(d.id) : setEmConstrucao(d))}
+          style={{ background: "#fff", border: `2px solid ${d.ativo ? d.cor : "#2a2a31"}`, padding: 0, cursor: "pointer", clipPath: chanfro, boxShadow: "none", opacity: d.ativo ? 1 : .6, position: "relative", overflow: "hidden", width: "100%", display: "block" }}>
           {d.semLogo
             ? <div style={{ height: 76, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, letterSpacing: 3, fontSize: 18, color: "#0b0b0e", paddingBottom: 14 }}>CENTRAL <span style={{ color: "#E50914", marginLeft: 6 }}>MOKED</span></div>
             : <img src={logoDivisao(d.id)} alt={d.nome} style={{ display: "block", width: "100%", height: 76, objectFit: "contain", background: "#fff", padding: "8px 14px", boxSizing: "border-box" }} />}
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, background: d.ativo ? d.cor : "#2a2a31", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "3px 8px", textAlign: "center" }}>{d.ativo ? d.sub : "Em breve"}</div>
-        </button>)}
+        </button></div>)}
       </div>
-      <div style={{ marginTop: 18, fontSize: 10, color: "#4b5563", textAlign: "center" }}>Moked Security Consulting</div>
+      <div className="mk-t mk-cli" style={{ "--i": DIVISOES.length, "--d": "-2.2s", "--z": "70px", "--c": "#7dd3fc" }}><button onClick={() => onEscolher("cliente")} aria-label="Área do Cliente" style={{ width: "100%", background: "#1f2937", border: "1px solid #475569", color: "#f3f4f6", padding: "18px 16px", fontWeight: 900, letterSpacing: 2, fontSize: 13, cursor: "pointer", clipPath: chanfro, textTransform: "uppercase", boxShadow: "none" }}>Área do Cliente ›</button></div>
+      <div style={{ marginTop: 26, fontSize: 10, color: "#4b5563", textAlign: "center" }}>Moked Security Consulting</div>
     </div>
   </main>;
 }

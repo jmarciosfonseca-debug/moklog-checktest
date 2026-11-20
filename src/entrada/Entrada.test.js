@@ -66,15 +66,19 @@ test("abertura mostra a frase da marca e o mostrador decorativo", async () => {
   } finally { act(() => root.unmount()); host.remove(); }
 });
 
-test("abertura 3D toca quando pedida, pula com um toque e segue para o logo com Entrar", async () => {
+test("abertura do SIS toca quando pedida e qualquer toque leva direto às Áreas (sem Entrar)", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   try {
     await act(async () => root.render(<Entrada onEscolher={() => {}} comAbertura />));
-    expect(host.querySelector('[data-testid="entrada-abertura"]')).not.toBeNull();
+    const ab = host.querySelector('[data-testid="entrada-abertura"]');
+    expect(ab).not.toBeNull();
     expect(host.querySelector('[data-testid="entrada-splash"]')).toBeNull();
-    await clicar(host.querySelector('[data-testid="entrada-abertura"]'));
+    expect(ab.querySelectorAll("[data-no]").length).toBe(10); // componentes do SIS, não as divisões
+    expect(ab.textContent).toMatch(/Sistema Integrado de Segurança/);
+    expect(botao(host, "Entrar")).toBeFalsy();
+    await act(async () => { ab.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await new Promise((r) => setTimeout(r, 700)); });
     expect(host.querySelector('[data-testid="entrada-abertura"]')).toBeNull();
-    expect(host.querySelector('[data-testid="entrada-splash"]')).not.toBeNull();
+    expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
   } finally { act(() => root.unmount()); host.remove(); }
 });
 
