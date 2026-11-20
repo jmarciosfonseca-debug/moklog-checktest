@@ -1,4 +1,5 @@
 // Abertura nova (Marcio, 20/11/2026), prévia aprovada:
+//  0) A frase "o software por trás do hardware" surge em vermelho, em 3D, e recua para o fundo.
 //  1) Ignição: uma bolinha branca sobe, acende e a tela ofusca e liga.
 //  2) SIS em órbita 3D: os componentes do Sistema Integrado de Segurança (equipamentos, pessoas, procedimentos) giram
 //     em torno do MOKED SIS⁺. Dá para arrastar em qualquer direção. Qualquer toque (num ícone ou fora) vai para o MESMO
@@ -55,12 +56,16 @@ const CSS = `
 .sis-info b{display:block;font-size:15px;letter-spacing:.06em}.sis-info span{display:block;font-size:12px;color:#9ca3af;margin-top:3px;letter-spacing:.04em}
 .sis-leg{position:absolute;left:0;right:0;bottom:calc(26px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9ca3af;pointer-events:none}
 .sis-leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
-.sis-ign{position:absolute;inset:0;z-index:3;background:#000;transition:opacity .7s ease .1s}.sis-ign.fim{opacity:0;pointer-events:none}
+.sis-ign{position:absolute;inset:0;z-index:3;background:#000;perspective:900px;perspective-origin:50% 42%;transition:opacity .7s ease .1s}.sis-ign.fim{opacity:0;pointer-events:none}
 .sis-dot{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;box-shadow:0 0 18px 4px rgba(255,255,255,.8);transform:translateY(42vh) scale(.4);opacity:0;transition:transform .95s cubic-bezier(.2,.7,.2,1),opacity .4s}
 .sis-ign.sobe .sis-dot{transform:translateY(0) scale(1);opacity:1}
 .sis-ign.acende .sis-dot{transform:translateY(0) scale(2.4);box-shadow:0 0 60px 24px rgba(255,255,255,.95);transition:transform .35s ease-in,box-shadow .35s}
 .sis-flash{position:absolute;inset:0;background:#fff;opacity:0;transition:opacity .22s ease-in}.sis-ign.flash .sis-flash{opacity:1}.sis-ign.apaga .sis-flash{opacity:0;transition:opacity .75s ease-out}
-@media (prefers-reduced-motion:reduce){.sis-orb::after{animation:none}}
+.sis-frase{position:absolute;left:0;right:0;top:50%;margin-top:-21vmin;text-align:center;transform-style:preserve-3d;animation:sisFrase 2.5s cubic-bezier(.55,0,.25,1) .1s both;will-change:transform,opacity;pointer-events:none}
+.sis-frase p{margin:0;font-weight:900;line-height:1.02;letter-spacing:-.02em;font-size:clamp(40px,11.5vw,128px);color:#E50914;text-shadow:0 1px 0 #c0070f,0 2px 0 #b0060e,0 3px 0 #a0060d,0 4px 0 #90050c,0 5px 0 #80050b,0 6px 0 #70040a,0 12px 22px rgba(0,0,0,.65),0 0 46px rgba(229,9,20,.45)}
+@media (min-width:1024px){.sis-frase p{font-size:clamp(64px,8.2vw,150px)}}
+@keyframes sisFrase{0%{transform:translate3d(0,0,520px) rotateX(-10deg);opacity:0}16%{opacity:1;transform:translate3d(0,0,160px) rotateX(-4deg)}46%{opacity:1;transform:translate3d(0,0,0) rotateX(0deg)}100%{opacity:0;transform:translate3d(0,-10%,-2800px) rotateX(16deg)}}
+@media (prefers-reduced-motion:reduce){.sis-orb::after{animation:none}.sis-frase{display:none}}
 `;
 
 const reduzido = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -157,10 +162,10 @@ export default function AberturaSIS({ onFim }) {
     const liga = () => { el.classList.add("on"); ign.classList.add("apaga"); tm.push(setTimeout(() => ign.classList.add("fim"), 800)); };
     if (reduz) { el.classList.add("on"); ign.classList.add("fim"); }
     else {
-      tm.push(setTimeout(() => ign.classList.add("sobe"), 60));
-      tm.push(setTimeout(() => ign.classList.add("acende"), 1000));
-      tm.push(setTimeout(() => ign.classList.add("flash"), 1280));
-      tm.push(setTimeout(liga, 1520));
+      tm.push(setTimeout(() => ign.classList.add("sobe"), 2300));
+      tm.push(setTimeout(() => ign.classList.add("acende"), 3240));
+      tm.push(setTimeout(() => ign.classList.add("flash"), 3520));
+      tm.push(setTimeout(liga, 3760));
     }
     // tocar durante a ignição pula direto para a órbita
     const pulaIgn = () => { if (!el.classList.contains("on")) { tm.forEach(clearTimeout); tm.length = 0; el.classList.add("on"); ign.classList.add("fim"); } };
@@ -182,7 +187,7 @@ export default function AberturaSIS({ onFim }) {
         <div className="sis-info" dangerouslySetInnerHTML={{ __html: INFO_PADRAO }} />
         <div className="sis-leg"><span><i style={{ background: "#94a3b8" }} />Equipamentos</span><span><i style={{ background: "#7dd3fc" }} />Pessoas</span><span><i style={{ background: "#fde68a" }} />Procedimentos</span></div>
       </div>
-      <div className="sis-ign" aria-hidden="true"><div className="sis-dot" /><div className="sis-flash" /></div>
+      <div className="sis-ign" aria-hidden="true"><div className="sis-frase"><p>o software</p><p>por trás</p><p>do hardware</p></div><div className="sis-dot" /><div className="sis-flash" /></div>
     </div>
   );
 }
