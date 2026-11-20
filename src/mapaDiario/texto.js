@@ -2,7 +2,7 @@
 // Títulos em negrito e emoji por assunto (início, efetivo, destaque de falta/FT e informações adicionais abaixo). P260B e P260C saem com cabeçalho "P260-B"/"P260-C"
 // (o P260B envia ao grupo do P260A).
 import { rotuloDia } from "./regras";
-import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloCorrecaoKm, rotuloBaixa, rotuloTrocaNoPlantao, semVeiculo } from "./modelo";
+import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloCorrecaoKm, rotuloBaixa, rotuloTrocaNoPlantao, semVeiculo, rotuloPendenciaEquip } from "./modelo";
 
 export const cabecalhoProjeto = (pid) => (/^P260[BC]$/.test(pid) ? `P260-${pid.slice(-1)}` : pid);
 
@@ -89,6 +89,9 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "", desligamentos = []
   if (qs.length) m.push(`📦 Quantidades conferidas: ${qs.map((q) => `${q.nome} ${q.qtd}`).join(" · ")}`);
   (mat.baixas || []).forEach((b) => m.push(`🔻 ${rotuloBaixa(b)}`));
   blocos.push(m);
+  // Equipamento inoperante puxado sozinho do cadastro: sai em todo plantão até a equipe resolver no app.
+  const pend = Array.isArray(mat.pendenciasEquip) ? mat.pendenciasEquip : [];
+  if (pend.length) blocos.push(["🔧 *EQUIPAMENTOS COM PENDÊNCIA*", ...pend.map((p) => `• ${rotuloPendenciaEquip(p)}`)]);
   // Veículo sem nenhuma leitura não vira linha (antes saía "Veículo 2: —").
   const veic = [];
   (semVeiculo(mapa) ? [] : mapa.veiculos || []).forEach((v) => {

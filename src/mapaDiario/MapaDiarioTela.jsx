@@ -6,7 +6,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao, semVeiculo, marcarSemVeiculo, registrarTrocaNoPlantao, desfazerTrocaNoPlantao, rotuloTrocaNoPlantao, kmMenorQueAnterior } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao, semVeiculo, marcarSemVeiculo, registrarTrocaNoPlantao, desfazerTrocaNoPlantao, rotuloTrocaNoPlantao, kmMenorQueAnterior, comPendenciasDeEquipamento, rotuloPendenciaEquip } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
@@ -114,7 +114,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
           setEditando(true);
         } else setAvisoReaberto("");
         setAvisoEquipe(aviso);
-        setColabs(cs); setMapa(m.status === "enviado" ? (reabrir ? garantirMoto(completo) : m) : garantirMoto(completarPostosFixos(m, cs))); setItensMat(itensDeEquipamento(eq, pid, turno));
+        setColabs(cs); setMapa(m.status === "enviado" ? (reabrir ? garantirMoto(completo) : m) : comPendenciasDeEquipamento(garantirMoto(completarPostosFixos(m, cs)), eq)); setItensMat(itensDeEquipamento(eq, pid, turno));
         if (m.status === "enviado") aplicarCorrecoesKm(m, 1);   // reabriu um mapa enviado: garante que a correção de km chegou ao plantão anterior
       } catch (e) { if (vivo) setErro("Não consegui abrir o mapa agora. Tente de novo; nada foi alterado."); }
       finally { if (vivo) { setCarregando(false); setTimeout(() => { carregadoRef.current = true; }, 0); } }
@@ -184,7 +184,11 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
     if (menores.length && !window.confirm(`${menores.map((v) => `${v.rotulo || "Veículo"}: km atual ${v.kmAtual} é menor que o anterior ${v.kmAnterior}`).join(" · ")}.\n\nSe o veículo foi trocado, cancele e toque em "Troquei de veículo neste plantão".\n\nEnviar assim mesmo? (OK para concluir, Cancelar para ajustar)`)) return;
     const altos = rodadoAlto(mapaC);
     if (altos.length && !window.confirm(`${altos.map((v) => `${v.rotulo || "Veículo"}: ${kmRodado(v)} km`).join(" · ")} num único plantão. Confira o odômetro.\n\nEstá correto? (OK para concluir, Cancelar para corrigir)`)) return;
-    const final = { ...veiculosInteiros(mapaC), material: { ...materialNovo(), ...(mapaC.material || {}), conferidos: resumoItens(itensMat, mapaC.material?.quantidades), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
+    // Pendência de equipamento: relê o cadastro agora (a equipe pode ter reportado ou resolvido depois que o mapa abriu).
+    let eqAgora = null;
+    try { eqAgora = io.loadEquipamentos ? await io.loadEquipamentos(pid) : null; } catch (e) { eqAgora = null; }
+    const mapaP = eqAgora ? comPendenciasDeEquipamento(mapaC, eqAgora) : mapaC;
+    const final = { ...veiculosInteiros(mapaP), material: { ...materialNovo(), ...(mapaP.material || {}), conferidos: resumoItens(itensMat, mapaC.material?.quantidades), quantidades: Object.fromEntries(contaveis.filter((i) => (mapaC.material?.quantidades || {})[i.chaveQtd]).map((i) => [i.chaveQtd, mapaC.material.quantidades[i.chaveQtd]])) }, status: "enviado", ...(edicaoLiderRef.current && !mapaC.edicaoLiderEm ? { edicaoLiderEm: agora } : {}), enviadoEm: mapaC.enviadoEm || agora, revisoes: mapaC.enviadoEm ? [...(mapaC.revisoes || []), { em: agora }] : (mapaC.revisoes || []) };
     await enviarComConfirmacao(final);
   }
   // Envio OFICIAL: grava e CONFIRMA no servidor antes de liberar o WhatsApp. Sem confirmação,
@@ -691,6 +695,13 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                   </div>
                   <button aria-expanded={matAberto} aria-label="Conferir material" onClick={() => setMatAberto((v) => !v)} style={S.btn}>{matAberto ? "Recolher ▴" : "Conferir ▾"}</button>
                 </div>
+                {(mat.pendenciasEquip || []).length > 0 && (
+                  <div data-testid="pendencias-equip" style={{ marginTop: 10, border: "1px solid #dc262655", background: "#dc262612", borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#dc2626" }}>Equipamentos com pendência (entram sozinhos no mapa)</div>
+                    {(mat.pendenciasEquip || []).map((p) => <div key={p.id} style={{ fontSize: 12, color: cor.txt, marginTop: 3 }}>• {rotuloPendenciaEquip(p)}</div>)}
+                    <div style={{ fontSize: 11, color: cor.txt2, marginTop: 4 }}>Saem do mapa quando a equipe marcar como resolvido em Equipamentos.</div>
+                  </div>
+                )}
                 <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: cor.txt, marginTop: 10 }}>
                   <input type="checkbox" disabled={exc.length > 0} checked={!!mat.semAlteracao && exc.length === 0} onChange={(e) => setMat((m) => ({ ...m, semAlteracao: e.target.checked }))} /> Sem alteração: conferi e está tudo disponível
                 </label>

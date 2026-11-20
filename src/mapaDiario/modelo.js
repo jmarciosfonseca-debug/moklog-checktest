@@ -154,6 +154,47 @@ export function resumoItens(itens, quantidades = {}) {
   return [...cont.entries()].map(([k, n]) => `${k} ${n}`).join(" · ");
 }
 
+// ── Equipamento inoperante entra sozinho no mapa (Marcio, 18/11/2026) ───────────────────────────────────────
+// Tudo o que o cadastro de Equipamentos (inclusive a moto) marca como Inoperante/Crítico/Parcial/Baixo é puxado
+// para TODO mapa até a equipe resolver no app: "Lanterna inoperante há 1 dia, há 2 dias…". Resolveu → sai sozinho.
+// Só leitura do cadastro; o líder não digita nada. `dataMapa` (YYYY-MM-DD) é a referência dos dias.
+const ROTULO_PEND = { inop: "INOPERANTE", critico: "INOPERANTE", parcial: "PARCIAL", baixo: "PARCIAL" };
+const diasCorridos = (de, ate) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(de || "") || !/^\d{4}-\d{2}-\d{2}$/.test(ate || "")) return null;
+  return Math.max(0, Math.round((new Date(`${ate}T12:00:00`).getTime() - new Date(`${de}T12:00:00`).getTime()) / 86400000));
+};
+export function pendenciasDeEquipamento(data, dataMapa, projetoId = null) {
+  if (!data) return [];
+  const out = [];
+  const add = (cat, rotuloCat, it, i) => {
+    if (!it || typeof it !== "object" || !ROTULO_PEND[it.status]) return;
+    const nome = cat === "moto" ? `Moto${it.placa ? ` ${it.placa}` : ""}` : it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
+    out.push({ id: `${cat}:${it.id != null ? it.id : i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, situacao: ROTULO_PEND[it.status] === "INOPERANTE" ? "inoperante" : "parcial", desde: /^\d{4}-\d{2}-\d{2}$/.test(it.dataProblem || "") ? it.dataProblem : "", dias: diasCorridos(it.dataProblem, dataMapa), motivo: String(it.justificativa || "").trim() });
+  };
+  CATEGORIAS_MATERIAL.forEach(([cat, rotuloCat]) => {
+    const restrito = SO_NO_MEGA_CURITIBA_ITAJAI[cat];
+    if (restrito && projetoId && !restrito.includes(projetoId)) return;
+    (Array.isArray(data[cat]) ? data[cat] : []).forEach((it, i) => add(cat, rotuloCat, it, i));
+  });
+  if (data.moto && data.moto.placa) add("moto", "Moto", data.moto, 0);
+  return out.sort((a, b) => (a.situacao === b.situacao ? (b.dias ?? -1) - (a.dias ?? -1) : a.situacao === "inoperante" ? -1 : 1));
+}
+const hojeOuDias = (d) => (d === null || d === undefined ? "" : d === 0 ? "desde hoje" : `há ${d} ${d === 1 ? "dia" : "dias"}`);
+// "Lanterna Tático — INOPERANTE há 3 dias (desde 15/11): não acende"
+export function rotuloPendenciaEquip(p) {
+  const dm = p.desde ? ` (desde ${p.desde.slice(8)}/${p.desde.slice(5, 7)})` : "";
+  const t = hojeOuDias(p.dias);
+  return `${p.nome} — ${p.situacao === "inoperante" ? "INOPERANTE" : "PARCIAL"}${t ? ` ${t}` : ""}${dm}${p.motivo ? `: ${p.motivo}` : ""}`;
+}
+// Grava no material do mapa (o snapshot vai com o mapa enviado, para o histórico mostrar o que foi reportado).
+export const comPendenciasDeEquipamento = (mapa, data) => {
+  const lista = pendenciasDeEquipamento(data, mapa.data, mapa.projetoId);
+  const atual = (mapa.material && mapa.material.pendenciasEquip) || [];
+  if (!lista.length && !atual.length) return mapa;
+  if (JSON.stringify(lista) === JSON.stringify(atual)) return mapa;
+  return { ...mapa, material: { ...materialNovo(), ...(mapa.material || {}), pendenciasEquip: lista } };
+};
+
 // ── Baixa de equipamento pelo líder (troca, extravio, dano, devolução) ───────
 // Mesma lista do servidor (api/ai/lib/equipamentosSave.js). O cadastro é atualizado pelo servidor; o mapa só guarda o registro.
 export const MOTIVOS_BAIXA = ["Substituído", "Extraviado", "Danificado / inservível", "Devolvido", "Outro"];
