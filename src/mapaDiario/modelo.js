@@ -10,6 +10,7 @@ import { plantoesAfastamento, MAX_PLANTOES_AFASTAMENTO } from "../equipeEventos"
 //  - quilometragem rodada = odômetro atual − anterior.
 
 import { itensDaBase } from "./materialBase";
+import { desdeDoItem } from "./emAberto";
 import { chaveMapa } from "./regras";
 import { postosDoProjeto, defDoPosto, projetoPuxaEquipe, cargoCabe } from "./postos";
 import { pertenceA } from "../equipe/vinculos";
@@ -128,7 +129,7 @@ export function itensDeEquipamento(data, projetoId = null, turno = null) {
         if (!it || typeof it !== "object") return;
         const nome = it.identificacao || it.modelo || it.marca || `${rotuloCat} ${i + 1}`;
         const det = [it.calibre, it.nSerie ? `nº ${it.nSerie}` : "", it.qtd > 1 ? `${it.qtd} un.` : ""].filter(Boolean).join(" · ");
-        cad.push({ id: `${cat}:${it.id != null ? it.id : i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok", identificacao: it.identificacao || "", qtd: it.qtd ?? null });
+        cad.push({ id: `${cat}:${it.id != null ? it.id : i}`, categoria: cat, rotuloCategoria: rotuloCat, nome, detalhe: det, cadastro: it.status || "ok", identificacao: it.identificacao || "", qtd: it.qtd ?? null, desde: desdeDoItem(it), motivo: it.justificativa || "" });
       });
     });
   }

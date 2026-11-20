@@ -6,6 +6,7 @@ import { descreverFiltros } from "../mapaDiario/consolidado";
 import { rotuloTurno } from "../mapaDiario/texto";
 import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloBaixa, rotuloCorrecaoKm, rotuloTrocaNoPlantao, semVeiculo } from "../mapaDiario/modelo";
 import { fotoDaPessoa, iniciais } from "../mapaDiario/fotos";
+import { emAbertoDoMapa, linhaEmAberto } from "../mapaDiario/emAberto";
 
 const e = escHTML;
 const BADGE = { falta: "mk-b-da", vago: "mk-b-da", atraso: "mk-b-wa", ft: "mk-b-in", cobertura: "mk-b-in", troca: "mk-b-in" };
@@ -69,6 +70,7 @@ function blocoMapa(m, nomeProj, av) {
 <div class="mk-mu mk-sm">Líder: ${e(m.liderNome || "—")}${e(env)}</div>
 <table class="mk-tb"><thead><tr><th>Posto</th><th>Colaborador</th><th>Situação</th></tr></thead><tbody>${postos}</tbody></table>
 <div class="mk-sm"><b>Material:</b> ${e(material)}${km ? ` · <b>Km:</b> ${e(km)}` : ""}${vis || ult ? ` · <b>Supervisão:</b> ${e([vis, ult].filter(Boolean).join("; "))}` : ""}</div>
+${emAbertoDoMapa(m).length ? `<div class="mk-sm" style="color:#92400e">⚠ <b>Equipamentos em aberto:</b> ${e(emAbertoDoMapa(m).map((x) => linhaEmAberto(x)).join("; "))}</div>` : ""}
 ${(m.resumo || "").trim() ? `<div class="mk-sm"><b>Resumo da passagem:</b> ${e(m.resumo.trim())}</div>` : ""}
 ${(m.observacoes || "").trim() ? `<div class="mk-sm"><b>Observações:</b> ${e(m.observacoes.trim())}</div>` : ""}</div>`;
 }
