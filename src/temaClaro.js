@@ -39,6 +39,19 @@ export function definirTema(t) { _atual = t; }
 export function iconeTema() { const t = _atual === "sol" || _atual === "nuvem" ? _atual : "lua"; return createElement("img", { src: `/icones/tema/${t}.svg`, alt: NOMES[t] || t, width: 26, height: 26, draggable: false, style: { display: "block" } }); }
 export function tituloTema() { return `Tema ${NOMES[_atual]} — toque para trocar (Lua · Nuvem · Sol)`; }
 
+// Texto em cores vivas (azul-céu, verde, âmbar, vermelho, roxo...) pensado para fundo escuro some no fundo branco/creme:
+// no tema claro troca por tons escuros da mesma família (contraste mínimo 4,5:1). Só texto (color), nunca borda/fundo.
+const ACENTOS = [
+  ["14, 165, 233", "#0369a1"], ["56, 189, 248", "#0369a1"], ["96, 165, 250", "#1d4ed8"], ["59, 130, 246", "#1d4ed8"],
+  ["34, 197, 94", "#15803d"], ["74, 222, 128", "#15803d"], ["16, 185, 129", "#047857"],
+  ["245, 158, 11", "#b45309"], ["245, 185, 66", "#b45309"], ["251, 191, 36", "#b45309"], ["250, 204, 21", "#854d0e"], ["234, 179, 8", "#854d0e"],
+  ["239, 68, 68", "#b91c1c"], ["248, 113, 113", "#b91c1c"],
+  ["168, 85, 247", "#7e22ce"], ["192, 132, 252", "#7e22ce"], ["167, 139, 250", "#5b21b6"], ["124, 58, 237", "#5b21b6"],
+  ["45, 212, 191", "#0f766e"], ["20, 184, 166", "#0f766e"], ["6, 182, 212", "#0e7490"], ["34, 211, 238", "#0e7490"],
+  ["156, 163, 175", "#64748b"],
+];
+const ACENTOS_CLAROS = ACENTOS.map(([rgb, cor]) => `[style^="color: rgb(${rgb})"],[style*="; color: rgb(${rgb})"]{color:${cor} !important}`);
+
 // Legibilidade no celular (só nos temas claros): letras minúsculas maiores e
 // cinzas claros demais escurecidos para dar contraste sobre fundo branco/creme.
 const LEGIBILIDADE = [
@@ -46,6 +59,7 @@ const LEGIBILIDADE = [
   '[style*="font-size: 10px"]{font-size:11px !important}',
   '[style^="color: rgb(148, 163, 184)"],[style*="; color: rgb(148, 163, 184)"]{color:#64748b !important}',
   '[style^="color: rgb(203, 213, 225)"],[style*="; color: rgb(203, 213, 225)"]{color:#64748b !important}',
+  ...ACENTOS_CLAROS,
 ].join("\n");
 
 // Sol: troca os neutros frios do claro por creme quente (mesma estrutura, outro tom).
