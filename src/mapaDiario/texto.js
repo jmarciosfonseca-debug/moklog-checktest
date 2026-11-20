@@ -2,7 +2,7 @@
 // Títulos em negrito e emoji por assunto (início, efetivo, destaque de falta/FT e informações adicionais abaixo). P260B e P260C saem com cabeçalho "P260-B"/"P260-C"
 // (o P260B envia ao grupo do P260A).
 import { rotuloDia } from "./regras";
-import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloCorrecaoKm, rotuloBaixa, rotuloTrocaNoPlantao, semVeiculo } from "./modelo";
+import { ROTULO_SITUACAO, kmRodado, rotuloSaida, rotuloCorrecaoKm, rotuloBaixa, rotuloTrocaNoPlantao, rotuloReserva, semVeiculo } from "./modelo";
 
 export const cabecalhoProjeto = (pid) => (/^P260[BC]$/.test(pid) ? `P260-${pid.slice(-1)}` : pid);
 
@@ -98,7 +98,8 @@ export function montarTextoWhatsApp(mapa, { nomeProjeto = "", desligamentos = []
     if (v.kmAtual != null && v.kmAtual !== "") partes.push(`atual ${v.kmAtual}${v.kmAtualCorrigido != null && v.kmAtualCorrigido !== "" ? ` (corrigido depois para ${v.kmAtualCorrigido})` : ""}`);
     if (r != null) partes.push(r < 0 ? "rodado a conferir (km atual menor que o anterior)" : `rodado ${r} km`);
     if (partes.length) veic.push(`• *${v.rotulo || "Veículo"}${v.placa ? ` ${v.placa}` : ""}:* ${partes.join(" · ")}`);
-    if (v.trocaNoPlantao) veic.push(`   ↳ ${rotuloTrocaNoPlantao(v).replace(/^t/, "T")}`);
+    if (v.reserva && !v.trocaNoPlantao) veic.push(`   ↳ ${rotuloReserva(v).replace(/^m/, "M")}`);
+    if (v.trocaNoPlantao) veic.push(`   ↳ ${rotuloTrocaNoPlantao(v).replace(/^./, (c) => c.toUpperCase())}`);
     if (v.trocaMoto) veic.push(`   ↳ Moto substituída${v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}`);
   });
   if (semVeiculo(mapa)) veic.push("• Sem veículo neste plantão");

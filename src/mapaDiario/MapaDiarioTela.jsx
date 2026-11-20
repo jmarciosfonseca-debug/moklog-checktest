@@ -6,7 +6,7 @@ import { projetoPuxaEquipe, puxarEquipe } from "./postos";
 import { turnoVigente, dataBrasilia } from "./painel";
 import { chaveMapa, estadoDoMapa, inicioDoTurno, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
-import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao, semVeiculo, marcarSemVeiculo, registrarTrocaNoPlantao, desfazerTrocaNoPlantao, rotuloTrocaNoPlantao, kmMenorQueAnterior } from "./modelo";
+import { novoMapa, postoVazio, SITUACOES, ROTULO_SITUACAO, SITUACOES_MATERIAL, itensDeEquipamento, resumoItens, definirSituacaoMaterial, materialNovo, itensContaveis, definirQuantidade, validarParaConcluir, avisoResumoSemExcecao, pessoasRepetidas, kmRodado, soDigitos, ehPostoExtra, candidatosAFalta, vincularFalta, mudarSituacao, removerPosto, garantirMoto, completarPostosFixos, ehMoto, projetoComMoto, ausentesDaEquipe, foraDaEquipe, definirCobertoDe, marcarCoberturaSemFalta, completarIdsCobertura, herdarKmDoUltimoPlantao, veiculosInteiros, rodadoAlto, registrarSaidaAntecipada, MOTIVOS_SAIDA, TIPOS_COBERTURA, rotuloSaida, corrigirKmAnterior, desfazerCorrecaoKm, rotuloCorrecaoKm, MOTIVOS_BAIXA, validarBaixa, registrarBaixaNoMapa, rotuloBaixa, definirMotivoAntecipacao, semVeiculo, marcarSemVeiculo, registrarTrocaNoPlantao, desfazerTrocaNoPlantao, rotuloTrocaNoPlantao, kmMenorQueAnterior, iniciarReserva, encerrarReserva, rotuloReserva } from "./modelo";
 import { resumoLancamento, descricaoLancamentos } from "./ficha";
 import { montarTextoWhatsApp, linkWhatsApp, rotuloTurno } from "./texto";
 import { MAX_PLANTOES_AFASTAMENTO, linhaDesligamento } from "../equipeEventos";
@@ -56,6 +56,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
   const [saidaForm, setSaidaForm] = useState(null);   // saída antecipada / substituição (mapa já enviado)
   const [saidaErros, setSaidaErros] = useState([]);
   const [trocaForm, setTrocaForm] = useState(null);  // troca de veículo no meio do plantão { veiculoId, kmFinalAnterior, kmInicialNova, placaNova, motivo, erros }
+  const [reservaForm, setReservaForm] = useState(null); // moto reserva { veiculoId, modo: "entra"|"sai", tipo, km..., erros }
   const [kmForm, setKmForm] = useState(null);        // correção do km anterior { veiculoId, km, motivo, erros }
   const [baixaForm, setBaixaForm] = useState(null);  // baixa de equipamento pelo líder { id, motivo, obs, erro, salvando }
   const [baixaMsg, setBaixaMsg] = useState("");
@@ -351,7 +352,7 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
 
   // Troca de veículo no meio do plantão: o líder aponta e segue; o rodado soma os dois trechos. Função de render, não componente.
   const renderTroca = (v) => {
-    if (v.trocaNoPlantao) return null;
+    if (v.trocaNoPlantao || v.reserva) return null; // com a reserva em uso, o caminho é "Moto reserva recolhida"
     if (!trocaForm || trocaForm.veiculoId !== v.id) return <button onClick={() => setTrocaForm({ veiculoId: v.id, kmFinalAnterior: "", kmInicialNova: "", placaNova: "", motivo: "", erros: [] })} style={{ ...S.btn, marginTop: 6, marginLeft: 6, fontSize: 11, padding: "4px 10px" }} aria-label={`Troquei de veículo neste plantão ${v.rotulo || "Veículo"}`}>Troquei de veículo neste plantão</button>;
     const campo = (k, rot, num = true) => <label style={{ display: "flex", flexDirection: "column", gap: 3 }}><span style={S.lab}>{rot}</span><input aria-label={rot} type="text" inputMode={num ? "numeric" : "text"} value={trocaForm[k]} onChange={(e) => setTrocaForm((f) => ({ ...f, [k]: num ? soDigitos(e.target.value) : e.target.value }))} style={S.in} /></label>;
     const salvar = () => {
@@ -371,6 +372,54 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={salvar} style={{ ...S.btn, fontWeight: 800 }}>Registrar troca</button>
           <button onClick={() => setTrocaForm(null)} style={S.btn}>Cancelar</button>
+        </div>
+      </div>
+    );
+  };
+
+  // Moto reserva: a principal foi para a manutenção e chegou outra; depois a reserva é recolhida e a principal volta (ou vem uma nova).
+  const renderReserva = (v) => {
+    if (!ehMoto(v)) return null;
+    const aberto = reservaForm && reservaForm.veiculoId === v.id ? reservaForm : null;
+    const campo = (k, rot, num = true) => <label style={{ display: "flex", flexDirection: "column", gap: 3 }}><span style={S.lab}>{rot}</span><input aria-label={rot} type="text" inputMode={num ? "numeric" : "text"} value={reservaForm[k]} onChange={(e) => setReservaForm((f) => ({ ...f, [k]: num ? soDigitos(e.target.value) : e.target.value }))} style={S.in} /></label>;
+    const caixa = { marginTop: 6, padding: 8, border: `1px dashed ${cor.line}`, borderRadius: 8, display: "flex", flexDirection: "column", gap: 6 };
+    const erros = aberto && aberto.erros.length > 0 ? <div role="alert" style={{ color: "#dc2626", fontSize: 12, fontWeight: 700 }}>{aberto.erros.map((e) => <div key={e}>{e}</div>)}</div> : null;
+    const aplicar = (r) => { if (r.erros.length) return setReservaForm((f) => ({ ...f, erros: r.erros })); alterar(() => r.mapa); setReservaForm(null); };
+    const mini = { ...S.btn, marginTop: 6, marginLeft: 6, fontSize: 11, padding: "4px 10px" };
+    if (v.reserva) {
+      if (v.trocaNoPlantao) return null; // a reserva entrou neste plantão: só "Desfazer" (na linha de status)
+      if (!aberto) return <button onClick={() => setReservaForm({ veiculoId: v.id, modo: "sai", tipo: "mesma", kmFinalReserva: "", kmRetorno: v.reserva.principal && v.reserva.principal.km != null ? String(v.reserva.principal.km) : "", placaNova: "", motivo: "", erros: [] })} style={mini}>Moto reserva recolhida</button>;
+      const nova = aberto.tipo === "nova";
+      const opc = (t, rot) => <button key={t} aria-pressed={aberto.tipo === t} onClick={() => setReservaForm((f) => ({ ...f, tipo: t, erros: [] }))} style={{ ...S.btn, flex: 1, fontSize: 12, fontWeight: 800, ...(aberto.tipo === t ? { background: cor.ac, color: "#fff", borderColor: cor.ac } : {}) }}>{rot}</button>;
+      return (
+        <div data-testid="reserva-sai" style={caixa}>
+          <div style={{ fontSize: 12, color: cor.txt2 }}>A moto reserva foi recolhida. O que entrou no lugar?</div>
+          <div style={{ display: "flex", gap: 6 }}>{opc("mesma", "A moto principal voltou")}{opc("nova", "Veio outra moto principal")}</div>
+          {campo("kmRetorno", nova ? "Km inicial da moto nova (obrigatório)" : "Km com que a moto principal voltou (obrigatório)")}
+          {nova && campo("placaNova", "Placa da moto nova (se souber)", false)}
+          {campo("kmFinalReserva", "Km final da moto reserva (se souber)")}
+          <div style={{ fontSize: 11, color: cor.txt2 }}>No campo "Km atual" vai o odômetro da moto que ficou, no fim do plantão.</div>
+          {erros}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => aplicar(encerrarReserva(mapa, v.id, { ...aberto, por: quemPreenche(), agora: agoraFn() }))} style={{ ...S.btn, fontWeight: 800 }}>Registrar</button>
+            <button onClick={() => setReservaForm(null)} style={S.btn}>Cancelar</button>
+          </div>
+        </div>
+      );
+    }
+    if (v.trocaNoPlantao) return null;
+    if (!aberto) return <button onClick={() => setReservaForm({ veiculoId: v.id, modo: "entra", kmFinalPrincipal: v.kmAnterior != null ? String(v.kmAnterior) : "", kmInicialReserva: "", placaReserva: "", motivo: "", erros: [] })} style={mini}>Moto recolhida para manutenção</button>;
+    return (
+      <div data-testid="reserva-entra" style={caixa}>
+        <div style={{ fontSize: 12, color: cor.txt2 }}>A moto principal foi para a manutenção e chegou uma moto reserva? Os lançamentos passam a usar o km da reserva até a principal voltar. Se não veio reserva, use "Sem veículo neste plantão".</div>
+        {campo("kmInicialReserva", "Km com que a moto reserva chegou (obrigatório)")}
+        {campo("kmFinalPrincipal", "Km da moto principal ao ser recolhida")}
+        {campo("placaReserva", "Placa da moto reserva (se souber)", false)}
+        {campo("motivo", "Motivo (ex.: problema mecânico)", false)}
+        {erros}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => aplicar(iniciarReserva(mapa, v.id, { ...aberto, por: quemPreenche(), agora: agoraFn() }))} style={{ ...S.btn, fontWeight: 800 }}>Usar moto reserva</button>
+          <button onClick={() => setReservaForm(null)} style={S.btn}>Cancelar</button>
         </div>
       </div>
     );
@@ -775,10 +824,12 @@ export default function MapaDiarioTela({ project, dark, onBack, io = dados, agor
                 </div>
                 {v.trocaMoto && <div role="status" style={{ fontSize: 12, color: cor.ac, fontWeight: 700, marginTop: 4 }}>Moto substituída{v.trocaMoto.em ? ` em ${dataBR(String(v.trocaMoto.em).slice(0, 10))}` : ""}{v.trocaMoto.placaAnterior ? ` (antes ${v.trocaMoto.placaAnterior})` : ""}: o km anterior é o km inicial da moto nova.</div>}
                 {kmRodado(v) != null && kmRodado(v) < 0 && !v.trocaNoPlantao && <div role="alert" style={{ fontSize: 12, color: "#d97706", fontWeight: 700, marginTop: 4 }}>Menor que o anterior ({v.kmAnterior}). Trocou de veículo? Toque em "Troquei de veículo neste plantão". Se o km anterior foi digitado errado, toque em "Corrigir km anterior". Dá para concluir assim mesmo.</div>}
-                {v.trocaNoPlantao && <div role="status" data-testid="troca-no-plantao" style={{ fontSize: 12, color: cor.ac, fontWeight: 700, marginTop: 4 }}>{rotuloTrocaNoPlantao(v).replace(/^t/, "T")}. <button onClick={() => alterar((m) => desfazerTrocaNoPlantao(m, v.id))} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Desfazer troca</button></div>}
+                {v.trocaNoPlantao && <div role="status" data-testid="troca-no-plantao" style={{ fontSize: 12, color: cor.ac, fontWeight: 700, marginTop: 4 }}>{rotuloTrocaNoPlantao(v).replace(/^./, (c) => c.toUpperCase())}. <button onClick={() => alterar((m) => desfazerTrocaNoPlantao(m, v.id))} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Desfazer troca</button></div>}
                 {v.correcaoKm && <div role="status" style={{ fontSize: 12, color: cor.txt2, marginTop: 4 }}>Km anterior {rotuloCorrecaoKm(v)}. <button onClick={() => alterar((m) => desfazerCorrecaoKm(m, v.id))} style={{ ...S.btn, padding: "3px 8px", fontSize: 11 }}>Desfazer correção</button></div>}
                 {renderCorrigirKm(v)}
+                {v.reserva && !v.trocaNoPlantao && <div role="status" data-testid="reserva-em-uso" style={{ fontSize: 12, color: "#d97706", fontWeight: 700, marginTop: 4 }}>{rotuloReserva(v).replace(/^m/, "M")}. O km é o da reserva.</div>}
                 {renderTroca(v)}
+                {renderReserva(v)}
               </div>
             ))}
             <button onClick={() => alterar((m) => ({ ...m, veiculos: [...m.veiculos, { id: `v${Date.now().toString(36)}`, rotulo: m.veiculos.length ? `Veículo ${m.veiculos.length + 1}` : "Moto", kmAnterior: null, kmAtual: null }] }))} style={{ ...S.btn, display: semVeiculo(mapa) ? "none" : undefined }}>+ Veículo</button>
