@@ -129,7 +129,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
   const fichas = modelo.individuos.filter(i => !selecionados || selecionados.includes(i.colaborador.id));
   const tr = modelo.treinamentos;
   const quadro = totalQuadro(project?.id);
-  const turnQuadro = quadro ? turnoverSobreQuadro(project.id, modelo.desligados12m) : null;
+  const turnQuadro = quadro ? turnoverSobreQuadro(project.id, modelo.movimentacao) : null;
   const catalogo = Array.isArray(equipe.treinamentosEsperados) ? equipe.treinamentosEsperados.filter(t => t && String(t.nome || '').trim()) : [];
   const inicio = new Date(`${hoje}T12:00:00`); inicio.setFullYear(inicio.getFullYear() - 1);
   const desligados = incluirDesligados ? desligadosUnicos(equipe.desligados, (equipe.colaboradores || []).filter(c => (c.status || 'ativo') === 'ativo')).unicos.filter(c => c.tipoDesligamento !== 'Transferência' && c.desligadoEm && new Date(`${c.desligadoEm}T12:00:00`) >= inicio && c.desligadoEm <= hoje) : [];
@@ -148,7 +148,7 @@ export function gerarMapaEquipeHTML({ project, equipe, hoje, empresa = {}, selec
     <div class="mk-k"><div class="mk-kl">Efetivo ativo</div><div class="mk-kv">${modelo.individuos.length}</div><div class="mk-nota">${quadro ? `de ${quadro} postos · ${Math.max(0, quadro - modelo.individuos.length)} vaga(s) · ` : ''}${modelo.quantidadeAferida} com índice aferido${fichas.length !== modelo.individuos.length ? ` · ${fichas.length} nas fichas` : ''}</div></div>
     <div class="mk-k"><div class="mk-kl">${esc(TITULO_TREINAMENTOS)}</div><div class="mk-kv ${tr.comRegistro ? '' : 'mk-mu'}" style="font-size:${tr.comRegistro ? '15pt' : '10pt'}">${tr.comRegistro ? `${tr.comRegistro12m} de ${tr.total} · ${pct(tr.percentual12m)}` : esc(rotuloTreinamentos(tr))}</div><div class="mk-nota">${tr.comRegistro ? 'colaboradores com treinamento registrado na ficha · ' : ''}${esc(notaTreinamentos(tr))}</div></div>
     <div class="mk-k"><div class="mk-kl">Maturidade da equipe</div><div class="mk-kv" style="color:${corNota(modelo.indice)}">${nota(modelo.indice)}</div><div class="mk-nota"><b>${esc(modelo.classe)}</b> · 0–100</div></div>
-    <div class="mk-k"><div class="mk-kl">Turnover · últimos 12 meses</div><div class="mk-kv">${quadro ? pct(turnQuadro) : pct(modelo.turnover)}</div><div class="mk-nota">${modelo.desligados12m} desligamento(s) ÷ ${quadro ? `quadro de ${quadro} postos · efetivo médio real ${String(Math.round(modelo.efetivoMedio * 10) / 10).replace('.', ',')}: ${pct(modelo.turnover)}` : `efetivo médio ${String(Math.round(modelo.efetivoMedio * 10) / 10).replace('.', ',')}`} · estabilidade ${nota(modelo.estabilidade)}${modelo.turnover === null ? ' · base insuficiente' : ''}</div></div>
+    <div class="mk-k"><div class="mk-kl">Turnover · últimos 12 meses</div><div class="mk-kv">${quadro ? pct(turnQuadro) : pct(modelo.turnover)}</div><div class="mk-nota">(${modelo.admissoes} admissão(ões) + ${modelo.desligados12m} desligamento(s)) ÷ 2 ÷ ${quadro ? `quadro de ${quadro} postos · efetivo médio real ${String(Math.round(modelo.efetivoMedio * 10) / 10).replace('.', ',')}: ${pct(modelo.turnover)}` : `efetivo médio ${String(Math.round(modelo.efetivoMedio * 10) / 10).replace('.', ',')}`} · estabilidade ${nota(modelo.estabilidade)}${modelo.turnover === null ? ' · base insuficiente' : ''}</div></div>
   </div>`;
 
   const resumo = `<section class="eq-resumo">

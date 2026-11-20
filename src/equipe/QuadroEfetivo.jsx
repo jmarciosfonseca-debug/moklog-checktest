@@ -12,7 +12,7 @@ export default function QuadroEfetivo({ projectId, equipe, hoje, dark = true, ge
   const mu = { fontSize: 12, color: c.mu, lineHeight: 1.4, margin: '4px 0' };
   let modelo = null;
   try { modelo = calcularMapaEquipe(equipe, hoje); } catch (e) { modelo = null; }
-  const turnQuadro = modelo ? turnoverSobreQuadro(projectId, modelo.desligados12m) : null;
+  const turnQuadro = modelo ? turnoverSobreQuadro(projectId, modelo.movimentacao) : null;
   const completo = ocup.vagas === 0;
   const cor = completo ? '#22c55e' : '#f59e0b';
   const porPosto = ocup.semPosto === 0;
@@ -33,7 +33,7 @@ export default function QuadroEfetivo({ projectId, equipe, hoje, dark = true, ge
       </div>)}
     </div>
     <p style={mu}>
-      Turnover 12 meses: {turnQuadro === null ? 'não aferido' : `${Math.round(turnQuadro)}% sobre o quadro (${modelo.desligados12m} deslig. ÷ ${ocup.previsto} postos)`}
+      Turnover 12 meses: {turnQuadro === null ? 'não aferido' : `${Math.round(turnQuadro)}% sobre o quadro ((${modelo.admissoes} adm. + ${modelo.desligados12m} deslig.) ÷ 2 ÷ ${ocup.previsto} postos)`}
       {modelo && modelo.turnover !== null ? ` · ${Math.round(modelo.turnover)}% sobre o efetivo médio real` : ''}
     </p>
     {onMatriz && <button type="button" disabled={gerando} onClick={onMatriz}

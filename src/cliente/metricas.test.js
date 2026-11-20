@@ -19,7 +19,7 @@ test("equipe: ativos, turnover 12 m (fórmula da maturidade), treinados e últim
   ], desligados: [{ id: "z", nome: "Zé", desligadoEm: "2026-05-05", dataContratacao: "2024-01-01" }] };
   const r = equipeResumo(eq, "2026-10-20");
   expect(r.ativos).toBe(3); expect(r.porCargo).toEqual({ Vigilante: 2, "Líder": 1 });
-  expect(r.turnover).toBe(28.6); expect(r.saidas12m).toBe(1); expect(r.entradas12m).toBe(0);
+  expect(r.turnover).toBe(14.3); expect(r.saidas12m).toBe(1); expect(r.entradas12m).toBe(0); // (0 admissões + 1 saída) ÷ 2 ÷ efetivo médio 3,5
   expect(r.treinadosPct).toBe(67);
   expect(r.ultimosTreinos.map((t) => t.detalhe)).toEqual(["DDS", "Brigada"]);
   expect(r.tempoMedioMeses).toBeGreaterThan(20);
@@ -61,4 +61,20 @@ test("equipe: reciclagem em dia conta como treinado; contagens de ficha e recicl
   ] };
   const r = equipeResumo(eq, hoje, []);
   expect(r.comTreinoFicha).toBe(1); expect(r.comReciclagem).toBe(1); expect(r.treinadosPct).toBe(50);
+});
+
+test("turnover por período para o cliente: 12, 24 e 36 meses, com aviso de histórico parcial", () => {
+  const vet = (id) => ({ id, nome: `Vet ${id}`, cargo: "Vigilante", status: "ativo", dataContratacao: "2020-01-10", historico: [] });
+  const eq = { historicoDesde: "2025-03-01", colaboradores: [...["a", "b", "c", "d", "e", "f", "g", "h", "i"].map(vet), { id: "n", nome: "Nova", cargo: "Vigilante", status: "ativo", dataContratacao: "2026-04-01", historico: [] }],
+    desligados: [{ id: "x", nome: "X", desligadoEm: "2026-08-01", dataContratacao: "2026-02-01" }, { id: "y", nome: "Y", desligadoEm: "2025-01-15", dataContratacao: "2019-01-01" }, { id: "t", nome: "T", desligadoEm: "2026-09-01", dataContratacao: "2026-05-01", tipoDesligamento: "Transferência" }] };
+  const r = equipeResumo(eq, "2026-10-20");
+  const p = r.turnoverPeriodos;
+  expect(Object.keys(p)).toEqual(["12", "24", "36"]);
+  expect(p[12]).toMatchObject({ meses: 12, admissoes: 2, saidas: 1, entraramESairam: 1, parcialDesde: null, inicio: "2025-10-20" });
+  expect(p[12].entradasLista.map((c) => c.nome)).toEqual(["Nova"]);
+  expect(p[12].turnover).toBe(r.turnover);
+  expect(p[24]).toMatchObject({ saidas: 2, parcialDesde: "2025-03-01" });
+  expect(p[24].turnover).toBeCloseTo(p[24].turnoverPeriodo / 2, 1);
+  expect(p[36].parcialDesde).toBe("2025-03-01");
+  expect(r.admissoes12m).toBe(2);
 });

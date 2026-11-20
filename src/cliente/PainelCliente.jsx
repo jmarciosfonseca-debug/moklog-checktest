@@ -110,7 +110,7 @@ function Abas({ abas, atual, onMudar }) {
 
 function Detalhe({ p, tipo, onBack, abrirPDF }) {
   const s = p.sistemas;
-  const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false), [verEntradas, setVerEntradas] = useState(false), [aberto, setAberto] = useState({}), [maisTestes, setMaisTestes] = useState(false);
+  const [aba, setAba] = useState("mapa"), [sel, setSel] = useState(null), [verSaidas, setVerSaidas] = useState(false), [verEntradas, setVerEntradas] = useState(false), [periodoTurn, setPeriodoTurn] = useState(12), [aberto, setAberto] = useState({}), [maisTestes, setMaisTestes] = useState(false);
   const alternar = (k) => setAberto((a) => ({ ...a, [k]: !a[k] }));
   const Seta = ({ on }) => <span style={{ color: "#9ca3af", fontSize: 11 }}>{on ? "▴" : "▾"}</span>;
   const titulo = { teste: "Teste semanal", risco: "Análise de risco", plantao: "Equipe de plantão", turnover: "Turnover", equip: "Equipamentos de plantão", treino: "Treinamentos", sistemas: "Sistemas", ferias: "Férias", fotos: "Fotos · treinamentos", entorno: "Entorno" }[tipo];
@@ -167,23 +167,39 @@ function Detalhe({ p, tipo, onBack, abrirPDF }) {
       </div>}
     </>}
 
-    {tipo === "turnover" && <div style={C.card}>
-      <Mostrador valor={p.equipe.turnover} max={50} invertido rotulo="Turnover 12 m" cor={corTurnover(p.equipe.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub="saídas ÷ efetivo médio · últimos 12 meses" />
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-        <tbody>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Quantos temos hoje</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #2a2a31" }}>{p.equipe.ativos}</td></tr>
-          {Object.entries(p.equipe.porCargo).map(([c, n]) => <tr key={c}><td style={{ padding: "3px 0 3px 12px", color: "#9ca3af" }}>{c}</td><td style={{ textAlign: "right", color: "#9ca3af" }}>{n}</td></tr>)}
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Entraram nos últimos 12 meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem entrou" onClick={() => setVerEntradas((v) => !v)} style={{ ...C.back, color: VERDE, fontWeight: 900 }}>{p.equipe.entradas12m} {verEntradas ? "▴" : "▾ ver quem"}</button></td></tr>
-          {verEntradas && <tr><td colSpan={2} style={{ padding: "4px 0 8px 12px", color: "#9ca3af", fontSize: 11.5 }}>{p.equipe.entradas12mLista.length ? p.equipe.entradas12mLista.map((c) => `${c.nome} (${c.cargo || "—"}, desde ${fmtD(c.desde)})`).join(" · ") : "Ninguém admitido no período."}</td></tr>}
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Saíram nos últimos 12 meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem saiu" onClick={() => setVerSaidas((v) => !v)} style={{ ...C.back, color: VERMELHO2, fontWeight: 900 }}>{p.equipe.saidas12m} {verSaidas ? "▴" : "▾ ver quem"}</button></td></tr>
-          <tr><td style={{ padding: "6px 0", borderTop: "1px solid #2a2a31" }}>Total de desligamentos registrados</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31", color: "#9ca3af" }}>{p.desligados.length}</td></tr>
-        </tbody>
-      </table>
-      {verSaidas && <div style={{ marginTop: 8 }}>
-        {p.desligados.length === 0 && <div style={C.micro}>Nenhum desligamento registrado.</div>}
-        {p.desligados.map((c, i) => <Linha key={c.id || i} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={38} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.saida ? ` · saiu em ${fmtD(c.saida)}` : ""}{c.motivo ? ` · ${c.motivo}` : ""}</div></div></Linha>)}
-      </div>}
-    </div>}
+    {tipo === "turnover" && (() => {
+      // Turnover (16/11/2026): fórmula pedida pelo cliente — (admissões + desligamentos) ÷ 2 ÷ efetivo médio — e busca por período.
+      // O número grande é sempre a MÉDIA POR ANO, para 12, 24 e 36 meses serem comparáveis; o acumulado do período vai na tabela.
+      const pers = p.equipe.turnoverPeriodos || {};
+      const t = pers[periodoTurn] || { meses: 12, turnover: p.equipe.turnover, turnoverPeriodo: p.equipe.turnover, taxaSaidas: null, admissoes: p.equipe.entradas12m, saidas: p.equipe.saidas12m, entradasLista: p.equipe.entradas12mLista || [], entraramESairam: 0, inicio: null, parcialDesde: null, motivo: p.equipe.turnoverMotivo };
+      const pc = (v) => (typeof v === "number" ? `${v.toLocaleString("pt-BR")}%` : "não aferido");
+      const sairam = p.desligados.filter((c) => !t.inicio || (c.saida && c.saida >= t.inicio));
+      const linha = { padding: "6px 0", borderTop: "1px solid #2a2a31" };
+      return <div style={C.card}>
+        <div role="group" aria-label="Período do turnover" style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 6 }}>
+          {[12, 24, 36].map((m) => <button key={m} aria-pressed={periodoTurn === m} onClick={() => setPeriodoTurn(m)} style={{ borderRadius: 999, padding: "7px 14px", minHeight: 36, fontSize: 12, fontWeight: 800, cursor: "pointer", border: `1px solid ${periodoTurn === m ? "#e5e7eb" : "#3a3a42"}`, background: periodoTurn === m ? "#e5e7eb" : "transparent", color: periodoTurn === m ? "#0b0b0e" : "#d1d5db" }}>{m} meses</button>)}
+        </div>
+        <Mostrador valor={t.turnover} max={50} invertido rotulo={t.meses === 12 ? "Turnover 12 m" : `Turnover · média/ano (${t.meses} m)`} cor={corTurnover(t.turnover)} zonas={[[0, 5, VERDE], [5, 12.5, AMARELO], [12.5, 25, LARANJA], [25, 50, VERMELHO2]]} sub={`(admissões + desligamentos) ÷ 2 ÷ efetivo médio · últimos ${t.meses} meses`} />
+        {t.turnover === null && t.motivo && <div style={{ ...C.micro, textAlign: "center", marginBottom: 6 }}>Não aferido: {t.motivo}.</div>}
+        {t.parcialDesde && <div data-testid="turnover-parcial" style={{ ...C.micro, textAlign: "center", marginBottom: 6, color: AMARELO }}>O histórico da equipe neste app começa em {fmtD(t.parcialDesde)}: o período de {t.meses} meses está incompleto.</div>}
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <tbody>
+            <tr><td style={linha}>Quantos temos hoje</td><td style={{ textAlign: "right", fontWeight: 900, borderTop: "1px solid #2a2a31" }}>{p.equipe.ativos}</td></tr>
+            {Object.entries(p.equipe.porCargo).map(([c, n]) => <tr key={c}><td style={{ padding: "3px 0 3px 12px", color: "#9ca3af" }}>{c}</td><td style={{ textAlign: "right", color: "#9ca3af" }}>{n}</td></tr>)}
+            <tr><td style={linha}>Entraram nos últimos {t.meses} meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem entrou" onClick={() => setVerEntradas((v) => !v)} style={{ ...C.back, color: VERDE, fontWeight: 900 }}>{t.admissoes} {verEntradas ? "▴" : "▾ ver quem"}</button></td></tr>
+            {verEntradas && <tr><td colSpan={2} style={{ padding: "4px 0 8px 12px", color: "#9ca3af", fontSize: 11.5 }}>{t.entradasLista.length ? t.entradasLista.map((c) => `${c.nome} (${c.cargo || "—"}, desde ${fmtD(c.desde)})`).join(" · ") : "Ninguém admitido no período segue na equipe."}{t.entraramESairam > 0 ? ` · mais ${t.entraramESairam} que entrou e já saiu no período` : ""}</td></tr>}
+            <tr><td style={linha}>Saíram nos últimos {t.meses} meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31" }}><button aria-label="Ver quem saiu" onClick={() => setVerSaidas((v) => !v)} style={{ ...C.back, color: VERMELHO2, fontWeight: 900 }}>{t.saidas} {verSaidas ? "▴" : "▾ ver quem"}</button></td></tr>
+            {t.meses > 12 && <tr><td style={linha}>Turnover acumulado em {t.meses} meses</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31", color: "#9ca3af" }}>{pc(t.turnoverPeriodo)}</td></tr>}
+            <tr><td style={linha}>Só saídas ÷ efetivo médio{t.meses > 12 ? " (média/ano)" : ""}</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31", color: "#9ca3af" }}>{pc(t.taxaSaidas)}</td></tr>
+            <tr><td style={linha}>Total de desligamentos registrados</td><td style={{ textAlign: "right", borderTop: "1px solid #2a2a31", color: "#9ca3af" }}>{p.desligados.length}</td></tr>
+          </tbody>
+        </table>
+        {verSaidas && <div style={{ marginTop: 8 }}>
+          {sairam.length === 0 && <div style={C.micro}>Nenhum desligamento no período.</div>}
+          {sairam.map((c, i) => <Linha key={c.id || i} primeiro={i === 0}><Avatar foto={c.foto} nome={c.nome} tam={38} /><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{c.nome}</div><div style={C.micro}>{c.cargo}{c.saida ? ` · saiu em ${fmtD(c.saida)}` : ""}{c.motivo ? ` · ${c.motivo}` : ""}</div></div></Linha>)}
+        </div>}
+      </div>;
+    })()}
 
     {tipo === "equip" && <div style={C.card}>
       <div style={{ ...C.micro, marginBottom: 6 }}>{p.equip.total} itens · {p.equip.ok} ok · {p.equip.parcial} parciais · {p.equip.inop} inoperantes</div>

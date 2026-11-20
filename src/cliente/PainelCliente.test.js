@@ -66,6 +66,12 @@ test("PIN de proprietário: macro do grupo → parque (padrão SIS+) → telas d
     await clicar(botao(host, "Ver quem saiu")); expect(host.textContent).toContain("Zé Saiu"); expect(host.textContent).toContain("Pediu demissão");
     expect(host.textContent).toContain("Entraram nos últimos 12 meses");
     await clicar(botao(host, "Ver quem entrou")); expect(host.textContent).toContain("Bia Souza (VSPP Líder, desde 01/08/2026)");
+    // busca por período (16/11/2026): 12 / 24 / 36 meses, com a fórmula (admissões + desligamentos) ÷ 2 ÷ efetivo médio
+    expect(host.textContent).toContain("(admissões + desligamentos) ÷ 2 ÷ efetivo médio · últimos 12 meses");
+    await clicar(botao(host, "36 meses"));
+    expect(host.textContent).toContain("Entraram nos últimos 36 meses"); expect(host.textContent).toContain("Turnover acumulado em 36 meses");
+    expect(botao(host, "36 meses").getAttribute("aria-pressed")).toBe("true");
+    await clicar(botao(host, "12 meses")); expect(host.textContent).not.toContain("Turnover acumulado");
     // teste semanal: toque abre o PDF
     await clicar(botao(host, "← Golgi Cajamar")); await menu(host, "Teste semanal");
     expect(host.textContent).toContain("O que está puxando a nota para baixo"); expect(host.textContent).toContain("sem imagem");

@@ -150,7 +150,7 @@ export const INDICADORES = [
   { id: "turnover", pilar: "RH", nome: "Turnover (12 meses)", peso: 2, origem: "app", abrir: "turnover", calc: (p, r) => {
     const t = p.equipe?.turnover;
     if (typeof t !== "number") return { valor: null, texto: `Turnover não aferido${p.equipe?.turnoverMotivo ? ` (${p.equipe.turnoverMotivo})` : ""}.` };
-    return { valor: lim(100 - t * (r.id === "moked" ? 3 : 2)), texto: `${t.toLocaleString("pt-BR")}% em 12 meses · ${plural(p.equipe.saidas12m || 0, "saída")} · ${plural(p.equipe.entradas12m || 0, "entrada")}.` };
+    return { valor: lim(100 - t * (r.id === "moked" ? 3 : 2)), texto: `${t.toLocaleString("pt-BR")}% em 12 meses · ${plural(p.equipe.admissoes12m ?? p.equipe.entradas12m ?? 0, "admissão", "admissões")} · ${plural(p.equipe.saidas12m || 0, "saída")}.` };
   } },
   { id: "treino", pilar: "RH", nome: "Treinamento e reciclagem", peso: 2, origem: "app", abrir: "treino", calc: (p, r) => {
     const e = p.equipe || {};
