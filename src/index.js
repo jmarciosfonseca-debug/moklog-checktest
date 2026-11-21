@@ -3,6 +3,7 @@ import "./firebaseInicio"; // inicia o Firestore ANTES dos módulos que usam o b
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import OfertaDigital from './digital/OfertaDigital';
 import './temaMoked.css';
 import './tema/site.css';
 
@@ -20,6 +21,6 @@ root.render(
   <React.StrictMode>
     {fuToken
       ? <Suspense fallback={<div style={{ padding: 24, fontFamily: 'sans-serif' }}>Carregando…</div>}><PaginaExterna token={fuToken} /></Suspense>
-      : <App />}
+      : <><App /><OfertaDigital /></>}
   </React.StrictMode>
 );
