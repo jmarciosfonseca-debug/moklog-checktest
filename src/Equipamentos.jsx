@@ -184,8 +184,63 @@ function StatusSelector({ value, onChange, tipos, dark }) {
   );
 }
 
+// ── Correção da ocorrência (só gerencial): a equipe informa a data errada → o gerencial acerta a data e o texto.
+// Guarda a correção em `correcoes` (quem, quando, de → para) e não mexe no status nem no restante do item.
+export function aplicarCorrecaoOcorrencia(item, { dataProblem, justificativa }, { por="Gerencial", agora=new Date() }={}) {
+  const data = String(dataProblem||"").trim();
+  const just = String(justificativa||"").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return { ok:false, erro:"Informe a data da ocorrência." };
+  if (just.length<3) return { ok:false, erro:"Informe a justificativa." };
+  const hoje = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,"0")}-${String(agora.getDate()).padStart(2,"0")}`;
+  if (data>hoje) return { ok:false, erro:"A data da ocorrência não pode ser futura." };
+  if (data===item.dataProblem && just===String(item.justificativa||"").trim()) return { ok:false, erro:"Nada foi alterado." };
+  const corr = { em:agora.toISOString(), por, de:{ dataProblem:item.dataProblem||"", justificativa:item.justificativa||"" }, para:{ dataProblem:data, justificativa:just } };
+  return { ok:true, item:{ ...item, dataProblem:data, justificativa:just, correcoes:[...(item.correcoes||[]), corr] } };
+}
+
+function CorrigirOcorrencia({ item, onSalvar, dark }) {
+  const S = getStyles(dark);
+  const [aberto, setAberto] = useState(false);
+  const [data, setData] = useState(item.dataProblem||todayStr());
+  const [just, setJust] = useState(item.justificativa||"");
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const abrir = () => { setData(item.dataProblem||todayStr()); setJust(item.justificativa||""); setErro(""); setAberto(true); };
+  if (!aberto) return (
+    <button aria-label="Corrigir data da ocorrência" onClick={abrir} style={{ ...S.btnSm, color:"#0ea5e9", border:"1px solid #0ea5e944", fontSize:11, marginTop:8, marginRight:8 }}>
+      ✎ Corrigir data da ocorrência
+    </button>
+  );
+  const salvar = async () => {
+    const r = aplicarCorrecaoOcorrencia(item, { dataProblem:data, justificativa:just });
+    if (!r.ok) return setErro(r.erro);
+    setSalvando(true); setErro("");
+    const ok = await onSalvar(r.item);
+    setSalvando(false);
+    if (ok===false) setErro("Não foi possível salvar. Veja o aviso no topo e tente de novo."); else setAberto(false);
+  };
+  return (
+    <div data-testid="corrigir-ocorrencia" style={{ marginTop:8, padding:10, border:"1px dashed #0ea5e966", borderRadius:8, display:"flex", flexDirection:"column", gap:8 }}>
+      <div style={{ fontSize:11, ...S.txt2 }}>Acerte a data informada pela equipe. A correção fica registrada (quem, quando, valor anterior).</div>
+      <div>
+        <label style={S.lbl}>Data da ocorrência</label>
+        <CampoData aria-label="Data da ocorrência" value={data} onChange={v=>{ setData(v); setErro(""); }} style={S.inp}/>
+      </div>
+      <div>
+        <label style={S.lbl}>Justificativa</label>
+        <textarea aria-label="Justificativa da ocorrência" value={just} onChange={e=>{ setJust(e.target.value); setErro(""); }} style={{ ...S.inp, height:60, resize:"vertical", fontSize:12 }}/>
+      </div>
+      {erro && <div role="alert" style={{ fontSize:12, color:"#ef4444", fontWeight:700 }}>{erro}</div>}
+      <div style={{ display:"flex", gap:8 }}>
+        <button onClick={()=>setAberto(false)} style={{ ...S.btnSec, flex:1, fontSize:12 }}>Cancelar</button>
+        <button onClick={salvar} disabled={salvando} style={{ ...S.btn, flex:1, fontSize:12 }}>{salvando?"Gravando…":"Salvar correção"}</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Item Card genérico
-function ItemCard({ item, icon, title, children, onRemove, onBaixa, adminAuth, dark, problema }) {
+function ItemCard({ item, icon, title, children, onRemove, onBaixa, onCorrigir, adminAuth, dark, problema }) {
   const S = getStyles(dark);
   const [open, setOpen] = useState(false);
   const [baixa, setBaixa] = useState(null); // { motivo, obs, erro, salvando }
@@ -220,6 +275,7 @@ function ItemCard({ item, icon, title, children, onRemove, onBaixa, adminAuth, d
               <div style={{ fontSize:11, ...S.txt }}>{item.justificativa}</div>
             </div>
           )}
+          {adminAuth && onCorrigir && hasProblema && <CorrigirOcorrencia item={item} onSalvar={onCorrigir} dark={dark}/>}
           {onBaixa && !baixa && (
             <button aria-label={`Dar baixa: ${title}`} onClick={()=>setBaixa({motivo:"",obs:"",erro:""})}
               style={{ ...S.btnSm, color:"#f59e0b", border:"1px solid #f59e0b44", fontSize:11, marginTop:8, marginRight:8 }}>
@@ -462,6 +518,7 @@ export function SecaoItens({ titulo, icon, tipo, items, project, onUpdate, onBai
       <fieldset disabled={showForm||!!editItem} style={{border:0,padding:0,margin:0,minWidth:0}}>{items.map(item => (
         <ItemCard key={item.id} item={item} icon={icon} title={item.identificacao||(item.tipo||tipo)}
           onRemove={adminAuth?()=>removeItem(item.id):null}
+          onCorrigir={adminAuth?async(novo)=>(await onUpdate(items.map(x=>x.id===novo.id?novo:x)))!==false:null}
           onBaixa={canEdit&&onBaixa?async(info)=>{ const ok=await onBaixa(item,info); if(ok&&info.motivo==="Substituído"){ setAberto(true); setEditItem(null); setShowForm(true); } return ok; }:null}
           adminAuth={adminAuth} dark={dark}>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -721,6 +778,8 @@ function SecMoto({ moto, project, onUpdate, adminAuth, liderAuth, dark }) {
                     <div style={{fontSize:11,...S.txt}}>{form.justificativa}</div>
                   </div>
                 )}
+
+                {adminAuth && hasProblema && form.justificativa && <CorrigirOcorrencia item={form} dark={dark} onSalvar={async(novo)=>{ const ok=(await onUpdate(novo))!==false; if(ok)setForm(novo); return ok; }}/>}
 
                 {liderAuth && hasProblema && (
                   <button onClick={()=>{ const u={...form,status:"ok",justificativa:"",dataProblem:""}; setForm(u); onUpdate(u); }}
