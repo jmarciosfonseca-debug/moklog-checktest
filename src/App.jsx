@@ -39,8 +39,8 @@ import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE, calcularRiscoProjeto } from "./AnaliseRisco";
 import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
-import { montarHTMLExecutivo } from "./relatorios/executivoRelatorio";
-import { itensDoEstado, falhasPorSistema } from "./relatorios/metricas";
+import { montarHTMLSis } from "./relatorios/sis/htmlSis";
+import { itensDoEstado, falhasPorSistema, porCategoria } from "./relatorios/metricas";
 import { baixarHtml, abrirParaImpressao } from "./relatorios/padraoMoked";
 import { gerarVisao360HTML } from "./relatorios/visao360Relatorio";
 import PainelCliente from "./cliente/PainelCliente";
@@ -1704,7 +1704,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
             {!loadingV&&rows.length>0&&<button onClick={()=>gerarPDFVisao360(rows, mediaGrupo, grupoSel?grupoSel.label:null)}
               style={{...S.secBtn,fontSize:12,color:"#60a5fa",borderColor:"#1d4ed844",padding:"8px 12px"}}><Ico n="arquivo"/> PDF Executivo</button>}
             {!loadingV&&rows.length>0&&grupoSel&&<button disabled={gerandoExec} onClick={async()=>{
-                // HTML Executivo: mesmas linhas da Visão 360 + resumos de cada relatório, lidos SÓ NO CLIQUE (somente leitura).
+                // HTML Visão 360 com SIS⁺: mesmas linhas da Visão 360 + resumos de cada relatório, lidos SÓ NO CLIQUE (somente leitura).
                 // Fonte que falhar = null ("não aferido" no arquivo); documento inexistente = [] (sem registros).
                 if(gerandoExec) return; setGerandoExec(true);
                 try {
@@ -1724,7 +1724,7 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                       const ult = hist[hist.length-1]; const h = computeHealth(p, ult.state);
                       ex.ultimo = { pct:h.pct, total:h.total, ok:h.ok, partial:h.partial, inop:h.inop, data:ult.meta?.date||null };
                       ex.tendencia = hist.slice(-6).map(x=>({ pct: computeHealth(p, x.state).pct, data: x.meta?.date||null }));
-                      try { ex.falhasSistemas = falhasPorSistema(itensDoEstado(p, ult.state)); } catch(e){ ex.falhasSistemas = []; }
+                      try { const itens = itensDoEstado(p, ult.state); ex.falhasSistemas = falhasPorSistema(itens); ex.categorias = porCategoria(itens); } catch(e){ ex.falhasSistemas = []; ex.categorias = []; }
                     }
                     const mega = r.id==="P311A"||r.id==="P311B";
                     const [key, en, rv, cams, man, ilum, amb] = await Promise.all([
@@ -1736,14 +1736,12 @@ function Dashboard({stored, ctmkData={}, onToggleCtmk, onBack, onDeleteReport, o
                     if(mega) ex.ambulancia = amb;
                     extras[r.id] = ex;
                   }));
-                  const c = SCORE360_CFG;
-                  const nota = `Como a pontuação é calculada: parte do % do último checklist semanal e desconta pendências ativas — CTMK off-line (−${c.ctmkPorDia}/dia, máx. −${c.ctmkMax}), falha de KeyAccess aberta (−${c.keyAccess} cada, máx. −${c.keyAccessMax}), placa crítica no bolsão (−${c.bolsaoCritico} cada, máx. −${c.bolsaoMax}), zona perimetral com problema (−${c.perimetralZona} cada, máx. −${c.perimetralMax}), Ronda VSPP abaixo de 90% (−${c.rondaMedia}) ou de 60% (−${c.rondaBaixa}). Iluminação, energia, ronda virtual, gravação, manutenção e ambulância são exibidas, sem pontuação.`;
-                  const html = montarHTMLExecutivo({ rows, grupoLabel: grupoSel.label, agora: new Date(), extras, notaCalculo: nota, logoSrc: MOKED_LOGO });
-                  baixarHtml(html, `executivo_${grupoSel.label.toLowerCase()}_${new Date().toLocaleDateString("sv-SE")}.html`);
-                } catch(e){ alert("Não foi possível gerar o HTML Executivo. Tente novamente."); }
+                  const html = montarHTMLSis({ rows, grupoLabel: grupoSel.label, agora: new Date(), extras, logoSrc: MOKED_LOGO });
+                  baixarHtml(html, `visao360_sis_${grupoSel.label.toLowerCase()}_${new Date().toLocaleDateString("sv-SE")}.html`);
+                } catch(e){ alert("Não foi possível gerar o HTML Visão 360. Tente novamente."); }
                 finally { setGerandoExec(false); }
               }}
-              style={{...S.secBtn,fontSize:12,color:"#e2e8f0",borderColor:"#b21e2766",padding:"8px 12px",opacity:gerandoExec?0.6:1}}>{gerandoExec?"Gerando…":"HTML Executivo"}</button>}
+              style={{...S.secBtn,fontSize:12,color:"#e2e8f0",borderColor:"#b21e2766",padding:"8px 12px",opacity:gerandoExec?0.6:1}}>{gerandoExec?"Gerando…":"HTML 360 · SIS⁺"}</button>}
           </div>
 
           {!loadingV&&<div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:8}}>
