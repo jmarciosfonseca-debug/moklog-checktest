@@ -3,6 +3,7 @@
 //  - ativo=false desliga e apaga os caches em todos os aparelhos na próxima abertura;
 //  - sem conseguir ler a chave (sem internet, erro): NÃO muda nada (nem liga, nem desliga);
 //  - a versão nova nunca entra sozinha: oferece "Atualizar" e só troca quando o usuário aceita.
+import { aplicarLeitura } from "./cacheLeitura";
 const CONFIG_URL = "/offline-config.json";
 const SW_URL = "/sw.js";
 const A_CADA_MS = 10 * 60000;
@@ -39,9 +40,11 @@ export const _reiniciarSW = () => { ligado = false; };
  * @param perfil  nivel da sessão ("demo", "gerencial", "cliente", "equipe") ou null antes do login
  * @param onAtualizacao  ({ aplicar }) quando há versão nova esperando; aplicar() troca e recarrega
  */
-export async function iniciarOffline({ perfil = null, onAtualizacao, nav = typeof navigator !== "undefined" ? navigator : null, win = typeof window !== "undefined" ? window : null, fetchFn, agora = () => Date.now(), cacheApi } = {}) {
+export async function iniciarOffline({ perfil = null, onAtualizacao, nav = typeof navigator !== "undefined" ? navigator : null, win = typeof window !== "undefined" ? window : null, fetchFn, agora = () => Date.now(), cacheApi, aplicarLeituraFn = aplicarLeitura } = {}) {
+  const config = await lerConfig(fetchFn);
+  try { aplicarLeituraFn(config, perfil); } catch { /* a leitura offline é opcional: nunca atrapalha o resto */ }
   if (!nav || !nav.serviceWorker) return "indisponivel";
-  const acao = decidir(await lerConfig(fetchFn), perfil);
+  const acao = decidir(config, perfil);
   if (acao === "desligar") { ligado = false; await desligar({ nav, ...(cacheApi !== undefined ? { cacheApi } : {}) }); return "desligado"; }
   if (acao !== "ligar") return "mantido";
   if (ligado) return "ligado";
