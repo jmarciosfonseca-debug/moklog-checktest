@@ -134,4 +134,18 @@ describe("telas: invisíveis quando desligado", () => {
     await montar(<OfertaDigital />);
     expect(host.innerHTML).toBe("");
   });
+  test("?digital=1 vale mesmo quem já está com sessão aberta (não passou pela porta de PIN)", async () => {
+    const { entrarComResposta, clearSession } = require("../session");
+    Object.defineProperty(window.navigator, "credentials", { value: { create: jest.fn(), get: jest.fn() }, configurable: true });
+    window.PublicKeyCredential = function PublicKeyCredential() {};
+    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true;
+    window.localStorage.removeItem(K_TESTE);
+    window.history.pushState({}, "", "/?digital=1");
+    cfg("teste");
+    expect(entrarComResposta({ ok: true, token: "t.k", nivel: "admin", exp: Date.now() + 3600000 }, { anyProject: true })).toBe("admin");
+    await montar(<OfertaDigital />);
+    expect(host.querySelector('[data-testid="digital-chip"],[data-testid="digital-painel"]')).not.toBeNull();
+    expect(window.localStorage.getItem(K_TESTE)).toBe("1");
+    await act(async () => { clearSession(); }); window.history.pushState({}, "", "/"); window.localStorage.removeItem(K_TESTE); delete window.PublicKeyCredential; delete window.navigator.credentials;
+  });
 });
