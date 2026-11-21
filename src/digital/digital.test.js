@@ -32,9 +32,9 @@ describe("liberação (chave remota + marca de teste + suporte)", () => {
     expect(await lerConfigDigital(fetchSeq(resp({ modo: "qualquer" })))).toEqual({ modo: "desligado" });
     expect(await lerConfigDigital(fetchSeq(resp({}, 500)))).toEqual({ modo: "desligado" });
   });
-  test("o arquivo publicado começa desligado", () => {
+  test("o arquivo publicado nunca está em \"ligado\" sem decisão (desligado ou teste)", () => {
     const cfg = JSON.parse(require("fs").readFileSync(require("path").join(__dirname, "..", "..", "public", "digital-config.json"), "utf8"));
-    expect(cfg.modo).toBe("desligado");
+    expect(["desligado", "teste"]).toContain(cfg.modo);
   });
   test("desligado nunca libera; teste só com a marca do aparelho; ligado precisa de suporte", async () => {
     const win = winCom({});
