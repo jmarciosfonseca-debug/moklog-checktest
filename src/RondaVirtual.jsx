@@ -21,7 +21,7 @@ import { Ico } from "./Icones";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { onSnapshot } from "firebase/firestore";
 import { setDoc as fgSetDoc } from "./fireGuard";
-import { TOLERANCIA_MIN, temGradeEspecial, buildSlots, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot } from "./rondaVirtualGrade";
+import { TOLERANCIA_MIN, temGradeEspecial, buildSlots, limiteFinalTurnoMin, minutosDesdeInicio, statusSlot, dataInicioNovoTurno, turnoEmJanela } from "./rondaVirtualGrade";
 import { montarRelatorioTurno, montarConsolidadoRonda, chaveColaboradora, periodoUltimosDias, rotulosColaboradoras } from "./relatorios/rondaVirtualRelatorio";
 import { baixarHtml } from "./relatorios/padraoMoked";
 import PlantaoDoMapa, { usePlantaoDoMapa } from "./mapaDiario/PlantaoDoMapa";
@@ -148,6 +148,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const editandoRef = useRef(false);        // usuário digitando? (segura o snapshot p/ não pisar por cima)
   const editTimer = useRef(null);
   const turnosRef = useRef([]);             // sempre a lista mais recente (p/ merge)
+  const persistRef = useRef(null);          // persist atual (para o snapshot regravar turnos perdidos)
   useEffect(()=>{ turnosRef.current = turnos; },[turnos]);
   const marcarEditando = () => {
     editandoRef.current = true;
@@ -171,7 +172,12 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const [abrindo, setAbrindo] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erroSalvar, setErroSalvar] = useState(false);
-  const [listaPendente, setListaPendente] = useState(null); // última gravação que falhou, p/ retry
+  const [listaPendente, setListaPendente] = useState(null); // última gravação que falhou ({opts}), p/ retry
+  const [tamanhoKB, setTamanhoKB] = useState(0);              // tamanho do registro do projeto (limite do banco: 1024 KB)
+  // Turnos criados/alterados AQUI e ainda não confirmados pelo servidor, e turnos já confirmados por este aparelho.
+  // O servidor nunca pode "sumir" com um turno ativo da tela só porque um eco/leitura veio sem ele.
+  const pendentesRef = useRef(new Set());
+  const meusIdsRef = useRef(new Set());
   const [selTurnos, setSelTurnos] = useState(new Set());
   // Relatórios (F2-1): versão interna, período, colaboradoras e tipo de turno do consolidado por filtro
   const [relInterno, setRelInterno] = useState(false);
@@ -206,6 +212,15 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       // o merge na hora de salvar garante que nada se perca.
       if(editandoRef.current){ setLoading(false); return; }
       const lista = data.turnos||[];
+      try{ setTamanhoKB(Math.round(JSON.stringify(lista).length/1024)); }catch(e){}
+      // PROTEÇÃO DE TURNO ATIVO: turno ativo com ronda registrada que este aparelho criou/gravou e que o servidor
+      // NÃO trouxe (gravação ainda não confirmada, ou sobrescrita por outro aparelho com leitura velha) continua
+      // na tela e, se já tinha sido confirmado, é regravado — o trabalho da operadora nunca some em silêncio.
+      const idsServ = new Set(lista.map(t=>t.id));
+      idsServ.forEach(id=>pendentesRef.current.delete(id));
+      const orfaos = (turnosRef.current||[]).filter(t=>!idsServ.has(t.id) && !t.arquivado
+        && (pendentesRef.current.has(t.id) || meusIdsRef.current.has(t.id))
+        && (pendentesRef.current.has(t.id) || Object.values(t.rondas||{}).some(r=>rondaTemConteudo(r))));
       // PROTEÇÃO ANTI-REVERSÃO: se o servidor manda um turno SEM inicio num slot que
       // localmente já tem inicio (ronda começada aqui e ainda não ecoada), preserva o
       // local. Evita o bug "voltei pra finalizar e o app pediu pra iniciar de novo".
@@ -250,9 +265,13 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
         }
         return mudou ? {...baseArq, rondas} : baseArq;
       });
-      setTurnos(fundida);
-      try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(fundida)); }catch(e){}
+      const final = orfaos.length ? [...orfaos, ...fundida] : fundida;
+      setTurnos(final);
+      try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(final)); }catch(e){}
       setLoading(false);
+      // regrava os turnos que o servidor perdeu (só os já confirmados antes; os pendentes têm a própria tentativa)
+      const perdidos = orfaos.filter(t=>!pendentesRef.current.has(t.id)).map(t=>t.id);
+      if(perdidos.length) setTimeout(()=>{ persistRef.current && persistRef.current(turnosRef.current, { turnosAlterados: perdidos }); }, 0);
     }, (err)=>{
       console.error("Ronda snapshot error:", err);
       // fallback: cache local (já pintado acima)
@@ -271,6 +290,7 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
   const persist = async (lista, opts={}) => {
     const alterados = opts.turnosAlterados || lista.map(t=>t.id);
     const remover   = new Set(opts.remover || []);
+    alterados.forEach(id=>{ if(!remover.has(id)) pendentesRef.current.add(id); });
     // otimista: pinta já na tela
     setTurnos(lista);
     try{ localStorage.setItem(`${COL}_${project.id}`, JSON.stringify(lista)); }catch(e){}
@@ -336,16 +356,19 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
     let ok = false, ultimoErro = null;
     for(let tentativa=1; tentativa<=2 && !ok; tentativa++){
       try{
-        let servidor = [];
+        // SEM leitura do servidor NÃO se grava: antes, se a leitura falhava (sinal ruim), gravava a lista local como se o
+        // servidor estivesse vazio e podia sobrescrever rondas/turnos de outro aparelho. Agora tenta de novo e, se não der,
+        // avisa e mantém tudo pendente na tela.
+        let servidor = null;
         try{
           const snap = await getDoc(ref);
           servidor = (snap && snap.exists()) ? (snap.data().turnos||[]) : [];
         }catch(eRead){
-          // se a leitura falhar, ainda tentamos gravar a partir do que temos
           console.error("Ronda read-before-write falhou (tentativa "+tentativa+"):", eRead);
-          servidor = [];
         }
+        if(servidor===null){ ultimoErro = new Error("leitura do servidor falhou"); await new Promise(r=>setTimeout(r, 400)); continue; }
         const final = construirFinal(servidor);
+        try{ setTamanhoKB(Math.round(JSON.stringify(final).length/1024)); }catch(e){}
         await fgSetDoc(ref, { turnos: final, updatedAt: stamp });
         ok = true;
       }catch(e){
@@ -355,17 +378,26 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       }
     }
 
-    if(ok){ setErroSalvar(false); setListaPendente(null); }
+    if(ok){ setErroSalvar(false); setListaPendente(null); alterados.forEach(id=>{ pendentesRef.current.delete(id); if(!remover.has(id)) meusIdsRef.current.add(id); }); }
     else {
       // não conseguiu gravar: mantém pendente e AVISA (não perde o trabalho local)
       console.error("Ronda: falha definitiva ao salvar:", ultimoErro);
       setErroSalvar(true);
-      setListaPendente(lista);
+      setListaPendente({ opts });
     }
     setSalvando(false);
   };
 
-  const tentarSalvarDeNovo = () => { if(listaPendente) persist(listaPendente); };
+  persistRef.current = persist;
+  // Retry usa SEMPRE a lista mais recente da tela (não a de quando falhou) e os mesmos turnos alterados.
+  const tentarSalvarDeNovo = () => { if(listaPendente) persist(turnosRef.current, listaPendente.opts||{}); };
+  // Voltou o sinal → tenta de novo sozinho; também a cada ciclo do relógio enquanto houver pendência.
+  useEffect(()=>{
+    const on = ()=>{ if(listaPendente && !salvando) tentarSalvarDeNovo(); };
+    window.addEventListener("online", on);
+    return ()=>window.removeEventListener("online", on);
+  });
+  useEffect(()=>{ if(listaPendente && !salvando && tick>0) tentarSalvarDeNovo(); },[tick]);
 
   const abrirTurno = async () => {
     // ── TRAVA: só pode existir UM turno ativo (não arquivado) por vez no projeto.
@@ -427,11 +459,23 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
       if(!confirma) return;
     }
 
+    // ── Turno do MESMO tipo arquivado (por engano, em geral) e ainda dentro da jornada de 12h: oferece REABRIR o mesmo
+    // turno, que mantém as rondas já feitas. Antes, abrir um novo a partir daí criava um turno vazio e todos os horários
+    // anteriores apareciam como "não executados".
+    const agoraAbrir = new Date();
+    const recente = turnosRef.current.find(t=>t.arquivado && t.tipo===novoTipo && turnoEmJanela(t.tipo, t.dataInicio, agoraAbrir, project.id)
+      && Object.values(t.rondas||{}).some(r=>rondaTemConteudo(r)));
+    if(recente){
+      const reabrir = window.confirm(
+        `Já existe um turno ${RONDA_TURNOS[recente.tipo]?.label?.toUpperCase()||recente.tipo} de ${fmtDataBR(recente.dataInicio)} (${recente.plantonista?.nome||"—"}) concluído, mas ainda dentro do horário, com rondas registradas.\n\n`+
+        `OK = REABRIR esse turno (as rondas já feitas continuam)\nCancelar = abrir um turno novo, vazio`);
+      if(reabrir){ marcarEditando(); await updTurno(recente.id, t=>({...t, arquivado:false, arquivadoEm:null})); setNovoPlant(""); return; }
+    }
     setAbrindo(true);
     const novo = {
       id: Date.now().toString()+Math.random().toString(36).substring(2,6),
       tipo: novoTipo,
-      dataInicio: hojeISO(),
+      dataInicio: dataInicioNovoTurno(novoTipo, project.id, agoraAbrir),
       plantonista: { id:col.id, nome:col.nome, cargo:col.cargo||"" },
       abertoEm: new Date().toISOString(),
       arquivado: false,
@@ -486,6 +530,12 @@ export default function RondaVirtual({ project, dark, S, adminAuth, loadEquipe, 
             style={{background:"#fff",color:"#7c2d12",border:"none",borderRadius:8,padding:"8px 14px",fontWeight:700,fontSize:12,cursor:salvando?"not-allowed":"pointer",flexShrink:0,opacity:salvando?0.6:1}}>
             {salvando?"⟳":"Tentar"}
           </button>
+        </div>
+      )}
+      {tamanhoKB>=800 && (
+        <div role="alert" style={{background:"#7c2d12",border:"1px solid #f59e0b",borderRadius:10,padding:"10px 14px",fontSize:12,color:"#fed7aa"}}>
+          <strong style={{color:"#fff"}}>Registro de rondas quase no limite ({tamanhoKB} KB de 1024 KB).</strong> Acima disso o banco recusa novas rondas.
+          Avise o suporte para arquivar o histórico antigo antes que isso aconteça.
         </div>
       )}
       {/* KPIs */}
@@ -706,6 +756,10 @@ function TurnoCard({ turno, projectId, dark, S, adminAuth, tick, onEditando, onU
       alert(`Favor justificar as rondas não realizadas.\n\nHá ${naoRealizadasSemJust} ronda(s) não executada(s) sem justificativa. Preencha o motivo antes de concluir e arquivar o turno.`);
       return;
     }
+    // Turno ainda dentro da jornada (ex.: noturno só termina às 06:00): pede confirmação — arquivar sem querer no meio do
+    // plantão fazia a lista de ativos ficar vazia e o próximo turno aberto nascer sem as rondas anteriores.
+    if(!turno.arquivado && turnoEmJanela(turno.tipo, turno.dataInicio, new Date(), projectId)
+       && !window.confirm(`O turno ${tinfo.label.toUpperCase()} de ${fmtDataBR(turno.dataInicio)} ainda está em andamento.\n\nConcluir e arquivar agora? As próximas rondas deste turno não poderão mais ser registradas nele.`)) return;
     onArquivar();
   };
 

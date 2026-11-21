@@ -15,3 +15,19 @@ test("status por relógio e registro", () => {
   expect(statusSlot(s, 60, 999, { naoExec: true })).toBe("naoexec");
   expect(minutosDesdeInicio("noturno", "2026-10-04", new Date("2026-10-05T00:30:00"), "P601")).toBe(390);
 });
+
+test("turno noturno aberto de madrugada pertence ao dia anterior (senão tudo fica 'aguardando')", () => {
+  const { dataInicioNovoTurno, turnoEmJanela } = require("./rondaVirtualGrade");
+  expect(dataInicioNovoTurno("noturno", "P260A", new Date(2026, 10, 21, 1, 0))).toBe("2026-11-20");
+  expect(dataInicioNovoTurno("noturno", "P260A", new Date(2026, 10, 20, 22, 0))).toBe("2026-11-20");
+  expect(dataInicioNovoTurno("noturno", "P260A", new Date(2026, 10, 21, 6, 0))).toBe("2026-11-21"); // 06h já é outro dia/turno
+  expect(dataInicioNovoTurno("noturno", "P606", new Date(2026, 10, 21, 6, 30))).toBe("2026-11-20"); // P606 vai até 07h
+  expect(dataInicioNovoTurno("diurno", "P260A", new Date(2026, 10, 21, 1, 0))).toBe("2026-11-21");
+  expect(dataInicioNovoTurno("noturno", "P601", new Date(2026, 0, 1, 0, 30))).toBe("2025-12-31"); // virada de ano
+  // com a data certa, de madrugada os horários correm (não ficam 'aguardando')
+  const d = dataInicioNovoTurno("noturno", "P260A", new Date(2026, 10, 21, 1, 0));
+  expect(minutosDesdeInicio("noturno", d, new Date(2026, 10, 21, 1, 0), "P260A")).toBe(420);
+  expect(turnoEmJanela("noturno", "2026-11-20", new Date(2026, 10, 21, 1, 0), "P260A")).toBe(true);
+  expect(turnoEmJanela("noturno", "2026-11-20", new Date(2026, 10, 21, 6, 0), "P260A")).toBe(false); // terminou
+  expect(turnoEmJanela("noturno", "2026-11-20", new Date(2026, 10, 20, 17, 0), "P260A")).toBe(false); // ainda não começou
+});
