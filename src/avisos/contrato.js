@@ -7,6 +7,7 @@
 // Notícia: { id, origem: "sistema" | "externa", tema: "sistema" | "seguranca" | "mercado", projetoId, titulo, resumo, fonte,
 //            links: [url], data: Date | null, sev }
 import { CATEGORIAS, SEVERIDADES } from "./config";
+import { TIPOS_GRAVES } from "../entorno/locais";
 
 export const ABAS = [
   { id: "equipamentos", rotulo: "Equipamentos" },
@@ -56,13 +57,14 @@ export function agrupar(avisos) {
 const txt = (v, n) => String(v == null ? "" : v).slice(0, n);
 const dataValida = (v) => { if (!v) return null; const d = v instanceof Date ? v : new Date(v); return Number.isNaN(d.getTime()) ? null : d; };
 
-// Notícia de fora (Entorno). Segurança perto do parque é mais forte; mercado logístico é informativo.
+// Notícia de fora (Entorno). Regra de cores do Marcio (02/11): criminalidade grave em vermelho, demais ocorrências em amarelo,
+// mercado/logística em verde (mercado entra como "info" e a tela pinta de verde).
 export function noticiaExterna(it, projetoId) {
   if (!it || !it.id || !it.titulo) return null;
   const tema = it.tema === "mercado" ? "mercado" : "seguranca";
-  const perto = it.proximidade === "cidade";
-  const links = Array.isArray(it.links) ? it.links.filter(Boolean) : it.link ? [it.link] : [];
-  return { id: `ext:${projetoId || "GERAL"}:${it.id}`, origem: "externa", tema, projetoId: projetoId || "TODOS", titulo: txt(it.titulo, 200), resumo: txt(it.resumo, 200), fonte: txt(it.fonte, 60), links, data: dataValida(it.data), sev: tema === "mercado" ? "info" : perto ? "critico" : "atencao" };
+  const links = Array.isArray(it.links) ? it.links.map((l) => (typeof l === "string" ? { fonte: "", link: l } : l)).filter((l) => l && l.link) : it.link ? [{ fonte: txt(it.fonte, 60), link: it.link }] : [];
+  const sev = tema === "mercado" ? "info" : TIPOS_GRAVES.includes(it.tipo) ? "critico" : "atencao";
+  return { id: `ext:${projetoId || "GERAL"}:${it.id}`, origem: "externa", tema, tipo: it.tipo || "", projetoId: projetoId || "TODOS", titulo: txt(it.titulo, 200), resumo: txt(it.resumo, 200), fonte: txt(it.fonte, 60), links, local: [it.bairro, it.cidade].filter(Boolean).join(", "), data: dataValida(it.data), sev };
 }
 
 // Notícia do sistema (teste semanal enviado, equipamento reparado, nova versão disponível…).
