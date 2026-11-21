@@ -1,5 +1,13 @@
 {
   "ativo": false,
-  "perfis": ["demo"],
-  "observacao": "Chave de desligamento remota do modo offline. ativo=false desliga e limpa o cache em todos os aparelhos na próxima abertura. perfis: quem pode ligar (demo = testador; depois gerencial, cliente, equipe)."
+  "perfis": [
+    "demo"
+  ],
+  "observacao": "Chave de desligamento remota do modo offline. ativo=false desliga TUDO (abrir e ler sem internet) e limpa o cache em todos os aparelhos na próxima abertura. perfis: quem pode ligar (demo = testador; depois gerencial, cliente, equipe). leitura: liga o cache de dados no aparelho (só vale com ativo=true; vale na abertura seguinte).",
+  "leitura": {
+    "ativo": false,
+    "perfis": [
+      "demo"
+    ]
+  }
 }
