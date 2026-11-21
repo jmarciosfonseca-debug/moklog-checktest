@@ -74,3 +74,45 @@ test("foto do cadastro aparece no mapa; quem não tem foto mostra iniciais; falh
   expect(host.querySelector('[data-testid="mapa-visual"]').textContent).toContain("Roger");
   expect(host.querySelectorAll('img[data-testid="avatar-foto"]')).toHaveLength(0);
 });
+
+// ── Cartão de identidade no painel gerencial (Marcio, 20/11/2026) ──
+const FOTOS = { porId: {}, porNome: {} };
+test("gerencial: tocar na pessoa do mapa abre o cartão de identidade e completa com a ficha (cargo, turno, desde, treinos)", async () => {
+  const lerColabs = jest.fn(async () => [{ id: "p1", nome: "Luiz Felipe", cargo: "VSPP Líder", turno: "Noturno", desde: "2023-10-10", treinos: 6 }]);
+  const mapa = { ...NOITE_11, postos: [posto("l", "Líder", "Luiz Felipe", "presente", {}, { pessoaId: "p1", lider: true }), posto("v", "Vigilante", "Murilo")] };
+  await act(async () => root.render(<VerMapasProjeto projetoId="P606" data="2026-10-11" turno="N" dark ler={async () => mapa} lerFotos={async () => FOTOS} lerColabs={lerColabs} />));
+  await act(async () => { await Promise.resolve(); });
+  expect(host.querySelector('[data-testid="cartao-identidade"]')).toBeNull();
+  const linha = [...host.querySelectorAll('[data-testid="posto-linha"]')][0];
+  await clicar(linha);
+  await act(async () => { await Promise.resolve(); });
+  const cartao = document.querySelector('[data-testid="cartao-identidade"]');
+  expect(cartao).not.toBeNull();
+  expect(cartao.textContent).toContain("IDENTIFICAÇÃO");
+  expect(cartao.textContent).toContain("Luiz Felipe");
+  expect(cartao.textContent).toContain("LÍDER DO PLANTÃO");
+  expect(cartao.textContent).toContain("VSPP Líder");
+  expect(cartao.textContent).toContain("Noturno");
+  expect(cartao.textContent).toContain("10/10/2023");
+  expect(cartao.textContent).toContain("6 registrados");
+  expect(lerColabs).toHaveBeenCalledTimes(1);
+  await clicar(document.querySelector('button[aria-label="Fechar"]'));
+  expect(document.querySelector('[data-testid="cartao-identidade"]')).toBeNull();
+});
+test("gerencial: se a ficha não puder ser lida, o cartão abre com o que o mapa tem; com onPessoa de fora (cliente) o cartão interno não abre", async () => {
+  const mapa = { ...NOITE_11, postos: [posto("v", "Vigilante", "Murilo", "falta")] };
+  await act(async () => root.render(<VerMapasProjeto projetoId="P606" data="2026-10-11" turno="N" dark ler={async () => mapa} lerFotos={async () => FOTOS} lerColabs={async () => { throw new Error("offline"); }} />));
+  await act(async () => { await Promise.resolve(); });
+  await clicar(host.querySelector('[data-testid="posto-linha"]'));
+  await act(async () => { await Promise.resolve(); });
+  const c = document.querySelector('[data-testid="cartao-identidade"]');
+  expect(c.textContent).toContain("Murilo");
+  expect(c.textContent).toContain("Falta");
+  await clicar(document.querySelector('button[aria-label="Fechar"]'));
+  const fora = jest.fn();
+  await act(async () => root.render(<VerMapasProjeto projetoId="P606" data="2026-10-11" turno="N" dark ler={async () => mapa} lerFotos={async () => FOTOS} onPessoa={fora} />));
+  await act(async () => { await Promise.resolve(); });
+  await clicar(host.querySelector('[data-testid="posto-linha"]'));
+  expect(fora).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('[data-testid="cartao-identidade"]')).toBeNull();
+});
