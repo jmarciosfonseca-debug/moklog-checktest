@@ -1,4 +1,4 @@
 {
-  "modo": "desligado",
+  "modo": "teste",
   "observacao": "Chave remota da entrada por digital/Face ID. desligado = ninguém vê o botão (só PIN). teste = só aparelhos que o Marcio habilitou abrindo o app com ?digital=1. ligado = todos os perfis permitidos (gerencial e cliente). O servidor também precisa de DIGITAL_ATIVO=1."
 }
