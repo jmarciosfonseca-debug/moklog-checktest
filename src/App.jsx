@@ -48,6 +48,8 @@ import PinMoklog from "./entrada/PinMoklog";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
 import { telaLazy } from "./lazyTela";
+import { iniciarOffline } from "./registrarSW";
+import { mostrarAvisoVersao } from "./avisoVersao";
 const RdApp=React.lazy(()=>import("./rd/RdApp"));
 // Telas pesadas: só baixam quando abertas (A1 do upgrade). Troque por import direto se precisar voltar ao modelo antigo.
 const RondaVSPP=telaLazy(()=>import("./RondaVSPP"),"Abrindo a Ronda VSPP…");
@@ -3541,6 +3543,13 @@ function DemoBanner(){
 
 export default function App(){
   const [screen,setScreen]=useState("home");
+  // Modo offline (service worker v2): DESLIGADO por padrão; a chave remota public/offline-config.json decide (hoje: só perfil "demo").
+  // Roda ao abrir e a cada mudança de sessão; sem conseguir ler a chave não muda nada. Versão nova só entra quando o usuário toca em "Atualizar".
+  useEffect(()=>{
+    const rodar=()=>{ try{ iniciarOffline({ perfil:getSession()?.nivel||null, onAtualizacao:mostrarAvisoVersao }).catch(()=>{}); }catch(_){} };
+    rodar(); window.addEventListener("moklog-auth-changed",rodar);
+    return ()=>window.removeEventListener("moklog-auth-changed",rodar);
+  },[]);
   // Porta de entrada Moked: "entrada" (logo → vídeo → áreas) | "moklog" (app atual) | "cliente" (Área do Cliente)
   // Retomada (19/11/2026): fechou sem querer e voltou logo (ou F5) → volta para onde estava, já logado, sem abertura.
   const [retomada]=useState(()=>lerRetomada());
