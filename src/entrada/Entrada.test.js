@@ -73,7 +73,7 @@ test("abertura do SIS toca quando pedida e qualquer toque leva direto às Áreas
     const ab = host.querySelector('[data-testid="entrada-abertura"]');
     expect(ab).not.toBeNull();
     expect(host.querySelector('[data-testid="entrada-splash"]')).toBeNull();
-    expect(ab.querySelectorAll("[data-no]").length).toBe(10); // componentes do SIS, não as divisões
+    expect(ab.querySelectorAll("[data-no]").length).toBe(11); // componentes do SIS, não as divisões
     expect(ab.textContent).toMatch(/Sistema Integrado de Segurança/);
     expect(botao(host, "Entrar")).toBeFalsy();
     expect(ab.querySelector(".sis-frase").textContent).toBe("o softwarepor trásdo hardware"); // a frase da marca abre a sequência

@@ -6,6 +6,7 @@
 //     lugar: a escolha de Áreas Moked. Não há botão "Entrar".
 // Só toca na abertura de verdade (ver src/retomar.js). Com "reduzir movimento", mostra a órbita parada.
 import { useEffect, useRef } from "react";
+import { ICONES_SIS, COR_ICONE, CSS_ICONES } from "./iconesSIS";
 
 export const SIS_NOS = [
   { k: "cftv", t: "CFTV", d: "Câmeras e tempo de gravação", g: "eq", r: 0 },
@@ -14,23 +15,12 @@ export const SIS_NOS = [
   { k: "ilum", t: "Iluminação", d: "Pontos e quadrantes", g: "eq", r: 1 },
   { k: "panico", t: "Botão de pânico", d: "Acionamento e resposta", g: "eq", r: 1 },
   { k: "cco", t: "CCO", d: "Central de monitoramento", g: "eq", r: 1 },
+  { k: "central", t: "Central Moked online", d: "Central remota, monitoramento 24h", g: "eq", r: 1 },
   { k: "radio", t: "Rádios HT", d: "Comunicação da equipe", g: "eq", r: 2 },
   { k: "pessoas", t: "Pessoas", d: "Equipe, treinamento e maturidade", g: "pe", r: 2 },
   { k: "pop", t: "POPs", d: "Procedimentos operacionais padrão", g: "pr", r: 2 },
   { k: "mnp", t: "MNP", d: "Manual de normas e procedimentos", g: "pr", r: 0 },
 ];
-const ICONES = {
-  cftv: '<path d="M3 8h11v8H3z"/><path d="M14 11l6-3v8l-6-3"/>',
-  peri: '<path d="M4 20V8M9 20V6M14 20V8M19 20V6M3 12h18M3 16h18"/>',
-  acesso: '<rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="12" cy="11" r="2.5"/><path d="M8 17c1-2 7-2 8 0"/>',
-  ilum: '<path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 00-4-10z"/>',
-  panico: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/>',
-  radio: '<rect x="8" y="7" width="8" height="14" rx="2"/><path d="M12 7V3M10 11h4"/>',
-  cco: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M9 20h6M12 16v4"/>',
-  pessoas: '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6"/><circle cx="17" cy="9" r="2.3"/><path d="M16 14c3 0 5 2 5 5"/>',
-  pop: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 9l1.5 1.5L14 7.5M9 16h6"/>',
-  mnp: '<path d="M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3z"/><path d="M5 17a3 3 0 013-3h10"/>',
-};
 const ANEIS = [{ tx: 1.15, tz: 0, k: 1, v: 0.22 }, { tx: 0.3, tz: -0.95, k: 0.8, v: -0.28 }, { tx: -0.95, tz: 0.65, k: 0.92, v: 0.18 }];
 const INFO_PADRAO = '<b>SIS⁺ · Sistema Integrado de Segurança</b><span>o software por trás do hardware</span>';
 
@@ -66,6 +56,7 @@ const CSS = `
 @media (min-width:1024px){.sis-frase p{font-size:clamp(64px,8.2vw,150px)}}
 @keyframes sisFrase{0%{transform:translate3d(0,0,520px) rotateX(-10deg);opacity:0}16%{opacity:1;transform:translate3d(0,0,160px) rotateX(-4deg)}46%{opacity:1;transform:translate3d(0,0,0) rotateX(0deg)}100%{opacity:0;transform:translate3d(0,-10%,-2800px) rotateX(16deg)}}
 @media (prefers-reduced-motion:reduce){.sis-orb::after{animation:none}.sis-frase{display:none}}
+${CSS_ICONES}
 `;
 
 const reduzido = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -102,7 +93,7 @@ export default function AberturaSIS({ onFim }) {
       const c = document.createElementNS(NS, "circle"); c.setAttribute("r", "2"); c.setAttribute("fill", "#ff6a70"); fx.appendChild(c); pacotes.push(c);
     });
     const orb = document.createElement("div"); orb.className = "sis-orb"; orb.innerHTML = '<div><div class="sis-logo">MOK<b>E</b>D</div><small>SIS<sup style="color:#FF1E27">+</sup></small></div>'; corpo.appendChild(orb);
-    SIS_NOS.forEach((n) => { const d = document.createElement("div"); d.className = "sis-nd " + n.g; d.setAttribute("data-no", n.k); d.innerHTML = `<svg viewBox="0 0 24 24">${ICONES[n.k]}</svg>`; corpo.appendChild(d); els.push(d); });
+    SIS_NOS.forEach((n) => { const d = document.createElement("div"); d.className = "sis-nd " + n.g; d.setAttribute("data-no", n.k); d.style.setProperty("--ac", COR_ICONE[n.k] || "#94a3b8"); d.innerHTML = `<svg viewBox="0 0 24 24">${ICONES_SIS[n.k]}</svg>`; corpo.appendChild(d); els.push(d); });
     const cont = [0, 0, 0]; const nos = SIS_NOS.map((n) => ({ ...n, i: cont[n.r]++ }));
     nos.forEach((n) => { n.a0 = n.i / cont[n.r] * Math.PI * 2 + n.r * 0.7; });
 
