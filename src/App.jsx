@@ -611,7 +611,8 @@ const PROJECTS = {
       // (colisão, dano na haste). Rótulo "08B" para não renumerar os demais, que são a chave das tratativas.
       {id:"cancelas",label:"08B - CANCELAS / HASTE",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},
       {id:"qr_code",label:"09 - LEITORES QR CODE",type:"items",itemLabels:["Cancela 01 Sup","Cancela 01 Inf","Cancela 02 Sup","Cancela 02 Inf","Cancela 04 Sup","Cancela 04 Inf","Sa\u00edda Cancela 02 Sup","Sa\u00edda Cancela 02 Inf","Sa\u00edda Cancela 03 Sup","Sa\u00edda Cancela 03 Inf","Sa\u00edda Cancela 04 Sup","Sa\u00edda Cancela 04 Inf"]},
-      {id:"materiais",label:"10 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x2)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
+      // 17/11/2026 (Marcio): "10 - MATERIAIS OPERACIONAIS" (id materiais) saiu do teste semanal do P311B — é equipamento operacional,
+      // acompanhado no módulo Equipamentos e no Mapa de Equipe. Demais rótulos não renumerados (chave das tratativas).
       {id:"mon_cda",label:"11 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04"]},
       {id:"mon_cftv",label:"12 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
       {id:"portoes",label:"13 - PORT\u00d5ES",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02","Port\u00e3o 03","Port\u00e3o 04"]},
