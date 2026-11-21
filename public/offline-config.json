@@ -1,0 +1,5 @@
+{
+  "ativo": false,
+  "perfis": ["demo"],
+  "observacao": "Chave de desligamento remota do modo offline. ativo=false desliga e limpa o cache em todos os aparelhos na próxima abertura. perfis: quem pode ligar (demo = testador; depois gerencial, cliente, equipe)."
+}
