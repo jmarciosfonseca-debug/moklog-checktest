@@ -1,4 +1,5 @@
 import "./compat";
+import "./firebaseInicio"; // inicia o Firestore ANTES dos módulos que usam o banco
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
