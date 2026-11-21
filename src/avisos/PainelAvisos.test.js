@@ -135,3 +135,16 @@ test("sem nada crítico, o painel diz 'tudo em dia' e ainda mostra o último tes
   expect(host.textContent).toContain("Tudo em dia");
   expect(host.textContent).toContain("teste semanal");
 });
+
+test("Painel 2.0: ao abrir a central lê as notícias de fora; falha aparece na aba Notícias", async () => {
+  const lerNoticias = jest.fn().mockResolvedValue({ noticias: [], erro: "Sem conexão com o servidor.", deMemoria: false, lidoEm: null });
+  await montar({ assinar: fake(), storage: memoria(), lerNoticias });
+  await dados("manutencao", "P605", [MAN("r1", 10)]); await dados("energia", "P601", []);
+  expect(lerNoticias).not.toHaveBeenCalled();            // recolhido não consulta o servidor
+  const b = host.querySelector('[role="button"]');
+  await act(async () => b.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  expect(lerNoticias).toHaveBeenCalledTimes(1);
+  expect(lerNoticias.mock.calls[0][0].projetos).toEqual(["P601", "P605"]);
+  await act(async () => host.querySelector('[data-testid="aba-noticias"]').dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  expect(host.querySelector('[role="alert"]').textContent).toContain("Não consegui ler as notícias de fora");
+});
