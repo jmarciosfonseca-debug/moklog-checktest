@@ -29,13 +29,14 @@ describe("contrato dos avisos", () => {
     expect(g[0]).toMatchObject({ projetoId: "P601", qtd: 2, sev: "critico" });
     expect(g[0].desde.toISOString().slice(0, 10)).toBe("2026-11-01");
   });
-  test("notícia externa: segurança perto = crítico, longe = atenção, mercado = info; sem título é descartada", () => {
+  test("notícia externa: segurança grave = crítico, demais = atenção, mercado = info; sem título é descartada", () => {
     const base = { id: "a", titulo: "Roubo de carga", resumo: "r", fonte: "G1", data: "2026-11-20T10:00:00Z" };
-    expect(noticiaExterna({ ...base, tema: "seguranca", proximidade: "cidade" }, "P601").sev).toBe("critico");
-    expect(noticiaExterna({ ...base, tema: "seguranca", proximidade: "regiao" }, "P601").sev).toBe("atencao");
-    expect(noticiaExterna({ ...base, tema: "mercado", proximidade: "cidade" }, "P601").sev).toBe("info");
+    expect(noticiaExterna({ ...base, tema: "seguranca", tipo: "roubo_carga" }, "P601").sev).toBe("critico");
+    expect(noticiaExterna({ ...base, tema: "seguranca", tipo: "furto" }, "P601").sev).toBe("atencao");
+    expect(noticiaExterna({ ...base, tema: "mercado", tipo: "roubo_carga" }, "P601").sev).toBe("info");
     expect(noticiaExterna({ id: "x" }, "P601")).toBeNull();
-    expect(noticiaExterna({ ...base, tema: "mercado", link: "https://a" }, "P601").links).toEqual(["https://a"]);
+    expect(noticiaExterna({ ...base, tema: "mercado", link: "https://a" }, "P601").links).toEqual([{ fonte: "G1", link: "https://a" }]);
+    expect(noticiaExterna({ ...base, tema: "mercado", links: [{ fonte: "UOL", link: "https://b" }, null] }, "P601").links).toEqual([{ fonte: "UOL", link: "https://b" }]);
     expect(noticiaExterna({ ...base, tema: "mercado", data: "lixo" }, "P601").data).toBeNull();
   });
   test("notícia do sistema exige id e título", () => {
@@ -60,7 +61,7 @@ describe("contrato dos avisos", () => {
     expect(g.abas.find((a) => a.id === "cliente").grupos[0].tipo).toBe("manutencao");
   });
   test("central junta notícias de fora e do sistema, sem perder nenhuma", () => {
-    const ext = noticiaExterna({ id: "e1", titulo: "Furto na região", tema: "seguranca", proximidade: "cidade", data: "2026-11-20T10:00:00Z" }, "P601");
+    const ext = noticiaExterna({ id: "e1", titulo: "Furto na região", tema: "seguranca", tipo: "roubo_carga", data: "2026-11-20T10:00:00Z" }, "P601");
     const c = montarCentral({ avisos: [A({ tipo: "teste", sev: "info" })], noticias: [ext], gerencial: false });
     const n = c.abas.find((a) => a.id === "noticias");
     expect(n.total).toBe(2);

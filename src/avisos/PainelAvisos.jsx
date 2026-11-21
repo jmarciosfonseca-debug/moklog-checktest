@@ -6,6 +6,8 @@ import { AVISOS_CFG } from "./config";
 import { calcularAvisos } from "./regras";
 import { assinarFontes, ROTULO_FONTE } from "./fontes";
 import { lerVisto, gravarVisto, marcarNovos } from "./visto";
+import CentralAvisos from "./CentralAvisos";
+import { carregarNoticias } from "./noticias";
 
 const COR = { critico: "#ef4444", atencao: "#f59e0b", info: "#64748b" };
 const ROTULO_SEV = { critico: "crítico", atencao: "atenção", info: "informativo" };
@@ -26,10 +28,10 @@ export function sortearPar(n, anterior = [], rnd = Math.random) {
 const hhmm = (d) => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
 // Recolhido: UMA manchete que troca sozinha (como um painel de notícias) + contadores. Tocar abre a lista completa (com rolagem).
-export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], offline = false, dark, atualizadoEm, nomeProj = (p) => p, aberto, onToggle, onAbrir, tickerMs = AVISOS_CFG.tickerMs, tickerMax = AVISOS_CFG.tickerMax, aleatorio = Math.random }) {
+export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], offline = false, dark, atualizadoEm, nomeProj = (p) => p, aberto, onToggle, onAbrir, gerencial = false, noticias = [], noticiasEstado = {}, tickerMs = AVISOS_CFG.tickerMs, tickerMax = AVISOS_CFG.tickerMax, aleatorio = Math.random }) {
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#94a3b8" : "#64748b";
-  const linha = dark ? "#0f172a" : "#eef2f7";
+  const linha = dark ? "#3b4859" : "#eef2f7"; // tom suave do tema do app (cinza-azulado, não preto)
   const total = avisos.length;
   const manchetes = useMemo(() => avisos.slice(0, tickerMax), [avisos, tickerMax]);
   const [par, setPar] = useState([0, 1]); // começa pelas 2 mais importantes; depois sorteia
@@ -49,7 +51,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
       <span style={{ display: "flex", fontSize: 16, color: COR[a.sev], marginTop: 1, flexShrink: 0 }}><Ico n={ICONE[a.tipo] || "alerta"} /></span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, color: txt2, background: dark ? "#1f1f25" : "#e2e8f0", borderRadius: 5, padding: "1px 6px" }}>{a.projetoId}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 800, color: txt2, background: dark ? "#2b3748" : "#e2e8f0", borderRadius: 5, padding: "1px 6px" }}>{a.projetoId}</span>
           <span style={{ fontSize: 12.5, fontWeight: 800, color: txt }}>{a.titulo}</span>
           {a.novo && <span style={{ fontSize: 9.5, fontWeight: 900, color: "#fff", background: "#2563eb", borderRadius: 5, padding: "1px 6px", letterSpacing: .4 }}>NOVO</span>}
         </div>
@@ -59,7 +61,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
     </button>
   );
   return (
-    <div data-testid="painel-avisos" style={{ marginTop: 10, background: dark ? "linear-gradient(160deg,#15151a 0%,#0b0b0e 70%)" : "linear-gradient(165deg,#ffffff 0%,#f8fafc 100%)", border: `1px solid ${corBorda}55`, borderRadius: 14, padding: "10px 14px", boxShadow: dark ? "0 8px 22px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04)" : "0 4px 14px rgba(15,23,42,.08)" }}
+    <div data-testid="painel-avisos" style={{ marginTop: 10, background: dark ? "linear-gradient(160deg,#1F2937 0%,#182231 75%)" : "linear-gradient(165deg,#ffffff 0%,#f8fafc 100%)", border: `1px solid ${corBorda}55`, borderRadius: 14, padding: "10px 14px", boxShadow: dark ? "0 6px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.04)" : "0 4px 14px rgba(15,23,42,.08)" }}
       onMouseEnter={() => setPausa(true)} onMouseLeave={() => setPausa(false)}>
       <style>{`@keyframes mkAvisoPulso{0%,100%{opacity:1}50%{opacity:.45}}@keyframes mkAvisoEntra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
       <div onClick={total ? onToggle : undefined} role={total ? "button" : undefined} aria-expanded={total ? !!aberto : undefined} style={{ display: "flex", alignItems: "center", gap: 8, cursor: total ? "pointer" : "default" }}>
@@ -103,9 +105,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
       )}
 
       {!carregando && aberto && total > 0 && (
-        <div style={{ marginTop: 8, maxHeight: 320, overflowY: "auto", WebkitOverflowScrolling: "touch" }} data-testid="avisos-lista">
-          {avisos.map((a, i) => linhaAviso(a, i > 0))}
-        </div>
+        <CentralAvisos avisos={avisos} noticias={noticias} noticiasEstado={noticiasEstado} gerencial={gerencial} dark={dark} agora={new Date()} nomeProj={nomeProj} onAbrir={onAbrir} />
       )}
     </div>
   );
@@ -113,7 +113,7 @@ export function PainelAvisosView({ avisos, contagem, carregando, falhas = [], of
 
 // Container: lê as fontes em tempo real, calcula, marca "novo" e entrega à tela.
 // ctmkData/pendencias/ultimoRelatorio já vivem na Home (tempo real); as demais fontes são assinadas aqui.
-export default function PainelAvisos({ dark = true, gerencial = false, projetos = [], ctmkData = {}, pendencias = [], ultimoRelatorio = {}, testes = {}, nomeProj, onAbrir, assinar = assinarFontes, mapasAtivo = true, storage, cfg }) {
+export default function PainelAvisos({ dark = true, gerencial = false, projetos = [], ctmkData = {}, pendencias = [], ultimoRelatorio = {}, testes = {}, nomeProj, onAbrir, assinar = assinarFontes, mapasAtivo = true, storage, cfg, lerNoticias = carregarNoticias }) {
   const [agora, setAgora] = useState(() => new Date());
   const [dados, setDados] = useState({});
   const [falhasMap, setFalhasMap] = useState({});
@@ -122,6 +122,7 @@ export default function PainelAvisos({ dark = true, gerencial = false, projetos 
   const [aberto, setAberto] = useState(false);
   const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
   const [atualizadoEm, setAtualizadoEm] = useState(null);
+  const [noticias, setNoticias] = useState({ noticias: [], carregando: false, erro: "", deMemoria: false, lidoEm: null });
   const vistoBase = useRef(null);
   if (vistoBase.current === null) vistoBase.current = { v: lerVisto(gerencial, storage) };
   const primeiros = useRef(new Set());
@@ -152,6 +153,16 @@ export default function PainelAvisos({ dark = true, gerencial = false, projetos 
     // eslint-disable-next-line
   }, [gerencial, chaveProjetos, mapasAtivo, assinar]);
 
+  // Notícias de fora (Entorno): só são lidas quando a central é aberta, e de novo a cada abertura. Falha aparece na aba, nunca vira "sem notícias".
+  useEffect(() => {
+    if (!aberto) return undefined;
+    let vivo = true;
+    setNoticias((n) => ({ ...n, carregando: true }));
+    lerNoticias({ projetos }).then((r) => { if (vivo) setNoticias({ ...r, carregando: false }); }).catch(() => { if (vivo) setNoticias((n) => ({ ...n, carregando: false, erro: "Falha ao ler.", deMemoria: n.noticias.length > 0 })); });
+    return () => { vivo = false; };
+    // eslint-disable-next-line
+  }, [aberto]);
+
   const carregando = esperados === null || recebidos < esperados;
   const falhas = useMemo(() => [...new Set(Object.values(falhasMap))], [falhasMap]);
   const { avisos, contagem } = useMemo(
@@ -180,5 +191,5 @@ export default function PainelAvisos({ dark = true, gerencial = false, projetos 
   }, [gerencial]);
 
   return <PainelAvisosView avisos={marcados} contagem={contagem} carregando={carregando} falhas={falhas} offline={offline} dark={dark} atualizadoEm={atualizadoEm} nomeProj={nomeProj}
-    aberto={aberto} onToggle={() => { setAberto((v) => !v); confirmar(); }} onAbrir={(a) => { confirmar(); onAbrir && onAbrir(a); }} />;
+    aberto={aberto} gerencial={gerencial} noticias={noticias.noticias} noticiasEstado={noticias} onToggle={() => { setAberto((v) => !v); confirmar(); }} onAbrir={(a) => { confirmar(); onAbrir && onAbrir(a); }} />;
 }
