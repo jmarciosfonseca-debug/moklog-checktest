@@ -17,9 +17,7 @@ import Ocorrencias from "./Ocorrencias";
 import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos, { ContadorEquipamentos } from "./Equipamentos";
 import Bolsao from "./Bolsao";
-import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
-import Perimetral from "./Perimetral";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession, setDivisaoAtiva, getDivisaoAtiva, gerencialNaDivisao } from "./session";
 import { projetosNovasDivisoes, SEGMENTOS, DIVISOES, idsDoSegmento, divisaoDoProjeto, faixa as faixaIds } from "./divisoes";
@@ -35,7 +33,6 @@ import { recursosHabilitados } from "./gerenciaisConfig";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
-import RondaDiaria from "./RondaDiaria";
 import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE, calcularRiscoProjeto } from "./AnaliseRisco";
 import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
@@ -50,7 +47,12 @@ import Entrada from "./entrada/Entrada";
 import PinMoklog from "./entrada/PinMoklog";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
+import { telaLazy } from "./lazyTela";
 const RdApp=React.lazy(()=>import("./rd/RdApp"));
+// Telas pesadas: só baixam quando abertas (A1 do upgrade). Troque por import direto se precisar voltar ao modelo antigo.
+const RondaVSPP=telaLazy(()=>import("./RondaVSPP"),"Abrindo a Ronda VSPP…");
+const Perimetral=telaLazy(()=>import("./Perimetral"),"Abrindo o Teste Perimetral…");
+const RondaDiaria=telaLazy(()=>import("./RondaDiaria"),"Abrindo a Ronda Diária…");
 
 // ── Hook de conectividade
 function useOnlineStatus() {
