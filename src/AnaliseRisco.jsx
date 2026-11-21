@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { LOGO_MOKED_OFICIAL } from "./logoOficial";
+import { ANALISE_RISCO_ELIGIBLE } from "./analiseRiscoElegiveis";
 import { Ico } from "./Icones";
 import { hasGerencial } from "./session";
 import { normalizarZona, resumirColecaoPerimetral, escolherFontePerimetral } from "./perimetralFontes";
@@ -96,7 +97,7 @@ async function obterRefSequencial(pid) {
 }
 
 // Projetos elegíveis (Jatinox P260A/B/C fora) e pacotes de cliente.
-export const ANALISE_RISCO_ELIGIBLE = ["P601","P602","P604","P605","P606","P607","P311A","P311B","P505"];
+export { ANALISE_RISCO_ELIGIBLE };
 export const PACOTES = {
   golgi: { label: "Golgi", ids: ["P601","P602","P604","P605","P606","P607"] },
   mega:  { label: "Mega",  ids: ["P311A","P311B"] },

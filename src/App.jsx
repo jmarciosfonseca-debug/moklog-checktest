@@ -10,16 +10,14 @@ import { avisarFalhaServidor } from "./avisoSalvar";
 import { PERIMETRAL_VIA_RONDAS, zonasRuinsProjeto } from "./v360Perimetral";
 import AcessoApp from "./Acesso";
 import KeyAccessFalha from "./KeyAccessFalha";
-import EquipeApp, { ContadorEquipe } from "./Equipe";
+import ContadorEquipe from "./ContadorEquipeLazy";
 import { useFotosEquipe, fotoDe, referenciasFotos } from "./fotosEquipe";
 import AcessoCCO from "./AcessoCCO";
 import Ocorrencias from "./Ocorrencias";
 import EmpresaInfo from "./EmpresaInfo";
 import Equipamentos, { ContadorEquipamentos } from "./Equipamentos";
 import Bolsao from "./Bolsao";
-import RondaVSPP from "./RondaVSPP";
 import Inquilinos from "./Inquilinos";
-import Perimetral from "./Perimetral";
 import Ambulancia from "./Ambulancia";
 import { grantSession, getAccess, getSession, hasGerencial, touchSession, isDemo, checkPin, getScopedProjectId, checkPinAnyProject, clearSession, setDivisaoAtiva, getDivisaoAtiva, gerencialNaDivisao } from "./session";
 import { projetosNovasDivisoes, SEGMENTOS, DIVISOES, idsDoSegmento, divisaoDoProjeto, faixa as faixaIds } from "./divisoes";
@@ -35,8 +33,7 @@ import { recursosHabilitados } from "./gerenciaisConfig";
 import Iluminacao, { loadIluminacao, tqAlvoVigente, tqAlvoTimestamp } from "./Iluminacao";
 import BolsaoInquilinos from "./BolsaoInquilinos";
 import EnergiaOcorrencias, { loadEnergiaResumoParaPDF } from "./EnergiaOcorrencias";
-import RondaDiaria from "./RondaDiaria";
-import AnaliseRisco, { ANALISE_RISCO_ELIGIBLE, calcularRiscoProjeto } from "./AnaliseRisco";
+import { ANALISE_RISCO_ELIGIBLE } from "./analiseRiscoElegiveis";
 import GestaoFV from "./GestaoFV";
 import { generatePDF, generateConsolidatedPDF, generateGroupComparativePDF, MOKED_LOGO } from "./generatePDF";
 import { montarHTMLSis } from "./relatorios/sis/htmlSis";
@@ -50,7 +47,16 @@ import Entrada from "./entrada/Entrada";
 import PinMoklog from "./entrada/PinMoklog";
 import AssistenteIA, { BotaoIA } from "./ia/AssistenteIA";
 import DiagnosticoSituacional from "./diagnostico/DiagnosticoSituacional";
+import { telaLazy } from "./lazyTela";
 const RdApp=React.lazy(()=>import("./rd/RdApp"));
+// Telas pesadas: só baixam quando abertas (A1 do upgrade). Troque por import direto se precisar voltar ao modelo antigo.
+const RondaVSPP=telaLazy(()=>import("./RondaVSPP"),"Abrindo a Ronda VSPP…");
+const Perimetral=telaLazy(()=>import("./Perimetral"),"Abrindo o Teste Perimetral…");
+const AnaliseRisco=telaLazy(()=>import("./AnaliseRisco"),"Abrindo a Análise de Risco…");
+// Mesma função async de antes; só baixa o módulo quando o Painel do Cliente pede o risco.
+const calcularRiscoProjeto=(project,stored)=>import("./AnaliseRisco").then(m=>m.calcularRiscoProjeto(project,stored));
+const EquipeApp=telaLazy(()=>import("./Equipe"),"Abrindo a Equipe…");
+const RondaDiaria=telaLazy(()=>import("./RondaDiaria"),"Abrindo a Ronda Diária…");
 
 // ── Hook de conectividade
 function useOnlineStatus() {
