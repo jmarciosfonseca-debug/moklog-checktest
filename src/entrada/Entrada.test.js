@@ -91,3 +91,19 @@ test("sem abertura pedida (voltou logo / Áreas) não toca a abertura", async ()
     expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
   } finally { act(() => root.unmount()); host.remove(); }
 });
+
+test("Áreas: botão discreto 'voltar à abertura' reabre a abertura e, ao tocar, volta às Áreas", async () => {
+  const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Entrada onEscolher={() => {}} etapaInicial="areas" />));
+    const b = host.querySelector('[data-testid="voltar-abertura"]');
+    expect(b).not.toBeNull();
+    expect(b.textContent).toContain("voltar à abertura");
+    expect(Number(b.style.opacity)).toBeLessThan(0.6); // discreto, meio transparente
+    await act(async () => b.click());
+    const ab = host.querySelector('[data-testid="entrada-abertura"]');
+    expect(ab).not.toBeNull();
+    await act(async () => { ab.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await new Promise((r) => setTimeout(r, 700)); });
+    expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
+  } finally { act(() => root.unmount()); host.remove(); }
+});

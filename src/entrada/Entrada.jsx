@@ -117,6 +117,8 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
       </div>
       <div className="mk-t mk-cli" style={{ "--i": DIVISOES.length, "--d": "-2.2s", "--z": "70px", "--c": "#7dd3fc" }}><button onClick={() => onEscolher("cliente")} aria-label="Área do Cliente" style={{ width: "100%", background: "#1f2937", border: "1px solid #475569", color: "#f3f4f6", padding: "18px 16px", fontWeight: 900, letterSpacing: 2, fontSize: 13, cursor: "pointer", clipPath: chanfro, textTransform: "uppercase", boxShadow: "none" }}>Área do Cliente ›</button></div>
       <div style={{ marginTop: 26, fontSize: 10, color: "#4b5563", textAlign: "center" }}>Moked Security Consulting</div>
+      <div style={{ textAlign: "center", marginTop: 6 }}><button type="button" data-testid="voltar-abertura" onClick={() => { veioDaAbertura.current = true; setEtapa("abertura"); }} aria-label="Voltar à abertura"
+        style={{ background: "transparent", border: 0, color: "#9ca3af", opacity: 0.4, fontSize: 10.5, letterSpacing: 1.5, cursor: "pointer", padding: "8px 14px", textTransform: "lowercase" }}>↺ voltar à abertura</button></div>
     </div>
   </main>;
 }
