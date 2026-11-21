@@ -62,7 +62,7 @@ export default function MapaVisual({ mapa, dark, fotos = null, onPessoa = null }
         <div style={{ border: "1px solid #dc262655", background: "#dc262612", borderRadius: 10, padding: "6px 10px", display: "grid", gap: 4 }}>
           {ocs.map((o, i) => (
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", fontSize: 12.5 }}>
-              <Avatar fotos={fotos} pessoaId={o.pessoaId} nome={o.pessoa} tam={26} dark={dark} cor={est(o.tipo).cor} />
+              {tocar({ pessoaId: o.pessoaId, nome: o.pessoa, posto: o.posto && o.posto !== "—" ? o.posto : "", situacao: o.tipo, foto: fotoDaPessoa(fotos, o.pessoaId, o.pessoa) }, <Avatar fotos={fotos} pessoaId={o.pessoaId} nome={o.pessoa} tam={26} dark={dark} cor={est(o.tipo).cor} />)}
               <Pilula tipo={o.tipo} />
               <b style={{ color: txt }}>{o.pessoa || "—"}</b>
               <span style={{ color: txt2 }}>{o.posto && o.posto !== "—" ? `${o.posto}` : ""}{o.detalhe ? `${o.posto && o.posto !== "—" ? " · " : ""}${o.detalhe}` : ""}</span>
@@ -76,7 +76,8 @@ export default function MapaVisual({ mapa, dark, fotos = null, onPessoa = null }
           const e = est(p.situacao || "presente");
           const { detalhe } = p.situacao && p.situacao !== "presente" ? detalheDoPosto(p, postos) : { detalhe: "" };
           return (
-            <div key={p.id || i} style={{ display: "flex", alignItems: "center", gap: 10, borderLeft: `4px solid ${e.cor}`, background: dark ? "#0f172a" : "#fff", borderRadius: 8, padding: "6px 10px" }}>
+            <div key={p.id || i} data-testid="posto-linha" onClick={onPessoa && (p.pessoaNome || "").trim() ? (ev) => { if (ev.target.closest("button")) return; onPessoa({ pessoaId: p.pessoaId, nome: p.pessoaNome, posto: p.rotulo, situacao: p.situacao || "presente", foto: fotoDaPessoa(fotos, p.pessoaId, p.pessoaNome), lider: !!p.lider }); } : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 10, borderLeft: `4px solid ${e.cor}`, background: dark ? "#0f172a" : "#fff", borderRadius: 8, padding: "6px 10px", cursor: onPessoa && (p.pessoaNome || "").trim() ? "pointer" : "default" }}>
               {tocar({ pessoaId: p.pessoaId, nome: p.pessoaNome, posto: p.rotulo, situacao: p.situacao || "presente", foto: fotoDaPessoa(fotos, p.pessoaId, p.pessoaNome) }, <Avatar fotos={fotos} pessoaId={p.pessoaId} nome={p.pessoaNome} dark={dark} cor={e.cor} />)}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, color: txt2, textTransform: "uppercase", letterSpacing: ".05em" }}>{p.rotulo || "Posto"}{p.horario ? ` · ${String(p.horario.inicio || "").replace(":", "h")}–${String(p.horario.fim || "").replace(":", "h")}` : ""}</div>

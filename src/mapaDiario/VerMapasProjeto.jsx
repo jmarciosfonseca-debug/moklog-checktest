@@ -1,6 +1,6 @@
 // "Ver" do painel gerencial: plantão atual + os três anteriores de um projeto, em cascata (toca no plantão e o mapa abre).
 // Leitura direta por id (equipes/{pid}/mapas/{projeto_data_turno}); nada é gravado. Falha de leitura é dita, nunca vira "sem mapa".
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { chaveMapa, somarDias, rotuloDia } from "./regras";
 import { horarioDoTurno } from "./horarios";
 import { rotuloTurno } from "./texto";
@@ -8,6 +8,8 @@ import { loadMapa } from "./dados";
 import { loadFotosProjeto } from "./fotos";
 import { ocorrenciasDoMapa } from "./consolidado";
 import MapaVisual, { Pilula } from "./MapaVisual";
+import CartaoIdentidade from "../cliente/CartaoIdentidade";
+import { loadColabsCartao, montarCartao } from "./cartaoPessoa";
 
 export const QTD_PLANTOES = 4; // o atual + 3 anteriores
 
@@ -24,7 +26,7 @@ export function plantoesRecentes(data, turno, qtd = QTD_PLANTOES) {
 
 const dm = (iso) => iso.split("-").reverse().slice(0, 2).join("/");
 
-export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = loadMapa, lerFotos = loadFotosProjeto, onPessoa = null }) {
+export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = loadMapa, lerFotos = loadFotosProjeto, lerColabs = loadColabsCartao, onPessoa = null }) {
   const txt = dark ? "#f1f5f9" : "#0f172a";
   const txt2 = dark ? "#94a3b8" : "#64748b";
   const borda = dark ? "#1e293b" : "#e2e8f0";
@@ -32,6 +34,17 @@ export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = lo
   const [itens, setItens] = useState(null); // null = lendo
   const [aberto, setAberto] = useState(0); // o atual já vem aberto
   const [fotos, setFotos] = useState(null); // chega depois dos mapas; sem foto (ou falha), a tela mostra as iniciais
+  // Sem onPessoa de fora (painel gerencial), tocar numa pessoa abre aqui o mesmo cartão de identidade da Área do Cliente.
+  const [cartao, setCartao] = useState(null);
+  const colabsRef = useRef(null);
+  const toque = useRef(0);
+  const abrirCartao = async (info) => {
+    const id = ++toque.current;
+    setCartao(montarCartao(info, colabsRef.current || []));   // abre na hora com o que o mapa já tem
+    if (colabsRef.current) return;
+    try { colabsRef.current = await lerColabs(projetoId); } catch (e) { colabsRef.current = []; }
+    if (toque.current === id) setCartao(montarCartao(info, colabsRef.current));   // completa cargo, turno, desde e treinamentos
+  };
 
   useEffect(() => {
     let vivo = true;
@@ -52,6 +65,7 @@ export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = lo
 
   if (!itens) return <div style={{ padding: "8px 4px", fontSize: 12, color: txt2 }}>Lendo os mapas…</div>;
   return (
+    <>
     <div data-testid="ver-mapas" style={{ display: "grid", gap: 6, padding: "6px 0 10px 14px", borderLeft: `2px solid ${borda}`, marginLeft: 3 }}>
       {itens.map((it, idx) => {
         const h = horarioDoTurno(projetoId, it.turno);
@@ -83,7 +97,7 @@ export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = lo
             </div>
             {aberto_ && (
               <div style={{ marginTop: 6 }}>
-                {m ? <MapaVisual mapa={m} dark={dark} fotos={fotos} onPessoa={onPessoa} />
+                {m ? <MapaVisual mapa={m} dark={dark} fotos={fotos} onPessoa={onPessoa || abrirCartao} />
                   : <div style={{ fontSize: 12, color: it.erro ? "#dc2626" : txt2, padding: "6px 4px" }}>{it.erro ? "Não consegui ler este mapa agora. Tente de novo em instantes." : idx === 0 ? "Este plantão ainda não tem mapa preenchido." : "Não há mapa para este plantão."}</div>}
               </div>
             )}
@@ -91,5 +105,7 @@ export default function VerMapasProjeto({ projetoId, data, turno, dark, ler = lo
         );
       })}
     </div>
+    {!onPessoa && <CartaoIdentidade pessoa={cartao} onFechar={() => { toque.current++; setCartao(null); }} />}
+    </>
   );
 }
