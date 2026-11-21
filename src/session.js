@@ -29,15 +29,8 @@ export function getClienteScope(){const s=getSession();if(!s)return null;if(s.ni
 export function clearSession(){current=null;persistir(true);announce();}
 export function touchSession(){const s=getSession();if(!s)return;s.exp=janela(s.nivel,s.srvExp);persistir(false);}
 export function grantSession(){return getSession();} // Legacy callbacks cannot manufacture access.
-export async function checkPin(value,opts={}){
- const pin=String(value||'').trim();if(!pin||pending)return null;
- pending=(async()=>{
- // Sem resposta em 12 s o pedido é abortado: antes, um fetch pendurado deixava `pending` preso e todo PIN seguinte
- // voltava "inválido" até recarregar a página (relato do Marcio no computador, 28/10/2026).
- const ctrl=typeof AbortController!=='undefined'?new AbortController():null;const tmr=ctrl?setTimeout(()=>ctrl.abort(),12000):null;
- let r;try{r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{}),...(!opts.cliente&&divisaoAtiva!=='moklog'?{div:divisaoAtiva}:{})}),...(ctrl?{signal:ctrl.signal}:{})});}finally{if(tmr)clearTimeout(tmr);}
- const data=await r.json().catch(()=>({}));
- if(!r.ok||!data.ok){window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:data.erro||'Servidor de acesso indisponível.'}));return null;}
+// Valida a resposta de acesso do servidor (PIN ou digital) e abre a sessão. Mesmas regras para as duas entradas.
+function aceitarResposta(data,opts={}){
  if(data.nivel==='gestor'){if((!opts.cliente&&data.div!==divisaoAtiva)||opts.allowAdmin===false)return null; // na Área do Cliente o gestor entra direto no escopo da divisão dele
  data.nivel='admin';data.gestorDiv=data.div;} // gestor de divisão = gerencial só dentro da divisão dele
  else if(data.nivel==='lider'&&data.pid&&divisaoDoProjeto(data.pid)!==divisaoAtiva&&!opts.projectId)return null; // PIN de líder não abre projeto de outra divisão
@@ -50,6 +43,19 @@ export async function checkPin(value,opts={}){
  if((opts.adminOnly||(!opts.projectId&&!opts.anyProject&&!opts.cliente))&&!['admin','demo'].includes(data.nivel))return null;
  const nivel={admin:'gerencial',lider:'equipe',demo:'demo',ronda:'ronda',cliente:'cliente'}[data.nivel];
  current={token:data.token,nivel,projectId:data.pid||null,srvExp:data.exp,exp:janela(nivel,data.exp),...(data.gestorDiv?{div:data.gestorDiv}:{}),...(data.nivel==='cliente'?{escopo:data.escopo,pids:Array.isArray(data.pids)?data.pids:[]}:{})};persistir(true);announce();return data.nivel;
+}
+// Entrada por digital/Face ID (só gerencial, gestor e cliente): a resposta do servidor passa pelas MESMAS regras do PIN.
+export function entrarComResposta(data,opts={}){try{return aceitarResposta(data,opts);}catch{return null;}}
+export async function checkPin(value,opts={}){
+ const pin=String(value||'').trim();if(!pin||pending)return null;
+ pending=(async()=>{
+ // Sem resposta em 12 s o pedido é abortado: antes, um fetch pendurado deixava `pending` preso e todo PIN seguinte
+ // voltava "inválido" até recarregar a página (relato do Marcio no computador, 28/10/2026).
+ const ctrl=typeof AbortController!=='undefined'?new AbortController():null;const tmr=ctrl?setTimeout(()=>ctrl.abort(),12000):null;
+ let r;try{r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,...(opts.projectId?{pid:opts.projectId}:{}),...(opts.ronda?{ronda:true}:{}),...(!opts.cliente&&divisaoAtiva!=='moklog'?{div:divisaoAtiva}:{})}),...(ctrl?{signal:ctrl.signal}:{})});}finally{if(tmr)clearTimeout(tmr);}
+ const data=await r.json().catch(()=>({}));
+ if(!r.ok||!data.ok){window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:data.erro||'Servidor de acesso indisponível.'}));return null;}
+ return aceitarResposta(data,opts);
  })();
  try{return await pending;}catch{window.dispatchEvent(new CustomEvent('moklog-auth-error',{detail:'Sem conexão com o servidor de acesso.'}));return null;}finally{pending=null;}
 }

@@ -1,7 +1,8 @@
 // Porta do MokLog (Marcio, 26/10/2026): o PIN vem ANTES da Home. PIN gerencial → Home completa (todos os grupos);
 // PIN de projeto (líder) → só o painel do projeto dele. A Área do Cliente tem a própria porta.
 import { useState } from "react";
-import { checkPinPorta } from "../session";
+import { checkPinPorta, getSession } from "../session";
+import BotaoDigital from "../digital/BotaoDigital";
 
 const fundo = { minHeight: "100vh", background: "radial-gradient(140% 70% at 50% -10%, #1a0507 0%, #0b0f19 40%, #0b0f19 100%)", color: "#e5e7eb", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 };
 const chanfro = "polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)";
@@ -41,6 +42,7 @@ export default function PinMoklog({ onEntrar, onVoltar, sessaoLider = null, divi
         style={{ width: "100%", boxSizing: "border-box", background: "#050507", color: "#f3f4f6", border: "1px solid #3a3a42", padding: "12px 10px", fontSize: 22, letterSpacing: 10, textAlign: "center", marginBottom: 10 }} />
       {erro && <div role="alert" style={{ fontSize: 12, color: "#FF1E27", fontWeight: 700, marginBottom: 8 }}>{erro}</div>}
       <button onClick={tentar} disabled={busy} style={{ ...botao, opacity: busy ? .6 : 1 }}>{busy ? "Verificando…" : "Entrar"}</button>
+      <BotaoDigital opts={{ anyProject: true, aceitaCliente: true }} onSucesso={(nivel) => onEntrar({ level: nivel, projectId: (getSession() || {}).projectId || null })} />
       {sessaoLider && <button onClick={() => onEntrar({ level: "lider", projectId: sessaoLider })} style={{ marginTop: 10, background: "#160507", border: "1px solid #E5091488", color: "#fecaca", padding: "10px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", clipPath: chanfro, width: "100%" }}>Continuar como líder do {sessaoLider}</button>}
       <button onClick={onVoltar} style={{ marginTop: 10, background: "transparent", border: "1px solid #3a3a42", color: "#9ca3af", padding: "9px 16px", fontSize: 12, cursor: "pointer", clipPath: chanfro, width: "100%" }}>← Voltar</button>
     </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getApps } from "firebase/app";
 import { getFirestore, doc, getDoc, collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { checkPin, clearSession, getClienteScope } from "../session";
+import BotaoDigital from "../digital/BotaoDigital";
 import { carregarFotos, fotoDe } from "../fotosEquipe";
 import CartaoIdentidade from "./CartaoIdentidade";
 import { PERIODOS_TURNOVER, testeSemanal, equipeResumo, mapaResumo, equipamentosResumo, consolidarGrupo, sistemasResumo, luzes, GRUPOS_CLIENTE } from "./metricas";
@@ -373,6 +374,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
         <div className="tit" style={{ marginBottom: 12 }}>Digite seu PIN</div>
         <input type="password" inputMode="numeric" aria-label="PIN do cliente" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} placeholder="PIN" style={{ width: "100%", maxWidth: 240, padding: 12, border: "1px solid #3a3a42", background: "#08080a", color: "#f1f5f9", fontSize: 20, textAlign: "center", letterSpacing: 8 }} />
         {erro && <div role="alert" style={{ color: VERMELHO2, fontSize: 12, marginTop: 8 }}>{erro}</div>}
+        <BotaoDigital opts={{ cliente: true }} onSucesso={() => { setPin(""); setEscopo(getClienteScope()); }} />
         <div><button onClick={entrar} style={{ marginTop: 14, background: "linear-gradient(180deg, #FF1E27, #9f0710)", color: "#fff", border: "none", padding: "11px 32px", fontWeight: 900, letterSpacing: 2, cursor: "pointer", clipPath: "polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px)", boxShadow: "0 0 16px #FF1E2755" }}>ENTRAR</button></div>
       </div>
     </div>
