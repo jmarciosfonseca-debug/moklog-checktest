@@ -47,6 +47,33 @@ export function pendenciasDoLaudo(project, itens, followupsInfo, hoje = new Date
   }).sort((a, b) => (b.dias ?? -1) - (a.dias ?? -1));
 }
 
+// Follow-ups no laudo (22/11/2026): máximo de registros impressos por tratativa (os mais recentes); o resto fica no app.
+export const MAX_TRAT_ENTRADAS = 3;
+const tempoEntrada = (e) => { const t = new Date(e?.em || e?.data || "").getTime(); return Number.isNaN(t) ? 0 : t; };
+// Mais recentes primeiro (ordem estável quando não há data).
+export const entradasRecentes = (entries) => (entries || []).map((e, i) => [e, i]).sort((a, b) => tempoEntrada(b[0]) - tempoEntrada(a[0]) || a[1] - b[1]).map((x) => x[0]);
+// Identidade de uma tratativa: mesmo conteúdo registrado (status, data, responsável, proposta, texto, link) = mesma tratativa.
+export function chaveTratativa(trat) {
+  if (!trat || !Array.isArray(trat.entries) || !trat.entries.length) return "";
+  return JSON.stringify([trat.statusAtual || "", trat.comQuem || "", trat.entries.map((e) => [e.status || "", e.em || e.data || "", e.responsavel || "", e.proposta?.numero || "", e.proposta?.valor || "", e.previsao || "", String(e.texto || "").replace(/\s+/g, " ").trim(), e.link || ""])]);
+}
+// Identidade de UM registro de follow-up (a mesma OS/orçamento aparece em vários itens).
+export const chaveEntrada = (e) => JSON.stringify([e?.status || "", e?.em || e?.data || "", e?.responsavel || "", e?.proposta?.numero || "", e?.proposta?.valor || "", e?.previsao || "", String(e?.texto || "").replace(/\s+/g, " ").trim(), e?.link || ""]);
+// Junta pendências iguais (mesmo sistema, diagnóstico, início, status e tratativa) numa linha só; mantém a ordem por tempo em aberto.
+export function agruparPendencias(pend) {
+  const grupos = [], porChave = new Map();
+  pend.forEach((p) => {
+    const chave = chaveTratativa(p.trat);
+    const id = p.unico ? null : JSON.stringify([p.cat, String(p.note || "").replace(/\s+/g, " ").trim().toLowerCase(), p.since || "", p.status, chave]);
+    const g = id && porChave.get(id);
+    if (g) { g.itens.push(p); return; }
+    const novo = { itens: [p], chave };
+    grupos.push(novo);
+    if (id) porChave.set(id, novo);
+  });
+  return grupos;
+}
+
 // "06 - CANCELAS AS (ALTA SEGURANÇA)" → "CANCELAS AS (ALTA SEGURANÇA)": o número do cadastro não vai para o documento.
 export const nomeSistema = (lbl) => String(lbl || "").replace(/^\s*\d+[A-Za-z]?\s*[-–.]\s*/, "").trim();
 
@@ -116,31 +143,65 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
       <div class="mk-nota" style="border-left:4px solid ${grav.cor};padding-left:10px">${grav.pct === null ? "Não informado neste teste." : grav.pct === 0 ? `<b>Todas as câmeras</b> com ${MINIMO_DIAS} dias ou mais de gravação.` : `<b>Até ${grav.pct}% das câmeras (até ≈ ${grav.cameras} de ${grav.total})</b> com menos de ${MINIMO_DIAS} dias de gravação.`}${grav.obs ? ` Observação da equipe: ${escHTML(grav.obs)}` : ""}</div></section>` : "";
 
   // ── Pendências e tratativas
+  // 22/11/2026 (Marcio): o laudo crescia com o nº de follow-ups (a mesma OS/orçamento impressa uma vez por item).
+  // Agora: (1) itens iguais (mesmo sistema, diagnóstico, início, status e tratativa) viram UMA linha; (2) tratativa que vale
+  // para 2+ linhas é impressa UMA vez (T1, T2…) com a lista dos itens que ela cobre; (3) no máximo MAX_TRAT_ENTRADAS
+  // registros por tratativa (os mais recentes); o resto fica no histórico do app. Tratativa de uma linha só segue inline.
   const pill = (st) => (st === "partial" ? '<span class="mk-b mk-b-wa">Parcial</span>' : '<span class="mk-b mk-b-da">Inoperante</span>');
-  const linhasPend = pend.map((p) => {
+  const sistemaDe = (p) => nomeSistema(rotuloCat.get(p.cat) || p.cat);
+  const grupos = agruparPendencias(pend);
+  // A unidade que se repete é o REGISTRO de follow-up (uma OS, um orçamento), não a cadeia inteira: cada registro usado por
+  // 2+ linhas é impresso uma vez (T1, T2…) e nas linhas aparece só a remissão (→ T1) na coluna Tratativa.
+  const registrosDe = (g) => (g.itens[0].trat ? entradasRecentes(g.itens[0].trat.entries).slice(0, MAX_TRAT_ENTRADAS) : []);
+  const usoRegistro = new Map(); // chave do registro → { e, trat, grupos }
+  grupos.forEach((g) => registrosDe(g).forEach((e) => { const k = chaveEntrada(e); const u = usoRegistro.get(k) || { e, trat: g.itens[0].trat, grupos: [] }; u.grupos.push(g); usoRegistro.set(k, u); }));
+  const refs = new Map(); // chave do registro compartilhado → "T1"
+  grupos.forEach((g) => registrosDe(g).forEach((e) => { const k = chaveEntrada(e); if (usoRegistro.get(k).grupos.length > 1 && !refs.has(k)) refs.set(k, `T${refs.size + 1}`); }));
+  const entradaHTML = (e, trat) => {
+    const st = e.status || trat.statusAtual;
+    const quando = e.em || e.data || "";
+    const d = quando ? new Date(quando) : null;
+    const quandoFmt = d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "";
+    const dias = diasEntre(quando, hoje);
+    const cab = `<span class="mk-b mk-b-${FU_CLASSE[st] || "wa"}">${escHTML(FU_ROTULO[st] || "Aguardando retorno")}</span><span class="mk-mu mk-sm">${quandoFmt}${e.responsavel ? ` · ${escHTML(e.responsavel)}` : ""}${dias != null && dias > DIAS_FOLLOWUP_VENCIDO ? ` · <span class="mk-inv">há ${dias} dias</span>` : ""}</span>`;
+    const prop = e.proposta && e.proposta.numero ? `<div class="mk-sm"><b>Proposta nº ${escHTML(e.proposta.numero)}</b>${e.proposta.valor ? ` · ${escHTML(e.proposta.valor)}` : ""}${e.previsao ? ` · previsão ${escHTML(e.previsao)}` : ""}</div>` : "";
+    return `<div class="ls-tr">${cab}${prop}${e.texto ? `<div>${escHTML(e.texto)}</div>` : ""}${e.link ? `<div class="mk-sm" style="word-break:break-all">↳ <a href="${escHTML(e.link)}" style="color:#1D4ED8">${escHTML(e.link)}</a></div>` : ""}</div>`;
+  };
+  const linhasPend = grupos.map((g) => {
+    const p = g.itens[0];
     const nome = p.unico ? p.cat : p.item;
-    const linha = `<tr><td><b>${escHTML(nome)}</b>${p.unico ? "" : `<div class="mk-mu">${escHTML(rotuloCat.get(p.cat) || p.cat)}</div>`}</td>
+    const dispositivo = g.itens.length > 1
+      ? `<b>${g.itens.length} itens</b><div class="mk-mu">${escHTML(rotuloCat.get(p.cat) || p.cat)}</div><div class="mk-sm">${g.itens.map((x) => escHTML(x.item)).join(", ")}</div>`
+      : `<b>${escHTML(nome)}</b>${p.unico ? "" : `<div class="mk-mu">${escHTML(rotuloCat.get(p.cat) || p.cat)}</div>`}`;
+    const regs = registrosDe(g);
+    const remissoes = regs.map((e) => refs.get(chaveEntrada(e))).filter(Boolean).join(" · ");
+    const ultimo = p.trat ? (p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual) : null;
+    const linha = `<tr><td>${dispositivo}</td>
       <td>${p.note && p.note !== "--" ? escHTML(p.note) : '<span class="mk-nao">Sem descrição registrada</span>'}</td>
       <td class="mk-num">${p.dias != null ? `<b class="${p.dias > 180 ? "mk-da" : p.dias >= 30 ? "mk-wa" : ""}">${p.dias} d</b>` : '<span class="mk-nao">—</span>'}${p.since ? `<div class="mk-mu">desde ${dataBR(p.since)}</div>` : ""}</td>
       <td>${pill(p.status)}</td>
-      <td>${p.trat ? `<span class="mk-b mk-b-${FU_CLASSE[p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual] || "wa"}">${escHTML(FU_ROTULO[p.trat.entries.length ? p.trat.entries[p.trat.entries.length - 1].status || p.trat.statusAtual : p.trat.statusAtual] || "Aguardando retorno")}</span>${COM_QUEM_ROTULO[p.trat.comQuem] ? `<div class="mk-mu mk-sm">${COM_QUEM_ROTULO[p.trat.comQuem]}${p.trat.comQuem === "manutencao" && (p.trat.entries[0] || {}).status === "aguardando" ? " — análise do técnico, sem proposta" : ""}</div>` : ""}` : '<span class="mk-nao">Sem tratativa</span>'}</td></tr>`;
-    if (!p.trat || !p.trat.entries.length) return linha;
-    const itensTrat = p.trat.entries.map((e) => {
-      const st = e.status || p.trat.statusAtual;
-      const quando = e.em || e.data || "";
-      const d = quando ? new Date(quando) : null;
-      const quandoFmt = d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR") : "";
-      const dias = diasEntre(quando, hoje);
-      return `<div class="ls-tr"><span class="mk-b mk-b-${FU_CLASSE[st] || "wa"}">${escHTML(FU_ROTULO[st] || "Aguardando retorno")}</span><span class="mk-mu mk-sm">${quandoFmt}${e.responsavel ? ` · ${escHTML(e.responsavel)}` : ""}${dias != null && dias > DIAS_FOLLOWUP_VENCIDO ? ` · <span class="mk-inv">há ${dias} dias</span>` : ""}</span>${e.proposta && e.proposta.numero ? `<div class="mk-sm"><b>Proposta nº ${escHTML(e.proposta.numero)}</b>${e.proposta.valor ? ` · ${escHTML(e.proposta.valor)}` : ""}${e.previsao ? ` · previsão ${escHTML(e.previsao)}` : ""}</div>` : ""}${e.texto ? `<div>${escHTML(e.texto)}</div>` : ""}${e.link ? `<div class="mk-sm" style="word-break:break-all">↳ <a href="${escHTML(e.link)}" style="color:#1D4ED8">${escHTML(e.link)}</a></div>` : ""}</div>`;
-    }).join("");
-    return linha + `<tr class="ls-trl"><td colspan="5"><div class="ls-trw"><div class="mk-lb" style="margin-bottom:4px">Tratativas registradas (${p.trat.entries.length})</div>${itensTrat}</div></td></tr>`;
+      <td>${p.trat ? `<span class="mk-b mk-b-${FU_CLASSE[ultimo] || "wa"}">${escHTML(FU_ROTULO[ultimo] || "Aguardando retorno")}</span>${COM_QUEM_ROTULO[p.trat.comQuem] ? `<div class="mk-mu mk-sm">${COM_QUEM_ROTULO[p.trat.comQuem]}${p.trat.comQuem === "manutencao" && (p.trat.entries[0] || {}).status === "aguardando" ? " — análise do técnico, sem proposta" : ""}</div>` : ""}${remissoes ? `<div class="mk-sm"><b>→ ${remissoes}</b></div>` : ""}` : '<span class="mk-nao">Sem tratativa</span>'}</td></tr>`;
+    // Registros só desta linha ficam abaixo dela; os compartilhados aparecem só como remissão (T1, T2…) na coluna Tratativa.
+    const proprios = regs.filter((e) => !refs.has(chaveEntrada(e)));
+    const resto = p.trat ? p.trat.entries.length - regs.length : 0;
+    if (!proprios.length && !(resto > 0)) return linha;
+    const itensTrat = proprios.map((e) => entradaHTML(e, p.trat)).join("")
+      + (resto > 0 ? `<div class="mk-mu mk-sm">+ ${resto} registro${resto === 1 ? "" : "s"} anterior${resto === 1 ? "" : "es"} no histórico do app</div>` : "");
+    return linha + `<tr class="ls-trl"><td colspan="5"><div class="ls-trw"><div class="mk-lb" style="margin-bottom:4px">Tratativas registradas (${proprios.length})</div>${itensTrat}</div></td></tr>`;
   }).join("");
+  const blocosCompartilhados = [...refs.entries()].map(([k, ref]) => {
+    const u = usoRegistro.get(k);
+    const cobertos = u.grupos.flatMap((g) => g.itens);
+    const cobre = cobertos.map((x) => `${escHTML(x.unico ? x.cat : x.item)} <span class="mk-mu">(${escHTML(sistemaDe(x))})</span>`).join(" · ");
+    return `<div class="ls-tc"><div class="mk-lb">${ref} · vale para ${cobertos.length} ${cobertos.length === 1 ? "item" : "itens"}</div><div class="mk-sm ls-cob">${cobre}</div><div class="ls-trw">${entradaHTML(u.e, u.trat)}</div></div>`;
+  }).join("");
+  const compartilhadas = blocosCompartilhados ? `<div class="mk-h2" style="margin-top:12px">Registros que valem para vários itens <span class="mk-mu">· ${refs.size} ${refs.size === 1 ? "registro" : "registros"}, impressos uma só vez</span></div>${blocosCompartilhados}` : "";
   // QR do link de follow-up da empresa de manutenção (só quando a gestão gera o PDF e há link ativo).
   const blocoLink = linkFollowup && linkFollowup.url ? `<div class="ls-qr">${linkFollowup.qr ? `<img src="${escHTML(linkFollowup.qr)}" alt="QR Code do follow-up" width="86" height="86">` : ""}<div><div class="mk-lb">Atualização de follow-up pela empresa de manutenção</div><div class="mk-sm">Escaneie o QR Code ou acesse o link, informe a situação de cada item (diagnóstico, proposta nº e valor, execução) e toque em <b>Concluir e enviar</b>.</div><div class="mk-sm" style="word-break:break-all"><a href="${escHTML(linkFollowup.url)}" style="color:#1D4ED8">${escHTML(linkFollowup.url)}</a></div></div></div>` : "";
   const pendencias = `<section><div class="mk-h2">Pendências e tratativas <span class="mk-mu">· ${pend.length} ${pend.length === 1 ? "item" : "itens"}, por tempo em aberto</span></div>
     ${pend.length ? `<table class="mk-tb"><colgroup><col style="width:24%"><col style="width:30%"><col style="width:12%"><col style="width:13%"><col style="width:21%"></colgroup>
       <thead><tr><th>Dispositivo</th><th>Diagnóstico</th><th class="mk-num">Em aberto</th><th>Status</th><th>Tratativa</th></tr></thead><tbody>${linhasPend}</tbody></table>
-      <div class="mk-nota">Itens inoperantes e parciais em ordem decrescente de tempo em aberto. As tratativas vêm do registro de follow-up da gestão Moked; itens resolvidos deixam de ser exibidos. Follow-up há mais de ${DIAS_FOLLOWUP_VENCIDO} dias sem atualização é marcado como vencido.</div>${blocoLink}`
+      <div class="mk-nota">Itens inoperantes e parciais em ordem decrescente de tempo em aberto. As tratativas vêm do registro de follow-up da gestão Moked; itens resolvidos deixam de ser exibidos. Follow-up há mais de ${DIAS_FOLLOWUP_VENCIDO} dias sem atualização é marcado como vencido. Itens com o mesmo diagnóstico e a mesma tratativa aparecem numa só linha; o registro de follow-up (OS, orçamento) que vale para vários itens é impresso uma única vez (T1, T2…).</div>${compartilhadas}${blocoLink}`
     : `<div class="mk-vazio"><div class="mk-big">0</div><div class="mk-kl">pendências</div><div class="mk-mu mk-sm">Todos os dispositivos operacionais nesta verificação.</div></div>`}</section>`;
 
   // ── Energia (últimos 7 dias)
@@ -165,7 +226,7 @@ export function montarLaudoSemanal(project, state, meta, { ctmkInfo = null, ener
 .ls-vg{display:flex;gap:14px;align-items:center}.ls-leg{font-size:8.8pt;color:#374151;display:grid;gap:4px}.ls-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}.ls-leg span{color:#6B7280}
 .ls-fb{display:flex;align-items:center;gap:6px}.ls-ft{display:flex;gap:2px;flex:1;height:8px}.ls-ft span{display:block;height:8px;border-radius:2px}
 .ls-qr{display:flex;gap:12px;align-items:center;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;margin-top:8px;break-inside:avoid}.ls-qr img{flex:none}
-.ls-trl td{padding:0 6px 6px;border-bottom:1px solid #EEF0F3}.ls-trw{border-left:2.5px solid #111827;background:#F9FAFB;padding:6px 10px;border-radius:0 6px 6px 0}.ls-tr{margin:3px 0 5px;font-size:8.8pt}.ls-tr .mk-b{margin-right:6px}
+.ls-tc{margin:6px 0 8px;break-inside:avoid}.ls-cob{margin:2px 0 4px}.ls-trl td{padding:0 6px 6px;border-bottom:1px solid #EEF0F3}.ls-trw{border-left:2.5px solid #111827;background:#F9FAFB;padding:6px 10px;border-radius:0 6px 6px 0}.ls-tr{margin:3px 0 5px;font-size:8.8pt}.ls-tr .mk-b{margin-right:6px}
 .ls-info{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #E5E7EB;border-radius:8px;overflow:hidden}.ls-i{padding:7px 10px;border-right:1px solid #EEF0F3;border-bottom:1px solid #EEF0F3;font-size:9.4pt;font-weight:600}.ls-i:nth-child(4n){border-right:none}.ls-i:nth-last-child(-n+4){border-bottom:none}
 .ls-leg i,.ls-ft span,.ls-trw{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 @media screen and (max-width:640px){.ls-info{grid-template-columns:1fr 1fr}.ls-i:nth-child(4n){border-right:1px solid #EEF0F3}.ls-i:nth-child(2n){border-right:none}}
