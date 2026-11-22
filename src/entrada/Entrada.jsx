@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import MostradorSIS from "../ui/MostradorSIS";
 import AberturaSIS from "./AberturaSIS";
+import AreasEsfera from "./AreasEsfera";
 
 export const DIVISOES = [
   { id: "moklog", nome: "MokLog", sub: "Condomínios logísticos", ativo: true, cor: "#E50914" },
@@ -51,6 +52,8 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   const [etapa, setEtapa] = useState(comAbertura && etapaInicial === "splash" ? "abertura" : etapaInicial); // abertura | splash | video | areas | construcao
   const veioDaAbertura = useRef(comAbertura);
   const [emConstrucao, setEmConstrucao] = useState(null);
+  const [emLista, setEmLista] = useState(false); // Áreas em cartões: reserva (aparelho sem canvas) ou escolha em "ver em lista"
+  const ultimaArea = useRef(0); // ao voltar de "Em construção", a esfera reabre na mesma área
   const vid = useRef(null);
   const [bloqueado, setBloqueado] = useState(false); // navegador recusou o autoplay → mostra "Tocar"
   // Vídeo antigo desligado (texto "Moqued", logo antigo, "Mok Dir"). Volta com pularVideo={false} quando houver abertura nova aprovada.
@@ -97,6 +100,10 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
     <div style={{ marginTop: 26 }}><button onClick={() => setEmConstrucao(null)} style={botaoVermelho}>Voltar</button></div>
   </main>;
 
+  if (!emLista) return <AreasEsfera divisoes={DIVISOES} logo={logo} inicial={ultimaArea.current} aoFalhar={() => setEmLista(true)} onLista={() => setEmLista(true)}
+    onAcessar={(d) => { ultimaArea.current = Math.max(0, DIVISOES.findIndex((x) => x.id === d.id)); if (d.ativo) onEscolher(d.id); else setEmConstrucao(d); }}
+    onCliente={() => onEscolher("cliente")} onVoltarAbertura={() => { veioDaAbertura.current = true; setEtapa("abertura"); }} />;
+
   const inclinar = (e) => { if (reducao()) return; const w = e.currentTarget.querySelector(".mk-areas-wrap"); if (!w) return; w.style.setProperty("--ry", ((e.clientX / window.innerWidth - 0.5) * 8).toFixed(1) + "deg"); w.style.setProperty("--rx", (-(e.clientY / window.innerHeight - 0.5) * 6).toFixed(1) + "deg"); };
   return <main style={{ ...fundo, justifyContent: "flex-start", padding: "34px 20px 24px", animation: veioDaAbertura.current ? "mkAreasIn .7s ease" : undefined }} className="mk-areas mk-flut" data-testid="entrada-areas" onPointerMove={inclinar}>
     <style>{CSS_AREAS}</style>
@@ -117,7 +124,8 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
       <div className="mk-t mk-cli" style={{ "--i": DIVISOES.length, "--d": "-2.2s", "--z": "70px", "--c": "#7dd3fc" }}><button onClick={() => onEscolher("cliente")} aria-label="Área do Cliente" style={{ width: "100%", background: "#1f2937", border: "1px solid #475569", color: "#f3f4f6", padding: "18px 16px", fontWeight: 900, letterSpacing: 2, fontSize: 13, cursor: "pointer", clipPath: chanfro, textTransform: "uppercase", boxShadow: "none" }}>Área do Cliente ›</button></div>
       <div style={{ marginTop: 26, fontSize: 10, color: "#4b5563", textAlign: "center" }}>Moked Security Consulting</div>
       <div style={{ textAlign: "center", marginTop: 6 }}><button type="button" data-testid="voltar-abertura" onClick={() => { veioDaAbertura.current = true; setEtapa("abertura"); }} aria-label="Voltar à abertura"
-        style={{ background: "transparent", border: 0, color: "#9ca3af", opacity: 0.4, fontSize: 10.5, letterSpacing: 1.5, cursor: "pointer", padding: "8px 14px", textTransform: "lowercase" }}>↺ voltar à abertura</button></div>
+        style={{ background: "transparent", border: 0, color: "#9ca3af", opacity: 0.4, fontSize: 10.5, letterSpacing: 1.5, cursor: "pointer", padding: "8px 14px", textTransform: "lowercase" }}>↺ voltar à abertura</button>
+        <button type="button" data-testid="voltar-esfera" onClick={() => setEmLista(false)} style={{ background: "transparent", border: 0, color: "#9ca3af", opacity: 0.4, fontSize: 10.5, letterSpacing: 1.5, cursor: "pointer", padding: "8px 14px", textTransform: "lowercase" }}>◉ ver em esfera</button></div>
     </div>
   </main>;
 }
