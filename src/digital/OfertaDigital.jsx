@@ -2,7 +2,7 @@
 // Invisível enquanto a chave remota estiver "desligado" (padrão) e para quem entra como líder, equipe, CCO ou demo.
 import { useCallback, useEffect, useState } from "react";
 import { getSession } from "./../session";
-import { digitalLiberada, temDigitalNoAparelho, devePerguntarCadastro, adiarCadastro, naoPerguntarMais, cadastrarDigital, listarAparelhos, removerAparelho, esquecerDigitalDoAparelho, K_ID } from "./digital";
+import { digitalLiberada, marcarTeste, temDigitalNoAparelho, devePerguntarCadastro, adiarCadastro, naoPerguntarMais, cadastrarDigital, listarAparelhos, removerAparelho, esquecerDigitalDoAparelho, K_ID } from "./digital";
 
 const NIVEIS = ["gerencial", "cliente"];
 const painel = { position: "fixed", left: 12, bottom: "calc(12px + env(safe-area-inset-bottom, 0px))", zIndex: 60, maxWidth: "min(92vw, 360px)", background: "#1F2937", color: "#F3F4F6", border: "1px solid #3b4859", borderRadius: 10, boxShadow: "0 6px 24px rgba(0,0,0,.35)", fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" };
@@ -28,7 +28,7 @@ export default function OfertaDigital() {
     let vivo = true;
     if (!elegivel) { setLiberada(false); setAberto(false); return undefined; }
     (async () => {
-      try { const l = await digitalLiberada(); if (!vivo) return; setLiberada(l); setNeste(temDigitalNoAparelho()); if (l && devePerguntarCadastro()) setAberto(true); } catch { /* só PIN */ }
+      try { marcarTeste(); const l = await digitalLiberada(); if (!vivo) return; setLiberada(l); setNeste(temDigitalNoAparelho()); if (l && devePerguntarCadastro()) setAberto(true); } catch { /* só PIN */ }
     })();
     return () => { vivo = false; };
   }, [elegivel]);
