@@ -25,7 +25,10 @@ var reduz=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)
 function vibra(n){try{if(navigator.vibrate)navigator.vibrate(n)}catch(e){}}
 
 /* ═════ dados dos ícones (mesmos 11 do app + o que cada um alimenta) ═════ */
-var NOS=[
+// 22/11/2026 (Marcio): abertura limpa. Os satélites (ícones em órbita) saem por enquanto; fica só o MOKED brilhando,
+// com a mesma interação (segurar → carga → viagem → História). Para voltar: iniciarSIS(..., { satelites: true }).
+var SATELITES=opc.satelites===true;
+var NOS_TODOS=[
  {k:'cftv',t:'CFTV',d:'Câmeras e tempo de gravação',g:'eq',r:0,x:'Imagem que vira evidência: quantas câmeras o projeto tem, se estão gravando e por quanto tempo.',f:['Tempo de gravação','Câmeras e bodycam','Ronda Virtual']},
  {k:'peri',t:'Perímetro',d:'Cerca, sensores e zonas',g:'eq',r:0,x:'A linha que separa o parque do mundo: cobertura diária do perímetro, cerca e sensores.',f:['Teste Perimetral','Zonas e sensores']},
  {k:'acesso',t:'Controle de acesso',d:'Portarias, catracas e credenciais',g:'eq',r:0,x:'Quem entra, quando e por onde: portarias, catracas, credenciais, horários e chaves.',f:['Controle de acesso','Horários de acesso','Chaves e acessos com falha']},
@@ -38,11 +41,13 @@ var NOS=[
  {k:'pop',t:'POPs',d:'Procedimentos operacionais padrão',g:'pr',r:2,x:'O jeito certo de fazer, escrito e verificável, por projeto.',f:['POPs por projeto','Teste Semanal']},
  {k:'mnp',t:'MNP',d:'Manual de normas e procedimentos',g:'pr',r:0,x:'O manual que sustenta a operação: normas e procedimentos do projeto.',f:['Manual de normas','Documentos por projeto']}
 ];
+var NOS=SATELITES?NOS_TODOS:[];
 var COREG={eq:'#94a3b8',pe:'#7dd3fc',pr:'#fde68a',out:'#ff6a70'};
 var NOMEG={eq:'Equipamentos',pe:'Pessoas',pr:'Procedimentos',out:'Entrega'};
 
 /* ═════ ÓRBITA ═════ */
-var sis=$('#sis'),corpo=$('#corpo'),fx=$('.sis-fx'),ghost=$('.sis-ghost'),prEl=$('#pr'),prC=$('#pr circle');
+var sis=$('#sis');if(!SATELITES)sis.classList.add('limpa');
+var corpo=$('#corpo'),fx=$('.sis-fx'),ghost=$('.sis-ghost'),prEl=$('#pr'),prC=$('#pr circle');
 var ANEIS=[{tx:1.15,tz:0,k:1,v:.22},{tx:.3,tz:-.95,k:.8,v:-.28},{tx:-.95,tz:.65,k:.92,v:.18}];
 var aL=$('.g-aL'),aP=$('.g-aP'),ticks=$('.g-ticks');
 (function(){var tk='';for(var i=0;i<60;i++){var u=i*6*Math.PI/180,r1=i%5?126:121,r2=130;tk+='<line x1="'+(150+Math.sin(u)*r1).toFixed(2)+'" y1="'+(150-Math.cos(u)*r1).toFixed(2)+'" x2="'+(150+Math.sin(u)*r2).toFixed(2)+'" y2="'+(150-Math.cos(u)*r2).toFixed(2)+'" stroke="#fff" stroke-opacity="'+(i%5?.1:.22)+'" stroke-width="'+(i%5?1:2)+'"/>'}ticks.innerHTML=tk})();
@@ -91,7 +96,7 @@ function quadro(t){
     var pe=Math.max(ccP,pinP);if(pe!==pShown){pShown=pe;setP(pe)}
   }
   var ow=parseFloat(orb.style.width)||0,amp=reduz?0:ccP*ccP*4,jx=(Math.random()-.5)*amp*2,jy=(Math.random()-.5)*amp*2;orb.style.zIndex=Math.round(R*2);orb.style.transform='translate('+(cx-ow/2+jx).toFixed(1)+'px,'+(cy-ow/2+jy).toFixed(1)+'px)'+(bp>0?' scale('+(1+bp*5).toFixed(2)+')':'');orb.style.opacity=(1-Math.max(0,(bp-.15)/.5)).toFixed(2);
-  var ge=Math.max(ccP,pinP);glow.style.opacity=Math.min(1,(.28+ge*.32+(nLido/NOS.length)*.3)*(1-bp)).toFixed(2);glow.style.transform='scale('+(.8+ge*.45+bp*1.2).toFixed(3)+')';
+  var ge=Math.max(ccP,pinP);glow.style.opacity=Math.min(1,(.28+ge*.32+(NOS.length?nLido/NOS.length:.5)*.3)*(1-bp)).toFixed(2);glow.style.transform='scale('+(.8+ge*.45+bp*1.2).toFixed(3)+')';
   agulha(reduz?72:62+22*Math.sin(t/2300)+6*Math.sin(t/770));
   var plp=boom?(1-clamp((t-boom.t0)/1100,0,1)):ge;plasma(t,plp,boom?bp*2.2:0);bokeh(t,boom?1-bp:1,ge);
   var vs=boom?0:(cc.on?ccP:(cg.k>=0?prog[cg.k]:0));vs=Math.max(vs,boom?0:pinP);if(Math.abs(vs-vsU)>.01||(vs===0&&vsU!==0)){vsU=vs;cargaSom(vs,cc.on||pinP>0)}
@@ -118,7 +123,7 @@ var saiu=false;
 function entrar(){if(saiu||morto)return;saiu=true;fecharCard();box.classList.add('saindo');after(function(){if(opc.onFim)opc.onFim()},reduz?0:560)}
 
 /* carga dos ícones, explosão e entrada */
-function atualizaHint(){dotsAtualiza();var h=$('#hint');h.textContent=nLido===0?tx('Segure o dedo num ícone','Clique e segure num ícone'):(nLido>=NOS.length?tx('Tudo descoberto · agora segure o MOKED','Tudo descoberto · agora clique e segure o MOKED'):nLido+' de '+NOS.length+tx(' · continue, ou segure o MOKED',' · continue, ou clique e segure o MOKED'));orb.style.setProperty('--heat',(nLido/NOS.length).toFixed(2));if(nLido===3)dica(tx('Dica: afaste dois dedos sobre o MOKED','Dica: role o mouse sobre o MOKED'))}
+function atualizaHint(){var h=$('#hint');if(!SATELITES){h.textContent=tx('Segure o dedo no MOKED','Clique e segure o MOKED');return}dotsAtualiza();h.textContent=nLido===0?tx('Segure o dedo num ícone','Clique e segure num ícone'):(nLido>=NOS.length?tx('Tudo descoberto · agora segure o MOKED','Tudo descoberto · agora clique e segure o MOKED'):nLido+' de '+NOS.length+tx(' · continue, ou segure o MOKED',' · continue, ou clique e segure o MOKED'));orb.style.setProperty('--heat',(nLido/NOS.length).toFixed(2));if(nLido===3)dica(tx('Dica: afaste dois dedos sobre o MOKED','Dica: role o mouse sobre o MOKED'))}
 function completo(k){somPing();lido[k]=true;els[k].classList.add('lido');ignorar=true;abrirCard(k);vibra([12,30,16]);nLido=lido.filter(Boolean).length;atualizaHint()}
 /* ── áudio sintetizado (só depois do primeiro toque) ── */
 var AC=null,mestre=null,somOn=true,chO=null,chG=null,chF=null;
@@ -264,7 +269,7 @@ var dicaT=0;function dica(tx){var d=$('#dica');if(tx)d.textContent=tx;d.classLis
 var roda=0;
 sis.addEventListener('wheel',function(e){if(mergulhando||entrando||!dentroOrb(e.clientX,e.clientY,1.2))return;e.preventDefault();roda=clamp(roda+(e.deltaY<0?.12:-.12),0,1);pinP=roda;if(roda>=1){roda=0;explodir(performance.now())}},{passive:false});
 sis.addEventListener('dblclick',function(e){if(!entrando&&!mergulhando&&dentroOrb(e.clientX,e.clientY,1))explodir(performance.now())});
-after(function(){if(!nLido)dica(tx('Segure o dedo sobre um ícone','Clique e segure um ícone'))},5500);
+after(function(){if(!nLido&&SATELITES)dica(tx('Segure o dedo sobre um ícone','Clique e segure um ícone'))},5500);
 
 /* ═════ MERGULHO ═════ */
 var dive=$('#dive'),abaAtual='hist';
@@ -518,7 +523,7 @@ uc.addEventListener('wheel',function(e){if(!uni)return;e.preventDefault();var w0
 /* ═════ partida ═════ */
 medir();bgMedir();dotsAtualiza();
 $('#uhint').textContent=tx('arraste · aproxime com dois dedos · toque num módulo','arraste · role para aproximar · clique num módulo');
-$('#hint').textContent=tx('Segure o dedo num ícone','Clique e segure num ícone');
+atualizaHint();
 $('#entrar2').addEventListener('click',function(e){e.stopPropagation();entrar()});
 var ign=$('#ign'),tIntro=[];
 function intro(fn,ms){tIntro.push(after(fn,ms))}

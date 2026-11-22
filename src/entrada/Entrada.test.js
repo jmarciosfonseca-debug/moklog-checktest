@@ -76,7 +76,7 @@ test("abertura do SIS toca quando pedida (bolinha → órbita) e Enter leva dire
     expect(ab).not.toBeNull();
     expect(host.querySelector('[data-testid="entrada-splash"]')).toBeNull();
     const sr = ab.shadowRoot; expect(sr).not.toBeNull(); // a abertura vive num Shadow DOM (estilo isolado do app)
-    expect(sr.querySelectorAll("[data-no]").length).toBe(11); // componentes do SIS, não as divisões
+    expect(sr.querySelectorAll("[data-no]").length).toBe(0); expect(sr.querySelector(".sis-orb")).not.toBeNull(); // abertura limpa (22/11/2026): só o MOKED, sem satélites
     expect(sr.textContent).toMatch(/Sistema Integrado de Segurança/);
     expect(botao(host, "Entrar")).toBeFalsy(); // o botão "Entrar" da órbita fica dentro da abertura, não no app
     expect(sr.querySelector(".sis-ign .sis-dot")).not.toBeNull(); expect(sr.querySelector(".sis-frase")).toBeNull(); // a sequência abre só com a bolinha branca

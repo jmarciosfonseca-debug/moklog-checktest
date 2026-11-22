@@ -10,7 +10,8 @@
 import { useEffect, useRef } from "react";
 import { iniciarSIS } from "./sisMotor";
 
-export default function AberturaSIS({ onFim }) {
+// satelites (padrão: não): os ícones em órbita saíram em 22/11/2026 (abertura limpa); a prop os traz de volta.
+export default function AberturaSIS({ onFim, satelites = false }) {
   const host = useRef(null);
   const fim = useRef(onFim);
   fim.current = onFim;
@@ -18,7 +19,7 @@ export default function AberturaSIS({ onFim }) {
   useEffect(() => {
     const el = host.current; if (!el) return undefined;
     const raiz = el.shadowRoot || (el.attachShadow ? el.attachShadow({ mode: "open" }) : el);
-    const parar = iniciarSIS(raiz, el, { onFim: () => { if (fim.current) fim.current(); } });
+    const parar = iniciarSIS(raiz, el, { satelites, onFim: () => { if (fim.current) fim.current(); } });
     return () => { parar(); if (raiz !== el) raiz.innerHTML = ""; else el.innerHTML = ""; };
   }, []);
 
