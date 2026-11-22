@@ -104,6 +104,13 @@ button{font:inherit;color:inherit}
 .univ canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;-webkit-touch-callout:none}
 .uhint{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));text-align:center;font-size:10.5px;letter-spacing:.1em;color:#9ca3af;pointer-events:none;padding:0 16px;transition:opacity .4s}
 .uleg{position:absolute;left:12px;top:calc(62px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:5px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9ca3af;pointer-events:none}
+.uzoom{position:absolute;right:16px;bottom:calc(44px + env(safe-area-inset-bottom,0px));display:none;flex-direction:column;gap:6px;align-items:stretch}
+.sisx.fino .uzoom{display:flex}
+.uzoom button{min-width:40px;height:40px;border:1px solid #2a2f3f;background:rgba(13,15,22,.86);color:#e5e7eb;border-radius:10px;font-size:20px;line-height:1;cursor:pointer}
+.uzoom button.t{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:0 8px}
+.uzoom button:hover{border-color:#ff1e27;color:#fff}
+.sisx.land .ucont{right:auto;left:12px;top:calc(150px + env(safe-area-inset-top,0px));text-align:left}
+.sisx.land #ucard{left:auto;right:72px;bottom:auto;top:calc(86px + env(safe-area-inset-top,0px));width:340px;max-width:38vw;margin:0}
 .uleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
 .ucont{position:absolute;right:12px;top:calc(62px + env(safe-area-inset-top,0px));text-align:right;font-size:10px;letter-spacing:.1em;color:#9ca3af;pointer-events:none;line-height:1.5}
 .ucont b{display:block;font-size:22px;color:#fff;letter-spacing:0}

@@ -80,6 +80,7 @@ export const HTML_SIS = `<div class="sisx" id="sisx">
     <canvas id="uni"></canvas>
     <div class="uleg"><span><i style="background:#94a3b8"></i>Equipamentos</span><span><i style="background:#7dd3fc"></i>Pessoas</span><span><i style="background:#fde68a"></i>Procedimentos</span><span><i style="background:#ff6a70"></i>Entregas</span></div>
     <div class="ucont"><b id="ucn">0</b>módulos<br>conectados</div>
+    <div class="uzoom" id="uzoom"><button type="button" data-z="in" aria-label="Aproximar">+</button><button type="button" data-z="out" aria-label="Afastar">−</button><button type="button" data-z="fit" class="t">ver tudo</button></div>
     <div class="uhint" id="uhint">arraste · aproxime com dois dedos · toque num módulo</div>
     <div class="card" id="ucard"><div class="k" id="uk"></div><h3 id="ut"></h3><p id="ud"></p><div class="lb" id="ulr">Recebe de</div><div class="chips" id="ur"></div><div class="lb" id="ula">Alimenta</div><div class="chips" id="ua"></div><div class="acoes"><button id="ux">Fechar</button></div></div>
   </div></section>

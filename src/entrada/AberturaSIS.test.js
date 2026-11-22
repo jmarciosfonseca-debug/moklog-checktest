@@ -188,3 +188,13 @@ test("abertura limpa: o centro pulsa (mesmo com animações reduzidas) e o Entra
   expect(CSS_SIS).toMatch(/\.btn-entrar\{[^}]*background:rgba\(185,28,28,\.38\)/);
   expect(CSS_SIS).not.toMatch(/prefers-reduced-motion:reduce\)\{\.sis-orb::after\{animation:none/);
 });
+
+test("Universo no PC (22/11/2026): botões + − e ver tudo, cartão lateral em tela deitada e rolagem suave", () => {
+  const { CSS_SIS } = require("./sisCss"); const { HTML_SIS } = require("./sisHtml");
+  const fs = require("fs"), path = require("path"); const src = fs.readFileSync(path.join(__dirname, "sisMotor.js"), "utf8");
+  expect(HTML_SIS).toContain('id="uzoom"'); expect(HTML_SIS).toContain('data-z="fit"');
+  expect(CSS_SIS).toContain(".sisx.fino .uzoom{display:flex}"); expect(CSS_SIS).toContain(".sisx.land #ucard{");
+  expect(src).toContain("function uDeitada(){return W>H*1.15}");
+  expect(src).not.toContain("CAM.k*(e.deltaY<0?1.12:.89)"); // sem salto fixo por evento: o trackpad não dispara o zoom
+  expect(src).toContain("if(uDeitada()!==uni.land){uniFechar();uniIniciar()}"); // redimensionar a janela refaz o grafo
+});
