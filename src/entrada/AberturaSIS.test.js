@@ -31,7 +31,9 @@ test("monta a ignição e a órbita com os 11 componentes do SIS num Shadow DOM,
   try {
     expect(c.sr).not.toBeNull();
     expect(c.sr.querySelectorAll("[data-no]").length).toBe(11);
-    expect(c.sr.querySelector(".sis-ign .sis-frase").textContent).toBe("o softwarepor trásdo hardware");
+    expect(c.sr.querySelector(".sis-ign .sis-dot")).not.toBeNull(); // a ignição é só a bolinha branca
+    expect(c.sr.querySelector(".sis-frase")).toBeNull();
+    expect(c.sr.textContent).not.toMatch(/software por tr[aá]s|do hardware/i); // conceito retirado da abertura e da História
     expect([...c.sr.querySelectorAll("button")].some((b) => b.textContent.trim() === "Entrar")).toBe(true);
     expect(c.sr.querySelector("style").textContent).toContain(".sis-nd"); // estilos dentro do shadow, não no app
     expect(document.head.querySelector("style")?.textContent || "").not.toContain(".sis-nd");
@@ -100,8 +102,12 @@ test("segurar o MOKED explode e abre a História; o Universo monta o grafo; Esca
     expect(c.api.estado().mergulhando).toBe(true);
     expect(c.sr.querySelector("#dive").hidden).toBe(false);
     expect(c.sr.querySelector("#p-hist").classList.contains("on")).toBe(true);
-    expect(c.sr.querySelectorAll(".cap").length).toBe(6);
+    expect(c.sr.querySelectorAll(".cap").length).toBe(7);
     expect(c.sr.textContent).toContain("De Israel para o Brasil");
+    const hist = c.sr.querySelector("#hist").textContent; // história real, do site oficial da Moked
+    expect(hist).toContain("1995"); expect(hist).toContain("Yehuda Carmi"); expect(hist).toContain("Tenente-Coronel das Forças Armadas de Israel");
+    expect(hist).toContain("Moked On-line"); expect(hist).toContain("ISO 9001"); expect(hist).toContain("ISO 37001"); expect(hist).toContain("Moked 4.0");
+    expect(hist).not.toMatch(/software por tr[aá]s|hardware/i);
     expect(c.sr.textContent).not.toMatch(/Protótipo|PROTÓTIPO/);
     c.sr.querySelector('.tab[data-a="univ"]').click();
     await esperar(80);
