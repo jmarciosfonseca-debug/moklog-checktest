@@ -198,6 +198,7 @@ import { ocupacaoDoQuadro, totalQuadro, ORDEM_PROJETOS } from "./equipe/quadroPr
 import { montarMatrizEfetivo } from "./relatorios/matrizEfetivo";
 import { carregarOcupacoes } from "./equipe/carregarOcupacoes";
 import LedVaga from "./equipe/LedVaga";
+import { categoriaVigente, categoriasVigentes, semCategoriasRetiradas } from "./vigenciaCategorias";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 // Ícone de módulo: usa a arte 3D em /icones/modulos/<arq>.png quando existir (sem caixa, com brilho na cor do módulo);
@@ -594,7 +595,7 @@ const PROJECTS = {
       {id:"intercomunicadores",label:"10 - INTERCOMUNICADORES",type:"items",itemLabels:["Intercomunicador 01","Intercomunicador 02","Intercomunicador 03"]},
       {id:"intercom_totem",label:"11 - INTERCOMUNICADORES DE TOTEM",type:"items",itemLabels:["Totem Superior 01","Totem Superior 02","Totem Superior 03","Totem Superior 04","Totem Superior 05","Totem Superior 06","Totem Inferior 01","Totem Inferior 02","Totem Inferior 03","Totem Inferior 04","Totem Inferior 05","Totem Inferior 06"]},
       {id:"qr_code",label:"12 - LEITORES DE QR CODE",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},
-      {id:"materiais",label:"13 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
+      {id:"materiais",label:"13 - MATERIAIS OPERACIONAIS",ate:"2026-11-21",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
       {id:"mon_cda",label:"14 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03"]},
       {id:"mon_cftv",label:"15 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
       {id:"portoes",label:"16 - PORT\u00d5ES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},
@@ -619,7 +620,9 @@ const PROJECTS = {
       // (colisão, dano na haste). Rótulo "08B" para não renumerar os demais, que são a chave das tratativas.
       {id:"cancelas",label:"08B - CANCELAS / HASTE",type:"items",itemLabels:["Cancela 01","Cancela 02","Cancela 03","Cancela 04"]},
       {id:"qr_code",label:"09 - LEITORES QR CODE",type:"items",itemLabels:["Cancela 01 Sup","Cancela 01 Inf","Cancela 02 Sup","Cancela 02 Inf","Cancela 04 Sup","Cancela 04 Inf","Sa\u00edda Cancela 02 Sup","Sa\u00edda Cancela 02 Inf","Sa\u00edda Cancela 03 Sup","Sa\u00edda Cancela 03 Inf","Sa\u00edda Cancela 04 Sup","Sa\u00edda Cancela 04 Inf"]},
-      {id:"materiais",label:"10 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x2)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
+      // 22/11/2026 (Marcio): materiais operacionais saem do teste semanal do P311B (cada equipamento tem relatório próprio, no módulo Equipamentos).
+      // `ate`: relatórios até 21/11 seguem com a categoria; de 22/11 em diante ela não existe. Rótulos dos demais não mudam (chave das tratativas).
+      {id:"materiais",label:"10 - MATERIAIS OPERACIONAIS",ate:"2026-11-21",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x2)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
       {id:"mon_cda",label:"11 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03","Monitor 04"]},
       {id:"mon_cftv",label:"12 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
       {id:"portoes",label:"13 - PORT\u00d5ES",type:"items",itemLabels:["Port\u00e3o 01","Port\u00e3o 02","Port\u00e3o 03","Port\u00e3o 04"]},
@@ -854,6 +857,7 @@ function getWeekLabel(dateStr) {
 function buildBlank(project) {
   const st = {};
   for(const cat of project.categories){
+    if(!categoriaVigente(cat)) continue; // categoria retirada (ver vigenciaCategorias.js)
     if(cat.type==="single") st[cat.id]={status:"ok",note:"",since:""};
     else if(cat.type==="items") st[cat.id]=cat.itemLabels.map((_,i)=>{
       const unitId=getUnitId(project.id,cat,i);
@@ -878,6 +882,7 @@ function buildFromLast(project, lastState) {
   if(!lastState) return buildBlank(project);
   const st = {};
   for(const cat of project.categories){
+    if(!categoriaVigente(cat)) continue; // categoria retirada: não herda do relatório anterior
     if(cat.type==="single"){
       const prev=lastState[cat.id];
       const prevSt=resolveStatus(prev);
@@ -3954,6 +3959,7 @@ export default function App(){
       alert("Erro: dados do relatório inválidos. Tente novamente.");
       return;
     }
+    st=semCategoriasRetiradas(project,st,mt?.date); // rascunho/relatório de hoje feito antes da retirada não leva a categoria
     if(editingIdx!==null){
       const result=await editReport(project.id,editingIdx,st,mt);
       setSyncing(false);
@@ -4046,6 +4052,7 @@ export default function App(){
     const raw=JSON.parse(JSON.stringify(report.state||{}));
     const migrado={...raw};
     for(const cat of proj.categories){
+      if(!categoriaVigente(cat,report.meta?.date)) continue; // retirada para a data deste relatório: não recria em branco
       const cur=migrado[cat.id];
       if(cur===undefined||cur===null){
         if(cat.type==="items") migrado[cat.id]=(cat.itemLabels||[]).map(()=>({status:"ok",note:"",since:""}));
@@ -4060,7 +4067,7 @@ export default function App(){
         migrado[cat.id]=arr;
       }
     }
-    setState(migrado);
+    setState(semCategoriasRetiradas(proj,migrado,report.meta?.date));
     setMeta({date:todayStr(),start:"",end:"",leader:"",cco:"",moked:"",mokedContact:false,mokedTime:"",obs:"",signature:"",...report.meta,date:report.meta?.date||todayStr()});
     setPhotos([]);
     setEditingIdx(idx);
@@ -4075,6 +4082,7 @@ export default function App(){
     // criando em branco qualquer categoria que falte (sem perder o que foi preenchido).
     const migrado={...(draft.state||{})};
     for(const cat of project.categories){
+      if(!categoriaVigente(cat,draft.meta?.date)) continue;
       if(migrado[cat.id]===undefined||migrado[cat.id]===null){
         if(cat.type==="items") migrado[cat.id]=(cat.itemLabels||[]).map(()=>({status:"ok",note:"",since:""}));
         else if(cat.type==="single") migrado[cat.id]={status:"ok",note:"",since:""};
@@ -4083,7 +4091,7 @@ export default function App(){
         else if(cat.type==="maintenance") migrado[cat.id]={visits:[]};
       }
     }
-    setState(migrado);setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);
+    setState(semCategoriasRetiradas(project,migrado,draft.meta?.date));setMeta(draft.meta);initialFormRef.current={state:null,meta:null};setPhotos(draft.photos||[]);setShowDraftPrompt(false);setScreen("form");setActive(null);
     // Bug 5 (28/08): reconstrói o cronômetro a partir do início REAL do
     // preenchimento (não reinicia). Fallback: savedAt, senão agora.
     formTimerRef.current = draft.formInicioReal || draft.savedAt || Date.now();
@@ -4298,7 +4306,7 @@ export default function App(){
             <button onClick={()=>{setHomeGroup("jatinox");setScreen("home");}} style={S.backBtn}>← Voltar</button>
             <div style={{flex:1}}>
               <div style={{fontSize:16,fontWeight:900,color:"#f1f5f9"}}>P260A — Jatinox Unidade A</div>
-              <div style={{fontSize:11,color:"#94a3b8"}}>Checklist Semanal · {project.categories.length} categorias</div>
+              <div style={{fontSize:11,color:"#94a3b8"}}>Checklist Semanal · {categoriasVigentes(project).length} categorias</div>
             </div>
             {h&&<HealthRing pct={h.pct} size={50}/>}
           </div>
@@ -4387,16 +4395,17 @@ export default function App(){
         </div>
       )}
       <SyncBadge/><DemoBanner/>
-      {firestoreDown && (
-        <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:18}}><Ico n="xCirculo"/></span>
-          <div style={{flex:1}}>
-            <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Servidor não está respondendo</div>
-            <div style={{fontSize:11,color:"#fed7aa"}}>O que você salvar agora pode ficar só neste aparelho até a conexão voltar. Avise o suporte se isso persistir.</div>
-          </div>
-        </div>
-      )}
       <div style={S.formWrap}>
+        {/* 22/11/2026: o aviso ficava solto no container flex da tela e virava uma coluna de 138 px, empurrando o formulário para fora da tela quando o servidor caía. Dentro do formWrap (coluna) ocupa a largura toda. */}
+        {firestoreDown && (
+          <div role="alert" style={{background:"#7c2d12",border:"1px solid #ef4444",borderRadius:10,padding:"10px 14px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:18}}><Ico n="xCirculo"/></span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Servidor não está respondendo</div>
+              <div style={{fontSize:11,color:"#fed7aa"}}>O que você salvar agora pode ficar só neste aparelho até a conexão voltar. Avise o suporte se isso persistir.</div>
+            </div>
+          </div>
+        )}
         {editingIdx!==null&&(
           <div style={{background:"#001a2e",border:"1px solid #0ea5e966",borderRadius:10,padding:"10px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
             <span style={{fontSize:16}}><Ico n="editar"/></span>
@@ -4466,7 +4475,7 @@ export default function App(){
           </div>
         </div>
 
-        {state&&project.categories.map(cat=>{
+        {state&&categoriasVigentes(project,meta.date).map(cat=>{
           const isOpen=active===cat.id;
           // BLINDAGEM: categoria nova (adicionada em atualização) pode não existir
           // no estado carregado de um teste anterior. Cria o estado em branco na
