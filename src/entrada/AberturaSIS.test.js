@@ -12,9 +12,9 @@ const ponteiro = (el, tipo, x, y, id = 1) => {
   Object.defineProperty(e, "pointerId", { value: id });
   el.dispatchEvent(e);
 };
-async function montar(onFim = jest.fn()) {
+async function montar(onFim = jest.fn(), satelites = true) { // os testes da órbita ligam os satélites (no app o padrão é a abertura limpa)
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
-  await act(async () => root.render(<AberturaSIS onFim={onFim} />));
+  await act(async () => root.render(<AberturaSIS onFim={onFim} satelites={satelites} />));
   const ab = host.querySelector('[data-testid="entrada-abertura"]');
   const sr = ab.shadowRoot;
   const fechar = async () => { await act(async () => root.unmount()); host.remove(); };
@@ -164,4 +164,20 @@ test("abertura sem o som da ignição (22/11/2026): sem zumbido de carga nem exp
   expect(src).not.toMatch(/createOscillator\(\);chO\.type='sawtooth'/);
   expect(src).not.toContain("tom(120,32,.9");
   expect(src).toContain("function somPing(){");
+});
+
+test("abertura limpa (padrão, 22/11/2026): sem satélites; só o MOKED, que ao segurar ainda carrega e leva à História", async () => {
+  const c = await montar(jest.fn(), false);
+  try {
+    expect(c.sr.querySelectorAll("[data-no]").length).toBe(0);
+    expect(c.sis.classList.contains("limpa")).toBe(true);
+    expect(c.sr.querySelector(".sis-orb")).not.toBeNull(); expect(c.sr.querySelector(".sis-glow")).not.toBeNull();
+    expect(c.sr.querySelector("style").textContent).toContain(".sis.limpa .sis-fx,.sis.limpa .sis-dots,.sis.limpa .sis-leg");
+    await aberta(c);
+    expect(c.sr.querySelector("#hint").textContent).toMatch(/MOKED/); expect(c.sr.querySelector("#hint").textContent).not.toMatch(/ícone/);
+    expect(typeof c.api.mergulhar).toBe("function"); // a viagem até a História continua disponível
+    const { cx, cy } = c.api.centro();
+    ponteiro(c.sis, "pointerdown", cx, cy); await esperar(2100); ponteiro(c.sis, "pointerup", cx, cy); await esperar(200);
+    expect(c.onFim).not.toHaveBeenCalled(); // segurar o MOKED não é "entrar": dispara a viagem
+  } finally { await c.fechar(); }
 });

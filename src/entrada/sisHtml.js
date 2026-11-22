@@ -12,7 +12,7 @@ export const HTML_SIS = `<div class="sisx" id="sisx">
   <svg class="sis-pr" id="pr" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"></circle></svg>
   <button class="som" id="som" type="button">SOM</button>
   <div id="logoV"><div>MOK<i>E</i>D</div><small>SIS<sup>+</sup></small></div>
-  <div class="sis-hint" id="hint">Segure o dedo num ícone</div>
+  <div class="sis-hint" id="hint"></div>
   <div class="sis-dica" id="dica"></div>
   <div class="sis-info"><b>SIS⁺ · Sistema Integrado de Segurança</b></div>
   <button class="btn-entrar" id="entrar">Entrar</button>

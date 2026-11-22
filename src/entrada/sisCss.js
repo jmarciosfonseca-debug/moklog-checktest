@@ -38,6 +38,7 @@ button{font:inherit;color:inherit}
 .sis-dica{position:absolute;left:0;right:0;top:calc(52px + env(safe-area-inset-top,0px));text-align:center;font-size:11px;letter-spacing:.08em;color:#ff8a90;pointer-events:none;opacity:0;transition:opacity .8s}
 .sis-dica.v{opacity:1}
 .sis-leg{position:absolute;left:0;right:0;bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#9ca3af;pointer-events:none}
+.sis.limpa .sis-fx,.sis.limpa .sis-dots,.sis.limpa .sis-leg,.sis.limpa .card{display:none}
 .sis-leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
 .sis-info{position:absolute;left:0;right:0;bottom:calc(112px + env(safe-area-inset-bottom,0px));text-align:center;padding:0 24px;pointer-events:none}
 .sis-info b{display:block;font-size:15px;letter-spacing:.06em}.sis-info span{display:block;font-size:12px;color:#9ca3af;margin-top:3px}
