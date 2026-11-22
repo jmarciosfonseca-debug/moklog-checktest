@@ -129,12 +129,10 @@ var pend=null,pendT=0;
 function audioPendente(){if(pend&&AC&&performance.now()-pendT<2600){var f=pend;pend=null;try{AC.resume().then(f)}catch(e){}}else pend=null}
 function ruido(dur){var n=Math.floor(AC.sampleRate*dur),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);for(var i=0;i<n;i++)d[i]=Math.random()*2-1;var s=AC.createBufferSource();s.buffer=b;return s}
 function tom(f0,f1,dur,tipo,vol,atraso){if(!AC||!somOn||AC.state!=='running')return;try{var t=AC.currentTime+(atraso||0),o=AC.createOscillator(),g=AC.createGain();o.type=tipo||'sine';o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(mestre);o.start(t);o.stop(t+dur+.05)}catch(e){}}
-function cargaSom(v,forte){if(!AC||!somOn||AC.state!=='running')return;try{if(!chO){chO=AC.createOscillator();chO.type='sawtooth';chF=AC.createBiquadFilter();chF.type='lowpass';chF.frequency.value=300;chG=AC.createGain();chG.gain.value=0;chO.connect(chF);chF.connect(chG);chG.connect(mestre);chO.start()}var t=AC.currentTime;chO.frequency.setTargetAtTime(70+v*v*420,t,.05);chF.frequency.setTargetAtTime(260+v*2600,t,.05);chG.gain.setTargetAtTime(v>.01?(forte?.1:.04)*v:0,t,.06)}catch(e){}}
+// 22/11/2026 (Marcio): sem o som da ignição (zumbido de carga e explosão). Ficam só o ping suave de cada cartão e o botão SOM.
+function cargaSom(){}
 function somPing(){tom(660,990,.28,'sine',.16);tom(990,1480,.34,'triangle',.07,.05)}
-function somExplosao(){if(!AC||!somOn)return;if(AC.state!=='running'){pend=somExplosao;pendT=performance.now();return}try{var t=AC.currentTime;tom(120,32,.9,'sine',.9);
-  var r=ruido(2.4),f=AC.createBiquadFilter(),g=AC.createGain();f.type='lowpass';f.frequency.setValueAtTime(5000,t);f.frequency.exponentialRampToValueAtTime(120,t+1.4);g.gain.setValueAtTime(.7,t);g.gain.exponentialRampToValueAtTime(.001,t+1.8);r.connect(f);f.connect(g);g.connect(mestre);r.start(t);
-  var w=ruido(3),bf=AC.createBiquadFilter(),wg=AC.createGain();bf.type='bandpass';bf.Q.value=.9;bf.frequency.setValueAtTime(240,t+.3);bf.frequency.exponentialRampToValueAtTime(5200,t+2.3);wg.gain.setValueAtTime(0,t+.3);wg.gain.linearRampToValueAtTime(.55,t+2);wg.gain.exponentialRampToValueAtTime(.001,t+2.9);w.connect(bf);bf.connect(wg);wg.connect(mestre);w.start(t+.3);
-  tom(180,900,2.2,'sawtooth',.06,.3);tom(1200,1800,.8,'sine',.12,2.15)}catch(e){}}
+function somExplosao(){}
 $('#som').addEventListener('click',function(e){e.stopPropagation();audioIniciar();audioAcordar();somOn=!somOn;this.classList.toggle('off',!somOn);try{if(mestre)mestre.gain.setTargetAtTime(somOn?.9:0,AC.currentTime,.02)}catch(_){}if(somOn)tom(520,780,.2,'sine',.12)});
 
 /* ── plasma atrás do MOKED (cresce enquanto o dedo segura) ── */

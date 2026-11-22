@@ -2,7 +2,8 @@
 // Invisível enquanto a chave remota estiver "desligado" (padrão) e para quem entra como líder, equipe, CCO ou demo.
 import { useCallback, useEffect, useState } from "react";
 import { getSession } from "./../session";
-import { digitalLiberada, marcarTeste, temDigitalNoAparelho, devePerguntarCadastro, adiarCadastro, naoPerguntarMais, cadastrarDigital, listarAparelhos, removerAparelho, esquecerDigitalDoAparelho, K_ID } from "./digital";
+import { EVENTO_DIAGNOSTICO } from "./DiagnosticoDigital";
+import { digitalLiberada, marcarTeste, temDigitalNoAparelho, devePerguntarCadastro, adiarCadastro, naoPerguntarMais, cadastrarDigital, listarAparelhos, removerAparelho, esquecerDigitalDoAparelho, K_ID, K_TESTE } from "./digital";
 
 const NIVEIS = ["gerencial", "cliente"];
 const painel = { position: "fixed", left: 12, bottom: "calc(12px + env(safe-area-inset-bottom, 0px))", zIndex: 60, maxWidth: "min(92vw, 360px)", background: "#1F2937", color: "#F3F4F6", border: "1px solid #3b4859", borderRadius: 10, boxShadow: "0 6px 24px rgba(0,0,0,.35)", fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" };
@@ -40,6 +41,10 @@ export default function OfertaDigital() {
   }, []);
   useEffect(() => { if (aberto && liberada && neste) carregar(); }, [aberto, liberada, neste, carregar]);
 
+  const pedirDiagnostico = () => { try { window.dispatchEvent(new Event(EVENTO_DIAGNOSTICO)); } catch { /* sem painel */ } };
+  // Aparelho habilitado para o teste mas a digital não está liberada: em vez de sumir em silêncio, mostra como descobrir o motivo.
+  const habilitadoParaTeste = (() => { try { return window.localStorage.getItem(K_TESTE) === "1"; } catch { return false; } })();
+  if (elegivel && !liberada && habilitadoParaTeste) return <button type="button" onClick={pedirDiagnostico} data-testid="digital-por-que" style={{ ...painel, padding: "7px 11px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", color: "#fca5a5" }}>🔐 Digital indisponível: ver motivo</button>;
   if (!elegivel || !liberada) return null;
   if (!aberto) return <button type="button" onClick={() => setAberto(true)} data-testid="digital-chip" aria-label="Digital neste aparelho" style={{ ...painel, padding: "7px 11px", fontSize: 12.5, fontWeight: 800, cursor: "pointer", color: "#CBD5E1" }}>🔐 Digital</button>;
 
@@ -84,6 +89,7 @@ export default function OfertaDigital() {
         {itens.length === 0 && <li style={{ fontSize: 12, color: "#CBD5E1" }}>Nenhum aparelho.</li>}
       </ul>)}
     {neste && <button type="button" onClick={() => { esquecerDigitalDoAparelho(); setNeste(false); setMsg("Neste aparelho a digital deixou de ser usada. Para apagar o cadastro no servidor, use Remover."); }} style={{ ...btn(false), marginTop: 8 }}>Parar de usar neste aparelho</button>}
+    <button type="button" onClick={pedirDiagnostico} style={{ ...btn(false), marginTop: 8, marginLeft: neste ? 8 : 0 }} data-testid="digital-diagnostico">Diagnóstico</button>
     {msg && <div role="status" style={{ fontSize: 12, color: "#bae6fd", marginTop: 8, lineHeight: 1.4 }}>{msg}</div>}
   </div>;
 }

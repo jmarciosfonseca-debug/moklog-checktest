@@ -4,6 +4,7 @@ import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import OfertaDigital from './digital/OfertaDigital';
+import DiagnosticoDigital from './digital/DiagnosticoDigital';
 import './temaMoked.css';
 import './tema/site.css';
 
@@ -21,6 +22,6 @@ root.render(
   <React.StrictMode>
     {fuToken
       ? <Suspense fallback={<div style={{ padding: 24, fontFamily: 'sans-serif' }}>Carregando…</div>}><PaginaExterna token={fuToken} /></Suspense>
-      : <><App /><OfertaDigital /></>}
+      : <><App /><OfertaDigital /><DiagnosticoDigital /></>}
   </React.StrictMode>
 );

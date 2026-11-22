@@ -155,3 +155,13 @@ test("reduzir movimento: a órbita já abre ligada, sem ignição", async () => 
     expect(c.sr.querySelector("#ign").classList.contains("fim")).toBe(true);
   } finally { await c.fechar(); window.matchMedia = antes; }
 });
+
+test("abertura sem o som da ignição (22/11/2026): sem zumbido de carga nem explosão; fica só o ping suave do cartão", () => {
+  const fs = require("fs"), path = require("path");
+  const src = fs.readFileSync(path.join(__dirname, "sisMotor.js"), "utf8");
+  expect(src).toContain("function cargaSom(){}");
+  expect(src).toContain("function somExplosao(){}");
+  expect(src).not.toMatch(/createOscillator\(\);chO\.type='sawtooth'/);
+  expect(src).not.toContain("tom(120,32,.9");
+  expect(src).toContain("function somPing(){");
+});

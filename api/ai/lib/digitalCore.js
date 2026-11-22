@@ -9,7 +9,10 @@ const crypto = require('crypto');
 
 const TTL_DESAFIO = 5 * 60000;
 const ALGS = { '-7': 'ES256', '-257': 'RS256' };
-const ORIGENS_PADRAO = ['https://moked-checktest.vercel.app']; // só o endereço oficial (passkey é amarrada ao domínio); outros por DIGITAL_ORIGENS
+const { ENDERECO_APP, ENDERECO_ANTIGO } = require('../../../src/enderecoApp');
+// Os dois endereços oficiais do app (o antigo continua em uso no celular de quem instalou por ele). A passkey é amarrada ao domínio:
+// quem cadastra num endereço entra por ele; o outro endereço pede novo cadastro. Outros só por DIGITAL_ORIGENS.
+const ORIGENS_PADRAO = [ENDERECO_APP, ENDERECO_ANTIGO];
 const NIVEIS = ['admin', 'gestor', 'cliente']; // gerencial, gestor de divisão e cliente. Líder, equipe, CCO e demo: só PIN.
 
 const b64u = (b) => Buffer.from(b).toString('base64url');

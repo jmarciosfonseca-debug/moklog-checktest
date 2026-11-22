@@ -94,6 +94,14 @@ describe("digital: chave de desligamento e origem", () => {
     expect((await chamar({ acao: "opcoes-login" }, { origin: "https://site-falso.com" })).code).toBe(403);
     expect((await chamar({ acao: "opcoes-login" }, { origin: null })).code).toBe(403);
   });
+  test("os dois endereços oficiais (novo e antigo) são aceitos; cada um com o seu rpId", async () => {
+    process.env.DIGITAL_ATIVO = "1";
+    for (const [origin, rpId] of [["https://moked-checktest.vercel.app", "moked-checktest.vercel.app"], ["https://moklog-checktest.vercel.app", "moklog-checktest.vercel.app"]]) {
+      const r = await chamar({ acao: "opcoes-login" }, { origin });
+      expect(r.code).toBe(200); expect(r.body.rpId).toBe(rpId);
+    }
+    expect((await chamar({ acao: "opcoes-login" }, { origin: "https://moklog-checktest-git.vercel.app" })).code).toBe(403);
+  });
   test("só POST", async () => {
     const r = res(); await handler({ method: "GET", headers: {} }, r); expect(r.code).toBe(405);
   });
