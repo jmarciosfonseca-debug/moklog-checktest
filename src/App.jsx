@@ -595,7 +595,7 @@ const PROJECTS = {
       {id:"intercomunicadores",label:"10 - INTERCOMUNICADORES",type:"items",itemLabels:["Intercomunicador 01","Intercomunicador 02","Intercomunicador 03"]},
       {id:"intercom_totem",label:"11 - INTERCOMUNICADORES DE TOTEM",type:"items",itemLabels:["Totem Superior 01","Totem Superior 02","Totem Superior 03","Totem Superior 04","Totem Superior 05","Totem Superior 06","Totem Inferior 01","Totem Inferior 02","Totem Inferior 03","Totem Inferior 04","Totem Inferior 05","Totem Inferior 06"]},
       {id:"qr_code",label:"12 - LEITORES DE QR CODE",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02","Sa\u00edda 03"]},
-      {id:"materiais",label:"13 - MATERIAIS OPERACIONAIS",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
+      {id:"materiais",label:"13 - MATERIAIS OPERACIONAIS",ate:"2026-11-21",type:"items",itemLabels:["Smartphone (x3)","Lanterna (x2)","Armamento (x2)","Muni\u00e7\u00e3o (x36)","R\u00e1dio HT (x3)","Bodycam (x3)","Moto de Ronda","P\u00e2nico ZTRAX (x2)"]},
       {id:"mon_cda",label:"14 - MONITOR CCO CDA (CONTROLE DE ACESSO)",type:"items",itemLabels:["Monitor 01","Monitor 02","Monitor 03"]},
       {id:"mon_cftv",label:"15 - MONITOR CCO CFTV",type:"items",itemLabels:["Monitor 01","Monitor 02"]},
       {id:"portoes",label:"16 - PORT\u00d5ES",type:"items",itemLabels:["Entrada 01","Entrada 02","Entrada 03","Sa\u00edda 01","Sa\u00edda 02"]},

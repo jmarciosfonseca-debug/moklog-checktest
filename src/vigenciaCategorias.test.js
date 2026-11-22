@@ -1,10 +1,11 @@
-// Marcio, 22/11/2026: o P311B deixa de testar "10 - MATERIAIS OPERACIONAIS" a partir de hoje; o histórico até 21/11 não muda.
+// Marcio, 22/11/2026: o P311B e o P311A deixam de testar "MATERIAIS OPERACIONAIS" (cada equipamento tem relatório próprio) a partir de hoje; o histórico até 21/11 não muda.
 import fs from "fs";
 import path from "path";
 import { categoriaVigente, categoriasVigentes, semCategoriasRetiradas } from "./vigenciaCategorias";
 
 const fonte = fs.readFileSync(path.join(__dirname, "App.jsx"), "utf8");
 const bloco = fonte.slice(fonte.indexOf('P311B: {id:"P311B"'), fonte.indexOf('P505: {id:"P505"'));
+const blocoA = fonte.slice(fonte.indexOf('P311A: {id:"P311A"'), fonte.indexOf('P311B: {id:"P311B"'));
 const proj = { categories: [{ id: "a", label: "01 - A" }, { id: "materiais", label: "10 - M", ate: "2026-11-21" }, { id: "b", label: "11 - B" }] };
 
 test("categoria com `ate`: relatórios até 21/11 mantêm, de 22/11 em diante não têm", () => {
@@ -32,7 +33,9 @@ test("P311B: só a categoria 10 tem `ate`; rótulos dos demais seguem iguais (ch
   expect(bloco).toContain('{id:"materiais",label:"10 - MATERIAIS OPERACIONAIS",ate:"2026-11-21",type:"items"');
   expect((bloco.match(/ate:"/g) || []).length).toBe(1);
   for (const r of ['"11 - MONITOR CCO CDA', '"12 - MONITOR CCO CFTV"', '"13 - PORT', '"14 - SDAI', '"15 - SISTEMA KEYACCESS"', '"16 - TOTENS NAS CANCELAS"', '"17 - VISITA', '"18 - INFRAESTRUTURA']) expect(bloco).toContain("label:" + r);
-  expect((fonte.match(/ate:"2026-11-21"/g) || []).length).toBe(1); // P311A e demais continuam com materiais operacionais
+  expect(blocoA).toContain('{id:"materiais",label:"13 - MATERIAIS OPERACIONAIS",ate:"2026-11-21",type:"items"');
+  expect((blocoA.match(/ate:"/g) || []).length).toBe(1);
+  expect((fonte.match(/ate:"2026-11-21"/g) || []).length).toBe(2); // só P311A e P311B; demais projetos continuam como estavam
 });
 test("o App usa a vigência ao criar, editar, restaurar rascunho, salvar e desenhar o formulário", () => {
   expect(fonte).toContain("if(!categoriaVigente(cat)) continue; // categoria retirada (ver vigenciaCategorias.js)");
