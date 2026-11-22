@@ -50,12 +50,9 @@
 /* Aparelho estreito: cartões de módulo mais compactos para o título caber. */
 @media (max-width: 400px) { .mk-modulos > button { padding-left: 10px !important; padding-right: 8px !important; gap: 9px !important; } .mk-modulos > button > div > div:first-child { font-size: 13.5px !important; } .mk-modulos > button > span:last-child { display: none; } }
 
-/* Abertura (19/11/2026): frase da marca + mostrador SIS decorativo */
-.mk-frase { margin-top: 14px; font-size: 12.5px; letter-spacing: .6px; color: #9ca3af; text-align: center; }
-.mk-frase b { color: #f3f4f6; letter-spacing: 3px; font-weight: 900; }
+/* Abertura (19/11/2026): mostrador SIS decorativo */
 .mk-entrada-dial { display: flex; justify-content: center; margin-top: 18px; }
 @media (min-width: 1024px) {
-  .mk-frase { font-size: 15px; text-align: left; margin: 0 0 22px; }
   .mk-entrada-dial { margin-top: 0; margin-bottom: 26px; }
 }
 

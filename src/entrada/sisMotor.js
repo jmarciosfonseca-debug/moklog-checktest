@@ -527,7 +527,7 @@ function intro(fn,ms){tIntro.push(after(fn,ms))}
 function ligar(){sis.classList.add('on');ign.classList.add('apaga');after(function(){ign.classList.add('fim')},800)}
 function pulaIgn(){if(!sis.classList.contains('on')){tIntro.forEach(clearTimeout);tIntro=[];sis.classList.add('on');ign.classList.add('fim')}}
 if(reduz){sis.classList.add('on');ign.classList.add('fim')}
-else{intro(function(){ign.classList.add('sobe')},2300);intro(function(){ign.classList.add('acende')},3240);intro(function(){ign.classList.add('flash')},3520);intro(ligar,3760)}
+else{intro(function(){ign.classList.add('sobe')},300);intro(function(){ign.classList.add('acende')},1240);intro(function(){ign.classList.add('flash')},1520);intro(ligar,1760)}
 ign.addEventListener('pointerdown',function(e){e.stopPropagation();audioIniciar();audioAcordar();pulaIgn()});
 /* iOS: sem isto o pinça/arrasto rola ou dá zoom na página */
 function semGesto(e){if(e.cancelable)e.preventDefault()}

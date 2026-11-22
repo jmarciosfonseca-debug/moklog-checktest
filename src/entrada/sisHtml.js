@@ -14,11 +14,11 @@ export const HTML_SIS = `<div class="sisx" id="sisx">
   <div id="logoV"><div>MOK<i>E</i>D</div><small>SIS<sup>+</sup></small></div>
   <div class="sis-hint" id="hint">Segure o dedo num ícone</div>
   <div class="sis-dica" id="dica"></div>
-  <div class="sis-info"><b>SIS⁺ · Sistema Integrado de Segurança</b><span>o software por trás do hardware</span></div>
+  <div class="sis-info"><b>SIS⁺ · Sistema Integrado de Segurança</b></div>
   <button class="btn-entrar" id="entrar">Entrar</button>
   <div class="sis-dots" id="dots"></div>
   <div class="sis-leg"><span><i style="background:#94a3b8"></i>Equipamentos</span><span><i style="background:#7dd3fc"></i>Pessoas</span><span><i style="background:#fde68a"></i>Procedimentos</span></div>
-  <div class="sis-ign" id="ign" aria-hidden="true"><div class="sis-frase"><p>o software</p><p>por trás</p><p>do hardware</p></div><div class="sis-dot"></div><div class="sis-flash"></div></div>
+  <div class="sis-ign" id="ign" aria-hidden="true"><div class="sis-dot"></div><div class="sis-flash"></div></div>
   <div class="card" id="card"><div class="k" id="ck"></div><h3 id="ct"></h3><p id="cd"></p><div class="lb">Alimenta no app</div><div class="chips" id="cf"></div><div class="acoes"><button id="cx">Fechar</button><button class="pri" id="ce">Entrar</button></div></div>
 </div>
 
@@ -31,20 +31,29 @@ export const HTML_SIS = `<div class="sisx" id="sisx">
     <div class="hist" id="hist">
       <div class="esp"><div class="tit"><b>História da Moked</b><span>De Israel para o Brasil</span><div class="rola" id="rola">role<i></i></div></div></div>
       <article class="cap" id="cap1">
-        <div class="kk">Capítulo I · Origem</div><div class="yr">30+</div><h2>Nasce com um método</h2>
-        <p>A MOKED traz uma metodologia de <b>origem israelense</b>. São <b>mais de três décadas</b> de prática aplicada à gestão de riscos, crises e prevenção de perdas.</p>
+        <div class="kk">Capítulo I · Fundação</div><div class="yr">1995</div><h2>Nasce a Moked do Brasil</h2>
+        <p>Em <b>1995</b>, <b>Yehuda Carmi</b>, Tenente-Coronel das Forças Armadas de Israel, funda a Moked do Brasil: uma consultoria de segurança de <b>origem israelense</b>, com know-how e expertise em segurança.</p>
       </article>
       <article class="cap" id="cap2">
-        <div class="kk">Capítulo II · Evolução</div><h2>Do projeto à operação</h2>
-        <p>Começou projetando sistemas e dando apoio técnico-administrativo. Passou a gerir o que projeta: <b>Sistemas Integrados de Segurança (SIS)</b>, <b>Departamentos de Segurança Empresarial (DSE)</b>, <b>CCOs</b> e monitoramento contínuo. Da planta ao dia a dia.</p>
+        <div class="kk">Capítulo II · Vigilância</div><div class="yr">2000</div><h2>Central 24 horas</h2>
+        <p>Nasce a <b>Moked On-line</b>, a central de monitoramento 24 horas. Antes, em 1996 e 1997, a marca ganha o primeiro logotipo e a versão em preto, vermelho e branco.</p>
       </article>
       <article class="cap" id="cap3">
-        <div class="kk">Capítulo III · Método</div><h2>Reverse Control®</h2>
-        <p>O risco não é a invasão. É a <b>saída irregular</b>. O Reverse Control® troca a revista física por validação sistêmica. Soma-se o <b>KeyAccess</b>, no controle de acesso, e o <b>dimensionamento de efetivo</b> pelo risco real de cada operação.</p>
+        <div class="kk">Capítulo III · Qualidade</div><div class="yr">2005</div><h2>Gestão certificada</h2>
+        <p>Chega o selo <b>ISO 9001:2000</b>: a única consultoria de segurança do Brasil com essa certificação. Em 2010 é homologado o <b>Selo de Qualidade Moked de Segurança Internacional</b>. Hoje a gestão é certificada pelas <b>ISO 9001:2015</b> e <b>ISO 37001:2016</b> (antissuborno).</p>
       </article>
       <article class="cap" id="cap4">
-        <div class="kk">Capítulo IV · Especialização</div><h2>Cada setor pede um jeito</h2>
-        <p><b>MokLog</b> para condomínios logísticos multiusuário. <b>MokVip</b> para pessoas e eventos. Mesma base metodológica, aplicação vertical.</p>
+        <div class="kk">Capítulo IV · Tecnologia</div><div class="yr">2007</div><h2>Tecnologia própria</h2>
+        <p>Nasce a área de tecnologia interna, para criar <b>sistemas próprios e aplicativos</b> de apoio à gestão e à tomada de decisões.</p>
+      </article>
+      <article class="cap" id="cap5">
+        <div class="kk">Capítulo V · Atuação</div><h2>Do projeto à gestão</h2>
+        <p>Consultoria, projeção, gestão e DSE: a Moked concebe, projeta, implanta, opera e gere <b>Sistemas Integrados de Segurança (SIS)</b>, com foco na inteligência do sistema e na gestão de riscos e crises.</p>
+        <div class="icos" id="icos"></div>
+      </article>
+      <article class="cap" id="cap6">
+        <div class="kk">Capítulo VI · Especialização</div><h2>Cada setor pede um jeito</h2>
+        <p>A mesma base ganha aplicação por vertical. Na logística, a <b>MokLog</b> usa o <b>Reverse Control®</b>: o risco é a saída irregular, e a validação sistêmica substitui a revista física.</p>
         <div class="divs">
           <div class="dv"><b><i></i>MokLog</b><span>Condomínios logísticos</span></div>
           <div class="dv"><b><i></i>MokPat</b><span>Patrimonial</span></div>
@@ -52,22 +61,16 @@ export const HTML_SIS = `<div class="sisx" id="sisx">
           <div class="dv"><b><i></i>MokVip</b><span>Pessoas e eventos</span></div>
         </div>
       </article>
-      <article class="cap" id="cap5">
-        <div class="kk">Capítulo V · Governança</div><h2>Gestão certificada</h2>
-        <p><b>ISO 9001:2015</b>, de gestão da qualidade, e <b>ISO 37001:2016</b>, de gestão antissuborno. O processo é auditável por dentro e por fora.</p>
-      </article>
-      <article class="cap" id="cap6">
-        <div class="kk">Capítulo VI · Futuro</div><h2>O software por trás do hardware</h2>
-        <p>Inteligência artificial e auditoria digital entram na rotina: o dado sai do campo registrado e auditável. A lógica não muda: ser o <b>software por trás do hardware</b> da operação do cliente.</p>
-        <div class="icos" id="icos"></div>
+      <article class="cap" id="cap7">
+        <div class="kk">Capítulo VII · Agora</div><div class="yr">2026</div><h2>Moked 4.0 · Era da IA</h2>
+        <p>A Moked lança a <b>Moked 4.0</b>, a Era da IA: inteligência artificial integrada à camada de inteligência generativa.</p>
       </article>
       <div class="resumo">
         <h3>Em resumo</h3>
-        <p>A <b>MOKED Security Consulting</b> (MOKED do Brasil) nasceu de um método de origem israelense: mais de três décadas aplicando, na prática, a gestão de riscos, crises e prevenção de perdas.</p>
-        <p>Começou projetando sistemas e dando apoio técnico-administrativo. Hoje gere <b>Sistemas Integrados de Segurança (SIS)</b>, <b>Departamentos de Segurança Empresarial (DSE)</b>, <b>CCOs</b> e monitoramento contínuo: projeta, implanta, opera e audita.</p>
-        <p>O <b>Reverse Control®</b> tira a segurança da revista física e a coloca na validação sistêmica, porque o risco não é a invasão, é a saída irregular. Soma-se o <b>KeyAccess</b>, no controle de acesso, e o dimensionamento de efetivo pelo risco real. Essa base ganha especialização por vertical: <b>MokLog</b> para logística e <b>MokVip</b> para pessoas e eventos.</p>
-        <p>A gestão é certificada pelas <b>ISO 9001:2015</b> e <b>ISO 37001:2016</b>. A modernização, com inteligência artificial e auditoria digital, segue uma regra simples:</p>
-        <div class="fim">Ser o software por trás do hardware da operação do cliente.</div>
+        <p>A <b>MOKED do Brasil</b> foi fundada em <b>1995</b> por <b>Yehuda Carmi</b>, Tenente-Coronel das Forças Armadas de Israel: uma consultoria de segurança de origem israelense, com mais de três décadas de atuação.</p>
+        <p>Criou a central <b>Moked On-line</b> (2000), conquistou a <b>ISO 9001</b> (2005), montou a própria área de tecnologia (2007) e hoje é certificada pelas <b>ISO 9001:2015</b> e <b>ISO 37001:2016</b>.</p>
+        <p>Concebe, projeta, implanta, opera e gere <b>Sistemas Integrados de Segurança (SIS)</b> e <b>Departamentos de Segurança Empresarial (DSE)</b>, com <b>MokLog</b> para centros logísticos, <b>MokPat</b> para instalações e <b>MokVip</b> para pessoas. Em 2026, a <b>Moked 4.0</b> traz a inteligência artificial para o sistema. Tudo a serviço de uma missão:</p>
+        <div class="fim">Proteger vidas e bens com eficiência e eficácia, proporcional aos riscos e ao menor custo possível.</div>
         <button class="btn-entrar btn-fim" id="entrar2" type="button">Entrar nas Áreas</button>
       </div>
     </div>

@@ -135,11 +135,7 @@ button{font:inherit;color:inherit}
 .sis-ign.sobe .sis-dot{transform:translateY(0) scale(1);opacity:1}
 .sis-ign.acende .sis-dot{transform:translateY(0) scale(2.4);box-shadow:0 0 60px 24px rgba(255,255,255,.95);transition:transform .35s ease-in,box-shadow .35s}
 .sis-flash{position:absolute;inset:0;background:#fff;opacity:0;transition:opacity .22s ease-in}.sis-ign.flash .sis-flash{opacity:1}.sis-ign.apaga .sis-flash{opacity:0;transition:opacity .75s ease-out}
-.sis-frase{position:absolute;left:0;right:0;top:50%;margin-top:-21vmin;text-align:center;transform-style:preserve-3d;animation:sisFrase 2.5s cubic-bezier(.55,0,.25,1) .1s both;will-change:transform,opacity;pointer-events:none}
-.sis-frase p{margin:0;font-weight:900;line-height:1.02;letter-spacing:-.02em;font-size:clamp(40px,11.5vw,128px);color:#E50914;text-shadow:0 1px 0 #c0070f,0 2px 0 #b0060e,0 3px 0 #a0060d,0 4px 0 #90050c,0 5px 0 #80050b,0 6px 0 #70040a,0 12px 22px rgba(0,0,0,.65),0 0 46px rgba(229,9,20,.45)}
-@media (min-width:1024px){.sis-frase p{font-size:clamp(64px,8.2vw,150px)}}
-@keyframes sisFrase{0%{transform:translate3d(0,0,520px) rotateX(-10deg);opacity:0}16%{opacity:1;transform:translate3d(0,0,160px) rotateX(-4deg)}46%{opacity:1;transform:translate3d(0,0,0) rotateX(0deg)}100%{opacity:0;transform:translate3d(0,-10%,-2800px) rotateX(16deg)}}
-@media (prefers-reduced-motion:reduce){.sis-frase{display:none}.sisx{transition:opacity .2s}.sisx.saindo{transform:none;filter:none}}
+@media (prefers-reduced-motion:reduce){.sisx{transition:opacity .2s}.sisx.saindo{transform:none;filter:none}}
 /* PC: a barra de abas e o texto acompanham a coluna; foco visível no teclado */
 .tabs{max-width:420px}
 button:focus-visible{outline:2px solid #ff6a70;outline-offset:2px}

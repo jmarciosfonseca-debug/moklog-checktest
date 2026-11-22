@@ -66,7 +66,6 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
   if (etapa === "splash") return <main style={veioDaAbertura.current ? { ...fundo, animation: "mkFadeIn .6s ease" } : fundo} className="mk-entrada" data-testid="entrada-splash">
     <div className="mk-entrada-hero">
       <img src={logo} alt="Moked Security Consulting" style={{ width: "min(78vw, 360px)", borderRadius: 18, padding: "18px 22px", background: "#0b0f19", boxShadow: "0 0 0 1px #475569" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-      <div className="mk-frase" data-testid="entrada-frase"><b>MOKED</b> · o software por trás do hardware</div>
       <div className="mk-so-pc">
         <h1>Moked <span>CheckTest</span></h1>
         <p>A operação de segurança de cada projeto em um só lugar: testes, equipe, rondas e a nota que explica como o projeto está hoje.</p>

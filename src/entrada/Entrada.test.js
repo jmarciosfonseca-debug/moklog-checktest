@@ -57,17 +57,18 @@ test("etapaInicial='areas' (voltar de dentro de uma área) abre direto na escolh
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
-test("abertura mostra a frase da marca e o mostrador decorativo", async () => {
+test("tela inicial de reserva: logo e mostrador decorativo, sem a frase \"software por trás do hardware\"", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   try {
     await act(async () => root.render(<Entrada onEscolher={() => {}} />));
-    expect(host.querySelector('[data-testid="entrada-frase"]').textContent).toMatch(/o software por trás do hardware/);
+    expect(host.querySelector('[data-testid="entrada-frase"]')).toBeNull();
+    expect(host.textContent).not.toMatch(/software por trás do hardware/);
     expect(host.querySelector('[data-testid="mostrador-sis"]').className).toContain("scan");
     expect(botao(host, "Entrar")).toBeTruthy();
   } finally { act(() => root.unmount()); host.remove(); }
 });
 
-test("abertura do SIS toca quando pedida (frase → órbita) e Enter leva direto às Áreas", async () => {
+test("abertura do SIS toca quando pedida (bolinha → órbita) e Enter leva direto às Áreas", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   try {
     await act(async () => root.render(<Entrada onEscolher={() => {}} comAbertura />));
@@ -78,7 +79,7 @@ test("abertura do SIS toca quando pedida (frase → órbita) e Enter leva direto
     expect(sr.querySelectorAll("[data-no]").length).toBe(11); // componentes do SIS, não as divisões
     expect(sr.textContent).toMatch(/Sistema Integrado de Segurança/);
     expect(botao(host, "Entrar")).toBeFalsy(); // o botão "Entrar" da órbita fica dentro da abertura, não no app
-    expect(sr.querySelector(".sis-ign .sis-frase").textContent).toBe("o softwarepor trásdo hardware"); // a frase da marca abre a sequência
+    expect(sr.querySelector(".sis-ign .sis-dot")).not.toBeNull(); expect(sr.querySelector(".sis-frase")).toBeNull(); // a sequência abre só com a bolinha branca
     await act(async () => { ab.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await new Promise((r) => setTimeout(r, 700)); });
     expect(host.querySelector('[data-testid="entrada-abertura"]')).toBeNull();
     expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();

@@ -1,6 +1,5 @@
 // Abertura SIS⁺ (Marcio, 20–21/11/2026), versão aprovada na prévia:
-//  0) A frase "o software por trás do hardware" surge em vermelho, em 3D, e recua para o fundo.
-//  1) Ignição: uma bolinha branca sobe, acende e a tela ofusca e liga. Tocar durante a ignição pula para a órbita.
+//  1) Ignição (sem frase, 22/11/2026): uma bolinha branca sobe, acende e a tela ofusca e liga. Tocar durante a ignição pula para a órbita.
 //  2) SIS em órbita 3D: os componentes do Sistema Integrado de Segurança giram em torno do MOKED SIS⁺ (arraste para girar).
 //     - Segurar um ícone: o anel enche e abre o cartão do que ele alimenta no app.
 //     - Segurar o MOKED (ou afastar dois dedos / rolar o mouse sobre ele): plasma, explosão, túnel e a História da Moked
