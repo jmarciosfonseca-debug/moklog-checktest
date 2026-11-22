@@ -60,7 +60,7 @@ export default function Entrada({ onEscolher, logo = LOGO_MOKED_URL, video = VID
 
   useEffect(() => { if (etapa !== "video") return undefined; tocar(); const t = setTimeout(fimVideo, 25000); return () => clearTimeout(t); }, [etapa]); // nunca prende o usuário
 
-  if (etapa === "abertura") return <AberturaSIS onFim={() => { setEtapa("areas"); if (onAberturaFim) onAberturaFim(); }} />; // órbita do SIS → qualquer toque vai às Áreas (sem "Entrar")
+  if (etapa === "abertura") return <AberturaSIS onFim={() => { setEtapa("areas"); if (onAberturaFim) onAberturaFim(); }} />; // órbita do SIS: "Entrar", toque fora dos ícones, Enter ou Espaço vão às Áreas
 
   // No computador (padrão de site): marca e texto à esquerda, acesso à direita. No celular: como sempre, tudo centralizado.
   if (etapa === "splash") return <main style={veioDaAbertura.current ? { ...fundo, animation: "mkFadeIn .6s ease" } : fundo} className="mk-entrada" data-testid="entrada-splash">

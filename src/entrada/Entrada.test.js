@@ -1,7 +1,8 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import Entrada from "./Entrada";
-beforeAll(() => { global.IS_REACT_ACT_ENVIRONMENT = true; });
+beforeAll(() => { global.IS_REACT_ACT_ENVIRONMENT = true; jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null); }); // jsdom não desenha canvas: a abertura tolera isso
+afterAll(() => { jest.restoreAllMocks(); });
 beforeEach(() => { sessionStorage.clear(); });
 const clicar = async (el) => { expect(el).toBeTruthy(); await act(async () => el.dispatchEvent(new MouseEvent("click", { bubbles: true }))); };
 const botao = (host, t) => [...host.querySelectorAll("button")].find((b) => b.textContent.includes(t) || b.getAttribute("aria-label") === t);
@@ -66,17 +67,18 @@ test("abertura mostra a frase da marca e o mostrador decorativo", async () => {
   } finally { act(() => root.unmount()); host.remove(); }
 });
 
-test("abertura do SIS toca quando pedida e qualquer toque leva direto às Áreas (sem Entrar)", async () => {
+test("abertura do SIS toca quando pedida (frase → órbita) e Enter leva direto às Áreas", async () => {
   const host = document.createElement("div"); document.body.appendChild(host); const root = createRoot(host);
   try {
     await act(async () => root.render(<Entrada onEscolher={() => {}} comAbertura />));
     const ab = host.querySelector('[data-testid="entrada-abertura"]');
     expect(ab).not.toBeNull();
     expect(host.querySelector('[data-testid="entrada-splash"]')).toBeNull();
-    expect(ab.querySelectorAll("[data-no]").length).toBe(11); // componentes do SIS, não as divisões
-    expect(ab.textContent).toMatch(/Sistema Integrado de Segurança/);
-    expect(botao(host, "Entrar")).toBeFalsy();
-    expect(ab.querySelector(".sis-frase").textContent).toBe("o softwarepor trásdo hardware"); // a frase da marca abre a sequência
+    const sr = ab.shadowRoot; expect(sr).not.toBeNull(); // a abertura vive num Shadow DOM (estilo isolado do app)
+    expect(sr.querySelectorAll("[data-no]").length).toBe(11); // componentes do SIS, não as divisões
+    expect(sr.textContent).toMatch(/Sistema Integrado de Segurança/);
+    expect(botao(host, "Entrar")).toBeFalsy(); // o botão "Entrar" da órbita fica dentro da abertura, não no app
+    expect(sr.querySelector(".sis-ign .sis-frase").textContent).toBe("o softwarepor trásdo hardware"); // a frase da marca abre a sequência
     await act(async () => { ab.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); await new Promise((r) => setTimeout(r, 700)); });
     expect(host.querySelector('[data-testid="entrada-abertura"]')).toBeNull();
     expect(host.querySelector('[data-testid="entrada-areas"]')).not.toBeNull();
