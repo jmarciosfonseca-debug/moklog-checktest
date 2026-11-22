@@ -19,6 +19,11 @@ button{font:inherit;color:inherit}
 .sis-orb{position:absolute;left:0;top:0;border-radius:50%;display:grid;place-items:center;text-align:center;pointer-events:none;background:radial-gradient(circle at 50% 38%,rgba(42,13,18,calc(1 - var(--p,0)*.93)),rgba(10,10,14,calc(1 - var(--p,0)*.9)) 72%);border:1px solid #ff1e2766;box-shadow:0 0 40px rgba(255,30,39,.32),inset 0 0 calc(28px + var(--p,0)*40px) rgba(255,30,39,calc(.14 + var(--p,0)*.5))}
 .sis-glow{position:absolute;left:0;top:0;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,30,39,.62) 0,rgba(255,30,39,.26) 26%,rgba(255,30,39,.08) 48%,rgba(255,30,39,0) 68%);opacity:.3;will-change:opacity,transform}
 .sis-orb::after{content:"";position:absolute;inset:-10%;border-radius:50%;border:1px solid #ff1e2733;animation:sisPulso 3.2s ease-out infinite}
+.sis.limpa .sis-orb::after{border:2px solid #ff3a40aa;animation:sisPulso 1.9s ease-out infinite}
+.sis.limpa .sis-orb::before{content:"";position:absolute;inset:-34%;border-radius:50%;pointer-events:none;z-index:-1;background:radial-gradient(circle,rgba(255,40,48,.6) 0,rgba(255,40,48,.24) 42%,rgba(255,40,48,0) 70%);animation:sisBate 1.9s ease-in-out infinite}
+.sis.limpa .sis-orb>div{animation:sisBateTxt 1.9s ease-in-out infinite}
+@keyframes sisBate{0%,100%{transform:scale(.82);opacity:.45}18%{transform:scale(1.18);opacity:1}36%{transform:scale(.95);opacity:.6}52%{transform:scale(1.08);opacity:.85}}
+@keyframes sisBateTxt{0%,100%{transform:scale(1)}18%{transform:scale(1.06)}36%{transform:scale(1)}52%{transform:scale(1.03)}}
 @keyframes sisPulso{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.4);opacity:0}}
 .sis-logo{font-weight:700;letter-spacing:.28em;padding-left:.28em;font-size:var(--lf,18px)}.sis-logo b{color:#FF1E27}
 .sis-orb small{display:block;font-size:calc(var(--lf,18px)*.42);letter-spacing:.3em;color:#9ca3af;margin-top:3px}
@@ -42,7 +47,7 @@ button{font:inherit;color:inherit}
 .sis-leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
 .sis-info{position:absolute;left:0;right:0;bottom:calc(112px + env(safe-area-inset-bottom,0px));text-align:center;padding:0 24px;pointer-events:none}
 .sis-info b{display:block;font-size:15px;letter-spacing:.06em}.sis-info span{display:block;font-size:12px;color:#9ca3af;margin-top:3px}
-.btn-entrar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(54px + env(safe-area-inset-bottom,0px));background:#B91C1C;color:#fff;border:none;padding:11px 34px;font-weight:900;letter-spacing:2.5px;font-size:12px;text-transform:uppercase;cursor:pointer;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+.btn-entrar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(54px + env(safe-area-inset-bottom,0px));background:rgba(185,28,28,.38);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:inset 0 0 0 1px rgba(255,90,80,.55);color:#fff;border:none;padding:11px 34px;font-weight:900;letter-spacing:2.5px;font-size:12px;text-transform:uppercase;cursor:pointer;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
 .btn-entrar:active{filter:brightness(1.15)}
 .sis.foco .btn-entrar,.sis.foco .sis-info{opacity:0;pointer-events:none}
 /* cartão do ícone */
@@ -125,7 +130,7 @@ button{font:inherit;color:inherit}
 #wflash{position:absolute;inset:0;z-index:30;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 43%,#fff 0,#e8f4ff 38%,#a9d4ff 100%)}
 .som{position:absolute;left:12px;top:calc(8px + env(safe-area-inset-top,0px));font-size:9px;letter-spacing:.18em;color:#9ca3af;border:1px solid #2a2f3f;border-radius:99px;padding:3px 9px;background:#0d0f16;z-index:5;cursor:pointer}
 .som.off{opacity:.5;text-decoration:line-through}
-@media (prefers-reduced-motion:reduce){.sis-orb::after{animation:none}.dive,.dive.on{transition:opacity .2s}}
+@media (prefers-reduced-motion:reduce){.sis:not(.limpa) .sis-orb::after{animation:none}.dive,.dive.on{transition:opacity .2s}}
 
 /* ───────── contêiner, saída e ignição (a abertura que já estava no app) ───────── */
 .sisx{position:absolute;inset:0;overflow:hidden;background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;-webkit-text-size-adjust:100%;--gut:max(0px,calc((100% - 520px)/2));transition:opacity .6s ease,transform .6s cubic-bezier(.5,0,.8,.3),filter .6s}

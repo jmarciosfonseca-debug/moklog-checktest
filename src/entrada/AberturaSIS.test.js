@@ -181,3 +181,10 @@ test("abertura limpa (padrão, 22/11/2026): sem satélites; só o MOKED, que ao 
     expect(c.onFim).not.toHaveBeenCalled(); // segurar o MOKED não é "entrar": dispara a viagem
   } finally { await c.fechar(); }
 });
+
+test("abertura limpa: o centro pulsa (mesmo com animações reduzidas) e o Entrar é translúcido", () => {
+  const { CSS_SIS } = require("./sisCss");
+  expect(CSS_SIS).toContain("@keyframes sisBate{"); expect(CSS_SIS).toContain(".sis.limpa .sis-orb::before{");
+  expect(CSS_SIS).toMatch(/\.btn-entrar\{[^}]*background:rgba\(185,28,28,\.38\)/);
+  expect(CSS_SIS).not.toMatch(/prefers-reduced-motion:reduce\)\{\.sis-orb::after\{animation:none/);
+});
