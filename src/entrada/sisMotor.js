@@ -285,7 +285,7 @@ function abrirHistoria(cine){
 }
 function mergulhar(){abrirHistoria(false)}
 function voltar(){
-  if(!mergulhando)return;dive.classList.remove('on');bgVivo=false;univVivo=false;cenaPara();
+  if(!mergulhando)return;dive.classList.remove('on');bgVivo=false;univVivo=false;if(u3)u3.pausar();cenaPara();
   orbVivo=true;ultimo=0;raf=requestAnimationFrame(quadro);
   after(function(){sis.classList.remove('mergulho');},180);
   after(function(){dive.hidden=true;mergulhando=false},760)
@@ -301,9 +301,10 @@ $$('.tab').forEach(function(b){b.addEventListener('click',function(){irAba(b.get
 function irAba(a,primeira){
   abaAtual=a;$$('.tab').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-a')===a)});
   $$('.pn').forEach(function(p){p.classList.toggle('on',p.id==='p-'+a)});
-  univVivo=(a==='univ');
+  univVivo=(a==='univ')&&!u3;
+  if(u3){if(a==='univ')u3.retomar();else u3.pausar()}
   if(a==='hist'){cenaLigar()}else{cenaPara()}
-  if(a==='univ'){if(!uni)uniIniciar();uniFechar();uniVoo(true);requestAnimationFrame(univLoop)}
+  if(a==='univ'){if(!uni)uniIniciar();uniFechar();uniVoo(true);requestAnimationFrame(univLoop);u3Tentar()}
   if(a==='hist')after(efeitoHist,30)
 }
 
@@ -399,6 +400,16 @@ $('#icos').innerHTML=['cftv','pessoas','pop'].map(function(k,i){return '<div><di
 
 /* ═════ UNIVERSO ═════ */
 var uc=$('#uni'),ux=ctx2d(uc),univVivo=false;
+// 24/11/2026 (Marcio): Universo em 3D 360°. Carrega sob demanda; sem WebGL (ou se falhar) fica o Universo 2D abaixo.
+var u3=null,u3pend=false,u3falhou=false;
+function u3Tentar(){
+  if(u3||u3pend||u3falhou||!opc.universo3d)return;u3pend=true;
+  Promise.resolve().then(opc.universo3d).then(function(m){u3pend=false;if(morto)return;
+    var novo=m&&m.iniciarUniverso3D?m.iniciarUniverso3D({raiz:$('.univ'),dados:{MODS:UN,LIG:LIG}}):null;
+    if(!novo){u3falhou=true;return}
+    u3=novo;box.classList.add('u3');univVivo=false;if(abaAtual!=='univ'||!mergulhando)u3.pausar();
+  }).catch(function(){u3pend=false;u3falhou=true});
+}
 var UN=[
  ['grav','eq','Tempo de gravação','Quanto tempo cada câmera guarda de imagem, por projeto.'],
  ['body','eq','Câmeras e bodycam','Câmeras do projeto e o uso de bodycam.'],
@@ -549,6 +560,7 @@ raf=requestAnimationFrame(quadro);
 host.__sis={mergulhar:mergulhar,seq:function(){return seq?{u:(performance.now()-seq.t0)/1000,aberto:seq.aberto}:null},entrando:function(){return entrando},irAba:irAba,voltar:voltar,abrirCard:abrirCard,explodir:function(){explodir(performance.now())},estado:function(){return{foco:foco,mergulhando:mergulhando,aba:abaAtual,nodes:uni?uni.nodes.length:0,lido:nLido,boom:!!boom,ccP:ccP,prog:prog.map(function(v){return +v.toFixed(2)})}},uniAbrir:function(id){uniAbrir(byId[id])},nos:function(){return pos.map(function(p){return{x:p.x,y:p.y,z:p.z}})},centro:function(){return{cx:cx,cy:cy,R:R}}};
 
 return function destruir() {
+  if(u3){try{u3.parar()}catch(e){/* já parado */}u3=null}
   if (morto) return; morto = true;
   timers.forEach(clearTimeout);
   try { cancelAnimationFrame(raf); cancelAnimationFrame(cenaRaf); } catch (e) {}

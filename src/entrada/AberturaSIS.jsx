@@ -19,7 +19,7 @@ export default function AberturaSIS({ onFim, satelites = false }) {
   useEffect(() => {
     const el = host.current; if (!el) return undefined;
     const raiz = el.shadowRoot || (el.attachShadow ? el.attachShadow({ mode: "open" }) : el);
-    const parar = iniciarSIS(raiz, el, { satelites, onFim: () => { if (fim.current) fim.current(); } });
+    const parar = iniciarSIS(raiz, el, { satelites, universo3d: () => import("./universo3d"), onFim: () => { if (fim.current) fim.current(); } });
     return () => { parar(); if (raiz !== el) raiz.innerHTML = ""; else el.innerHTML = ""; };
   }, []);
 

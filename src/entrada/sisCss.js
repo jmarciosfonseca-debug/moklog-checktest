@@ -109,6 +109,7 @@ button{font:inherit;color:inherit}
 .uzoom button{min-width:40px;height:40px;border:1px solid #2a2f3f;background:rgba(13,15,22,.86);color:#e5e7eb;border-radius:10px;font-size:20px;line-height:1;cursor:pointer}
 .uzoom button.t{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:0 8px}
 .uzoom button:hover{border-color:#ff1e27;color:#fff}
+.sisx.u3 #uni,.sisx.u3 .uleg,.sisx.u3 .ucont,.sisx.u3 .uzoom,.sisx.u3 .uhint,.sisx.u3 #ucard{display:none}
 .sisx.land .ucont{right:auto;left:12px;top:calc(150px + env(safe-area-inset-top,0px));text-align:left}
 .sisx.land #ucard{left:auto;right:72px;bottom:auto;top:calc(86px + env(safe-area-inset-top,0px));width:340px;max-width:38vw;margin:0}
 .uleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}
