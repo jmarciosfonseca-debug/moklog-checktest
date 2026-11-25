@@ -224,3 +224,13 @@ test("Universo infinito (25/11/2026): dentro do núcleo ficam as áreas e cada �
   expect(src).toContain("entrarSis(sel.area)"); // aproximar de uma área entra nela
   expect(src).toContain("if(f>1&&dT>=MAXD-.01&&dist>MAXD-3){subir();return}"); // afastar além do limite sobe um nível
 });
+
+test("lembranças do Universo (25/11/2026): todo módulo e pilar tem a sua prévia, sempre marcada como ilustração", () => {
+  const fs = require("fs"), path = require("path"); const motor = fs.readFileSync(path.join(__dirname, "sisMotor.js"), "utf8");
+  const { PREVIAS_U3D, previaU3D } = require("./universo3d");
+  const ids = [...motor.slice(motor.indexOf("var UN=["), motor.indexOf("var PIL=")).matchAll(/\n \['([a-z0-9]+)','(eq|pe|pr|out)'/g)].map((m) => m[1]);
+  expect(ids.length).toBe(29);
+  ids.concat(["Peq", "Ppe", "Ppr"]).forEach((id) => { expect(PREVIAS_U3D[id]).toBeTruthy(); const h = previaU3D(id); expect(h).toContain('class="u3-pv"'); expect(h).toContain("ilustração"); });
+  expect(previaU3D("equipe")).toContain('class="ros"'); expect(previaU3D("pops")).toContain("POP · "); expect(previaU3D("tsem")).toContain('class="das"');
+  expect(previaU3D("moked")).toBe(""); expect(previaU3D("moklog")).toBe(""); // núcleo e áreas não têm slide: levam ao próximo nível
+});

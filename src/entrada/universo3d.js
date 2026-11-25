@@ -23,6 +23,46 @@ export const CSS_U3D = `.u3d{position:absolute;inset:0;overflow:hidden;backgroun
 #u3-warp.on{animation:u3warp .9s ease-out}
 @keyframes u3warp{0%{opacity:0;transform:scale(.3)}22%{opacity:1}100%{opacity:0;transform:scale(2.6)}}
 #u3-card .ir{display:inline-block;margin-top:10px;cursor:pointer;border:0;background:linear-gradient(180deg,#d63224,#a0201a);color:#fff;font-weight:700;font-size:12px;letter-spacing:.14em;padding:10px 14px;border-radius:9px;text-transform:uppercase}
+.u3-pv{position:relative;height:92px;margin:8px 0 9px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));overflow:hidden;animation:u3pvIn .5s ease both}
+@keyframes u3pvIn{from{opacity:0;transform:translateY(6px)}}
+.u3-pv>s{position:absolute;right:7px;bottom:4px;font-size:8px;letter-spacing:.14em;color:rgba(255,255,255,.34);text-decoration:none;text-transform:uppercase}
+.u3-pv .ros{display:flex;gap:9px;align-items:center;justify-content:center;height:100%}
+.u3-pv .ros i{width:38px;height:38px;border-radius:50%;border:1px solid rgba(105,195,255,.7);background:radial-gradient(circle at 50% 36%,rgba(255,255,255,.85) 0 21%,transparent 23%),radial-gradient(ellipse at 50% 100%,rgba(255,255,255,.7) 0 42%,transparent 44%),rgba(105,195,255,.14);opacity:.18;animation:u3ros 3.2s ease-in-out infinite}
+@keyframes u3ros{0%,100%{opacity:.18;transform:scale(.92)}18%,34%{opacity:1;transform:scale(1.06)}}
+.u3-pv .lis{position:absolute;left:12px;right:12px;top:0;animation:u3lis 9s linear infinite}
+.u3-pv .lis div{height:23px;line-height:23px;font-size:11.5px;color:#e6eaf2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px dashed rgba(255,255,255,.1)}
+.u3-pv .lis div::before{content:"▸";color:#ffd766;margin-right:7px}
+@keyframes u3lis{from{transform:translateY(8px)}to{transform:translateY(-50%)}}
+.u3-pv .das{display:flex;align-items:center;gap:14px;height:100%;padding:0 14px}
+.u3-pv .das svg{width:64px;height:64px;flex:none}
+.u3-pv .das circle.f{stroke-dasharray:176;stroke-dashoffset:176;animation:u3anel 2.6s ease-out infinite alternate}
+@keyframes u3anel{to{stroke-dashoffset:var(--o,24)}}
+.u3-pv .das b{position:absolute;left:14px;width:64px;text-align:center;font-weight:800;font-size:17px;color:#fff}
+.u3-pv .bar{flex:1;display:flex;align-items:flex-end;gap:5px;height:58px}
+.u3-pv .bar i{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#ff6a6f,rgba(255,90,95,.25));transform-origin:bottom;animation:u3bar 2.4s ease-in-out infinite alternate}
+@keyframes u3bar{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
+.u3-pv .doc{display:flex;justify-content:center;gap:12px;height:100%;align-items:center}
+.u3-pv .doc u{display:block;width:56px;height:74px;border-radius:4px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.07);padding:7px 6px;text-decoration:none;animation:u3doc 4s ease-in-out infinite}
+.u3-pv .doc u:nth-child(2){animation-delay:-1.3s}.u3-pv .doc u:nth-child(3){animation-delay:-2.6s}
+.u3-pv .doc i{display:block;height:3px;margin-bottom:5px;border-radius:2px;background:rgba(255,255,255,.55)}
+.u3-pv .doc i:first-child{background:#ff5a5f;width:60%}.u3-pv .doc i:nth-child(3){width:75%}.u3-pv .doc i:last-child{height:20px;background:linear-gradient(90deg,rgba(255,90,95,.6) 30%,rgba(255,255,255,.2) 30% 55%,rgba(105,195,255,.5) 55%)}
+@keyframes u3doc{0%,100%{transform:translateY(4px) rotate(-3deg);opacity:.55}50%{transform:translateY(-3px) rotate(2deg);opacity:1}}
+.u3-pv .cam{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;height:100%;padding:8px}
+.u3-pv .cam i{position:relative;border:1px solid rgba(154,167,199,.5);border-radius:4px;background:linear-gradient(160deg,rgba(154,167,199,.2),rgba(10,14,22,.3));overflow:hidden}
+.u3-pv .cam i::before{content:"";position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.55);animation:u3scan 2.6s linear infinite}
+.u3-pv .cam i::after{content:"";position:absolute;left:5px;top:5px;width:5px;height:5px;border-radius:50%;background:#ff3b40;animation:u3rec 1.1s steps(1) infinite}
+.u3-pv .cam i:nth-child(2)::before{animation-delay:-.9s}.u3-pv .cam i:nth-child(3)::before{animation-delay:-1.7s}.u3-pv .cam i:nth-child(4)::before{animation-delay:-.4s}
+@keyframes u3scan{from{top:0}to{top:100%}}@keyframes u3rec{50%{opacity:0}}
+.u3-pv .map{position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px) 0 0/100% 18px,linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px) 0 0/22px 100%}
+.u3-pv .map svg{position:absolute;inset:0;width:100%;height:100%}
+.u3-pv .map path{fill:none;stroke:#ffd766;stroke-width:1.6;stroke-dasharray:6 5;animation:u3traco 3s linear infinite}
+@keyframes u3traco{to{stroke-dashoffset:-44}}
+.u3-pv .map circle{fill:#ff5a5f;animation:u3rec 1.6s ease-in-out infinite}
+.u3-pv .sta{display:flex;flex-wrap:wrap;gap:6px;align-content:center;justify-content:center;height:100%;padding:0 10px}
+.u3-pv .sta span{font-size:10.5px;color:#e6eaf2;border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:4px 9px 4px 7px;white-space:nowrap}
+.u3-pv .sta span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#5fd08f;animation:u3rec 2.2s ease-in-out infinite}
+.u3-pv .sta span:nth-child(3n)::before{background:#ffd766;animation-delay:-.7s}.u3-pv .sta span:nth-child(5n)::before{background:#ff5a5f;animation-delay:-1.3s}
+@media (prefers-reduced-motion:reduce){.u3-pv *{animation-duration:8s}}
 #u3-hint{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));text-align:center;font-size:10.5px;letter-spacing:.14em;color:#98a1b3;pointer-events:none;transition:opacity .5s}
 .u3-btns{position:absolute;right:12px;bottom:calc(44px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:7px}
 .u3-btns button{cursor:pointer;min-width:42px;height:42px;padding:0 8px;text-align:center;border:1px solid rgba(255,255,255,.2);background:rgba(10,12,20,.6);border-radius:11px;font-weight:600;font-size:18px;color:#fff;box-shadow:none}
@@ -45,6 +85,29 @@ const HTML_U3D = (n) => `<canvas id="u3-gl"></canvas><div id="u3-lbs"></div>
 <div id="u3-hint">arraste para girar · dois dedos para aproximar · toque num módulo</div>`;
 
 /* eslint-disable */
+// 25/11/2026 (Marcio): cada módulo mostra uma "lembrança" do que ele é: um slide pequeno, translúcido e animado.
+// São ILUSTRAÇÕES (a abertura aparece antes do login): nada de rosto, nome ou número real de projeto.
+var L=function(){return ['lis',[].slice.call(arguments)]},S=function(){return ['sta',[].slice.call(arguments)]};
+export var PREVIAS_U3D={
+ grav:['das',72,'dias'],body:['cam'],peri:['map'],acc:S('Portaria','Catracas','Cancela','Credenciais','Chaves'),ilum:S('Quadrante A','Quadrante B','Docas','Pátio','Gerador'),
+ equip:S('Rádios','Bodycams','Lanternas','Detectores','Veículos'),cco:['cam'],rondav:['cam'],
+ equipe:['ros'],mapaeq:['ros'],mapadia:['ros'],fv:['das',88,'%'],camp:L('Campanha do mês','Reconhecimento da equipe','Ações de engajamento'),lider:['das',94,'%'],
+ tsem:['das',92,'%'],rondad:L('Ronda 06:00 · portaria','Ronda 10:00 · perímetro','Ronda 14:00 · docas','Ronda 18:00 · pátio'),audit:L('Postos e efetivo','Apresentação e uniforme','Procedimentos em uso','Equipamentos do posto'),
+ pops:L('POP · Controle de acesso de veículos','POP · Abertura e fechamento de docas','POP · Ronda perimetral','MNP · Manual de normas e procedimentos','POP · Atendimento a ocorrências'),
+ risco:['doc'],diag:['doc'],ocorr:L('Acesso indevido · registrado','Veículo sem cadastro · tratado','Alarme perimetral · verificado'),sinis:L('Acionamento de ambulância','Colisão no pátio','Registro e comunicação'),
+ entorno:['map'],follow:L('Câmera sem imagem · aguardando manutenção','Cerca do setor B · proposta enviada','Iluminação da doca · concluído'),
+ avisos:L('Follow-ups vencidos','Teste semanal pendente','Mapa do dia não enviado'),nota:['das',87,''],cliente:['das',90,'%'],pdf:['doc'],v360:['doc'],
+ Peq:['cam'],Ppe:['ros'],Ppr:L('Teste Semanal','Ronda Diária','POPs e MNP','Análise de Risco','Follow-ups')
+};
+export function previaU3D(id){var p=PREVIAS_U3D[id];if(!p)return '';var t=p[0],h='';
+ if(t==='ros'){for(var i=0;i<6;i++)h+='<i style="animation-delay:'+(i*.5)+'s"></i>';h='<div class="ros">'+h+'</div>'}
+ else if(t==='lis'){var it=p[1].concat(p[1]);h='<div class="lis">'+it.map(function(x){return '<div>'+x+'</div>'}).join('')+'</div>'}
+ else if(t==='das'){var v=p[1],o=Math.round(176*(1-Math.min(100,v)/100));h='<div class="das"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="5"/><circle class="f" cx="32" cy="32" r="28" fill="none" stroke="#ff5a5f" stroke-width="5" stroke-linecap="round" transform="rotate(-90 32 32)" style="--o:'+o+'"/></svg><b>'+v+(p[2]==='%'?'%':'')+'</b><div class="bar">'+[.5,.8,.6,1,.7,.9].map(function(k,j){return '<i style="height:'+Math.round(k*100)+'%;animation-delay:-'+(j*.4)+'s"></i>'}).join('')+'</div></div>'}
+ else if(t==='doc'){h='<div class="doc">'+[0,1,2].map(function(){return '<u><i></i><i></i><i></i><i></i><i></i></u>'}).join('')+'</div>'}
+ else if(t==='cam'){h='<div class="cam"><i></i><i></i><i></i><i></i></div>'}
+ else if(t==='map'){h='<div class="map"><svg viewBox="0 0 300 92" preserveAspectRatio="none"><path d="M20 70 L70 22 L150 30 L230 16 L280 60 L190 78 L90 80 Z"/><circle cx="70" cy="22" r="4"/><circle cx="230" cy="16" r="4" style="animation-delay:-.5s"/><circle cx="190" cy="78" r="4" style="animation-delay:-1s"/></svg></div>'}
+ else if(t==='sta'){h='<div class="sta">'+p[1].map(function(x){return '<span>'+x+'</span>'}).join('')+'</div>'}
+ return '<div class="u3-pv" data-pv="'+t+'">'+h+'<s>ilustração</s></div>'}
 // 25/11/2026 (Marcio): o núcleo não é vazio e o zoom é infinito. Aproximar do núcleo MOKED leva às ÁREAS (MokLog, MokPat…);
 // aproximar de uma área leva ao SIS dela (pilares e módulos), cujo núcleo leva às áreas de novo. Afastar além do limite sobe um nível.
 export const AREAS_U3D = [["moklog","Log","Condomínios logísticos",1],["mokpat","Pat","Patrimonial",1],["mokvip","Vip","Executivos e eventos",0],["mokres","Res","Residencial",0],["mokimp","Imp","Implantação",1],["moktec","Tec","Tecnologia",0]];
@@ -175,7 +238,7 @@ function acha(x,y){var best=null,bd=1e9;mundo.nodes.forEach(function(n){if(n.min
 function abrir(n){toque();sel=n;tT.copy(n.p);dT=n.g==='c'?3.2:(n.pil||n.g==='ar'?8:6.5);realce(n);
  // olha o módulo de fora para dentro, um pouco de lado, para o pilar não ficar atrás do nome
  if(n.g!=='c'){var dir=n.p.clone().normalize();vy=vp=0;yawT=Math.atan2(dir.x,dir.z)+.55;pitchT=clamp(Math.asin(dir.y)+.25,-1.2,1.2)}
- var h='<div class="k" style="color:#'+('000000'+COR[n.g].toString(16)).slice(-6)+'">'+NOME[n.g]+'</div><h2>'+n.nome+'</h2><p>'+n.desc+(n.g==='ar'&&!n.ativo?' Em breve no app.':'')+'</p>';
+ var h='<div class="k" style="color:#'+('000000'+COR[n.g].toString(16)).slice(-6)+'">'+NOME[n.g]+'</div><h2>'+n.nome+'</h2>'+previaU3D(n.id)+'<p>'+n.desc+(n.g==='ar'&&!n.ativo?' Em breve no app.':'')+'</p>';
  if(n.g==='ar')h+='<button class="ir" data-ir="sis">Entrar em '+n.nome+' ›</button>';
  else if(n.g==='c')h+='<button class="ir" data-ir="'+(mundo.tipo==='sis'?'areas':'sobe')+'">'+(mundo.tipo==='sis'?'Entrar no núcleo ›':'Voltar ao SIS⁺ ›')+'</button>';
  else{var rel=n.rel.filter(function(r){return r.g!=='c'}).slice(0,8);if(rel.length){h+='<div class="ch"><em>LIGADO A</em>';rel.forEach(function(r){h+='<button data-id="'+r.id+'">'+r.nome+'</button>'});h+='</div>'}}
