@@ -407,7 +407,7 @@ function u3Tentar(){
   Promise.resolve().then(opc.universo3d).then(function(m){u3pend=false;if(morto)return;
     var novo=m&&m.iniciarUniverso3D?m.iniciarUniverso3D({raiz:$('.univ'),dados:{MODS:UN,LIG:LIG}}):null;
     if(!novo){u3falhou=true;return}
-    u3=novo;box.classList.add('u3');univVivo=false;if(abaAtual!=='univ'||!mergulhando)u3.pausar();
+    u3=novo;host.__u3=novo;box.classList.add('u3');univVivo=false;if(abaAtual!=='univ'||!mergulhando)u3.pausar();
   }).catch(function(){u3pend=false;u3falhou=true});
 }
 var UN=[

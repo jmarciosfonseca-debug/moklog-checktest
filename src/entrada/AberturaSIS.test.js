@@ -214,3 +214,13 @@ test("Universo 3D (24/11/2026): carregado sob demanda; sem WebGL devolve null e 
   expect(iniciarUniverso3D({ raiz: null, dados })).toBeNull();
   raiz.remove();
 });
+
+test("Universo infinito (25/11/2026): dentro do núcleo ficam as áreas e cada área leva ao SIS dela", () => {
+  const fs = require("fs"), path = require("path"); const src = fs.readFileSync(path.join(__dirname, "universo3d.js"), "utf8");
+  const { AREAS_U3D } = require("./universo3d"); const { DIVISOES } = require("./Entrada");
+  expect(AREAS_U3D.map((a) => a[0])).toEqual(DIVISOES.map((d) => d.id)); // as mesmas áreas da tela "Escolha a sua área"
+  AREAS_U3D.forEach((a) => expect(!!a[3]).toBe(!!DIVISOES.find((d) => d.id === a[0]).ativo));
+  expect(src).toContain("if(mundo.tipo==='sis'&&dist<.42&&tgt.length()<.5){entrarAreas()}"); // aproximar do núcleo atravessa
+  expect(src).toContain("entrarSis(sel.area)"); // aproximar de uma área entra nela
+  expect(src).toContain("if(f>1&&dT>=MAXD-.01&&dist>MAXD-3){subir();return}"); // afastar além do limite sobe um nível
+});
