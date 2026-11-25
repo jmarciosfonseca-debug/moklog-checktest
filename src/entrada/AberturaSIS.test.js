@@ -198,3 +198,19 @@ test("Universo no PC (22/11/2026): botões + − e ver tudo, cartão lateral em 
   expect(src).not.toContain("CAM.k*(e.deltaY<0?1.12:.89)"); // sem salto fixo por evento: o trackpad não dispara o zoom
   expect(src).toContain("if(uDeitada()!==uni.land){uniFechar();uniIniciar()}"); // redimensionar a janela refaz o grafo
 });
+
+test("Universo 3D (24/11/2026): carregado sob demanda; sem WebGL devolve null e o Universo 2D continua", () => {
+  const fs = require("fs"), path = require("path");
+  const motor = fs.readFileSync(path.join(__dirname, "sisMotor.js"), "utf8"), jsx = fs.readFileSync(path.join(__dirname, "AberturaSIS.jsx"), "utf8");
+  expect(jsx).toContain('universo3d: () => import("./universo3d")'); // three não entra no pacote principal
+  expect(motor).toContain("if(!novo){u3falhou=true;return}");
+  const { CSS_SIS } = require("./sisCss"); expect(CSS_SIS).toContain(".sisx.u3 #uni,");
+  const { iniciarUniverso3D, CSS_U3D } = require("./universo3d");
+  expect(CSS_U3D).toContain("#u3-vit"); // sinais vitais do núcleo
+  const raiz = document.createElement("div"); document.body.appendChild(raiz);
+  const dados = { MODS: [["tsem", "pr", "Teste Semanal", "x"], ["avisos", "out", "Painel de Avisos", "y"]], LIG: [["tsem", "avisos"]] };
+  expect(iniciarUniverso3D({ raiz, dados })).toBeNull(); // jsdom não tem WebGL
+  expect(raiz.querySelector(".u3d")).toBeNull(); // não deixa resto na tela
+  expect(iniciarUniverso3D({ raiz: null, dados })).toBeNull();
+  raiz.remove();
+});
