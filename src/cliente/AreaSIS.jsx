@@ -4,6 +4,8 @@ import { ORDEM_PILARES, PILARES, faixa } from "./sis";
 
 // CSS da prévia, escopado em .sx (não vaza para o resto do app).
 export const CSS_SIS = `
+.sx .barra .ico.univ{color:#ff8a8f;border-color:#ff1e2766;animation:sxUniv 2.8s ease-in-out infinite}
+@keyframes sxUniv{0%,100%{box-shadow:0 0 0 #ff1e2700}50%{box-shadow:0 0 14px #ff1e2788}}
 .sx{--bg:#050507;--linha:#2a2a31;--txt:#e5e7eb;--mu:#9ca3af;--mu2:#6b7280;--red:#E50914;--red2:#FF1E27;--ok:#22c55e;--wa:#f59e0b;--or:#f97316;--da:#ef4444;min-height:100vh;background:radial-gradient(120% 60% at 50% -10%,#1d0406 0%,#0a0a0d 45%,#050507 100%);color:var(--txt);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto}
 .sx *{box-sizing:border-box}
 .sx .barra{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:1px solid var(--linha)}
@@ -108,14 +110,17 @@ const valItem = (i) => (i.aDefinir ? 0 : i.valor);
 const corItem = (i, r) => (i.aDefinir ? "#6b7280" : fx(i.valor, r).cor);
 
 // ── Barra superior: ☰ · MOKED · 🔔 ──
-export function Barra({ onMenu, onAvisos, avisos = 0, onAreas }) {
+export function Barra({ onMenu, onAvisos, avisos = 0, onAreas, onUniverso }) {
   return <div className="barra">
     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
       <button className="ico" onClick={onMenu} title="Menu" aria-label="Menu">☰</button>
       {onAreas && <button className="ico" onClick={onAreas} title="Escolher outra área" aria-label="Escolher outra área" data-testid="cliente-areas" style={{ width: "auto", padding: "0 10px", fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>← Áreas</button>}
     </div>
     <div className="logo">MOK<span>E</span>D</div>
-    <button className="ico" onClick={onAvisos} title="Avisos" aria-label={`Avisos: ${avisos}`}>🔔{avisos > 0 && <span className="b">{avisos}</span>}</button>
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {onUniverso && <button className="ico univ" onClick={onUniverso} title="Entrar no universo" aria-label="Entrar no universo" data-testid="cliente-universo">✦</button>}
+      <button className="ico" onClick={onAvisos} title="Avisos" aria-label={`Avisos: ${avisos}`}>🔔{avisos > 0 && <span className="b">{avisos}</span>}</button>
+    </div>
   </div>;
 }
 

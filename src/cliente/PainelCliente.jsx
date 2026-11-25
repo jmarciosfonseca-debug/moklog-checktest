@@ -28,6 +28,8 @@ import { divisaoDoProjeto, DIVISOES } from "../divisoes";
 import { baseSIS, calcularSIS, lerFavoritos, gravarFavoritos } from "./sis";
 import { fraseGravacao } from "../gravacaoSemanal";
 import BotaoRelatorioCameras from "./RelatorioCameras";
+import UniversoCliente from "./UniversoCliente";
+import { itensUniversoCliente } from "./universoItens";
 import { CSS_SIS, Barra, Home, TelaSis, TelaPilar, TelaItem, TelaFavs, TelaMenu, TelaAvisos, TelaComunicar, Macro } from "./AreaSIS";
 const LARANJA = "#f97316";
 const B = "#2a2a31"; // borda padrão do app
@@ -299,6 +301,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   const dadosBase = dadosBruto;
   const dados = useMemo(() => { if (!dadosBase || mesesTurn === 12) return dadosBase; const o = {}; for (const [k, x] of Object.entries(dadosBase)) { const per = x.equipe?.periodos?.[mesesTurn]; o[k] = per ? { ...x, equipe: { ...x.equipe, ...per } } : x; } return o; }, [dadosBase, mesesTurn]);
   const [cartao, setCartao] = useState(null);
+  const [universo, setUniverso] = useState(false); // Universo 3D do cliente (25/11/2026)
   const sisAtual = useMemo(() => (pid && dados?.[pid] ? calcularSIS(dados[pid], gerencial ? reguaId : "cliente") : null), [pid, dados, reguaId, gerencial]);
   const sisOutra = useMemo(() => (gerencial && pid && dados?.[pid] ? calcularSIS(dados[pid], reguaId === "moked" ? "cliente" : "moked") : null), [pid, dados, reguaId, gerencial]);
   const [falhas, setFalhas] = useState({}), [atualizadoEm, setAtualizadoEm] = useState(null), [versao, setVersao] = useState(0);
@@ -408,7 +411,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
   }
 
   return <main className="sx"><style>{CSS_SIS}</style>
-    <Barra onMenu={() => setPilha((s) => (s[s.length - 1] === "menu" ? s.slice(0, -1) : [...s, "menu"]))} onAvisos={() => setPilha((s) => [...s, "avisos"])} avisos={avisos.length} onAreas={onBack} />
+    <Barra onMenu={() => setPilha((s) => (s[s.length - 1] === "menu" ? s.slice(0, -1) : [...s, "menu"]))} onAvisos={() => setPilha((s) => [...s, "avisos"])} avisos={avisos.length} onAreas={onBack} onUniverso={pAtual && !carregando ? () => setUniverso(true) : undefined} />
     {gerencial && <div className="gestor-faixa">Área do Gestor · {reguaId === "moked" ? "régua interna Moked" : "vendo como o cliente"}<button onClick={() => setReguaId(reguaId === "moked" ? "cliente" : "moked")}>{reguaId === "moked" ? "ver como o cliente" : "voltar à régua Moked"}</button></div>}
     <div className="corpo">
       {carregando && <p role="status" className="mu">Lendo os dados dos {termo}…</p>}
@@ -420,5 +423,7 @@ export default function PainelCliente({ PROJECTS, stored, computeHealth, ctmkDat
       {!carregando && tela}
     </div>
     <CartaoIdentidade pessoa={cartao} onFechar={() => setCartao(null)} />
+    {universo && pAtual && <UniversoCliente nome={pAtual.nome} divisao={(() => { try { return DIVISOES[divisaoDoProjeto(pAtual.pid)]?.nome || "MokLog"; } catch { return "MokLog"; } })()} perfilId={escopo?.escopo} perfilNome={gerencial ? "Consultor Moked" : pids.length > 1 ? "Proprietário" : "Gestor do parque"} itens={itensUniversoCliente(pAtual, { plantao, sis: sisAtual, rotuloRisco: pAtual.risco?.nivel ? NIVEL_LABEL[pAtual.risco.nivel] : "" })} onInicio={() => setUniverso(false)}
+      onAcao={(item, acao) => { setUniverso(false); if (acao === "pdf") { const r = pAtual.historico[0]; if (r && abrirPDF) abrirPDF(pAtual.pid, r.report); } else if (acao.startsWith("ver:")) setPilha([acao.slice(4)]); }} />}
   </main>;
 }

@@ -63,6 +63,19 @@ export const CSS_U3D = `.u3d{position:absolute;inset:0;overflow:hidden;backgroun
 .u3-pv .sta span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#5fd08f;animation:u3rec 2.2s ease-in-out infinite}
 .u3-pv .sta span:nth-child(3n)::before{background:#ffd766;animation-delay:-.7s}.u3-pv .sta span:nth-child(5n)::before{background:#ff5a5f;animation-delay:-1.3s}
 @media (prefers-reduced-motion:reduce){.u3-pv *{animation-duration:8s}}
+#u3-itens,#u3-ini{display:none}
+.u3d.cli #u3-itens{display:flex;gap:7px;position:absolute;left:0;right:0;top:calc(10px + env(safe-area-inset-top,0px));padding:0 12px 6px;overflow-x:auto;scrollbar-width:none}
+.u3d.cli #u3-itens button{flex:none;cursor:pointer;font-weight:600;font-size:11.5px;color:#fff;background:rgba(10,12,20,.6);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:7px 11px;white-space:nowrap}
+.u3d.cli #u3-itens button i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.u3d.cli #u3-itens button.on{border-color:#ff5a5f;background:rgba(160,30,24,.5)}
+.u3d.cli #u3-ini{display:block;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));cursor:pointer;font-weight:700;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#fff;background:rgba(10,12,20,.72);border:1px solid rgba(255,90,95,.6);border-radius:999px;padding:11px 20px;box-shadow:0 0 16px rgba(255,59,64,.25)}
+.u3d.cli .u3-leg,.u3d.cli .u3-cnt,.u3d.cli #u3-hint{display:none}
+.u3d.cli #u3-onde{top:calc(54px + env(safe-area-inset-top,0px))}
+.u3d.cli #u3-card,.u3d.cli .u3-btns{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+#u3-card .ln{font-size:12.5px;line-height:1.35;color:#dfe4ee;padding:4px 0;border-top:1px dashed rgba(255,255,255,.1)}
+#u3-card .ac{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#u3-card .ac button{cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:#fff;font-weight:700;font-size:11.5px;letter-spacing:.1em;padding:9px 12px;border-radius:9px;text-transform:uppercase}
+#u3-card .ac button.pri{border:0;background:linear-gradient(180deg,#d63224,#a0201a)}
 #u3-hint{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));text-align:center;font-size:10.5px;letter-spacing:.14em;color:#98a1b3;pointer-events:none;transition:opacity .5s}
 .u3-btns{position:absolute;right:12px;bottom:calc(44px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:7px}
 .u3-btns button{cursor:pointer;min-width:42px;height:42px;padding:0 8px;text-align:center;border:1px solid rgba(255,255,255,.2);background:rgba(10,12,20,.6);border-radius:11px;font-weight:600;font-size:18px;color:#fff;box-shadow:none}
@@ -80,7 +93,7 @@ const HTML_U3D = (n) => `<canvas id="u3-gl"></canvas><div id="u3-lbs"></div>
 <div class="u3-cnt" id="u3-cnt"></div>
 <div id="u3-onde"></div><div id="u3-warp"></div>
 <div id="u3-vit"><b>NÚCLEO MOKED · SINAIS VITAIS</b><canvas id="u3-ecg" width="440" height="92"></canvas><span>CONTINUE APROXIMANDO PARA ENTRAR NAS ÁREAS</span></div>
-<div id="u3-card"></div>
+<div id="u3-itens"></div><div id="u3-card"></div><button type="button" id="u3-ini">⌂ Início</button>
 <div class="u3-btns"><button type="button" id="u3-zi" aria-label="Aproximar">+</button><button type="button" id="u3-zo" aria-label="Afastar">−</button><button type="button" id="u3-zn" class="t">NÚCLEO</button><button type="button" id="u3-zf" class="t">VER TUDO</button></div>
 <div id="u3-hint">arraste para girar · dois dedos para aproximar · toque num módulo</div>`;
 
@@ -111,16 +124,20 @@ export function previaU3D(id){var p=PREVIAS_U3D[id];if(!p)return '';var t=p[0],h
 // 25/11/2026 (Marcio): o núcleo não é vazio e o zoom é infinito. Aproximar do núcleo MOKED leva às ÁREAS (MokLog, MokPat…);
 // aproximar de uma área leva ao SIS dela (pilares e módulos), cujo núcleo leva às áreas de novo. Afastar além do limite sobe um nível.
 export const AREAS_U3D = [["moklog","Log","Condomínios logísticos",1],["mokpat","Pat","Patrimonial",1],["mokvip","Vip","Executivos e eventos",0],["mokres","Res","Residencial",0],["mokimp","Imp","Implantação",1],["moktec","Tec","Tecnologia",0]];
-export function iniciarUniverso3D({ raiz, dados, win = typeof window !== "undefined" ? window : null }) {
+// Modo cliente (25/11/2026): dados.cliente = { nome, itens:[{ id, g, nome, linhas:[texto], acoes:[{ id, rotulo, principal }] }] } monta um único
+// mundo com o que o cliente tem disponível; aoAcao(itemId, acaoId) executa (abrir PDF, ir para a tela) e aoInicio() volta para a área dele.
+export function iniciarUniverso3D({ raiz, dados, aoAcao, aoInicio, win = typeof window !== "undefined" ? window : null }) {
 if (!raiz || !win || !dados) return null;
 // Sonda em um canvas à parte (não gasta o contexto do canvas de verdade nem suja o console onde não há WebGL).
 try { var sonda = raiz.ownerDocument.createElement("canvas"), gl0 = sonda.getContext && (sonda.getContext("webgl2") || sonda.getContext("webgl")); if (!gl0 || typeof gl0.getShaderPrecisionFormat !== "function") return null; } catch (e) { return null; }
 var el = raiz.ownerDocument.createElement("div"); el.className = "u3d"; el.setAttribute("data-testid", "universo-3d");
 el.innerHTML = "<style>" + CSS_U3D + "</style>" + HTML_U3D(dados.MODS.length);
 raiz.appendChild(el);
+var CLI=dados.cliente||null;if(CLI)el.classList.add('cli');
+function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return '&#'+c.charCodeAt(0)+';'})}
 var MODS=dados.MODS,LIG=dados.LIG,AREAS=dados.AREAS||AREAS_U3D,TAU=Math.PI*2,MAXD=34;
-var COR={eq:0x9aa7c7,pe:0x69c3ff,pr:0xffd766,out:0xff5a5f,c:0xff3b40,ar:0xff5a5f,mini:0xffc9c2};
-var NOME={eq:'EQUIPAMENTOS',pe:'PESSOAS',pr:'PROCEDIMENTOS',out:'ENTREGA',c:'NÚCLEO',ar:'ÁREA MOKED'};
+var COR={eq:0x9aa7c7,pe:0x69c3ff,pr:0xffd766,out:0xff5a5f,c:0xff3b40,ar:0xff5a5f,mini:0xffc9c2,eu:0xffffff,topo:0xff3b40};
+var NOME={eq:'EQUIPAMENTOS',pe:'PESSOAS',pr:'PROCEDIMENTOS',out:'ENTREGA',c:'NÚCLEO',ar:'ÁREA MOKED',eu:'VOCÊ',topo:'MOKED'};
 var $=function(i){return el.querySelector('#u3-'+i)},app=el,canvas=$('gl'),renderer;
 try{renderer=new THREE.WebGLRenderer({canvas:canvas,antialias:true,alpha:true,powerPreference:'high-performance'})}catch(e){renderer=null}
 if(!renderer||!renderer.getContext||!renderer.getContext()){el.remove();return null}
@@ -146,6 +163,13 @@ function tx(fn,s){var k=raiz.ownerDocument.createElement('canvas');k.width=k.hei
 var tGlow=tx(function(x,s){var g=x.createRadialGradient(s/2,s/2,0,s/2,s/2,s/2);g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(.22,'rgba(255,255,255,.32)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,s,s)});
 var tRing=tx(function(x,s){x.fillStyle='rgba(6,8,14,.82)';x.beginPath();x.arc(s/2,s/2,s*.4,0,TAU);x.fill();x.strokeStyle='#fff';x.lineWidth=s*.045;x.stroke()},256);
 var tDia=tx(function(x,s){x.translate(s/2,s/2);x.rotate(Math.PI/4);x.fillStyle='rgba(6,8,14,.82)';x.strokeStyle='#fff';x.lineWidth=s*.05;var h=s*.29;x.fillRect(-h,-h,2*h,2*h);x.strokeRect(-h,-h,2*h,2*h)},256);
+// Quem está acessando faz parte do universo: um ponto com a foto (translúcida) ou as iniciais, ligado ao MOKED e ao projeto.
+var cvEu=raiz.ownerDocument.createElement('canvas');cvEu.width=cvEu.height=256;var tEu=new THREE.CanvasTexture(cvEu);
+function pintaEu(img,nome){var x=cvEu.getContext('2d'),s=256;x.clearRect(0,0,s,s);x.save();x.beginPath();x.arc(s/2,s/2,s*.44,0,TAU);x.closePath();x.fillStyle='rgba(10,14,24,.9)';x.fill();x.clip();
+ if(img){var k=Math.max(s/img.width,s/img.height),w=img.width*k,h=img.height*k;x.drawImage(img,(s-w)/2,(s-h)/2,w,h)}
+ else{x.fillStyle='#fff';x.font='800 96px system-ui,sans-serif';x.textAlign='center';x.textBaseline='middle';var ini=String(nome||'?').trim().split(/\s+/).map(function(p){return p[0]}).slice(0,2).join('').toUpperCase();x.fillText(ini||'?',s/2,s/2+6)}
+ x.restore();x.strokeStyle='#fff';x.lineWidth=8;x.beginPath();x.arc(s/2,s/2,s*.44,0,TAU);x.stroke();tEu.needsUpdate=true}
+function fotoEu(url,nome){if(!url){pintaEu(null,nome);return}var im=new win.Image();im.onload=function(){pintaEu(im,nome)};im.onerror=function(){pintaEu(null,nome)};im.src=url}
 function spr(t,col,sc,add){var m=new THREE.SpriteMaterial({map:t,color:col,transparent:true,depthWrite:false,blending:add?THREE.AdditiveBlending:THREE.NormalBlending});var s=new THREE.Sprite(m);s.scale.set(sc,sc,1);return s}
 /* estrelas e poeira: ficam em todos os níveis */
 (function(){var n=nuvem(),r=semente(7),i;for(i=0;i<1600;i++){var u=r()*2-1,a=r()*TAU,q=Math.sqrt(1-u*u),R=60+r()*120;n.pt(V(q*Math.cos(a)*R,u*R,q*Math.sin(a)*R),r()<.15?0xffb0a8:(r()<.3?0xa8c8ff:0xffffff),.5+r()*.9,r()*8,.03+r()*.05,.35)}
@@ -182,6 +206,15 @@ function construir(tipo,area){
   nucleo(n,rnd,1);
   // as áreas, pequenas, já aparecem dentro do núcleo
   AREAS.forEach(function(a,i){var y=1-2*(i+.5)/AREAS.length,q=Math.sqrt(1-y*y),th=i*2.399963,o=add('m_'+a[0],'mini','Mok <em>'+a[1]+'</em>','',V(Math.cos(th)*q*.52,y*.52,Math.sin(th)*q*.52),.05);o.mini=1})
+ }else if(tipo==='cli'){
+  add('moked','c',CLI.nome,'',V(0,0,0),1);
+  CLI.itens.forEach(function(it,i){var k=CLI.itens.length,y=k>1?1-2*(i+.5)/k:0,q=Math.sqrt(1-y*y),th=i*2.399963+.4,o=add(it.id,it.g||'out',it.nome,'',V(Math.cos(th)*q*5.4,y*3.6,Math.sin(th)*q*5.4),.42);o.item=it;liga('moked',it.id,1)});
+  CLI.itens.forEach(function(it,i){if(CLI.itens.length>2)liga(it.id,CLI.itens[(i+1)%CLI.itens.length].id,0)});
+  // o cliente (ou consultor) e a MOKED fazem parte do mesmo universo, ligados ao projeto
+  var topo=add('topo','topo','MOKED','',V(-1.5,6.4,-7.5),.9);topo.item={id:'topo',nome:'MOKED · '+(CLI.divisao||'MokLog'),linhas:['Você está em: Moked › '+(CLI.divisao||'MokLog')+' › '+CLI.nome,'O projeto faz parte do SIS⁺ da Moked: equipamentos, pessoas e procedimentos ligados.'],acoes:[]};
+  var eu=add('eu','eu',(CLI.eu&&CLI.eu.nome)||'Você','',V(4.6,3.1,4.2),.62);eu.item={id:'eu',nome:(CLI.eu&&CLI.eu.nome)||'Você',linhas:['É você neste universo, ligado à Moked e ao projeto.','A foto fica guardada só neste aparelho.'],acoes:[{id:'foto',rotulo:'Escolher foto',principal:true},{id:'sem-foto',rotulo:'Remover foto'}]};
+  liga('topo','moked',1);liga('eu','moked',1);liga('eu','topo',0);fotoEu(CLI.eu&&CLI.eu.foto,eu.nome);
+  nucleo(n,rnd,1)
  }else{
   add('moked','c','MOKED','O centro das áreas. Afaste para voltar ao universo do SIS⁺.',V(0,0,0),.6);
   AREAS.forEach(function(a,i){var y=1-2*(i+.5)/AREAS.length,q=Math.sqrt(1-y*y),th=i*2.399963+.6,o=add(a[0],'ar','Mok'+a[1],a[2],V(Math.cos(th)*q*5.6,y*4.4,Math.sin(th)*q*5.6),.5);o.area=a;o.ativo=!!a[3];liga('moked',a[0],1)});
@@ -192,39 +225,43 @@ function construir(tipo,area){
  M.grupo.add(n.fechar());
  M.nodes.forEach(function(o){var col=o.g==='ar'&&!o.ativo?0x8b94a8:COR[o.g];
   if(o.g==='c'){o.glow=spr(tGlow,0xff2a30,5.4*o.r,true);o.glow.material.opacity=.55;o.glow.position.copy(o.p);M.grupo.add(o.glow)}
-  else{o.glow=spr(tGlow,col,o.r*5.2,true);o.base=o.pil||o.g==='ar'?.5:.34;o.glow.material.opacity=o.base;o.glow.position.copy(o.p);M.grupo.add(o.glow);
-   if(!o.mini){o.ring=spr(o.g==='out'?tDia:tRing,col,o.r*2.3,false);o.ring.position.copy(o.p);o.ring.renderOrder=2;M.grupo.add(o.ring)}}
-  var e=raiz.ownerDocument.createElement('div');e.className='u3-lb'+(o.g==='c'?' c':o.pil?' p':o.g==='out'?' o':o.mini?' m':o.g==='ar'?' a':'');
-  e.innerHTML=o.g==='c'?'MOKED<small>'+(tipo==='sis'?'SIS⁺':'ÁREAS')+'</small>':o.g==='ar'?'Mok <em>'+o.area[1]+'</em><small>'+o.desc+(o.ativo?'':' · em breve')+'</small>':o.nome;lbs.appendChild(e);o.el=e});
+  else{o.glow=spr(tGlow,col,o.r*5.2,true);o.base=o.pil||o.g==='ar'||o.g==='topo'?.5:.34;o.glow.material.opacity=o.base;o.glow.position.copy(o.p);M.grupo.add(o.glow);
+   if(!o.mini){o.ring=spr(o.g==='eu'?tEu:(o.g==='out'?tDia:tRing),col,o.r*2.3,false);o.ring.position.copy(o.p);o.ring.renderOrder=2;M.grupo.add(o.ring)}}
+  var e=raiz.ownerDocument.createElement('div');e.className='u3-lb'+(o.g==='c'?' c':o.pil?' p':o.g==='out'?' o':o.mini?' m':(o.g==='ar'||o.g==='eu'||o.g==='topo')?' a':'');
+  e.innerHTML=tipo==='cli'?(o.g==='c'?esc(o.nome)+'<small>SEU PROJETO</small>':o.g==='topo'?'MOKED<small>'+esc(CLI.divisao||'MokLog')+'</small>':o.g==='eu'?esc(o.nome)+'<small>VOCÊ</small>':esc(o.nome)):o.g==='c'?'MOKED<small>'+(tipo==='sis'?'SIS⁺':'ÁREAS')+'</small>':o.g==='ar'?'Mok <em>'+o.area[1]+'</em><small>'+o.desc+(o.ativo?'':' · em breve')+'</small>':o.nome;lbs.appendChild(e);o.el=e});
  scene.add(M.grupo);return M}
 function desfazer(M){if(!M)return;scene.remove(M.grupo);M.grupo.traverse(function(o){if(o.isPoints)o.geometry.dispose();else if(o.isSprite)o.material.dispose()});M.nodes.forEach(function(o){if(o.el)o.el.remove()})}
 /* ---------- estado ---------- */
 var mundo=null,nivel=0,trava=0,yawT=null,pitchT=null,W=1,H=1,yaw=.5,pitch=.22,dist=19,dT=19,tgt=V(0,0,0),tT=V(0,0,0),vy=0,vp=0,sel=null,tocou=false,ocioso=0,DFIT=19;
 function realce(n){while(hl.children.length){var c=hl.children[0];hl.remove(c);c.geometry.dispose();c.material.dispose()}if(!n)return;mundo.links.forEach(function(L){if(L.a!==n&&L.b!==n)return;var pts=[];for(var i=0;i<=30;i++)pts.push(curva(L,i/30).clone());
  hl.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false})))})}
-function painel(){var s=mundo.tipo==='sis';$('leg').style.display=s?'':'none';
+function painel(){if(mundo.tipo==='cli'){$('onde').textContent='Moked › '+(CLI.divisao||'MokLog')+' › '+CLI.nome;return}var s=mundo.tipo==='sis';$('leg').style.display=s?'':'none';
  $('cnt').innerHTML=s?(mundo.cheio?'<b>'+MODS.length+'</b>módulos<br>conectados':'<b>3</b>pilares<br>módulos em construção'):'<b>'+AREAS.length+'</b>áreas<br>Moked';
  $('onde').textContent=s?(mundo.area?'Moked › Áreas › Mok'+mundo.area[1]+' · SIS⁺':'Moked · SIS⁺'):'Moked › Áreas';
  $('hint').textContent=s?'aproxime do núcleo para entrar nas áreas · afaste para sair':'aproxime de uma área para entrar · afaste para sair'}
 // modo: 'entra' chega de longe e mergulha; 'sai' reaparece perto do ponto de onde saiu e recua
 function trocar(tipo,area,modo,perto){fechar();desfazer(mundo);mundo=construir(tipo,area);trava=.9;yawT=pitchT=null;vy=vp=0;
  var w=$('warp');w.classList.remove('on');void w.offsetWidth;w.classList.add('on');
- var alvo=tipo==='areas'?DFIT*.6:DFIT;
+ var alvo=tipo==='sis'?DFIT:DFIT*.6;
  if(modo==='entra'){tgt.set(0,0,0);tT.set(0,0,0);dist=alvo*2.1;dT=alvo}
  else{var p=perto&&mundo.byId[perto]?mundo.byId[perto].p:V(0,0,0);tgt.copy(p);tT.set(0,0,0);dist=.7;dT=alvo}
  painel()}
 function entrarAreas(){nivel++;trocar('areas',null,'entra')}
 function entrarSis(a){nivel++;trocar('sis',a,'entra')}
 function subir(){nivel--;if(mundo.tipo==='sis')trocar('areas',null,'sai',mundo.area?mundo.area[0]:'moked');else trocar('sis',null,'sai','moked')}
-function zoom(f){toque();if(trava>0)return;if(f>1&&dT>=MAXD-.01&&dist>MAXD-3){subir();return}dT=clamp(dT*f,.12,MAXD)}
+function zoom(f){toque();if(trava>0)return;if(!CLI&&f>1&&dT>=MAXD-.01&&dist>MAXD-3){subir();return}dT=clamp(dT*f,.12,MAXD)}
 function resize(){W=app.clientWidth||1;H=app.clientHeight||1;renderer.setSize(W,H,false);cam.aspect=W/H;cam.fov=W<H?62:50;cam.updateProjectionMatrix();uni.scale.value=H*PR/(2*Math.tan(cam.fov*Math.PI/360));DFIT=W<H?31:19;if(!tocou){dist=dT=DFIT}}
 win.addEventListener('resize',resize);resize();
-mundo=construir('sis',null);painel();
+mundo=construir(CLI?'cli':'sis',null);painel();
+// chegada do cliente: nasce junto ao MOKED e é levado até o projeto dele
+if(CLI){var tp=mundo.byId.topo;tgt.copy(tp.p);tT.copy(tp.p);dist=2.2;dT=4.5;tocou=true;yaw=.2;pitch=.3;win.setTimeout(function(){if(vivo&&!sel){tT.set(0,0,0);dT=DFIT*.6}},1500)}
+if(CLI){var faixa=$('itens');CLI.itens.forEach(function(it){var b=raiz.ownerDocument.createElement('button');b.type='button';b.setAttribute('data-item',it.id);var d=raiz.ownerDocument.createElement('i');d.style.background='#'+('000000'+(COR[it.g]||COR.out).toString(16)).slice(-6);b.appendChild(d);b.appendChild(raiz.ownerDocument.createTextNode(it.nome));b.onclick=function(){abrir(mundo.byId[it.id])};faixa.appendChild(b)});
+ $('ini').onclick=function(){if(aoInicio)aoInicio()}}
 var ptr={},pin0=0,d0=0,lx=0,ly=0,lt=0,mv=0,pinF=1;
 app.addEventListener('pointerdown',function(e){if(e.target.closest('button,#u3-card'))return;ptr[e.pointerId]={x:e.clientX,y:e.clientY};var ids=Object.keys(ptr);if(ids.length===2){var a=ptr[ids[0]],b=ptr[ids[1]];pin0=Math.hypot(a.x-b.x,a.y-b.y);d0=dT;pinF=1}
  lx=e.clientX;ly=e.clientY;lt=win.performance.now();mv=0;vy=vp=0;yawT=pitchT=null;toque();try{app.setPointerCapture(e.pointerId)}catch(_){}});
 app.addEventListener('pointermove',function(e){if(!ptr[e.pointerId])return;ptr[e.pointerId]={x:e.clientX,y:e.clientY};var ids=Object.keys(ptr);
- if(ids.length>=2){var a=ptr[ids[0]],b=ptr[ids[1]];if(pin0>0&&trava<=0){var f=pin0/Math.hypot(a.x-b.x,a.y-b.y);if(f>pinF*1.25&&dT>=MAXD-.01&&dist>MAXD-3){pin0=0;subir()}else{dT=clamp(d0*f,.12,MAXD);if(dT<MAXD-.01)pinF=f}}mv=99;lx=e.clientX;ly=e.clientY;return}
+ if(ids.length>=2){var a=ptr[ids[0]],b=ptr[ids[1]];if(pin0>0&&trava<=0){var f=pin0/Math.hypot(a.x-b.x,a.y-b.y);if(!CLI&&f>pinF*1.25&&dT>=MAXD-.01&&dist>MAXD-3){pin0=0;subir()}else{dT=clamp(d0*f,.12,MAXD);if(dT<MAXD-.01)pinF=f}}mv=99;lx=e.clientX;ly=e.clientY;return}
  var now=win.performance.now(),dx=e.clientX-lx,dy=e.clientY-ly,dt=Math.max(8,now-lt),k=.0052;mv+=Math.abs(dx)+Math.abs(dy);
  yaw-=dx*k;pitch=clamp(pitch+dy*k,-1.45,1.45);vy=.7*vy+.3*(-dx*k/dt*1000);vp=.7*vp+.3*(dy*k/dt*1000);lx=e.clientX;ly=e.clientY;lt=now});
 function solta(e){if(!ptr[e.pointerId])return;delete ptr[e.pointerId];var ids=Object.keys(ptr);if(ids.length){lx=ptr[ids[0]].x;ly=ptr[ids[0]].y;pin0=0;return}
@@ -235,19 +272,27 @@ function toque(){ocioso=0;if(!tocou){tocou=true}}
 var pv=V();
 function tela(n){pv.copy(n.p).project(cam);return{x:(pv.x*.5+.5)*W,y:(-pv.y*.5+.5)*H,z:pv.z}}
 function acha(x,y){var best=null,bd=1e9;mundo.nodes.forEach(function(n){if(n.mini)return;var s=tela(n);if(s.z>1)return;var d=Math.hypot(s.x-x,s.y-y),lim=n.g==='c'||n.g==='ar'?46:30;if(d<lim&&d<bd){bd=d;best=n}});return best}
+function abrirItem(n){var c=$('card'),D=raiz.ownerDocument,it=n.item;c.textContent='';
+ function no(tag,cls,txt){var e=D.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;c.appendChild(e);return e}
+ var k=no('div','k',NOME[n.g]||'');k.style.color='#'+('000000'+(COR[n.g]||COR.out).toString(16)).slice(-6);no('h2','',it.nome);
+ (it.linhas||[]).forEach(function(l){no('div','ln',l)});
+ if((it.acoes||[]).length){var ac=no('div','ac');it.acoes.forEach(function(a){var b=D.createElement('button');b.type='button';b.textContent=a.rotulo;if(a.principal)b.className='pri';b.setAttribute('data-acao',a.id);b.onclick=function(){if(aoAcao)aoAcao(it.id,a.id)};ac.appendChild(b)})}
+ c.classList.add('on');Array.prototype.forEach.call(el.querySelectorAll('#u3-itens button'),function(b){b.classList.toggle('on',b.getAttribute('data-item')===it.id)})}
 function abrir(n){toque();sel=n;tT.copy(n.p);dT=n.g==='c'?3.2:(n.pil||n.g==='ar'?8:6.5);realce(n);
  // olha o módulo de fora para dentro, um pouco de lado, para o pilar não ficar atrás do nome
  if(n.g!=='c'){var dir=n.p.clone().normalize();vy=vp=0;yawT=Math.atan2(dir.x,dir.z)+.55;pitchT=clamp(Math.asin(dir.y)+.25,-1.2,1.2)}
+ if(n.item){abrirItem(n);return}
+ if(CLI){fechar();return}
  var h='<div class="k" style="color:#'+('000000'+COR[n.g].toString(16)).slice(-6)+'">'+NOME[n.g]+'</div><h2>'+n.nome+'</h2>'+previaU3D(n.id)+'<p>'+n.desc+(n.g==='ar'&&!n.ativo?' Em breve no app.':'')+'</p>';
  if(n.g==='ar')h+='<button class="ir" data-ir="sis">Entrar em '+n.nome+' ›</button>';
  else if(n.g==='c')h+='<button class="ir" data-ir="'+(mundo.tipo==='sis'?'areas':'sobe')+'">'+(mundo.tipo==='sis'?'Entrar no núcleo ›':'Voltar ao SIS⁺ ›')+'</button>';
  else{var rel=n.rel.filter(function(r){return r.g!=='c'}).slice(0,8);if(rel.length){h+='<div class="ch"><em>LIGADO A</em>';rel.forEach(function(r){h+='<button data-id="'+r.id+'">'+r.nome+'</button>'});h+='</div>'}}
  var c=$('card');c.innerHTML=h;c.classList.add('on');
  Array.prototype.forEach.call(c.querySelectorAll('button'),function(b){b.onclick=function(){var ir=b.getAttribute('data-ir');if(ir==='sis')entrarSis(n.area);else if(ir==='areas')entrarAreas();else if(ir==='sobe')subir();else abrir(mundo.byId[b.getAttribute('data-id')])}})}
-function fechar(){sel=null;realce(null);$('card').classList.remove('on')}
+function fechar(){sel=null;realce(null);$('card').classList.remove('on');if(CLI)Array.prototype.forEach.call(el.querySelectorAll('#u3-itens button'),function(b){b.classList.remove('on')})}
 $('zi').onclick=function(){zoom(.62)};$('zo').onclick=function(){zoom(1/.62)};
-$('zf').onclick=function(){toque();fechar();tT.set(0,0,0);dT=mundo.tipo==='areas'?DFIT*.6:DFIT};
-$('zn').onclick=function(){toque();fechar();tT.set(0,0,0);dT=mundo.tipo==='sis'?.3:DFIT};
+$('zf').onclick=function(){toque();fechar();tT.set(0,0,0);dT=mundo.tipo==='sis'?DFIT:DFIT*.6};
+$('zn').onclick=function(){toque();fechar();tT.set(0,0,0);dT=mundo.tipo==='sis'?.3:(CLI?2.6:DFIT)};
 /* ---------- ECG ---------- */
 var ecg=$('ecg').getContext('2d');
 function batida(t){var f=(t%1.25)/1.25;return Math.exp(-Math.pow((f-.08)*26,2))+.7*Math.exp(-Math.pow((f-.3)*22,2))}
@@ -267,15 +312,16 @@ function frame(){if(!vivo)return;raf=win.requestAnimationFrame(frame);var dt=Mat
  var perto=mundo.tipo==='sis'&&dc<2.6;$('vit').classList.toggle('on',perto);ecgT+=dt;if(perto&&ecgT>.033){ecgT=0;desenhaEcg(t)}
  renderer.render(scene,cam);
  for(var i=0;i<mundo.nodes.length;i++){var n=mundo.nodes[i],s=tela(n),d=cam.position.distanceTo(n.p),e=n.el,vis=s.z<1&&s.x>-80&&s.x<W+80&&s.y>-40&&s.y<H+40;
-  var show=n.g==='c'?(d>3.4*n.r?1:0):n.mini?clamp((4.2-dc)/1.4,0,1):(n.pil||n.g==='out'||n.g==='ar'?clamp(1.6-d/30,.35,1):(sel&&(n===sel||sel.rel.indexOf(n)>=0)?1:clamp((11-d)/4,0,1)));
+  var show=n.g==='c'?(d>3.4*n.r?1:0):n.mini?clamp((4.2-dc)/1.4,0,1):(n.pil||n.g==='out'||n.g==='ar'||n.g==='eu'||n.g==='topo'||n.item?clamp(1.6-d/30,.35,1):(sel&&(n===sel||sel.rel.indexOf(n)>=0)?1:clamp((11-d)/4,0,1)));
   if(n.mini){n.glow.material.opacity=.75*clamp((4.6-dc)/1.6,0,1)*(.7+.3*b)}
-  else if(n.ring){var pu=n===sel?1+.12*Math.sin(t*5):1;n.ring.scale.setScalar(n.r*2.3*pu);var nf=clamp((d-.8)/1.6,0,1);n.ring.material.opacity=nf;n.glow.material.opacity=n.base*nf}
+  else if(n.ring){var pu=n===sel?1+.12*Math.sin(t*5):1;n.ring.scale.setScalar(n.r*2.3*pu);var nf=clamp((d-.8)/1.6,0,1);n.ring.material.opacity=n.g==='eu'?nf*.72:nf;n.glow.material.opacity=n.base*nf}
   if(!vis||show<=.02){if(e._o!==0){e.style.opacity=0;e._o=0}continue}
   var off=n.g==='c'?0:(n.r*uni.scale.value/PR/Math.max(.2,d))*1.25+6;
   e.style.opacity=show.toFixed(2);e._o=show;e.style.transform='translate3d('+s.x.toFixed(1)+'px,'+(s.y+off).toFixed(1)+'px,0) translate(-50%,'+(n.g==='c'?'-50%':'0')+')'}}
 frame();
 return {
  nos:function(){return mundo.nodes.length},
+ foto:function(url){if(CLI&&mundo.byId.eu)fotoEu(url,mundo.byId.eu.nome)},
  onde:function(){return {tipo:mundo.tipo,area:mundo.area?mundo.area[0]:null,nivel:nivel}},
  abrir:function(id){if(mundo.byId[id])abrir(mundo.byId[id])},
  entrarAreas:entrarAreas,entrarSis:function(id){var a=AREAS.filter(function(x){return x[0]===id})[0];if(a)entrarSis(a)},subir:subir,zoom:zoom,

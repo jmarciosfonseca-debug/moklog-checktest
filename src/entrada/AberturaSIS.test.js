@@ -222,7 +222,7 @@ test("Universo infinito (25/11/2026): dentro do núcleo ficam as áreas e cada �
   AREAS_U3D.forEach((a) => expect(!!a[3]).toBe(!!DIVISOES.find((d) => d.id === a[0]).ativo));
   expect(src).toContain("if(mundo.tipo==='sis'&&dist<.42&&tgt.length()<.5){entrarAreas()}"); // aproximar do núcleo atravessa
   expect(src).toContain("entrarSis(sel.area)"); // aproximar de uma área entra nela
-  expect(src).toContain("if(f>1&&dT>=MAXD-.01&&dist>MAXD-3){subir();return}"); // afastar além do limite sobe um nível
+  expect(src).toContain("if(!CLI&&f>1&&dT>=MAXD-.01&&dist>MAXD-3){subir();return}"); // afastar além do limite sobe um nível
 });
 
 test("lembranças do Universo (25/11/2026): todo módulo e pilar tem a sua prévia, sempre marcada como ilustração", () => {
