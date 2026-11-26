@@ -3,7 +3,7 @@
 // Código imperativo (canvas, WebAudio e ponteiros) herdado do protótipo aprovado e testado em celular e PC; por isso fica fora do lint.
 // Contrato: iniciarSIS(raiz, host, { onFim }) monta tudo dentro de `raiz` (Shadow DOM do host) e devolve destruir().
 import { ICONES_SIS, COR_ICONE } from "./iconesSIS";
-import { FLAG_IL } from "./sisBandeira";
+import { FLAG_IL, FLAG_BR } from "./sisBandeira";
 import { HTML_SIS } from "./sisHtml";
 import { CSS_SIS } from "./sisCss";
 
@@ -329,9 +329,18 @@ var ro=null;try{if(window.ResizeObserver){ro=new ResizeObserver(aoRedim);ro.obse
 
 /* ── História: cenário das bandeiras + efeito de túnel ── */
 var hist=$('#hist'),caps=$$('.cap'),railp=$('#railp'),rolaEl=$('#rola'),hScroll=0;
-var cena=$('#cena'),cnx=ctx2d(cena),cenaVivo=false,cenaRaf=0,cenaD=1,cenaT0=0,cenaPronta=false,imgIL=new Image(),spIL=null,mote=[],raios=[],glints=[];
-imgIL.onload=function(){spIL=bandSprite(imgIL)};imgIL.src=FLAG_IL;
-function bandSprite(im){var c=document.createElement('canvas');c.width=900;c.height=675;ctx2d(c).drawImage(im,0,0,900,675);return c}
+var cena=$('#cena'),cnx=ctx2d(cena),cenaVivo=false,cenaRaf=0,cenaD=1,cenaT0=0,cenaPronta=false,imgIL=new Image(),imgBR=new Image(),spIL=null,mote=[],raios=[],glints=[];
+/* Fusão Israel → Brasil num só pano (26/11/2026): Israel à esquerda, Brasil à direita, dissolvendo um no outro em diagonal no meio.
+   Cada bandeira é deslocada para o seu lado, para a estrela e o losango aparecerem inteiros. Sem a do Brasil, fica só a de Israel. */
+var ilOk=false,brOk=false;
+function fundir(){if(!ilOk)return;spIL=bandSprite(imgIL,brOk?imgBR:null)}
+imgIL.onload=function(){ilOk=true;fundir()};imgBR.onload=function(){brOk=true;fundir()};imgIL.src=FLAG_IL;imgBR.src=FLAG_BR;
+function bandSprite(im,br){var w=900,h=675,c=document.createElement('canvas');c.width=w;c.height=h;var g=ctx2d(c);
+  if(!br){g.drawImage(im,0,0,w,h);return c}
+  var des=w*.2;g.fillStyle='#fff';g.fillRect(0,0,w,h);g.fillStyle='#0038b8';g.fillRect(0,h*.094,w,h*.1316);g.fillRect(0,h*.7805,w,h*.1316);g.drawImage(im,-des,0,w,h);
+  var b=document.createElement('canvas');b.width=w;b.height=h;var bg=ctx2d(b);bg.fillStyle='#009739';bg.fillRect(0,0,w,h);var k=.86;bg.drawImage(br,w*.62-w*k/2,h*(1-k)/2,w*k,h*k);
+  bg.globalCompositeOperation='destination-in';var m=bg.createLinearGradient(w*.36,h*.62,w*.64,h*.38);m.addColorStop(0,'rgba(0,0,0,0)');m.addColorStop(1,'#000');bg.fillStyle=m;bg.fillRect(0,0,w,h);
+  g.drawImage(b,0,0);return c}
 for(var mi=0;mi<34;mi++)mote.push({x:Math.random(),y:Math.random(),s:3+Math.random()*14,a:.04+Math.random()*.14,v:.2+Math.random()*.8,f:Math.random()*6.283,k:Math.random()<.65?1:2});
 for(var ri=0;ri<11;ri++)raios.push({a:-1+ri*.2+(Math.random()-.5)*.08,w:.05+Math.random()*.08,al:.07+Math.random()*.09,sp:.3+Math.random()*.5,f:Math.random()*6.283});
 
@@ -380,7 +389,7 @@ function cenaLoop(t){
     if(fo.width!==Math.ceil(ow*dd2)||fo.height!==Math.ceil(oh*dd2)){fo.width=Math.ceil(ow*dd2);fo.height=Math.ceil(oh*dd2)}else{fc.setTransform(1,0,0,1,0,0);fc.clearRect(0,0,fo.width,fo.height)}
     bandeira(fc,spIL,pad+2,pad+amp,fw,fh,s,amp,-.25+((s%7)/7)*1.6,dd2);
     fc.globalCompositeOperation='destination-in';
-    var gm=fc.createLinearGradient((pad+2)*dd2,0,(pad+2+fw)*dd2,0);gm.addColorStop(0,'#000');gm.addColorStop(.6,'#000');gm.addColorStop(1,'rgba(0,0,0,.3)');fc.fillStyle=gm;fc.fillRect(0,0,fo.width,fo.height);
+    var gm=fc.createLinearGradient((pad+2)*dd2,0,(pad+2+fw)*dd2,0);gm.addColorStop(0,'#000');gm.addColorStop(.82,'#000');gm.addColorStop(1,'rgba(0,0,0,.5)');fc.fillStyle=gm;fc.fillRect(0,0,fo.width,fo.height);
     var gv=fc.createLinearGradient(0,(pad+amp)*dd2,0,(pad+amp+fh)*dd2);gv.addColorStop(0,'rgba(0,0,0,.9)');gv.addColorStop(.5,'#000');gv.addColorStop(1,'rgba(0,0,0,.4)');fc.fillStyle=gv;fc.fillRect(0,0,fo.width,fo.height);
     fc.globalCompositeOperation='source-over';
     cnx.globalAlpha=fa*.8;cnx.drawImage(fo,px+2-pad-2,y0-pad-amp,fo.width/dd2,fo.height/dd2);
