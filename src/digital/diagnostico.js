@@ -35,7 +35,7 @@ export async function diagnosticarDigital({ win = typeof window !== "undefined" 
   const detalheSv = sv.status === 200 ? "Respondendo e liberado." : sv.status === 503 ? "Digital desligada no servidor." : sv.status === 403 ? "O servidor não aceita este endereço." : sv.status === 429 ? "Muitas tentativas; aguarde 15 minutos." : sv.status === 0 ? "Sem conexão com o servidor." : `Resposta inesperada (${sv.status}).`;
   add("servidor", "Servidor de acesso", sv.status === 200, detalheSv);
   const cad = !!(st && seguro(() => st.getItem(K_ID), null));
-  add("cadastro", "Digital cadastrada neste aparelho", cad, cad ? "Sim. O app pede a biometria ao abrir a tela do PIN." : "Ainda não. Entre com o PIN (gerencial ou cliente) e toque em 'Ativar neste aparelho'.");
+  add("cadastro", "Digital cadastrada neste aparelho", cad, cad ? "Sim. O botão 'Entrar com digital' aparece na tela do PIN." : "Ainda não. Entre com o PIN (gerencial ou cliente) e toque em 'Ativar neste aparelho'.");
   const primeiro = itens.find((i) => !i.ok && i.id !== "cadastro");
   return { itens, pronto: !primeiro, motivo: primeiro ? `${primeiro.rotulo}: ${primeiro.detalhe}` : "" };
 }
