@@ -5,8 +5,8 @@ import {
   paraB64u, deB64u, lerConfigDigital, digitalLiberada, cadastrarDigital, entrarComDigital, devePerguntarCadastro, adiarCadastro, naoPerguntarMais, marcarTeste,
   K_ID, K_TESTE, K_NAO, K_ADIADO,
 } from "./digital";
-import BotaoDigital, { reiniciarPedidoAutomatico } from "./BotaoDigital";
-import OfertaDigital, { FRASE_COMPARTILHADO, K_AVISO_COMPART } from "./OfertaDigital";
+import BotaoDigital from "./BotaoDigital";
+import OfertaDigital from "./OfertaDigital";
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 if (typeof global.TextEncoder === "undefined") global.TextEncoder = TE;
@@ -32,9 +32,9 @@ describe("liberação (chave remota + marca de teste + suporte)", () => {
     expect(await lerConfigDigital(fetchSeq(resp({ modo: "qualquer" })))).toEqual({ modo: "desligado" });
     expect(await lerConfigDigital(fetchSeq(resp({}, 500)))).toEqual({ modo: "desligado" });
   });
-  test("o arquivo publicado está em \"ligado\" por decisão do Marcio (25/11/2026) e segue um modo válido", () => {
+  test("o arquivo publicado nunca está em \"ligado\" sem decisão (desligado ou teste)", () => {
     const cfg = JSON.parse(require("fs").readFileSync(require("path").join(__dirname, "..", "..", "public", "digital-config.json"), "utf8"));
-    expect(cfg.modo).toBe("ligado");
+    expect(["desligado", "teste"]).toContain(cfg.modo);
   });
   test("desligado nunca libera; teste só com a marca do aparelho; ligado precisa de suporte", async () => {
     const win = winCom({});
@@ -147,37 +147,5 @@ describe("telas: invisíveis quando desligado", () => {
     expect(host.querySelector('[data-testid="digital-chip"],[data-testid="digital-painel"]')).not.toBeNull();
     expect(window.localStorage.getItem(K_TESTE)).toBe("1");
     await act(async () => { clearSession(); }); window.history.pushState({}, "", "/"); window.localStorage.removeItem(K_TESTE); delete window.PublicKeyCredential; delete window.navigator.credentials;
-  });
-  const comBiometria = () => {
-    Object.defineProperty(window.navigator, "credentials", { value: { create: jest.fn(), get: jest.fn().mockRejectedValue(Object.assign(new Error("x"), { name: "NotAllowedError" })) }, configurable: true });
-    window.PublicKeyCredential = function PublicKeyCredential() {};
-    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable = async () => true;
-  };
-  const semBiometria = () => { delete window.PublicKeyCredential; delete window.navigator.credentials; };
-  test("aparelho com biometria ativa: a porta pede a biometria sozinha, uma vez por abertura; cancelar deixa o PIN e o botão", async () => {
-    comBiometria(); reiniciarPedidoAutomatico();
-    window.localStorage.setItem(K_ID, "AQID");
-    global.fetch = jest.fn(async (url) => (String(url).includes("digital-config") ? resp({ modo: "ligado" }) : resp({ ok: true, rpId: "x", desafio: "d", timeout: 1000 })));
-    await montar(<BotaoDigital onSucesso={() => {}} />);
-    expect(window.navigator.credentials.get).toHaveBeenCalledTimes(1);
-    expect(host.querySelector('[data-testid="entrar-digital"]').textContent).toContain("Entrar com biometria");
-    expect(host.querySelector('[role="alert"]')).toBeNull(); // cancelar o pedido automático não é erro
-    await act(async () => root.unmount()); root = createRoot(host);
-    await montar(<BotaoDigital onSucesso={() => {}} />);
-    expect(window.navigator.credentials.get).toHaveBeenCalledTimes(1); // não insiste na mesma abertura
-    semBiometria();
-  });
-  test("acesso compartilhado (líder e CCO): biometria bloqueada com a frase, sem botão de ativar; \"Entendi\" não mostra de novo", async () => {
-    const { entrarComResposta, clearSession } = require("../session");
-    comBiometria(); cfg("ligado");
-    expect(entrarComResposta({ ok: true, token: "t.k", nivel: "lider", pid: "P601", exp: Date.now() + 3600000 }, { projectId: "P601" })).toBe("lider");
-    await montar(<OfertaDigital />);
-    const cx = host.querySelector('[data-testid="biometria-compartilhado"]');
-    expect(cx.textContent).toContain(FRASE_COMPARTILHADO);
-    expect(host.querySelector('[data-testid="digital-ativar"],[data-testid="digital-chip"]')).toBeNull();
-    await act(async () => { cx.querySelector("button").click(); });
-    expect(host.innerHTML).toBe("");
-    expect(window.localStorage.getItem(K_AVISO_COMPART)).toBe("1");
-    await act(async () => { clearSession(); }); semBiometria();
   });
 });

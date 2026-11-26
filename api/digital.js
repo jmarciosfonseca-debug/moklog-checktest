@@ -96,7 +96,7 @@ module.exports = async (req, res) => {
     const sess = sessao(req);
     if (!sess) return res.status(401).json({ ok: false, erro: 'Sessão ausente ou expirada. Entre novamente.' });
     const identidade = D.identidadeDoToken(sess);
-    if (!identidade || !D.hashDoPerfil(identidade, c)) return res.status(403).json({ ok: false, erro: 'Não recomendamos usar a biometria neste acesso, porque ele é compartilhado. Use o PIN.' });
+    if (!identidade || !D.hashDoPerfil(identidade, c)) return res.status(403).json({ ok: false, erro: 'Este perfil entra só com PIN.' });
     const grupo = D.grupoDaIdentidade(identidade);
 
     if (acao === 'opcoes-registro') {
